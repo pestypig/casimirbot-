@@ -9,6 +9,8 @@ export const CASIMIR_DESKTOP_SESSION_HEADER =
   "x-casimir-desktop-session";
 
 const MIN_DESKTOP_SESSION_SECRET_LENGTH = 32;
+export const DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH =
+  "/api/agi/brokerage-connections/robinhood/oauth/callback";
 
 export type DesktopSessionConfig = Readonly<{
   enabled: boolean;
@@ -76,7 +78,13 @@ export function createDesktopSessionGuard(
   config: DesktopSessionConfig,
 ): RequestHandler {
   return (req, res, next) => {
-    if (isDesktopSessionAuthorized(req.headers, config)) {
+    const isOneTimeRobinhoodCallback = config.enabled &&
+      (req.method ?? "").toUpperCase() === "GET" &&
+      req.path === DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH;
+    if (
+      isOneTimeRobinhoodCallback ||
+      isDesktopSessionAuthorized(req.headers, config)
+    ) {
       next();
       return;
     }
@@ -88,4 +96,3 @@ export function createDesktopSessionGuard(
     });
   };
 }
-

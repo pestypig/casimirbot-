@@ -18,19 +18,22 @@ const intent = {
 };
 
 describe("Robinhood live equity preview contract adapter", () => {
-  it("selects exactly one explicitly labelled Agentic account", () => {
+  it("selects exactly one account explicitly admitted for this agent", () => {
     expect(extractUniqueRobinhoodAgenticAccountRef({ accounts: [
-      { account_type: "individual", account_number: "masked-primary" },
-      { account_type: "Agentic", account_number: "agentic-secret-ref" },
+      { nickname: "Agentic", agentic_allowed: false,
+        account_number: "masked-primary" },
+      { nickname: "Casimir", agentic_allowed: true,
+        account_number: "agentic-secret-ref" },
     ] })).toBe("agentic-secret-ref");
 
     expect(() => extractUniqueRobinhoodAgenticAccountRef({ accounts: [
-      { account_type: "individual", account_number: "primary" },
+      { nickname: "Agentic", agentic_allowed: false,
+        account_number: "primary" },
     ] })).toThrow(/dedicated Agentic account/u);
 
     expect(() => extractUniqueRobinhoodAgenticAccountRef({ accounts: [
-      { account_type: "Agentic", account_number: "one" },
-      { account_type: "Agentic", account_number: "two" },
+      { agentic_allowed: true, account_number: "one" },
+      { agentic_allowed: true, account_number: "two" },
     ] })).toThrow(/more than one Agentic account/u);
   });
 

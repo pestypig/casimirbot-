@@ -75,6 +75,7 @@ export class RobinhoodConnectionError extends Error {
 type OAuthTransactionRow = {
   transaction_id: string;
   owner_profile_id: string;
+  owner_profile_id: string;
   state_hash: string;
   encrypted_code_verifier: string;
   oauth_client_id: string;
@@ -500,19 +501,29 @@ export const startRobinhoodOAuth = async (input: {
 
 const readPendingOAuthTransaction = async (
   db: Queryable,
-  ownerProfileId: string,
+  ownerProfileId: string | null,
   state: string,
 ): Promise<OAuthTransactionRow> => {
   const { rows } = await db.query<OAuthTransactionRow>(
-    `
-      SELECT *
-      FROM helix_brokerage_oauth_transactions
-      WHERE owner_profile_id = $1 AND state_hash = $2 AND status = 'pending'
-      LIMIT 1;
-    `,
-    [ownerProfileId, sha256("helix.robinhood.oauth.state.v1", state)],
+    ownerProfileId
+      ? `
+          SELECT *
+          FROM helix_brokerage_oauth_transactions
+          WHERE owner_profile_id = $1 AND state_hash = $2
+            AND status = 'pending'
+          LIMIT 2;
+        `
+      : `
+          SELECT *
+          FROM helix_brokerage_oauth_transactions
+          WHERE state_hash = $1 AND status = 'pending'
+          LIMIT 2;
+        `,
+    ownerProfileId
+      ? [ownerProfileId, sha256("helix.robinhood.oauth.state.v1", state)]
+      : [sha256("helix.robinhood.oauth.state.v1", state)],
   );
-  const transaction = rows[0];
+  const transaction = rows.length === 1 ? rows[0] : null;
   if (!transaction) {
     throw new RobinhoodConnectionError(
       "brokerage_oauth_state_invalid",
@@ -535,15 +546,15 @@ const readPendingOAuthTransaction = async (
 };
 
 export const completeRobinhoodOAuth = async (input: {
-  ownerProfileId: string;
+  ownerProfileId?: string;
   state: string;
   code: string;
   fetchImpl?: typeof fetch;
 }): Promise<HelixBrokerageConnection> => {
-  const ownerProfileId = input.ownerProfileId.trim();
+  const requestedOwnerProfileId = input.ownerProfileId?.trim() || null;
   const state = input.state.trim();
   const code = input.code.trim();
-  if (!ownerProfileId || !state || !code) {
+  if (!state || !code) {
     throw new RobinhoodConnectionError(
       "brokerage_oauth_state_invalid",
       400,
@@ -553,9 +564,17 @@ export const completeRobinhoodOAuth = async (input: {
   const db = await readSharedRealtimeRoomDatabase();
   const transaction = await readPendingOAuthTransaction(
     db,
-    ownerProfileId,
+    requestedOwnerProfileId,
     state,
   );
+  const ownerProfileId = transaction.owner_profile_id.trim();
+  if (!ownerProfileId) {
+    throw new RobinhoodConnectionError(
+      "brokerage_oauth_state_invalid",
+      400,
+      "The Robinhood authorization state is invalid or already used.",
+    );
+  }
   const verifier = decryptProviderCredential<{ code_verifier: string }>(
     transaction.encrypted_code_verifier,
     `robinhood-oauth-transaction\n${transaction.transaction_id}\n${ownerProfileId}`,

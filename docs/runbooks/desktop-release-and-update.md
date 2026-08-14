@@ -41,6 +41,53 @@ cookies remain `Secure` everywhere except the exact guarded desktop-host
 loopback lane, where HTTP is intentional and every request is already bound to
 the native per-launch secret.
 
+## Packaged desktop Helix Ask developer smoke
+
+The installed application is a supported local-first operator surface for the
+alpha. It is not the same process as the provider-keyed repository runtime. The
+EXE starts its own compiled service on a reserved ephemeral loopback port,
+injects the per-launch desktop session header into exact-origin renderer
+requests, and owns shutdown of that service. It does not invoke or absorb the
+opaque `start-myapp-for-codex` launcher.
+
+The desktop environment allowlist intentionally excludes `OPENAI_API_KEY`,
+repository `.env` values, injected provider tokens, and pairing credentials.
+It does not copy a provider auth store into the packaged runtime. It retains
+the Windows paths needed to locate an installed Codex binary, whose client may
+use its own user-account boundary. A Helix Ask turn may therefore reach a
+bounded installed-Codex compatibility path, but the visible answer alone does
+not prove which transport ran. Do not broaden the allowlist to turn this smoke
+into a provider-keyed test.
+
+Run the smoke as follows:
+
+1. Apply the workstation memory envelope below and remove only verified
+   duplicate CasimirBot, tunnel, keyed-server, build, or test-worker trees.
+2. Launch the installed shortcut or exact installed EXE and require the
+   sanitized desktop Ready state.
+3. Create or sign in to the intended desktop-local profile. Confirm developer
+   policy only for an exact trusted developer identity.
+4. Open Helix Ask, choose the intended runtime, and submit one natural prompt.
+5. Copy the exact visible turn's debug export. Record the selected runtime,
+   Codex launchability, native bridge status, compatibility/fallback transport,
+   observation re-entry, route-product materialization, and terminal-authority
+   result. Never record hidden reasoning, tokens, provider auth state, or the
+   desktop session secret.
+6. Report `codex_app_server`, `codex_exec`, `helix_native`, or `typed_failure`
+   from that evidence. A `codex_exec` completion is useful packaged-desktop
+   evidence but is not native app-server parity. A typed failure does not become
+   provider acceptance because the UI rendered normally.
+7. Exercise Device Check as a separate read-only smoke. Do not claim OpenAI MCP
+   tunnel parity unless a supported external OpenAI surface invoked that tool.
+8. Close CasimirBot and verify the exact compiled-service and supervised tunnel
+   process trees exit. Record memory before, peak, and after.
+
+Use the keyed opaque-launcher plus browser/API workflow in
+`docs/helix-ask-readiness-debug-loop.md` when live provider keys, Shared Live
+Rooms, GPT Realtime, environment-source capture, or exact browser parity are in
+scope. Use the packaged desktop smoke for installed-host and normal operator
+experience. Neither result substitutes for the other.
+
 ## Build closure
 
 `npm --prefix apps/desktop run build:host` creates the Electron main/preload

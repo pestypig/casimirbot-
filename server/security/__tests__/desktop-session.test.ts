@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CASIMIR_DESKTOP_SESSION_HEADER,
+  DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH,
   createDesktopSessionGuard,
   isDesktopSessionAuthorized,
   resolveDesktopSessionConfig,
@@ -94,5 +95,39 @@ describe("desktop session boundary", () => {
     });
     expect(JSON.stringify(body)).not.toContain(SECRET);
   });
-});
 
+  it("admits only the exact one-time Robinhood GET callback without the desktop header", () => {
+    const config = resolveDesktopSessionConfig({
+      CASIMIR_DESKTOP_HOST: "1",
+      CASIMIR_DESKTOP_SESSION_SECRET: SECRET,
+    });
+    const guard = createDesktopSessionGuard(config);
+    const next = vi.fn();
+    const response = {
+      setHeader: vi.fn(),
+      status: vi.fn(function status() { return this; }),
+      json: vi.fn(function json() { return this; }),
+    };
+
+    guard({
+      headers: {},
+      method: "GET",
+      path: DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH,
+    } as never, response as never, next);
+    expect(next).toHaveBeenCalledOnce();
+
+    next.mockClear();
+    guard({
+      headers: {},
+      method: "POST",
+      path: DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH,
+    } as never, response as never, next);
+    guard({
+      headers: {},
+      method: "GET",
+      path: `${DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH}/extra`,
+    } as never, response as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(401);
+  });
+});

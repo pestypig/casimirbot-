@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -56,6 +57,41 @@ import {
   helixEnvironmentDeviceCheckListSchema,
   type HelixEnvironmentDeviceCheckList,
 } from "@shared/helix-environment-device-check";
+import {
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+  helixEnvironmentActionControlObservationSchema,
+  helixEnvironmentActionObservationSchema,
+} from "@shared/helix-environment-action";
+import {
+  helixMinecraftFluidSequenceArgumentsSchema,
+} from "@shared/helix-minecraft-fluid-sequence";
+import {
+  helixMinecraftReactiveProgramArgumentsSchema,
+} from "@shared/helix-minecraft-reactive-program";
+import {
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+  helixMinecraftPlayerActionArgumentsSchema,
+} from "@shared/helix-minecraft-player-capabilities";
 import { requireHelixAgentApiScope } from "../auth/helix-agent-principal";
 import {
   buildHelixAgentApiError,
@@ -84,12 +120,28 @@ import {
 import { resolveCasimirPublicBaseUrl } from "../services/public-base-url";
 import { buildEnvironmentConnectorDeviceCheckList } from
   "../services/environment-connectors/devices";
+import {
+  executeEnvironmentActionGatewayCapability,
+  type EnvironmentActionGatewayExecution,
+} from "../services/helix-ask/workstation-tool-gateway/environment-action";
+import {
+  executeEnvironmentActionControlGatewayCapability,
+  type EnvironmentActionControlGatewayExecution,
+} from "../services/helix-ask/workstation-tool-gateway/environment-action-control";
 
 type RecordLike = Record<string, unknown>;
 
 const HELIX_ROOM_RUN_ATTACHMENT_SCOPES = [
   HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
   HELIX_AGENT_RUN_WRITE_SCOPE,
+] as const;
+const HELIX_MINECRAFT_ACTION_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+] as const;
+const HELIX_MINECRAFT_STATUS_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
 ] as const;
 
 type HelixRunStartToolArguments = {
@@ -130,6 +182,29 @@ type HelixRoomIdToolArguments = {
 type HelixEnvironmentDeviceCheckToolArguments = {
   room_id?: string;
 };
+
+type HelixMinecraftPlayerActionToolArguments = {
+  room_id: string;
+  idempotency_key: string;
+  environment_label?: string;
+  action: RecordLike & { action_kind: string };
+};
+
+type HelixMinecraftWorkflowStatusToolArguments = {
+  room_id: string;
+  workflow_ref: string;
+};
+
+type HelixMinecraftWorkflowControlToolArguments =
+  HelixMinecraftWorkflowStatusToolArguments & {
+    control: "resume" | "cancel" | "emergency_stop";
+    reason?: string;
+  };
+
+export type HelixEnvironmentActionMcpExecutor =
+  typeof executeEnvironmentActionGatewayCapability;
+export type HelixEnvironmentActionControlMcpExecutor =
+  typeof executeEnvironmentActionControlGatewayCapability;
 
 export type HelixEnvironmentDeviceCheckServicePort = (input: {
   ownerProfileId: string;
@@ -367,6 +442,98 @@ const roomSourceCreateOutputSchema = z
   })
   .strict();
 
+const minecraftPlayerActionInputSchema = z.union([
+  helixMinecraftPlayerActionArgumentsSchema,
+  helixMinecraftFluidSequenceArgumentsSchema,
+  helixMinecraftReactiveProgramArgumentsSchema,
+]);
+
+const minecraftPlayerActionOutputSchema = z
+  .object({
+    operation: z.literal("minecraft.player.action"),
+    room_id: helixSharedLiveRoomIdSchema,
+    ok: z.boolean(),
+    status: z.enum(["completed", "blocked", "failed"]),
+    summary: z.string(),
+    idempotency_replayed: z.boolean(),
+    observation: helixEnvironmentActionObservationSchema,
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const minecraftWorkflowControlOutputSchema = z
+  .object({
+    operation: z.enum([
+      "minecraft.player.workflow.status",
+      "minecraft.player.workflow.control",
+    ]),
+    room_id: helixSharedLiveRoomIdSchema,
+    ok: z.boolean(),
+    status: z.enum(["completed", "blocked", "failed"]),
+    summary: z.string(),
+    observation: helixEnvironmentActionControlObservationSchema,
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const minecraftCapabilityIdForActionKind = (
+  actionKind: string,
+): string | null => {
+  switch (actionKind) {
+    case "navigate_to": return HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY;
+    case "look_at": return HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY;
+    case "track_target": return HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY;
+    case "walk": return HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY;
+    case "jump": return HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY;
+    case "interact": return HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY;
+    case "hotbar_select": return HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY;
+    case "equip": return HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY;
+    case "follow": return HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY;
+    case "collect": return HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY;
+    case "mine": return HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY;
+    case "place": return HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY;
+    case "craft": return HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY;
+    case "inventory_transfer":
+      return HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY;
+    case "execute_sequence":
+      return HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY;
+    case "execute_reactive_program":
+      return HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY;
+    default: return null;
+  }
+};
+
+const minecraftControlCapabilityId = (
+  control: "status" | "resume" | "cancel" | "emergency_stop",
+): string => {
+  switch (control) {
+    case "status": return HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY;
+    case "resume": return HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY;
+    case "cancel": return HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY;
+    case "emergency_stop":
+      return HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY;
+  }
+};
+
+const minecraftMcpIdentityDigest = (input: {
+  principal: HelixAgentApiPrincipal;
+  idempotencyKey: string;
+}): string => crypto
+  .createHash("sha256")
+  .update([
+    input.principal.tenantId,
+    input.principal.issuer,
+    input.principal.subjectId,
+    input.principal.accountProfileId,
+    input.idempotencyKey,
+  ].join("\n"), "utf8")
+  .digest("hex")
+  .slice(0, 40);
+
 const oauthSecuritySchemes = (
   requiredScopes: RequiredOAuthScopes,
 ): McpOAuthSecurityScheme[] => [
@@ -485,6 +652,14 @@ const toolSuccess = (value: RecordLike) => ({
     },
   ],
   structuredContent: value,
+});
+
+const environmentObservationToolResult = (
+  value: RecordLike,
+  ok: boolean,
+) => ({
+  ...toolSuccess(value),
+  ...(!ok ? { isError: true as const } : {}),
 });
 
 const toolError = (
@@ -673,6 +848,18 @@ const callRoomTool = async (
   }
 };
 
+const callRoomObservationTool = async (
+  requiredScopes: RequiredOAuthScopes,
+  operation: () => Promise<{ value: RecordLike; ok: boolean }>,
+) => {
+  try {
+    const result = await operation();
+    return environmentObservationToolResult(result.value, result.ok);
+  } catch (error) {
+    return roomToolError(error, requiredScopes);
+  }
+};
+
 const idempotencyKeySchema = z
   .string()
   .trim()
@@ -700,6 +887,8 @@ export const createHelixMcpServer = (input: {
     | "revokeClaimedRunChatBindingForOwner"
   >;
   deviceCheckService?: HelixEnvironmentDeviceCheckServicePort;
+  environmentActionExecutor?: HelixEnvironmentActionMcpExecutor;
+  environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const roomControlService =
@@ -711,6 +900,11 @@ export const createHelixMcpServer = (input: {
   );
   const deviceCheckService =
     input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList;
+  const environmentActionExecutor =
+    input.environmentActionExecutor ?? executeEnvironmentActionGatewayCapability;
+  const environmentActionControlExecutor =
+    input.environmentActionControlExecutor ??
+      executeEnvironmentActionControlGatewayCapability;
   const roomOwner = {
     tenantId: input.principal.tenantId,
     issuer: input.principal.issuer,
@@ -752,7 +946,8 @@ export const createHelixMcpServer = (input: {
         "Mutations require a caller-stable idempotency_key and continuations require expected_version.",
         "completion_status and terminal_authority_status are separate. Evidence and MCP tool output are not assistant answers.",
         "Room and source receipts are non-authoritative; source creation returns only an opaque secure-delivery handle, never a source bearer.",
-        "Shared Live Room command execution is disabled and sensor credentials are never action credentials.",
+        "Raw Shared Live Room server-command execution is disabled. Typed Minecraft player actions use a separately paired action authority; sensor credentials are never action credentials.",
+        "Minecraft action and workflow-control results are observations for Codex re-entry, never assistant answers or terminal authority.",
         "Continue only while progress is possible and within the declared run budget.",
       ].join(" "),
     },
@@ -977,6 +1172,194 @@ export const createHelixMcpServer = (input: {
     principal: input.principal,
     deviceCheckService,
   });
+
+  server.registerTool(
+    "helix_minecraft_player_action",
+    {
+      title: "Execute a typed Minecraft player action",
+      description:
+        "Executes one bounded typed action or an admitted concurrent guardian program through the exact room, participant/player binding, Fabric action authority, live manifest, lease, resource locks, and manual-override policy. It does not accept raw server commands, shell, files, credentials, pairing material, or embedded model code. The returned observation must re-enter Codex before any answer is written.",
+      inputSchema: z
+        .object({
+          room_id: helixSharedLiveRoomIdSchema,
+          idempotency_key: idempotencyKeySchema,
+          environment_label: z.string().trim().min(1).max(240).optional(),
+          action: minecraftPlayerActionInputSchema,
+        })
+        .strict(),
+      outputSchema: minecraftPlayerActionOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async ({
+      room_id,
+      idempotency_key,
+      environment_label,
+      action,
+    }: HelixMinecraftPlayerActionToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const capabilityId = minecraftCapabilityIdForActionKind(
+          action.action_kind,
+        );
+        if (!capabilityId) {
+          throw new HelixAgentApiServiceError(
+            400,
+            "invalid_request",
+            "The requested Minecraft player action is not registered.",
+          );
+        }
+        const digest = minecraftMcpIdentityDigest({
+          principal: input.principal,
+          idempotencyKey: idempotency_key,
+        });
+        const { action_kind: _actionKind, ...actionArguments } = action;
+        const execution: EnvironmentActionGatewayExecution =
+          await environmentActionExecutor({
+            capabilityId,
+            turnId: `mcp_environment_turn:${digest}`,
+            toolCallId: `mcp_environment_tool_call:${digest}`,
+            providerExecutionId: `mcp_environment_execution:${digest}`,
+            arguments: {
+              ...actionArguments,
+              ...(environment_label ? { environment_label } : {}),
+            },
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
+        return {
+          ok: execution.ok,
+          value: {
+            operation: "minecraft.player.action",
+            room_id,
+            ok: execution.ok,
+            status: execution.status,
+            summary: execution.summary,
+            idempotency_replayed: execution.idempotentReplay ?? false,
+            observation: execution.observation,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_minecraft_workflow_status",
+    {
+      title: "Read a Minecraft player workflow status",
+      description:
+        "Reads one exact admitted workflow through its room/player authority. The result is a current non-terminal observation, not an assistant answer.",
+      inputSchema: z
+        .object({
+          room_id: helixSharedLiveRoomIdSchema,
+          workflow_ref: z.string().trim().min(1).max(320),
+        })
+        .strict(),
+      outputSchema: minecraftWorkflowControlOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async ({ room_id, workflow_ref }: HelixMinecraftWorkflowStatusToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const execution: EnvironmentActionControlGatewayExecution =
+          await environmentActionControlExecutor({
+            capabilityId: minecraftControlCapabilityId("status"),
+            turnId: `mcp_environment_status_turn:${crypto.randomUUID()}`,
+            arguments: { workflow_ref },
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
+        return {
+          ok: execution.ok,
+          value: {
+            operation: "minecraft.player.workflow.status",
+            room_id,
+            ok: execution.ok,
+            status: execution.status,
+            summary: execution.summary,
+            observation: execution.observation,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_minecraft_workflow_control",
+    {
+      title: "Control a Minecraft player workflow",
+      description:
+        "Resumes, cancels, or emergency-stops one exact admitted workflow. Cancellation and Emergency Stop require the Fabric client to release asserted controls; the returned receipt is evidence, never answer authority.",
+      inputSchema: z
+        .object({
+          room_id: helixSharedLiveRoomIdSchema,
+          workflow_ref: z.string().trim().min(1).max(320),
+          control: z.enum(["resume", "cancel", "emergency_stop"]),
+          reason: z.string().trim().min(1).max(1_000).optional(),
+        })
+        .strict(),
+      outputSchema: minecraftWorkflowControlOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async ({
+      room_id,
+      workflow_ref,
+      control,
+      reason,
+    }: HelixMinecraftWorkflowControlToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const execution: EnvironmentActionControlGatewayExecution =
+          await environmentActionControlExecutor({
+            capabilityId: minecraftControlCapabilityId(control),
+            turnId: `mcp_environment_control_turn:${crypto.randomUUID()}`,
+            arguments: {
+              workflow_ref,
+              ...(reason ? { reason } : {}),
+            },
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
+        return {
+          ok: execution.ok,
+          value: {
+            operation: "minecraft.player.workflow.control",
+            room_id,
+            ok: execution.ok,
+            status: execution.status,
+            summary: execution.summary,
+            observation: execution.observation,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
 
   server.registerTool(
     "helix_room_list",
@@ -1341,6 +1724,9 @@ export const createHelixMcpServer = (input: {
       ["helix_run_fetch_evidence", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_run_list_events", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_minecraft_player_action", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_minecraft_workflow_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_minecraft_workflow_control", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_room_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_create", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],

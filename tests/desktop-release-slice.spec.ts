@@ -26,6 +26,30 @@ const readManifest = async () => validateReleaseSliceManifest(
 );
 
 describe("desktop release slice audit", () => {
+  it("stages, packages, and verifies the one shared Minecraft lifecycle provider", async () => {
+    const [stageSource, packagerSource, verifierSource] = await Promise.all([
+      readFile(
+        path.join(repoRoot, "apps/desktop/scripts/stage-runtime.mjs"),
+        "utf8",
+      ),
+      readFile(
+        path.join(repoRoot, "apps/desktop/electron-builder.config.cjs"),
+        "utf8",
+      ),
+      readFile(
+        path.join(repoRoot, "apps/desktop/scripts/verify-runtime-tree.mjs"),
+        "utf8",
+      ),
+    ]);
+    const provider = "scripts/helix-minecraft-launch-fabric-loopback.ps1";
+
+    expect(stageSource).toContain(provider);
+    expect(packagerSource).toContain(provider);
+    expect(verifierSource).toContain(provider);
+    expect(stageSource).toContain("minecraftFabricLoopbackLifecycle");
+    expect(verifierSource).toContain("minecraftLifecycleReceipts");
+  });
+
   it("validates the exact owned/shared release-slice contract", async () => {
     const manifest = await readManifest();
     expect(manifest.schema).toBe(RELEASE_SLICE_SCHEMA);

@@ -3,7 +3,12 @@ package com.casimirbot.helixplayer.fabric;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.Component;
 import com.casimirbot.helixsensor.pairing.ConnectorPairingClient;
 import java.util.concurrent.CompletableFuture;
@@ -22,16 +27,30 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     private volatile PlayerActionRuntime runtime;
     private final AtomicBoolean connectorOperation = new AtomicBoolean(false);
     private int pairingInboxTicks;
+    private int diagnosticInboxTicks;
+    private int autoJoinInboxTicks;
+    private int autoJoinTitleTicks;
+    private PlayerAutoJoinInbox.AutoJoinRequest pendingAutoJoin;
+    private volatile PlayerActionDiagnosticInbox.Scope diagnosticInboxScope =
+        PlayerActionDiagnosticInbox.Scope.DISABLED;
 
     @Override
     public void onInitializeClient() {
         minecraft = Minecraft.getInstance();
         PlayerActionConfig initialConfig = PlayerActionConfigLoader.load(LOGGER);
         replaceRuntime(initialConfig);
+        restoreDiagnosticInboxScope();
         PlayerActionClientCommands.register(this);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             runtime.tick();
             pollPairingInbox();
+            pollDiagnosticInbox();
+            pollAutoJoinInbox();
+            maybeAutoJoin(client);
+        });
+        WorldRenderEvents.START.register(context -> {
+            PlayerActionRuntime active = runtime;
+            if (active != null) active.renderFrame(System.nanoTime());
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             PlayerActionRuntime active = runtime;
@@ -108,9 +127,48 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     }
 
     void showDiagnosticStatus() {
-        message(runtime == null
+        String runtimeStatus = runtime == null
             ? "Helix player embodiment is not initialized."
-            : runtime.localDiagnosticStatusText());
+            : runtime.localDiagnosticStatusText();
+        message(
+            runtimeStatus + " Local diagnostic inbox scope: " +
+            diagnosticInboxScope.wireName() + "."
+        );
+    }
+
+    void enableDiagnosticInbox(PlayerActionDiagnosticInbox.Scope scope) {
+        if (scope == PlayerActionDiagnosticInbox.Scope.DISABLED) {
+            disableDiagnosticInbox();
+            return;
+        }
+        try {
+            // Clear before enabling so a request staged without the player's
+            // prior opt-in can never become executable afterward.
+            PlayerActionDiagnosticInbox.clearDefault();
+            PlayerActionDiagnosticInbox.persistScope(scope);
+            diagnosticInboxScope = scope;
+            message(scope == PlayerActionDiagnosticInbox.Scope.FULL
+                ? "Helix full local control is enabled across client restarts until disabled or emergency-stopped. Typed interaction, inventory, and world-mutation actions may execute."
+                : "Helix movement-only local control is enabled across client restarts until disabled or emergency-stopped. Interaction, inventory, and world-mutation actions remain blocked.");
+        } catch (IOException error) {
+            diagnosticInboxScope = PlayerActionDiagnosticInbox.Scope.DISABLED;
+            message("Helix could not safely save and enable local control.");
+        }
+    }
+
+    void disableDiagnosticInbox() {
+        diagnosticInboxScope = PlayerActionDiagnosticInbox.Scope.DISABLED;
+        PlayerActionRuntime active = runtime;
+        if (active != null) active.cancelLocalDiagnostic();
+        try {
+            PlayerActionDiagnosticInbox.clearDefault();
+            PlayerActionDiagnosticInbox.persistScope(
+                PlayerActionDiagnosticInbox.Scope.DISABLED
+            );
+            message("Helix local control is disabled across restarts and pending requests were cleared.");
+        } catch (IOException error) {
+            message("Helix disabled local control for this process, but could not clear all saved local state.");
+        }
     }
 
     void startDiagnosticWalk(String direction, int durationMs, boolean sprint) {
@@ -165,8 +223,35 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     }
 
     void emergencyStop() {
+        diagnosticInboxScope = PlayerActionDiagnosticInbox.Scope.DISABLED;
+        try {
+            PlayerActionDiagnosticInbox.clearDefault();
+            PlayerActionDiagnosticInbox.persistScope(
+                PlayerActionDiagnosticInbox.Scope.DISABLED
+            );
+        } catch (IOException error) {
+            LOGGER.warn("Could not clear all saved Helix local-control state during emergency stop.");
+        }
         if (runtime != null) runtime.localEmergencyStop("The player invoked the local emergency stop.");
-        message("Helix released every client control and latched the local emergency stop.");
+        message("Helix released every client control, disabled the direct diagnostic inbox, and latched the local emergency stop.");
+    }
+
+    private void restoreDiagnosticInboxScope() {
+        try {
+            // Never execute a request that was staged while the client was not
+            // running, even when the operator has chosen a persistent scope.
+            PlayerActionDiagnosticInbox.clearDefault();
+            diagnosticInboxScope = PlayerActionDiagnosticInbox.loadPersistedScope();
+            if (diagnosticInboxScope != PlayerActionDiagnosticInbox.Scope.DISABLED) {
+                LOGGER.info(
+                    "Helix restored {} local control from the operator's saved preference; disable and emergency-stop remain available.",
+                    diagnosticInboxScope.wireName()
+                );
+            }
+        } catch (IOException error) {
+            diagnosticInboxScope = PlayerActionDiagnosticInbox.Scope.DISABLED;
+            LOGGER.warn("Helix could not safely restore the saved local-control preference.");
+        }
     }
 
     void disconnectLocal() {
@@ -196,6 +281,98 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         } catch (IOException error) {
             LOGGER.warn("Could not claim the local Helix player-pairing inbox.");
         }
+    }
+
+    private void pollDiagnosticInbox() {
+        PlayerActionDiagnosticInbox.Scope scope = diagnosticInboxScope;
+        if (scope == PlayerActionDiagnosticInbox.Scope.DISABLED) return;
+        diagnosticInboxTicks = (diagnosticInboxTicks + 1) % 20;
+        if (diagnosticInboxTicks != 0) return;
+        try {
+            PlayerActionDiagnosticInbox.PollResult result =
+                PlayerActionDiagnosticInbox.consumeDefault(
+                    System.currentTimeMillis(),
+                    scope
+                );
+            if (result.request() != null) {
+                PlayerActionDiagnosticInbox.DiagnosticRequest request = result.request();
+                PlayerActionRuntime active = runtime;
+                message(active == null
+                    ? "Helix player embodiment is not initialized."
+                    : active.startLocalDiagnostic(
+                        request.actionKind(),
+                        request.arguments(),
+                        request.maxDurationTicks(),
+                        request.controlEngine(),
+                        request.requestId()
+                    ));
+            } else if (!result.failureCode().isBlank()) {
+                LOGGER.warn(
+                    "Ignored a local Helix direct-diagnostic inbox entry: {}.",
+                    result.failureCode()
+                );
+                message("Helix rejected a staged direct diagnostic request (" +
+                    result.failureCode() + ").");
+            }
+        } catch (IOException error) {
+            LOGGER.warn("Could not claim the local Helix direct-diagnostic inbox.");
+        }
+    }
+
+    private void pollAutoJoinInbox() {
+        if (minecraft.player != null || minecraft.level != null || pendingAutoJoin != null) {
+            return;
+        }
+        autoJoinInboxTicks = (autoJoinInboxTicks + 1) % 20;
+        if (autoJoinInboxTicks != 0) return;
+        try {
+            PlayerAutoJoinInbox.PollResult result =
+                PlayerAutoJoinInbox.consumeDefault(System.currentTimeMillis());
+            if (result.request() != null) {
+                pendingAutoJoin = result.request();
+                autoJoinTitleTicks = 0;
+                LOGGER.info(
+                    "Helix accepted a one-shot loopback auto-join request for {}.",
+                    result.request().address()
+                );
+            } else if (!result.failureCode().isBlank()) {
+                LOGGER.warn(
+                    "Ignored a local Helix auto-join inbox entry: {}.",
+                    result.failureCode()
+                );
+            }
+        } catch (IOException error) {
+            LOGGER.warn("Could not claim the local Helix auto-join inbox.");
+        }
+    }
+
+    private void maybeAutoJoin(Minecraft client) {
+        PlayerAutoJoinInbox.AutoJoinRequest request = pendingAutoJoin;
+        if (
+            request == null || client.player != null || client.level != null ||
+            !(client.screen instanceof TitleScreen)
+        ) return;
+        if (++autoJoinTitleTicks < 20) return;
+
+        // Consume once before connecting. A failed connection returns control
+        // to the user and never becomes an unattended reconnect loop.
+        pendingAutoJoin = null;
+        autoJoinTitleTicks = 0;
+        ServerAddress address = ServerAddress.parseString(request.address());
+        ServerData data = new ServerData(
+            "Helix loopback",
+            request.address(),
+            ServerData.Type.OTHER
+        );
+        LOGGER.info("Helix is opening Minecraft's native loopback connection screen.");
+        ConnectScreen.startConnecting(
+            client.screen,
+            client,
+            address,
+            data,
+            false,
+            null
+        );
     }
 
     private void replaceRuntime(PlayerActionConfig config) {

@@ -15,8 +15,11 @@ import {
   HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+  HELIX_MINECRAFT_MECHANICS_FACT_CAPABILITY_IDS,
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
 } from "@shared/helix-environment-connector";
@@ -29,6 +32,8 @@ import {
 import { HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA } from "@shared/helix-environment-action";
 import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
@@ -130,6 +135,32 @@ const MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS = new Map<
     },
   ],
   [
+    HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+    {
+      required: [
+        "target_kind",
+        "aim_point",
+        "max_acquisition_distance",
+        "max_duration_ms",
+        "max_turn_degrees_per_tick",
+        "max_angular_acceleration_degrees_per_tick_squared",
+        "prediction_ticks",
+        "deadband_degrees",
+        "reacquire_ticks",
+        "require_line_of_sight",
+        "stop_below_health",
+      ],
+      optional: [
+        "entity_type_id",
+        "particle_type_id",
+        "continuity",
+        "handoff_radius",
+        "max_handoffs",
+        "environment_label",
+      ],
+    },
+  ],
+  [
     HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
     {
       required: ["direction", "duration_ms", "sprint"],
@@ -202,6 +233,25 @@ const MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS = new Map<
     "com.casimirbot.minecraft.player.inventory.transfer",
     {
       required: ["direction", "item_id", "count", "container_target"],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+    {
+      required: [
+        "sequence_schema",
+        "sequence_id",
+        "ruleset",
+        "execution_plane",
+        "scheduler_engine",
+        "optimization",
+        "start_node_id",
+        "max_total_ticks",
+        "required_checkpoint_ids",
+        "mutation_scope",
+        "nodes",
+      ],
       optional: ["environment_label"],
     },
   ],
@@ -2043,6 +2093,27 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
               : ["freshness_requirement_ms"],
       }),
     ),
+    ...HELIX_MINECRAFT_MECHANICS_FACT_CAPABILITY_IDS.map((capability) =>
+      liveEnvironmentEvidenceContract({
+        capability,
+        aliases: [
+          capability.replace(/^com\.casimirbot\./, "").replaceAll(".", " "),
+        ],
+        requiredObservationKinds: [
+          "helix.environment_connector.probe_observation.v1",
+          "helix.agent_step_observation_packet.v1",
+          "provider_gateway_observation_packet",
+        ],
+        requiredArgs:
+          capability === HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY
+            ? ["registry_kind", "resource_id"]
+            : ["query_kind", "resource_id"],
+        optionalArgs:
+          capability === HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY
+            ? ["max_results", "freshness_requirement_ms"]
+            : ["freshness_requirement_ms"],
+      }),
+    ),
     ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.map((capability) => {
       const args = MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS.get(capability) ?? {
         required: [],
@@ -3444,6 +3515,22 @@ const naturalMinecraftSituationProbePromptMatches = (
     patterns: RegExp[];
   }> = [
     {
+      capability: HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+      patterns: [
+        /\b(?:check|verify|inspect|query|read|look\s+up)\b[\s\S]{0,100}\b(?:running|live|current|paired|connected)?\s*(?:minecraft|fabric)?\s*(?:block|item|entity[-\s]?type|mob[-\s]?effect)?\s*registry\b[\s\S]{0,160}\b(?:exists?|registered|contains?|present)\b/i,
+        /\b(?:check|verify|tell\s+me|is)\b[\s\S]{0,100}\b(?:exact\s+)?(?:block|item|entity[-\s]?type|mob[-\s]?effect)\s+(?:id\s+)?[a-z0-9_.-]+:[a-z0-9_./-]+\b[\s\S]{0,140}\b(?:exists?|registered|present)\b[\s\S]{0,100}\b(?:registry|minecraft|fabric|server)\b/i,
+        /\b(?:is|does)\s+[a-z0-9_.-]+:[a-z0-9_./-]+\b[\s\S]{0,100}\b(?:exist|registered|appear)\b[\s\S]{0,100}\b(?:block|item|entity[-\s]?type|mob[-\s]?effect)?\s*registry\b/i,
+      ],
+    },
+    {
+      capability: HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+      patterns: [
+        /\b(?:check|verify|inspect|query|read|look\s+up|find|show|list)\b[\s\S]{0,120}\b(?:running|live|current|paired|connected)?\s*(?:minecraft|fabric)?\s*recipes?\b[\s\S]{0,160}\b(?:recipe\s+id|output|produce[sd]?|craft(?:s|ing)?|for)\b/i,
+        /\b(?:what|which|show|list|find|check)\s+recipes?\b[\s\S]{0,100}\b(?:produce|craft|output|make)\b[\s\S]{0,80}\b[a-z0-9_.-]+:[a-z0-9_./-]+\b/i,
+        /\b(?:check|verify|look\s+up|find)\b[\s\S]{0,80}\b(?:exact\s+)?recipe\s+(?:id\s+)?[a-z0-9_.-]+:[a-z0-9_./-]+\b[\s\S]{0,100}\b(?:minecraft|fabric|server|exists?|registered)\b/i,
+      ],
+    },
+    {
       capability: HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
       patterns: playerEmbodimentPlane
         ? [
@@ -3589,6 +3676,14 @@ const naturalMinecraftSituationProbePromptMatches = (
     [
       HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
       /\b(?:health|hearts?|hunger|food\s+level|status|game\s+mode|position|yaw|pitch|facing(?:\s+direction)?|view(?:\s+(?:direction|rotation))?|rotation|crimson\s+curse|infection)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+      /\b(?:registry|block|item|entity[-\s]?type|mob[-\s]?effect|[a-z0-9_.-]+:[a-z0-9_./-]+)\b/i,
+    ],
+    [
+      HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+      /\b(?:recipes?|recipe\s+id|output|produce[sd]?|craft(?:s|ing)?|[a-z0-9_.-]+:[a-z0-9_./-]+)\b/i,
     ],
     [
       HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
@@ -4141,17 +4236,33 @@ export const extractPlannerBindingCapabilityContracts = (
   if (!isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)) {
     return matches;
   }
-  const hasExactPlayerAction = matches.some((match) =>
+  const isPlayerActionMatch = (
+    match: ExtractedExplicitCapabilityContract,
+  ): boolean =>
     HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.includes(
       match.capability as (typeof HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS)[number],
-    ),
+    );
+  const hasOperatorNamedExactPlayerAction = matches.some(
+    (match) =>
+      isPlayerActionMatch(match) &&
+      (match.source === "command_mention" ||
+        match.source === "compound_command_chain"),
   );
-  if (hasExactPlayerAction) return matches;
+  if (hasOperatorNamedExactPlayerAction) {
+    return matches.filter(
+      (match) =>
+        !isPlayerActionMatch(match) ||
+        match.source === "command_mention" ||
+        match.source === "compound_command_chain",
+    );
+  }
   return matches.filter(
     (match) =>
-      HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.includes(
+      !isPlayerActionMatch(match) &&
+      (HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.includes(
         match.capability as (typeof HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS)[number],
-      ) || !match.capability.startsWith("com.casimirbot.minecraft."),
+      ) ||
+        !match.capability.startsWith("com.casimirbot.minecraft.")),
   );
 };
 

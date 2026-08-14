@@ -6,6 +6,7 @@ Capabilities:
 
 - `com.casimirbot.minecraft.player.navigate`
 - `com.casimirbot.minecraft.player.look`
+- `com.casimirbot.minecraft.player.camera.track`
 - `com.casimirbot.minecraft.player.walk`
 - `com.casimirbot.minecraft.player.jump`
 - `com.casimirbot.minecraft.player.interact`
@@ -17,6 +18,8 @@ Capabilities:
 - `com.casimirbot.minecraft.player.place`
 - `com.casimirbot.minecraft.player.craft`
 - `com.casimirbot.minecraft.player.inventory.transfer`
+- `com.casimirbot.minecraft.player.sequence.execute`
+- `com.casimirbot.minecraft.player.guardian.execute`
 - `com.casimirbot.minecraft.player.workflow.status`
 - `com.casimirbot.minecraft.player.workflow.resume`
 - `com.casimirbot.minecraft.player.workflow.cancel`
@@ -54,6 +57,9 @@ The model supplies only semantic action fields plus an optional
   `relative_rotation` accepts `yaw_delta_degrees` and
   `pitch_delta_degrees` in `[-180, 180]`; positive yaw turns right and positive
   pitch turns down;
+- camera track: `target_kind`, `aim_point`, prediction horizon, acquisition
+  radius, turn-rate and angular-acceleration ceilings, deadband, reacquisition
+  window, duration, line-of-sight policy, and health stop threshold;
 - walk: `direction`, `duration_ms`, `sprint`;
 - jump: `count`;
 - interact: `target`, `hand`, `interaction`;
@@ -63,10 +69,25 @@ The model supplies only semantic action fields plus an optional
   `max_duration_ms`, and `stop_below_health`;
 - collect: `item_or_block_id`, `count`, and loaded `search_radius`;
 - mine: `block_id`, `count`, and a loaded integer `search_radius` of at most 32;
-- place: `block_id` and at most 256 exact integer block positions;
+- place: `block_id` plus exactly one target source: at most 256 exact integer
+  positions, or a bounded `predicted_collision_cell` binding with a 1-20 tick
+  horizon, at most six actor-relative blocks, and a replaceable-cell
+  requirement. Bucket/item use also names its exact source item and hand;
 - craft: `output_item_id`, `count`, and optional exact `recipe_id`;
 - inventory transfer: `direction`, `item_id`, `count`, and current/opened
   container target;
+- fluid sequence: `survival_tas`, `native_fabric`, a maximum world-tick budget,
+  mutation/inventory ceilings, and one finite acyclic graph containing
+  tick-addressed input, existing typed actions, whitelisted current-state
+  branches, checkpoints and typed terminals;
+- concurrent guardian program: an exact program schema/ID, ruleset, execution
+  plane, scheduler, total tick ceiling, completion policy, mutation scope,
+  bounded lanes, races, and interrupts. Codex authors strategy; the client
+  schedules and measures it. Every requested state change needs an explicit
+  causal action node: a camera, condition, event, or checkpoint node cannot
+  substitute for movement, interaction, or mutation. A failed or timed-out
+  action/event/checkpoint cannot transition directly to a successful terminal;
+  it must fail/cancel or enter explicit bounded recovery work;
 - workflow status/resume/cancel: the exact prior `workflow_ref` and an optional
   semantic `reason`;
 - emergency stop: an exact prior `workflow_ref` used only to resolve the
@@ -100,7 +121,7 @@ requires the client to release every asserted control.
 
 ## Host Projection
 
-Codex receives generated semantic tools for the 13 admitted action
+Codex receives generated semantic tools for the 14 admitted action
 capabilities plus separate typed workflow controls.
 The paired-client endpoint, action token, room/source/world IDs, player UUID,
 authority lease, connector epoch, private address, and setup material remain
@@ -138,6 +159,15 @@ positions, crafted output or transfer delta—and enforces the admitted mutation
 and inventory ceilings. A generic `workflow.succeeded` marker without those
 measurements is insufficient.
 
+For `player.sequence.execute`, terminal measurements additionally require the
+exact sequence/ruleset, executed nodes, required checkpoints, scheduler ticks,
+separately measured wall-clock time, deviations/retries, inventory/world
+effects and an event-triggered condition stream. The stream is capped at 512
+changes. Helix validates each event against the admitted branch/checkpoint and
+condition kind, enforces monotonic bounded ticks and rejects repeated unchanged
+values. These observations constrain Codex's later synthesis but do not choose
+a recovery route or write an answer.
+
 The public action observation exposes `verified_terminal_measurements` only
 after Helix has found the exact terminal workflow event for the same action,
 workflow, execution, connector epoch and provenance envelope. For relative
@@ -148,7 +178,7 @@ model-visible evidence.
 
 ## Bounded implementation notes
 
-Version `0.2.0` supports native local steering and conditionally declares
+Version `0.3.0` supports native local steering, the bounded fluid sequence, and conditionally declares
 Baritone navigation only when its public API is installed. Follow targets are
 resolved to native identity by Helix and that identity is never returned to
 Codex. Collect covers dropped item entities. Mine is limited to loaded blocks

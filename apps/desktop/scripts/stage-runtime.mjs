@@ -10,11 +10,17 @@ const desktopRoot = path.resolve(
 );
 const repoRoot = path.resolve(desktopRoot, "..", "..");
 const runtimeRoot = path.join(desktopRoot, "runtime");
+const minecraftFabricLoopbackLifecycleScript =
+  "scripts/helix-minecraft-launch-fabric-loopback.ps1";
 
 const copies = [
   ["dist/public", "dist/public"],
   ["configs/ideology-verifiers.json", "configs/ideology-verifiers.json"],
   ["docs/ethos/ideology.json", "docs/ethos/ideology.json"],
+  [
+    minecraftFabricLoopbackLifecycleScript,
+    minecraftFabricLoopbackLifecycleScript,
+  ],
   [
     ".agents/plugins/marketplace.json",
     "codex-marketplace/.agents/plugins/marketplace.json",
@@ -181,6 +187,12 @@ const runtimeManifest = {
   codexMarketplaceTreeSha256: await hashTree(codexMarketplaceRoot),
   desktopLockfileSha256: sha256(desktopLockBytes),
   releaseSliceManifestSha256: sha256(releaseSliceManifestBytes),
+  minecraftFabricLoopbackLifecycle: {
+    path: minecraftFabricLoopbackLifecycleScript,
+    sha256: sha256(await readFile(
+      path.join(repoRoot, minecraftFabricLoopbackLifecycleScript),
+    )),
+  },
   allowlist: copies.map(([source]) => source),
   tunnelClient: {
     version: tunnelArtifactManifest.version,

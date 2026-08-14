@@ -10,6 +10,11 @@ import {
   helixEnvironmentProbeSubmissionSchema,
 } from "@shared/helix-environment-connector";
 import {
+  HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+  HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_OBSERVATION_SCHEMA,
+  helixMinecraftLocalLifecycleOperatorRequestSchema,
+} from "@shared/helix-minecraft-local-lifecycle";
+import {
   HELIX_CONNECTOR_PAIRING_REDEMPTION_SCHEMA,
   HELIX_CONNECTOR_PAIRING_UNPAIR_RECEIPT_SCHEMA,
   helixConnectorPairingRedeemRequestSchema,
@@ -61,6 +66,16 @@ import {
 import {
   buildEnvironmentConnectorDeviceCheckList,
 } from "../services/environment-connectors/devices";
+import {
+  executeMinecraftFabricLoopbackLifecycle,
+  MinecraftLocalLifecycleError,
+} from "../services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle";
+import {
+  authorizeWorkstationGatewayCall,
+  resolveWorkstationGatewayAccountContext,
+} from "../services/helix-ask/workstation-tool-gateway/account-policy";
+import { readHelixSessionCookie } from
+  "../services/helix-account/session-cookie";
 
 const identifier = z
   .string()
@@ -182,6 +197,12 @@ const sendError = (res: Response, error: unknown): void => {
     return;
   }
   if (error instanceof DurableEnvironmentProbeError) {
+    res
+      .status(error.statusCode)
+      .json(errorPayload({ code: error.code, message: error.message }));
+    return;
+  }
+  if (error instanceof MinecraftLocalLifecycleError) {
     res
       .status(error.statusCode)
       .json(errorPayload({ code: error.code, message: error.message }));
@@ -564,6 +585,79 @@ environmentConnectorBrowserRouter.use(
   browserBoundary.enforceIpRateLimit,
   browserBoundary.enforceSameOrigin,
   json({ limit: "32kb" }),
+);
+
+const isLoopbackRequest = (req: Request): boolean => {
+  const remote = req.socket.remoteAddress?.toLowerCase() ?? "";
+  return remote === "::1" ||
+    remote === "127.0.0.1" ||
+    remote === "::ffff:127.0.0.1";
+};
+
+environmentConnectorBrowserRouter.post(
+  "/environment-connectors/local/minecraft/fabric-loopback/launch",
+  route(async (req, res) => {
+    if (!isLoopbackRequest(req)) {
+      res.status(403).json(errorPayload({
+        code: "minecraft_local_runtime_required",
+        message:
+          "Minecraft lifecycle control is available only through the local Helix service.",
+      }));
+      return;
+    }
+    const parsed = helixMinecraftLocalLifecycleOperatorRequestSchema.safeParse(
+      req.body,
+    );
+    if (!parsed.success) {
+      res.status(400).json(errorPayload({
+        code: "minecraft_lifecycle_operator_confirmation_required",
+        message:
+          "Explicit operator confirmation and a loopback Minecraft address are required.",
+      }));
+      return;
+    }
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      readHelixSessionCookie(req.headers.cookie),
+    );
+    const authorization = authorizeWorkstationGatewayCall({
+      accountContext,
+      requestedMode: "act",
+      requestedRuntime: null,
+      capabilityId:
+        HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+      arguments: { address: parsed.data.address },
+    });
+    if (
+      !accountContext.trusted_account_session ||
+      accountContext.account_policy.account_type !== "developer" ||
+      !authorization.admitted
+    ) {
+      res.status(403).json(errorPayload({
+        code: "minecraft_local_lifecycle_account_policy_blocked",
+        message:
+          "A signed-in developer account on the local Helix service is required.",
+      }));
+      return;
+    }
+    browserBoundary.enforceAccountRateLimit(
+      res,
+      accountContext.profile_id ?? "unknown",
+    );
+    const receipt = await executeMinecraftFabricLoopbackLifecycle({
+      request: { address: parsed.data.address },
+    });
+    res.json({
+      schema: HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_OBSERVATION_SCHEMA,
+      ok: true,
+      status: "connected",
+      invocation_source: "explicit_operator_ui",
+      receipt,
+      credential_included: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  }),
 );
 
 environmentConnectorBrowserRouter.get(

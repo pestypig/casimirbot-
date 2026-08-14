@@ -25,7 +25,9 @@ import {
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
 } from "@shared/helix-environment-connector";
@@ -42,6 +44,75 @@ import {
 const CAPABILITY = "com.casimirbot.minecraft.inventory.check";
 
 describe("Minecraft environment connector capability routing", () => {
+  it.each([
+    [
+      "On the live Fabric server in this room, check the running Minecraft registry and tell me whether the exact block ID minecraft:netherrack exists. Use current environment evidence rather than general knowledge.",
+      HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+    ],
+    [
+      "From the connected Fabric server, list the live recipes that produce minecraft:stone_bricks, with at most five results.",
+      HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+    ],
+  ])("routes a live mechanics fact request through the environment: %s", (prompt, capability) => {
+    const contracts = extractExplicitCapabilityContracts(prompt, {
+      trusted_environment_domain: "minecraft",
+    });
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: `turn:${capability}`,
+      threadId: `thread:${capability}`,
+      promptText: prompt,
+      trustedEnvironmentContext: {
+        trusted_environment_domain: "minecraft",
+      },
+    });
+
+    expect(contracts.map((entry) => entry.capability)).toContain(capability);
+    expect(sourceTarget).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.reasons).not.toContain("negative_workspace_scope");
+  });
+
+  it.each([
+    "Do not check whether minecraft:netherrack exists in the live Minecraft block registry.",
+    "Later, check whether minecraft:netherrack exists in the live Minecraft block registry.",
+    'The guide says "check whether minecraft:netherrack exists in the live Minecraft block registry."',
+    "Why did the previous turn check whether minecraft:netherrack exists in the live Minecraft block registry?",
+    "Do not look up recipes that produce minecraft:stone_bricks on the Fabric server.",
+    "Later we may look up recipes that produce minecraft:stone_bricks on the Fabric server.",
+    'The screen shows "look up recipes that produce minecraft:stone_bricks" as an example.',
+  ])("does not execute contextual live mechanics wording: %s", (prompt) => {
+    const capabilities = extractExplicitCapabilityContracts(prompt, {
+      trusted_environment_domain: "minecraft",
+    }).map((entry) => entry.capability);
+
+    expect(capabilities).not.toContain(
+      HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+    );
+    expect(capabilities).not.toContain(
+      HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+    );
+  });
+
+  it("preserves an affirmative general-knowledge-only request as model-only", () => {
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "turn:general-knowledge-only",
+      threadId: "thread:general-knowledge-only",
+      promptText: "Use only general knowledge to explain what netherrack is.",
+      trustedEnvironmentContext: {
+        trusted_environment_domain: "minecraft",
+      },
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "model_only",
+      strength: "hard",
+    });
+  });
+
   it("keeps the Player Embodiment look contract aligned with the live gateway schema", () => {
     expect(
       explicitCapabilityContractForCapability(
@@ -58,7 +129,7 @@ describe("Minecraft environment connector capability routing", () => {
     });
   });
 
-  it("binds a conditional safe step to movement evidence without preselecting direction", () => {
+  it("binds conditional movement evidence without preselecting the player action", () => {
     const prompt =
       "Help me take one safe step as a player in the active Minecraft Fabric world. First inspect a small region immediately around and below DatDamPig. If a cardinal direction has solid walkable support, safe headroom, and no nearby fire, drop, or other immediate hazard, use the paired Player Embodiment client to walk no more than one block in that direction, then make a fresh player-status check. If no safe direction is evidenced, do not move and explain the missing or unsafe evidence.";
     const contract = buildHelixCompoundCapabilityContract({
@@ -83,15 +154,7 @@ describe("Minecraft environment connector capability routing", () => {
       target: "current_actor",
       purpose: "movement_safety",
     });
-    expect(walk?.args_hint).not.toHaveProperty("direction");
-    expect(walk?.guarded_noop_policy).toMatchObject({
-      required_purpose: "movement_safety",
-      accepted_observation_purposes: ["movement_safety"],
-      candidate_field: "walk_step_candidates",
-      completeness_field: "walk_step_candidates_complete",
-      omitted_count_field: "omitted_walk_step_candidate_count",
-      guard_subgoal_id: spatial?.subgoal_id,
-    });
+    expect(walk).toBeUndefined();
   });
 
   it("admits an operative Player Embodiment plane without preselecting Codex's concrete action", () => {
@@ -250,6 +313,58 @@ describe("Minecraft environment connector capability routing", () => {
     expect(contract?.requires_all_subgoals).toBe(true);
   });
 
+  it("leaves a natural concurrent Player Embodiment program to Codex instead of prebinding walk from camera wording", () => {
+    const prompt =
+      "In the paired Minecraft Player Embodiment client, take one very short step forward while turning my camera fifteen degrees to the right at the same time. Use the bounded concurrent reactive capability so both lanes run together, stop immediately if my health drops below six, perform no world mutation, release all controls when done, and report the measured execution evidence.";
+    const context = { trusted_environment_domain: "minecraft" as const };
+
+    expect(
+      extractExplicitCapabilityContracts(prompt, context).map(
+        (entry) => entry.capability,
+      ),
+    ).toContain(HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY);
+    expect(
+      extractPlannerBindingCapabilityContracts(prompt, context).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY);
+
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "turn:runtime-owned-concurrent-player-action",
+      threadId: "thread:runtime-owned-concurrent-player-action",
+      promptText: prompt,
+      trustedEnvironmentContext: context,
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "turn:runtime-owned-concurrent-player-action",
+      promptText: prompt,
+      sourceTargetIntent: sourceTarget,
+      trustedEnvironmentContext: context,
+    });
+    expect(admission).toMatchObject({
+      admitted_tool_families: ["live_environment"],
+    });
+    expect(admission.requested_capability).toBeUndefined();
+    expect(admission.selected_capability).toBeUndefined();
+    expect(admission.admitted_capability).toBeUndefined();
+    expect(admission.mandatory_next_tool_name).not.toBe(
+      HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+    );
+  });
+
+  it("still prebinds a Player Embodiment capability when the operator names its exact capability ID", () => {
+    const prompt =
+      "Using the paired Minecraft Player Embodiment client, run com.casimirbot.minecraft.player.walk with direction forward for 250 milliseconds.";
+    const plannerCapabilities = extractPlannerBindingCapabilityContracts(
+      prompt,
+      { trusted_environment_domain: "minecraft" },
+    ).map((entry) => entry.capability);
+
+    expect(plannerCapabilities).toContain(
+      HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+    );
+  });
+
   it.each([
     'Explain the example "using the paired Minecraft Player Embodiment client, rotate right" without acting.',
     "Later, use the paired Minecraft Player Embodiment client to rotate right.",
@@ -274,7 +389,7 @@ describe("Minecraft environment connector capability routing", () => {
     ).not.toBe("explicit_minecraft_player_embodiment_source_target");
   });
 
-  it("builds the explicit paired-client walk/jump/verify itinerary without substituting World Authority", () => {
+  it("keeps natural paired-client actions runtime-owned while preserving the explicit verification subgoal", () => {
     const prompt =
       "Using the paired Minecraft player client, take one careful step forward no farther than 1.5 blocks, jump once, stop, and then verify my final position from fresh Minecraft environment evidence. If manual input is detected or the landing path is unsafe, cancel and return the exact typed reason. Do not place or break blocks.";
     const context = { trusted_environment_domain: "minecraft" as const };
@@ -295,20 +410,10 @@ describe("Minecraft environment connector capability routing", () => {
       promptText: prompt,
       trustedEnvironmentContext: context,
     });
-    expect(contract?.required_capabilities).toEqual(capabilities);
+    expect(contract?.required_capabilities).toEqual([
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    ]);
     expect(contract?.subgoals).toEqual([
-      expect.objectContaining({
-        requested_capability: HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
-        args_hint: {
-          direction: "forward",
-          duration_ms: 250,
-          sprint: false,
-        },
-      }),
-      expect.objectContaining({
-        requested_capability: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
-        args_hint: { count: 1 },
-      }),
       expect.objectContaining({
         requested_capability: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
         args_hint: { target: "current_actor" },
@@ -324,7 +429,15 @@ describe("Minecraft environment connector capability routing", () => {
       },
       trustedEnvironmentContext: context,
     });
-    expect(admission.compound_requested_capabilities).toEqual(capabilities);
+    expect(admission.compound_requested_capabilities).toEqual([
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    ]);
+    expect(admission.compound_requested_capabilities).not.toContain(
+      HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
+    );
+    expect(admission.compound_requested_capabilities).not.toContain(
+      HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+    );
   });
 
   it("keeps an immediate player safety precondition executable", () => {
@@ -363,7 +476,10 @@ describe("Minecraft environment connector capability routing", () => {
         promptText: prompt,
         trustedEnvironmentContext: context,
       });
-    expect(compoundContract?.required_capabilities).toEqual(capabilities);
+    expect(compoundContract?.required_capabilities).toEqual([
+      HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    ]);
     expect(compoundContract?.subgoals[0]?.args_hint).toMatchObject({
       target: "current_actor",
       purpose: "movement_safety",

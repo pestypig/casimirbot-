@@ -3,6 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  HELIX_MINECRAFT_PLAYER_ACTION_KINDS,
+  minecraftPlayerCapabilityForActionKind,
+  type HelixMinecraftPlayerActionArguments,
+} from "../shared/helix-minecraft-player-capabilities";
+import { HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY } from "../shared/helix-minecraft-fluid-sequence";
+import { HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY } from
+  "../shared/helix-minecraft-reactive-program";
+import {
   environmentActionDifferentialCaptureInputSchema,
   type EnvironmentActionDifferentialCaptureInput,
 } from "../server/services/environment-connectors/actions/workflow-differential-trace-capture";
@@ -17,6 +25,7 @@ export interface DirectDiagnosticCaptureOptions {
   prompt: string;
   requestedWorkflowId?: string | null;
   scenarioId?: string | null;
+  comparisonMode?: boolean;
 }
 
 const argument = (name: string): string | null => {
@@ -26,6 +35,17 @@ const argument = (name: string): string | null => {
 
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
+
+const capabilityIdForActionKind = (actionKind: string): string | null =>
+  actionKind === "execute_reactive_program"
+    ? HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY
+    : actionKind === "execute_sequence"
+    ? HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY
+    : (HELIX_MINECRAFT_PLAYER_ACTION_KINDS as readonly string[]).includes(actionKind)
+    ? minecraftPlayerCapabilityForActionKind(
+        actionKind as HelixMinecraftPlayerActionArguments["action_kind"],
+      )
+    : null;
 
 export const parseDirectDiagnosticRecords = (logText: string): JsonRecord[] =>
   logText.split(/\r?\n/u).flatMap((line): JsonRecord[] => {
@@ -48,6 +68,7 @@ export const buildDirectDiagnosticCapture = ({
   prompt,
   requestedWorkflowId,
   scenarioId,
+  comparisonMode = false,
 }: DirectDiagnosticCaptureOptions): EnvironmentActionDifferentialCaptureInput => {
   const records = parseDirectDiagnosticRecords(logText);
   const requests = records.filter(
@@ -111,37 +132,77 @@ export const buildDirectDiagnosticCapture = ({
     }
   })();
 
-  const capabilityId = (() => {
-    switch (actionKind) {
-      case "walk":
-        return "com.casimirbot.minecraft.player.walk";
-      case "jump":
-        return "com.casimirbot.minecraft.player.jump";
-      case "look_at":
-        return "com.casimirbot.minecraft.player.look";
-      default:
-        return null;
-    }
-  })();
+  const capabilityId = capabilityIdForActionKind(actionKind);
+  const controlEngine = readString(request.control_engine) || "native_fabric";
 
   const logHash = crypto
     .createHash("sha256")
     .update(logText, "utf8")
     .digest("hex");
+  const terminalSequence =
+    typeof terminal.sequence === "number" && Number.isFinite(terminal.sequence)
+      ? terminal.sequence
+      : events.indexOf(terminal);
+  const terminalObservationRef =
+    `direct_diagnostic_observation:${workflowId}:${terminalSequence}`;
+  const terminalMeasurements =
+    terminal.measurements &&
+    typeof terminal.measurements === "object" &&
+    !Array.isArray(terminal.measurements)
+      ? (terminal.measurements as JsonRecord)
+      : {};
+  const comparisonMeasurements = terminalMeasurements;
+  const commonCapabilityContract = {
+    capability_id: capabilityId,
+    capability_version: 1,
+    control_engine: controlEngine,
+    manual_override_required: true,
+    postcondition_verification_required: true,
+  };
+  const normalizedProgress = comparisonMode
+    ? [
+        {
+          sequence: 0,
+          event_type: "workflow.started",
+          workflow_state: "running",
+          progress_fraction: 0,
+          measurements: {},
+          manual_override_detected: false,
+          controls_released: false,
+        },
+        {
+          sequence: 1,
+          event_type: readString(terminal.event_type),
+          workflow_state: readString(terminal.workflow_state),
+          progress_fraction: terminal.progress_fraction,
+          measurements: comparisonMeasurements,
+          manual_override_detected: manualOverride,
+          controls_released: terminal.controls_released === true,
+        },
+      ]
+    : events.map((event) => ({
+        sequence: event.sequence,
+        event_type: event.event_type,
+        workflow_state: event.workflow_state,
+        progress_fraction: event.progress_fraction,
+        measurements: event.measurements,
+        manual_override_detected: event.manual_override_detected,
+        controls_released: event.controls_released,
+      }));
   return environmentActionDifferentialCaptureInputSchema.parse({
     scenario_id: scenarioId ?? `minecraft_player_direct:${actionKind}`,
     lane: "direct_codex",
     action_kind: actionKind,
     prompt,
-    starting_state: request.starting_state ?? null,
-    capability_contract: {
-      capability_id: capabilityId,
-      capability_version: 1,
-      control_engine: "native_fabric",
-      local_reference_lane: true,
-      manual_override_required: true,
-      postcondition_verification_required: true,
-    },
+    starting_state: comparisonMode
+      ? {
+          fixture_kind: "bounded_player_action",
+          required_preconditions: ["connected", "on_ground"],
+        }
+      : request.starting_state ?? null,
+    capability_contract: comparisonMode
+      ? commonCapabilityContract
+      : { ...commonCapabilityContract, local_reference_lane: true },
     source_artifact_refs: [
       `minecraft_client_log_sha256:${logHash}`,
       `direct_diagnostic_workflow:${workflowId}`,
@@ -150,24 +211,24 @@ export const buildDirectDiagnosticCapture = ({
     normalized_arguments: request.arguments ?? null,
     admission_status: "not_applicable",
     execution_outcome: executionOutcome,
-    normalized_progress: events.map((event) => ({
-      sequence: event.sequence,
-      event_type: event.event_type,
-      workflow_state: event.workflow_state,
-      progress_fraction: event.progress_fraction,
-      measurements: event.measurements,
-      manual_override_detected: event.manual_override_detected,
-      controls_released: event.controls_released,
-    })),
+    normalized_progress: normalizedProgress,
     postcondition_status:
       executionOutcome === "succeeded" ? "satisfied" : "not_satisfied",
-    observation_refs: [],
+    // Direct diagnostics do not pass through Helix re-entry, but the public
+    // terminal controller event is still an executed observation. Retaining a
+    // stable reference lets the observer distinguish "direct evidence exists"
+    // from "Helix re-entered that evidence" without granting answer authority.
+    observation_refs: [terminalObservationRef],
     observation_reentered: false,
     final_candidate_text: null,
     final_candidate_support_refs: [],
     route_product_text: null,
     route_product_support_refs: [],
-    terminal_outcome: "not_applicable",
+    terminal_outcome: comparisonMode
+      ? executionOutcome === "succeeded"
+        ? "success"
+        : "typed_failure"
+      : "not_applicable",
     terminal_authority_status: "not_applicable",
     terminal_writer_text: null,
     terminal_writer_support_refs: [],
@@ -196,6 +257,7 @@ export const runDirectDiagnosticCaptureCli = (): void => {
     prompt,
     requestedWorkflowId: argument("--workflow-id"),
     scenarioId: argument("--scenario"),
+    comparisonMode: process.argv.includes("--comparison-mode"),
   });
   const resolvedOutput = path.resolve(outputPath);
   fs.mkdirSync(path.dirname(resolvedOutput), { recursive: true });

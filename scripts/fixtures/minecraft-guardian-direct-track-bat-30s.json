@@ -1,0 +1,18 @@
+{
+  "action_kind": "track_target",
+  "target": {
+    "target_kind": "entity_type",
+    "entity_type_id": "minecraft:bat",
+    "selection": "nearest"
+  },
+  "aim_point": "render_center",
+  "max_acquisition_distance": 24,
+  "max_duration_ms": 30000,
+  "max_turn_degrees_per_tick": 12,
+  "max_angular_acceleration_degrees_per_tick_squared": 3,
+  "prediction_ticks": 2,
+  "deadband_degrees": 0.35,
+  "reacquire_ticks": 12,
+  "require_line_of_sight": true,
+  "stop_below_health": 6
+}

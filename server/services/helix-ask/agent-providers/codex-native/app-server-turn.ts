@@ -65,6 +65,7 @@ export type CodexNativeAppServerDebug = {
   native_turn_status: string | null;
   native_error_code: string | null;
   native_error_http_status: number | null;
+  native_error_message: string | null;
   terminal_candidate_present: boolean;
   turn_lifecycle: HelixTurnLifecycle;
 };
@@ -102,7 +103,7 @@ export type RunCodexNativeAppServerTurnInput = {
 };
 
 const NATIVE_BASE_INSTRUCTIONS = [
-  "You are the read-only reasoning worker inside the Helix workstation.",
+  "You are the reasoning worker inside the Helix workstation. The host workspace sandbox is read-only; an exact model-visible dynamic Helix tool may still carry a separately governed effect in its connected environment.",
   "Only the dynamic Helix tools supplied on this turn are authorized. Built-in shell, file mutation, web, MCP, app, plugin, image, and subagent tools are unavailable.",
   `Before calling any workstation capability, call ${HELIX_CODEX_ROUTE_PROPOSAL_TOOL} with a helix.runtime_semantic_route_proposal.v1 proposal.`,
   "For a compound request, put every needed model-visible capability in proposed_capability_ids, ordered by use, and put the primary capability first in proposed_capability_id.",
@@ -142,9 +143,22 @@ const readHttpStatus = (value: unknown): number | null => {
   return Number.isInteger(parsed) ? parsed : null;
 };
 
+const sanitizeNativeProviderDiagnostic = (value: unknown): string | null => {
+  const diagnostic = readString(value);
+  if (!diagnostic) return null;
+  return diagnostic
+    .replace(/\bBearer\s+\S+/gi, "Bearer [REDACTED]")
+    .replace(/\b(?:sk|sess|helix)[-_][A-Za-z0-9._-]{12,}\b/g, "[REDACTED_TOKEN]")
+    .replace(/([?&](?:token|key|secret|authorization)=)[^\s&#]+/gi, "$1[REDACTED]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1_000);
+};
+
 const readNativeProviderFailure = (value: unknown): {
   code: string | null;
   httpStatus: number | null;
+  message: string | null;
 } => {
   const container = readRecord(value);
   const error = readRecord(container?.error) ?? container;
@@ -154,7 +168,19 @@ const readNativeProviderFailure = (value: unknown): {
     readHttpStatus(disconnected?.httpStatusCode) ??
     readHttpStatus(error?.additionalDetails) ??
     readHttpStatus(error?.message);
-  const code = httpStatus === 401
+  const rawMessage =
+    readString(error?.message) ??
+    readString(error?.additionalDetails) ??
+    readString(disconnected?.message);
+  const quotaExhausted = Boolean(
+    rawMessage &&
+      /(?:no credits remaining|insufficient[_ -]?quota|billing quota|add credits to continue)/i.test(
+        rawMessage,
+      ),
+  );
+  const code = quotaExhausted
+    ? "provider_quota_exhausted"
+    : httpStatus === 401
     ? "provider_auth_failed"
     : httpStatus === 403
       ? "provider_access_denied"
@@ -165,7 +191,8 @@ const readNativeProviderFailure = (value: unknown): {
           : readString(error?.message)
             ? "provider_turn_failed"
             : null;
-  return { code, httpStatus };
+  const message = sanitizeNativeProviderDiagnostic(rawMessage);
+  return { code, httpStatus, message };
 };
 
 const readRecord = (value: unknown): RecordLike =>
@@ -263,6 +290,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   let nativeFinalItemId: string | null = null;
   let nativeErrorCode: string | null = null;
   let nativeErrorHttpStatus: number | null = null;
+  let nativeErrorMessage: string | null = null;
   let answer = "";
 
   const recordToolResponse = (args: {
@@ -296,6 +324,15 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       capabilityId: args.capabilityId,
       observationRefs: args.observationRefs ?? [],
     });
+    // Project only stage identity into the live transcript. The actual result
+    // remains on the governed observation re-entry path and is never copied
+    // into this progress event.
+    input.onNativeEvent?.("item/tool/result", {
+      callId: args.callId,
+      tool: args.capabilityId,
+      success: args.success,
+      reasonCode: args.reasonCode,
+    });
     return toolResponse(args.content, args.success);
   };
 
@@ -323,6 +360,16 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   });
 
   client.setServerRequestHandler(async (method: string, rawParams: unknown) => {
+    const params = readRecord(rawParams);
+    // Live progress carries lifecycle identity only. Arguments stay on the
+    // governed app-server request path and must not leak into transcripts.
+    input.onNativeEvent?.(method, {
+      callId:
+        readString(params.callId) ?? readString(params.call_id) ?? undefined,
+      tool: readString(params.tool) ?? undefined,
+      turnId:
+        readString(params.turnId) ?? readString(params.turn_id) ?? undefined,
+    });
     if (method !== "item/tool/call") {
       forbiddenItems.push(`server_request:${method}`);
       throw new CodexAppServerProtocolError(
@@ -330,7 +377,6 @@ export const runCodexNativeAppServerTurnWithTransport = async (
         `Helix denied unexpected Codex app-server request ${method}.`,
       );
     }
-    const params = readRecord(rawParams);
     const toolName = readString(params.tool) ?? "";
     const args = readRecord(params.arguments);
     const requestNativeTurnId =
@@ -577,6 +623,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       const failure = readNativeProviderFailure(params);
       nativeErrorCode = failure.code ?? nativeErrorCode;
       nativeErrorHttpStatus = failure.httpStatus ?? nativeErrorHttpStatus;
+      nativeErrorMessage = failure.message ?? nativeErrorMessage;
     }
     if (method === "item/started" || method === "item/completed") {
       const item = readRecord(params.item);
@@ -609,6 +656,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       const failure = readNativeProviderFailure(turn);
       nativeErrorCode = failure.code ?? nativeErrorCode;
       nativeErrorHttpStatus = failure.httpStatus ?? nativeErrorHttpStatus;
+      nativeErrorMessage = failure.message ?? nativeErrorMessage;
       lifecycle.append({
         kind: nativeTurnStatus === "completed" ? "runtime.turn.completed" : "runtime.turn.failed",
         producer: "codex_runtime",
@@ -698,6 +746,9 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       error instanceof CodexAppServerProtocolError
         ? error.code
         : "native_app_server_error";
+    nativeErrorMessage = sanitizeNativeProviderDiagnostic(
+      error instanceof Error ? error.message : String(error),
+    );
   } finally {
     clearTimeout(timeout);
     input.signal?.removeEventListener("abort", abort);
@@ -762,6 +813,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     native_turn_status: nativeTurnStatus,
     native_error_code: nativeErrorCode,
     native_error_http_status: nativeErrorHttpStatus,
+    native_error_message: nativeErrorMessage,
     terminal_candidate_present: Boolean(answer.trim()),
     turn_lifecycle: lifecycle.snapshot(),
   };
@@ -866,6 +918,9 @@ export const runCodexNativeAppServerTurn = async (
         native_turn_status: null,
         native_error_code: null,
         native_error_http_status: null,
+        native_error_message: sanitizeNativeProviderDiagnostic(
+          error instanceof Error ? error.message : String(error),
+        ),
         terminal_candidate_present: false,
         turn_lifecycle: lifecycle.snapshot(),
       },

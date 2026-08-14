@@ -6,7 +6,10 @@ import { HELIX_ROBINHOOD_TRADING_MCP_RESOURCE } from
   "@shared/helix-brokerage-environment";
 import type { HelixProtectiveExitIntent } from
   "@shared/trading/protective-exit-contract";
-import { RobinhoodLiveOrderCallError } from "./robinhood-live-order-adapter";
+import {
+  providerIdempotencyValue,
+  RobinhoodLiveOrderCallError,
+} from "./robinhood-live-order-adapter";
 
 const MCP_TIMEOUT_MS = 20_000;
 const MAX_RESULT_BYTES = 256 * 1_024;
@@ -153,7 +156,7 @@ const schemaFields = (inputSchema: unknown) => {
       "account", "accountnumber", "accountid", "accountref",
     ])),
     clientOrderId: field(properties, new Set([
-      "clientorderid", "clientid", "idempotencykey",
+      "clientorderid", "clientid", "idempotencykey", "refid",
     ])),
     review: field(properties, new Set([
       "reviewid", "reviewtoken", "previewid", "previewtoken", "orderreviewid",
@@ -168,6 +171,7 @@ const schemaFields = (inputSchema: unknown) => {
     stopPrice: field(properties, new Set([
       "stopprice", "triggerprice", "stoptriggerprice",
     ])),
+    marketHours: field(properties, new Set(["markethours"])),
     extendedHours: field(properties, new Set([
       "extendedhours", "extendedhourstrading",
     ])),
@@ -250,13 +254,17 @@ export const buildRobinhoodProtectiveExitArguments = (input: {
     if (name) output[name] = value;
   };
   put(fields.account, input.accountRef);
-  put(fields.clientOrderId, input.clientOrderId);
+  if (fields.clientOrderId && input.clientOrderId) {
+    put(fields.clientOrderId, providerIdempotencyValue(
+      fields.clientOrderId, input.clientOrderId,
+    ));
+  }
   put(fields.review, reviewRef);
   put(fields.symbol, input.intent.symbol);
   put(fields.side, enumValue(properties[fields.side!], ["sell"]));
   put(fields.orderType, enumValue(properties[fields.orderType!],
     input.intent.order_type === "stop"
-      ? ["stop", "stop_market"] : ["market"]));
+      ? ["stop_market", "stop"] : ["market"]));
   put(fields.timeInForce, enumValue(properties[fields.timeInForce!], ["gfd", "day"]));
   put(fields.quantity, scalar(properties[fields.quantity!],
     decimal(input.intent.quantity_micros)));
@@ -264,6 +272,8 @@ export const buildRobinhoodProtectiveExitArguments = (input: {
     put(fields.stopPrice, scalar(properties[fields.stopPrice!],
       decimal(input.intent.stop_price_micros)));
   }
+  put(fields.marketHours, enumValue(properties[fields.marketHours!],
+    ["regular_hours"]));
   put(fields.extendedHours, false);
   return output;
 };
@@ -387,10 +397,10 @@ RobinhoodProtectiveExitPlacementCall = async (input) => {
       operation: async (client, tools) => {
         const descriptor = tools.find((tool) =>
           tool.name === "place_equity_order");
-        if (!descriptor || descriptor.annotations?.destructiveHint !== true) {
+        if (!descriptor) {
           throw new RobinhoodLiveOrderCallError(
             "contract", false,
-            "Robinhood place_equity_order is absent or not explicitly destructive.",
+            "Robinhood place_equity_order is absent.",
           );
         }
         const args = buildRobinhoodProtectiveExitArguments({

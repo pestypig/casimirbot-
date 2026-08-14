@@ -346,6 +346,661 @@
       "to": "shared/casimir-dp-inference.ts",
       "reason": "The Stage-4.2B forecast reconciles legacy rate-only power and independent dynamics-signature diagnostics while adding full nuisance profiling and bounded parameter regions.",
       "waiver": "The diagnostic go/no-go preserves the reduced-order inference dependency and cannot identify collapse from a rate-only comparison."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The fixed-background observables boundary exact-binds the frozen conformal scalar reference, sample set, tensor convention, and claim locks."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The blocked connected-noise convention is scoped to the exact fixed-background smearing and observable boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The additive mean-RSET convention exact-binds the frozen geometry, conformal state, compact smearing, tensor convention, and SI restoration boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The mean-RSET convention is scoped to the exact mean and uncertainty array roles of the blocked fixed-background observable boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+      "reason": "The mean convention preserves the centered connected-noise definition and factor-four Phillips-Hu crosswalk while distinguishing c-number cancellation from mean-stress renormalization."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The local anomaly reduction exact-binds the conformal geometry, state, compact smearing, tetrad, sampling, and SI boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The reduction targets the exact fixed-background mean-RSET and deterministic-uncertainty roles while retaining their blocked output authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "reason": "The reduction instantiates the frozen positive-BoxR anomaly and zero finite-Wald scheme without confusing conformalAnomalyK with variational H3 or double-counting H1."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-mean-rset-diagnostic-kernel.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.ts",
+      "reason": "The fixed pointwise binary64 diagnostic exact-pins the anomaly reduction and checks only its local tensor algebra without producing smeared arrays, run evidence, or authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The blocked Gram-representation design derives its sample, bump-support, tensor-component, and component-pair mapping from the exact scalar reference."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The numerical design exact-binds the 64x64x100 noise and uncertainty roles, axis order, byte layout, covariance dimension, and deterministic enclosure semantics."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+      "reason": "The blocked numerical overlay is a proposed realization of the exact local-Wick distribution convention and explicitly forbids semantic substitution or singular pointwise shortcuts."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+      "reason": "The additive overlay exact-binds the blocked numerical representation and removes only its external missing-mean-binding blocker without modifying the upstream contract or granting execution authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "reason": "The overlay exact-binds the frozen mean-RSET convention required to interpret centered connected-noise outputs while preserving every formula, proof, runtime, and authority blocker."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v3-replay-epoch.v1.ts",
+      "reason": "The spherical candidate-specific tolerance artifact exact-binds the current v3 replay and constraint-arithmetic limits without importing legacy-v2 authority or granting execution."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v3-pair-numeric-agreement-policy.v1.ts",
+      "reason": "The spherical tolerance artifact copies and exact-binds the frozen pair group tolerances and simultaneous-coverage duties while preserving every pair and physical lock."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+      "reason": "The distinct spherical candidate exact-binds its own preexecution no-retune tolerance set rather than inheriting the observed prolate lineage."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v3-replay-epoch.v1.ts",
+      "reason": "The candidate freezes the uncompressed 25-plus-3 input and 68-output v3 replay topology, role hashes, and all-false claim boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v3-constraint-operand-manifest.v1.ts",
+      "reason": "The candidate preregisters all 63 full constraint operand arrays and exact manifest boundary; spherical symmetry may not compress or omit them."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v3-pair-numeric-agreement-policy.v1.ts",
+      "reason": "The candidate exact-binds the v3 independent-run agreement and no-retune policy while leaving both executions and pair receipt absent."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "reason": "The radial BVP exact-binds the new spherical candidate identity, model, chart, amplitude, and first vacuum-connected nodeless branch selector."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+      "reason": "The radial BVP exact-binds the candidate-specific frozen limits but grants no solver, residual-pass, execution, or branch authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "reason": "The semantic seed exact-binds the distinct spherical candidate identity, radial 1s selector, frozen target amplitude, and fail-without-retuning disposition."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+      "reason": "The semantic seed exact-binds the candidate-specific no-retune limits while leaving incomplete numerical definitions and every execution authority closed."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+      "reason": "The seed freezes the initializer-only map from the verified scaled radial composite into the radial EKG BVP, which must independently re-solve frequency and branch gates."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "reason": "The incomplete prepolicy exact-binds the semantic seed and freezes only the primary core/tail candidate-map structure while keeping quadrature, proof, interchange, implementation, preseal, execution, acceptance, lamps, and physical authority closed."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+      "reason": "The incomplete Stage-2 proof architecture exact-binds the primary core/tail structure and freezes checked algebra and proof duties while explicitly leaving exact operators, schemas, ABI, implementation, execution, acceptance, lamps, and physical authority closed."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "reason": "The primary operation policy exact-binds the semantic spherical seed and realizes its frozen core, scaling, tail, and no-retune numerical duties without granting execution authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+      "reason": "The replacement primary numerics closes the finite candidate-map operation graph anticipated by the incomplete prepolicy while retaining all implementation and authority locks."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+      "to": "configs/research/nhm2-spherical-gl256-mpfr256-manifest.v1.json",
+      "reason": "The primary quadrature graph exact-binds the independently verified 256-point MPFR/RNDN node-and-weight fixture."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "reason": "The directed operator exact-binds the semantic spherical seed whose origin, exterior, sign, identity, and no-retune proof duties it formalizes."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+      "reason": "The directed operator consumes the frozen core/tail square-map structure from the incomplete operation prepolicy."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof.v1.ts",
+      "reason": "The successor operator closes the exact origin, whole-X, Z0/Z1, and truncation formulas left explicitly incomplete by the proof architecture."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+      "reason": "The proof operator exact-binds the finite representative and byte-level numerical operation policy whose results a future independent implementation must enclose."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "reason": "The interchange carries the semantic seed binding through every primary descriptor, proof record, and receipt."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+      "reason": "The interchange binds the predecessor core/tail structure while granting no execution or proof authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof.v1.ts",
+      "reason": "The exact sixteen-duty record inventory preserves the proof architecture's duty and resource topology."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+      "reason": "The five untrusted primary payload schemas exact-bind the replacement primary numerical operation policy."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+      "reason": "Every directed record and conclusion carries the exact operator-policy binding but remains non-authoritative until independent replay."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1.ts",
+      "reason": "The spherical v2 candidate freezes its output and provenance duties against the approved server-owned v2 replay inventory and tolerance authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-scientific-candidate-manifest.v1.ts",
+      "reason": "The spherical freeze adopts the exact server-owned v2 scientific preseal boundary while explicitly leaving nine scientific inputs and the candidate manifest instance absent."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-state-realizability.v1.ts",
+      "reason": "The candidate binds the baseline same-state Hadamard, renormalization, QEI, and non-lever realizability duties."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
+      "reason": "The candidate binds the version-2 normalized noise, constraint, uncertainty, and regulator gates without importing any observed outputs."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "reason": "The v2 lane freeze carries the distinct spherical geometry, coherent state, chart, normalization, sampling, and no-retune identity into the server-owned replay lane."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+      "reason": "The v2 candidate requires the separately frozen nodeless spherical relativistic branch before nondegeneracy or array emission."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "reason": "The v2 candidate binds the no-retune spherical initializer lineage while granting no seed or branch acceptance."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "reason": "The classical target freeze closes one candidate-specific scientific input while inheriting no execution, replay, lamp, or physical authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "reason": "The three target formulas use only the frozen spherical candidate chart, metric, and state geometry."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1.ts",
+      "reason": "The target family, component order, sample shape, and normalized raw roles align with the approved v2 replay inventory."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-science-derivation-authority.v1.ts",
+      "reason": "The frozen target witness graph uses only derivation edges already approved by the server-owned v2 science authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-state-realizability.v2.ts",
+      "reason": "The classical targets preserve the state-realizability separation between target, computed, uncertainty, and residual operands."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-regulator-definition.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "reason": "The regulator successor closes the candidate-specific three-level raw inventory without modifying the observed-free no-retune candidate freeze."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-regulator-definition.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-constraint-operand-replay.v1.ts",
+      "reason": "All sixty-three constraint paths, levels, families, primitive roles, component order, and recomputation duties are inherited exactly from the server-owned operand replay policy."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-regulator-definition.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1.ts",
+      "reason": "The successor records that the legacy aggregate-only manifest cannot carry the complete sixty-eight-file inventory and therefore cannot authorize execution without additive schema integration."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "reason": "The total constraint semantics are frozen for the exact spherical v2 identity while candidate execution and all authority remain closed."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "reason": "The ADM action, gravity-plus-state phase space, normalization, target signs, and no-lever boundary are inherited from the frozen spherical candidate."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+      "reason": "Computed constraint brackets are kept independent from the exact candidate-specific classical target formulas and server residual chronology."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-science-derivation-authority.v1.ts",
+      "reason": "The contract binds the current derivation graph, records its missing computed-side geometry/chart/sampling dependencies as an exact overlay, and fail-closes until a successor authority approves them."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1.ts",
+      "reason": "The bracket residual, antisymmetry, and Jacobi arrays retain the approved v2 normalized component ordering and independent server recomputation semantics."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-prescription.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "reason": "The Hadamard prescription closes one frozen spherical-v2 science input while inheriting no execution, replay, lamp, or physical authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-prescription.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+      "reason": "The two-real normalization, state, mass, coupling, length scale, and centered-noise boundary are fixed by the same spherical coherent candidate."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-prescription.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+      "reason": "The point-split prescription is scoped to the exact spherical geometry and field conventions of the frozen branch without asserting that the branch has executed."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-counterterms.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-prescription.v1.ts",
+      "reason": "The finite counterterm tensor is an additive one-way completion of the exact point-split prescription and may not be imported in reverse or double counted."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-counterterms.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "reason": "The coefficient basis and scale are frozen for the distinct spherical-v2 identity with execution and all downstream claims locked."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+      "reason": "The bridge maps only initializer semantics into the distinct target-v2 candidate identity and imports no source candidate, replay, or tolerance authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "reason": "The bridge consumes the exact semantic source seed and scaling map as non-authoritative initializer evidence."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+      "reason": "The exact five payloads retain the frozen primary numerical operation graph and source identity without granting target branch acceptance."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+      "reason": "Only the exact authority-false directed-proof conclusion may accompany source payloads into the initializer binding."
+    },
+    {
+      "from": "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The bridge consumes the closed five-payload and proof-summary byte grammar while preserving its source-v3 identity as evidence only."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/f64le_inventory.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint decoder implements the exact five-payload order, byte counts, f64 bit restrictions, and payload hash domain frozen by the interchange."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/dyadic_interval.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint parser implements the interchange's canonical JSON-array directed-endpoint wire representation as exact dyadic fractions."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/canonical_json.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint parser enforces the interchange's bounded canonical-JSON byte boundary before future descriptor or proof-duty validation."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/hash_graph.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint verifier implements only the payload, descriptor, input-binding, manifest, and output-root hash graphs whose preimages are fully frozen by the interchange."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/forbidden_roles.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint verifier applies the interchange's exact declared lever/tile admission denial before numeric payloads are opened."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/forbidden_roles.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/canonical_json.py",
+      "reason": "Forbidden-role admission traverses only the immutable bounded tree produced by the independent canonical-JSON parser."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint descriptor validator implements the interchange's exact source-candidate descriptor, policy, payload, provenance-shape, and authority-false boundary."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/canonical_json.py",
+      "reason": "Descriptor validation consumes only the bounded immutable canonical tree and plain hash produced by the independent parser."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/forbidden_roles.py",
+      "reason": "Every accepted descriptor passes the frozen declared lever/tile denial before any future numeric payload open."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/hash_graph.py",
+      "reason": "Descriptor and input-binding hashes are independently recomputed through only the interchange-closed hash graph."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/primary_bundle.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+      "reason": "The source-disjoint bundle boundary implements the interchange's admission chronology for one descriptor and exactly five bound raw payloads."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/primary_bundle.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+      "reason": "The descriptor, source identity, policy bindings, provenance shape, and forbidden-role denial are validated before any raw numeric payload is opened."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/primary_bundle.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/f64le_inventory.py",
+      "reason": "Every exact path, size, raw hash, and payload-binding hash is checked before the global nonfinite and negative-zero scans and immutable decode."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-seed/verifier/primary_bundle.py",
+      "to": "tools/nhm2-spherical-boson-star-seed/verifier/hash_graph.py",
+      "reason": "The descriptor-declared raw hashes are independently tied to their exact path and size through the interchange-closed payload hash graph."
+    },
+    {
+      "from": "tools/nhm2-spherical-boson-star-branch/radial_residual.py",
+      "to": "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+      "reason": "The bounded pointwise kernel implements the exact cancellation-free radial EKG rows and ordering frozen by the spherical BVP without assembling or solving the branch."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/covariant_residual.py",
+      "to": "shared/contracts/nhm2-prolate-boson-star-branch-bvp.v1.ts",
+      "reason": "The fixed-size pointwise diagnostic kernel implements the exact covariant solved and unused EKG residual rows frozen by the branch-BVP contract while granting no boundary assembly, solver, branch, candidate, lamp, or physical authority."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/regular_residual.py",
+      "to": "shared/contracts/nhm2-prolate-boson-star-branch-bvp.v1.ts",
+      "reason": "The coordinate-regular diagnostic implements the exact solved and unused EKG rows from the frozen prolate metric after symbolically verified cancellation of coordinate-only terms, without granting solver or branch authority."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/regular_residual.py",
+      "to": "tools/nhm2-boson-star-branch/covariant_residual.py",
+      "reason": "The regular evaluator imports the frozen field-jet and component-order boundary and is independently compared against the generic covariant implementation on well-conditioned fixtures."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/collocation_residual.py",
+      "to": "shared/contracts/nhm2-prolate-boson-star-branch-bvp.v1.ts",
+      "reason": "The structured assembler realizes the frozen grids, compactification, boundary families, radial corner precedence, and separate peak equations while stopping before the explicitly incomplete nonlinear solver policy."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/collocation_residual.py",
+      "to": "tools/nhm2-boson-star-branch/regular_residual.py",
+      "reason": "Every strict-interior collocation jet is evaluated through the symbolically verified coordinate-regular EKG diagnostic; no flat-background subtraction or tolerance relaxation is performed."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/collocation_residual.py",
+      "to": "tools/nhm2-boson-star-branch/covariant_residual.py",
+      "reason": "The assembler consumes the shared frozen field and residual ordering declared by the generic covariant diagnostic while its numerical rows use the regular evaluator."
+    },
+    {
+      "from": "tools/nhm2-boson-star-branch/collocation_residual.py",
+      "to": "tools/nhm2-boson-star-seed/producer/spectral.py",
+      "reason": "The assembler reuses the current binary64 mapped-node and barycentric derivative primitives for the exact frozen collocation shapes; this dependency grants no sealed-v3 or execution authority."
+    },
+    {
+      "from": "tools/nhm2-boson-star-seed/producer/spectral.py",
+      "to": "shared/contracts/nhm2-prolate-boson-star-newtonian-seed.v1.ts",
+      "reason": "The current producer spectral primitives implement the binary64 mapped-node, interpolation, parity, nonlinear-product, and radial operations used by the initializer contract but are not the sealed MPFR replay graph."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-constraint-operand-replayer.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-constraint-operand-replay.v1.ts",
+      "reason": "The calculation-only server replayer implements the frozen v2 byte inventory, residual formulas, signed-zero-safe echo rejection, uncertainty propagation, and regulator convergence policy while retaining every derivation, preseal, agreement, lamp, and physical authority blocker."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-constraint-filesystem-replayer.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-constraint-operand-replay.v1.ts",
+      "reason": "The filesystem boundary derives the exact 63-file inventory, descriptor paths, hashes, sizes, and manifest semantics from the frozen v2 operand contract without granting root or replay authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-constraint-filesystem-replayer.ts",
+      "to": "server/services/theory/nhm2-semiclassical-v2-constraint-operand-replayer.ts",
+      "reason": "After secure current-byte observation, the wrapper supplies detached full views to the calculation-only arithmetic replayer while preserving every derivation, agreement, lamp, and physical blocker."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-constraint-filesystem-replayer.ts",
+      "to": "server/services/theory/nhm2-secure-run-output-reader.ts",
+      "reason": "The wrapper reuses the authority-neutral secure reader for exact inventory, stable identity, no-follow, single-link, hash, size, and finite-Float64 observation under caller-selected roots."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The symbol convention exact-binds the frozen conformal geometry, state, compact smearing, tetrad component order, and SI-restoration boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The symbol convention uses the exact ten-component and one-hundred-pair observable mapping while retaining the blocked output and authority boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+      "reason": "The exact Fock-space symbol is a diagnostic realization of the centered local-Wick distribution semantics and factor-four Phillips-Hu crosswalk, not a pointwise singular-kernel recipe."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "reason": "The centered-noise symbol binds the exact mean-renormalization convention whose c-number shifts cancel only after centering."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+      "reason": "The symbol convention fills the planned operator, normalization, measure, Fourier, and spectral identities while preserving the numerical overlay's proof and execution blockers."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.ts",
+      "reason": "The symbol convention inherits the exact mean-bound numerical baseline and removes only its six named algebraic-convention blockers."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "reason": "The smearing transform inherits the exact stress symbol, Fourier phase, on-shell measure, and spectral normalization while preserving all proof and execution blockers."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.ts",
+      "reason": "The analytic transform remains attached to the exact mean-bound numerical baseline and does not grant normalization or execution authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The transform exact-binds the sample order, compact-smearing identity, and connected-noise output boundary."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The analytic Q, S_p, C_p, center, half-width, and displacement formulas derive from the frozen scalar-reference bump and sampling geometry."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-fourier-diagnostic.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+      "reason": "The binary64 diagnostic exact-pins the analytic smearing/Fourier convention while explicitly withholding enclosure, U95, run, and execution authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-block-diagnostic.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "reason": "The bounded single-K diagnostic exact-pins the two-particle stress symbol, future-cone normalization, division-free spin-two polynomial, and frozen component order without granting execution or output authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-block-diagnostic.ts",
+      "to": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-fourier-diagnostic.ts",
+      "reason": "The spectral block composes one or two bounded Fourier diagnostics for a single sample pair while preserving their null enclosure, U95, run, and authority boundary."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+      "reason": "The exact integer-over-six coefficient map derives the inversion-even moment rows and component symmetries from the frozen two-particle spin-two spectral polynomial without adding cubature or execution authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.ts",
+      "to": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-block-diagnostic.ts",
+      "reason": "The moment map independently cross-checks its pointwise polynomial coefficients and frozen component order against the bounded single-momentum spectral diagnostic while keeping full-array and run outputs unavailable."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-diagnostic-cubature-policy.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+      "reason": "The cubature policy exact-binds the compact bump, sample normalization, Fourier phase, and momentum-coordinate scaling while retaining every missing normalization and tail enclosure blocker."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-diagnostic-cubature-policy.v1.ts",
+      "to": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.ts",
+      "reason": "The worker policy consumes the exact 100x22 parity-projected polynomial coefficient and scatter descriptor; it adds only frozen diagnostic integration mechanics and no run or scientific authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-full-array-diagnostic.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-diagnostic-cubature-policy.v1.ts",
+      "reason": "The current-host worker exact-pins and executes the frozen binary64 Sobol, normalization-surrogate, cutoff, batching, work, memory, and output policy while retaining its null enclosure, U95, run, and authority boundary."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-full-array-diagnostic.ts",
+      "to": "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.ts",
+      "reason": "The emitter consumes the exact 100x22 polynomial, parity, reflection, exchange, and 64x64x100 scatter descriptor and grants no independent-agreement or physical authority."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-run.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The run plan exact-binds the five frozen observable-array roles and their shapes."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-run.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The run plan exact-binds the scalar-reference candidate descriptor and sampling multiplicities."
+    },
+    {
+      "from": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-pair-agreement.v1.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The pair policy derives its compared output roles, units, and uncertainty semantics from the fixed observables boundary."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+      "reason": "The byte replay exact-pins the connected-noise semantic baseline while preserving its execution blockers."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+      "reason": "The byte replay exact-pins the frozen mean-RSET semantic convention while leaving source-byte, formula, recurrence, coincidence, interval, runtime, and authority gaps blocked."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+      "reason": "The replay binds the blocked Gram-design mapping and deterministic U95/negative-witness interpretation without treating its null mean binding or numerical plans as execution authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+      "reason": "The byte replay consumes exactly the five roles, shapes, encodings, and authority locks frozen by the observables contract."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-run.v1.ts",
+      "reason": "The byte replay validates the exact planned raw-array inventory and byte sizes."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-fixed-background-pair-agreement.v1.ts",
+      "reason": "The calculation remains below the frozen independent-pair agreement and no-retune boundary."
+    },
+    {
+      "from": "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+      "reason": "The replay uses the exact tensor multiplicities and sample weights from the scalar reference."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge.ts",
+      "to": "shared/contracts/nhm2-conformally-flat-needle-metric-demand-derivation-verification.v1.ts",
+      "reason": "The blocked adapter structurally binds the existing conformal metric-demand verification artifact without granting capability authority."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-content-replay.ts",
+      "to": "server/services/theory/nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge.ts",
+      "reason": "The v2 content replay can clear metric provenance blockers only through an opaque scope-matched capability, for which no issuer exists."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-run-replayer.ts",
+      "to": "server/services/theory/nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge.ts",
+      "reason": "The run replayer derives and snapshots the exact run scope before forwarding any opaque metric replay evidence."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-scientific-root-observer.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1.ts",
+      "reason": "The observer uses the exact 23-role scientific input inventory frozen by the v2 raw replay contract."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-scientific-root-observer.ts",
+      "to": "shared/contracts/nhm2-semiclassical-v2-scientific-preseal.v1.ts",
+      "reason": "The observer snapshots and cross-binds one validated persisted scientific preseal."
+    },
+    {
+      "from": "server/services/theory/nhm2-semiclassical-v2-scientific-root-observer.ts",
+      "to": "server/services/theory/nhm2-secure-run-output-reader.ts",
+      "reason": "The observer reuses the authority-neutral secure reader for exact two-pass file identity and byte observation."
     }
   ]
 }

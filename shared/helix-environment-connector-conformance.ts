@@ -16,6 +16,38 @@ export const validateEnvironmentConnectorSchemaValue = (
   value: unknown,
   path = "$",
 ): EnvironmentConnectorSchemaIssue[] => {
+  if (schema.oneOf) {
+    const alternatives = schema.oneOf.map((alternative) =>
+      validateEnvironmentConnectorSchemaValue(alternative, value, path),
+    );
+    const matched = alternatives.filter((candidate) => candidate.length === 0);
+    if (matched.length === 1) return [];
+    if (matched.length > 1) {
+      return [{
+        path,
+        code: "one_of_ambiguous",
+        message: "Value matched more than one exclusive schema alternative.",
+      }];
+    }
+    const branchScore = (candidate: EnvironmentConnectorSchemaIssue[]): number =>
+      candidate.length + candidate.reduce(
+        (penalty, entry) =>
+          penalty + (entry.code === "enum" && /_(kind|type)$/.test(entry.path)
+            ? 1_000
+            : 0),
+        0,
+      );
+    const closest = alternatives.reduce<EnvironmentConnectorSchemaIssue[] | null>(
+      (best, candidate) =>
+        !best || branchScore(candidate) < branchScore(best) ? candidate : best,
+      null,
+    ) ?? [];
+    return [{
+      path,
+      code: "one_of",
+      message: "Value did not match any admitted schema alternative.",
+    }, ...closest];
+  }
   const issues: EnvironmentConnectorSchemaIssue[] = [];
   const issue = (code: string, message: string): void => {
     issues.push({ path, code, message });
@@ -119,7 +151,15 @@ export const validateEnvironmentConnectorSchemaValue = (
     schema.enum &&
     !schema.enum.some((candidate) => Object.is(candidate, value))
   ) {
-    issue("enum", "Value is outside the admitted enum.");
+    const admittedValues = schema.enum
+      .slice(0, 16)
+      .map((candidate) => JSON.stringify(candidate))
+      .join(", ");
+    const truncated = schema.enum.length > 16 ? ", ..." : "";
+    issue(
+      "enum",
+      `Value must be one of the admitted values: ${admittedValues}${truncated}.`,
+    );
   }
   if (
     typeof value === "number" &&
@@ -147,4 +187,3 @@ export const compileEnvironmentConnectorSchema = (
   const issues = validateEnvironmentConnectorSchemaValue(schema, value);
   return { ok: issues.length === 0, issues };
 };
-

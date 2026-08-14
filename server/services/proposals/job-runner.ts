@@ -12,6 +12,7 @@ let draining = false;
 let started = false;
 let unsubscribe: (() => void) | null = null;
 let shutdownRequested = false;
+let startupPromise: Promise<void> = Promise.resolve();
 
 const PROGRESS_PLAN: Array<{ progress: number; phase: string }> = [
   { progress: 0.15, phase: "queueing" },
@@ -23,9 +24,9 @@ const PROGRESS_PLAN: Array<{ progress: number; phase: string }> = [
 const MIN_DELAY_MS = 30;
 const MAX_DELAY_MS = 90;
 
-export function startProposalJobRunner(): void {
+export function startProposalJobRunner(): Promise<void> {
   if (started || process.env.ENABLE_PROPOSAL_JOB_RUNNER === "0") {
-    return;
+    return startupPromise;
   }
   started = true;
   shutdownRequested = false;
@@ -37,7 +38,8 @@ export function startProposalJobRunner(): void {
     enqueueJob(job.id);
   });
 
-  void enqueueExistingProposalJobs();
+  startupPromise = enqueueExistingProposalJobs();
+  return startupPromise;
 }
 
 function enqueueJob(jobId?: string | null): void {
@@ -175,6 +177,7 @@ export function __waitForProposalJobRunner(): Promise<void> {
 
 export function __resetProposalJobRunnerForTest(): void {
   shutdownRequested = true;
+  startupPromise = Promise.resolve();
   jobQueue.length = 0;
   queuedJobs.clear();
   if (unsubscribe) {

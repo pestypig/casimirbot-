@@ -14,6 +14,10 @@ import {
   HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
 import {
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+} from "@shared/helix-environment-action";
+import {
   createHelixAgentApiRouter,
   createHelixAgentProtectedResourceMetadataRouter,
 } from "../helix-agent-api";
@@ -436,6 +440,8 @@ describe("Helix agent REST transport", () => {
           HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
           HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
           HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+          HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+          HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
         ],
       }),
     );
@@ -459,6 +465,8 @@ describe("Helix agent REST transport", () => {
             HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
             HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
             HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+            HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+            HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
           ]),
         ),
         bearer_methods_supported: ["header"],
@@ -793,6 +801,9 @@ describe("Helix MCP HTTP transport", () => {
         "helix_run_inspect",
         "helix_room_list",
         "helix_room_command_request",
+        "helix_minecraft_player_action",
+        "helix_minecraft_workflow_status",
+        "helix_minecraft_workflow_control",
       ]),
     );
   });

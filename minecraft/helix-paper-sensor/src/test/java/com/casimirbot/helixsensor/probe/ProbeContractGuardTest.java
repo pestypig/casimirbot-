@@ -20,4 +20,13 @@ class ProbeContractGuardTest {
         assertTrue(guard.isReadOnly(Map.of("constraints", Map.of("read_only", true, "side_effects_allowed", false))));
         assertFalse(guard.isReadOnly(Map.of("constraints", Map.of("read_only", true, "side_effects_allowed", true))));
     }
+
+    @Test
+    void admitsLiveMechanicsFactsOnlyAsReadOnlyProbes() {
+        ProbeContractGuard guard = new ProbeContractGuard();
+
+        assertTrue(guard.isKnownReadOnlyProbe(Map.of("probe_type", "registry_fact")));
+        assertTrue(guard.isKnownReadOnlyProbe(Map.of("probe_type", "recipe_fact")));
+        assertFalse(guard.isForbiddenAction(Map.of("probe_type", "registry_fact")));
+    }
 }

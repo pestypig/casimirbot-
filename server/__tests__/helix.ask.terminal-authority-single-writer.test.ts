@@ -7084,6 +7084,230 @@ describe("Helix terminal authority single writer", () => {
     );
   });
 
+  it("preserves a grounded Codex synthesis after repaired action evidence and an exact post-action read", () => {
+    const turnId = "ask:test:guardian-repair-read-act-read-terminal";
+    const status = "com.casimirbot.minecraft.actor.status.read";
+    const action = "com.casimirbot.minecraft.player.guardian.execute";
+    const beforeObservationRef = `${turnId}:normalized:status:1`;
+    const actionObservationRef = `${turnId}:normalized:guardian:5`;
+    const afterObservationRef = `${turnId}:normalized:status:6`;
+    const beforeGatewayRef = `${turnId}:gateway:status:1`;
+    const failedActionGatewayRef = `${turnId}:gateway:guardian:2:failed`;
+    const actionGatewayRef = `${turnId}:gateway:guardian:5:succeeded`;
+    const afterGatewayRef = `${turnId}:gateway:status:6`;
+    const draftRef = `${turnId}:final_answer_draft`;
+    const draftText =
+      "The repaired guardian action succeeded, and the post-action status read confirms the player remains in a recoverable state.";
+    const normalizedObservation = (
+      capability: string,
+      ref: string,
+      gatewayRef: string,
+    ) => ({
+      artifact_id: ref,
+      producer_item_id: `${gatewayRef}:call`,
+      kind: "live_environment_observation",
+      turn_id: turnId,
+      source_scope: "current_turn_context",
+      capability_key: capability,
+      source_capability_id: capability,
+      provider_gateway_observation_ref: gatewayRef,
+      provider_gateway_packet_refs: [gatewayRef],
+      status: "succeeded",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        status: "succeeded",
+        capability_key: capability,
+        source_capability_id: capability,
+        provider_gateway_observation_ref: gatewayRef,
+        provider_gateway_packet_refs: [gatewayRef],
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+    const gatewayPacket = (
+      capability: string,
+      ref: string,
+      iteration: number,
+      statusValue: string,
+    ) => ({
+      artifact_id: ref,
+      producer_item_id: `${ref}:call`,
+      kind: "provider_gateway_observation_packet",
+      turn_id: turnId,
+      capability_key: capability,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        iteration,
+        capability_key: capability,
+        status: statusValue,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+    const artifacts = [
+      // The production terminal ledger stores normalized observations first.
+      normalizedObservation(status, beforeObservationRef, beforeGatewayRef),
+      normalizedObservation(action, actionObservationRef, actionGatewayRef),
+      normalizedObservation(status, afterObservationRef, afterGatewayRef),
+      gatewayPacket(status, beforeGatewayRef, 1, "succeeded"),
+      gatewayPacket(action, failedActionGatewayRef, 2, "failed"),
+      gatewayPacket(action, actionGatewayRef, 5, "succeeded"),
+      gatewayPacket(status, afterGatewayRef, 6, "succeeded"),
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        turn_id: turnId,
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          artifact_id: draftRef,
+          turn_id: turnId,
+          text: draftText,
+          answer_text: draftText,
+          support_refs: [
+            beforeObservationRef,
+            actionObservationRef,
+            afterObservationRef,
+          ],
+          subgoal_observation_refs: [
+            beforeObservationRef,
+            actionObservationRef,
+            afterObservationRef,
+          ],
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Read my status, run the bounded guardian, read my status again, and report the result.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        turn_id: turnId,
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+          required_capabilities: [status],
+          required_capability_any_of_groups: [{
+            group_id: "minecraft.player_embodiment.action",
+            capability_ids: [action],
+          }],
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          subgoals: [{
+            subgoal_id: "planned:post-status",
+            requested_capability: status,
+            runtime_capability: status,
+            required_observation_kinds: ["live_environment_observation"],
+            observation_after_capability_any_of_group_ids: [
+              "minecraft.player_embodiment.action",
+            ],
+            mandatory: true,
+          }],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        rail_status: "satisfied",
+        subgoals: [
+          {
+            subgoal_id: "current:status:before",
+            order: 1,
+            requested_capability: status,
+            runtime_capability: status,
+            capability_occurrence: 1,
+            observation_ref: beforeObservationRef,
+            observation_refs: [beforeObservationRef],
+            required_observation_kinds: ["live_environment_observation"],
+            satisfaction: "satisfied",
+            satisfied: true,
+          },
+          {
+            subgoal_id: "current:guardian",
+            order: 2,
+            requested_capability: action,
+            runtime_capability: action,
+            capability_occurrence: 1,
+            observation_ref: actionObservationRef,
+            observation_refs: [actionObservationRef],
+            required_observation_kinds: ["live_environment_observation"],
+            satisfaction: "satisfied",
+            satisfied: true,
+          },
+          {
+            subgoal_id: "current:status:after",
+            order: 3,
+            requested_capability: status,
+            runtime_capability: status,
+            capability_occurrence: 2,
+            observation_ref: afterObservationRef,
+            observation_refs: [afterObservationRef],
+            required_observation_kinds: ["live_environment_observation"],
+            satisfaction: "satisfied",
+            satisfied: true,
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      complete: true,
+      missing_compound_subgoal_ids: [],
+      missing_required_capabilities: [],
+      missing_temporal_postconditions: [],
+    });
+    expect(payload.terminal_error_code).not.toBe(
+      "capability_itinerary_observations_missing",
+    );
+    expect(result.selected_terminal_artifact_kind).toBe(
+      "compound_evidence_synthesis_answer",
+    );
+    expect(result.visible_text).toBe(draftText);
+    expect(artifacts).toContainEqual(
+      expect.objectContaining({ artifact_id: failedActionGatewayRef }),
+    );
+  });
+
   it("preserves a required gateway policy rejection instead of replacing it with a generic missing-observation failure", () => {
     const turnId = "ask:test:scientific-evidence-policy-rejection";
     const payload: Record<string, unknown> = {

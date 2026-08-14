@@ -30,10 +30,18 @@ EXPECTED_RUNTIME_SYS_PATH = (
 EXPECTED_ARGV = (
     "--input-manifest",
     "/run/input/00-seed-run-request.v1.json",
+    "--numeric-materialization-policy",
+    "/run/input/08-numeric-materialization-policy-v1.canonical.json",
+    "--postprojection-policy",
+    "/run/input/09-postprojection-policy-v1.canonical.json",
     "--staging-root",
     "/run/staging",
+    "--postprojection-evidence-root",
+    "/run/postprojection-evidence",
     "--replay-bundle",
     "/run/replay/seed-verifier-replay-bundle.canonical.json",
+    "--broker-runtime-evidence",
+    "/run/broker-channel/verifier-runtime-evidence.v3.canonical.json",
 )
 EXPECTED_ENVIRONMENT = {
     "BLIS_NUM_THREADS": "1",
@@ -121,12 +129,16 @@ def main() -> int:
     sys.path[:] = list(EXPECTED_RUNTIME_SYS_PATH)
     try:
         from verifier.errors import VerificationBlocked
-        from verifier.verifier import run_fail_closed_verifier
+        from verifier.verifier import run_fail_closed_v3_verifier
 
-        run_fail_closed_verifier(
+        run_fail_closed_v3_verifier(
             input_manifest=EXPECTED_ARGV[1],
-            staging_root=EXPECTED_ARGV[3],
-            replay_bundle=EXPECTED_ARGV[5],
+            numeric_materialization_policy=EXPECTED_ARGV[3],
+            postprojection_policy=EXPECTED_ARGV[5],
+            staging_root=EXPECTED_ARGV[7],
+            postprojection_evidence_root=EXPECTED_ARGV[9],
+            replay_bundle=EXPECTED_ARGV[11],
+            broker_runtime_evidence=EXPECTED_ARGV[13],
         )
     except VerificationBlocked as error:
         _fail(error.blocker.code, error.blocker.detail)

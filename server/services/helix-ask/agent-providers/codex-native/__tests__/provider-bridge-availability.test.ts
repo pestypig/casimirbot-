@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  noteCodexNativeProviderFailure,
+  readCodexNativeProviderCooldown,
   readTurnAdmittedWorkstationTools,
   removeSatisfiedNativeWorkstationTools,
+  resetCodexNativeProviderCooldownForTests,
+  resolveNativeAllowedWorkstationTools,
   resolveCodexNativeProviderBridgeAvailability,
 } from "../provider-bridge";
 
@@ -9,9 +13,47 @@ const ORIGINAL_ENV = { ...process.env };
 
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
+  resetCodexNativeProviderCooldownForTests();
 });
 
 describe("Codex native provider bridge availability", () => {
+  it("temporarily suppresses repeat native attempts after an explicit quota failure", () => {
+    process.env.HELIX_CODEX_NATIVE_QUOTA_COOLDOWN_MS = "60000";
+    noteCodexNativeProviderFailure("native_provider_quota_exhausted", 10_000);
+
+    expect(readCodexNativeProviderCooldown(20_000)).toEqual({
+      reason: "native_provider_quota_exhausted",
+      untilMs: 70_000,
+    });
+    expect(readCodexNativeProviderCooldown(70_000)).toBeNull();
+  });
+
+  it("temporarily suppresses repeat native attempts after a transport timeout", () => {
+    process.env.HELIX_CODEX_NATIVE_TIMEOUT_COOLDOWN_MS = "60000";
+    noteCodexNativeProviderFailure("native_turn_timeout", 10_000);
+
+    expect(readCodexNativeProviderCooldown(20_000)).toEqual({
+      reason: "native_turn_timeout",
+      untilMs: 70_000,
+    });
+    expect(readCodexNativeProviderCooldown(70_000)).toBeNull();
+  });
+
+  it("treats native bootstrap timeouts as transport health failures", () => {
+    process.env.HELIX_CODEX_NATIVE_TIMEOUT_COOLDOWN_MS = "60000";
+    noteCodexNativeProviderFailure("native_turn_start_timeout", 10_000);
+
+    expect(readCodexNativeProviderCooldown(20_000)).toEqual({
+      reason: "native_turn_start_timeout",
+      untilMs: 70_000,
+    });
+  });
+
+  it("does not open the native cooldown for reasoning or tool failures", () => {
+    noteCodexNativeProviderFailure("native_route_observation_missing", 10_000);
+    expect(readCodexNativeProviderCooldown(20_000)).toBeNull();
+  });
+
   it("intersects a durable goal allowlist with the narrower current-turn admission", () => {
     expect(
       readTurnAdmittedWorkstationTools({
@@ -61,7 +103,7 @@ describe("Codex native provider bridge availability", () => {
           schema: "helix.committed_ask_route.v1",
           turn_id: "ask:test:visual-family",
           capability_policy: {
-            allowed_tool_families: ["visual_capture"],
+            allowed_tool_families: ["situation_run"],
             suppressed_tool_families: [],
           },
         },
@@ -78,7 +120,7 @@ describe("Codex native provider bridge availability", () => {
     ).toEqual([
       "docs.search",
       "scientific-calculator.solve_expression",
-      "theory-badge-graph.reflect_discussion_context",
+      "helix_ask.reflect_theory_context",
     ]);
   });
 
@@ -110,6 +152,50 @@ describe("Codex native provider bridge availability", () => {
         runtime_goal_session: { allowed_workstation_tools: [] },
       }),
     ).toEqual([]);
+  });
+
+  it("passes the provider-governed semantic capability set to native Codex without inventing an exact tool", () => {
+    const guardian = "com.casimirbot.minecraft.player.guardian.execute";
+    const walk = "com.casimirbot.minecraft.player.walk";
+    expect(
+      resolveNativeAllowedWorkstationTools({
+        body: {
+          committed_ask_route: {
+            schema: "helix.committed_ask_route.v1",
+            turn_id: "ask:test:semantic-player-actions",
+            capability_policy: {
+              allowed_tool_families: ["live_environment"],
+              suppressed_tool_families: [],
+            },
+          },
+          tool_call_admission_decision: {
+            admitted_tool_families: ["live_environment"],
+          },
+        },
+        runtimeProviderAdmittedCapabilityIds: [guardian, walk],
+      }),
+    ).toEqual([guardian, walk]);
+  });
+
+  it("still filters the provider-governed set through the committed route", () => {
+    expect(
+      resolveNativeAllowedWorkstationTools({
+        body: {
+          committed_ask_route: {
+            schema: "helix.committed_ask_route.v1",
+            turn_id: "ask:test:semantic-route-filter",
+            capability_policy: {
+              allowed_tool_families: ["live_environment"],
+              suppressed_tool_families: [],
+            },
+          },
+        },
+        runtimeProviderAdmittedCapabilityIds: [
+          "com.casimirbot.minecraft.player.guardian.execute",
+          "repo.search",
+        ],
+      }),
+    ).toEqual(["com.casimirbot.minecraft.player.guardian.execute"]);
   });
 
   it("does not re-expose a capability whose successful observation is already in the prompt", () => {

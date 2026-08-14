@@ -45,7 +45,7 @@ authorized or executed.
 - Minecraft direct-connect address: `localhost:25565`
 - Fabric project: `minecraft/helix-fabric-sensor`
 - Fabric player companion project: `minecraft/helix-fabric-player-agent`
-- Fabric player companion version: `0.2.0`
+- Fabric player companion version: `0.4.0`
 - Dedicated-server directory: `minecraft/helix-fabric-sensor/run`
 - Existing world: `helix_fabric_test_world`
 - Fabric sensor config: `minecraft/helix-fabric-sensor/run/config/helix-fabric-sensor.json`
@@ -135,7 +135,7 @@ Expected server signals:
 
 ```text
 Loading Minecraft 1.21.8 with Fabric Loader 0.18.4
-helix_fabric_sensor 0.2.0
+helix_fabric_sensor 0.3.0
 Starting Minecraft server on 127.0.0.1:25565
 Preparing level "helix_fabric_test_world"
 Done (...)! For help, type "help"
@@ -165,7 +165,7 @@ record the actual start/end tick, `duration_ticks`, elapsed wall time and, when
 available, observed TPS. A receipt must not infer exact elapsed time from the
 nominal rate when the server is lagging.
 
-The `0.2.0` player companion now publishes
+The `0.4.0` player companion now publishes
 `helix.environment_clock_snapshot.v1` on its heartbeat and every workflow
 event. A settled result retains `started_clock`, `completed_clock`, and the
 measured `duration_ticks`; Helix rejects a result whose duration does not equal
@@ -242,6 +242,14 @@ Use one of these paths for the successful probe battery:
    binding and an exact durable run-room binding have completed. A human room
    invitation or browser guest session is not a substitute for that binding.
 
+An authenticated localhost acceptance harness must mirror the browser's room
+presence lifecycle while a keyed turn is pending. Send `present` before the
+turn and renew it serially every 15 seconds until the Ask response and debug
+export are received. A one-shot presence write expires after 60 seconds; a slow
+but healthy provider turn can otherwise reach the tool with an `away` member
+and correctly fail as `permission_revoked`. Do not weaken the membership check
+or extend its security TTL to accommodate a deficient test harness.
+
 Do not sign into the owner's profile from an automation harness, copy browser
 session material, promote a participant to owner implicitly, or relax the
 gateway's owner/membership/consent checks just to make the test pass.
@@ -295,6 +303,23 @@ available throughout command provisioning. Fabric publishes its Brigadier
 catalog only after source-manifest admission, avoiding the startup race where
 catalog setup could arrive before the room recognized the connector.
 
+For the repository-owned localhost acceptance harness, Codex may provision the
+same separate command lane without exposing its credential by running
+`scripts/helix-minecraft-local-command-session.mjs` against the exact local
+room state and Fabric config. This helper authenticates as the configured local
+test owner, creates a finite authority and command credential, writes the
+credential only into the connector config, and emits a sanitized receipt. When
+the keyed server advertises a public deployment origin, the helper rebases only
+the returned command endpoint origin to the explicitly validated loopback
+origin; it preserves the authority path and all environment identities. Restart
+the Fabric server once so it loads the new command section, then require the
+console signal `Helix Fabric live Brigadier command catalog was admitted`.
+`http_404_api_not_found` during catalog publication usually means this local
+origin rebase was omitted; it is not evidence that Codex chose an invalid
+Minecraft command. This localhost helper is an acceptance-test convenience,
+not a replacement for the one-time in-game pairing flow used by ordinary
+users.
+
 If the room still labels the source as Paper, do not accept it as equivalent.
 Verify that the new binding names `minecraft.fabric_mod.v1`, has the intended
 world identity and label, and was installed in the Fabric config rather than a
@@ -303,7 +328,7 @@ Paper plugin config.
 ## 5A. Pair the Player Embodiment companion
 
 This is separate from `/helix pair`, server command pairing and the room-source
-credential. Build or install `HelixFabricPlayerAgent-0.2.0.jar` in the Fabric
+credential. Build or install `HelixFabricPlayerAgent-0.3.0.jar` in the Fabric
 1.21.8 **client** instance alongside Fabric API. Do not install this client-only
 mod in the dedicated server.
 
@@ -346,9 +371,9 @@ pairing succeeded. The client companion is publishing its capabilities.` If
    access pairing, stop: the wrong connector consumed a different code or the
    client companion was not loaded.
 5. Run `/helix-player status`. Confirm a fresh client manifest and heartbeat by
-   their sanitized room/API projections. The manifest must list all 13 native
-   actions. It may list `baritone` only when Baritone was actually discovered
-   in this client.
+   their sanitized room/API projections. The manifest must list the 13 typed
+   actions plus `com.casimirbot.minecraft.player.sequence.execute`. It may list
+   `baritone` only when Baritone was actually discovered in this client.
 6. Keep `/helix-player emergency-stop` available throughout the test. Manual
    movement, view, mouse or inventory input must pause or cancel the active
    workflow according to the owner policy and release connector-owned controls.
@@ -371,7 +396,7 @@ Send each command to its exact execution plane:
   client chat. It is a client-only command and will not pair Player Embodiment
   when sent to the dedicated-server console.
 
-`HelixFabricPlayerAgent-0.2.0` also supports a local-agent handoff when native
+`HelixFabricPlayerAgent-0.3.0` also supports a local-agent handoff when native
 GLFW input is unavailable. Write the exact copied `/helix-player pair ...`
 line atomically to
 `<Fabric instance>/config/helix-fabric-player-agent.pairing-inbox`. The
@@ -386,6 +411,18 @@ fallback when Windows can focus Minecraft but the game rejects injected
 keystrokes. The repository helper
 `scripts/helix-minecraft-player-pairing-inbox.ps1` implements that exact
 stdin-only atomic handoff and emits only `player_pairing_inbox_staged`.
+
+For a Codex-controlled in-app-browser acceptance run, use the tab's browser
+session clipboard API as the opaque boundary. Create the player pairing from
+the authenticated owner page, invoke its single-copy control, read the value
+only into an ephemeral automation variable, validate the exact
+`/helix-player pair ...` shape and 512-byte ceiling, and atomically rename it
+into the pairing inbox. Immediately blank both the automation variable and the
+browser clipboard. Do not route the value through PowerShell output, Windows
+clipboard history, Minecraft chat, a model prompt or an artifact. Then poll
+only the sanitized `connector_readiness` projection until it reports `ready`.
+This is the standard same-host Codex-owned path; do not stop the acceptance run
+to ask the player to copy or type the command.
 
 Before the handoff, verify the current room, environment binding, Fabric
 adapter kind, intended authority, and exact target process/session. Do not paste
@@ -421,6 +458,125 @@ Run these client-only commands from the connected Minecraft client:
 /helix-player diagnostic cancel
 ```
 
+For agent-run workflow comparison, the client also has a typed one-shot local
+diagnostic inbox. The player selects its scope from the connected game client:
+
+```text
+/helix-player diagnostic inbox-enable movement
+/helix-player diagnostic inbox-enable full
+/helix-player diagnostic inbox-disable
+```
+
+`movement` admits only navigate, look, walk, jump and follow. `full` also
+admits typed interaction, hotbar/equipment, collect, mine, place, craft and
+inventory-transfer requests plus the bounded fluid sequence and concurrent
+reactive guardian program. Full scope is
+appropriate only for a disposable
+or explicitly authorized fixture. `/helix-player emergency-stop` disables the
+inbox, clears a pending request, releases controls and latches the existing
+local emergency stop. Disabling the inbox also cancels a running direct
+diagnostic.
+
+The selected scope is a non-secret, user-owned preference restored across
+client restarts. Startup clears any request staged while the client was offline
+before restoring that scope, so persistence never replays physical input.
+`inbox-disable` and `emergency-stop` both revoke the saved preference. This
+removes repeated operator ceremony during rebuild/restart testing without
+granting host shell, files, processes, RCON, credentials, server administration
+or arbitrary Minecraft commands.
+
+After the in-game opt-in, stage exactly one action JSON object through stdin:
+
+```powershell
+npx tsx scripts/helix-minecraft-player-stage-diagnostic.ts --max-duration-ms 20000
+```
+
+The first reversible guardian A0 fixture is checked in and can be staged
+without copying JSON through Minecraft chat:
+
+```powershell
+Get-Content -Raw scripts\fixtures\minecraft-guardian-direct-parallel-step.json |
+  npm run helix:minecraft:player-stage-diagnostic -- --max-duration-ms 9000
+```
+
+It turns the camera 15 degrees while taking a quarter-second step, under a
+low-health one-shot interrupt. Run it only from safe, level terrain. Its
+terminal receipt must show `max_concurrent_lane_count >= 2`,
+`parallel_tick_count >= 1`, zero held resources and
+`controls_released=true`.
+
+The controlled water-bucket fixture uses the production dynamic landing-cell
+binding rather than a model-authored placeholder coordinate:
+
+```powershell
+Get-Content -Raw scripts\fixtures\minecraft-guardian-direct-water-bucket-rescue.json |
+  npm run helix:minecraft:player-stage-diagnostic -- --max-duration-ms 9000
+```
+
+Reset the disposable platform and player first. The program must contain a
+separate locomotion lane, wait for measured downward velocity and
+`predicted_collision_within`, then place through
+`position_binding.binding_kind=predicted_collision_cell`. A successful receipt
+must identify the resolved integer target, first collision tick, placement
+reach forecast, one water mutation, one inventory transition, and released
+controls. A timeout must retain `timeout_reason`, `last_runtime_summary`, and
+the most recent target/placement forecast; do not reduce that evidence to
+`solver_continuation_pending` or a generic adapter failure.
+
+### Codex-owned local task entry
+
+Once the operator has selected and persisted `movement` or `full`, Codex owns
+the remaining mechanical test entry. Do not pause a running acceptance goal to
+ask the player to retype `/helix-player diagnostic ...`, copy an action JSON
+object, close a workflow-owned screen, or enter a World Authority command.
+
+- Stage Player Embodiment work with
+  `scripts/helix-minecraft-player-stage-diagnostic.ts`, then read the exact
+  terminal workflow event from the client log.
+- Send Minecraft server commands through the already verified local Fabric
+  server console session. Never substitute host shell, RCON, files or a leaked
+  credential for this game-scoped World Authority path.
+- A pending action rejected with `screen_open` is evidence of a manual-override
+  boundary, not permission to spray input. If the screen was opened by the
+  immediately preceding workflow, the current client build closes it during
+  settlement. For an older already-running client, Codex may send one bounded
+  Escape only after verifying that exactly one visible `javaw` window is the
+  Minecraft client, then must start a fresh typed action and retain both the
+  canceled and repaired traces.
+- Pairing remains a distinct authority operation. When a fresh room code is
+  genuinely required, Codex should use the connector's opaque pairing inbox or
+  the verified Fabric server console rather than asking the player to act as a
+  clipboard. It must not print, log or re-expose the pairing material.
+
+The persistent local-control preference is enough authorization for later
+direct-reference actions within its selected scope. A client restart must not
+reintroduce operator ceremony: verify the restored-scope log, clear any stale
+offline request as startup already requires, and stage the next task directly.
+Only a revoked/invalid preference, a latched emergency stop, a material change
+of authority scope, or an action whose risk exceeds the saved scope requires
+fresh operator action.
+
+The helper validates the shared Minecraft player-action, fluid-sequence or
+concurrent reactive-program schema, chooses only
+`native_fabric` or the exact requested Baritone navigation engine, bounds the
+duration, and atomically writes
+`<Fabric instance>/config/helix-fabric-player-agent.diagnostic-inbox.json`.
+The client claims and deletes that regular file before execution, rejects stale
+or oversized requests, validates every field again locally, and never accepts
+Minecraft commands, host shell, paths, URLs, credentials or arbitrary code.
+The movement scope rejects interaction/inventory/world-mutation action kinds;
+the full scope must have been selected by the local operator before those kinds
+are consumed.
+Do not pre-stage a request and then enable the inbox: enabling deliberately
+clears pending files so current-session player intent remains observable.
+
+This handoff removes unreliable OS keystroke automation from direct-reference
+testing; it does not create a second agent runtime. Codex still authors the
+semantic typed action, the production controller performs mechanics, and the
+credential-free diagnostic log remains the only comparison observation. Helix
+admission, leases, evidence re-entry and terminal authority remain absent from
+the direct lane and must be tested separately with the same fixture.
+
 Each request and workflow event is logged as bounded credential-free JSON after
 the marker `HELIX_PLAYER_DIRECT_DIAGNOSTIC`. Records identify the lane as
 `direct_codex_reference`, report `admission_status=local_operator_diagnostic`,
@@ -437,6 +593,14 @@ observation re-entry, Codex synthesis or Helix terminal eligibility. Run the
 same semantic request through Helix next and stop at the first divergent public
 stage.
 
+The direct-reference lane has no Helix action transport authority, so a stale
+or offline remote connector must not cancel its local controller workflow.
+Connection loss to the Minecraft world, manual input, the local emergency stop,
+or a controller postcondition may still stop it. A direct diagnostic that
+settles as `connector_offline` solely because keyed Helix is parked is a client
+runtime regression; preserve that failed trace, repair the lane boundary, then
+rerun the same local action before starting the keyed comparison.
+
 Convert the exact client log records into the public differential-capture input
 without copying chat text or private connector material:
 
@@ -450,6 +614,208 @@ The capture command selects the newest diagnostic by default. Pass
 to create a capture until that exact workflow has a terminal controller event.
 The output contains hashes and bounded lifecycle facts, not raw world content,
 credentials, hidden reasoning, assistant prose or terminal authority.
+
+For a strict A/B run, pass the **same complete semantic prompt**, scenario ID
+and `--comparison-mode` to the direct capture. Comparison mode retains the
+actual measured result and exact source refs while projecting lane-neutral
+fixture preconditions, the shared capability contract and bounded
+started/terminal progress. It does not claim Helix admission, evidence re-entry
+or terminal authority for the direct lane.
+
+### Fluid TAS sequence acceptance
+
+Use `com.casimirbot.minecraft.player.sequence.execute` when a natural objective
+needs several tick-sensitive client actions. This is one provider-neutral tool
+call containing a finite acyclic graph; it is not a private adapter planner and
+does not authorize Minecraft commands. `survival_tas` is the only executable
+Player Embodiment ruleset. `command_assisted_sandbox` requires separately
+authorized World Authority, and `copilot_speedrun` remains guidance-only.
+
+The first micro-course must require all of the following in one sequence:
+
+1. inspect and retain the current pose, focus, inventory, equipped items,
+   health/food, dimension, nearby hazards and portal context;
+2. perform a bounded look, sprint/walk and timed jump;
+3. interact with a verified reachable target;
+4. select/equip an item and perform inventory or crafting work;
+5. branch or wait on current Fabric-observed state;
+6. reach explicit checkpoints and a typed success or failure terminal; and
+7. release every connector-owned control on success, failure, timeout, manual
+   override, cancellation and emergency stop.
+
+Fabric evaluates immediate conditions at 20 Hz. Codex authors the objective,
+resource/crafting strategy, graph and any later repair after observing the
+result. Helix validates identity, capability, ruleset, finite lease, engine,
+mutation ceilings, evidence identity and terminal eligibility; it never adds a
+hidden movement or recovery policy.
+
+Acceptance records these independent measurements:
+
+- exact client/world ticks from start to verified terminal checkpoint;
+- wall-clock elapsed milliseconds, without deriving it from nominal TPS;
+- number of northbound tool calls and remote model round trips;
+- executed node/checkpoint identities, deviations and retries;
+- inventory/world-effect counts within the admitted scope;
+- compact condition observations, capped at 512 changes and validated against
+  the admitted node and condition identity; and
+- `controls_released=true` on the exact terminal event.
+
+Compare this with a one-action-per-turn baseline that restores equivalent
+starting state. The sequence passes the fluidity claim only when it uses
+materially fewer remote round trips and no more Minecraft world ticks for the
+same verified checkpoint. A faster wall clock caused only by a different TPS,
+stale state, skipped interaction, omitted crafting/inventory work or weaker
+postconditions is not a pass.
+
+Run direct Codex first through the local diagnostic inbox, capture its public
+request/events/result, then restore the fixture and submit the identical
+natural prompt through keyed Helix. Compare prompt, proposed request,
+admission, execution ticks, normalized observation refs, re-entry, later Codex
+candidate, route product, terminal writer and text/voice hashes. Repair the
+first shared-contract divergence; do not tune the prompt around a downstream
+adapter contradiction.
+
+The same A0 lane accepts `execute_reactive_program`. Use it before A1/B to
+prove camera/locomotion/hand concurrency, event and interrupt transitions,
+trajectory/placement conditions, race settlement and final control release
+without Helix admission or terminal projection. The direct capture preserves
+the guardian capability identity and its parallel, race and placement receipts
+while keeping terminal authority `not_applicable`.
+
+Use three explicit surfaces when the failure boundary is unclear:
+
+1. **A0 â€” Fabric direct diagnostic:** stage the typed action through the
+   consented local diagnostic inbox. This proves only the Fabric contract,
+   controller, perception and game effect; it does not prove Helix admission.
+2. **A1 â€” Codex through Helix MCP:** connect Codex to the authenticated
+   Streamable HTTP `/mcp` resource and call
+   `helix_minecraft_player_action`, `helix_minecraft_workflow_status`, or
+   `helix_minecraft_workflow_control`. This retains the real account, room,
+   selected participant/player, action authority, lease, broker, manifest,
+   heartbeat, provenance and evidence normalization while bypassing Helix Ask
+   prompt interpretation and terminal projection.
+3. **B â€” Helix Ask/Shared Live Room:** submit the natural prompt through the
+   real Ask or Realtime handoff and require current-turn observation re-entry,
+   a Codex final candidate, route-product survival and terminal authority.
+
+If A0 fails, repair the Fabric capability or fixture. If A0 passes and A1
+fails, repair MCP/broker identity, scope, admission or observation transport.
+If A1 passes and B fails, repair Ask tool admission, continuation, evidence
+re-entry or terminal projection. Never make a later deterministic rail invent
+an answer to compensate for an earlier failure.
+
+For a mid-execution perturbation, keep the readiness watcher independent from
+the long Ask request. Start the watcher first, start Ask second, wait only for
+the first persistent active-workflow event, and apply the perturbation at once.
+Do not wait for both processes as one batch: that can delay the fixture until
+after the resident program has finished. Keep the changed condition in place
+until `active_workflow_count=0` and `controls_asserted=false`, then restore the
+player and fixture.
+
+An authored safety interrupt is a handled execution result, not an automatic
+workflow failure, when the exact admitted condition fired, its interrupt-only
+lane reached an explicit terminal, every required lane succeeded or was
+canceled by that same interrupt, and all controls were released. Preserve the
+exact interrupt and lane identities in the receipt. The broker must reject a
+forged or incomplete settlement, and Helix Ask must re-enter the accepted
+receipt for Codex synthesis rather than treating the receipt itself as an
+answer.
+
+For a local keyed A1 run, start CasimirBot only through the opaque
+`start-myapp-for-codex` launcher, then add a Codex MCP server whose URL is
+`http://localhost:1522/mcp`. Request only the scopes required by the test:
+`helix.rooms.read`, `helix.environment_actions.read`, and
+`helix.environment_actions.write`. Enable only the three Minecraft tools plus
+`helix_environment_device_check`, use write-sensitive approval mode at the
+Codex host/app layer, complete the configured OAuth/account binding, and
+restart the Codex host so it reloads the MCP catalog. The credential-free
+trusted-project configuration is:
+
+```toml
+[mcp_servers.casimirbot_local]
+url = "http://localhost:1522/mcp"
+oauth_resource = "https://casimirbot.com/mcp"
+scopes = [
+  "helix.rooms.read",
+  "helix.environment_actions.read",
+  "helix.environment_actions.write",
+]
+enabled_tools = [
+  "helix_environment_device_check",
+  "helix_minecraft_player_action",
+  "helix_minecraft_workflow_status",
+  "helix_minecraft_workflow_control",
+]
+enabled = true
+required = false
+startup_timeout_sec = 20
+tool_timeout_sec = 360
+```
+
+Do not add `auth = "oauth"`; current Codex initiates OAuth when the remote MCP
+server has no bearer-token or static authentication configuration. Never paste
+an access token, room-source bearer, action pairing code, or Minecraft account
+credential into `config.toml`, a prompt, or debug output.
+
+The localhost transport intentionally retains the deployed resource identity
+`https://casimirbot.com/mcp`; it must match the `resource` advertised by the
+keyed server's protected-resource metadata and the configured OAuth audience.
+
+MCP does not make the Fabric mod start `codex.exe`, and the mod cannot launch
+Minecraft before it is loaded. Launcher start is a separate explicit
+workstation capability; one-shot loopback auto-join begins only after the
+known Minecraft profile starts. The production connector remains
+provider-neutral and never receives a model-provider credential.
+
+For the local Windows Fabric reference lane, the complete launcher-to-loopback
+handoff can be exercised without asking the player to relay clicks or menu
+actions:
+
+```powershell
+npm run helix:minecraft:launch-fabric-loopback -- --Address localhost:25565
+```
+
+Run it only after the dedicated loopback server is listening. If a compatible
+Minecraft client is already connected, the operation succeeds idempotently as
+`reused_client` plus `already_connected`. If a client is running but has not
+connected, the adapter waits for its Helix mod-load signal and stages the same
+one-shot auto-join. Otherwise it requires the most recently used installed
+profile to be Fabric for the requested game version, waits for the rendered
+launcher Play control rather than assuming the launcher window is ready, closes
+only the launcher UI after its new Java client starts, and then stages
+auto-join. Success is the typed
+`helix.minecraft.workstation_launch_receipt.v1` receipt plus an established
+client connection—not a click attempt.
+
+The room owner may invoke the identical executor from either the localhost
+browser or the packaged EXE with **Start or join localhost** on the Minecraft
+local lifecycle card. Both shells call
+`POST /api/agi/environment-connectors/local/minecraft/fabric-loopback/launch`
+with explicit operator confirmation. The route requires same-origin loopback,
+a trusted signed-in developer account, and the fixed loopback address. Codex
+uses the capability
+`environment.minecraft.fabric_loopback.launch_and_join` through the normal
+confirmation-bound workstation gateway. Do not add renderer-specific process
+launch logic: browser, EXE, and Codex must retain one executor, receipt schema,
+and typed failure vocabulary.
+
+`minecraft_fabric_profile_selection_required`,
+`minecraft_launcher_play_control_timeout`,
+`minecraft_helix_mod_load_timeout`, and
+`minecraft_loopback_connect_timeout` are actionable lifecycle failures. This
+command does not pair a room, grant an action lease, start Codex, or expose an
+account credential.
+
+When memory pressure makes the full workstation UI counterproductive, use the
+same-origin operator probe at
+`http://localhost:1522/codex-local-ask-probe.html`. It reuses the authenticated
+room owner session, exposes only sanitized readiness, and can submit the same
+Ask prompt plus load its exact-turn server-redacted debug export. It must never
+render or download pairing codes, connector credentials, cookies, provider
+credentials or hidden model reasoning. Pairing uses the documented single-copy
+opaque handoff; in a same-host Codex run, deliver it directly to the bounded
+Fabric client inbox through the browser session clipboard rather than asking
+the player to act as a command relay.
 
 The room intentionally reports authority and connector readiness separately.
 `authority active` means an owner-created finite lease exists; it is not a
@@ -554,20 +920,32 @@ yaw/pitch. This second turn must select a read capability and may not reuse the
 action result as if it were a fresh World Authority observation.
 
 After normalizing the two public traces to
-`helix.environment_action.differential_trace.v1`, run the observer-only audit:
+`helix.environment_action.differential_trace.v1`, run the observer-only audit.
+Prefer the strict builders below over hand-authoring lifecycle JSON. The Helix
+builder reads only explicit executed-action, re-entry, provider-candidate,
+terminal-presentation and single-writer paths from the server-redacted
+exact-turn export. It intentionally does not recursively select the first
+familiar `capability_id`, `outcome`, `status` or `observation_reentered` field,
+because catalog defaults and manifest projections are not execution evidence.
 
-Start from
-`docs/runbooks/fixtures/helix-minecraft-player-differential-capture.example.json`.
-Replace every example ref and public-text placeholder with values from the exact
-turn. For the `direct_codex` lane, set admission and terminal-authority fields
-to `not_applicable`, and leave route-product, terminal-writer, visible and voice
-text fields `null` unless that direct harness actually publishes those public
-stages. Never fill a missing stage from a later projection merely to make the
-audit pass. `source_artifact_refs` must name the exact direct-run public record
-or Helix Ask debug export used to construct the capture; the generated
-`public_capture_hash` binds the normalized trace to that operator input.
+Use the same prompt and scenario ID in both builders:
 
 ```powershell
+npm run helix:minecraft:player-direct-capture -- `
+  --log "$env:APPDATA\.minecraft\logs\latest.log" `
+  --workflow-id <exact-direct-workflow-id> `
+  --prompt <exact-semantic-prompt> `
+  --scenario <shared-scenario-id> `
+  --comparison-mode `
+  --out <direct-codex-public-capture.json>
+
+npm run helix:minecraft:player-helix-capture -- `
+  --url "http://localhost:1522/api/agi/ask/turn/<encoded-exact-turn-id>/debug-export" `
+  --capability <exact-capability-id> `
+  --prompt <exact-semantic-prompt> `
+  --scenario <shared-scenario-id> `
+  --out <helix-public-capture.json>
+
 npm run helix:minecraft:player-trace -- `
   --input <direct-codex-public-capture.json> `
   --out <direct-codex-trace.json>
@@ -581,6 +959,14 @@ npm run helix:minecraft:player-differential -- `
   --helix <helix-trace.json> `
   --out <differential-audit.json>
 ```
+
+The Helix capture fails closed if the requested exact executed action is
+absent, the tool lifecycle lacks an observation ref, or the turn lacks selected
+terminal text. `source_artifact_refs` bind each capture to the direct workflow
+or exact Ask turn and evidence identity. The legacy example at
+`docs/runbooks/fixtures/helix-minecraft-player-differential-capture.example.json`
+remains useful for schema orientation, but never fill a missing stage from a
+later projection merely to manufacture a passing audit.
 
 The audit records hashes and the first divergence. It never reads hidden model
 reasoning, admits an action, changes a result, or grants terminal authority.
@@ -623,7 +1009,7 @@ For a Player Embodiment scenario, require this separate chain:
 
 ```text
 active participant-to-player binding and action authority verified
-fresh client manifest/heartbeat and frozen 13-action catalog admitted
+fresh client manifest/heartbeat and frozen 14-action catalog admitted
 Codex requests one semantic action
 Fabric client leases the exact one-shot request
 ordered progress plus raw player-embodiment events are retained
@@ -662,38 +1048,39 @@ architectural failure by hard-coding one prompt.
 
 ## 8. Fast troubleshooting
 
-| Symptom                                                                                                           | Likely boundary                                               | Next check                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Port 1522 is absent                                                                                               | Keyed CasimirBot lifecycle                                    | Use only the opaque keyed launcher and wait for app ready.                                                                                                                                                                                                                                                                                                                                                                                               |
-| Port 25565 is absent                                                                                              | Fabric server lifecycle                                       | Start with the explicit Java 21 executable and inspect the server console.                                                                                                                                                                                                                                                                                                                                                                               |
-| `room_source_binding_closed`                                                                                      | Room/source admission                                         | Create a fresh source binding for the current room, install it locally, and restart Fabric.                                                                                                                                                                                                                                                                                                                                                              |
-| Source is configured but not active                                                                               | Manifest/heartbeat admission                                  | Check the sanitized typed source status and adapter/world identity.                                                                                                                                                                                                                                                                                                                                                                                      |
-| Source says Paper                                                                                                 | Wrong adapter identity                                        | Create a Fabric binding; do not reuse the Paper setup packet.                                                                                                                                                                                                                                                                                                                                                                                            |
-| A player-state prompt that says `Report my player...` requests `docs_viewer`                                      | Prompt interpretation                                         | Treat `report` as an output verb unless the surrounding phrase identifies an actual report document. The Minecraft prompt must admit `live_environment`.                                                                                                                                                                                                                                                                                                 |
-| A player-state prompt containing `check ... online` requires web search                                           | Source-route projection contradiction                         | Once `live_environment` is committed, internet evidence guards must validate only an explicitly committed `internet_search` route. Retain lexical web detection only for legacy/provider-only turns without route authority. Do not add a Minecraft prompt exception.                                                                                                                                                                                    |
-| A Player Embodiment safety prompt requests docs/search or Minecraft command authority                             | Prompt interpretation / capability itinerary contradiction    | Treat the paired player client as a local live-observation scope. Preserve safety conditions such as solid support, headroom, fire and drop checks as operative action guards. A negative constraint such as `do not issue a server command` must forbid command admission; bare `no` inside `no nearby fire` must not negate a later walk. The expected itinerary is the matching read/action/read capability sequence, not a prompt-specific fallback. |
-| Active Fabric source returns `subject_binding_required`                                                           | Participant-to-subject binding                                | Confirm the player is online, refresh the sanitized subject directory, then select that player under **Your identity in this environment**. Do not bypass identity selection or expose a raw player UUID.                                                                                                                                                                                                                                                |
-| The first probe after a keyed restart says every matching connector admission is stale                            | Connector freshness recovery                                  | Preserve the fail-closed result. Wait for the Fabric manifest/heartbeat to be freshly admitted after pg-mem restore and connector backoff, confirm the sanitized source is active, then start a new turn. Re-pair only if freshness does not recover.                                                                                                                                                                                                    |
-| Probe waits indefinitely                                                                                          | Connector poll/result lane                                    | Confirm Fabric is running, manifest-admitted, and polling after heartbeat startup.                                                                                                                                                                                                                                                                                                                                                                       |
-| Player action says no paired client                                                                               | Player Embodiment pairing                                     | Confirm the action authority is active, redeem a fresh action-only code with `/helix-player pair`, then check the sanitized client manifest/heartbeat. Do not reuse source or command pairing.                                                                                                                                                                                                                                                           |
-| Relative look completes but the reported pose is absent or unchanged                                              | Player-action measurement continuity                          | Require initial, target and final yaw/pitch plus applied deltas and errors on the exact accepted terminal workflow event. Confirm the gateway observation exposes only server-validated `verified_terminal_measurements`; do not trust a detached client result summary or coerce an unknown target into `current_focus`.                                                                                                                                |
-| A follow-up asks for fresh yaw/pitch but no read capability runs                                                  | Required observation-family continuation                      | Confirm the committed route still requires `live_environment`, then require one capability-neutral retry that lets Codex choose an admitted read capability. The adapter may state the missing family but must not preselect actor status or author the answer.                                                                                                                                                                                          |
-| Player action returns `request_canceled` with `manual_override_detected`                                          | Player Embodiment manual-override boundary                    | Read the exact `manual_override_reason`. For `screen_open`, return to the normal crosshair/world view; for a named mouse or movement key, release it; for `unexpected_view_change`, stop moving the camera. Do not automatically issue another physical action in the same turn. Confirm `action_ticks_before_override=0` before asserting that no player side effect occurred, then start a fresh user-authorized turn.                                 |
-| An executed manual cancellation is labeled `admission_status: blocked` or `retry_recommendation: retry_same_tool` | Gateway lifecycle projection contradiction                    | Admission must remain `admitted` after execution begins. Confirm the observation carries `repair_action: ask_user`, then require the gateway trace to project `next_action: ask_user` and `external_change_required: true`; do not rely only on model-prompt wording to suppress physical replay.                                                                                                                                                        |
-| A semantic retry returns `action_request_conflict` after the first action timed out                               | Player-action broker idempotency projection                   | Compare the stored and retried semantic projections, excluding request/workflow/condition/tool-call ids and timestamps. The same turn/capability/arguments must resolve to the original request; changed authority, identity, capability, arguments, conditions, approval or constraints must still conflict. Do not generate a new physical action to hide the contradiction.                                                                           |
-| A workflow physically settles but its gateway wait expires                                                        | Player-embodiment delivery outbox                             | Inspect sanitized `action_delivery_<stage>_*` status and verify the same workflow event, event batch and terminal result identities remain queued in that order until acknowledged. Do not replay player input. The next action must remain blocked while delivery evidence is pending.                                                                                                                                                                  |
-| A failed action is followed by a successful same-turn retry, but the answer repeats the earlier failure           | Provider failure-authority projection contradiction          | Keep the failed attempt in provenance. If a later admitted observation for the same exact turn and capability satisfies the required occurrence, `wrong_environment`/`wrong_world` no longer blocks terminal synthesis. Never use cross-turn or unrelated-capability evidence, and never supersede hard permission/provenance failures such as `permission_revoked`. Confirm the lifecycle differential has no provider-candidate/runtime-message mismatch. |
-| First player action settles, then later actions time out while the client log repeats `action_event_invalid`      | Player-embodiment event normalization/provenance backpressure | Keep the provenance backpressure enabled. Compare the connector's canonical event-batch bytes/hash with the Node event-store canonicalization, including floating-point spellings such as zero, whole values and scientific notation. Relaunch the rebuilt client after repairing parity so the rejected in-memory batch is cleared, then rerun the same natural prompt.                                                                                 |
-| `/helix-player` is unknown or pairing prints the generic connector success message                                | Client companion lifecycle                                    | Close Minecraft completely, verify `HelixFabricPlayerAgent-0.2.0.jar` is in the active instance's client `mods` directory, relaunch Fabric 1.21.8, and confirm the dedicated player-agent load message before rotating another one-time code.                                                                                                                                                                                                            |
-| Room says `authority active` but `waiting for client`                                                             | Action readiness                                              | The lease exists but no matching admitted manifest plus fresh heartbeat exists. Check the loaded client mod, exact paired player identity and `/helix-player status`; do not count this as ready.                                                                                                                                                                                                                                                        |
-| Room/API and action execution refer to different active authority IDs                                             | Authority supersession/projection                             | Save player authority once through the current owner UI. Confirm only the newest policy/newest-created lease remains active for the environment and participant before rotating an action-only pairing. Do not pair against whichever row happened to be returned first.                                                                                                                                                                                 |
-| Baritone was requested but not admitted                                                                           | Control-engine admission                                      | Confirm Baritone is installed in the client and declared in that exact live manifest; otherwise use native navigation or retain the typed limitation.                                                                                                                                                                                                                                                                                                    |
-| Workflow reports success but Helix returns `postcondition_failed`                                                 | Measurement/evidence normalization                            | Inspect the exact terminal action event for required measurements, evidence refs and admitted count ceilings. Do not weaken postcondition authority.                                                                                                                                                                                                                                                                                                     |
-| Manual input does not stop movement                                                                               | Client override safety                                        | Use `/helix-player emergency-stop`, verify controls released, preserve the trace, and do not continue mutating tests until fixed.                                                                                                                                                                                                                                                                                                                        |
-| Tool completed but answer is missing                                                                              | Evidence re-entry or continuation                             | Look for the current-turn observation and the required post-tool model step.                                                                                                                                                                                                                                                                                                                                                                             |
-| Answer describes old state                                                                                        | Freshness/current-turn authority                              | Move again and require a new probe with a bounded freshness requirement.                                                                                                                                                                                                                                                                                                                                                                                 |
-| GPT Live fails while text succeeds                                                                                | Realtime provider route                                       | Diagnose Realtime separately; do not infer that the shared API key must be replaced.                                                                                                                                                                                                                                                                                                                                                                     |
-| Worker exits or the machine approaches its memory limit                                                           | Local resource pressure                                       | Pause new heavy work at 90% and hard-stop the current heavy/keyed process at 95%, park polling localhost tabs, keep one keyed Node tree and one Fabric tree, remove only verified redundant helper trees, serialize builds/suites, and separate infrastructure failure from product failure. The opaque launcher is the only permitted keyed-server restart path.                                                                                        |
+| Symptom                                                                                                           | Likely boundary                                               | Next check                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Port 1522 is absent                                                                                               | Keyed CasimirBot lifecycle                                    | Use only the opaque keyed launcher and wait for app ready.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Port 25565 is absent                                                                                              | Fabric server lifecycle                                       | Start with the explicit Java 21 executable and inspect the server console.                                                                                                                                                                                                                                                                                                                                                                                  |
+| `room_source_binding_closed`                                                                                      | Room/source admission                                         | Create a fresh source binding for the current room, install it locally, and restart Fabric.                                                                                                                                                                                                                                                                                                                                                                 |
+| Source is configured but not active                                                                               | Manifest/heartbeat admission                                  | Check the sanitized typed source status and adapter/world identity.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Source says Paper                                                                                                 | Wrong adapter identity                                        | Create a Fabric binding; do not reuse the Paper setup packet.                                                                                                                                                                                                                                                                                                                                                                                               |
+| A player-state prompt that says `Report my player...` requests `docs_viewer`                                      | Prompt interpretation                                         | Treat `report` as an output verb unless the surrounding phrase identifies an actual report document. The Minecraft prompt must admit `live_environment`.                                                                                                                                                                                                                                                                                                    |
+| A player-state prompt containing `check ... online` requires web search                                           | Source-route projection contradiction                         | Once `live_environment` is committed, internet evidence guards must validate only an explicitly committed `internet_search` route. Retain lexical web detection only for legacy/provider-only turns without route authority. Do not add a Minecraft prompt exception.                                                                                                                                                                                       |
+| A Player Embodiment safety prompt requests docs/search or Minecraft command authority                             | Prompt interpretation / capability itinerary contradiction    | Treat the paired player client as a local live-observation scope. Preserve safety conditions such as solid support, headroom, fire and drop checks as operative action guards. A negative constraint such as `do not issue a server command` must forbid command admission; bare `no` inside `no nearby fire` must not negate a later walk. The expected itinerary is the matching read/action/read capability sequence, not a prompt-specific fallback.    |
+| Active Fabric source returns `subject_binding_required`                                                           | Participant-to-subject binding                                | Confirm the player is online, refresh the sanitized subject directory, then select that player under **Your identity in this environment**. Do not bypass identity selection or expose a raw player UUID.                                                                                                                                                                                                                                                   |
+| The first probe after a keyed restart says every matching connector admission is stale                            | Connector freshness recovery                                  | Preserve the fail-closed result. Wait for the Fabric manifest/heartbeat to be freshly admitted after pg-mem restore and connector backoff, confirm the sanitized source is active, then start a new turn. Re-pair only if freshness does not recover.                                                                                                                                                                                                       |
+| Probe waits indefinitely                                                                                          | Connector poll/result lane                                    | Confirm Fabric is running, manifest-admitted, and polling after heartbeat startup.                                                                                                                                                                                                                                                                                                                                                                          |
+| Player action says no paired client                                                                               | Player Embodiment pairing                                     | Confirm the action authority is active, redeem a fresh action-only code with `/helix-player pair`, then check the sanitized client manifest/heartbeat. Do not reuse source or command pairing.                                                                                                                                                                                                                                                              |
+| Relative look completes but the reported pose is absent or unchanged                                              | Player-action measurement continuity                          | Require initial, target and final yaw/pitch plus applied deltas and errors on the exact accepted terminal workflow event. Confirm the gateway observation exposes only server-validated `verified_terminal_measurements`; do not trust a detached client result summary or coerce an unknown target into `current_focus`.                                                                                                                                   |
+| A follow-up asks for fresh yaw/pitch but no read capability runs                                                  | Required observation-family continuation                      | Confirm the committed route still requires `live_environment`, then require one capability-neutral retry that lets Codex choose an admitted read capability. The adapter may state the missing family but must not preselect actor status or author the answer.                                                                                                                                                                                             |
+| Player action returns `request_canceled` with `manual_override_detected`                                          | Player Embodiment manual-override boundary                    | Read the exact `manual_override_reason`. For `screen_open`, return to the normal crosshair/world view; for a named mouse or movement key, release it; for `unexpected_view_change`, stop moving the camera. Do not automatically issue another physical action in the same turn. Confirm `action_ticks_before_override=0` before asserting that no player side effect occurred, then start a fresh user-authorized turn.                                    |
+| An executed manual cancellation is labeled `admission_status: blocked` or `retry_recommendation: retry_same_tool` | Gateway lifecycle projection contradiction                    | Admission must remain `admitted` after execution begins. Confirm the observation carries `repair_action: ask_user`, then require the gateway trace to project `next_action: ask_user` and `external_change_required: true`; do not rely only on model-prompt wording to suppress physical replay.                                                                                                                                                           |
+| A semantic retry returns `action_request_conflict` after the first action timed out                               | Player-action broker idempotency projection                   | Compare the stored and retried semantic projections, excluding request/workflow/condition/tool-call ids and timestamps. The same turn/capability/arguments must resolve to the original request; changed authority, identity, capability, arguments, conditions, approval or constraints must still conflict. Do not generate a new physical action to hide the contradiction.                                                                              |
+| A workflow physically settles but its gateway wait expires                                                        | Player-embodiment delivery outbox                             | Inspect sanitized `action_delivery_<stage>_*` status and verify the same workflow event, event batch and terminal result identities remain queued in that order until acknowledged. Do not replay player input. The next action must remain blocked while delivery evidence is pending.                                                                                                                                                                     |
+| A direct diagnostic immediately returns `connector_offline` while keyed Helix is parked                           | Direct-reference/runtime transport boundary                   | Confirm the workflow is the local `direct_codex_reference` lane. Remote transport loss must fail closed only an active remotely admitted action envelope; it must not cancel a local diagnostic. Preserve the failed trace, repair the shared runtime predicate, relaunch the rebuilt client and rerun the same diagnostic.                                                                                                                                 |
+| A failed action is followed by a successful same-turn retry, but the answer repeats the earlier failure           | Provider failure-authority projection contradiction           | Keep the failed attempt in provenance. If a later admitted observation for the same exact turn and capability satisfies the required occurrence, `wrong_environment`/`wrong_world` no longer blocks terminal synthesis. Never use cross-turn or unrelated-capability evidence, and never supersede hard permission/provenance failures such as `permission_revoked`. Confirm the lifecycle differential has no provider-candidate/runtime-message mismatch. |
+| First player action settles, then later actions time out while the client log repeats `action_event_invalid`      | Player-embodiment event normalization/provenance backpressure | Keep the provenance backpressure enabled. Compare the connector's canonical event-batch bytes/hash with the Node event-store canonicalization, including floating-point spellings such as zero, whole values and scientific notation. Relaunch the rebuilt client after repairing parity so the rejected in-memory batch is cleared, then rerun the same natural prompt.                                                                                    |
+| `/helix-player` is unknown or pairing prints the generic connector success message                                | Client companion lifecycle                                    | Close Minecraft completely, verify `HelixFabricPlayerAgent-0.3.0.jar` is in the active instance's client `mods` directory, relaunch Fabric 1.21.8, and confirm the dedicated player-agent load message before rotating another one-time code.                                                                                                                                                                                                               |
+| Room says `authority active` but `waiting for client`                                                             | Action readiness                                              | The lease exists but no matching admitted manifest plus fresh heartbeat exists. Check the loaded client mod, exact paired player identity and `/helix-player status`; do not count this as ready.                                                                                                                                                                                                                                                           |
+| Room/API and action execution refer to different active authority IDs                                             | Authority supersession/projection                             | Save player authority once through the current owner UI. Confirm only the newest policy/newest-created lease remains active for the environment and participant before rotating an action-only pairing. Do not pair against whichever row happened to be returned first.                                                                                                                                                                                    |
+| Baritone was requested but not admitted                                                                           | Control-engine admission                                      | Confirm Baritone is installed in the client and declared in that exact live manifest; otherwise use native navigation or retain the typed limitation.                                                                                                                                                                                                                                                                                                       |
+| Workflow reports success but Helix returns `postcondition_failed`                                                 | Measurement/evidence normalization                            | Inspect the exact terminal action event for required measurements, evidence refs and admitted count ceilings. Do not weaken postcondition authority.                                                                                                                                                                                                                                                                                                        |
+| Manual input does not stop movement                                                                               | Client override safety                                        | Use `/helix-player emergency-stop`, verify controls released, preserve the trace, and do not continue mutating tests until fixed.                                                                                                                                                                                                                                                                                                                           |
+| Tool completed but answer is missing                                                                              | Evidence re-entry or continuation                             | Look for the current-turn observation and the required post-tool model step.                                                                                                                                                                                                                                                                                                                                                                                |
+| Answer describes old state                                                                                        | Freshness/current-turn authority                              | Move again and require a new probe with a bounded freshness requirement.                                                                                                                                                                                                                                                                                                                                                                                    |
+| GPT Live fails while text succeeds                                                                                | Realtime provider route                                       | Diagnose Realtime separately; do not infer that the shared API key must be replaced.                                                                                                                                                                                                                                                                                                                                                                        |
+| Worker exits or the machine approaches its memory limit                                                           | Local resource pressure                                       | Pause new heavy work at 90% and hard-stop the current heavy/keyed process at 95%, park polling localhost tabs, keep one keyed Node tree and one Fabric tree, remove only verified redundant helper trees, serialize builds/suites, and separate infrastructure failure from product failure. The opaque launcher is the only permitted keyed-server restart path.                                                                                           |
 
 ## 9. Test closure
 

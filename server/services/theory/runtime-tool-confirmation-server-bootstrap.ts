@@ -2,6 +2,7 @@ import { createPublicKey } from "node:crypto";
 import type { Pool } from "pg";
 
 import { installSharedLiveRoomGatewayConfirmationDependenciesForServerV1 } from "../helix-ask/workstation-tool-gateway/shared-live-room";
+import { installMinecraftLocalLifecycleConfirmationDependenciesForServerV1 } from "../helix-ask/workstation-tool-gateway/minecraft-local-lifecycle";
 import { createPostgresTrustedRuntimeToolConfirmationReplayLedgerV1 } from "./runtime-tool-confirmation-postgres-replay-ledger";
 import {
   installCasimirTheoryExecutionRuntimeApprovalDependenciesForServerV1,
@@ -161,6 +162,9 @@ export const installRuntimeToolConfirmationVerifierAtServerBootstrapV1 = (
     installSharedLiveRoomGatewayConfirmationDependenciesForServerV1({
       requireDurableReplayProtection: true,
     });
+    installMinecraftLocalLifecycleConfirmationDependenciesForServerV1({
+      requireDurableReplayProtection: true,
+    });
     installCasimirTheoryExecutionRuntimeApprovalDependenciesForServerV1(
       {},
     );
@@ -182,6 +186,11 @@ export const installRuntimeToolConfirmationVerifierAtServerBootstrapV1 = (
       input.replayPool,
     );
   installSharedLiveRoomGatewayConfirmationDependenciesForServerV1({
+    verifyTrustedRuntimeReceipt,
+    replayLedger: confirmationReplayLedger,
+    requireDurableReplayProtection: true,
+  });
+  installMinecraftLocalLifecycleConfirmationDependenciesForServerV1({
     verifyTrustedRuntimeReceipt,
     replayLedger: confirmationReplayLedger,
     requireDurableReplayProtection: true,

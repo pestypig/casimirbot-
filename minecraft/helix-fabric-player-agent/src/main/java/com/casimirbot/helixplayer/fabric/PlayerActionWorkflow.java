@@ -2,6 +2,7 @@ package com.casimirbot.helixplayer.fabric;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public final class PlayerActionWorkflow {
     private PlayerActionWorkflow() {}
@@ -77,6 +78,28 @@ public final class PlayerActionWorkflow {
         }
     }
 
+    /**
+     * One narrow postcondition sample for the hand used by an admitted action.
+     * This deliberately exposes only the held item identity and count, not the
+     * player's full inventory or any native client object.
+     */
+    public record HandObservation(boolean available, String itemId, int count) {
+        public HandObservation {
+            itemId = itemId == null ? "" : itemId;
+            if (count < 0) {
+                throw new IllegalArgumentException("A held item count cannot be negative.");
+            }
+            if (!available) {
+                itemId = "";
+                count = 0;
+            }
+        }
+
+        public static HandObservation unavailable() {
+            return new HandObservation(false, "", 0);
+        }
+    }
+
     public record MovementInput(
         boolean forward,
         boolean back,
@@ -87,6 +110,78 @@ public final class PlayerActionWorkflow {
     ) {
         public static MovementInput released() {
             return new MovementInput(false, false, false, false, false, false);
+        }
+    }
+
+    /**
+     * One bounded, connector-local target sample. targetRef is deliberately an
+     * opaque per-client reference; native entity identities never cross the
+     * connector contract.
+     */
+    public record TargetObservation(
+        boolean available,
+        boolean alive,
+        boolean visible,
+        String targetRef,
+        String targetTypeId,
+        double x,
+        double y,
+        double z,
+        double velocityX,
+        double velocityY,
+        double velocityZ,
+        double distance,
+        long handoffCount
+    ) {
+        public TargetObservation(
+            boolean available,
+            boolean alive,
+            boolean visible,
+            String targetRef,
+            String targetTypeId,
+            double x,
+            double y,
+            double z,
+            double velocityX,
+            double velocityY,
+            double velocityZ,
+            double distance
+        ) {
+            this(
+                available, alive, visible, targetRef, targetTypeId,
+                x, y, z, velocityX, velocityY, velocityZ, distance, 0
+            );
+        }
+
+        public TargetObservation {
+            if (handoffCount < 0) {
+                throw new IllegalArgumentException("Particle handoff count cannot be negative.");
+            }
+            if (!available) {
+                alive = false;
+                visible = false;
+                targetRef = targetRef == null ? "" : targetRef;
+                targetTypeId = targetTypeId == null ? "" : targetTypeId;
+            } else {
+                requireIdentifier(targetRef, "targetRef");
+                requireIdentifier(targetTypeId, "targetTypeId");
+                for (double value : new double[] {
+                    x, y, z, velocityX, velocityY, velocityZ, distance
+                }) {
+                    if (!Double.isFinite(value)) {
+                        throw new IllegalArgumentException(
+                            "Target observations require finite coordinates and velocity."
+                        );
+                    }
+                }
+            }
+        }
+
+        public static TargetObservation unavailable(String targetRef) {
+            return new TargetObservation(
+                false, false, false, targetRef, "",
+                0, 0, 0, 0, 0, 0, 0, 0
+            );
         }
     }
 
@@ -160,9 +255,44 @@ public final class PlayerActionWorkflow {
 
         void lookTo(float yaw, float pitch, float maxDegreesPerTick);
 
+        default TargetObservation observeTarget(
+            Map<String, Object> target,
+            String lockedTargetRef,
+            String aimPoint,
+            double maxDistance,
+            boolean requireLineOfSight
+        ) {
+            return TargetObservation.unavailable(lockedTargetRef);
+        }
+
+        default void updateCameraTrackingTarget(
+            double x,
+            double y,
+            double z,
+            float maxDegreesPerTick,
+            float maxAccelerationDegreesPerTickSquared,
+            float deadbandDegrees
+        ) {
+            lookAt(x, y, z, maxDegreesPerTick);
+        }
+
+        default String renderCameraTrackingFrame(long frameNanos) {
+            return null;
+        }
+
+        default String renderReactiveProgramFrame(long frameNanos) {
+            return null;
+        }
+
+        default void clearCameraTrackingTarget() {}
+
         void pulseJump();
 
         boolean interact(String target, String hand, String interaction);
+
+        default HandObservation observeHand(String hand) {
+            return HandObservation.unavailable();
+        }
 
         boolean selectHotbar(int slot);
 
@@ -188,6 +318,18 @@ public final class PlayerActionWorkflow {
                 "The client companion does not advertise action kind " + actionKind + ".",
                 Map.of("action_kind", actionKind)
             );
+        }
+
+        default boolean evaluateFluidWorldCondition(Map<String, Object> condition) {
+            return false;
+        }
+
+        default Map<String, Object> compactFluidState() {
+            return Map.of();
+        }
+
+        default void releaseResources(Set<String> resources) {
+            releaseAll();
         }
 
         void releaseAll();

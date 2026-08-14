@@ -8,7 +8,8 @@ server commands.
 
 The shared lifecycle and safety schemas live in
 `shared/helix-environment-action.ts`. Minecraft capability arguments live in
-`shared/helix-minecraft-player-capabilities.ts`. The architecture contract is
+`shared/helix-minecraft-player-capabilities.ts`; the bounded fluid-program
+contract is `shared/helix-minecraft-fluid-sequence.ts`. The architecture contract is
 `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`.
 
 Implementation in this namespace must provide:
@@ -26,10 +27,18 @@ shell/files/processes/credentials. The gateway may publish the reviewed action
 contracts, but an execution remains unavailable unless the exact room authority
 has a current paired client manifest, heartbeat and catalog snapshot. Optional
 engines remain absent from the live client manifest until the running connector
-discovers and declares them. Fabric player-agent `0.2.0` implements the six
+discovers and declares them. Fabric player-agent `0.3.0` implements the six
 bounded reusable workflows; their terminal action events must include the
 measurements Helix validates against the admitted arguments and side-effect
 ceilings before success can re-enter Codex.
+
+The fluid sequence capability does not widen those boundaries. Codex authors a
+finite acyclic graph of existing actions, tick-addressed input segments,
+whitelisted current-state branches and typed checkpoints. Fabric executes the
+graph at 20 Hz and publishes only changed condition observations plus bounded
+terminal measurements. Helix admits identity, ruleset, engine, lease and
+mutation ceilings and validates evidence; it does not choose the route,
+resources, crafting strategy, recovery branch or final answer.
 
 `workflow-differential-audit.ts` is an observer-only comparison of normalized
 public direct-Codex and Helix workflow traces. It may report the first divergent

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import {
   HELIX_ASK_TURN_CHECKPOINT_SCHEMA,
   HELIX_ASK_TURN_JOURNAL_SCHEMA,
@@ -49,6 +50,8 @@ const resolveCheckpointPath = (): string => {
 
 const checkpointPersistEnabled = (): boolean =>
   process.env.HELIX_ASK_TURN_CHECKPOINT_PERSIST !== "0";
+
+const CHECKPOINT_READ_CHUNK_BYTES = 64 * 1024;
 
 const normalizeTranscriptEvent = (
   value: unknown,
@@ -215,28 +218,135 @@ export function readHelixAskTurnCheckpointRecords(options?: {
       ? null
       : Math.max(1, Math.floor(options.limit));
   const records: HelixAskTurnCheckpointRecord[] = [];
-  const raw = fs.readFileSync(checkpointPath, "utf8");
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const record = normalizeCheckpointRecord(JSON.parse(trimmed));
-      if (!record) continue;
-      if (threadId && record.thread_id !== threadId) continue;
-      if (sessionId && record.session_id !== sessionId) continue;
-      if (turnId && record.turn_id !== turnId) continue;
+  scanHelixAskTurnCheckpointRecords(
+    checkpointPath,
+    { threadId, sessionId, turnId },
+    (record) => {
       records.push(record);
-    } catch {
-      continue;
-    }
-  }
+      if (limit !== null && records.length > limit) {
+        records.splice(0, records.length - limit);
+      }
+    },
+  );
   const ordered = records.sort(
     (left, right) =>
       left.recorded_at.localeCompare(right.recorded_at) ||
       left.record_id.localeCompare(right.record_id),
   );
-  return limit === null ? ordered : ordered.slice(-limit);
+  return ordered;
 }
+
+type CheckpointRecordFilters = {
+  threadId: string | null;
+  sessionId: string | null;
+  turnId: string | null;
+};
+
+const scanHelixAskTurnCheckpointRecords = (
+  checkpointPath: string,
+  filters: CheckpointRecordFilters,
+  visit: (record: HelixAskTurnCheckpointRecord) => void,
+): void => {
+  const descriptor = fs.openSync(checkpointPath, "r");
+  const decoder = new StringDecoder("utf8");
+  const chunk = Buffer.allocUnsafe(CHECKPOINT_READ_CHUNK_BYTES);
+  let pending = "";
+  const acceptLine = (line: string): void => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    try {
+      const record = normalizeCheckpointRecord(JSON.parse(trimmed));
+      if (!record) return;
+      if (filters.threadId && record.thread_id !== filters.threadId) return;
+      if (filters.sessionId && record.session_id !== filters.sessionId) return;
+      if (filters.turnId && record.turn_id !== filters.turnId) return;
+      visit(record);
+    } catch {
+      // A malformed or partially written JSONL row is never recovery evidence.
+    }
+  };
+  const acceptDecoded = (decoded: string): void => {
+    pending += decoded;
+    let newline = pending.indexOf("\n");
+    while (newline >= 0) {
+      acceptLine(pending.slice(0, newline).replace(/\r$/u, ""));
+      pending = pending.slice(newline + 1);
+      newline = pending.indexOf("\n");
+    }
+  };
+  try {
+    let bytesRead = 0;
+    do {
+      bytesRead = fs.readSync(
+        descriptor,
+        chunk,
+        0,
+        CHECKPOINT_READ_CHUNK_BYTES,
+        null,
+      );
+      if (bytesRead > 0) acceptDecoded(decoder.write(chunk.subarray(0, bytesRead)));
+    } while (bytesRead > 0);
+    acceptDecoded(decoder.end());
+    if (pending) acceptLine(pending.replace(/\r$/u, ""));
+  } finally {
+    fs.closeSync(descriptor);
+  }
+};
+
+const compareCheckpointRecords = (
+  left: HelixAskTurnCheckpointRecord,
+  right: HelixAskTurnCheckpointRecord,
+): number =>
+  left.recorded_at.localeCompare(right.recorded_at) ||
+  left.record_id.localeCompare(right.record_id);
+
+const scanHelixAskTurnCheckpointSummary = (input: {
+  thread_id?: string | null;
+  session_id?: string | null;
+}): HelixAskTurnJournalSummary => {
+  const checkpointPath = resolveCheckpointPath();
+  if (!checkpointPersistEnabled() || !fs.existsSync(checkpointPath)) {
+    return buildJournalSummary([]);
+  }
+  let latest: HelixAskTurnCheckpointRecord | null = null;
+  let checkpointCount = 0;
+  let transcriptEventCount = 0;
+  let terminalPayloadCount = 0;
+  let completedTurnCount = 0;
+  let failedTurnCount = 0;
+  let interruptedTurnCount = 0;
+  const turnIds = new Set<string>();
+  scanHelixAskTurnCheckpointRecords(
+    checkpointPath,
+    {
+      threadId: normalizeOptionalString(input.thread_id),
+      sessionId: normalizeOptionalString(input.session_id),
+      turnId: null,
+    },
+    (record) => {
+      checkpointCount += 1;
+      turnIds.add(record.turn_id);
+      if (record.checkpoint_type === "transcript_event") transcriptEventCount += 1;
+      if (record.checkpoint_type === "terminal_payload") terminalPayloadCount += 1;
+      if (record.checkpoint_type === "turn_completed") completedTurnCount += 1;
+      if (record.checkpoint_type === "turn_failed") failedTurnCount += 1;
+      if (record.checkpoint_type === "turn_interrupted") interruptedTurnCount += 1;
+      if (!latest || compareCheckpointRecords(latest, record) < 0) latest = record;
+    },
+  );
+  return {
+    checkpoint_count: checkpointCount,
+    transcript_event_count: transcriptEventCount,
+    terminal_payload_count: terminalPayloadCount,
+    completed_turn_count: completedTurnCount,
+    failed_turn_count: failedTurnCount,
+    interrupted_turn_count: interruptedTurnCount,
+    latest_turn_id: latest?.turn_id ?? null,
+    latest_status: latest?.status ?? "unknown",
+    latest_checkpoint_at: latest?.recorded_at ?? null,
+    recoverable_turn_count: turnIds.size,
+  };
+};
 
 const groupRecordsByTurn = (
   records: readonly HelixAskTurnCheckpointRecord[],
@@ -330,12 +440,11 @@ export function buildLatestHelixAskTurnRecovery(input: {
   session_id?: string | null;
   limit?: number | null;
 }): HelixAskTurnRecovery | null {
-  const records = readHelixAskTurnCheckpointRecords({
+  const summary = scanHelixAskTurnCheckpointSummary({
     thread_id: input.thread_id ?? null,
     session_id: input.session_id ?? null,
-    limit: null,
   });
-  const turnId = latestTurnIdFromRecords(records);
+  const turnId = summary.latest_turn_id;
   if (!turnId) return null;
   return buildHelixAskTurnRecovery({
     thread_id: input.thread_id ?? null,
@@ -371,13 +480,13 @@ export function buildHelixAskTurnJournal(input: {
   limit?: number | null;
 }): HelixAskTurnJournal {
   const requestedTurnId = normalizeOptionalString(input.turn_id);
-  const allMatchingRecords = readHelixAskTurnCheckpointRecords({
-    thread_id: input.thread_id ?? null,
-    session_id: input.session_id ?? null,
-    turn_id: requestedTurnId,
-    limit: null,
-  });
-  const selectedTurnId = requestedTurnId ?? latestTurnIdFromRecords(allMatchingRecords);
+  const globalSummary = requestedTurnId
+    ? null
+    : scanHelixAskTurnCheckpointSummary({
+        thread_id: input.thread_id ?? null,
+        session_id: input.session_id ?? null,
+      });
+  const selectedTurnId = requestedTurnId ?? globalSummary?.latest_turn_id ?? null;
   const selectedRecords = selectedTurnId
     ? readHelixAskTurnCheckpointRecords({
         thread_id: input.thread_id ?? null,
@@ -402,7 +511,9 @@ export function buildHelixAskTurnJournal(input: {
     turn_id: selectedTurnId,
     records: selectedRecords,
     recovery,
-    summary: buildJournalSummary(requestedTurnId ? selectedRecords : allMatchingRecords),
+    summary: requestedTurnId
+      ? buildJournalSummary(selectedRecords)
+      : globalSummary ?? buildJournalSummary([]),
     authority: CHECKPOINT_AUTHORITY,
   };
 }

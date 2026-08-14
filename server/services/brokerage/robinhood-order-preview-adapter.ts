@@ -103,13 +103,14 @@ const readField = (record: Record<string, unknown>, aliases: ReadonlySet<string>
 export const extractUniqueRobinhoodAgenticAccountRef = (payload: unknown): string => {
   const records: Record<string, unknown>[] = [];
   collectRecords(payload, records);
-  const markerAliases = new Set(["accounttype", "type", "subtype", "title", "name", "label"]);
-  const refAliases = new Set(["accountnumber", "accountid", "id", "accountref", "reference"]);
+  const allowedAliases = new Set(["agenticallowed"]);
+  const refAliases = ["accountnumber", "accountref", "accountid", "reference", "id"];
   const refs = new Set<string>();
   for (const record of records) {
-    const marker = readField(record, markerAliases);
-    if (typeof marker !== "string" || !/\bagentic\b/iu.test(marker)) continue;
-    const ref = readField(record, refAliases);
+    const allowed = readField(record, allowedAliases);
+    if (allowed !== true) continue;
+    const ref = refAliases.reduce<unknown>((selected, alias) =>
+      selected ?? readField(record, new Set([alias])), undefined);
     if (typeof ref === "string" && ref.trim() && ref.length <= 512) {
       refs.add(ref.trim());
     }

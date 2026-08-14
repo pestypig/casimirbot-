@@ -31,6 +31,80 @@ const readBooleanEnv = (
   return defaultValue;
 };
 
+type CodexNativeProviderCooldown = {
+  reason:
+    | "native_provider_quota_exhausted"
+    | "native_turn_timeout"
+    | "native_initialize_timeout"
+    | "native_thread_start_timeout"
+    | "native_turn_start_timeout";
+  untilMs: number;
+};
+
+let nativeProviderCooldown: CodexNativeProviderCooldown | null = null;
+
+const quotaCooldownMs = (): number => {
+  const configured = Number(process.env.HELIX_CODEX_NATIVE_QUOTA_COOLDOWN_MS);
+  return Number.isFinite(configured) && configured >= 1_000
+    ? Math.floor(configured)
+    : 300_000;
+};
+
+const transportTimeoutCooldownMs = (): number => {
+  const configured = Number(
+    process.env.HELIX_CODEX_NATIVE_TIMEOUT_COOLDOWN_MS,
+  );
+  return Number.isFinite(configured) && configured >= 1_000
+    ? Math.floor(configured)
+    : 300_000;
+};
+
+const nativeTransportTimeoutReasons = new Set<
+  CodexNativeProviderCooldown["reason"]
+>([
+  "native_turn_timeout",
+  "native_initialize_timeout",
+  "native_thread_start_timeout",
+  "native_turn_start_timeout",
+]);
+
+export const readCodexNativeProviderCooldown = (
+  nowMs = Date.now(),
+): CodexNativeProviderCooldown | null => {
+  if (!nativeProviderCooldown) return null;
+  if (nativeProviderCooldown.untilMs <= nowMs) {
+    nativeProviderCooldown = null;
+    return null;
+  }
+  return { ...nativeProviderCooldown };
+};
+
+export const noteCodexNativeProviderFailure = (
+  failReason: string | null,
+  nowMs = Date.now(),
+): void => {
+  const reason =
+    failReason === "native_provider_quota_exhausted" ||
+    nativeTransportTimeoutReasons.has(
+      failReason as CodexNativeProviderCooldown["reason"],
+    )
+      ? (failReason as CodexNativeProviderCooldown["reason"])
+      : null;
+  if (!reason) return;
+  nativeProviderCooldown = {
+    reason,
+    untilMs:
+      nowMs +
+      (reason === "native_provider_quota_exhausted"
+        ? quotaCooldownMs()
+        : transportTimeoutCooldownMs()),
+  };
+};
+
+export const resetCodexNativeProviderCooldownForTests = (): void => {
+  nativeProviderCooldown = null;
+};
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -220,6 +294,29 @@ export const removeSatisfiedNativeWorkstationTools = (
   );
 };
 
+export const resolveNativeAllowedWorkstationTools = (input: {
+  body: Record<string, unknown>;
+  runtimeProviderAdmittedCapabilityIds?: string[];
+  preexecutedGatewayCallResults?: readonly HelixWorkstationGatewayCallResult[];
+}): string[] | null => {
+  const committedRoute = readCommittedAskRoute(input.body);
+  const providerAdmittedTools = input.runtimeProviderAdmittedCapabilityIds
+    ? normalizeGatewayCapabilityIds(input.runtimeProviderAdmittedCapabilityIds)
+        .filter(
+          (capabilityId) =>
+            !committedRoute ||
+            assertCapabilityAllowedByCommittedRoute({
+              committedRoute,
+              capabilityId,
+            }).allowed,
+        )
+    : null;
+  return removeSatisfiedNativeWorkstationTools(
+    providerAdmittedTools ?? readTurnAdmittedWorkstationTools(input.body),
+    input.preexecutedGatewayCallResults,
+  );
+};
+
 export type CodexNativeProviderBridgeAttempt = {
   attempted: boolean;
   eligible: boolean;
@@ -295,6 +392,7 @@ export const runCodexNativeProviderBridge = async (input: {
   headers?: IncomingHttpHeaders;
   accountContext?: HelixWorkstationGatewayAccountContext;
   preexecutedGatewayCallResults?: readonly HelixWorkstationGatewayCallResult[];
+  runtimeProviderAdmittedCapabilityIds?: string[];
   authoritativeEvidenceArtifacts?: unknown[];
   runtimeApproval?: CodexNativeRuntimeApprovalContextV1;
   signal?: AbortSignal;
@@ -305,10 +403,12 @@ export const runCodexNativeProviderBridge = async (input: {
   const modelPolicy = resolveCodexNativeModelPolicy(input.body);
   const runtimeGoal = readRecord(input.body.runtime_goal_session);
   const trustedGoalAccountBindingRequired = Boolean(runtimeGoal);
-  const allowedWorkstationTools = removeSatisfiedNativeWorkstationTools(
-    readTurnAdmittedWorkstationTools(input.body),
-    input.preexecutedGatewayCallResults,
-  );
+  const allowedWorkstationTools = resolveNativeAllowedWorkstationTools({
+    body: input.body,
+    runtimeProviderAdmittedCapabilityIds:
+      input.runtimeProviderAdmittedCapabilityIds,
+    preexecutedGatewayCallResults: input.preexecutedGatewayCallResults,
+  });
   const baseDebug: CodexNativeProviderBridgeAttempt["debug"] = {
     schema: "helix.codex_native_provider_bridge.v1",
     enabled,
@@ -360,6 +460,24 @@ export const runCodexNativeProviderBridge = async (input: {
     };
   }
 
+  const providerCooldown = readCodexNativeProviderCooldown();
+  if (providerCooldown) {
+    return {
+      attempted: false,
+      eligible: true,
+      fallbackRequired: true,
+      fallbackReason: providerCooldown.reason,
+      result: null,
+      gatewayCallResults: [],
+      debug: {
+        ...baseDebug,
+        status: "unavailable",
+        fallback_required: true,
+        fallback_reason: providerCooldown.reason,
+      },
+    };
+  }
+
   const accountContext =
     input.accountContext ??
     (await resolveWorkstationGatewayAccountContext(
@@ -383,6 +501,7 @@ export const runCodexNativeProviderBridge = async (input: {
     signal: input.signal,
     onNativeEvent: input.onNativeEvent,
   });
+  noteCodexNativeProviderFailure(result.failReason);
   return {
     attempted: true,
     eligible: true,

@@ -1,0 +1,181 @@
+{
+  "action_kind": "execute_reactive_program",
+  "program_schema": "helix.minecraft.reactive_program.v1",
+  "program_id": "program:guardian-water-bucket-rescue-a1-dynamic-collision",
+  "ruleset": "survival_tas",
+  "execution_plane": "player_embodiment",
+  "scheduler_engine": "native_fabric_concurrent",
+  "max_total_ticks": 120,
+  "completion_policy": {
+    "mode": "all_required",
+    "cancel_remaining_on_settle": true
+  },
+  "mutation_scope": {
+    "world_mutation_allowed": true,
+    "max_block_mutations": 1,
+    "max_inventory_transfers": 1,
+    "allowed_block_ids": ["minecraft:water"],
+    "allowed_regions": [
+      {
+        "min": { "x": -80, "y": 81, "z": -39 },
+        "max": { "x": -80, "y": 81, "z": -39 }
+      }
+    ],
+    "combat_allowed": false
+  },
+  "lanes": [
+    {
+      "lane_id": "lane:step-off",
+      "lane_kind": "locomotion",
+      "priority": 60,
+      "required": true,
+      "activation": "immediate",
+      "resource_ceiling": ["locomotion"],
+      "start_node_id": "node:step-off",
+      "nodes": [
+        {
+          "node_id": "node:step-off",
+          "node_kind": "action",
+          "earliest_tick": 5,
+          "timeout_ticks": 25,
+          "action": {
+            "action_kind": "walk",
+            "direction": "forward",
+            "duration_ms": 350,
+            "sprint": false
+          },
+          "on_success": "node:step-off-done",
+          "on_failure": "node:step-off-failed",
+          "on_timeout": "node:step-off-failed"
+        },
+        {
+          "node_id": "node:step-off-done",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "controlled_fall_started"
+        },
+        {
+          "node_id": "node:step-off-failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "controlled_fall_not_started"
+        }
+      ]
+    },
+    {
+      "lane_id": "lane:water-placement",
+      "lane_kind": "world",
+      "priority": 100,
+      "required": true,
+      "activation": "immediate",
+      "resource_ceiling": [
+        "camera",
+        "locomotion",
+        "hotbar",
+        "main_hand",
+        "inventory",
+        "world",
+        "native_workflow"
+      ],
+      "start_node_id": "node:falling",
+      "nodes": [
+        {
+          "node_id": "node:falling",
+          "node_kind": "event",
+          "earliest_tick": 0,
+          "condition": {
+            "condition_kind": "vertical_velocity_at_most",
+            "velocity_y": -0.25
+          },
+          "trigger_when": "satisfied",
+          "debounce_ticks": 1,
+          "wait_up_to_ticks": 60,
+          "on_event": "node:landing-near",
+          "on_timeout": "node:rescue-failed"
+        },
+        {
+          "node_id": "node:landing-near",
+          "node_kind": "event",
+          "earliest_tick": 0,
+          "condition": {
+            "condition_kind": "predicted_collision_within",
+            "max_ticks": 5,
+            "expected": true
+          },
+          "trigger_when": "satisfied",
+          "debounce_ticks": 1,
+          "wait_up_to_ticks": 60,
+          "on_event": "node:place-water",
+          "on_timeout": "node:rescue-failed"
+        },
+        {
+          "node_id": "node:place-water",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 30,
+          "action": {
+            "action_kind": "place",
+            "block_id": "minecraft:water",
+            "position_binding": {
+              "binding_kind": "predicted_collision_cell",
+              "horizon_ticks": 5,
+              "max_distance_blocks": 6,
+              "require_replaceable": true
+            },
+            "placement_method": "item_use",
+            "source_item_id": "minecraft:water_bucket",
+            "hand": "main_hand"
+          },
+          "on_success": "node:rescue-done",
+          "on_failure": "node:rescue-failed",
+          "on_timeout": "node:rescue-failed"
+        },
+        {
+          "node_id": "node:rescue-done",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "water_bucket_rescue_verified"
+        },
+        {
+          "node_id": "node:rescue-failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "water_bucket_rescue_not_verified"
+        }
+      ]
+    },
+    {
+      "lane_id": "lane:safety",
+      "lane_kind": "safety",
+      "priority": 255,
+      "required": false,
+      "activation": "interrupt_only",
+      "resource_ceiling": ["safety"],
+      "start_node_id": "node:safety-stop",
+      "nodes": [
+        {
+          "node_id": "node:safety-stop",
+          "node_kind": "terminal",
+          "terminal_outcome": "canceled",
+          "reason_code": "health_floor_interrupt"
+        }
+      ]
+    }
+  ],
+  "races": [],
+  "interrupts": [
+    {
+      "interrupt_id": "interrupt:health-floor",
+      "priority": 255,
+      "condition": {
+        "condition_kind": "health_at_least",
+        "health": 8
+      },
+      "trigger_when": "not_satisfied",
+      "debounce_ticks": 1,
+      "activate_lane_id": "lane:safety",
+      "cancel_lane_ids": ["lane:step-off", "lane:water-placement"],
+      "max_activations": 1
+    }
+  ]
+}

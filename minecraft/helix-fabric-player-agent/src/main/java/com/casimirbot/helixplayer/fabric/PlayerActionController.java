@@ -3,11 +3,14 @@ package com.casimirbot.helixplayer.fabric;
 import static com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.*;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 
 public final class PlayerActionController {
+    private static final int INTERACTION_FOCUS_ACQUISITION_TICKS = 10;
     private final ControlBridge bridge;
     private final EventListener listener;
+    private final Runnable releaseOwnedControls;
     private ActionRequest active;
     private State state;
     private long sequence;
@@ -27,11 +30,40 @@ public final class PlayerActionController {
     private double navigationClosestDistance;
     private int navigationNoProgressTicks;
     private boolean oneShotAttempted;
+    private int interactionAttemptCount;
+    private HandObservation interactionHandBefore = HandObservation.unavailable();
+    private String trackingTargetRef;
+    private String trackingTargetTypeId;
+    private long trackingSamples;
+    private long trackingRetainedTicks;
+    private long trackingLossTicks;
+    private long trackingLineOfSightTicks;
+    private long trackingReacquisitions;
+    private long trackingParticleHandoffs;
+    private int trackingConsecutiveLossTicks;
+    private boolean trackingWasMissing;
+    private double trackingErrorSum;
+    private double trackingMaxError;
+    private double trackingFinalYawError;
+    private double trackingFinalPitchError;
+    private long[] trackingErrorHistogram = new long[181];
     private Map<String, Object> lastMeasurements = Map.of();
 
     public PlayerActionController(ControlBridge bridge, EventListener listener) {
+        this(bridge, listener, bridge::releaseAll);
+    }
+
+    PlayerActionController(
+        ControlBridge bridge,
+        EventListener listener,
+        Runnable releaseOwnedControls
+    ) {
         this.bridge = Objects.requireNonNull(bridge, "bridge");
         this.listener = Objects.requireNonNull(listener, "listener");
+        this.releaseOwnedControls = Objects.requireNonNull(
+            releaseOwnedControls,
+            "releaseOwnedControls"
+        );
     }
 
     public synchronized boolean start(ActionRequest request) {
@@ -56,6 +88,23 @@ public final class PlayerActionController {
         navigationClosestDistance = Double.POSITIVE_INFINITY;
         navigationNoProgressTicks = 0;
         oneShotAttempted = false;
+        interactionAttemptCount = 0;
+        interactionHandBefore = HandObservation.unavailable();
+        trackingTargetRef = null;
+        trackingTargetTypeId = null;
+        trackingSamples = 0;
+        trackingRetainedTicks = 0;
+        trackingLossTicks = 0;
+        trackingLineOfSightTicks = 0;
+        trackingReacquisitions = 0;
+        trackingParticleHandoffs = 0;
+        trackingConsecutiveLossTicks = 0;
+        trackingWasMissing = false;
+        trackingErrorSum = 0;
+        trackingMaxError = 0;
+        trackingFinalYawError = 0;
+        trackingFinalPitchError = 0;
+        trackingErrorHistogram = new long[181];
         lastMeasurements = Map.of();
         bridge.beginWorkflow(request.actionKind(), request.arguments(), request.controlEngine());
         emit("workflow.started", 0.0, "The admitted player workflow started.", false, false);
@@ -74,31 +123,7 @@ public final class PlayerActionController {
             return;
         }
         if (snapshot.manualInputDetected()) {
-            String manualInputReason = snapshot.manualInputReason();
-            lastMeasurements = Map.of(
-                "manual_input_reason", manualInputReason,
-                "action_ticks_before_override", actionTicks
-            );
-            bridge.releaseAll();
-            if (active.manualOverridePolicy() == ManualOverridePolicy.PAUSE) {
-                state = State.PAUSED_MANUAL_OVERRIDE;
-                emit(
-                    "workflow.manual_override_detected",
-                    progress(),
-                    "Manual player input paused the workflow and released controls (reason: " +
-                        manualInputReason + ").",
-                    true,
-                    true
-                );
-            } else {
-                settle(
-                    State.CANCELED,
-                    "workflow.canceled",
-                    "Manual player input canceled the workflow and released controls (reason: " +
-                        manualInputReason + ").",
-                    true
-                );
-            }
+            handleManualOverride(snapshot.manualInputReason());
             return;
         }
         if (++elapsedTicks > active.maxDurationTicks()) {
@@ -134,6 +159,18 @@ public final class PlayerActionController {
         return true;
     }
 
+    public synchronized void renderFrame(long frameNanos) {
+        if (active == null || state != State.RUNNING) return;
+        String manualInputReason = "track_target".equals(active.actionKind())
+            ? bridge.renderCameraTrackingFrame(frameNanos)
+            : "execute_reactive_program".equals(active.actionKind())
+                ? bridge.renderReactiveProgramFrame(frameNanos)
+                : null;
+        if (manualInputReason != null && !manualInputReason.isBlank()) {
+            handleManualOverride(manualInputReason);
+        }
+    }
+
     public synchronized boolean cancel(String workflowId, String reason) {
         if (active == null || terminal(state) || !active.workflowId().equals(workflowId)) {
             return false;
@@ -147,7 +184,7 @@ public final class PlayerActionController {
     }
 
     public synchronized boolean emergencyStop(String reason) {
-        bridge.releaseAll();
+        releaseOwnedControls.run();
         if (active == null || terminal(state)) return false;
         settle(
             State.EMERGENCY_STOPPED,
@@ -182,6 +219,7 @@ public final class PlayerActionController {
         switch (active.actionKind()) {
             case "navigate_to" -> navigate(snapshot);
             case "look_at" -> lookAt(snapshot);
+            case "track_target" -> trackTarget(snapshot);
             case "walk" -> walk(snapshot);
             case "jump" -> jump(snapshot);
             case "interact" -> interact();
@@ -407,6 +445,241 @@ public final class PlayerActionController {
         }
     }
 
+    private void trackTarget(PlayerSnapshot snapshot) {
+        double stopBelowHealth = number(active.arguments(), "stop_below_health");
+        if (snapshot.health() < stopBelowHealth) {
+            lastMeasurements = Map.ofEntries(
+                Map.entry("measured_health", (double) snapshot.health()),
+                Map.entry("stop_below_health", stopBelowHealth),
+                Map.entry("tracking_completed", false),
+                Map.entry("safety_interrupted", true),
+                Map.entry("interrupt_reason", "health_floor_crossed")
+            );
+            settle(
+                State.SUCCEEDED,
+                "workflow.succeeded",
+                "Camera tracking safely interrupted because measured player health crossed the admitted floor."
+            );
+            return;
+        }
+
+        Map<String, Object> target = object(active.arguments().get("target"));
+        String targetKind = text(target, "target_kind");
+        String aimPoint = text(active.arguments(), "aim_point");
+        double maxDistance = number(active.arguments(), "max_acquisition_distance");
+        boolean requireLineOfSight = bool(active.arguments(), "require_line_of_sight");
+        TargetObservation observation = bridge.observeTarget(
+            target,
+            trackingTargetRef,
+            aimPoint,
+            maxDistance,
+            requireLineOfSight
+        );
+        trackingSamples++;
+
+        if (!observation.available() || !observation.alive()) {
+            bridge.clearCameraTrackingTarget();
+            trackingLossTicks++;
+            trackingConsecutiveLossTicks++;
+            trackingWasMissing = true;
+            if (trackingConsecutiveLossTicks > integer(active.arguments(), "reacquire_ticks")) {
+                lastMeasurements = trackingMeasurements(targetKind, requireLineOfSight, false);
+                settle(
+                    State.FAILED,
+                    "workflow.failed",
+                    trackingTargetRef == null
+                        ? "No matching " + trackingSubject(targetKind) +
+                            " could be acquired inside the admitted tracking envelope."
+                        : "The locked " + trackingSubject(targetKind) +
+                            " left the admitted tracking envelope beyond its reacquisition grace."
+                );
+                return;
+            }
+        } else {
+            if (trackingTargetRef == null) {
+                trackingTargetRef = observation.targetRef();
+                trackingTargetTypeId = observation.targetTypeId();
+            } else if (!trackingTargetRef.equals(observation.targetRef())) {
+                lastMeasurements = trackingMeasurements(targetKind, requireLineOfSight, false);
+                settle(
+                    State.FAILED,
+                    "workflow.failed",
+                    "The connector attempted to substitute a different " +
+                        trackingSubject(targetKind) + " for the locked tracking target."
+                );
+                return;
+            }
+            trackingParticleHandoffs = Math.max(
+                trackingParticleHandoffs,
+                observation.handoffCount()
+            );
+            if (trackingWasMissing) trackingReacquisitions++;
+            trackingWasMissing = false;
+            trackingConsecutiveLossTicks = 0;
+            trackingRetainedTicks++;
+            if (observation.visible()) trackingLineOfSightTicks++;
+
+            double predictionTicks = integer(active.arguments(), "prediction_ticks");
+            double targetX = observation.x() + observation.velocityX() * predictionTicks;
+            double targetY = observation.y() + observation.velocityY() * predictionTicks;
+            double targetZ = observation.z() + observation.velocityZ() * predictionTicks;
+            double dx = targetX - snapshot.x();
+            double dy = targetY - snapshot.eyeY();
+            double dz = targetZ - snapshot.z();
+            double horizontal = Math.sqrt(dx * dx + dz * dz);
+            double desiredYaw = Math.toDegrees(Math.atan2(-dx, dz));
+            double desiredPitch = -Math.toDegrees(Math.atan2(dy, horizontal));
+            trackingFinalYawError = Math.abs(wrapDegrees(desiredYaw - snapshot.yaw()));
+            trackingFinalPitchError = Math.abs(desiredPitch - snapshot.pitch());
+            double angularError = Math.min(
+                180,
+                Math.hypot(trackingFinalYawError, trackingFinalPitchError)
+            );
+            trackingErrorSum += angularError;
+            trackingMaxError = Math.max(trackingMaxError, angularError);
+            trackingErrorHistogram[(int) Math.ceil(angularError)]++;
+
+            bridge.updateCameraTrackingTarget(
+                targetX,
+                targetY,
+                targetZ,
+                (float) number(active.arguments(), "max_turn_degrees_per_tick"),
+                (float) number(
+                    active.arguments(),
+                    "max_angular_acceleration_degrees_per_tick_squared"
+                ),
+                (float) number(active.arguments(), "deadband_degrees")
+            );
+        }
+
+        long durationTicks = Math.max(
+            1,
+            (long) Math.ceil(number(active.arguments(), "max_duration_ms") / 50.0)
+        );
+        if (actionTicks >= durationTicks) {
+            if (trackingTargetRef == null || trackingRetainedTicks < 1) {
+                lastMeasurements = trackingMeasurements(targetKind, requireLineOfSight, false);
+                settle(
+                    State.FAILED,
+                    "workflow.failed",
+                    "No matching " + trackingSubject(targetKind) +
+                        " was measured during the admitted tracking interval."
+                );
+                return;
+            }
+            lastMeasurements = trackingMeasurements(targetKind, requireLineOfSight, true);
+            settle(
+                State.SUCCEEDED,
+                "workflow.succeeded",
+                String.format(
+                    java.util.Locale.ROOT,
+                    "The camera retained the locked %s target for %d of %d measured ticks (mean error %.2f degrees, p95 %.2f degrees).",
+                    trackingTargetTypeId,
+                    trackingRetainedTicks,
+                    trackingSamples,
+                    trackingRetainedTicks == 0 ? 0 : trackingErrorSum / trackingRetainedTicks,
+                    trackingP95Error()
+                )
+            );
+            return;
+        }
+        if (actionTicks == 1 || actionTicks % 20 == 0) {
+            lastMeasurements = trackingMeasurements(targetKind, requireLineOfSight, false);
+            emit(
+                "workflow.progress",
+                Math.min(0.99, (double) actionTicks / durationTicks),
+                trackingTargetRef == null
+                    ? "The camera tracker is acquiring the admitted entity target."
+                    : "The camera tracker is retaining the locked entity target.",
+                false,
+                false
+            );
+        }
+    }
+
+    private Map<String, Object> trackingMeasurements(
+        String targetKind,
+        boolean requireLineOfSight,
+        boolean completed
+    ) {
+        Map<String, Object> measurements = new java.util.LinkedHashMap<>();
+        measurements.put("tracking_completed", completed);
+        measurements.put("target_kind", targetKind);
+        if (trackingTargetRef != null) measurements.put("target_ref", trackingTargetRef);
+        if (trackingTargetTypeId != null) {
+            measurements.put(
+                "particle_type".equals(targetKind)
+                    ? "target_particle_type_id"
+                    : "target_entity_type_id",
+                trackingTargetTypeId
+            );
+        }
+        if ("particle_type".equals(targetKind)) {
+            Map<String, Object> target = object(active.arguments().get("target"));
+            measurements.put("particle_continuity", text(target, "continuity"));
+            measurements.put("particle_handoff_count", trackingParticleHandoffs);
+            measurements.put("particle_max_handoffs", integer(target, "max_handoffs"));
+        }
+        measurements.put("duration_ticks", trackingSamples);
+        measurements.put("sample_count", trackingSamples);
+        measurements.put("retained_ticks", trackingRetainedTicks);
+        measurements.put("target_loss_ticks", trackingLossTicks);
+        measurements.put("line_of_sight_retained_ticks", trackingLineOfSightTicks);
+        measurements.put("reacquisition_count", trackingReacquisitions);
+        measurements.put(
+            "mean_angular_error_degrees",
+            trackingRetainedTicks == 0 ? 0 : trackingErrorSum / trackingRetainedTicks
+        );
+        measurements.put("p95_angular_error_degrees", trackingP95Error());
+        measurements.put("max_angular_error_degrees", trackingMaxError);
+        measurements.put("final_yaw_error_degrees", trackingFinalYawError);
+        measurements.put("final_pitch_error_degrees", trackingFinalPitchError);
+        measurements.put("line_of_sight_required", requireLineOfSight);
+        return Map.copyOf(measurements);
+    }
+
+    private static String trackingSubject(String targetKind) {
+        return "particle_type".equals(targetKind) ? "particle" : "entity";
+    }
+
+    private double trackingP95Error() {
+        if (trackingRetainedTicks == 0) return 0;
+        long threshold = (long) Math.ceil(trackingRetainedTicks * 0.95);
+        long cumulative = 0;
+        for (int error = 0; error < trackingErrorHistogram.length; error++) {
+            cumulative += trackingErrorHistogram[error];
+            if (cumulative >= threshold) return error;
+        }
+        return 180;
+    }
+
+    private void handleManualOverride(String manualInputReason) {
+        lastMeasurements = Map.of(
+            "manual_input_reason", manualInputReason,
+            "action_ticks_before_override", actionTicks
+        );
+        releaseOwnedControls.run();
+        if (active.manualOverridePolicy() == ManualOverridePolicy.PAUSE) {
+            state = State.PAUSED_MANUAL_OVERRIDE;
+            emit(
+                "workflow.manual_override_detected",
+                progress(),
+                "Manual player input paused the workflow and released controls (reason: " +
+                    manualInputReason + ").",
+                true,
+                true
+            );
+        } else {
+            settle(
+                State.CANCELED,
+                "workflow.canceled",
+                "Manual player input canceled the workflow and released controls (reason: " +
+                    manualInputReason + ").",
+                true
+            );
+        }
+    }
+
     private void walk(PlayerSnapshot snapshot) {
         if (actionStartX == null) {
             actionStartX = snapshot.x();
@@ -493,27 +766,79 @@ public final class PlayerActionController {
     }
 
     private void interact() {
-        if (oneShotAttempted) return;
-        oneShotAttempted = true;
-        if (!bridge.interact(
-            text(active.arguments(), "target"),
-            text(active.arguments(), "hand"),
-            text(active.arguments(), "interaction")
-        )) {
-            throw new IllegalArgumentException(
-                "No compatible block or entity was available at the current focus."
-            );
+        String target = text(active.arguments(), "target");
+        String hand = text(active.arguments(), "hand");
+        String interaction = text(active.arguments(), "interaction");
+        if (!oneShotAttempted) {
+            interactionAttemptCount++;
+            HandObservation beforeAttempt = bridge.observeHand(hand);
+            if (!bridge.interact(target, hand, interaction)) {
+                if (interactionAttemptCount >= INTERACTION_FOCUS_ACQUISITION_TICKS) {
+                    throw new IllegalArgumentException(
+                        "No compatible block or entity became available during the bounded focus acquisition window."
+                    );
+                }
+                lastMeasurements = Map.of(
+                    "interaction_accepted", false,
+                    "target", target,
+                    "hand", hand,
+                    "interaction", interaction,
+                    "focus_acquisition_pending", true,
+                    "interaction_attempt_count", interactionAttemptCount,
+                    "post_interaction_observed", false
+                );
+                return;
+            }
+            interactionHandBefore = beforeAttempt;
+            oneShotAttempted = true;
+            Map<String, Object> accepted = new LinkedHashMap<>();
+            accepted.put("interaction_accepted", true);
+            accepted.put("target", target);
+            accepted.put("hand", hand);
+            accepted.put("interaction", interaction);
+            accepted.put("focus_acquisition_pending", false);
+            accepted.put("interaction_attempt_count", interactionAttemptCount);
+            accepted.put("post_interaction_observed", false);
+            lastMeasurements = Map.copyOf(accepted);
+            return;
         }
-        lastMeasurements = Map.of(
-            "interaction_accepted", true,
-            "target", text(active.arguments(), "target"),
-            "hand", text(active.arguments(), "hand"),
-            "interaction", text(active.arguments(), "interaction")
-        );
+
+        HandObservation after = bridge.observeHand(hand);
+        Map<String, Object> measured = new LinkedHashMap<>();
+        measured.put("interaction_accepted", true);
+        measured.put("target", target);
+        measured.put("hand", hand);
+        measured.put("interaction", interaction);
+        measured.put("focus_acquisition_pending", false);
+        measured.put("interaction_attempt_count", interactionAttemptCount);
+        boolean observed = interactionHandBefore.available() && after.available();
+        measured.put("post_interaction_observed", observed);
+        if (observed) {
+            int delta = after.count() - interactionHandBefore.count();
+            boolean changed = delta != 0 ||
+                !after.itemId().equals(interactionHandBefore.itemId());
+            int consumed = after.itemId().equals(interactionHandBefore.itemId()) ||
+                after.itemId().isBlank()
+                ? Math.max(0, -delta)
+                : 0;
+            measured.put("held_item_id_before", interactionHandBefore.itemId());
+            measured.put("held_item_id_after", after.itemId());
+            measured.put("held_item_count_before", interactionHandBefore.count());
+            measured.put("held_item_count_after", after.count());
+            measured.put("held_item_count_delta", delta);
+            measured.put("consumed_item_count", consumed);
+            measured.put("inventory_mutations_performed", changed ? 1 : 0);
+        } else {
+            measured.put("consumed_item_count", 0);
+            measured.put("inventory_mutations_performed", 0);
+        }
+        lastMeasurements = Map.copyOf(measured);
         settle(
             State.SUCCEEDED,
             "workflow.succeeded",
-            "The game accepted the admitted interaction at the current focus."
+            observed
+                ? "The game accepted the interaction and the used hand postcondition was observed."
+                : "The game accepted the interaction; no hand postcondition provider was available."
         );
     }
 
@@ -577,7 +902,7 @@ public final class PlayerActionController {
         String summary,
         boolean manualOverrideDetected
     ) {
-        bridge.releaseAll();
+        releaseOwnedControls.run();
         state = next;
         emit(
             eventType,

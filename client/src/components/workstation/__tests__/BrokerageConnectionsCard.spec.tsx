@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BrokerageConnectionsCard } from
   "@/components/workstation/BrokerageConnectionsCard";
@@ -12,7 +12,11 @@ const response = (body: unknown, status = 200): Response => new Response(
 );
 
 describe("BrokerageConnectionsCard", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    delete window.casimirDesktop;
+  });
 
   it("starts Robinhood OAuth only through the admitted hosted origin", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
@@ -44,6 +48,36 @@ describe("BrokerageConnectionsCard", () => {
       expect.objectContaining({ method: "POST", credentials: "same-origin" }),
     );
     expect(await screen.findByText(/Finish authorization in the Robinhood window/u)).toBeTruthy();
+  });
+
+  it("uses the validated native shell bridge in the packaged desktop", async () => {
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (input, init) => {
+      const url = input.toString();
+      if (url.endsWith("/brokerage-connections") && !init?.method) {
+        return response({ connections: [] });
+      }
+      if (url.endsWith("/robinhood/oauth/start")) {
+        return response({
+          authorization_url:
+            "https://robinhood.com/oauth?state=safe-test-state",
+        }, 201);
+      }
+      return response({}, 404);
+    }));
+    const nativeOpen = vi.fn(async () => ({ opened: true }));
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: async () => ({}),
+      openRobinhoodOAuth: nativeOpen,
+    });
+    const popupOpen = vi.spyOn(window, "open");
+    render(<BrokerageConnectionsCard />);
+
+    await screen.findByText("No Robinhood connection is stored for this profile.");
+    fireEvent.click(screen.getByRole("button", { name: "Connect Robinhood" }));
+    await waitFor(() => expect(nativeOpen).toHaveBeenCalledWith(
+      "https://robinhood.com/oauth?state=safe-test-state",
+    ));
+    expect(popupOpen).not.toHaveBeenCalled();
   });
 
   it("shows only sanitized read status and keeps orders disabled", async () => {

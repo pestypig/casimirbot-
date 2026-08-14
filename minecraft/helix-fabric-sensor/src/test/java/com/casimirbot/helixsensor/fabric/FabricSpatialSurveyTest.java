@@ -18,6 +18,15 @@ final class FabricSpatialSurveyTest {
     private static final Gson JSON = new Gson();
 
     @Test
+    void keepsTheElevatedLandingSurveyInsideTheBrokerCellCeiling() {
+        int diameter = FabricSpatialSurvey.MAX_HORIZONTAL_RADIUS * 2 + 1;
+        int height = FabricSpatialSurvey.MAX_VERTICAL_RADIUS * 2 + 1;
+
+        assertEquals(16, FabricSpatialSurvey.MAX_VERTICAL_RADIUS);
+        assertTrue(diameter * diameter * height <= 10_000);
+    }
+
+    @Test
     void recordsTheExactSerializedWireSize() {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("payload", "x".repeat(731));

@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   HELIX_ENVIRONMENT_ACTION_REQUEST_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_RESULT_SCHEMA,
+  HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
   helixEnvironmentActionRequestSchema,
   helixEnvironmentActionResultSchema,
 } from "@shared/helix-environment-action";
 import {
   canonicalizeEnvironmentActionResult,
   environmentActionWorkflowMeasurementsValid,
+  readRecordedWorkflowEvidence,
 } from "../action-broker";
 import { minecraftPlayerCapabilityForActionKind } from "@shared/helix-minecraft-player-capabilities";
 
@@ -373,6 +375,194 @@ describe("environment action result canonicalization", () => {
     })).toBe(false);
   });
 
+  it("accepts an all-required guardian settled by its exact admitted interrupt", () => {
+    const guardianArguments = {
+      action_kind: "execute_reactive_program" as const,
+      program_schema: "helix.minecraft.reactive_program.v1" as const,
+      program_id: "program:handled-health-interrupt",
+      ruleset: "survival_tas" as const,
+      execution_plane: "player_embodiment" as const,
+      scheduler_engine: "native_fabric_concurrent" as const,
+      max_total_ticks: 200,
+      completion_policy: {
+        mode: "all_required" as const,
+        cancel_remaining_on_settle: true as const,
+      },
+      mutation_scope: {
+        world_mutation_allowed: false,
+        max_block_mutations: 0,
+        max_inventory_transfers: 0,
+        allowed_block_ids: [],
+        allowed_regions: [],
+        combat_allowed: false,
+      },
+      lanes: [{
+        lane_id: "lane:camera",
+        lane_kind: "camera" as const,
+        priority: 200,
+        required: true,
+        activation: "immediate" as const,
+        resource_ceiling: ["camera" as const],
+        start_node_id: "node:camera",
+        nodes: [{
+          node_id: "node:camera",
+          node_kind: "action" as const,
+          earliest_tick: 0,
+          timeout_ticks: 200,
+          action: {
+            action_kind: "look_at" as const,
+            target: { target_kind: "current_focus" as const },
+            max_turn_degrees_per_tick: 10,
+          },
+          on_success: "node:camera:done",
+          on_failure: "node:camera:done",
+          on_timeout: "node:camera:done",
+        }, {
+          node_id: "node:camera:done",
+          node_kind: "terminal" as const,
+          terminal_outcome: "succeeded" as const,
+          reason_code: "camera_complete",
+        }],
+      }, {
+        lane_id: "lane:safety",
+        lane_kind: "safety" as const,
+        priority: 255,
+        required: false,
+        activation: "interrupt_only" as const,
+        resource_ceiling: ["safety" as const],
+        start_node_id: "node:safety",
+        nodes: [{
+          node_id: "node:safety",
+          node_kind: "terminal" as const,
+          terminal_outcome: "canceled" as const,
+          reason_code: "low_health_stop",
+        }],
+      }],
+      races: [],
+      interrupts: [{
+        interrupt_id: "interrupt:low-health",
+        priority: 255,
+        condition: { condition_kind: "health_at_least" as const, health: 19 },
+        trigger_when: "not_satisfied" as const,
+        debounce_ticks: 1,
+        activate_lane_id: "lane:safety",
+        cancel_lane_ids: ["lane:camera"],
+        max_activations: 1 as const,
+      }],
+    };
+    const guardianRequest = helixEnvironmentActionRequestSchema.parse({
+      ...request,
+      action_request_id: "environment_action_request:handled-interrupt",
+      workflow_id: "environment_action_workflow:handled-interrupt",
+      capability_id: "com.casimirbot.minecraft.player.guardian.execute",
+      action_kind: "execute_reactive_program",
+      effect_class: "continuous_control",
+      arguments: guardianArguments,
+      idempotency_key: "canonicalization-handled-interrupt",
+    });
+    const guardianResult = helixEnvironmentActionResultSchema.parse({
+      ...result,
+      action_request_id: guardianRequest.action_request_id,
+      workflow_id: guardianRequest.workflow_id,
+      capability_id: guardianRequest.capability_id,
+      action_kind: guardianRequest.action_kind,
+      side_effects_performed: false,
+      player_motion_performed: false,
+      player_interaction_performed: false,
+      inventory_mutation_performed: false,
+      world_mutation_performed: false,
+      started_clock: {
+        schema: HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
+        clock_id: "minecraft_client_tick_clock:handled-interrupt",
+        clock_kind: "minecraft_game_tick",
+        tick_rate_hz: 20,
+        tick_index: 1_000,
+        world_tick_index: 50_000,
+        synchronization: "server_synchronized",
+        observed_at: startedAt,
+      },
+      completed_clock: {
+        schema: HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
+        clock_id: "minecraft_client_tick_clock:handled-interrupt",
+        clock_kind: "minecraft_game_tick",
+        tick_rate_hz: 20,
+        tick_index: 1_110,
+        world_tick_index: 50_110,
+        synchronization: "server_synchronized",
+        observed_at: completedAt,
+      },
+      duration_ticks: 110,
+    });
+    const measurements = {
+      program_schema: "helix.minecraft.reactive_program.v1",
+      program_id: guardianArguments.program_id,
+      reactive_program_completed: true,
+      reason_code: "reactive_program_interrupted",
+      settled_interrupt_id: "interrupt:low-health",
+      tick_index: 110,
+      active_lane_count: 0,
+      lanes: [{
+        lane_id: "lane:camera",
+        lane_kind: "camera",
+        state: "canceled",
+        node_id: "node:camera",
+        held_resources: [],
+        iteration: 0,
+        tick_index: 110,
+        controls_released: true,
+      }, {
+        lane_id: "lane:safety",
+        lane_kind: "safety",
+        state: "canceled",
+        node_id: "node:safety",
+        held_resources: [],
+        iteration: 0,
+        tick_index: 110,
+        controls_released: true,
+      }],
+      condition_observations: [{
+        node_id: "interrupt:low-health",
+        tick_index: 0,
+        condition_kind: "health_at_least",
+        satisfied: true,
+      }, {
+        node_id: "interrupt:low-health",
+        tick_index: 110,
+        condition_kind: "health_at_least",
+        satisfied: false,
+      }],
+      condition_observation_count: 2,
+      resource_conflict_count: 0,
+      interrupt_count: 1,
+      controls_released: true,
+      executed_action_count: 0,
+      max_concurrent_lane_count: 1,
+      parallel_tick_count: 0,
+      race_outcomes: [],
+      race_outcome_count: 0,
+      placement_predictions: [],
+      placement_prediction_count: 0,
+      placement_action_success_count: 0,
+      placement_mutation_success_count: 0,
+      world_mutations_performed: 0,
+      inventory_mutations_performed: 0,
+    };
+
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: guardianRequest,
+      result: guardianResult,
+      measurements,
+    })).toBe(true);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: guardianRequest,
+      result: guardianResult,
+      measurements: {
+        ...measurements,
+        settled_interrupt_id: "interrupt:forged",
+      },
+    })).toBe(false);
+  });
+
   it("preserves success only when every admitted required postcondition is proven", () => {
     expect(canonicalizeEnvironmentActionResult({
       request,
@@ -394,6 +584,76 @@ describe("environment action result canonicalization", () => {
         distance_blocks: 0.5,
         final_x: 8,
       },
+    });
+  });
+
+  it("re-enters bounded terminal diagnostics for a failed reactive workflow", async () => {
+    const eventId = "environment_action_event:reactive-failed";
+    const failedResult = helixEnvironmentActionResultSchema.parse({
+      ...result,
+      outcome: "failed",
+      summary: "A required reactive lane failed or was canceled.",
+      progress_event_refs: [eventId],
+      postconditions: result.postconditions.map((condition) => ({
+        ...condition,
+        status: "not_checked" as const,
+        evidence_refs: [eventId],
+      })),
+    });
+    const measurements = {
+      reason_code: "reactive_required_lane_failed",
+      failed_lane_id: "locomotion",
+      race_outcomes: [{
+        race_id: "stop_on_low_health",
+        winner_lane_id: "camera",
+        settle_on: "first_terminal",
+        settled_tick: 1,
+        canceled_lane_ids: ["locomotion"],
+      }],
+      condition_observations: [{
+        node_id: "health_floor_stop",
+        tick_index: 1,
+        condition_kind: "health_at_least",
+        satisfied: true,
+      }],
+    };
+    const evidence = await readRecordedWorkflowEvidence({
+      db: {
+        query: async () => ({
+          rows: [{
+            event_id: eventId,
+            event_payload: {
+              schema: "helix.environment_action.workflow_event.v1",
+              event_id: eventId,
+              action_request_id: request.action_request_id,
+              workflow_id: request.workflow_id,
+              sequence: 2,
+              event_type: "workflow.failed",
+              workflow_state: "failed",
+              progress_fraction: null,
+              summary: failedResult.summary,
+              control_engine: "native_fabric",
+              measurements,
+              evidence_refs: [],
+              manual_override_detected: false,
+              controls_released: true,
+              created_at: completedAt,
+              content_role: "environment_action_event_not_assistant_answer",
+              answer_authority: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+          }],
+        }),
+      } as never,
+      request,
+      result: failedResult,
+    });
+
+    expect(evidence).toEqual({
+      valid: true,
+      terminalMeasurements: measurements,
     });
   });
 

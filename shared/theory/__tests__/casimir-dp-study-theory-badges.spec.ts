@@ -188,6 +188,9 @@ describe("Casimir / DP quantum-foam study badges", () => {
     const campaign = stage4.find((badge) =>
       badge.id === "study.casimir_dp.polarization_congruence_stage4"
     );
+    const polarization = stage4.find((badge) =>
+      badge.id === "study.casimir_dp.polarization_resolved_qed_control"
+    );
 
     expect(stage4).toHaveLength(4);
     expect(stage4.every((badge) =>
@@ -202,6 +205,12 @@ describe("Casimir / DP quantum-foam study badges", () => {
     expect(stage4.every((badge) =>
       badge.calculatorPayloads.length === 0
     )).toBe(true);
+    expect(polarization?.sourceRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: "https://doi.org/10.1038/s41586-026-10859-z",
+        id: "Stewart-et-al-2026-magnetar-vacuum-birefringence",
+      }),
+    ]));
     expect(branch.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({
         from: "physics.radiation.mode_context",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_ENVIRONMENT_ACTION_CONTROL_REQUEST_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_CONNECTOR_HEARTBEAT_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_CONNECTOR_MANIFEST_SCHEMA,
@@ -29,6 +30,7 @@ import {
   minecraftPlayerCapabilityForActionKind,
 } from "@shared/helix-minecraft-player-capabilities";
 import {
+  environmentActionWorkflowMeasurementsValid,
   hashEnvironmentActionIdempotencyContent,
   storedEnvironmentActionMatchesIdempotencyContent,
 } from "../services/environment-connectors/actions/action-broker";
@@ -225,6 +227,173 @@ describe("provider-neutral environment player-action contract", () => {
         allow_dig: true,
       }).success,
     ).toBe(false);
+  });
+
+  it("validates a bounded camera tracker and rejects forged target evidence", () => {
+    const argumentsValue = {
+      action_kind: "track_target" as const,
+      target: {
+        target_kind: "entity_type" as const,
+        entity_type_id: "minecraft:bat",
+        selection: "nearest" as const,
+      },
+      aim_point: "center" as const,
+      max_acquisition_distance: 64,
+      max_duration_ms: 30_000,
+      max_turn_degrees_per_tick: 20,
+      max_angular_acceleration_degrees_per_tick_squared: 4,
+      prediction_ticks: 2,
+      deadband_degrees: 0.5,
+      reacquire_ticks: 10,
+      require_line_of_sight: false,
+      stop_below_health: 4,
+    };
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse(argumentsValue).success,
+    ).toBe(true);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...argumentsValue,
+        aim_point: "render_center",
+      }).success,
+    ).toBe(true);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...argumentsValue,
+        target: {
+          target_kind: "particle_type",
+          particle_type_id: "minecraft:enchant",
+          selection: "nearest",
+          continuity: "single_instance",
+          handoff_radius: 0,
+          max_handoffs: 0,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...argumentsValue,
+        target: {
+          target_kind: "particle_type",
+          particle_type_id: "minecraft:enchant",
+          selection: "nearest",
+          continuity: "single_instance",
+          handoff_radius: 1,
+          max_handoffs: 1,
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...argumentsValue,
+        target: { ...argumentsValue.target, selection: "random" },
+      }).success,
+    ).toBe(false);
+
+    const request = {
+      ...baseActionRequest(),
+      capability_id: HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+      action_kind: "track_target",
+      arguments: argumentsValue,
+      requested_control_engine: "native_fabric",
+    } as any;
+    const result = {
+      ...settledResult(),
+      capability_id: HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+      action_kind: "track_target",
+      duration_ticks: 600,
+    } as any;
+    const measurements = {
+      tracking_completed: true,
+      target_kind: "entity_type",
+      target_entity_type_id: "minecraft:bat",
+      target_ref: `target:${"a".repeat(40)}`,
+      duration_ticks: 600,
+      sample_count: 600,
+      retained_ticks: 590,
+      target_loss_ticks: 10,
+      line_of_sight_retained_ticks: 560,
+      reacquisition_count: 2,
+      mean_angular_error_degrees: 1.8,
+      p95_angular_error_degrees: 4,
+      max_angular_error_degrees: 12,
+      final_yaw_error_degrees: 1,
+      final_pitch_error_degrees: 0.5,
+      line_of_sight_required: false,
+    };
+    expect(environmentActionWorkflowMeasurementsValid({
+      request,
+      result,
+      measurements,
+    })).toBe(true);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request,
+      result,
+      measurements: {
+        ...measurements,
+        target_ref: "550e8400-e29b-41d4-a716-446655440000",
+      },
+    })).toBe(false);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request,
+      result,
+      measurements: {
+        ...measurements,
+        target_entity_type_id: "minecraft:pig",
+      },
+    })).toBe(false);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: {
+        ...request,
+        arguments: {
+          ...argumentsValue,
+          target: {
+            target_kind: "particle_type",
+            particle_type_id: "minecraft:enchant",
+            selection: "nearest",
+            continuity: "same_type_stream",
+            handoff_radius: 2,
+            max_handoffs: 20,
+          },
+        },
+      },
+      result,
+      measurements: {
+        ...measurements,
+        target_kind: "particle_type",
+        target_particle_type_id: "minecraft:enchant",
+        target_entity_type_id: undefined,
+        particle_continuity: "same_type_stream",
+        particle_handoff_count: 3,
+        particle_max_handoffs: 20,
+      },
+    })).toBe(true);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: {
+        ...request,
+        arguments: {
+          ...argumentsValue,
+          target: {
+            target_kind: "particle_type",
+            particle_type_id: "minecraft:enchant",
+            selection: "nearest",
+            continuity: "same_type_stream",
+            handoff_radius: 2,
+            max_handoffs: 20,
+          },
+        },
+      },
+      result,
+      measurements: {
+        ...measurements,
+        target_kind: "particle_type",
+        target_particle_type_id: "minecraft:enchant",
+        target_entity_type_id: undefined,
+        particle_continuity: "same_type_stream",
+        particle_handoff_count: 21,
+        particle_max_handoffs: 20,
+      },
+    })).toBe(false);
   });
 
   it("requires exact identities, postconditions, no host access, and no replay", () => {

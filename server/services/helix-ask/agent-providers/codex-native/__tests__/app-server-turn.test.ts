@@ -24,7 +24,8 @@ type SimulatorMode =
   | "stall_initialize"
   | "tool_before_route"
   | "forbidden_item"
-  | "provider_auth_failure";
+  | "provider_auth_failure"
+  | "provider_quota_exhausted";
 
 class FakeCodexAppServer implements CodexAppServerTransport {
   readonly stderr = "";
@@ -127,6 +128,29 @@ class FakeCodexAppServer implements CodexAppServerTransport {
   }
 
   private beginTurn(): void {
+    if (this.mode === "provider_quota_exhausted") {
+      this.emit({
+        method: "error",
+        params: {
+          error: {
+            message:
+              "stream disconnected: You have no credits remaining. Add credits to continue using the API. Bearer sk-example-should-not-leak",
+          },
+          willRetry: false,
+        },
+      });
+      this.emit({
+        method: "turn/completed",
+        params: {
+          turn: {
+            id: "turn:fake",
+            status: "failed",
+            error: { message: "You have no credits remaining." },
+          },
+        },
+      });
+      return;
+    }
     if (this.mode === "provider_auth_failure") {
       this.emit({
         method: "error",
@@ -350,12 +374,40 @@ describe("Codex native app-server turn", () => {
         native_turn_status: "failed",
         native_error_code: "provider_auth_failed",
         native_error_http_status: 401,
+        native_error_message: "unexpected status 401 Unauthorized",
       },
     });
   });
 
+  it("reports exhausted provider credit as a typed redacted native failure", async () => {
+    const result = await runCodexNativeAppServerTurnWithTransport(
+      {
+        prompt: "Answer from the native provider.",
+        turnId: "ask:test:native-quota",
+        cwd: process.cwd(),
+        capabilities: [],
+        validateRouteProposal: validateRoute,
+        executeCapability: vi.fn(),
+        timeoutMs: 2_000,
+      },
+      new FakeCodexAppServer("provider_quota_exhausted"),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      failReason: "native_provider_quota_exhausted",
+      debug: {
+        native_turn_status: "failed",
+        native_error_code: "provider_quota_exhausted",
+        native_error_message: "You have no credits remaining.",
+      },
+    });
+    expect(result.debug.native_error_message).not.toContain("sk-example");
+  });
+
   it("runs route proposal, capability observation, and final answer in one native turn", async () => {
     const transport = new FakeCodexAppServer("normal");
+    const onNativeEvent = vi.fn();
     const executeCapability = vi.fn(async () => ({
       ok: true,
       content: {
@@ -377,6 +429,7 @@ describe("Codex native app-server turn", () => {
         capabilities: [workspaceStatusManifest()],
         validateRouteProposal: validateRoute,
         executeCapability,
+        onNativeEvent,
         timeoutMs: 2_000,
       },
       transport,
@@ -419,6 +472,35 @@ describe("Codex native app-server turn", () => {
       providerExecutionId: "turn:fake",
       signal: expect.any(AbortSignal),
     });
+    expect(onNativeEvent).toHaveBeenCalledWith(
+      "item/tool/call",
+      expect.objectContaining({ tool: HELIX_CODEX_ROUTE_PROPOSAL_TOOL }),
+    );
+    expect(onNativeEvent).toHaveBeenCalledWith(
+      "item/tool/call",
+      expect.objectContaining({
+        tool: expect.stringMatching(/^helix_workspace_os_status_/),
+      }),
+    );
+    expect(onNativeEvent).toHaveBeenCalledWith(
+      "item/tool/result",
+      expect.objectContaining({
+        tool: "workspace_os.status",
+        success: true,
+      }),
+    );
+    const instructionThreadStart = transport.received.find(
+      (message) => message.method === "thread/start",
+    );
+    const baseInstructions = String(
+      (instructionThreadStart?.params as Record<string, unknown> | undefined)
+        ?.baseInstructions ?? "",
+    );
+    expect(baseInstructions).toContain("host workspace sandbox is read-only");
+    expect(baseInstructions).toContain(
+      "separately governed effect in its connected environment",
+    );
+    expect(baseInstructions).not.toContain("read-only reasoning worker");
     const lifecycle = result.debug.turn_lifecycle;
     const lifecycleKinds = lifecycle.events.map((event) => event.kind);
     expect(lifecycleKinds).toEqual([

@@ -34,6 +34,7 @@ import type {
   HelixRuntimeGoalStopPolicy,
   HelixRuntimeGoalWakeEventKind,
 } from "@shared/helix-runtime-goal-session";
+import { readCodexProviderStageLedger } from "../services/helix-ask/agent-providers/provider-stage-ledger";
 
 export const agentProvidersRouter = Router();
 
@@ -156,6 +157,48 @@ agentProvidersRouter.get("/agent-providers", async (req: Request, res: Response)
     account_policy: accountPolicy,
   });
 });
+
+agentProvidersRouter.get(
+  "/agent-providers/codex/turn-stage/:turnId",
+  async (req: Request, res: Response) => {
+    const accountPolicy = await getAccountCapabilityPolicy(
+      readHelixSessionCookie(req.headers.cookie),
+    );
+    if (accountPolicy.account_type !== "developer") {
+      return res.status(403).json({
+        schema: "helix.codex_provider_stage_ledger_response.v1",
+        ok: false,
+        error: "developer_account_required",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    }
+    const ledger = readCodexProviderStageLedger(req.params.turnId);
+    if (!ledger) {
+      return res.status(404).json({
+        schema: "helix.codex_provider_stage_ledger_response.v1",
+        ok: false,
+        error: "codex_provider_stage_ledger_not_found",
+        turn_id: req.params.turnId,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    }
+    return res.json({
+      schema: "helix.codex_provider_stage_ledger_response.v1",
+      ok: true,
+      ledger,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  },
+);
 
 agentProvidersRouter.get("/goal/runtime-session", async (req: Request, res: Response) => {
   const goalId = readQueryString(req.query.goal_id ?? req.query.goalId);

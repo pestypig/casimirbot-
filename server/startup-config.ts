@@ -15,6 +15,11 @@ export type StartupConfig = {
   sourcePort: string | undefined;
   sourceHost: string | undefined;
   voiceGovernance: VoiceGovernanceConfig;
+  robinhoodLiveTrading: {
+    executionEnabled: boolean;
+    supervisorEnabled: boolean;
+    startupGatePassed: true;
+  };
 };
 
 const parseProviderMode = (value: string | undefined): "local_only" | "allow_remote" => {
@@ -67,6 +72,19 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
   const providerMode = parseProviderMode(env.VOICE_PROVIDER_MODE);
   const managedProvidersEnabled = parseBooleanFlag(env.VOICE_MANAGED_PROVIDERS_ENABLED, true);
   const localOnlyMissionMode = parseBooleanFlag(env.VOICE_LOCAL_ONLY_MISSION_MODE, true);
+  const robinhoodExecutionEnabled =
+    env.ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION === "1";
+  const robinhoodSupervisorEnabled =
+    env.ENABLE_ROBINHOOD_LIVE_SUPERVISOR === "1";
+  if (robinhoodExecutionEnabled !== robinhoodSupervisorEnabled) {
+    throw new Error("robinhood_live_flags_must_be_enabled_together");
+  }
+  if (robinhoodExecutionEnabled &&
+      !isValidProviderCredentialEncryptionKey(
+        env.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY,
+      )) {
+    throw new Error("robinhood_live_provider_encryption_key_invalid");
+  }
 
   return {
     port,
@@ -83,5 +101,12 @@ export const resolveStartupConfig = (env: NodeJS.ProcessEnv, appEnv: string): St
       managedProvidersEnabled,
       localOnlyMissionMode: providerMode === "local_only" ? true : localOnlyMissionMode,
     },
+    robinhoodLiveTrading: {
+      executionEnabled: robinhoodExecutionEnabled,
+      supervisorEnabled: robinhoodSupervisorEnabled,
+      startupGatePassed: true,
+    },
   };
 };
+import { isValidProviderCredentialEncryptionKey } from
+  "./services/brokerage/provider-credential-vault";

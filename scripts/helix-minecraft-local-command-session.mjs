@@ -141,6 +141,7 @@ const commandConfig = record(
 const installation = await installHelixFabricRuntimeConfig({
   configPath,
   commandConfigText: JSON.stringify({ command: commandConfig }),
+  commandEndpointOrigin: baseUrl,
 });
 const nextState = {
   ...state,

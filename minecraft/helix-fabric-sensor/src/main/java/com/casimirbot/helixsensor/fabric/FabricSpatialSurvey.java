@@ -23,7 +23,9 @@ final class FabricSpatialSurvey {
     static final int DEFAULT_HORIZONTAL_RADIUS = 7;
     static final int DEFAULT_VERTICAL_RADIUS = 6;
     static final int MAX_HORIZONTAL_RADIUS = 7;
-    static final int MAX_VERTICAL_RADIUS = 8;
+    // A 15x15x33 survey remains below the 10,000-cell broker ceiling while
+    // allowing an elevated actor to observe an exact bounded landing surface.
+    static final int MAX_VERTICAL_RADIUS = 16;
     static final int MAX_DETAILS_JSON_BYTES = 33_500;
 
     private static final int MAX_RUNS_PER_COLUMN = 8;

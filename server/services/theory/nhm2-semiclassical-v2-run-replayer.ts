@@ -16,11 +16,22 @@ import {
   type Nhm2SemiclassicalV2RawReplayScientificPresealBindingV1,
 } from "../../../shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1";
 import {
+  NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_RECEIPT_ARTIFACT_ID,
+  NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_RECEIPT_CONTRACT_VERSION,
+} from "../../../shared/contracts/nhm2-semiclassical-v2-scientific-candidate-manifest.v1";
+import { NHM2_SEMICLASSICAL_TENSOR_COMPONENTS } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v1";
+import {
   replayNhm2SemiclassicalV2Content,
   type Nhm2SemiclassicalV2ContentReplayInput,
   type Nhm2SemiclassicalV2ContentReplayPolicy,
   type Nhm2SemiclassicalV2ContentReplayResult,
 } from "./nhm2-semiclassical-v2-content-replay";
+import {
+  NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_REPLAY_SCOPE_CONTRACT_VERSION,
+  snapshotNhm2SemiclassicalV2MetricDemandDerivationReplayScope,
+  type Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence,
+  type Nhm2SemiclassicalV2MetricDemandDerivationReplayScope,
+} from "./nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge";
 import {
   NHM2_SECURE_RUN_OUTPUT_READER_LIMITS,
   Nhm2SecureRunOutputReaderError,
@@ -301,6 +312,40 @@ const hasExactKeys = (
   );
 };
 
+const snapshotExactOwnDataRecord = (
+  value: unknown,
+  keys: readonly string[],
+): Readonly<Record<string, unknown>> | null => {
+  try {
+    if (value == null || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    const actual = Reflect.ownKeys(value);
+    if (
+      actual.length !== keys.length ||
+      actual.some((key) => typeof key !== "string" || !keys.includes(key))
+    ) {
+      return null;
+    }
+    const snapshot: Record<string, unknown> = Object.create(null);
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        descriptor == null ||
+        !("value" in descriptor) ||
+        descriptor.enumerable !== true
+      ) {
+        return null;
+      }
+      snapshot[key] = descriptor.value;
+    }
+    return Object.freeze(snapshot);
+  } catch {
+    return null;
+  }
+};
+
 const canonicalJson = (value: unknown): string => {
   if (value === null) return "null";
   if (typeof value === "string" || typeof value === "boolean") {
@@ -411,6 +456,319 @@ const validateInputContent = (
   }
 };
 
+type MetricDemandDerivationReceiptScope = Pick<
+  Nhm2SemiclassicalV2MetricDemandDerivationReplayScope,
+  | "metricDemandDerivationReceiptSha256"
+  | "intervalTraceSha256"
+  | "intervalTraceSizeBytes"
+  | "metricDemandDerivationSourceSha256"
+  | "metricDemandDerivationDependencyLockSha256"
+  | "metricDemandDerivationToolchainArtifactSha256"
+  | "metricDemandDerivationExecutableSha256"
+  | "metricDemandDerivationGitCommitSha"
+  | "metricDemandDerivationCommand"
+  | "metricDemandDerivationArgvSha256"
+  | "metricDemandDerivationStartedAt"
+  | "metricDemandDerivationCompletedAt"
+  | "metricDemandDerivationDurationMs"
+>;
+
+const DERIVATION_RECEIPT_ROOT_KEYS = [
+  "artifactId",
+  "contractVersion",
+  "candidateId",
+  "inputBindings",
+  "derivation",
+  "implementation",
+  "execution",
+  "outputs",
+  "verificationStatus",
+  "claimLocks",
+  "integrity",
+] as const;
+
+/**
+ * Parse only the frozen receipt contract needed to derive replay scope. The
+ * caller has already bounded, hash-checked, strict-UTF8-decoded, and
+ * canonical-JSON-checked the file; this function additionally rejects schema
+ * drift and cross-binds its trace, producer implementation, execution, and
+ * central/error outputs to the validated scientific inventory.
+ */
+const metricDemandDerivationReceiptScope = (input: {
+  bytes: Buffer;
+  receiptEntry: Nhm2SemiclassicalV2RawReplayInputEntryV1;
+  candidateId: string;
+  entriesById: ReadonlyMap<string, Nhm2SemiclassicalV2RawReplayInputEntryV1>;
+}): MetricDemandDerivationReceiptScope | null => {
+  if (
+    input.bytes.byteLength !== input.receiptEntry.sizeBytes ||
+    sha256(input.bytes) !== input.receiptEntry.sha256 ||
+    input.bytes.byteLength <= 0 ||
+    BigInt(input.bytes.byteLength) >
+      NHM2_SEMICLASSICAL_V2_RUN_REPLAYER_MAX_FILE_BYTES
+  ) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    const text = utf8.decode(input.bytes);
+    parsed = JSON.parse(text) as unknown;
+    if (canonicalJson(parsed) !== text) return null;
+  } catch {
+    return null;
+  }
+  if (
+    !isPlainRecord(parsed) ||
+    !hasExactKeys(parsed, DERIVATION_RECEIPT_ROOT_KEYS) ||
+    parsed.artifactId !==
+      NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_RECEIPT_ARTIFACT_ID ||
+    parsed.contractVersion !==
+      NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_RECEIPT_CONTRACT_VERSION ||
+    parsed.candidateId !== input.candidateId
+  ) {
+    return null;
+  }
+  const bindings = isPlainRecord(parsed.inputBindings)
+    ? parsed.inputBindings
+    : null;
+  const derivation = isPlainRecord(parsed.derivation)
+    ? parsed.derivation
+    : null;
+  const constants =
+    derivation != null && isPlainRecord(derivation.constants)
+      ? derivation.constants
+      : null;
+  const implementation = isPlainRecord(parsed.implementation)
+    ? parsed.implementation
+    : null;
+  const execution = isPlainRecord(parsed.execution) ? parsed.execution : null;
+  const outputs = isPlainRecord(parsed.outputs) ? parsed.outputs : null;
+  const central =
+    outputs != null && isPlainRecord(outputs.centralTensor)
+      ? outputs.centralTensor
+      : null;
+  const errorBound =
+    outputs != null && isPlainRecord(outputs.deterministicAbsoluteErrorBound)
+      ? outputs.deterministicAbsoluteErrorBound
+      : null;
+  const intervalTrace =
+    outputs != null && isPlainRecord(outputs.intervalTrace)
+      ? outputs.intervalTrace
+      : null;
+  const claimLocks = isPlainRecord(parsed.claimLocks)
+    ? parsed.claimLocks
+    : null;
+  const integrity = isPlainRecord(parsed.integrity) ? parsed.integrity : null;
+  const entry = (inputId: string) => input.entriesById.get(inputId);
+  const isNonzeroSha256 = (value: unknown): value is string =>
+    typeof value === "string" && SHA256.test(value) && !/^0{64}$/.test(value);
+  const isGitSha = (value: unknown): value is string =>
+    typeof value === "string" && /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value);
+  const startedMs = isoMs(execution?.startedAt);
+  const completedMs = isoMs(execution?.completedAt);
+  let integrityValid = false;
+  if (
+    integrity != null &&
+    hasExactKeys(integrity, [
+      "hashAlgorithm",
+      "canonicalization",
+      "receiptSha256",
+    ]) &&
+    integrity.hashAlgorithm === "sha256" &&
+    integrity.canonicalization === "utf8_lexicographic_object_keys_json_v1" &&
+    isNonzeroSha256(integrity.receiptSha256)
+  ) {
+    try {
+      const unsigned = {
+        ...parsed,
+        integrity: {
+          hashAlgorithm: integrity.hashAlgorithm,
+          canonicalization: integrity.canonicalization,
+        },
+      };
+      integrityValid =
+        integrity.receiptSha256 ===
+        sha256(Buffer.from(canonicalJson(unsigned), "utf8"));
+    } catch {
+      integrityValid = false;
+    }
+  }
+  if (
+    bindings == null ||
+    !hasExactKeys(bindings, [
+      "geometrySha256",
+      "chartSha256",
+      "samplingBasisSha256",
+      "smearingDefinitionSha256",
+      "normalizationSha256",
+      "tolerancePolicySha256",
+    ]) ||
+    bindings.geometrySha256 !== entry("geometry")?.sha256 ||
+    bindings.chartSha256 !== entry("chart")?.sha256 ||
+    bindings.samplingBasisSha256 !== entry("sampling_basis")?.sha256 ||
+    bindings.smearingDefinitionSha256 !==
+      entry("smearing_definition")?.sha256 ||
+    bindings.normalizationSha256 !== entry("normalization")?.sha256 ||
+    bindings.tolerancePolicySha256 !== entry("tolerance_policy")?.sha256 ||
+    derivation == null ||
+    !hasExactKeys(derivation, [
+      "formulaId",
+      "algorithmId",
+      "enclosureMethod",
+      "coverage",
+      "relativeEnclosureTarget",
+      "boundScope",
+      "zeroBoundDisposition",
+      "constants",
+      "intervalTraceSha256",
+    ]) ||
+    derivation.formulaId !==
+      "einstein_tensor_orthonormal_tetrad_pullback_spacetime_smear/v1" ||
+    derivation.algorithmId !==
+      "componentwise_outward_interval_plus_quadrature_discretization_truncation_bound/v1" ||
+    derivation.enclosureMethod !==
+      "componentwise_outward_rounded_interval_plus_discretization_truncation_tail_bound" ||
+    derivation.coverage !==
+      "all_64_samples_all_10_symmetric_tensor_components" ||
+    derivation.relativeEnclosureTarget !== 0.01 ||
+    derivation.boundScope !==
+      "deterministic_numerical_error_only_physical_constant_uncertainty_excluded" ||
+    derivation.zeroBoundDisposition !==
+      "strictly_positive_componentwise_bounds_required_pending_exact_zero_derivation_replay" ||
+    !isNonzeroSha256(derivation.intervalTraceSha256) ||
+    constants == null ||
+    !hasExactKeys(constants, [
+      "speedOfLightMetersPerSecond",
+      "newtonianGravitationalConstantSI",
+      "newtonianGravitationalConstantStandardUncertaintySI",
+      "einsteinCouplingConvention",
+    ]) ||
+    constants.speedOfLightMetersPerSecond !== 299792458 ||
+    constants.newtonianGravitationalConstantSI !== 6.6743e-11 ||
+    constants.newtonianGravitationalConstantStandardUncertaintySI !== 1.5e-15 ||
+    constants.einsteinCouplingConvention !==
+      "T_hat_ab=(c^4/(8*pi*G))*G_hat_ab" ||
+    implementation == null ||
+    !hasExactKeys(implementation, [
+      "sourceSha256",
+      "dependencyLockSha256",
+      "toolchainArtifactSha256",
+      "executableSha256",
+    ]) ||
+    ![
+      implementation.sourceSha256,
+      implementation.dependencyLockSha256,
+      implementation.toolchainArtifactSha256,
+      implementation.executableSha256,
+    ].every(isNonzeroSha256) ||
+    execution == null ||
+    !hasExactKeys(execution, [
+      "authority",
+      "gitCommitSha",
+      "command",
+      "argv",
+      "startedAt",
+      "completedAt",
+      "durationMs",
+      "exitCode",
+    ]) ||
+    execution.authority !== "executor_observed" ||
+    !isGitSha(execution.gitCommitSha) ||
+    typeof execution.command !== "string" ||
+    execution.command.length <= 0 ||
+    execution.command.length > 2048 ||
+    !Array.isArray(execution.argv) ||
+    execution.argv.length <= 0 ||
+    execution.argv.some(
+      (entry) =>
+        typeof entry !== "string" || entry.length <= 0 || entry.length > 1024,
+    ) ||
+    startedMs == null ||
+    completedMs == null ||
+    !Number.isSafeInteger(execution.durationMs) ||
+    Number(execution.durationMs) <= 0 ||
+    completedMs - startedMs !== execution.durationMs ||
+    execution.exitCode !== 0 ||
+    outputs == null ||
+    !hasExactKeys(outputs, [
+      "centralTensor",
+      "deterministicAbsoluteErrorBound",
+      "intervalTrace",
+    ]) ||
+    central == null ||
+    !hasExactKeys(central, ["inputId", "sha256", "sizeBytes", "freshness"]) ||
+    central.inputId !== "metric_demand_tensor" ||
+    central.sha256 !== entry("metric_demand_tensor")?.sha256 ||
+    central.sizeBytes !== entry("metric_demand_tensor")?.sizeBytes ||
+    central.freshness !== "created_or_modified_during_execution" ||
+    errorBound == null ||
+    !hasExactKeys(errorBound, [
+      "inputId",
+      "sha256",
+      "sizeBytes",
+      "unit",
+      "shape",
+      "componentOrder",
+      "freshness",
+    ]) ||
+    errorBound.inputId !== "metric_demand_absolute_error_bound" ||
+    errorBound.sha256 !== entry("metric_demand_absolute_error_bound")?.sha256 ||
+    errorBound.sizeBytes !==
+      entry("metric_demand_absolute_error_bound")?.sizeBytes ||
+    errorBound.unit !== "J/m^3" ||
+    !Array.isArray(errorBound.shape) ||
+    errorBound.shape.length !== 2 ||
+    errorBound.shape[0] !== 64 ||
+    errorBound.shape[1] !== 10 ||
+    !Array.isArray(errorBound.componentOrder) ||
+    errorBound.componentOrder.length !== 10 ||
+    errorBound.componentOrder.some(
+      (entry, index) => entry !== NHM2_SEMICLASSICAL_TENSOR_COMPONENTS[index],
+    ) ||
+    errorBound.freshness !== "created_or_modified_during_execution" ||
+    intervalTrace == null ||
+    !hasExactKeys(intervalTrace, ["sha256", "sizeBytes", "freshness"]) ||
+    intervalTrace.sha256 !== derivation.intervalTraceSha256 ||
+    !Number.isSafeInteger(intervalTrace.sizeBytes) ||
+    Number(intervalTrace.sizeBytes) <= 0 ||
+    intervalTrace.freshness !== "created_or_modified_during_execution" ||
+    parsed.verificationStatus !==
+      "metric_demand_derivation_executor_provenance_unverified" ||
+    claimLocks == null ||
+    !hasExactKeys(claimLocks, [
+      "derivationReplayAuthority",
+      "deterministicErrorBoundAuthority",
+      "diagnosticPass",
+      "theoryClosure",
+      "physicalViability",
+    ]) ||
+    Object.values(claimLocks).some((value) => value !== false) ||
+    !integrityValid
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    metricDemandDerivationReceiptSha256: input.receiptEntry.sha256,
+    intervalTraceSha256: derivation.intervalTraceSha256,
+    intervalTraceSizeBytes: Number(intervalTrace.sizeBytes),
+    metricDemandDerivationSourceSha256: implementation.sourceSha256 as string,
+    metricDemandDerivationDependencyLockSha256:
+      implementation.dependencyLockSha256 as string,
+    metricDemandDerivationToolchainArtifactSha256:
+      implementation.toolchainArtifactSha256 as string,
+    metricDemandDerivationExecutableSha256:
+      implementation.executableSha256 as string,
+    metricDemandDerivationGitCommitSha: execution.gitCommitSha as string,
+    metricDemandDerivationCommand: execution.command as string,
+    metricDemandDerivationArgvSha256: sha256(
+      Buffer.from(canonicalJson(execution.argv), "utf8"),
+    ),
+    metricDemandDerivationStartedAt: execution.startedAt as string,
+    metricDemandDerivationCompletedAt: execution.completedAt as string,
+    metricDemandDerivationDurationMs: Number(execution.durationMs),
+  });
+};
+
 const decodeFloat64Le = (
   file: Nhm2SecureRunOutputReadFileV1,
   expectedSha256: string,
@@ -516,6 +874,7 @@ const frozenSnapshot = <T>(value: T): T =>
  */
 export async function replayNhm2SemiclassicalV2Run(
   input: Nhm2SemiclassicalV2RunReplayerInput,
+  metricDemandDerivationReplayEvidence: Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence | null = null,
 ): Promise<Nhm2SemiclassicalV2RunReplayResult> {
   if (
     !isPlainRecord(input) ||
@@ -1154,6 +1513,100 @@ export async function replayNhm2SemiclassicalV2Run(
     );
   }
 
+  const receiptEntry = entryById.get("metric_demand_derivation_receipt");
+  const receiptFile =
+    receiptEntry == null
+      ? null
+      : scientificFiles.get(inputRelative.get(receiptEntry.path) ?? "");
+  const receiptScope =
+    receiptEntry == null || receiptFile == null
+      ? null
+      : metricDemandDerivationReceiptScope({
+          bytes: receiptFile.bytes,
+          receiptEntry,
+          candidateId: manifest.candidate.candidateId,
+          entriesById: entryById,
+        });
+  const approvedPolicyEntry = entryById.get("tolerance_policy");
+  const candidateManifestEntry = entryById.get("candidate_manifest");
+  let scopedMetricDemandDerivationReplayEvidence: Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence | null =
+    null;
+  const evidenceRecord = snapshotExactOwnDataRecord(
+    metricDemandDerivationReplayEvidence,
+    ["capability", "scope"],
+  );
+  const claimedScope =
+    snapshotNhm2SemiclassicalV2MetricDemandDerivationReplayScope(
+      evidenceRecord?.scope,
+    );
+  if (
+    receiptScope != null &&
+    approvedPolicyEntry != null &&
+    candidateManifestEntry != null &&
+    evidenceRecord != null &&
+    claimedScope != null
+  ) {
+    const derivedScope: Nhm2SemiclassicalV2MetricDemandDerivationReplayScope =
+      Object.freeze({
+        contractVersion:
+          NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_REPLAY_SCOPE_CONTRACT_VERSION,
+        candidateId: manifest.candidate.candidateId,
+        candidateManifestSha256: candidateManifestEntry.sha256,
+        scientificPresealSealKey:
+          manifest.inputClosure.scientificPresealBinding.sealKey,
+        scientificPresealScientificContentSha256:
+          manifest.inputClosure.scientificPresealBinding
+            .scientificContentSha256,
+        scientificPresealSealedInventorySha256:
+          manifest.inputClosure.scientificPresealBinding.sealedInventorySha256,
+        scientificPresealSealedAt:
+          manifest.inputClosure.scientificPresealBinding.sealedAt,
+        scientificClosureSha256: manifest.inputClosure.scientificClosureSha256,
+        completeClosureSha256: manifest.inputClosure.completeClosureSha256,
+        ...receiptScope,
+        approvedReplayPolicySha256: approvedPolicyEntry.sha256,
+        centralTensorSha256: metricEntry.sha256,
+        centralTensorSizeBytes: metricEntry.sizeBytes,
+        absoluteErrorBoundSha256: metricErrorEntry.sha256,
+        absoluteErrorBoundSizeBytes: metricErrorEntry.sizeBytes,
+        rawReplayManifestSha256: manifestSha256,
+        rawReplayManifestSizeBytes: manifestSizeBytes,
+        manifestFrozenAt: manifest.manifestFrozenAt,
+        manifestGeneratedAt: manifest.generatedAt,
+        manifestObservedAt,
+        implementationRole: manifest.implementation.role,
+        implementationId: manifest.implementation.implementationId,
+        implementationVersion: manifest.implementation.implementationVersion,
+        implementationSourceSha256:
+          manifest.implementation.sourceIdentity.sha256,
+        implementationDependencyLockSha256:
+          manifest.implementation.dependencyIdentity.sha256,
+        implementationExecutableSha256:
+          manifest.implementation.executableIdentity.sha256,
+        executionCommitSha: manifest.execution.commitSha,
+        executionCommand: manifest.execution.command,
+        executionArgvSha256: sha256(
+          Buffer.from(canonicalJson(manifest.execution.argv), "utf8"),
+        ),
+        executionWorkingDirectory: manifest.execution.workingDirectory,
+        executionOutputDirectory: manifest.execution.outputDirectory,
+        executionStartedAt: manifest.execution.startedAt,
+        executionCompletedAt: manifest.execution.completedAt,
+        executionDurationMs: manifest.execution.durationMs,
+      });
+    try {
+      if (canonicalJson(claimedScope) === canonicalJson(derivedScope)) {
+        scopedMetricDemandDerivationReplayEvidence = Object.freeze({
+          capability:
+            evidenceRecord.capability as Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence["capability"],
+          scope: derivedScope,
+        });
+      }
+    } catch {
+      scopedMetricDemandDerivationReplayEvidence = null;
+    }
+  }
+
   const array = (
     descriptor: Nhm2SemiclassicalV2RawReplayArrayV1,
   ): Float64Array => {
@@ -1218,47 +1671,50 @@ export async function replayNhm2SemiclassicalV2Run(
         },
       ]),
     ) as Nhm2SemiclassicalV2ContentReplayInput["arrays"]["brackets"];
-    replay = replayNhm2SemiclassicalV2Content({
-      policy,
-      arrays: {
-        noiseKernel: array(manifest.arrays.noiseKernel),
-        noiseAbsoluteUncertainty95: array(
-          manifest.arrays.noiseKernelAbsoluteUncertainty95,
-        ),
-        meanStressTensor: array(manifest.arrays.meanRset),
-        meanStressAbsoluteUncertainty95: array(
-          manifest.arrays.meanRsetAbsoluteUncertainty95,
-        ),
-        metricDemandRset: metricDemand,
-        metricDemandAbsoluteErrorBound,
-        meanSmearingWeights: array(manifest.arrays.smearingWeights),
-        brackets,
-        antisymmetry: {
-          forward: array(manifest.arrays.antisymmetry.forward),
-          reverse: array(manifest.arrays.antisymmetry.reverse),
-          producerResidual: array(manifest.arrays.antisymmetry.residual),
-          absoluteUncertainty95: array(
-            manifest.arrays.antisymmetry.absoluteUncertainty95,
+    replay = replayNhm2SemiclassicalV2Content(
+      {
+        policy,
+        arrays: {
+          noiseKernel: array(manifest.arrays.noiseKernel),
+          noiseAbsoluteUncertainty95: array(
+            manifest.arrays.noiseKernelAbsoluteUncertainty95,
           ),
-        },
-        jacobi: {
-          first: array(manifest.arrays.jacobi.term1),
-          second: array(manifest.arrays.jacobi.term2),
-          third: array(manifest.arrays.jacobi.term3),
-          producerResidual: array(manifest.arrays.jacobi.residual),
-          absoluteUncertainty95: array(
-            manifest.arrays.jacobi.absoluteUncertainty95,
+          meanStressTensor: array(manifest.arrays.meanRset),
+          meanStressAbsoluteUncertainty95: array(
+            manifest.arrays.meanRsetAbsoluteUncertainty95,
           ),
-        },
-        regulator: {
-          levels: manifest.arrays.regulatorLevels.map((level) => ({
-            scale: level.scale,
-            residual: array(level.residual),
-            absoluteUncertainty95: array(level.absoluteUncertainty95),
-          })),
+          metricDemandRset: metricDemand,
+          metricDemandAbsoluteErrorBound,
+          meanSmearingWeights: array(manifest.arrays.smearingWeights),
+          brackets,
+          antisymmetry: {
+            forward: array(manifest.arrays.antisymmetry.forward),
+            reverse: array(manifest.arrays.antisymmetry.reverse),
+            producerResidual: array(manifest.arrays.antisymmetry.residual),
+            absoluteUncertainty95: array(
+              manifest.arrays.antisymmetry.absoluteUncertainty95,
+            ),
+          },
+          jacobi: {
+            first: array(manifest.arrays.jacobi.term1),
+            second: array(manifest.arrays.jacobi.term2),
+            third: array(manifest.arrays.jacobi.term3),
+            producerResidual: array(manifest.arrays.jacobi.residual),
+            absoluteUncertainty95: array(
+              manifest.arrays.jacobi.absoluteUncertainty95,
+            ),
+          },
+          regulator: {
+            levels: manifest.arrays.regulatorLevels.map((level) => ({
+              scale: level.scale,
+              residual: array(level.residual),
+              absoluteUncertainty95: array(level.absoluteUncertainty95),
+            })),
+          },
         },
       },
-    });
+      scopedMetricDemandDerivationReplayEvidence,
+    );
   } catch (error) {
     return failure(
       "content_replay_internal_error",

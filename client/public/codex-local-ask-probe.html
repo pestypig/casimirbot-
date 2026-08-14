@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Helix local Ask probe</title>
+    <style>
+      :root { color-scheme: dark; font-family: "Segoe UI", system-ui, sans-serif; }
+      body { margin: 0; background: #07101f; color: #e5eefc; }
+      main { width: min(880px, calc(100% - 32px)); margin: 24px auto 64px; }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      p { color: #a9b9d1; line-height: 1.45; }
+      .notice { border-left: 3px solid #38bdf8; padding: 10px 12px; background: #0b172a; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 16px 0; }
+      button { border: 1px solid #31557e; border-radius: 8px; padding: 10px 12px; color: #eaf4ff; background: #10233d; cursor: pointer; text-align: left; }
+      button:hover:not(:disabled) { background: #173252; }
+      button:disabled { cursor: not-allowed; opacity: .45; }
+      dl { display: grid; grid-template-columns: 170px 1fr; gap: 7px 12px; padding: 14px; border: 1px solid #213650; border-radius: 10px; background: #0a1526; }
+      dt { color: #8fa6c4; } dd { margin: 0; overflow-wrap: anywhere; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; padding: 12px; border: 1px solid #213650; border-radius: 10px; background: #050b15; }
+      .ok { color: #86efac; } .bad { color: #fda4af; } .busy { color: #fde68a; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Helix local Ask probe</h1>
+      <p class="notice">Low-memory, same-origin operator surface. It does not render pairing codes, connector credentials, cookies, or hidden model reasoning.</p>
+
+      <div class="grid">
+        <button id="initialize">1. Create a fresh room</button>
+        <button id="create-source" disabled>2. Create source pairing</button>
+        <button id="copy-source" disabled>3. Copy source pairing once</button>
+        <button id="refresh-environment" disabled>4. Refresh Fabric environment</button>
+        <button id="bind-player" disabled>5. Bind the online player</button>
+        <button id="save-authority" disabled>6. Save Player Embodiment authority</button>
+        <button id="create-action" disabled>7. Create player pairing</button>
+        <button id="copy-action" disabled>8. Copy player pairing once</button>
+        <button id="refresh-readiness" disabled>9. Refresh action readiness</button>
+        <button id="run-ask" disabled>10. Run the natural 250 ms walk</button>
+        <button id="load-debug" disabled>11. Load the exact-turn debug export</button>
+        <button id="download-debug" disabled>Download redacted debug JSON</button>
+      </div>
+
+      <dl>
+        <dt>Status</dt><dd id="status">Idle.</dd>
+        <dt>Room</dt><dd id="room">Not created</dd>
+        <dt>Fabric source</dt><dd id="environment">Not paired</dd>
+        <dt>Player identity</dt><dd id="subject">Not bound</dd>
+        <dt>Action authority</dt><dd id="authority">Not configured</dd>
+        <dt>Action connector</dt><dd id="readiness">Not paired</dd>
+        <dt>Ask turn</dt><dd id="turn">Not run</dd>
+      </dl>
+
+      <h2>Visible answer</h2>
+      <pre id="answer">No answer yet.</pre>
+      <h2>Differential lifecycle summary</h2>
+      <pre id="debug-summary">No debug export loaded.</pre>
+    </main>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const state = {
+          room: null,
+          environment: null,
+          actionAuthority: null,
+          sourcePairingCommand: null,
+          actionPairingCommand: null,
+          askPayload: null,
+          turnId: null,
+          debugExport: null,
+        };
+
+        const actionCapabilities = [
+          "com.casimirbot.minecraft.player.navigate",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.walk",
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.interact",
+          "com.casimirbot.minecraft.player.hotbar.select",
+          "com.casimirbot.minecraft.player.equipment.equip",
+          "com.casimirbot.minecraft.player.follow",
+          "com.casimirbot.minecraft.player.collect",
+          "com.casimirbot.minecraft.player.mine",
+          "com.casimirbot.minecraft.player.place",
+          "com.casimirbot.minecraft.player.craft",
+          "com.casimirbot.minecraft.player.inventory.transfer",
+        ];
+
+        const byId = (id) => document.getElementById(id);
+        const setText = (id, text) => { byId(id).textContent = String(text); };
+        const setStatus = (text, kind = "busy") => {
+          const node = byId("status");
+          node.textContent = text;
+          node.className = kind;
+        };
+        const setEnabled = (id, enabled) => { byId(id).disabled = !enabled; };
+        const idempotencyKey = (prefix) => `${prefix}:${crypto.randomUUID()}`;
+
+        const api = async (url, options = {}) => {
+          const response = await fetch(url, {
+            credentials: "include",
+            cache: "no-store",
+            ...options,
+            headers: {
+              Accept: "application/json",
+              ...(options.body ? { "Content-Type": "application/json" } : {}),
+              ...(options.headers || {}),
+            },
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || (payload && payload.ok === false)) {
+            const code = payload && (payload.error || payload.code);
+            const message = payload && payload.message;
+            throw new Error([code, message].filter(Boolean).join(": ") || `HTTP ${response.status}`);
+          }
+          return payload;
+        };
+
+        const refreshRoom = async () => {
+          const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}`);
+          state.room = payload.room;
+          setText("room", `${state.room.title} — active owner room`);
+          return state.room;
+        };
+
+        const refreshEnvironment = async () => {
+          if (!state.room) throw new Error("Create the room first.");
+          const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/environments`);
+          const environments = Array.isArray(payload.environments) ? payload.environments : [];
+          state.environment = environments.find((entry) => entry.domain_adapter === "minecraft.fabric_mod.v1") || null;
+          if (!state.environment) {
+            setText("environment", "Fabric source has not redeemed the pairing yet");
+            setEnabled("bind-player", false);
+            setEnabled("save-authority", false);
+            return null;
+          }
+          const observed = state.environment.latest_observed_at ? "fresh observations present" : "awaiting observations";
+          setText("environment", `${state.environment.source_label} — ${state.environment.connection_status}; ${observed}`);
+          const self = state.environment.self_subject_binding;
+          setText("subject", self ? `${self.subject_label} — ${self.status}` : "Online player selection required");
+          setEnabled("bind-player", true);
+          setEnabled("save-authority", Boolean(self));
+          if (!state.actionAuthority) {
+            const actionPayload = await api(
+              `/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/environments/${encodeURIComponent(state.environment.environment_binding_id)}/action-authorities`,
+            );
+            state.actionAuthority = Array.isArray(actionPayload.authorities)
+              ? actionPayload.authorities[0] || null
+              : actionPayload.authority || null;
+            if (state.actionAuthority) {
+              setText("authority", `Active — ${state.actionAuthority.allowed_capability_ids.length} approved capabilities`);
+              setEnabled("create-action", true);
+            }
+          }
+          setEnabled("refresh-readiness", Boolean(state.actionAuthority));
+          return state.environment;
+        };
+
+        const findFirst = (value, keys, depth = 0) => {
+          if (!value || typeof value !== "object" || depth > 8) return null;
+          if (!Array.isArray(value)) {
+            for (const key of keys) {
+              if (Object.prototype.hasOwnProperty.call(value, key) && value[key] !== null && value[key] !== undefined) {
+                return value[key];
+              }
+            }
+          }
+          for (const child of Array.isArray(value) ? value : Object.values(value)) {
+            const found = findFirst(child, keys, depth + 1);
+            if (found !== null) return found;
+          }
+          return null;
+        };
+
+        const readAnswer = (payload) => {
+          const value = findFirst(payload, ["selected_final_answer", "visible_final_answer", "final_answer", "assistant_answer", "text"]);
+          return typeof value === "string" && value.trim() ? value.trim() : "No visible final answer was returned.";
+        };
+
+        const readTurnId = (payload) => {
+          const direct = findFirst(payload, ["turn_id", "active_turn_id", "backend_turn_id"]);
+          return typeof direct === "string" && direct.trim() ? direct.trim() : null;
+        };
+
+        const queuedAdmission = (payload) => {
+          if (!payload || payload.response_type !== "queued" || payload.final_status !== "pending_input") return null;
+          const admission = payload.ask_turn_admission;
+          if (!admission || admission.schema !== "helix.ask_turn_admission.v1" || admission.status !== "queued") {
+            throw new Error("Ask admission returned an invalid queue contract.");
+          }
+          if (!["session_busy", "instance_capacity", "memory_soft_pressure"].includes(admission.reason)) {
+            throw new Error("Ask admission returned an unsupported queue reason.");
+          }
+          return admission;
+        };
+
+        const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const copyOpaqueText = async (text) => {
+          try {
+            await navigator.clipboard.writeText(text);
+            return;
+          } catch {
+            const field = document.createElement("textarea");
+            field.value = text;
+            field.setAttribute("aria-hidden", "true");
+            field.style.position = "fixed";
+            field.style.left = "-10000px";
+            field.style.top = "0";
+            document.body.appendChild(field);
+            field.focus();
+            field.select();
+            const copied = document.execCommand("copy");
+            field.remove();
+            if (!copied) throw new Error("The one-time command could not be copied.");
+          }
+        };
+
+        byId("initialize").addEventListener("click", async () => {
+          try {
+            setStatus("Initializing the first-party account session and selecting an owner room…");
+            await api("/api/account/session");
+            const listed = await api("/api/agi/realtime/rooms");
+            const rooms = Array.isArray(listed.rooms) ? listed.rooms : [];
+            state.room = rooms.find((room) => {
+              const self = Array.isArray(room.participants)
+                ? room.participants.find((entry) => entry.participant_id === room.self_participant_id)
+                : null;
+              return room.status !== "closed" && self && self.role === "owner";
+            }) || null;
+            if (!state.room) {
+              const created = await api("/api/agi/realtime/rooms", {
+                method: "POST",
+                headers: { "Idempotency-Key": idempotencyKey("codex-local-room") },
+                body: JSON.stringify({ title: "Minecraft direct-versus-Helix replay" }),
+              });
+              state.room = created.room;
+            }
+            setText("room", `${state.room.title} — active owner room`);
+            setEnabled("create-source", true);
+            setEnabled("refresh-environment", true);
+            const environment = await refreshEnvironment();
+            setStatus(
+              environment
+                ? "Existing owner room and Fabric environment restored through the same-origin browser session."
+                : "Owner room is ready; create its Fabric source pairing next.",
+              "ok",
+            );
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("create-source").addEventListener("click", async () => {
+          try {
+            setStatus("Creating a one-time Fabric source pairing…");
+            const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/connector-pairings`, {
+              method: "POST",
+              headers: { "Idempotency-Key": idempotencyKey("codex-local-source") },
+              body: JSON.stringify({
+                purpose: "create",
+                world_id: "minecraft:local:fabric-1.21.8",
+                domain_adapter: "minecraft.fabric_mod.v1",
+                source_label: "Local Fabric 1.21.8 source",
+                command_credential_requested: false,
+                action_credential_requested: false,
+              }),
+            });
+            state.sourcePairingCommand = payload.pairing_command;
+            if (!state.sourcePairingCommand) throw new Error("Pairing response omitted the one-time command.");
+            setEnabled("copy-source", true);
+            setStatus("One-time Fabric source pairing is ready to copy; it has not been rendered.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("copy-source").addEventListener("click", async () => {
+          try {
+            if (!state.sourcePairingCommand) throw new Error("No source pairing command is available.");
+            await copyOpaqueText(state.sourcePairingCommand);
+            state.sourcePairingCommand = null;
+            setEnabled("copy-source", false);
+            setStatus("Source pairing copied once without rendering it. Paste it only into authorized Minecraft chat or the Fabric server console.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("refresh-environment").addEventListener("click", async () => {
+          try {
+            setStatus("Reading the sanitized room environment projection…");
+            await refreshRoom();
+            const environment = await refreshEnvironment();
+            setStatus(environment ? "Fabric environment projection is available." : "Fabric pairing has not been redeemed yet.", environment ? "ok" : "busy");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("bind-player").addEventListener("click", async () => {
+          try {
+            setStatus("Selecting the online Minecraft player for this room participant…");
+            const environment = await refreshEnvironment();
+            const subjects = environment && environment.subject_directory && Array.isArray(environment.subject_directory.subjects)
+              ? environment.subject_directory.subjects.filter((entry) => entry.presence === "online" && entry.freshness === "fresh")
+              : [];
+            const subject = subjects.find((entry) => entry.display_label === "DatDamPig") || subjects[0];
+            if (!subject) throw new Error("No fresh online Minecraft player is available yet.");
+            const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/environments/${encodeURIComponent(environment.environment_binding_id)}/me`, {
+              method: "PUT",
+              body: JSON.stringify({ subject_ref: subject.subject_ref }),
+            });
+            setText("subject", `${payload.binding.subject_label} — ${payload.binding.status}`);
+            await refreshEnvironment();
+            setEnabled("save-authority", true);
+            setStatus("The room participant is bound to the fresh online Minecraft player.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("save-authority").addEventListener("click", async () => {
+          try {
+            setStatus("Saving a bounded two-hour Player Embodiment authority…");
+            await refreshRoom();
+            const environment = await refreshEnvironment();
+            if (!environment || !environment.self_subject_binding) throw new Error("Bind the online player first.");
+            const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/environments/${encodeURIComponent(environment.environment_binding_id)}/action-authorities`, {
+              method: "PUT",
+              body: JSON.stringify({
+                participant_id: state.room.self_participant_id,
+                domain_adapter: "minecraft.fabric_client.v1",
+                allowed_capability_ids: actionCapabilities,
+                autonomy_mode: "approved_capabilities",
+                manual_override_policy: "cancel",
+                expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+              }),
+            });
+            state.actionAuthority = payload.authority;
+            setText("authority", `Active — ${state.actionAuthority.allowed_capability_ids.length} approved capabilities`);
+            setEnabled("create-action", true);
+            setEnabled("refresh-readiness", true);
+            setStatus("Player Embodiment authority saved; the separate client credential is not paired yet.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("create-action").addEventListener("click", async () => {
+          try {
+            setStatus("Creating a one-time player-client pairing…");
+            const environment = await refreshEnvironment();
+            if (!environment || !state.actionAuthority) throw new Error("Environment and action authority are required.");
+            const existingPairings = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/connector-pairings`);
+            const stalePendingActions = Array.isArray(existingPairings.pairings)
+              ? existingPairings.pairings.filter((entry) =>
+                  entry.status === "pending" && entry.action_credential_requested === true)
+              : [];
+            for (const entry of stalePendingActions) {
+              await api(
+                `/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/connector-pairings/${encodeURIComponent(entry.pairing_id)}`,
+                { method: "DELETE" },
+              );
+            }
+            const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/connector-pairings`, {
+              method: "POST",
+              headers: { "Idempotency-Key": idempotencyKey("codex-local-action") },
+              body: JSON.stringify({
+                purpose: "rotate",
+                binding_id: environment.room_source_binding_id,
+                domain_adapter: environment.domain_adapter,
+                source_label: environment.source_label,
+                command_credential_requested: false,
+                action_credential_requested: true,
+                action_authority_id: state.actionAuthority.action_authority_id,
+                credential_ttl_ms: 2 * 60 * 60 * 1000,
+              }),
+            });
+            state.actionPairingCommand = payload.pairing_command;
+            if (!state.actionPairingCommand) throw new Error("Player pairing response omitted the one-time command.");
+            setEnabled("copy-action", true);
+            setStatus("One-time player pairing is ready to copy; it has not been rendered.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("copy-action").addEventListener("click", async () => {
+          try {
+            if (!state.actionPairingCommand) throw new Error("No player pairing command is available.");
+            await copyOpaqueText(state.actionPairingCommand);
+            state.actionPairingCommand = null;
+            setEnabled("copy-action", false);
+            setStatus("Player pairing copied once without rendering it. Deliver it only to the Fabric client companion.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("refresh-readiness").addEventListener("click", async () => {
+          try {
+            setStatus("Reading sanitized Player Embodiment readiness…");
+            const environment = await refreshEnvironment();
+            const payload = await api(`/api/agi/realtime/rooms/${encodeURIComponent(state.room.room_id)}/environments/${encodeURIComponent(environment.environment_binding_id)}/action-authorities`);
+            state.actionAuthority = Array.isArray(payload.authorities) ? payload.authorities[0] : payload.authority;
+            const readinessEntries = Array.isArray(payload.connector_readiness)
+              ? payload.connector_readiness
+              : [];
+            const readiness = readinessEntries.find((entry) =>
+              entry.action_authority_id === state.actionAuthority?.action_authority_id) || readinessEntries[0] || null;
+            setText("readiness", readiness ? `${readiness.state} — ${readiness.blocking_reason || "connector report admitted"}` : "No connector readiness report");
+            const ready = readiness && (readiness.state === "ready" || readiness.ready_for_actions === true);
+            setEnabled("run-ask", ready);
+            setStatus(ready ? "World source, player identity, authority, and player client are ready." : "Player client is not ready yet.", ready ? "ok" : "busy");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("run-ask").addEventListener("click", async () => {
+          try {
+            const prompt = "Take one careful step forward using only my paired Minecraft Player Embodiment client. Do not use server commands, teleport, interact, or mutate blocks. Move for about 250 milliseconds and report the verified measured distance and duration ticks.";
+            const sessionId = `helix-ask:room:${state.room.room_id}`;
+            const body = {
+              question: prompt,
+              sessionId,
+              traceId: `minecraft-player-walk-${crypto.randomUUID()}`,
+              turnId: `ask:${crypto.randomUUID()}`,
+              agentRuntime: "codex",
+              agent_runtime: "codex",
+              goldenPathRuntime: true,
+              golden_path_runtime: true,
+              mode: "act",
+              context_mode: "isolated",
+              debug: true,
+              max_tokens: 1600,
+            };
+            setStatus("The natural request is running through keyed Helix Ask…");
+            let payload = null;
+            for (let attempt = 1; attempt <= 90; attempt += 1) {
+              payload = await api("/api/agi/ask/turn", { method: "POST", body: JSON.stringify(body) });
+              const queued = queuedAdmission(payload);
+              if (!queued) break;
+              body.turnId = queued.turn_id;
+              setStatus(`Ask admission is queued for ${queued.reason}; preserving turn identity and retrying…`);
+              await wait(Math.min(10000, Math.max(100, Number(queued.retry_after_ms) || 1000)));
+            }
+            if (!payload || queuedAdmission(payload)) throw new Error("Ask admission did not resume within the bounded probe window.");
+            state.askPayload = payload;
+            state.turnId = readTurnId(payload) || body.turnId;
+            setText("turn", state.turnId);
+            setText("answer", readAnswer(payload));
+            setEnabled("load-debug", Boolean(state.turnId));
+            setStatus("Helix Ask returned a terminal product for the exact room-scoped turn.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("load-debug").addEventListener("click", async () => {
+          try {
+            if (!state.turnId) throw new Error("No exact Ask turn is available.");
+            setStatus("Loading the server-redacted exact-turn debug export…");
+            state.debugExport = await api(`/api/agi/ask/turn/${encodeURIComponent(state.turnId)}/debug-export`);
+            const debugPayload = state.debugExport?.payload ?? state.debugExport;
+            const capabilityCalls = Array.isArray(debugPayload?.capability_lane_call_results)
+              ? debugPayload.capability_lane_call_results
+              : [];
+            const actionCall = capabilityCalls.find((call) =>
+              call?.observation?.schema === "helix.environment_action.observation.v1"
+              || call?.delegated_gateway_call_result?.observation?.schema === "helix.environment_action.observation.v1"
+            );
+            const actionObservation = actionCall?.observation
+              ?? actionCall?.delegated_gateway_call_result?.observation
+              ?? null;
+            const reentry = debugPayload?.provider_reasoning_reentry ?? {};
+            const loopParity = debugPayload?.loop_parity_trace ?? {};
+            const terminalAuthority = debugPayload?.terminal_answer_authority ?? {};
+            const lifecycleProjection = debugPayload?.turn_lifecycle_projection_audit ?? {};
+            const summary = {
+              turn_id: state.turnId,
+              selected_capability_id: actionObservation?.capability_id ?? null,
+              action_kind: actionObservation?.action_kind ?? null,
+              execution_outcome: actionObservation?.outcome ?? null,
+              verified_terminal_measurements: actionObservation?.result?.verified_terminal_measurements ?? null,
+              controls_released: actionObservation?.result?.controls_released ?? null,
+              observation_reentered: reentry?.observation_reentered === true,
+              evidence_reentered: reentry?.evidence_reentered === true,
+              solver_completed: reentry?.solver_completed === true,
+              followup_reasoning_ran: loopParity?.followup_reasoning_ran === true,
+              terminal_selection_ran_after_observations:
+                loopParity?.terminal_selection_ran_after_observations === true,
+              terminal_authority_status: debugPayload?.terminal_authority_status ?? null,
+              terminal_authority_ok: loopParity?.terminal_authority_ok === true,
+              terminal_eligible: terminalAuthority?.terminal_eligible === true,
+              lifecycle_projection_ok: lifecycleProjection?.ok === true,
+              first_divergence_stage: lifecycleProjection?.first_divergence_stage ?? null,
+              visible_answer:
+                debugPayload?.selected_final_answer
+                ?? debugPayload?.terminal_authority_single_writer?.visible_text
+                ?? debugPayload?.terminal_presentation?.concise_text
+                ?? null,
+            };
+            setText("debug-summary", JSON.stringify(summary, null, 2));
+            setEnabled("download-debug", true);
+            setStatus("Exact-turn debug export loaded; the bounded continuity summary is visible.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
+        byId("download-debug").addEventListener("click", () => {
+          if (!state.debugExport || !state.turnId) return;
+          const blob = new Blob([`${JSON.stringify(state.debugExport, null, 2)}\n`], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = `helix-minecraft-player-${state.turnId.replace(/[^a-zA-Z0-9._-]+/g, "-")}.json`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        });
+      })();
+    </script>
+  </body>
+</html>

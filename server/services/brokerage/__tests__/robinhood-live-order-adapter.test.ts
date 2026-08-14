@@ -70,7 +70,7 @@ describe("Robinhood live placement contract adapter", () => {
       clientOrderId: "client",
       intent,
       providerReview: { review_token: "review" },
-    })).toThrow(/missing clientOrderId/u);
+    })).toThrow(/missing idempotency identity/u);
 
     expect(() => buildRobinhoodLivePlacementArguments({
       inputSchema: {
@@ -86,6 +86,42 @@ describe("Robinhood live placement contract adapter", () => {
       intent,
       providerReview: { review_token: "review" },
     })).toThrow(/unreviewed required field/u);
+  });
+
+  it("adapts Robinhood's current ref_id and market_hours contract", () => {
+    const providerSchema = {
+      type: "object",
+      required: ["account_number", "side", "symbol", "type"],
+      properties: {
+        account_number: { type: "string" },
+        ref_id: { type: "string" },
+        symbol: { type: "string" },
+        side: { type: "string" },
+        type: { type: "string" },
+        time_in_force: { type: "string" },
+        quantity: { type: "string" },
+        limit_price: { type: "string" },
+        market_hours: { type: "string" },
+      },
+    };
+    const refId = "11111111-1111-4111-8111-111111111111";
+    expect(buildRobinhoodLivePlacementArguments({
+      inputSchema: providerSchema,
+      accountRef: "agentic-account",
+      clientOrderId: `casimir_live:${refId}`,
+      intent,
+      providerReview: {},
+    })).toEqual({
+      account_number: "agentic-account",
+      ref_id: refId,
+      symbol: "TEST",
+      side: "buy",
+      type: "limit",
+      time_in_force: "gfd",
+      quantity: "2.497502",
+      limit_price: "10.01",
+      market_hours: "regular_hours",
+    });
   });
 
   it("requires one unambiguous review reference when the provider binds it", () => {

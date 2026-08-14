@@ -423,6 +423,29 @@ The Shared Live Room extension tools are:
 | `helix_room_source_create`      | `helix.room_sources.manage`                       | `room_id`, `idempotency_key`, source `request` |
 | `helix_room_command_request`    | `helix.rooms.manage`                              | disabled command request                       |
 
+The Minecraft Player Embodiment extension tools are:
+
+| MCP tool                           | OAuth scopes                                          | Input |
+| ---------------------------------- | ----------------------------------------------------- | ----- |
+| `helix_minecraft_player_action`    | `helix.rooms.read`, `helix.environment_actions.write` | `room_id`, `idempotency_key`, optional environment label, typed `action` |
+| `helix_minecraft_workflow_status`  | `helix.rooms.read`, `helix.environment_actions.read`  | `room_id`, exact `workflow_ref` |
+| `helix_minecraft_workflow_control` | `helix.rooms.read`, `helix.environment_actions.write` | `room_id`, exact `workflow_ref`, resume/cancel/emergency-stop control |
+
+These tools do not turn the Fabric mod into an MCP server and do not launch or
+embed a model executable. Codex, ChatGPT, Gemini, or another MCP client connects
+northbound to Helix; Helix resolves the current account, room,
+participant/player binding, action authority, lease, live manifest, and
+connector. The Fabric mod continues to poll the narrower southbound connector
+protocol. Its credentials, private endpoint, and pairing material never enter
+MCP arguments or results.
+
+`helix_room_command_request` remains disabled. Typed player actions are not an
+escape hatch to arbitrary Minecraft commands, host shell, files, RCON, launcher
+credentials, or process control. Player motion and mutation remain bounded by
+the admitted action schema, current authority, manual override, Emergency Stop,
+and verified postconditions. Every action/control product is an observation for
+Codex re-entry with `answer_authority: false` and `terminal_eligible: false`.
+
 The authenticated MCP `tools/list` response is the source of truth for the
 complete catalog and is not filtered into a misleading partial catalog based on
 the token's granted scopes. Every protected tool declares its complete required
@@ -534,9 +557,14 @@ bearer token in that file:
 ```toml
 [mcp_servers.casimirbot]
 url = "https://casimirbot.com/mcp"
-auth = "oauth"
 oauth_resource = "https://casimirbot.com/mcp"
-scopes = ["helix.agent_runs.read", "helix.agent_runs.write"]
+scopes = [
+  "helix.agent_runs.read",
+  "helix.agent_runs.write",
+  "helix.rooms.read",
+  "helix.environment_actions.read",
+  "helix.environment_actions.write",
+]
 enabled_tools = [
   "helix_run_start",
   "helix_run_continue",
@@ -544,13 +572,24 @@ enabled_tools = [
   "helix_run_fetch_evidence",
   "helix_run_list_events",
   "helix_run_cancel",
+  "helix_environment_device_check",
+  "helix_minecraft_player_action",
+  "helix_minecraft_workflow_status",
+  "helix_minecraft_workflow_control",
 ]
-default_tools_approval_mode = "prompt"
+enabled = true
+required = false
+startup_timeout_sec = 20
+tool_timeout_sec = 360
 ```
 
-After adding the entry, run `codex mcp login casimirbot` and complete the
-provider-hosted OAuth flow. A controlled noninteractive host that already owns
-token acquisition may use
+When a remote MCP server has neither a bearer-token environment variable nor
+static authentication headers, Codex discovers and performs OAuth for that
+resource. After adding the entry, run `codex mcp login casimirbot` (or use the
+Codex app's MCP sign-in control) and complete the provider-hosted OAuth flow.
+Keep write-capable tools on the Codex host's write-sensitive approval policy;
+approval policy is a host/app setting rather than an MCP-server field. A
+controlled noninteractive host that already owns token acquisition may use
 `bearer_token_env_var = "CASIMIRBOT_MCP_ACCESS_TOKEN"` instead of embedding a
 token. ChatGPT does not read local Codex configuration; it needs its own
 developer-mode MCP connection or an installed MCP-backed plugin, plus separate
@@ -729,7 +768,7 @@ server but only the `helix.rooms.read` scope. Its corresponding
 `/mcp/device-check` server publishes only
 `helix_environment_device_check`; the read-only plugin cannot discover the full
 run, room, source, or command catalog. The other paths advertise the full run,
-room, and code-owned logical data scopes. Advertising a scope does not enable
+room, environment-action, and code-owned logical data scopes. Advertising a scope does not enable
 its logical data scope; deployment admission still uses
 `HELIX_AGENT_DATABASE_SCOPES`.
 
@@ -763,9 +802,12 @@ validated the user.
 
 Configure an Auth0 API whose identifier exactly matches
 `HELIX_AGENT_OAUTH_AUDIENCE` (`https://casimirbot.com/mcp` for production), use
-RS256 access tokens, define `helix.rooms.read`, enable manual Client ID Metadata
-Document registration, import the OpenAI-hosted CIMD URL presented for the MCP
-client, and grant only user-delegated Device Check access. Populate
+RS256 access tokens, define `helix.rooms.read`,
+`helix.environment_actions.read`, and `helix.environment_actions.write`, enable
+manual Client ID Metadata Document registration, and import the OpenAI-hosted
+CIMD URL presented for the MCP client. A Device Check-only client receives only
+user-delegated `helix.rooms.read`; the full client receives environment action
+scopes only after explicit user delegation. Populate
 `HELIX_AGENT_OAUTH_ISSUER`, `HELIX_AGENT_OAUTH_JWKS_URL`,
 `HELIX_AGENT_OAUTH_PROVIDER=auth0`, and `HELIX_AGENT_OAUTH_ALGORITHMS=RS256`
 from the deployed tenant. Never package Auth0 administrative credentials,

@@ -611,10 +611,18 @@ class VerifierContractTests(unittest.TestCase):
             (
                 "--input-manifest",
                 "/run/input/00-seed-run-request.v1.json",
+                "--numeric-materialization-policy",
+                "/run/input/08-numeric-materialization-policy-v1.canonical.json",
+                "--postprojection-policy",
+                "/run/input/09-postprojection-policy-v1.canonical.json",
                 "--staging-root",
                 "/run/staging",
+                "--postprojection-evidence-root",
+                "/run/postprojection-evidence",
                 "--replay-bundle",
                 REPLAY_BUNDLE_PATH,
+                "--broker-runtime-evidence",
+                "/run/broker-channel/verifier-runtime-evidence.v3.canonical.json",
             ),
         )
         self.assertEqual(EXPECTED_ENVIRONMENT["OMP_NUM_THREADS"], "1")

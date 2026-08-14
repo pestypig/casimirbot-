@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from contract import GRID_LEVELS, NU_BASE, GridLevel
+from raw_evidence import FrozenRawLevelEvidence, freeze_raw_level_evidence
 from spectral import (
     canonical_f64,
     differentiation_matrix,
@@ -24,7 +25,7 @@ class SpectralSolution:
     potential_nodal: np.ndarray
     scalar_odd: np.ndarray
     potential_even: np.ndarray
-    raw_residual_linf: float
+    raw_preprojection: FrozenRawLevelEvidence
 
 
 _NEWTON_SETTINGS = {
@@ -32,7 +33,55 @@ _NEWTON_SETTINGS = {
     "L1": {"f_tol": 1.0e-11, "maxiter": 60, "inner_maxiter": 100, "outer_k": 8},
     "L2": {"f_tol": 5.0e-12, "maxiter": 60, "inner_maxiter": 110, "outer_k": 8},
 }
-_RAW_ACCEPTANCE_LINF = 5.0e-10
+
+
+class SeedNewtonKrylovNoConvergence(RuntimeError):
+    """Typed fail-closed terminal state for an exhausted production solve."""
+
+
+class _SingleCycleLgmresMethod:
+    """One Newton solve's explicitly scoped LGMRES augmentation state."""
+
+    def __init__(self, *, inner_m: int, outer_k: int) -> None:
+        if inner_m <= 0 or outer_k < 0:
+            raise ValueError("invalid LGMRES dimensions")
+        self.inner_m = int(inner_m)
+        self.outer_k = int(outer_k)
+        # SciPy intentionally updates this list between nonlinear iterations.
+        # A fresh method object is constructed for every ``solve_level`` call,
+        # so no mutable augmentation state crosses independent solves.
+        self.outer_vectors: list[tuple[np.ndarray, np.ndarray | None]] = []
+
+    def __call__(
+        self,
+        operator: object,
+        right_hand_side: np.ndarray,
+        *,
+        rtol: float = 1.0e-5,
+        atol: float = 0.0,
+        maxiter: int | None = None,
+        M: object | None = None,
+    ) -> tuple[np.ndarray, int]:
+        del maxiter
+        from scipy.sparse.linalg import lgmres
+
+        return lgmres(
+            operator,
+            right_hand_side,
+            rtol=rtol,
+            atol=atol,
+            maxiter=1,
+            M=M,
+            inner_m=self.inner_m,
+            outer_k=self.outer_k,
+            outer_v=self.outer_vectors,
+            store_outer_Av=False,
+            prepend_outer_v=True,
+        )
+
+
+def _lgmres_method(*, inner_m: int, outer_k: int) -> _SingleCycleLgmresMethod:
+    return _SingleCycleLgmresMethod(inner_m=inner_m, outer_k=outer_k)
 
 
 def _pack(scalar: np.ndarray, potential: np.ndarray) -> np.ndarray:
@@ -288,7 +337,11 @@ def solve_level(level: GridLevel, previous: SpectralSolution | None) -> Spectral
     if previous is None:
         if level.level_id != "L0":
             raise ValueError("only L0 may start without a prolongated solution")
-        scalar, potential = _analytic_l0_guess(level)
+        from low_mode_initializer import low_mode_l0_initializer
+
+        initializer = low_mode_l0_initializer(level)
+        scalar = initializer.scalar_nodal
+        potential = initializer.potential_nodal
     else:
         scalar, potential = _prolong_guess(previous, level)
     initial = _pack(scalar, potential)
@@ -299,24 +352,39 @@ def solve_level(level: GridLevel, previous: SpectralSolution | None) -> Spectral
     from scipy.optimize import NoConvergence, newton_krylov
 
     settings = _NEWTON_SETTINGS[level.level_id]
+    method = _lgmres_method(
+        # Preserve the frozen numeric value while binding it to SciPy's actual
+        # Arnoldi-dimension parameter.  Passing this as ``inner_maxiter`` to
+        # ``newton_krylov`` instead would be overwritten to one outer cycle.
+        inner_m=int(settings["inner_maxiter"]),
+        outer_k=int(settings["outer_k"]),
+    )
     try:
         result = newton_krylov(
             lambda vector: _deflated_residual(vector, level),
             initial,
-            method="lgmres",
-            inner_maxiter=int(settings["inner_maxiter"]),
-            outer_k=int(settings["outer_k"]),
+            method=method,
+            inner_maxiter=1,
             maxiter=int(settings["maxiter"]),
             f_tol=float(settings["f_tol"]),
             line_search="armijo",
             verbose=False,
         )
     except NoConvergence as failure:
-        if not failure.args:
-            raise RuntimeError(f"{level.level_id}: Newton-Krylov did not converge") from failure
-        result = np.asarray(failure.args[0], dtype=np.float64)
+        raise SeedNewtonKrylovNoConvergence(
+            f"{level.level_id}: Newton-Krylov did not converge after "
+            f"{int(settings['maxiter'])} iterations"
+        ) from failure
 
     scalar, potential = _unpack(np.asarray(result, dtype=np.float64), level)
+    # The v3 postprojection policy makes these exact unpacked binary64 bytes
+    # the subject of independent P replay.  Snapshot them before any NumPy
+    # projection, mask, phase choice, reconstruction, or value normalization.
+    raw_preprojection = freeze_raw_level_evidence(
+        level.level_id,
+        scalar,
+        potential,
+    )
     scalar_nodal, potential_nodal, scalar_odd, potential_even = _postproject_fields(
         level,
         scalar,
@@ -329,20 +397,13 @@ def solve_level(level: GridLevel, previous: SpectralSolution | None) -> Spectral
         scalar_odd,
         potential_even,
     )
-    vector = _pack(scalar_nodal, potential_nodal)
-    residual_linf = float(np.max(np.abs(raw_residual(vector, level))))
-    if not np.isfinite(residual_linf) or residual_linf > _RAW_ACCEPTANCE_LINF:
-        raise RuntimeError(
-            f"{level.level_id}: post-projection nodal SP residual "
-            f"{residual_linf:.17g} exceeds producer cutoff"
-        )
     return SpectralSolution(
         level,
         scalar_nodal,
         potential_nodal,
         scalar_odd,
         potential_even,
-        residual_linf,
+        raw_preprojection,
     )
 
 

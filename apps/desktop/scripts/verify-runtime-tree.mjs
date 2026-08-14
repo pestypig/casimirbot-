@@ -9,6 +9,8 @@ const desktopRoot = path.resolve(
   "..",
 );
 const repoRoot = path.resolve(desktopRoot, "..", "..");
+const minecraftFabricLoopbackLifecycleScript =
+  "scripts/helix-minecraft-launch-fabric-loopback.ps1";
 const rendererRoots = {
   built: path.join(repoRoot, "dist", "public"),
   staged: path.join(desktopRoot, "runtime", "dist", "public"),
@@ -34,6 +36,17 @@ const marketplaceRoots = {
   ),
 };
 const tunnelPayloadRoots = {
+  staged: path.join(desktopRoot, "runtime"),
+  packed: path.join(
+    desktopRoot,
+    "release",
+    "win-unpacked",
+    "resources",
+    "runtime",
+  ),
+};
+const minecraftLifecycleRoots = {
+  source: repoRoot,
   staged: path.join(desktopRoot, "runtime"),
   packed: path.join(
     desktopRoot,
@@ -89,6 +102,31 @@ assertReleaseSliceIdentity(manifest, sha256(releaseSliceManifestBytes));
 if (sha256(stagedManifestBytes) !== sha256(packedManifestBytes)) {
   throw new Error(
     "Packaged runtime manifest does not exactly match the staged manifest",
+  );
+}
+const minecraftLifecycleReceipts = Object.fromEntries(
+  await Promise.all(
+    Object.entries(minecraftLifecycleRoots).map(async ([label, root]) => [
+      label,
+      sha256(await readFile(
+        path.join(root, minecraftFabricLoopbackLifecycleScript),
+      )),
+    ]),
+  ),
+);
+if (
+  manifest.minecraftFabricLoopbackLifecycle?.path !==
+    minecraftFabricLoopbackLifecycleScript ||
+  !/^[a-f0-9]{64}$/u.test(
+    manifest.minecraftFabricLoopbackLifecycle?.sha256 ?? "",
+  ) ||
+  Object.values(minecraftLifecycleReceipts).some(
+    (digest) =>
+      digest !== manifest.minecraftFabricLoopbackLifecycle.sha256,
+  )
+) {
+  throw new Error(
+    `Minecraft Fabric loopback lifecycle mismatch: ${JSON.stringify(minecraftLifecycleReceipts)}`,
   );
 }
 const receipts = Object.fromEntries(

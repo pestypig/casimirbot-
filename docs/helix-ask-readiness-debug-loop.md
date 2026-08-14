@@ -48,6 +48,83 @@ Invoke-WebRequest -UseBasicParsing http://localhost:1522/api/agi/agent-providers
 3. Static and deterministic unit tests may run without the keyed server. Do not
    present a mock, fallback, unkeyed, or ad hoc server as live-provider parity.
 
+## Runtime Surface Selection
+
+Choose the runtime surface before testing. These surfaces are complementary;
+success on one does not silently satisfy another surface's acceptance gate.
+
+| Surface | Starts and owns | Use it for | It does not prove |
+| --- | --- | --- | --- |
+| Packaged CasimirBot desktop | The installed EXE starts its integrity-checked compiled service on a reserved ephemeral `127.0.0.1` port and injects a 256-bit per-launch session secret into exact-origin renderer requests. | Installed-host startup, desktop account policy, updater presentation, local Helix Ask UI, Codex binary discovery, one natural runtime-agent prompt, and Device Check presentation. | Provider-keyed repository parity, native Codex app-server transport, Shared Live Room/Realtime parity, public MCP deployment, or OpenAI tunnel invocation. |
+| Keyed repository runtime | The user or explicitly authorized Codex Desktop starts the canonical checkout only through `start-myapp-for-codex`; the launcher reports the local URL. | Live provider keys, source/connector capture, Shared Live Rooms, GPT Realtime, exact API/browser parity, and representative release batteries. | Packaged installer closure, desktop session-header injection, updater behavior, or clean-machine EXE startup. |
+| Desktop MCP tunnel | The installed app supervises the pinned `tunnel-client`, which forwards only the private desktop Device Check MCP endpoint. | Owner-scoped, read-only external Device Check testing from a supported OpenAI surface. | General Helix Ask remote control, the full workstation tool catalog, public-plugin distribution, or keyed repository parity. |
+
+The packaged desktop service and the keyed opaque launcher are different trust
+boundaries. The desktop service inherits public OAuth verifier identifiers,
+the exact developer-profile allowlist, and a narrow Windows process
+environment, but it does not load the repository `.env` or inherit provider
+API keys. Its per-launch session secret is a local request boundary; it is not
+a provider key and must not be called a "keyed server" credential.
+
+The desktop service can discover an installed Codex binary through the allowed
+Windows user paths. A successful-looking answer is not sufficient to identify
+the provider transport. Copy the debug export from the exact visible turn and
+record, when present, `selected_runtime_agent_provider`,
+`codex_runtime_status`, `codex_native_provider_bridge.status`, its fallback
+reason/transport, observation re-entry, route-product materialization, and
+terminal-authority status. Classify the result as:
+
+- `codex_app_server`: native provider transport completed;
+- `codex_exec`: the bounded read-only compatibility transport completed;
+- `helix_native`: Helix Native, not Codex Workstation Mode, answered; or
+- `typed_failure`: startup/presentation may have passed, but provider parity did
+  not.
+
+Do not add provider credentials to the desktop environment allowlist to make a
+native-provider check pass. If the test requires provider-keyed behavior, move
+to the keyed repository surface.
+
+For latency-sensitive agent/tool checks, report the turnaround as separate
+intervals: provider/bootstrap, model-to-tool request, governed execution,
+observation re-entry, post-tool synthesis, and terminal projection. The target
+shape is one native runtime turn with observation re-entry and one final
+candidate. A compatibility transport that requires a marker response plus a
+second model call is fallback evidence, not native-loop performance parity.
+Classify an explicit provider credit/quota rejection as an external provider
+boundary; do not report it as model reasoning, tool-schema, or Minecraft
+execution failure, and do not repeatedly retry that known-dead provider path in
+the same acceptance run.
+
+### Packaged desktop Helix Ask smoke
+
+1. Record free/committed memory and confirm there is no duplicate CasimirBot,
+   `tunnel-client`, keyed Node, build, or test-worker tree.
+2. Launch the installed CasimirBot shortcut or the exact installed EXE. Do not
+   start a second repository server for this smoke.
+3. Require the desktop host to reach its sanitized Ready state. Do not retrieve
+   or copy its session secret, child environment, provider auth store, or
+   secret-bearing command line.
+4. Create or sign in to the intended desktop-local profile. For a developer
+   pilot, verify the exact account receives developer policy; do not synthesize
+   a developer identity.
+5. Open Helix Ask, select the intended runtime, and submit one representative
+   natural prompt. Preserve the visible turn ID and copy that turn's debug
+   export.
+6. Report the exact provider classification above, the first divergent
+   lifecycle stage if any, and whether the final response received Helix
+   terminal authority. Browser-free interactive success is a packaged-desktop
+   result, not browser-parity evidence.
+7. Test Device Check separately from Helix Ask. A local Device Check result is
+   not an OpenAI tunnel invocation until the external surface actually calls
+   the tunneled MCP tool.
+8. Close CasimirBot at the end of the smoke. Verify its compiled-service and
+   supervised tunnel children exit, then record memory headroom recovery.
+
+Use the in-app browser or Chrome lane when the acceptance target specifically
+requires DOM automation, a signed-in browser session, exact browser/API parity,
+or copied debug evidence from the keyed repository runtime. The packaged app
+is an alternative operator surface, not a reason to retire browser validation.
+
 ## Environment Capability Development Preflight
 
 Before extending an environment connector or adding adapter rules, separate the
@@ -70,6 +147,38 @@ Helix can carry a capable agent through it.
 The reference run proves feasibility and supplies a capability benchmark. The
 Helix run proves governed end-to-end parity. Neither result substitutes for the
 other.
+
+### Transparent-governor differential
+
+When reference Codex can perform an operation but keyed Helix cannot, rerun the
+exact same natural prompt and inspect this sequence before adding prompt rules:
+
+```txt
+prompt
+-> family/source admission
+-> runtime-visible capabilities and exact schemas
+-> runtime-selected requests
+-> admitted executions
+-> normalized observations, including failed-attempt diagnostics
+-> observation re-entry
+-> Codex terminal candidate
+-> terminal materialization and visible projection
+```
+
+Fail the adapter parity check if Helix prebound an unnamed exact action,
+advertised fields rejected by its trusted parser, substituted a deterministic
+request after a runtime-authored failure, converted a repairable executor
+failure into unexplained user input, or changed/dropped a grounded Codex
+candidate downstream. Retain hard identity, consent, source freshness,
+provenance, effect-scope, scientific-evidence, and terminal-eligibility gates.
+Those gates explain and constrain execution; they do not choose the game or
+workstation strategy.
+
+For Minecraft concurrent programs, verify that `all_required` completes every
+required lane without a race. A race is for competing alternatives and cancels
+losers. Require the failed receipt to expose the failed lane, race outcomes,
+condition observations, control release, and mutation counts so Codex can
+repair its own program without guessing an external precondition.
 
 ## Single-Prompt Success Checklist (Current)
 

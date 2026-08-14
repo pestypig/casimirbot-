@@ -26,9 +26,14 @@ const sendError = (res: Response, error: unknown): void => {
     });
     return;
   }
+  const diagnostic = error instanceof Error
+    ? `${error.name}: ${error.message}`
+      .replace(/helix_[A-Za-z0-9_-]+/g, "[redacted]")
+      .slice(0, 1_000)
+    : "unknown";
   console.warn(
     "[environment-action] connector request failed",
-    error instanceof Error ? error.name : "unknown",
+    diagnostic,
   );
   res.status(503).json({
     schema: "helix.environment_action.connector_receipt.v1",

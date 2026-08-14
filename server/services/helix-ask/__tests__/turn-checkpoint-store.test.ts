@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildHelixAskTurnJournal,
   buildHelixAskTurnRecovery,
@@ -219,6 +219,35 @@ describe("Helix Ask turn checkpoint store", () => {
       terminal_eligible: false,
       terminal_ineligible_reason: "ask_turn_checkpoint_is_recovery_context_only",
     });
+  });
+
+  it("scans the latest journal without reading the complete JSONL file into one string", () => {
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-streamed",
+      turn_id: "turn-streamed",
+      session_id: "session-streamed",
+      route: "/ask/turn",
+      checkpoint_type: "turn_started",
+      status: "running",
+      prompt_text: "Stream the journal.",
+      recorded_at: "2026-06-13T10:03:00.000Z",
+    });
+    const readFile = vi
+      .spyOn(fs, "readFileSync")
+      .mockImplementation(() => {
+        throw new Error("unbounded_checkpoint_read");
+      });
+    try {
+      const journal = buildHelixAskTurnJournal({
+        thread_id: "thread-streamed",
+        session_id: "session-streamed",
+      });
+      expect(journal.turn_id).toBe("turn-streamed");
+      expect(journal.records).toHaveLength(1);
+      expect(journal.summary.checkpoint_count).toBe(1);
+    } finally {
+      readFile.mockRestore();
+    }
   });
 
   it("returns an empty non-terminal journal when no scoped checkpoints exist", () => {

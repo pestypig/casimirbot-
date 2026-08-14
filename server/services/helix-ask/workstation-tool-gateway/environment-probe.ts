@@ -4,7 +4,7 @@ import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from "@shared/contracts/helix-share
 import {
   HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
-  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   type HelixEnvironmentProbeObservation,
   type HelixEnvironmentProbeOutcome,
@@ -783,7 +783,7 @@ const environmentProbeManifestForCapability = (
 };
 
 export const environmentProbeMinecraftManifests: HelixWorkstationCapabilityManifest[] =
-  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.map((capabilityId) =>
+  HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS.map((capabilityId) =>
     environmentProbeManifestForCapability(capabilityId),
   );
 

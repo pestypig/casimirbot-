@@ -6,6 +6,9 @@ import {
   HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_CAPABILITY,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
+import {
+  HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+} from "@shared/helix-minecraft-local-lifecycle";
 import type { HelixWorkstationGatewayCallResult } from "../../workstation-tool-gateway/types";
 import {
   THEORY_FORMAL_VERIFIER_PLAN_CAPABILITY,
@@ -57,9 +60,13 @@ type SharedLiveRoomMutationCapabilityId =
   | typeof HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY
   | typeof HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_CAPABILITY;
 
+type MinecraftLocalLifecycleCapabilityId =
+  typeof HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY;
+
 type RuntimeApprovalCapabilityId =
   | RuntimeStartCapabilityId
-  | SharedLiveRoomMutationCapabilityId;
+  | SharedLiveRoomMutationCapabilityId
+  | MinecraftLocalLifecycleCapabilityId;
 
 export type CodexNativeTrustedRuntimeStartPlanV1 = {
   capabilityId: RuntimeStartCapabilityId;
@@ -134,11 +141,17 @@ export const isCodexNativeSharedLiveRoomMutationApprovalCapability = (
   capabilityId === HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY ||
   capabilityId === HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_CAPABILITY;
 
+export const isCodexNativeMinecraftLocalLifecycleApprovalCapability = (
+  capabilityId: string,
+): capabilityId is MinecraftLocalLifecycleCapabilityId =>
+  capabilityId === HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY;
+
 export const isCodexNativeRuntimeApprovalCapability = (
   capabilityId: string,
 ): capabilityId is RuntimeApprovalCapabilityId =>
   isCodexNativeRuntimeApprovalStartCapability(capabilityId) ||
-  isCodexNativeSharedLiveRoomMutationApprovalCapability(capabilityId);
+  isCodexNativeSharedLiveRoomMutationApprovalCapability(capabilityId) ||
+  isCodexNativeMinecraftLocalLifecycleApprovalCapability(capabilityId);
 
 export const findModelSuppliedRuntimeApprovalControlField = (
   args: Record<string, unknown>,

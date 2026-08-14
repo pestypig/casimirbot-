@@ -407,7 +407,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/proposals", proposalsRouter);
     app.use("/api/proposals/profile-panel", profilePanelRouter);
     const { startProposalJobRunner } = await import("./services/proposals/job-runner");
-    startProposalJobRunner();
+    // The backlog scan is the first local-database consumer in many developer
+    // boots. Await it so `/api/ready` cannot advertise a server whose durable
+    // pg-mem restore is still consuming the fixed low-memory heap in the
+    // background.
+    await startProposalJobRunner();
   }
 
   if (!fastBoot && process.env.ENABLE_SPECIALISTS === "1") {

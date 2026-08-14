@@ -895,7 +895,38 @@ export const leaseDurableEnvironmentProbesForClaim = async (input: {
               reason: "live_answer_validation",
               objective: `Read-only ${row.capability_id} probe.`,
               target:
-                args.target === "current_actor"
+                legacyProbeType === "registry_fact"
+                  ? {
+                      registry_kind:
+                        typeof args.registry_kind === "string"
+                          ? (args.registry_kind as
+                              | "block"
+                              | "item"
+                              | "entity_type"
+                              | "mob_effect")
+                          : null,
+                      resource_id:
+                        typeof args.resource_id === "string"
+                          ? args.resource_id
+                          : null,
+                    }
+                  : legacyProbeType === "recipe_fact"
+                    ? {
+                        query_kind:
+                          typeof args.query_kind === "string"
+                            ? (args.query_kind as
+                                | "recipe_id"
+                                | "output_item_id")
+                            : null,
+                        resource_id:
+                          typeof args.resource_id === "string"
+                            ? args.resource_id
+                            : null,
+                        max_results: Number.isInteger(args.max_results)
+                          ? Number(args.max_results)
+                          : null,
+                      }
+                  : args.target === "current_actor"
                   ? {
                       target_ref: "current_actor",
                       ...(Number.isInteger(args.horizontal_radius)
@@ -999,6 +1030,96 @@ const normalizeLegacyResult = (
   const normalized: Record<string, unknown> = {
     result_summary: result.result_summary,
   };
+  if (
+    typeof details.game_version === "string" &&
+    details.game_version.trim().length > 0 &&
+    details.game_version.trim().length <= 80
+  ) {
+    normalized.game_version = details.game_version.trim();
+  }
+  if (
+    ["block", "item", "entity_type", "mob_effect"].includes(
+      String(details.registry_kind),
+    ) &&
+    typeof details.requested_resource_id === "string" &&
+    details.requested_resource_id.trim().length > 0 &&
+    details.requested_resource_id.trim().length <= 160 &&
+    typeof details.registered === "boolean"
+  ) {
+    normalized.registry_kind = String(details.registry_kind);
+    normalized.requested_resource_id =
+      details.requested_resource_id.trim();
+    normalized.registered = details.registered;
+    if (
+      typeof details.canonical_resource_id === "string" &&
+      details.canonical_resource_id.trim().length > 0 &&
+      details.canonical_resource_id.trim().length <= 160
+    ) {
+      normalized.canonical_resource_id =
+        details.canonical_resource_id.trim();
+    }
+  }
+  if (
+    ["recipe_id", "output_item_id"].includes(
+      String(details.query_kind),
+    ) &&
+    typeof details.requested_resource_id === "string" &&
+    details.requested_resource_id.trim().length > 0 &&
+    details.requested_resource_id.trim().length <= 160 &&
+    Number.isInteger(details.match_count) &&
+    Number(details.match_count) >= 0 &&
+    Number(details.match_count) <= 100_000 &&
+    typeof details.matches_complete === "boolean" &&
+    Array.isArray(details.matches)
+  ) {
+    normalized.query_kind = String(details.query_kind);
+    normalized.requested_resource_id =
+      details.requested_resource_id.trim();
+    normalized.match_count = Number(details.match_count);
+    normalized.matches_complete = details.matches_complete;
+    normalized.matches = details.matches
+      .slice(0, 16)
+      .map(asRecord)
+      .filter((match) => {
+        const resultItemIds = Array.isArray(match.result_item_ids)
+          ? match.result_item_ids
+          : null;
+        return (
+          typeof match.recipe_id === "string" &&
+          match.recipe_id.trim().length > 0 &&
+          match.recipe_id.trim().length <= 160 &&
+          typeof match.recipe_type === "string" &&
+          match.recipe_type.trim().length > 0 &&
+          match.recipe_type.trim().length <= 160 &&
+          typeof match.serializer_id === "string" &&
+          match.serializer_id.trim().length > 0 &&
+          match.serializer_id.trim().length <= 160 &&
+          typeof match.group === "string" &&
+          match.group.length <= 160 &&
+          resultItemIds !== null &&
+          resultItemIds.length <= 16 &&
+          resultItemIds.every(
+            (itemId) =>
+              typeof itemId === "string" &&
+              itemId.trim().length > 0 &&
+              itemId.trim().length <= 160,
+          ) &&
+          typeof match.result_resolution_complete === "boolean"
+        );
+      })
+      .map((match) => ({
+        recipe_id: String(match.recipe_id).trim(),
+        recipe_type: String(match.recipe_type).trim(),
+        serializer_id: String(match.serializer_id).trim(),
+        group: String(match.group),
+        result_item_ids: (match.result_item_ids as unknown[]).map((itemId) =>
+          String(itemId).trim(),
+        ),
+        result_resolution_complete: Boolean(
+          match.result_resolution_complete,
+        ),
+      }));
+  }
   if (Number.isInteger(details.stack_count)) {
     normalized.item_count = details.stack_count;
     normalized.slots = (Array.isArray(details.slots) ? details.slots : [])

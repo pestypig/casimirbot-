@@ -65,6 +65,8 @@ const probeTypeSchema = z.enum([
   "inventory_check",
   "local_map_summary",
   "spatial_region",
+  "registry_fact",
+  "recipe_fact",
 ]);
 
 export const helixEnvironmentMechanicsCollectionRefSchema = z

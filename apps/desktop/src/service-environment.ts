@@ -60,6 +60,7 @@ export const buildDesktopServiceEnvironment = (input: {
   processEnv: NodeJS.ProcessEnv;
   userDataPath: string;
   serviceOrigin: string;
+  providerCredentialEncryptionKey: string;
 }): NodeJS.ProcessEnv => {
   if (!input.userDataPath.trim()) {
     throw new Error("Electron userData path is required for desktop local state");
@@ -77,6 +78,16 @@ export const buildDesktopServiceEnvironment = (input: {
   ) {
     throw new Error(
       "Desktop service origin must be an exact HTTP 127.0.0.1 origin",
+    );
+  }
+  const providerCredentialEncryptionKey =
+    input.providerCredentialEncryptionKey.trim();
+  if (
+    !/^[A-Za-z0-9_-]{43}$/u.test(providerCredentialEncryptionKey) ||
+    Buffer.from(providerCredentialEncryptionKey, "base64url").length !== 32
+  ) {
+    throw new Error(
+      "Desktop provider credential key must be exactly 32 base64url bytes",
     );
   }
 
@@ -103,6 +114,8 @@ export const buildDesktopServiceEnvironment = (input: {
   // Immediate writes use the database's streaming atomic snapshot writer and
   // avoid losing a deferred update when Windows terminates the child process.
   environment.HELIX_LOCAL_PG_MEM_WRITE_MODE = "immediate";
+  environment.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY =
+    providerCredentialEncryptionKey;
   // The private desktop MCP publishes discovery at its per-launch loopback
   // origin. OpenAI Secure MCP Tunnel performs that discovery locally and
   // rewrites resource URLs to the public tunnel endpoint. Never inherit the

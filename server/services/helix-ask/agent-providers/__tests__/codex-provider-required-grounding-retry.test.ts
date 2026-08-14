@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCodexGatewayObservationReentryPrompt,
+  buildCodexRejectedPostObservationCandidateCorrectionPrompt,
   buildCodexContinuationCapabilityInputContractLines,
   buildCodexCapabilityLaneRetryInstruction,
   buildCapabilityLaneMutationEpochHistory,
   buildCodexGenericContinuationDecisionInstruction,
+  codexRequiredContinuationReviewMode,
   continuationStateRequiresCodexModelAuthoredCapabilityProposal,
+  continuationStateAdmitsGenericProviderLaneRequest,
   continuationStateAdmitsModelAuthoredRetryLaneRequest,
+  continuationStateAdmitsPostObservationLaneRequest,
   continuationStateAdmitsPreparedRuntimeRetryLaneRequest,
   continuationStateAdmitsRuntimeRetryLaneRequest,
+  extractCodexContinuationCapabilityLaneRequestCandidate,
   providerMentionedAdmittedCapabilityIds,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
   runtimeProviderRequiredObservationFamiliesFromBody,
@@ -17,6 +22,7 @@ import {
   shouldExtractCodexInitialCapabilityLaneRequest,
   shouldRetryCodexCapabilityLaneRequest,
   shouldRetryCodexPostObservationContinuationAffordance,
+  shouldRetryCodexRejectedPostObservationCandidate,
 } from "../codex-provider";
 import { environmentCommandMinecraftManifest } from "../../workstation-tool-gateway/environment-command";
 import { environmentActionMinecraftManifests } from "../../workstation-tool-gateway/environment-action";
@@ -548,6 +554,135 @@ describe("Codex required-grounding correction", () => {
     ).toBe(false);
   });
 
+  it("re-enters one wrong-capability repair rejection and keeps the correction on the exact failed capability", () => {
+    const failedCapability =
+      "com.casimirbot.minecraft.actor.status.read";
+    const rejectedCapability = "com.casimirbot.minecraft.inventory.read";
+    const state = {
+      schema: "helix.agent_continuation_state.v1",
+      turn_id: "ask:test:wrong-capability-repair",
+      state_id: "state:test:wrong-capability-repair",
+      sequence: 4,
+      trigger: "post_attempt",
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      observation_refs: {
+        existing: [],
+        new: ["observation:invalid-args"],
+        all: ["observation:invalid-args"],
+      },
+      missing_requirement_ids: [],
+      last_attempt: {
+        attempt_id: "attempt:invalid-args",
+        capability_id: failedCapability,
+        action_fingerprint: "sha256:invalid-args",
+        status: "failed",
+        failure_class: "invalid_args",
+        failure_code: "trusted_input_schema_failed",
+        failure_message:
+          "The request failed its trusted input schema contract.",
+        retryability: "retryable",
+        observation_refs: ["observation:invalid-args"],
+      },
+      next_admissible_affordances: [],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [failedCapability, rejectedCapability],
+        authority: "helix_policy_admits_runtime_proposal",
+      },
+      tried_action_fingerprints: ["sha256:invalid-args"],
+      progress: {
+        made_progress: false,
+        new_observation_count: 1,
+        resolved_requirement_ids: [],
+        added_requirement_ids: [],
+        new_affordance_count: 0,
+        no_progress_repeat_count: 1,
+        reason_codes: ["failed_attempt_observation_only"],
+      },
+      budget: {
+        soft: { pressure: "none", exhausted: false },
+        hard: { exhausted: false },
+        extension_count: 0,
+        max_extensions: 2,
+      },
+      allowed_decisions: ["retry", "act"],
+      authority: "runtime_agent_decides_within_admitted_boundaries",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    } as unknown as HelixAgentContinuationState;
+    const rejectedCandidate = {
+      capability: rejectedCapability,
+      arguments: { target: "current_actor" },
+    };
+    const rejection = {
+      schema: "helix.runtime_agent_lane_request_admission_rejection.v1",
+      reason:
+        "runtime_lane_request_not_in_admitted_continuation_affordances",
+      candidate: rejectedCandidate,
+      continuation_state_id: state.state_id,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    expect(
+      shouldRetryCodexRejectedPostObservationCandidate({
+        state,
+        rejectedCandidate,
+        admittedCapabilityIds: [failedCapability, rejectedCapability],
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetryCodexRejectedPostObservationCandidate({
+        state,
+        rejectedCandidate: {
+          capability: failedCapability,
+          arguments: { target: "current_actor" },
+        },
+        admittedCapabilityIds: [failedCapability, rejectedCapability],
+      }),
+    ).toBe(false);
+    expect(
+      shouldRetryCodexRejectedPostObservationCandidate({
+        state: {
+          ...state,
+          budget: { hard: { exhausted: true } },
+        } as unknown as HelixAgentContinuationState,
+        rejectedCandidate,
+        admittedCapabilityIds: [failedCapability, rejectedCapability],
+      }),
+    ).toBe(false);
+
+    const prompt =
+      buildCodexRejectedPostObservationCandidateCorrectionPrompt({
+        question: "Check my current Minecraft status.",
+        continuationState: state,
+        rejection,
+        priorResponse: `HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"${rejectedCapability}","arguments":{"target":"current_actor"}}`,
+        normalizedObservationArtifacts: [],
+        availableCapabilities: environmentProbeMinecraftManifests,
+        admittedCapabilityIds: [failedCapability, rejectedCapability],
+      });
+    const contractSection =
+      prompt.split("Exact input contracts for the bounded next capability decision:")[1]
+        ?.split("Prior rejected provider response")[0] ?? "";
+
+    expect(prompt).toContain("typed rejection below as a new non-terminal observation");
+    expect(prompt).toContain(`for exactly ${failedCapability}`);
+    expect(prompt).toContain(
+      "runtime_lane_request_not_in_admitted_continuation_affordances",
+    );
+    expect(contractSection).toContain(`"capability_id":"${failedCapability}"`);
+    expect(contractSection).not.toContain(
+      `"capability_id":"${rejectedCapability}"`,
+    );
+  });
+
   it("admits a semantic same-capability retry even when deterministic affordances use different arguments", () => {
     const state = {
       allowed_decisions: ["retry", "fail"],
@@ -633,6 +768,170 @@ describe("Codex required-grounding correction", () => {
     ).toBe(false);
   });
 
+  it("does not let a broad any-of action replace a repairable failed capability", () => {
+    const guardian =
+      "com.casimirbot.minecraft.player.guardian.execute";
+    const camera = "com.casimirbot.minecraft.player.camera.track";
+    const state = {
+      allowed_decisions: ["act", "retry"],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [guardian, camera],
+      },
+      last_attempt: {
+        capability_id: guardian,
+        failure_code: "precondition_failed",
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [
+        {
+          affordance_id: "minecraft-player-action:any-of:camera",
+          admissible: true,
+          tried: false,
+          reason: "A sibling Player Embodiment action remains admitted.",
+          lane_request: { capability: camera },
+        },
+      ],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: {
+          capability: guardian,
+          arguments: { program_schema: "helix.minecraft.reactive_program.v1" },
+        },
+        admittedCapabilityIds: [guardian, camera],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: {
+          capability: camera,
+          arguments: { target_kind: "entity_type" },
+        },
+        admittedCapabilityIds: [guardian, camera],
+      }),
+    ).toBe(false);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate: {
+          capability: guardian,
+          arguments: { program_schema: "helix.minecraft.reactive_program.v1" },
+        },
+        admittedCapabilityIds: [guardian, camera],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate: {
+          capability: camera,
+          arguments: { target_kind: "entity_type" },
+        },
+        admittedCapabilityIds: [guardian, camera],
+      }),
+    ).toBe(false);
+  });
+
+  it("allows a read-only diagnostic between a failed mutation and its retry", () => {
+    const guardian = "com.casimirbot.minecraft.player.guardian.execute";
+    const spatial = "com.casimirbot.minecraft.spatial_region.inspect";
+    const camera = "com.casimirbot.minecraft.player.camera.track";
+    const guardianManifest = environmentActionMinecraftManifests.find(
+      (manifest) => manifest.capability_id === guardian,
+    )!;
+    const cameraManifest = environmentActionMinecraftManifests.find(
+      (manifest) => manifest.capability_id === camera,
+    )!;
+    const state = {
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      allowed_decisions: ["retry", "fail"],
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [guardian, spatial, camera],
+      },
+      last_attempt: {
+        capability_id: guardian,
+        failure_code: "postcondition_failed",
+        failure_message: "predicted_collision_cell_not_below_actor",
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const availableCapabilities = [
+      guardianManifest,
+      environmentSpatialRegionMinecraftManifest,
+      cameraManifest,
+    ];
+    const spatialCandidate = {
+      capability: spatial,
+      arguments: { center: "@s", horizontal_radius: 4 },
+    };
+
+    expect(
+      continuationStateAdmitsRuntimeRetryLaneRequest({
+        state,
+        candidate: spatialCandidate,
+        admittedCapabilityIds: [guardian, spatial, camera],
+        availableCapabilities,
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate: spatialCandidate,
+        admittedCapabilityIds: [guardian, spatial, camera],
+        availableCapabilities,
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsPostObservationLaneRequest({
+        state,
+        candidate: spatialCandidate,
+        admittedCapabilityIds: [guardian, spatial, camera],
+        availableCapabilities,
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate: {
+          capability: camera,
+          arguments: { target_kind: "entity_type" },
+        },
+        admittedCapabilityIds: [guardian, spatial, camera],
+        availableCapabilities,
+      }),
+    ).toBe(false);
+
+    const contract = buildCodexContinuationCapabilityInputContractLines({
+      continuationState: state,
+      availableCapabilities,
+      admittedCapabilityIds: [guardian, spatial, camera],
+      preferredCapabilityIds: [guardian],
+    }).join("\n");
+    expect(contract).toContain(`"capability_id":"${guardian}"`);
+    expect(contract).toContain(`"capability_id":"${spatial}"`);
+    expect(contract).not.toContain(`"capability_id":"${camera}"`);
+
+    const instruction = buildCodexGenericContinuationDecisionInstruction(
+      state,
+      availableCapabilities,
+    );
+    expect(instruction).toContain("one admitted non-mutating diagnostic");
+    expect(instruction).toContain("does not satisfy it");
+    expect(instruction).toContain("Do not switch to a mutating sibling");
+  });
+
   it("admits a Docs search affordance when only transcript sentence punctuation changes", () => {
     const prompt =
       "Find the NHM2 current status whitepaper and explain its least established assumption.";
@@ -715,6 +1014,59 @@ describe("Codex required-grounding correction", () => {
     expect(instruction).toContain("Do not ask the user");
   });
 
+  it("returns the exact trusted contract diagnostic to Codex for a bounded repair", () => {
+    const diagnostic =
+      "The concurrent Minecraft guardian program failed its trusted contract at lanes.1.nodes.0.action: Action place requires undeclared lane resource locomotion.";
+    const instruction = buildCodexGenericContinuationDecisionInstruction({
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      allowed_decisions: ["retry"],
+      last_attempt: {
+        capability_id: "com.casimirbot.minecraft.player.guardian.execute",
+        failure_code: "precondition_failed",
+        failure_message: diagnostic,
+        retryability: "retryable",
+      },
+      next_admissible_affordances: [],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState);
+
+    expect(instruction).toContain(`Observed repair diagnostic: ${diagnostic}`);
+    expect(instruction).toContain("exactly one corrected or retried");
+    expect(instruction).toContain("Do not answer, ask the user to author tool arguments");
+  });
+
+  it("keeps causal reactive-program guidance in bounded continuation contracts", () => {
+    const guardian =
+      "com.casimirbot.minecraft.player.guardian.execute";
+    const guardianManifest = environmentActionMinecraftManifests.find(
+      (manifest) => manifest.capability_id === guardian,
+    )!;
+    const lines = buildCodexContinuationCapabilityInputContractLines({
+      continuationState: {
+        allowed_decisions: ["act"],
+        missing_requirement_ids: [guardian],
+        next_admissible_affordances: [],
+        capability_proposal: {
+          allowed: true,
+          admitted_capability_ids: [guardian],
+        },
+        budget: { hard: { exhausted: false } },
+      } as unknown as HelixAgentContinuationState,
+      availableCapabilities: [guardianManifest],
+      admittedCapabilityIds: [guardian],
+      preferredCapabilityIds: [guardian],
+    });
+    const contract = lines.join("\n");
+
+    expect(contract).toContain(`"capability_id":"${guardian}"`);
+    expect(contract).toContain("explicit causal action node");
+    expect(contract).toContain("cannot directly claim success");
+  });
+
   it("requires a model-authored next request for act-only observation-dependent continuation", () => {
     const instruction = buildCodexGenericContinuationDecisionInstruction({
       schema: "helix.agent_continuation_state.v1",
@@ -773,6 +1125,65 @@ describe("Codex required-grounding correction", () => {
     expect(instruction).toContain("act-only");
     expect(instruction).toContain("schema-valid arguments authored");
     expect(instruction).toContain("Do not answer, refuse, defer");
+    expect(instruction).toContain(
+      '{"capability":"<exact admitted capability_id>","arguments":{<schema-valid arguments>}}',
+    );
+  });
+
+  it("binds explicit bare marked arguments only to a unique act-only continuation capability", () => {
+    const state = {
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: ["com.casimirbot.minecraft.command"],
+      },
+      allowed_decisions: ["act"],
+    } as unknown as HelixAgentContinuationState;
+    const text =
+      'HELIX_CAPABILITY_LANE_REQUEST_JSON: {"command":"summon minecraft:bat ~ ~1 ~4","category":"entity_control","effect":"world_mutation"}';
+
+    expect(
+      extractCodexContinuationCapabilityLaneRequestCandidate({
+        text,
+        continuationState: state,
+      }),
+    ).toEqual({
+      capability: "com.casimirbot.minecraft.command",
+      arguments: {
+        command: "summon minecraft:bat ~ ~1 ~4",
+        category: "entity_control",
+        effect: "world_mutation",
+      },
+    });
+    expect(
+      extractCodexContinuationCapabilityLaneRequestCandidate({
+        text: '{"command":"summon minecraft:bat ~ ~1 ~4"}',
+        continuationState: state,
+      }),
+    ).toBeNull();
+    expect(
+      extractCodexContinuationCapabilityLaneRequestCandidate({
+        text,
+        continuationState: {
+          ...state,
+          allowed_decisions: ["act", "answer"],
+        },
+      }),
+    ).toBeNull();
+    expect(
+      extractCodexContinuationCapabilityLaneRequestCandidate({
+        text,
+        continuationState: {
+          ...state,
+          capability_proposal: {
+            allowed: true,
+            admitted_capability_ids: [
+              "com.casimirbot.minecraft.command",
+              "docs.search",
+            ],
+          },
+        },
+      }),
+    ).toBeNull();
   });
 
   it("keeps action available when supporting evidence unlocks a different required admitted capability", () => {
@@ -896,11 +1307,14 @@ describe("Codex required-grounding correction", () => {
       "Codex must author one new structured request for the missing admitted capability with all required arguments",
     );
     expect(prompt).toContain("HELIX_CAPABILITY_LANE_REQUEST_JSON:");
+    expect(prompt).toContain(
+      '{"capability":"<exact admitted capability_id>","arguments":{<schema-valid arguments>}}',
+    );
     expect(prompt).toContain("Do not answer while the required capability remains unobserved");
     expect(prompt).toContain(
-      '"schema": "helix.continuation_capability_input_contracts.v1"',
+      '"schema":"helix.continuation_capability_input_contracts.v1"',
     );
-    expect(prompt).toContain('"required": [\n          "command"');
+    expect(prompt).toContain('"required":["command"');
     expect(prompt).toContain(
       "A semantic intent, plan, structure, or constraints object is reasoning context only",
     );
@@ -979,9 +1393,9 @@ describe("Codex required-grounding correction", () => {
     });
     const text = lines.join("\n");
 
-    expect(text).toContain('"capability_id": "com.casimirbot.minecraft.command"');
-    expect(text).toContain('"required": [\n          "command"');
-    expect(text).not.toContain('"capability_id": "docs.search"');
+    expect(text).toContain('"capability_id":"com.casimirbot.minecraft.command"');
+    expect(text).toContain('"required":["command"');
+    expect(text).not.toContain('"capability_id":"docs.search"');
   });
 
   it("preserves every capability in an already-bounded semantic action proposal", () => {
@@ -1018,10 +1432,10 @@ describe("Codex required-grounding correction", () => {
     const text = lines.join("\n");
 
     for (const capabilityId of actionCapabilityIds) {
-      expect(text).toContain(`"capability_id": "${capabilityId}"`);
+      expect(text).toContain(`"capability_id":"${capabilityId}"`);
     }
     expect(text).toContain(
-      '"capability_id": "com.casimirbot.minecraft.player.navigate"',
+      '"capability_id":"com.casimirbot.minecraft.player.navigate"',
     );
   });
 
@@ -1124,9 +1538,9 @@ describe("Codex required-grounding correction", () => {
     });
     const text = lines.join("\n");
 
-    expect(text).toContain('"capability_id": "com.casimirbot.minecraft.command"');
+    expect(text).toContain('"capability_id":"com.casimirbot.minecraft.command"');
     expect(text).not.toContain(
-      '"capability_id": "com.casimirbot.minecraft.spatial_region.inspect"',
+      '"capability_id":"com.casimirbot.minecraft.spatial_region.inspect"',
     );
   });
 
@@ -1188,12 +1602,26 @@ describe("Codex required-grounding correction", () => {
     expect(
       continuationStateRequiresCodexModelAuthoredCapabilityProposal(state),
     ).toBe(true);
+    expect(shouldEnterCodexPostObservationContinuation(state)).toBe(true);
+    expect(codexRequiredContinuationReviewMode(state)).toBe("proposal");
     expect(
       continuationStateRequiresCodexModelAuthoredCapabilityProposal({
         ...state,
         allowed_decisions: ["act", "answer"],
       }),
     ).toBe(false);
+    expect(
+      shouldEnterCodexPostObservationContinuation({
+        ...state,
+        allowed_decisions: ["act", "answer"],
+      }),
+    ).toBe(false);
+    expect(
+      codexRequiredContinuationReviewMode({
+        ...state,
+        allowed_decisions: ["act", "answer"],
+      }),
+    ).toBeNull();
     expect(
       continuationStateRequiresCodexModelAuthoredCapabilityProposal({
         ...state,

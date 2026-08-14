@@ -2,7 +2,7 @@ export type MinecraftExecutionPlaneConstraint =
   "player_embodiment" | "world_authority" | "hybrid" | null;
 
 const PLAYER_EMBODIMENT_PLANE_CUE_RE =
-  /\b(?:player\s+embodiment(?:\s+plane)?|paired(?:\s+minecraft)?(?:\s+player)?\s+client|minecraft\s+player\s+client|normal\s+player\s+controls?|player-side\s+(?:client|control)|client-side\s+player\s+control)\b/iu;
+  /\b(?:player\s+embodiment(?:\s+plane)?|paired(?:\s+minecraft)?(?:\s+player)?\s+client|minecraft\s+player\s+client|normal\s+player\s+controls?|player-side\s+(?:client|control)|client-side\s+player\s+control|(?:bounded\s+)?(?:reactive\s+)?guardian\s+program|survival_tas(?:\s+guardian)?\s+program)\b/iu;
 const WORLD_AUTHORITY_PLANE_CUE_RE =
   /\b(?:world\s+authority(?:\s+plane)?|minecraft\s+(?:server\s+)?commands?|server\s+command(?:\s+tree)?|command-side\s+(?:world\s+)?control)\b/iu;
 
@@ -13,7 +13,7 @@ const stripQuotedMinecraftPlaneExamples = (prompt: string): string =>
   prompt.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/gu, " ");
 
 const IMMEDIATE_EXECUTION_GUARD_RE =
-  /\b(?:if|when|unless)\b[^.!?;\n]{0,240}\b(?:controls?\s+(?:are\s+)?idle|manual\s+input|landing\s+(?:path|area|site)|solid\s+(?:walkable\s+)?support|safe\s+headroom|air\s+clearance|nearby\s+(?:fire|drop|hazard)|safe|unsafe|ready|available|online|connected|reachable|within\s+(?:range|reach))\b/iu;
+  /\b(?:if|when|unless)\b[^.!?;\n]{0,240}\b(?:controls?\s+(?:are\s+)?idle|manual\s+(?:input|control)|health|food|hunger|landing\s+(?:path|area|site)|solid\s+(?:walkable\s+)?support|safe\s+headroom|air\s+clearance|nearby\s+(?:fire|drop|hazard)|safe|unsafe|ready|available|online|connected|reachable|within\s+(?:range|reach))\b/iu;
 
 const DEFERRED_OR_HYPOTHETICAL_PLANE_RE =
   /\b(?:later|eventually|hypothetically|in\s+the\s+future|tomorrow|next\s+time|someday)\b|\b(?:if|when)\s+(?:i|we|you|the\s+user)\b[^.!?;\n]{0,80}\b(?:ask|decide|want|choose|reconnect|return|come\s+back)\b/iu;
@@ -161,7 +161,7 @@ export const minecraftPlayerEmbodimentActionPromptMatch = (
     "iu",
   );
   const actionThenPlane = new RegExp(
-    `(${PLAYER_EMBODIMENT_ACTION_RE.source})[\\s\\S]{0,180}?${PLAYER_EMBODIMENT_PLANE_CUE_RE.source}`,
+    `(${PLAYER_EMBODIMENT_ACTION_RE.source})[\\s\\S]{0,320}?${PLAYER_EMBODIMENT_PLANE_CUE_RE.source}`,
     "iu",
   );
   const directActionPatterns = [

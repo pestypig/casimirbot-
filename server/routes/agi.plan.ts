@@ -99,7 +99,10 @@ import {
   buildHelixAskTurnAdmissionPayload,
   reserveHelixAskTurnAdmission,
 } from "../services/helix-ask/ask-turn-admission";
-import { createHelixAskTurnStreamAbortBoundary } from "../services/helix-ask/ask-turn-stream-abort";
+import {
+  createHelixAskTurnHttpAbortBoundary,
+  createHelixAskTurnStreamAbortBoundary,
+} from "../services/helix-ask/ask-turn-stream-abort";
 import { resolveHelixAgentProvider } from "../services/helix-ask/agent-providers/registry";
 import { selectHelixAgentRuntime } from "../services/helix-ask/agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../services/helix-ask/agent-providers/runtime-debug";
@@ -170567,6 +170570,11 @@ planRouter.post("/ask/turn", async (req, res) => {
     body,
     route: "/ask/turn",
   });
+  const askTurnAbortBoundary = createHelixAskTurnHttpAbortBoundary({
+    request: req,
+    response: res,
+    reasonPrefix: "ask_turn",
+  });
   let runtimeReleaseOutcome: HelixAskRuntimeTaskReleaseOutcome = "completed";
   try {
     if (askTurnAdmission.status !== "admitted") {
@@ -170744,7 +170752,12 @@ planRouter.post("/ask/turn", async (req, res) => {
         route: "/ask/turn",
         body: providerBody,
         headers: req.headers,
+        signal: askTurnAbortBoundary.signal,
       });
+      if (askTurnAbortBoundary.signal.aborted) {
+        runtimeReleaseOutcome = "aborted";
+        return;
+      }
       let payload = buildHelixAgentProviderAskPayload({
         provider,
         providerResult,
@@ -171422,9 +171435,13 @@ planRouter.post("/ask/turn", async (req, res) => {
       }),
     );
   } catch (error) {
-    runtimeReleaseOutcome = "failed";
+    runtimeReleaseOutcome = askTurnAbortBoundary.signal.aborted
+      ? "aborted"
+      : "failed";
+    if (askTurnAbortBoundary.signal.aborted) return;
     throw error;
   } finally {
+    askTurnAbortBoundary.dispose();
     if (askTurnAdmission.status === "admitted") {
       askTurnAdmission.release(runtimeReleaseOutcome);
     }

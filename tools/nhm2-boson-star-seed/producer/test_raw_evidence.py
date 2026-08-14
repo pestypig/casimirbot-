@@ -19,11 +19,14 @@ if str(HERE) not in sys.path:
 
 import raw_evidence  # noqa: E402
 from raw_evidence import (  # noqa: E402
+    FrozenRawLevelEvidence,
     RAW_EVIDENCE_INVENTORY,
     RAW_EVIDENCE_RELATIVE_PATHS,
     RAW_EVIDENCE_TOTAL_BYTE_LENGTH,
     RAW_EVIDENCE_TOTAL_ELEMENT_COUNT,
+    freeze_raw_level_evidence,
     prepare_and_write_raw_evidence,
+    prepare_frozen_raw_evidence,
     prepare_raw_evidence,
     write_raw_evidence_exclusive,
 )
@@ -177,8 +180,82 @@ class RawEvidencePreparationTests(unittest.TestCase):
                 with self.assertRaises(TypeError):
                     prepare_raw_evidence(arrays)
 
+    def test_level_capture_is_immutable_and_reassembles_without_reserialization(self) -> None:
+        arrays = _valid_level_arrays()
+        captured = tuple(
+            freeze_raw_level_evidence(level_id, scalar, potential)
+            for level_id, (scalar, potential) in arrays.items()
+        )
+        expected = prepare_raw_evidence(arrays)
+
+        for scalar, potential in arrays.values():
+            scalar.fill(17.0)
+            potential.fill(-19.0)
+
+        self.assertEqual(prepare_frozen_raw_evidence(captured), expected)
+        self.assertTrue(
+            all(
+                type(level.scalar_f64le) is bytes
+                and type(level.potential_f64le) is bytes
+                for level in captured
+            )
+        )
+
+    def test_frozen_assembly_rejects_stateful_mappings_and_wrong_order(self) -> None:
+        arrays = _valid_level_arrays()
+        captured = tuple(
+            freeze_raw_level_evidence(level_id, scalar, potential)
+            for level_id, (scalar, potential) in arrays.items()
+        )
+        with self.assertRaises(TypeError):
+            prepare_frozen_raw_evidence(  # type: ignore[arg-type]
+                {level.level_id: level for level in captured}
+            )
+        with self.assertRaisesRegex(ValueError, "exactly L0,L1,L2"):
+            prepare_frozen_raw_evidence((captured[1], captured[0], captured[2]))
+
+    def test_frozen_level_rejects_hostile_or_invalid_byte_leaves(self) -> None:
+        arrays = _valid_level_arrays()
+        captured = freeze_raw_level_evidence("L0", *arrays["L0"])
+        bad = bytearray(captured.scalar_f64le)
+        bad[:8] = np.uint64(0x8000000000000000).astype("<u8").tobytes()
+        with self.assertRaisesRegex(ValueError, "negative zero"):
+            FrozenRawLevelEvidence(
+                level_id="L0",
+                scalar_f64le=bytes(bad),
+                potential_f64le=captured.potential_f64le,
+            )
+        with self.assertRaises(TypeError):
+            FrozenRawLevelEvidence(
+                level_id="L0",
+                scalar_f64le=bytearray(captured.scalar_f64le),  # type: ignore[arg-type]
+                potential_f64le=captured.potential_f64le,
+            )
+        with self.assertRaisesRegex(TypeError, "exact string"):
+            FrozenRawLevelEvidence(
+                level_id=mock.Mock(),  # type: ignore[arg-type]
+                scalar_f64le=captured.scalar_f64le,
+                potential_f64le=captured.potential_f64le,
+            )
+
 
 class RawEvidenceWriterTests(unittest.TestCase):
+    def test_writer_rejects_comparison_spoofing_path_before_filesystem_use(self) -> None:
+        class SpoofPath:
+            def __eq__(self, _other: object) -> bool:
+                return True
+
+            def rsplit(self, _separator: str, _count: int) -> list[str]:
+                raise AssertionError("hostile path method must never be invoked")
+
+        payloads = list(prepare_raw_evidence(_valid_level_arrays()))
+        payloads[0] = (SpoofPath(), payloads[0][1])  # type: ignore[list-item]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = _precreated_root(Path(temporary))
+            with self.assertRaisesRegex(TypeError, "exact string"):
+                _write_for_focused_test(root, tuple(payloads))  # type: ignore[arg-type]
+            self.assertEqual(_all_leaf_entries(root), ())
+
     @unittest.skipIf(
         _LINUX_PRODUCTION_PLATFORM,
         "Linux uses the production held-dirfd writer",
@@ -221,7 +298,7 @@ class RawEvidenceWriterTests(unittest.TestCase):
             existing = root / RAW_EVIDENCE_RELATIVE_PATHS[0]
             existing.write_bytes(b"occupied")
             with self.assertRaises(RuntimeError):
-                _write_for_focused_test(root, payloads)
+                _write_for_focused_test(root, tuple(payloads))
             self.assertEqual(_all_leaf_entries(root), (RAW_EVIDENCE_RELATIVE_PATHS[0],))
             self.assertEqual(existing.read_bytes(), b"occupied")
 
@@ -310,7 +387,35 @@ class RawEvidenceWriterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = _precreated_root(Path(temporary))
             with self.assertRaises(ValueError):
-                _write_for_focused_test(root, payloads)
+                _write_for_focused_test(root, tuple(payloads))
+            self.assertEqual(_all_leaf_entries(root), ())
+
+        for hostile_bits in (0x8000000000000000, 0x7FF8000000000000):
+            with self.subTest(hostile_bits=hex(hostile_bits)):
+                payloads = list(prepare_raw_evidence(_valid_level_arrays()))
+                hostile = bytearray(payloads[-1][1])
+                hostile[:8] = np.uint64(hostile_bits).astype("<u8").tobytes()
+                payloads[-1] = (payloads[-1][0], bytes(hostile))
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = _precreated_root(Path(temporary))
+                    with self.assertRaises(ValueError):
+                        _write_for_focused_test(root, tuple(payloads))
+                    self.assertEqual(_all_leaf_entries(root), ())
+
+    def test_writer_rejects_unbounded_iterables_without_iteration(self) -> None:
+        reads = 0
+
+        def unbounded() -> object:
+            nonlocal reads
+            while True:
+                reads += 1
+                yield ("untrusted", b"")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = _precreated_root(Path(temporary))
+            with self.assertRaisesRegex(TypeError, "exact tuple"):
+                _write_for_focused_test(root, unbounded())  # type: ignore[arg-type]
+            self.assertEqual(reads, 0)
             self.assertEqual(_all_leaf_entries(root), ())
 
 

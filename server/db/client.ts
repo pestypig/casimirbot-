@@ -5,7 +5,10 @@ import pg from "pg";
 import { newDb } from "pg-mem";
 import type { Pool as PgPool } from "pg";
 import { LocalPersistenceScheduler } from "./local-persistence-scheduler";
-import { compactLocalEnvironmentSituationDigestRows } from
+import {
+  compactLocalEnvironmentPersistenceTables,
+  compactLocalEnvironmentSituationDigestRows,
+} from
   "./local-persistence-compaction";
 
 const { Pool } = pg;
@@ -28,10 +31,36 @@ const localPersistenceTables = [
   "helix_account_credentials",
   "helix_account_sign_in_attempts",
   "helix_email_outbox",
+  // Brokerage OAuth and the encrypted provider credential bundle are local
+  // workstation state. Restore the owner-scoped connection before any room
+  // binding, sanitized observation, paper ledger, or attended-live receipt.
+  "helix_brokerage_oauth_transactions",
+  "helix_brokerage_connections",
   "helix_shared_realtime_rooms",
   "helix_shared_realtime_room_members",
   "helix_shared_realtime_room_invites",
   "helix_shared_realtime_room_events",
+  "helix_brokerage_room_bindings",
+  "helix_brokerage_read_audit",
+  "helix_brokerage_observation_evidence",
+  "helix_paper_trading_accounts",
+  "helix_paper_risk_decisions",
+  "helix_trading_kill_switch_events",
+  "helix_paper_orders",
+  "helix_paper_positions",
+  "helix_paper_fills",
+  "helix_paper_journal_events",
+  "helix_paper_processed_observations",
+  "helix_live_equity_order_previews",
+  "helix_live_equity_order_approvals",
+  "helix_live_trading_controls",
+  "helix_live_equity_executions",
+  "helix_live_equity_execution_events",
+  "helix_live_protective_exit_previews",
+  "helix_live_protective_exit_approvals",
+  "helix_live_protective_exit_executions",
+  "helix_live_protective_exit_events",
+  "helix_live_provider_contract_acceptances",
   "helix_room_source_bindings",
   "helix_room_source_credentials",
   "helix_room_source_ingress_requests",
@@ -144,6 +173,29 @@ const localPersistenceJsonColumns = new Set([
   "helix_account_sessions.account_policy",
   "helix_account_profile_storage.snapshot",
   "helix_account_events.payload",
+  "helix_brokerage_oauth_transactions.requested_scopes",
+  "helix_brokerage_connections.granted_capability_ids",
+  "helix_brokerage_room_bindings.consent_capability_ids",
+  "helix_brokerage_observation_evidence.normalized_data",
+  "helix_paper_trading_accounts.policy_json",
+  "helix_paper_trading_accounts.open_symbols",
+  "helix_paper_risk_decisions.reasons",
+  "helix_paper_risk_decisions.source_observation_ids",
+  "helix_paper_risk_decisions.candidate_json",
+  "helix_paper_risk_decisions.decision_json",
+  "helix_paper_journal_events.payload",
+  "helix_paper_processed_observations.receipt_json",
+  "helix_live_equity_order_previews.intent_json",
+  "helix_live_equity_order_previews.provider_review_public_json",
+  "helix_live_equity_order_previews.provider_warnings",
+  "helix_live_trading_controls.policy_json",
+  "helix_live_equity_executions.intent_json",
+  "helix_live_equity_execution_events.detail_json",
+  "helix_live_protective_exit_previews.intent_json",
+  "helix_live_protective_exit_previews.provider_warnings",
+  "helix_live_protective_exit_executions.intent_json",
+  "helix_live_protective_exit_events.detail_json",
+  "helix_live_provider_contract_acceptances.gates_json",
   "helix_research_library_documents.metadata",
   "casimir_theory_execution_state.payload",
 ]);
@@ -160,7 +212,10 @@ const ENVIRONMENT_SITUATION_DIGEST_TABLE =
 const ROOM_SOURCE_REQUEST_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ROOM_SOURCE_REQUEST_REFRESH_OVERLAP_MS = 10 * 60 * 1000;
 const LOCAL_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING = 2_048;
-const LOCAL_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT = 128;
+const LOCAL_CAPABILITY_CATALOG_MAX_ROWS_PER_BINDING = 4;
+const LOCAL_ENVIRONMENT_EVENT_MAX_ROWS_PER_BINDING_PLANE = 512;
+const LOCAL_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT = 32;
+const LOCAL_ACTION_HEARTBEAT_MAX_ROWS_PER_AUTHORITY = 32;
 const LOCAL_RESTORE_BATCH_MAX_ROWS = 500;
 const LOCAL_RESTORE_BATCH_MAX_PARAMETERS = 5_000;
 
@@ -220,6 +275,46 @@ const localSituationDigestMaxRowsPerSubject = (): number => {
     ? Math.max(8, Math.min(4_096, Math.floor(value)))
     : LOCAL_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT;
 };
+
+const localCapabilityCatalogMaxRowsPerBinding = (): number => {
+  const value = Number(
+    process.env.HELIX_LOCAL_PG_MEM_CAPABILITY_CATALOG_MAX_ROWS_PER_BINDING ??
+      LOCAL_CAPABILITY_CATALOG_MAX_ROWS_PER_BINDING,
+  );
+  return Number.isFinite(value)
+    ? Math.max(1, Math.min(256, Math.floor(value)))
+    : LOCAL_CAPABILITY_CATALOG_MAX_ROWS_PER_BINDING;
+};
+
+const localEnvironmentEventMaxRowsPerBindingPlane = (): number => {
+  const value = Number(
+    process.env.HELIX_LOCAL_PG_MEM_ENVIRONMENT_EVENT_MAX_ROWS_PER_BINDING_PLANE ??
+      LOCAL_ENVIRONMENT_EVENT_MAX_ROWS_PER_BINDING_PLANE,
+  );
+  return Number.isFinite(value)
+    ? Math.max(64, Math.min(16_384, Math.floor(value)))
+    : LOCAL_ENVIRONMENT_EVENT_MAX_ROWS_PER_BINDING_PLANE;
+};
+
+const localActionHeartbeatMaxRowsPerAuthority = (): number => {
+  const value = Number(
+    process.env.HELIX_LOCAL_PG_MEM_ACTION_HEARTBEAT_MAX_ROWS_PER_AUTHORITY ??
+      LOCAL_ACTION_HEARTBEAT_MAX_ROWS_PER_AUTHORITY,
+  );
+  return Number.isFinite(value)
+    ? Math.max(4, Math.min(4_096, Math.floor(value)))
+    : LOCAL_ACTION_HEARTBEAT_MAX_ROWS_PER_AUTHORITY;
+};
+
+const compactLocalEnvironmentTables = (
+  tables: LocalSnapshot["tables"],
+) => compactLocalEnvironmentPersistenceTables(tables, {
+  maxCatalogRowsPerBinding: localCapabilityCatalogMaxRowsPerBinding(),
+  maxEventRowsPerBindingPlane:
+    localEnvironmentEventMaxRowsPerBindingPlane(),
+  maxDigestRowsPerSubject: localSituationDigestMaxRowsPerSubject(),
+  maxHeartbeatRowsPerAuthority: localActionHeartbeatMaxRowsPerAuthority(),
+});
 
 const compactLocalRoomSourceRequestRows = (
   rows: Array<Record<string, unknown>>,
@@ -482,10 +577,11 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
       tables[table] = [];
     }
   }
+  const compacted = compactLocalEnvironmentTables(tables);
   const snapshot: LocalSnapshot = {
     schema: "helix.local_pg_mem_snapshot.v1",
     saved_at: savedAt,
-    tables,
+    tables: compacted.tables,
   };
   await writeLocalSnapshotAtomically(localPersistencePath, snapshot);
   localPersistenceSnapshotCache = snapshot;
@@ -563,9 +659,21 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
   }
   localPersistenceSuppress = true;
   try {
-    const raw = await fs.promises.readFile(localPersistencePath, "utf8");
+    let raw = await fs.promises.readFile(localPersistencePath, "utf8");
     const snapshot = JSON.parse(raw) as Partial<LocalSnapshot>;
+    raw = "";
     if (snapshot.schema !== "helix.local_pg_mem_snapshot.v1" || !snapshot.tables) return;
+    const compacted = compactLocalEnvironmentTables(snapshot.tables);
+    snapshot.tables = compacted.tables;
+    if (compacted.changedTables.length > 0) {
+      markLocalPersistenceTablesDirty(compacted.changedTables);
+    }
+    if (
+      process.env.HELIX_LOW_MEMORY_STARTUP_GC === "1" &&
+      typeof global.gc === "function"
+    ) {
+      global.gc();
+    }
     localPersistenceSnapshotCache = {
       schema: "helix.local_pg_mem_snapshot.v1",
       saved_at:
@@ -576,7 +684,7 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
     };
     const restoreStartedAtMs = Date.now();
     let restoredRowCount = 0;
-    let discardedRowCount = 0;
+    let discardedRowCount = compacted.discardedRowCount;
     for (const table of localPersistenceTables) {
       const snapshotRows = Array.isArray(snapshot.tables[table])
         ? snapshot.tables[table]

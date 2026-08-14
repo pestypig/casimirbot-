@@ -19,7 +19,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 public final class FabricConnectorRuntime implements AutoCloseable {
-    public static final String ADAPTER_VERSION = "0.2.0";
+    public static final String ADAPTER_VERSION = "0.3.0";
 
     private final HelixSensorConfig config;
     private final FabricCommandConfig commandConfig;
@@ -153,7 +153,7 @@ public final class FabricConnectorRuntime implements AutoCloseable {
             config,
             ADAPTER_VERSION,
             manifestCreatedAt,
-            List.of("spatial_region")
+            List.of("spatial_region", "registry_fact", "recipe_fact")
         );
         httpClient
             .postManifestAsync(HelixJson.stringify(manifest))

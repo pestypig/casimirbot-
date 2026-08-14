@@ -73,6 +73,170 @@ describe("Helix capability itinerary execution", () => {
     });
   });
 
+  it("keeps a Player Embodiment action missing when a guardian only settles an immediate safety interrupt", () => {
+    const turnId = "ask:test:guardian-transport-settled-without-action";
+    const capability = "com.casimirbot.minecraft.player.guardian.execute";
+    const subgoalId = `${turnId}:guardian:1`;
+    const itinerary = {
+      turn_id: turnId,
+      admitted_tool_families: ["live_environment"],
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["live_environment"],
+        required_capability_any_of_groups: [{
+          group_id: "minecraft.player_embodiment.action",
+          semantic_requirement:
+            "one_successful_player_embodiment_action_selected_by_runtime",
+          capability_ids: [capability],
+        }],
+      },
+      compound_capability_contract: {
+        subgoals: [{
+          subgoal_id: subgoalId,
+          requested_capability: capability,
+          runtime_capability: capability,
+          required_observation_kinds: ["live_environment_observation"],
+          mandatory: true,
+        }],
+      },
+    };
+    const artifact = {
+      artifact_id: `${turnId}:observation:1`,
+      turn_id: turnId,
+      source_scope: "current_turn_context",
+      kind: "live_environment_observation",
+      capability_key: capability,
+      source_capability_id: capability,
+      status: "succeeded",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        capability_key: capability,
+        source_capability_id: capability,
+        status: "succeeded",
+        result: {
+          side_effects_performed: false,
+          player_motion_performed: false,
+          player_interaction_performed: false,
+          inventory_mutation_performed: false,
+          world_mutation_performed: false,
+          postconditions: [{
+            condition_kind: "minecraft.player.reactive_program_completed",
+            required: true,
+            status: "satisfied",
+            evidence_refs: ["event:workflow-settled"],
+          }],
+          verified_terminal_measurements: {
+            reason_code: "reactive_program_interrupted",
+            reactive_program_completed: true,
+            tick_index: 0,
+            executed_action_count: 0,
+            action_receipt_count: 0,
+            player_motion_performed: false,
+            player_interaction_performed: false,
+            placement_action_success_count: 0,
+            placement_mutation_success_count: 0,
+            world_mutations_performed: 0,
+            inventory_mutations_performed: 0,
+            satisfied_checkpoint_ids: [],
+          },
+        },
+      },
+    };
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [artifact],
+    });
+
+    expect(state).toMatchObject({
+      complete: false,
+      missing_required_capabilities: [capability],
+      missing_compound_subgoal_ids: [subgoalId],
+      missing_required_capability_any_of_groups: [{
+        group_id: "minecraft.player_embodiment.action",
+        satisfied: false,
+      }],
+      compound_subgoal_ledger: [expect.objectContaining({
+        subgoal_id: subgoalId,
+        satisfaction: "pending",
+        rail_status: "pending",
+        rail_failure_code: "subgoal_observation_missing",
+      })],
+    });
+  });
+
+  it("accepts the same canonical guardian envelope when current-turn measurements prove semantic action progress", () => {
+    const turnId = "ask:test:guardian-semantic-action-progress";
+    const capability = "com.casimirbot.minecraft.player.guardian.execute";
+    const subgoalId = `${turnId}:guardian:1`;
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: {
+        turn_id: turnId,
+        admitted_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capability_any_of_groups: [{
+            group_id: "minecraft.player_embodiment.action",
+            capability_ids: [capability],
+          }],
+        },
+        compound_capability_contract: {
+          subgoals: [{
+            subgoal_id: subgoalId,
+            requested_capability: capability,
+            runtime_capability: capability,
+            required_observation_kinds: ["live_environment_observation"],
+            mandatory: true,
+          }],
+        },
+      },
+      artifacts: [{
+        artifact_id: `${turnId}:observation:1`,
+        turn_id: turnId,
+        source_scope: "current_turn_context",
+        kind: "live_environment_observation",
+        capability_key: capability,
+        source_capability_id: capability,
+        status: "succeeded",
+        payload: {
+          schema: "helix.live_environment_observation.v1",
+          capability_key: capability,
+          source_capability_id: capability,
+          status: "succeeded",
+          result: {
+            side_effects_performed: true,
+            player_motion_performed: true,
+            player_interaction_performed: false,
+            inventory_mutation_performed: false,
+            world_mutation_performed: false,
+            postconditions: [],
+            verified_terminal_measurements: {
+              reason_code: "reactive_program_completed",
+              tick_index: 4,
+              executed_action_count: 1,
+              action_receipt_count: 1,
+              player_motion_performed: true,
+              satisfied_checkpoint_ids: ["checkpoint:step-off-complete"],
+            },
+          },
+        },
+      }],
+    });
+
+    expect(state).toMatchObject({
+      complete: true,
+      missing_required_capabilities: [],
+      missing_compound_subgoal_ids: [],
+      missing_required_capability_any_of_groups: [],
+      compound_subgoal_ledger: [expect.objectContaining({
+        subgoal_id: subgoalId,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      })],
+    });
+  });
+
   it("requires a fresh post-action observation instead of reusing a pre-action read", () => {
     const action = "com.casimirbot.minecraft.player.navigate";
     const status = "com.casimirbot.minecraft.actor.status.read";
@@ -866,6 +1030,170 @@ describe("Helix capability itinerary execution", () => {
     ).toMatchObject({
       observation_after_capability_any_of_group_ids: [
         "minecraft.player_embodiment.action",
+      ],
+    });
+  });
+
+  it("binds a singleton post-action constraint to the latest repeated provider occurrence and follows its gateway order", () => {
+    const turnId = "ask:test:repaired-guardian-read-act-read";
+    const status = "com.casimirbot.minecraft.actor.status.read";
+    const action = "com.casimirbot.minecraft.player.guardian.execute";
+    const beforeObservationRef = `${turnId}:normalized:status:1`;
+    const actionObservationRef = `${turnId}:normalized:guardian:2`;
+    const afterObservationRef = `${turnId}:normalized:status:3`;
+    const beforeGatewayRef = `${turnId}:gateway:status:1`;
+    const failedActionGatewayRef = `${turnId}:gateway:guardian:2:failed`;
+    const actionGatewayRef = `${turnId}:gateway:guardian:5:succeeded`;
+    const afterGatewayRef = `${turnId}:gateway:status:6`;
+    const payload: Record<string, unknown> = {
+      capability_itinerary: {
+        turn_id: turnId,
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["live_environment"],
+          required_capabilities: [status],
+          required_capability_any_of_groups: [{
+            group_id: "minecraft.player_embodiment.action",
+            capability_ids: [action],
+          }],
+        },
+        compound_capability_contract: {
+          subgoals: [{
+            subgoal_id: "planned:post-status",
+            requested_capability: status,
+            runtime_capability: status,
+            required_observation_kinds: ["live_environment_observation"],
+            observation_after_capability_any_of_group_ids: [
+              "minecraft.player_embodiment.action",
+            ],
+            mandatory: true,
+          }],
+        },
+      },
+      compound_capability_contract: {
+        source: "codex_provider_call_occurrence_normalization",
+        subgoal_identity_policy: "provider_call_occurrence",
+        subgoals: [
+          {
+            subgoal_id: "current:status:before",
+            order: 1,
+            requested_capability: status,
+            runtime_capability: status,
+            provider_call_id: "call:status:1",
+            capability_occurrence: 1,
+            observation_ref: beforeObservationRef,
+            required_observation_kinds: ["live_environment_observation"],
+            satisfied: true,
+          },
+          {
+            subgoal_id: "current:guardian",
+            order: 2,
+            requested_capability: action,
+            runtime_capability: action,
+            provider_call_id: "call:guardian:5",
+            capability_occurrence: 1,
+            observation_ref: actionObservationRef,
+            required_observation_kinds: ["live_environment_observation"],
+            satisfied: true,
+          },
+          {
+            subgoal_id: "current:status:after",
+            order: 3,
+            requested_capability: status,
+            runtime_capability: status,
+            provider_call_id: "call:status:6",
+            capability_occurrence: 2,
+            observation_ref: afterObservationRef,
+            required_observation_kinds: ["live_environment_observation"],
+            satisfied: true,
+          },
+        ],
+      },
+    };
+    const normalizedObservation = (
+      capability: string,
+      ref: string,
+      gatewayRef: string,
+    ) => ({
+      artifact_id: ref,
+      kind: "live_environment_observation",
+      turn_id: turnId,
+      source_scope: "current_turn_context",
+      capability_key: capability,
+      provider_gateway_observation_ref: gatewayRef,
+      provider_gateway_packet_refs: [gatewayRef],
+      status: "succeeded",
+      payload: {
+        schema: "helix.live_environment_observation.v1",
+        status: "succeeded",
+        capability_key: capability,
+        provider_gateway_observation_ref: gatewayRef,
+        provider_gateway_packet_refs: [gatewayRef],
+      },
+    });
+    const gatewayPacket = (
+      capability: string,
+      ref: string,
+      iteration: number,
+      status: string,
+    ) => ({
+      artifact_id: ref,
+      kind: "provider_gateway_observation_packet",
+      turn_id: turnId,
+      capability_key: capability,
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        iteration,
+        capability_key: capability,
+        status,
+      },
+    });
+    const artifacts = [
+      // Terminal ledgers group normalized observations before gateway packets.
+      normalizedObservation(status, beforeObservationRef, beforeGatewayRef),
+      normalizedObservation(action, actionObservationRef, actionGatewayRef),
+      normalizedObservation(status, afterObservationRef, afterGatewayRef),
+      gatewayPacket(status, beforeGatewayRef, 1, "succeeded"),
+      gatewayPacket(action, failedActionGatewayRef, 2, "failed"),
+      gatewayPacket(action, actionGatewayRef, 5, "succeeded"),
+      gatewayPacket(status, afterGatewayRef, 6, "succeeded"),
+    ];
+
+    expect(
+      attachHelixCapabilityItineraryExecutionState(payload, artifacts),
+    ).toEqual([]);
+    const mergedSubgoals = (payload.capability_itinerary as any)
+      .compound_capability_contract.subgoals;
+    expect(mergedSubgoals[0].observation_after_capability_any_of_group_ids)
+      .toBeUndefined();
+    expect(mergedSubgoals[2]).toMatchObject({
+      observation_after_capability_any_of_group_ids: [
+        "minecraft.player_embodiment.action",
+      ],
+    });
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      complete: true,
+      missing_compound_subgoal_ids: [],
+      missing_required_capabilities: [],
+      missing_temporal_postconditions: [],
+      compound_subgoal_ledger: [
+        expect.objectContaining({
+          subgoal_id: "current:status:before",
+          satisfaction: "satisfied",
+          temporal_constraint_applies: false,
+        }),
+        expect.objectContaining({
+          subgoal_id: "current:guardian",
+          satisfaction: "satisfied",
+        }),
+        expect.objectContaining({
+          subgoal_id: "current:status:after",
+          observation_ref: afterObservationRef,
+          satisfaction: "satisfied",
+          temporal_constraint_applies: true,
+          temporal_dependencies_satisfied: true,
+        }),
       ],
     });
   });

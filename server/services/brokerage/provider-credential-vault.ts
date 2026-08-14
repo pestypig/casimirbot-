@@ -12,15 +12,28 @@ export type ProviderCredentialEnvelope = Readonly<{
   algorithm: typeof ALGORITHM;
 }>;
 
+export const isValidProviderCredentialEncryptionKey = (
+  value: unknown,
+): boolean => {
+  const configured = clean(value);
+  if (!/^[A-Za-z0-9_-]{43}$/u.test(configured)) return false;
+  try {
+    return Buffer.from(configured, "base64url").length === 32;
+  } catch {
+    return false;
+  }
+};
+
 const resolveProviderCredentialKey = (): { key: Buffer; keyId: string } => {
   const configured = clean(
     process.env.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY,
   );
   if (configured) {
+    if (!isValidProviderCredentialEncryptionKey(configured)) {
+      throw new Error("provider_credential_encryption_key_invalid");
+    }
     const decoded = Buffer.from(configured, "base64url");
-    const key = decoded.length >= 32
-      ? decoded.subarray(0, 32)
-      : crypto.createHash("sha256").update(configured).digest();
+    const key = decoded;
     return {
       key,
       keyId: `env:${crypto
@@ -90,4 +103,3 @@ export const decryptProviderCredential = <T>(
   ]).toString("utf8");
   return JSON.parse(plaintext) as T;
 };
-

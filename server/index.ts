@@ -60,6 +60,10 @@ import {
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
+import {
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+} from "@shared/helix-environment-action";
 import { agentRunObserverRouter } from "./routes/agent-run-observer";
 import { createHelixAgentAccountBindingsRouter } from
   "./routes/helix-agent-account-bindings";
@@ -158,6 +162,8 @@ const healthReadyOnListen =
 const rootLivenessAlways = process.env.ROOT_LIVENESS_ALWAYS === "1";
 const probeDiag = process.env.PROBE_DIAG === "1";
 const netDiag = process.env.NET_DIAG === "1";
+const lowMemoryRequestTrace =
+  process.env.HELIX_LOW_MEMORY_REQUEST_TRACE === "1";
 const netDiagMaxConnections = 25;
 let netDiagConnectionsLogged = 0;
 let netReqSeq = 0;
@@ -525,6 +531,8 @@ app.use(createHelixAgentProtectedResourceMetadataRouter({
     HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
     HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
     HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+    HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+    HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
   ],
 }));
 app.use("/api/v1/agent-runs", createHelixAgentApiRouter());
@@ -965,6 +973,16 @@ app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonPreview: string | undefined = undefined;
+
+  if (lowMemoryRequestTrace && path.startsWith("/api")) {
+    const memory = process.memoryUsage();
+    log(
+      `[memory] request start ${req.method} ${path} ` +
+        `heap=${Math.round(memory.heapUsed / 1024 / 1024)}MiB ` +
+        `rss=${Math.round(memory.rss / 1024 / 1024)}MiB`,
+      "memory",
+    );
+  }
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {

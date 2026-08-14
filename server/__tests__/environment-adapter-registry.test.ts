@@ -35,7 +35,10 @@ describe("environment adapter registry", () => {
     });
 
     expect(first.profile.profile_id).toBe(HELIX_MINECRAFT_ADAPTER_PROFILE_ID);
-    expect(first.profile.profile_version).toBe(6);
+    expect(first.profile.profile_version).toBe(7);
+    expect(first.profile.allowed_probe_types).toEqual(
+      expect.arrayContaining(["registry_fact", "recipe_fact"]),
+    );
     expect(first.profile.domain).toBe("minecraft");
     expect(first.profile.execution_policy).toEqual({
       may_execute_live_actions: false,

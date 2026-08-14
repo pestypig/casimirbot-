@@ -17,6 +17,7 @@ import {
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
@@ -29,6 +30,7 @@ import {
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
 import type { HelixRoomSourceBinding } from "@shared/helix-room-source-ingress";
+import { MinecraftLocalLifecycleCard } from "./MinecraftLocalLifecycleCard";
 
 const PLAYER_ACTION_ADAPTER = "minecraft.fabric_client.v1";
 const DEFAULT_LEASE_MS = 2 * 60 * 60_000;
@@ -75,6 +77,10 @@ const CAPABILITY_OPTIONS: Array<{ id: string; label: string }> = [
   {
     id: HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
     label: "Inventory transfer",
+  },
+  {
+    id: HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+    label: "Fluid TAS sequence",
   },
 ];
 
@@ -222,7 +228,8 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   const mutationSelected = selectedCapabilities.some(
     (id) =>
       id === HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY ||
-      id === HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY,
+      id === HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY ||
+      id === HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   );
   const warningRequired = mutationSelected || autonomyMode === "autonomous";
 
@@ -411,6 +418,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
 
       {isOwner ? (
         <div className="mt-2 space-y-2">
+          <MinecraftLocalLifecycleCard />
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-[9px] text-emerald-100/70">
               Approval mode
@@ -503,6 +511,8 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               <span>
                 I understand that this finite lease can move the selected player,
                 interact with the game, and use the checked mutation workflows.
+                A fluid TAS sequence can combine the checked typed workflows under
+                one bounded tick-local program, but cannot run commands or code.
                 Manual input and Emergency stop remain available; this never grants
                 host shell, files, processes, RCON, or credentials.
               </span>

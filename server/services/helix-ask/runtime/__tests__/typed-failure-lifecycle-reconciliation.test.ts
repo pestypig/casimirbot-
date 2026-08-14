@@ -278,6 +278,53 @@ describe("authoritative typed-failure lifecycle reconciliation", () => {
     ).toContain("route_authority_missing");
   });
 
+  it("does not misclassify a current-turn capability observation packet as a zero-observation failure", () => {
+    const payload = basePayload();
+    const turnId = "ask:test:capability-repair-required";
+    payload.active_turn_id = turnId;
+    payload.terminal_error_code = "precondition_failed";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      turn_id: turnId,
+      error_code: "precondition_failed",
+      message: "The failed capability needs a corrected model-authored request.",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.route_authority_audit = { route_authority_ok: true };
+    payload.capability_lane_observation_packets = [
+      {
+        schema: "helix.agent_step_observation_packet.v1",
+        turn_id: turnId,
+        iteration: 2,
+        call_id: `${turnId}:call:2`,
+        decision_id: `${turnId}:decision:2`,
+        capability_key:
+          "com.casimirbot.minecraft.player.guardian.execute",
+        status: "failed",
+        observation_summary:
+          "The concurrent program reached its admitted tick ceiling.",
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    ];
+
+    expect(authoritativeTypedFailureRequiresNoContinuation(payload)).toBe(
+      false,
+    );
+    expect(
+      reconcileAuthoritativeTypedFailureLifecycle({
+        payload,
+        turnId,
+        promptText: "Repair the failed Minecraft guardian attempt.",
+        selectedTerminalArtifactKind: "typed_failure",
+        finalAnswerSource: "typed_failure",
+      }),
+    ).toBe(false);
+    expect(payload.canonical_goal_frame).toBeUndefined();
+  });
+
   it("settles an actionable source-observation failure without launching a generic tool loop", () => {
     const payload = basePayload();
     payload.terminal_error_code = "procedure_epoch_previous_unavailable";

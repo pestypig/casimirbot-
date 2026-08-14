@@ -428,7 +428,11 @@ const classifyFailure = (
     )
   )
     return "permission";
-  if (/invalid_arg|missing_arg|validation|malformed|parse_error/.test(text))
+  if (
+    /invalid_arg|missing_arg|validation|malformed|parse_error|did not satisfy (?:the )?(?:admitted )?input schema|failed (?:its|the) trusted contract|missing required property|property .+ is not admitted by (?:the )?(?:frozen )?schema/.test(
+      text,
+    )
+  )
     return "invalid_args";
   if (
     /missing_(?:evidence|observation|receipt|sidecar)|evidence_missing|not_materialized/.test(

@@ -3720,6 +3720,9 @@ This paper does not claim:
   electron-specific Yukawa coupling or connect the Higgs and Casimir vacua;
 - that resolving TE/TM or RCP/LCP polarization adds a gravitational degree of
   freedom or a standard DP polarization term;
+- that the magnetar polarimetry result supplies a measured Casimir response,
+  apparatus Green tensor, collapse signature, gravitational response, or
+  vacuum-to-manifold transfer law;
 - that Planck-to-Stefan-Boltzmann recovery predicts the Sun's temperature from
   Planck's constant alone or connects blackbody radiation to collapse;
 - that the Planck blackbody spectrum and gravitational Planck units are one
@@ -3803,6 +3806,15 @@ This paper does not claim:
   Applications to Photonic Topological Insulators," arXiv:1707.04577;
   supports polarization-mixing reflection matrices in macroscopic QED, not a
   polarization-dependent objective-collapse law.
+- R. E. Stewart et al., "Vacuum birefringence and the polarized X-ray emission
+  from a radio magnetar," *Nature* (2026), DOI
+  `10.1038/s41586-026-10859-z`, arXiv:2509.19446v4; reports phase- and
+  energy-resolved IXPE/NICER/Parkes polarimetry whose measured Stokes patterns,
+  within the adopted radiative-transfer framework, are better described when
+  strong-field QED vacuum birefringence is included. Used as external empirical
+  precedent for phase-sensitive ordinary-QED response and mechanism-on/off
+  model comparison, not as a Casimir apparatus input, data replay, DP/OR
+  result, or boundary-to-collapse kernel.
 - E. Tiesinga et al., "CODATA recommended values of the fundamental physical
   constants: 2018," *Reviews of Modern Physics* 93, 025010 (2021), DOI
   `10.1103/RevModPhys.93.025010`; supplies the exact SI radiation constants and

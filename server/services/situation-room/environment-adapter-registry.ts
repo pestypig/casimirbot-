@@ -71,7 +71,7 @@ export const environmentAdapterManifestHash = (
 const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
   schema: HELIX_ENVIRONMENT_ADAPTER_PROFILE_SCHEMA,
   profile_id: HELIX_MINECRAFT_ADAPTER_PROFILE_ID,
-  profile_version: 6,
+  profile_version: 7,
   domain: "minecraft",
   source_family: "minecraft",
   accepted_domain_adapters: [
@@ -98,6 +98,8 @@ const minecraftProfile = helixEnvironmentAdapterProfileSchema.parse({
     "inventory_check",
     "local_map_summary",
     "spatial_region",
+    "registry_fact",
+    "recipe_fact",
   ],
   required_probe_types: [
     "actor_status",

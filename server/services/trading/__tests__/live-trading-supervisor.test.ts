@@ -8,6 +8,7 @@ describe("live trading supervisor", () => {
       .toEqual(expect.objectContaining({
         enabled: false,
         controls_checked: 0,
+        deadman_relocks: 0,
         placed_orders: 0,
         cancelled_orders: 0,
         answer_authority: false,

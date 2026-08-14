@@ -13,7 +13,9 @@ import { runCodexNativeWorkstationTurn } from "../workstation-turn";
 
 const nativeResult = (input: {
   turn: RunCodexNativeAppServerTurnInput;
-  proposal: NonNullable<CodexNativeAppServerTurnResult["debug"]["route_proposal"]>;
+  proposal: NonNullable<
+    CodexNativeAppServerTurnResult["debug"]["route_proposal"]
+  >;
   admitted: string[];
   requested?: string[];
   executed?: string[];
@@ -23,7 +25,9 @@ const nativeResult = (input: {
   observationRefs?: string[];
   ok?: boolean;
 }): CodexNativeAppServerTurnResult => {
-  const lifecycle = createHelixTurnLifecycleRecorder({ turnId: input.turn.turnId });
+  const lifecycle = createHelixTurnLifecycleRecorder({
+    turnId: input.turn.turnId,
+  });
   const started = lifecycle.append({
     kind: "turn.started",
     producer: "helix_adapter",
@@ -59,39 +63,46 @@ const nativeResult = (input: {
   });
   return {
     ok: input.ok ?? true,
-    answer: input.ok === false ? "" : "Native answer from a re-entered observation.",
+    answer:
+      input.ok === false ? "" : "Native answer from a re-entered observation.",
     failReason: input.ok === false ? "native_tool_failed" : null,
     stderr: "",
     debug: {
-    schema: "helix.codex_native_app_server_debug.v1",
-    transport: "app_server_stdio_jsonl",
-    ephemeral_thread: true,
-    isolated_runtime_workspace: true,
-    sandbox_policy: "read_only",
-    network_access: false,
-    approval_policy: "never",
-    built_in_tools_disabled: true,
-    disabled_native_features: [],
-    model_visible_tools: input.turn.capabilities.map((capability) => capability.capability_id),
-    route_proposal: input.proposal,
-    route_admission_reason: "runtime_semantic_route_validated_against_helix_admission",
-    route_admitted_tools: input.admitted,
-    requested_tools: input.requested ?? [],
-    executed_tools: input.executed ?? [],
-    successful_tools:
-      input.successful ?? (input.ok === false ? [] : input.executed ?? []),
-    failed_tools:
-      input.failed ?? (input.ok === false ? input.executed ?? [] : []),
-    route_unobserved_tools: input.routeUnobserved ?? [],
-    observation_reentry_refs: input.observationRefs ?? [],
-    native_item_types: ["dynamicToolCall", "agentMessage"],
-    forbidden_native_item_types: [],
-    effective_model: input.turn.model ?? null,
-    effective_reasoning_effort: input.turn.reasoningEffort ?? null,
-    native_thread_id: "thread:test",
-    native_turn_id: "turn:test",
-    native_final_item_id: "answer:test",
-    native_turn_status: "completed",
+      schema: "helix.codex_native_app_server_debug.v1",
+      transport: "app_server_stdio_jsonl",
+      ephemeral_thread: true,
+      isolated_runtime_workspace: true,
+      sandbox_policy: "read_only",
+      network_access: false,
+      approval_policy: "never",
+      built_in_tools_disabled: true,
+      disabled_native_features: [],
+      model_visible_tools: input.turn.capabilities.map(
+        (capability) => capability.capability_id,
+      ),
+      route_proposal: input.proposal,
+      route_admission_reason:
+        "runtime_semantic_route_validated_against_helix_admission",
+      route_admitted_tools: input.admitted,
+      requested_tools: input.requested ?? [],
+      executed_tools: input.executed ?? [],
+      successful_tools:
+        input.successful ?? (input.ok === false ? [] : (input.executed ?? [])),
+      failed_tools:
+        input.failed ?? (input.ok === false ? (input.executed ?? []) : []),
+      route_unobserved_tools: input.routeUnobserved ?? [],
+      observation_reentry_refs: input.observationRefs ?? [],
+      native_item_types: ["dynamicToolCall", "agentMessage"],
+      forbidden_native_item_types: [],
+      effective_model: input.turn.model ?? null,
+      effective_reasoning_effort: input.turn.reasoningEffort ?? null,
+      native_thread_id: "thread:test",
+      native_turn_id: "turn:test",
+      native_final_item_id: "answer:test",
+      native_turn_status: "completed",
+      native_error_code: null,
+      native_error_http_status: null,
+      native_error_message: null,
       terminal_candidate_present: input.ok !== false,
       turn_lifecycle: lifecycle.snapshot(),
     },
@@ -111,51 +122,58 @@ describe("Codex native governed workstation turn", () => {
       profile_id: "profile:native-workstation-user",
       account_type: "user",
     });
-    const accountContext = await resolveWorkstationGatewayAccountContext(receipt.session?.session_id);
-    const nativeTurnRunner = vi.fn(async (turn: RunCodexNativeAppServerTurnInput) => {
-      const binding = readBinding(turn.prompt);
-      const admission = await turn.validateRouteProposal({
-        schema: "helix.runtime_semantic_route_proposal.v1",
-        turn_id: "ask:test:native-workstation",
-        proposal_source: "agent_runtime",
-        prompt_hash: binding.prompt_hash,
-        proposed_route: "workspace_status",
-        proposed_tool_family: "workspace",
-        proposed_capability_id: "workspace_os.status",
-        proposed_capability_ids: ["workspace_os.status"],
-        confidence: "high",
-        uncertainty: [],
-        reason_summary: "Current status requires the admitted status observation.",
-        supporting_hint_refs: [],
-      });
-      const execution = await turn.executeCapability({
-        capabilityId: "workspace_os.status",
-        arguments: {},
-        iteration: 1,
-      });
-      const outsideRouteExecution = await turn.executeCapability({
-        capabilityId: "repo.search",
-        arguments: { query: "must not execute" },
-        iteration: 2,
-      });
-      expect(outsideRouteExecution).toMatchObject({
-        ok: false,
-        content: {
-          reason: "capability_outside_validated_route",
-          capability_id: "repo.search",
-          terminal_eligible: false,
-        },
-      });
-      return nativeResult({
-        turn,
-        proposal: admission.proposal!,
-        admitted: admission.admittedCapabilityIds,
-        requested: ["workspace_os.status"],
-        executed: ["workspace_os.status"],
-        observationRefs: execution.observationRef ? [execution.observationRef] : [],
-        ok: execution.ok,
-      });
-    });
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      receipt.session?.session_id,
+    );
+    const nativeTurnRunner = vi.fn(
+      async (turn: RunCodexNativeAppServerTurnInput) => {
+        const binding = readBinding(turn.prompt);
+        const admission = await turn.validateRouteProposal({
+          schema: "helix.runtime_semantic_route_proposal.v1",
+          turn_id: "ask:test:native-workstation",
+          proposal_source: "agent_runtime",
+          prompt_hash: binding.prompt_hash,
+          proposed_route: "workspace_status",
+          proposed_tool_family: "workspace",
+          proposed_capability_id: "workspace_os.status",
+          proposed_capability_ids: ["workspace_os.status"],
+          confidence: "high",
+          uncertainty: [],
+          reason_summary:
+            "Current status requires the admitted status observation.",
+          supporting_hint_refs: [],
+        });
+        const execution = await turn.executeCapability({
+          capabilityId: "workspace_os.status",
+          arguments: {},
+          iteration: 1,
+        });
+        const outsideRouteExecution = await turn.executeCapability({
+          capabilityId: "repo.search",
+          arguments: { query: "must not execute" },
+          iteration: 2,
+        });
+        expect(outsideRouteExecution).toMatchObject({
+          ok: false,
+          content: {
+            reason: "capability_outside_validated_route",
+            capability_id: "repo.search",
+            terminal_eligible: false,
+          },
+        });
+        return nativeResult({
+          turn,
+          proposal: admission.proposal!,
+          admitted: admission.admittedCapabilityIds,
+          requested: ["workspace_os.status"],
+          executed: ["workspace_os.status"],
+          observationRefs: execution.observationRef
+            ? [execution.observationRef]
+            : [],
+          ok: execution.ok,
+        });
+      },
+    );
 
     const result = await runCodexNativeWorkstationTurn({
       prompt: "Check the current workstation status.",
@@ -349,53 +367,59 @@ describe("Codex native governed workstation turn", () => {
       profile_id: "profile:native-workstation-compound-developer",
       account_type: "developer",
     });
-    const accountContext = await resolveWorkstationGatewayAccountContext(receipt.session?.session_id);
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      receipt.session?.session_id,
+    );
     const proposedCapabilities = [
       "workspace_os.status",
       "scientific-calculator.solve_expression",
     ];
-    const nativeTurnRunner = vi.fn(async (turn: RunCodexNativeAppServerTurnInput) => {
-      const binding = readBinding(turn.prompt);
-      const admission = await turn.validateRouteProposal({
-        schema: "helix.runtime_semantic_route_proposal.v1",
-        turn_id: "ask:test:native-compound",
-        proposal_source: "agent_runtime",
-        prompt_hash: binding.prompt_hash,
-        proposed_route: "compound_workspace_calculator",
-        proposed_tool_family: "compound",
-        proposed_capability_id: proposedCapabilities[0],
-        proposed_capability_ids: proposedCapabilities,
-        confidence: "high",
-        uncertainty: [],
-        reason_summary: "Both bounded observations are required by the compound request.",
-        supporting_hint_refs: [],
-      });
-      expect(admission).toMatchObject({
-        ok: true,
-        admittedCapabilityIds: proposedCapabilities,
-      });
-      const status = await turn.executeCapability({
-        capabilityId: proposedCapabilities[0],
-        arguments: {},
-        iteration: 1,
-      });
-      const calculation = await turn.executeCapability({
-        capabilityId: proposedCapabilities[1],
-        arguments: { expression: "8*9" },
-        iteration: 2,
-      });
-      return nativeResult({
-        turn,
-        proposal: admission.proposal!,
-        admitted: admission.admittedCapabilityIds,
-        requested: proposedCapabilities,
-        executed: proposedCapabilities,
-        observationRefs: [status.observationRef, calculation.observationRef].filter(
-          (ref): ref is string => Boolean(ref),
-        ),
-        ok: status.ok && calculation.ok,
-      });
-    });
+    const nativeTurnRunner = vi.fn(
+      async (turn: RunCodexNativeAppServerTurnInput) => {
+        const binding = readBinding(turn.prompt);
+        const admission = await turn.validateRouteProposal({
+          schema: "helix.runtime_semantic_route_proposal.v1",
+          turn_id: "ask:test:native-compound",
+          proposal_source: "agent_runtime",
+          prompt_hash: binding.prompt_hash,
+          proposed_route: "compound_workspace_calculator",
+          proposed_tool_family: "compound",
+          proposed_capability_id: proposedCapabilities[0],
+          proposed_capability_ids: proposedCapabilities,
+          confidence: "high",
+          uncertainty: [],
+          reason_summary:
+            "Both bounded observations are required by the compound request.",
+          supporting_hint_refs: [],
+        });
+        expect(admission).toMatchObject({
+          ok: true,
+          admittedCapabilityIds: proposedCapabilities,
+        });
+        const status = await turn.executeCapability({
+          capabilityId: proposedCapabilities[0],
+          arguments: {},
+          iteration: 1,
+        });
+        const calculation = await turn.executeCapability({
+          capabilityId: proposedCapabilities[1],
+          arguments: { expression: "8*9" },
+          iteration: 2,
+        });
+        return nativeResult({
+          turn,
+          proposal: admission.proposal!,
+          admitted: admission.admittedCapabilityIds,
+          requested: proposedCapabilities,
+          executed: proposedCapabilities,
+          observationRefs: [
+            status.observationRef,
+            calculation.observationRef,
+          ].filter((ref): ref is string => Boolean(ref)),
+          ok: status.ok && calculation.ok,
+        });
+      },
+    );
 
     const result = await runCodexNativeWorkstationTurn({
       prompt: "Check workstation status and calculate 8*9.",
@@ -409,7 +433,10 @@ describe("Codex native governed workstation turn", () => {
     expect(result).toMatchObject({
       ok: true,
       gatewayCallResults: [
-        expect.objectContaining({ capability_id: "workspace_os.status", ok: true }),
+        expect.objectContaining({
+          capability_id: "workspace_os.status",
+          ok: true,
+        }),
         expect.objectContaining({
           capability_id: "scientific-calculator.solve_expression",
           ok: true,
@@ -426,12 +453,14 @@ describe("Codex native governed workstation turn", () => {
     expect(nativeTurnRunner).toHaveBeenCalledOnce();
   });
 
-  it("does not expose a mutating dynamic-panel capability to the read-only native turn", async () => {
+  it("does not expose an act-plane dynamic-panel capability through the observe/read native set", async () => {
     const receipt = await signInLocalAccountSession({
       profile_id: "profile:native-workstation-panel-user",
       account_type: "user",
     });
-    const accountContext = await resolveWorkstationGatewayAccountContext(receipt.session?.session_id);
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      receipt.session?.session_id,
+    );
     const nativeTurnRunner = vi.fn();
 
     const result = await runCodexNativeWorkstationTurn({
@@ -454,6 +483,225 @@ describe("Codex native governed workstation turn", () => {
       },
     });
     expect(result.gatewayCallResults).toEqual([]);
+    expect(nativeTurnRunner).not.toHaveBeenCalled();
+  });
+
+  it("exposes an exact trusted no-confirmation act capability without granting host access", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.guardian.execute";
+    const turnId = "ask:test:native-trusted-guardian";
+    const receipt = await signInLocalAccountSession({
+      profile_id: "profile:native-trusted-guardian-developer",
+      account_type: "developer",
+    });
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      receipt.session?.session_id,
+    );
+    const nativeTurnRunner = vi.fn(
+      async (turn: RunCodexNativeAppServerTurnInput) => {
+        expect(
+          turn.capabilities.map((capability) => capability.capability_id),
+        ).toEqual([capabilityId]);
+        expect(turn.capabilities[0]).toMatchObject({
+          mutating: true,
+          code_mutation: false,
+          shell_access: false,
+          requires_confirmation: false,
+          permission_profile_required: "act",
+        });
+        const binding = readBinding(turn.prompt);
+        const admission = await turn.validateRouteProposal({
+          schema: "helix.runtime_semantic_route_proposal.v1",
+          turn_id: turnId,
+          proposal_source: "agent_runtime",
+          prompt_hash: binding.prompt_hash,
+          proposed_route: "minecraft_player_guardian",
+          proposed_tool_family: "live_environment",
+          proposed_capability_id: capabilityId,
+          proposed_capability_ids: [capabilityId],
+          confidence: "high",
+          uncertainty: [],
+          reason_summary:
+            "The user's exact admitted Player Embodiment task requires the guardian capability.",
+          supporting_hint_refs: [],
+        });
+        expect(admission).toMatchObject({
+          ok: true,
+          admittedCapabilityIds: [capabilityId],
+        });
+        return nativeResult({
+          turn,
+          proposal: admission.proposal!,
+          admitted: admission.admittedCapabilityIds,
+        });
+      },
+    );
+
+    const result = await runCodexNativeWorkstationTurn({
+      prompt: "Track the calf while I move and feed it three wheat.",
+      turnId,
+      cwd: process.cwd(),
+      accountContext,
+      requestedMode: "act",
+      allowedWorkstationTools: [capabilityId],
+      nativeTurnRunner,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      gatewayCallResults: [],
+      debug: {
+        model_visible_tools: [capabilityId],
+        governed_direct_act_tools: [capabilityId],
+        route_admitted_tools: [capabilityId],
+        requested_mode: "act",
+        effective_mode: "act",
+        sandbox_policy: "read_only",
+        network_access: false,
+        built_in_tools_disabled: true,
+      },
+    });
+    expect(nativeTurnRunner).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {
+      label: "anonymous account",
+      account: async () => resolveWorkstationGatewayAccountContext(null),
+      requestedMode: "act",
+      allowedTools: ["com.casimirbot.minecraft.player.guardian.execute"],
+    },
+    {
+      label: "read mode",
+      account: async () => {
+        const receipt = await signInLocalAccountSession({
+          profile_id: "profile:native-guardian-read-mode-developer",
+          account_type: "developer",
+        });
+        return resolveWorkstationGatewayAccountContext(
+          receipt.session?.session_id,
+        );
+      },
+      requestedMode: "read",
+      allowedTools: ["com.casimirbot.minecraft.player.guardian.execute"],
+    },
+    {
+      label: "omitted exact goal list",
+      account: async () => {
+        const receipt = await signInLocalAccountSession({
+          profile_id: "profile:native-guardian-no-goal-developer",
+          account_type: "developer",
+        });
+        return resolveWorkstationGatewayAccountContext(
+          receipt.session?.session_id,
+        );
+      },
+      requestedMode: "act",
+      allowedTools: null,
+    },
+    {
+      label: "wildcard goal list",
+      account: async () => {
+        const receipt = await signInLocalAccountSession({
+          profile_id: "profile:native-guardian-wildcard-developer",
+          account_type: "developer",
+        });
+        return resolveWorkstationGatewayAccountContext(
+          receipt.session?.session_id,
+        );
+      },
+      requestedMode: "act",
+      allowedTools: ["*"],
+    },
+  ])(
+    "does not expose a direct act capability for $label",
+    async ({ account, requestedMode, allowedTools }) => {
+      const capabilityId = "com.casimirbot.minecraft.player.guardian.execute";
+      const nativeTurnRunner = vi.fn(
+        async (turn: RunCodexNativeAppServerTurnInput) => {
+          expect(
+            turn.capabilities.some(
+              (capability) => capability.capability_id === capabilityId,
+            ),
+          ).toBe(false);
+          const visibleCapabilityId = "workspace_os.status";
+          expect(
+            turn.capabilities.some(
+              (capability) => capability.capability_id === visibleCapabilityId,
+            ),
+          ).toBe(true);
+          const binding = readBinding(turn.prompt);
+          const admission = await turn.validateRouteProposal({
+            schema: "helix.runtime_semantic_route_proposal.v1",
+            turn_id: turn.turnId,
+            proposal_source: "agent_runtime",
+            prompt_hash: binding.prompt_hash,
+            proposed_route: "workspace_status",
+            proposed_tool_family: "workspace",
+            proposed_capability_id: visibleCapabilityId,
+            proposed_capability_ids: [visibleCapabilityId],
+            confidence: "high",
+            uncertainty: [],
+            reason_summary: "Use an admitted read capability only.",
+            supporting_hint_refs: [],
+          });
+          return nativeResult({
+            turn,
+            proposal: admission.proposal!,
+            admitted: admission.admittedCapabilityIds,
+          });
+        },
+      );
+      const result = await runCodexNativeWorkstationTurn({
+        prompt: "Context only; do not run the guardian.",
+        turnId: `ask:test:native-guardian-denied:${requestedMode}:${allowedTools?.[0] ?? "none"}`,
+        cwd: process.cwd(),
+        accountContext: await account(),
+        requestedMode,
+        allowedWorkstationTools: allowedTools,
+        nativeTurnRunner,
+      });
+
+      expect(result.debug.model_visible_tools).not.toContain(capabilityId);
+      if (allowedTools != null && !allowedTools.includes("*")) {
+        expect(result.failReason).toBe("native_admitted_capability_set_empty");
+        expect(nativeTurnRunner).not.toHaveBeenCalled();
+      } else {
+        expect(result.ok).toBe(true);
+        expect(nativeTurnRunner).toHaveBeenCalledOnce();
+      }
+    },
+  );
+
+  it("keeps confirmation-gated mutations on the runtime approval seam", async () => {
+    const capabilityId =
+      "environment.minecraft.fabric_loopback.launch_and_join";
+    const receipt = await signInLocalAccountSession({
+      profile_id: "profile:native-confirmation-gated-developer",
+      account_type: "developer",
+    });
+    const accountContext = await resolveWorkstationGatewayAccountContext(
+      receipt.session?.session_id,
+    );
+    const nativeTurnRunner = vi.fn();
+
+    const result = await runCodexNativeWorkstationTurn({
+      prompt: "Start and join the local Fabric environment.",
+      turnId: "ask:test:native-confirmation-gated",
+      cwd: process.cwd(),
+      accountContext,
+      requestedMode: "act",
+      allowedWorkstationTools: [capabilityId],
+      nativeTurnRunner,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      failReason: "native_admitted_capability_set_empty",
+      debug: {
+        model_visible_tools: [],
+        runtime_approval_start_tools: [],
+      },
+    });
     expect(nativeTurnRunner).not.toHaveBeenCalled();
   });
 

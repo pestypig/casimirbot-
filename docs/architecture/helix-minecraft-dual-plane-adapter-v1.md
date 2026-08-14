@@ -2,6 +2,11 @@
 
 Status: implementation contract.
 
+The runtime reasoning, simultaneous-lane, advisory-governance and durable-goal
+contract shared by Minecraft and future environments is defined in
+`helix-environment-agent-reasoning-v1.md`. This document maps that contract to
+Minecraft's World Authority and Player Embodiment planes.
+
 ## Outcome
 
 Minecraft is exposed through one provider-neutral Helix environment catalog and
@@ -26,6 +31,69 @@ The Fabric client companion controls only the selected Minecraft client. It may
 navigate, look, walk, jump, interact, select a hotbar slot, equip an item and
 run admitted higher-level workflows. It never receives host shell, filesystem,
 process, credential-store or general code-execution authority.
+
+## Product support ladder
+
+Helix support for an environment is a declared capability tier, not a binary
+integration badge. The same provider-neutral northbound interface may expose
+progressively deeper tiers as an environment adapter becomes mature:
+
+| Tier                  | Minecraft example                                                                                                         | Authority boundary                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Observe               | status, inventory, hazards, entities and local geometry                                                                   | read-only source credential                                                |
+| Advise                | Codex combines current observations with versioned mechanics evidence                                                     | no additional environment authority                                        |
+| Player action         | look, track, walk, jump, interact, equip and bounded workflows                                                            | selected-player Fabric lease                                               |
+| Reactive guardian     | concurrent camera, locomotion, hand, inventory, world and safety lanes with resource locks, races and one-shot interrupts | explicit `survival_tas` program plus effect ceilings                       |
+| World authority       | governed Brigadier commands and exact server-side mutation                                                                | separate server-command lease                                              |
+| Workstation lifecycle | detect a compatible installation, prepare a profile, launch and direct-connect                                            | separate operating-system capability; never inherited by the Minecraft mod |
+
+This is the reusable Helix Environment Connector service model: deeper support
+means more typed observations, actions, postconditions and recovery behavior,
+not wider ambient host access. A user with a compatible Minecraft installation
+may be offered the connector automatically by the future Helix harness, but it
+is only _available_ at detection time. Installing or modifying a game profile,
+pairing a room, selecting a player, and granting player/admin authority remain
+explicit user decisions. Read-only observation is the safest initial tier.
+
+The eventual harness distribution should bundle the provider-neutral Minecraft
+support pack so a compatible installation is discoverable without a separate
+integration hunt. That product promise is represented by explicit lifecycle
+states, not by silently controlling every detected game:
+
+```text
+bundled -> compatible installation detected -> profile prepared with consent
+  -> connector paired -> player selected -> authority granted -> ready
+```
+
+Each state is independently observable. `bundled` or `detected` means the
+service can offer setup; it does not mean the mod is installed, a room is
+paired, or actions are authorized. This same lifecycle applies to future
+environment support packs even when their deepest supported tier differs.
+
+The first Windows reference provider is
+`scripts/helix-minecraft-launch-fabric-loopback.ps1`. It is deliberately a
+Workstation Lifecycle adapter, not part of the Fabric Player Embodiment mod.
+For an already installed and previously selected Fabric profile it verifies a
+loopback server, enforces the local memory ceiling, reuses a compatible running
+client or identifies the actual rendered launcher Play control and starts one,
+waits for the Helix mod-load signal, stages a fresh loopback-only auto-join when
+needed, and requires the client TCP connection before emitting
+`helix.minecraft.workstation_launch_receipt.v1`. It neither reads nor emits a
+Minecraft/Microsoft credential. The rendered-control step is a bounded Windows
+launcher fallback; structured game capability calls begin as soon as Fabric
+loads and remain the primary control plane.
+
+The script is implementation detail behind one server-owned executor and the
+provider-neutral capability
+`environment.minecraft.fabric_loopback.launch_and_join`. The localhost browser
+and packaged EXE render the same lifecycle card and call the same same-origin
+operator endpoint. Codex reaches that executor through the workstation tool
+gateway after a trusted runtime confirmation receipt. These are different
+admission paths into one executor, not separate browser and desktop launchers.
+Neither UI shell receives an executable path, arbitrary arguments, a host shell,
+or Minecraft credentials. The packaged runtime stages the fixed script under
+its allowlisted runtime root so installed and repository surfaces retain the
+same receipt and failure vocabulary.
 
 ## Ownership
 
@@ -100,6 +168,7 @@ Initial client actions:
 ```text
 com.casimirbot.minecraft.player.navigate
 com.casimirbot.minecraft.player.look
+com.casimirbot.minecraft.player.camera.track
 com.casimirbot.minecraft.player.walk
 com.casimirbot.minecraft.player.jump
 com.casimirbot.minecraft.player.interact
@@ -109,6 +178,8 @@ com.casimirbot.minecraft.player.workflow.status
 com.casimirbot.minecraft.player.workflow.resume
 com.casimirbot.minecraft.player.workflow.cancel
 com.casimirbot.minecraft.player.emergency_stop
+com.casimirbot.minecraft.player.sequence.execute
+com.casimirbot.minecraft.player.guardian.execute
 com.casimirbot.minecraft.situation_digest.read
 ```
 
@@ -129,16 +200,18 @@ control or generated host code.
 
 ## Capability matrix
 
-| Plane | Capability family | Current implementation evidence | Release status |
-| --- | --- | --- | --- |
-| World Authority | source manifest, heartbeat, probes and typed world events | Fabric server connector plus protected room-source ingress | implemented; keyed live regression still required |
-| World Authority | exact Brigadier catalog and governed server command | command broker, member ceilings, one-shot request/result evidence | implemented; hybrid live journeys still required |
-| Player Embodiment | navigate, look, walk, jump, interact, hotbar and equip | separately paired Fabric client, finite owner-configured UI/API authority, durable action broker and measured postconditions | implemented baseline; keyed live regression still required |
-| Player Embodiment | workflow status, resume, cancel and emergency stop | typed control queue/result lane with control release requirements | implemented baseline; manual-interruption live journey still required |
-| Shared evidence | raw event ledger and situation digest | both protected world events and client workflow events enter plane-labeled, content-hashed batches; `com.casimirbot.minecraft.situation_digest.read` re-enters a selected plane | implemented deterministic slice; freshness and cross-plane live evidence still required |
-| Player Embodiment | optional Baritone navigation | `BaritoneFacade` discovers the public API at runtime; the live manifest advertises the engine only when discovery succeeds | implemented conditional adapter; installed-Baritone keyed live regression still required |
-| Player Embodiment | follow, collect, mine, place, craft and inventory transfer | Fabric player-agent `0.2.0`, trusted 13-action catalog/profile parity, bounded native workflow engine, action-specific terminal measurements and broker-side scope validation | implemented deterministic baseline; workflow-by-workflow keyed live regression still required |
-| Lifecycle parity | direct Codex versus Helix first-divergence comparison | required trace contract below | pending workflow-by-workflow acceptance |
+| Plane             | Capability family                                          | Current implementation evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Release status                                                                                         |
+| ----------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| World Authority   | source manifest, heartbeat, probes and typed world events  | Fabric server connector plus protected room-source ingress                                                                                                                                                                                                                                                                                                                                                                                                                                                     | implemented; keyed live regression still required                                                      |
+| World Authority   | exact Brigadier catalog and governed server command        | command broker, member ceilings, one-shot request/result evidence                                                                                                                                                                                                                                                                                                                                                                                                                                              | implemented; hybrid live journeys still required                                                       |
+| Player Embodiment | navigate, look, walk, jump, interact, hotbar and equip     | separately paired Fabric client, finite owner-configured UI/API authority, durable action broker and measured postconditions                                                                                                                                                                                                                                                                                                                                                                                   | implemented baseline; keyed live regression still required                                             |
+| Player Embodiment | workflow status, resume, cancel and emergency stop         | typed control queue/result lane with control release requirements                                                                                                                                                                                                                                                                                                                                                                                                                                              | implemented baseline; manual-interruption live journey still required                                  |
+| Shared evidence   | raw event ledger and situation digest                      | both protected world events and client workflow events enter plane-labeled, content-hashed batches; `com.casimirbot.minecraft.situation_digest.read` re-enters a selected plane                                                                                                                                                                                                                                                                                                                                | implemented deterministic slice; freshness and cross-plane live evidence still required                |
+| Player Embodiment | optional Baritone navigation                               | `BaritoneFacade` discovers the public API at runtime; the live manifest advertises the engine only when discovery succeeds                                                                                                                                                                                                                                                                                                                                                                                     | implemented conditional adapter; installed-Baritone keyed live regression still required               |
+| Player Embodiment | follow, collect, mine, place, craft and inventory transfer | Fabric player-agent `0.3.0`, trusted 13-action catalog/profile parity, bounded native workflow engine, action-specific terminal measurements and broker-side scope validation                                                                                                                                                                                                                                                                                                                                  | implemented deterministic baseline; workflow-by-workflow keyed live regression still required          |
+| Player Embodiment | fluid survival TAS sequence                                | one provider-neutral sequence capability embeds the existing actions plus tick-addressed input, finite branches and checkpoints; the 20 Hz Fabric interpreter reports world ticks and wall time independently and releases controls on every terminal path                                                                                                                                                                                                                                                     | implemented and unit-tested; direct-Codex and keyed-Helix micro-course evidence still required         |
+| Player Embodiment | concurrent reactive guardian                               | Codex authors a finite `helix.minecraft.reactive_program.v1`; Fabric executes same-tick nonconflicting lanes, explicit resource locks, bounded repeat/maintain/event nodes, races and one-shot interrupts. A place action may use exact cells or one bounded `predicted_collision_cell` binding (1-20 ticks, at most six actor-relative blocks); Fabric resolves geometry while Codex still owns locomotion, timing and strategy. Helix validates the resolved cell, settled lane evidence and effect ceilings | contract, MCP, broker and Fabric scheduler tests pass; direct-Codex and keyed live acceptance required |
+| Lifecycle parity  | direct Codex versus Helix first-divergence comparison      | required trace contract below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | pending workflow-by-workflow acceptance                                                                |
 
 `implemented baseline` does not mean release-ready. The remaining rows and the
 keyed natural prompt/text/voice journeys are required before this contract may
@@ -164,6 +237,17 @@ admitted arguments, mutation limits and inventory-transfer ceiling before the
 result can become a current-turn observation. The final action observation then
 re-enters Codex before any user-facing success claim.
 
+For reactive placement, `positions` and `position_binding` are mutually
+exclusive. The binding is not an adapter-authored rescue plan: it exposes one
+measured dataflow edge from a short-horizon collision forecast to a normal
+player item-use action. The Fabric runtime resolves one replaceable cell above
+the predicted downward collision, enforces the authored horizon and
+actor-relative distance, and receives the admitted mutation scope for a second
+local region/block check. Its receipt publishes the exact resolved target,
+trajectory model, collision tick, reach forecast, item/inventory change and
+world mutation. Timeout evidence retains the last runtime summary and target so
+Codex can repair the program instead of receiving a generic terminal failure.
+
 For `player.look`, `target_kind: relative_rotation` accepts semantic
 `yaw_delta_degrees` and `pitch_delta_degrees`; positive yaw means right and
 positive pitch means down. The client resolves one absolute target from the
@@ -177,6 +261,44 @@ cannot manufacture the terminal pose.
 Mutating or ambiguous operations are never automatically replayed. A new user
 request is a new action identity.
 
+### Fluid state and observation contract
+
+The fluid sequence is a finite typed program authored by Codex, not an adapter
+planner. Its Player Embodiment ruleset is `survival_tas`: only legal client
+inputs and the existing typed workflows are executable. The named
+`command_assisted_sandbox` ruleset belongs to separately authorized World
+Authority, while `copilot_speedrun` is guidance-only. Naming either future
+ruleset in the player sequence is a typed admission failure.
+
+Branch, event, interrupt and checkpoint conditions may read only a bounded vocabulary: tick,
+grounded pose, position, health, food, inventory/resource counts, equipped
+items/tools, current-focus kind and reachability, exact block state, current
+dimension, nearby portal kind, bounded local hazards, recipe craftability,
+prior node outcome, checkpoint progress, vertical velocity, a 1-20 tick
+collision forecast, and exact support-face placement reach over the same
+bounded horizon. The trajectory model is labeled as a vanilla airborne
+approximation and reports unsupported water, lava, Elytra or flight regimes
+instead of inventing certainty. These are observations, not strategy. Fabric
+evaluates them against current client state; Codex decides which conditions
+and recovery branches satisfy the user's objective.
+
+Condition evidence is event-triggered. Fabric records the first value observed
+for a condition and any later value change, together with its node, world tick,
+condition kind and bounded subject identity. It does not publish the same false
+value on every 20 Hz poll. This compact stream exposes reachability, resource
+or crafting readiness, hazards, equipment, dimension/portal state and
+checkpoint progress without raw NBT, arbitrary expressions, model calls or a
+second answer writer. The terminal result also retains executed node ids,
+per-node outcomes, exact scheduler ticks, separately measured wall-clock time,
+deviations, retries and admitted inventory/world-effect counts.
+
+The concurrent scheduler additionally reports the maximum number of lanes
+scheduled in one game tick, the number of ticks with more than one scheduled
+lane, exact declared-race winners and canceled members, and bounded placement
+prediction receipts. Helix admits those receipts only when their race, lane,
+target block and horizon match the submitted program. They prove execution
+continuity; they do not authorize Helix to choose a rescue or building plan.
+
 A bounded provider retry of the same semantic current-turn request is not a
 new action. The broker's idempotency comparison covers authority, exact
 environment/player identity, catalog capability/version, arguments,
@@ -185,6 +307,28 @@ excludes delivery-only workflow/request/condition/tool-call ids and timestamps.
 The retry therefore resolves to the original admitted request; changing any
 semantic action content under the same key remains a typed conflict. This
 deduplication never authorizes the client to execute an ambiguous action again.
+
+### Concurrent reactive-program contract
+
+`com.casimirbot.minecraft.player.guardian.execute` is the provider-neutral
+reactive tier. Codex remains the strategy author: it chooses typed actions,
+conditions, lanes, races and recovery edges. Helix validates identity, graph
+bounds, exact resource ceilings, mutation scope, lease and terminal evidence.
+The Fabric companion only advances the admitted program at render/tick cadence.
+
+Camera and locomotion may therefore advance on the same tick, while two lanes
+that both require the physical use-key channel serialize through the same hand
+resources. Safety lanes may be activated by a one-shot typed interrupt and can
+cancel lower-priority work. Every terminal path releases the resources held by
+each lane. The terminal evidence includes lane/node state, tick identity,
+condition changes, conflicts, interrupts and admitted effect counts; a generic
+connector success message is insufficient.
+
+Reactive programs cannot contain arbitrary code, raw Minecraft commands,
+shell, files, credentials, model calls or nested programs. Subject-bound
+embedded actions remain a typed limitation until nested room/player identity
+resolution is implemented; entity and particle tracking use the existing
+opaque target identities.
 
 Once the client has executed an admitted action, its workflow event, raw
 player-embodiment event batch and terminal result enter a bounded ordered
@@ -288,6 +432,62 @@ source event/snapshot references, producer plane and epoch, and remains
 
 The digest is an observation, not memory authority or terminal prose. Codex may
 request a fresh probe when the compact digest is insufficient.
+
+## Fluid sequence layer
+
+The fluid layer extends Player Embodiment with one provider-neutral capability,
+`com.casimirbot.minecraft.player.sequence.execute`. It does not replace or
+privately orchestrate the original thirteen player actions. Codex authors one
+bounded program; Helix validates its identities, ruleset, graph, lease and
+effect ceilings; the paired Fabric client advances the admitted state machine
+on the 20 Hz Minecraft client tick.
+
+This removes provider round trips from keypress timing without moving strategy
+into deterministic adapter code:
+
+```text
+natural objective
+  -> Codex observes, decomposes and authors typed sequence
+  -> Helix admits exact player/world/ruleset/effect envelope
+  -> Fabric executes input segments and existing workflow nodes per tick
+  -> Fabric emits compact checkpoints, deviations and terminal measurements
+  -> Helix normalizes exact evidence and re-enters Codex
+  -> Codex replans or synthesizes; Helix checks terminal eligibility
+```
+
+The named rulesets are deliberately different authority products:
+
+- `survival_tas` permits legal automated player inputs and the existing typed
+  Player Embodiment workflows. It is the only ruleset admitted by the first
+  sequence capability.
+- `command_assisted_sandbox` requires a separately authorized World Authority
+  command capability. Merely naming this ruleset cannot grant commands to the
+  client companion.
+- `copilot_speedrun` is guidance-only and leaves input with the player. It is
+  not silently upgraded to automated embodiment.
+
+The v1 sequence graph is finite and acyclic. Its node kinds are tick-addressed
+input segments, embedded typed workflows, observation checkpoints, finite
+branches and explicit success/failure terminals. Repetition remains inside a
+bounded typed workflow rather than an arbitrary graph loop. Branch conditions
+come from a whitelist of client-observable state such as tick, grounded state,
+health, food, position, inventory count, focused object, block state, prior
+node outcome and checkpoint status. No condition contains code or a general
+expression language.
+
+Every request declares `max_total_ticks`, required checkpoints, scheduler
+engine, optimization target, and a mutation scope. Static admission proves
+that graph references are valid and reachable, the graph terminates, and every
+declared mine/place/inventory effect fits its ceiling. Runtime success still
+requires all named checkpoints, a continuous start/completion clock, exact
+duration ticks, terminal postcondition evidence and released controls.
+
+The Fabric scheduler must release all owned controls on success, failure,
+timeout, cancellation, disconnect, manual override and emergency stop. It may
+evaluate an admitted immediate condition locally, but it must not invoke a
+model, invent a new goal, synthesize an unadmitted action, replay automatically
+or author the final answer. Unexpected state becomes a typed deviation or
+failure observation for Codex re-entry.
 
 ## Differential acceptance
 

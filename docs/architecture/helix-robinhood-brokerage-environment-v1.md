@@ -90,6 +90,8 @@ account with the `brokerage_environment` feature.
 | `POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-equity-previews` | Convert one fresh accepted risk decision into a non-executing Robinhood equity review. |
 | `GET` | `/brokerage-connections/:connectionId/rooms/:roomId/live-equity-previews` | List bounded reviews and their expiry/approval state. |
 | `POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-equity-previews/:previewId/approve` | Record exact-text, explicit-user, one-time approval for the reviewed order. |
+| `GET` | `/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-readiness` | Aggregate sanitized read, contract, supervisor, operator, entry, exit, and exposure gates without provider order-tool calls. |
+| `GET/POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-contract-preflight` | Read the latest sanitized receipt or inspect the MCP catalog without calling an order tool. |
 | `GET/POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-control` | Inspect or explicitly arm/stop the fail-closed tiny live-entry control. |
 | `POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-presence` | Maintain a short-lived attended-operator heartbeat while the visible room UI is active. |
 | `GET/POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-equity-executions` | List live receipts or atomically consume one approved review for placement. |
@@ -116,6 +118,27 @@ Placement and cancellation remain excluded from the generic room read catalog
 and agent tool gateway. They are reachable only through the dedicated
 developer-session routes and narrower contracts. Options and every other
 brokerage mutation remain excluded.
+
+Before the live control can arm, a private-room operator must run the dedicated
+provider-contract preflight. It lists the current MCP catalog, exercises the
+local argument builders with synthetic values, and calls no provider order
+tool. The immutable receipt exposes only catalog/schema hashes and typed gate
+results. A PASS is valid for 24 hours and is checked again during the atomic
+placement reservation, so missing, failed, stale, duplicate, ambiguously
+annotated, or schema-drifted contracts fail closed.
+
+Startup also fails closed when only one of the execution/supervisor flags is
+enabled or when live mode lacks an exact 32-byte base64url provider credential
+key. The evidence-only acceptance projection separates read acceptance, safe
+flag enablement, attended-canary readiness, arming readiness, and completed
+entry/exit acceptance. It is derived from sanitized database receipts, invokes
+zero provider order tools, and has neither execution nor answer authority.
+
+While armed, attended operator presence is a ten-second lease. If it expires or
+has a future-invalid timestamp, the next five-second supervisor cycle durably
+disarms the control, clears presence, activates the kill switch, and appends an
+immutable `operator_presence_expired_relocked` event. The supervisor still
+places, cancels, and reconciles zero provider orders.
 
 The server adapter lists the provider's current tool catalog on each fresh MCP
 session, requires an exact admitted tool, rejects provider tools marked as

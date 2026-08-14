@@ -41,6 +41,7 @@ import {
   DESKTOP_MCP_TUNNEL_START_CHANNEL,
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
+  DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
   DESKTOP_UPDATE_CHECK_CHANNEL,
   DESKTOP_UPDATE_DOWNLOAD_CHANNEL,
   DESKTOP_UPDATE_INSTALL_CHANNEL,
@@ -63,6 +64,16 @@ import {
   buildDesktopServiceEnvironment,
   resolveDesktopUserDataOverride,
 } from "./service-environment";
+import {
+  installProcessOutputGuards,
+  writeProcessDiagnostic,
+} from "./process-output";
+import { loadOrCreateDesktopProviderCredentialKey } from
+  "./provider-credential-key";
+import { isAllowedDesktopRobinhoodAuthorizationUrl } from
+  "./robinhood-oauth";
+
+installProcessOutputGuards();
 
 const DESKTOP_SESSION_HEADER = "X-Casimir-Desktop-Session";
 const SERVICE_HEAP_LIMIT_MB = 1_024;
@@ -310,6 +321,12 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   }
 
   const userDataPath = app.getPath("userData");
+  const providerCredentialEncryptionKey =
+    loadOrCreateDesktopProviderCredentialKey({
+      userDataPath,
+      storage: safeStorage,
+      configuredKey: process.env.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY,
+    });
   const startupJournal = createStartupJournal(userDataPath);
   const readyReceiptPath = resolveReadyReceiptPath(userDataPath);
   clearReadyReceipt(readyReceiptPath);
@@ -326,6 +343,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
           processEnv: process.env,
           userDataPath: app.getPath("userData"),
           serviceOrigin: origin,
+          providerCredentialEncryptionKey,
         }),
         ELECTRON_RUN_AS_NODE: "1",
         NODE_ENV: "production",
@@ -347,11 +365,17 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   child.stderr.setEncoding("utf8");
   child.stdout.on("data", (chunk: string) => {
     appendStartupJournal(startupJournal, "stdout", chunk, secret);
-    console.log(`[desktop-service] ${sanitizeServiceLog(chunk, secret)}`);
+    writeProcessDiagnostic(
+      process.stdout,
+      `[desktop-service] ${sanitizeServiceLog(chunk, secret)}`,
+    );
   });
   child.stderr.on("data", (chunk: string) => {
     appendStartupJournal(startupJournal, "stderr", chunk, secret);
-    console.error(`[desktop-service] ${sanitizeServiceLog(chunk, secret)}`);
+    writeProcessDiagnostic(
+      process.stderr,
+      `[desktop-service] ${sanitizeServiceLog(chunk, secret)}`,
+    );
   });
 
   const runtime = {
@@ -574,6 +598,17 @@ const registerDesktopIpc = (
         })
       ) {
         throw new Error("The Auth0 authorization request is invalid");
+      }
+      await shell.openExternal(authorizationUrl);
+      return Object.freeze({ opened: true });
+    },
+  );
+  ipcMain.handle(
+    DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
+    async (event, authorizationUrl: unknown) => {
+      assertTrustedRenderer(event.senderFrame?.url ?? "");
+      if (!isAllowedDesktopRobinhoodAuthorizationUrl(authorizationUrl)) {
+        throw new Error("The Robinhood authorization request is invalid");
       }
       await shell.openExternal(authorizationUrl);
       return Object.freeze({ opened: true });

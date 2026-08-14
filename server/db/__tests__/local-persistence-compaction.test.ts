@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { compactLocalEnvironmentSituationDigestRows } from
+import {
+  compactLocalEnvironmentPersistenceTables,
+  compactLocalEnvironmentSituationDigestRows,
+} from
   "../local-persistence-compaction";
 
 const digest = (input: {
@@ -50,5 +53,68 @@ describe("local persistence telemetry compaction", () => {
       "digest:4",
       "digest:5",
     ]);
+  });
+
+  it("keeps referenced catalogs while bounding redundant connector telemetry", () => {
+    const catalogs = Array.from({ length: 8 }, (_, id) => ({
+      catalog_snapshot_id: `catalog:${id}`,
+      environment_binding_id: "binding:a",
+      frozen_at: new Date(Date.UTC(2026, 0, 1, 0, 0, id)).toISOString(),
+    }));
+    const events = Array.from({ length: 6 }, (_, id) => ({
+      event_id: `event:${id}`,
+      batch_id: `batch:${id}`,
+      environment_binding_id: "binding:a",
+      producer_plane: "player_embodiment",
+      observed_at: new Date(Date.UTC(2026, 0, 1, 0, 1, id)).toISOString(),
+    }));
+    const batches = Array.from({ length: 6 }, (_, id) => ({
+      batch_id: `batch:${id}`,
+    }));
+    const heartbeats = Array.from({ length: 5 }, (_, id) => ({
+      heartbeat_id: `heartbeat:${id}`,
+      action_authority_id: "authority:a",
+      received_at: new Date(Date.UTC(2026, 0, 1, 0, 2, id)).toISOString(),
+    }));
+
+    const result = compactLocalEnvironmentPersistenceTables({
+      helix_environment_capability_catalog_snapshots: catalogs,
+      helix_environment_probe_requests: [{ catalog_snapshot_id: "catalog:0" }],
+      helix_environment_action_requests: [{ catalog_snapshot_id: "catalog:1" }],
+      helix_environment_events: events,
+      helix_environment_event_batches: batches,
+      helix_environment_situation_digests: Array.from(
+        { length: 5 },
+        (_, id) => digest({ id }),
+      ),
+      helix_environment_action_connector_heartbeats: heartbeats,
+    }, {
+      maxCatalogRowsPerBinding: 2,
+      maxEventRowsPerBindingPlane: 3,
+      maxDigestRowsPerSubject: 2,
+      maxHeartbeatRowsPerAuthority: 2,
+    });
+
+    expect(
+      result.tables.helix_environment_capability_catalog_snapshots
+        .map((row) => row.catalog_snapshot_id)
+        .sort(),
+    ).toEqual(["catalog:0", "catalog:1", "catalog:6", "catalog:7"]);
+    expect(
+      result.tables.helix_environment_events.map((row) => row.event_id),
+    ).toEqual(["event:5", "event:4", "event:3"]);
+    expect(
+      result.tables.helix_environment_event_batches.map((row) => row.batch_id),
+    ).toEqual(["batch:3", "batch:4", "batch:5"]);
+    expect(result.tables.helix_environment_situation_digests).toHaveLength(2);
+    expect(result.tables.helix_environment_action_connector_heartbeats)
+      .toHaveLength(2);
+    expect(result.changedTables).toEqual(expect.arrayContaining([
+      "helix_environment_capability_catalog_snapshots",
+      "helix_environment_events",
+      "helix_environment_event_batches",
+      "helix_environment_situation_digests",
+      "helix_environment_action_connector_heartbeats",
+    ]));
   });
 });

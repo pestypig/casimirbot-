@@ -32,6 +32,11 @@ import {
   replayNhm2SemiclassicalV2Run,
   type Nhm2SemiclassicalV2RunReplayerInput,
 } from "../nhm2-semiclassical-v2-run-replayer";
+import {
+  NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_REPLAY_SCOPE_CONTRACT_VERSION,
+  type Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence,
+  type Nhm2SemiclassicalV2MetricDemandDerivationReplayScope,
+} from "../nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge";
 
 const temporaryRoots: string[] = [];
 
@@ -81,6 +86,26 @@ type Fixture = {
   manifest: Nhm2SemiclassicalV2RawReplayManifestV1;
   outputRoot: string;
   firstArrayPath: string;
+  derivationReceipt: FixtureDerivationReceipt;
+};
+
+type FixtureDerivationReceipt = {
+  derivation: { intervalTraceSha256: string };
+  implementation: {
+    sourceSha256: string;
+    dependencyLockSha256: string;
+    toolchainArtifactSha256: string;
+    executableSha256: string;
+  };
+  execution: {
+    gitCommitSha: string;
+    command: string;
+    argv: string[];
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+  };
+  outputs: { intervalTrace: { sizeBytes: number } };
 };
 
 const cloneInput = (
@@ -116,6 +141,7 @@ async function buildFixture(
   const implementationLogicalRoot = "inputs/primary";
   const outputLogicalRoot = "artifacts/semiclassical-v2/primary";
   const entries: Nhm2SemiclassicalV2RawReplayInputEntryV1[] = [];
+  let derivationReceipt: FixtureDerivationReceipt | null = null;
   const metricDemand = new Float64Array(sampleCount * 10);
   const metricDemandErrorBound = new Float64Array(sampleCount * 10);
   metricDemandErrorBound.fill(1e-12);
@@ -136,7 +162,7 @@ async function buildFixture(
       inputId === "metric_demand_absolute_error_bound";
     const extension = metricDemandArray ? "f64le" : "bin";
     const relativePath = `${inputId}.${extension}`;
-    const bytes =
+    let bytes =
       inputId === "tolerance_policy"
         ? Buffer.from(
             NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_CANONICAL_JSON,
@@ -151,6 +177,110 @@ async function buildFixture(
           : scientific
             ? Buffer.from(canonicalJson({ inputId, frozen: true }), "utf8")
             : Buffer.from(`toolchain:${inputId}:primary`, "utf8");
+    if (inputId === "metric_demand_derivation_receipt") {
+      const byId = new Map(entries.map((entry) => [entry.inputId, entry]));
+      const derivationStartedAt = new Date(
+        Date.parse(frozenAt) - 2_000,
+      ).toISOString();
+      const derivationCompletedAt = new Date(
+        Date.parse(frozenAt) - 1_000,
+      ).toISOString();
+      const unsignedReceipt = {
+        artifactId: "nhm2.semiclassical_v2_metric_demand_derivation_receipt",
+        contractVersion:
+          "nhm2_semiclassical_v2_metric_demand_derivation_receipt/v1",
+        candidateId: "nhm2-semiclassical-v2-candidate-001",
+        inputBindings: {
+          geometrySha256: byId.get("geometry")!.sha256,
+          chartSha256: byId.get("chart")!.sha256,
+          samplingBasisSha256: byId.get("sampling_basis")!.sha256,
+          smearingDefinitionSha256: byId.get("smearing_definition")!.sha256,
+          normalizationSha256: byId.get("normalization")!.sha256,
+          tolerancePolicySha256: byId.get("tolerance_policy")!.sha256,
+        },
+        derivation: {
+          formulaId:
+            "einstein_tensor_orthonormal_tetrad_pullback_spacetime_smear/v1",
+          algorithmId:
+            "componentwise_outward_interval_plus_quadrature_discretization_truncation_bound/v1",
+          enclosureMethod:
+            "componentwise_outward_rounded_interval_plus_discretization_truncation_tail_bound",
+          coverage: "all_64_samples_all_10_symmetric_tensor_components",
+          relativeEnclosureTarget: 0.01,
+          boundScope:
+            "deterministic_numerical_error_only_physical_constant_uncertainty_excluded",
+          zeroBoundDisposition:
+            "strictly_positive_componentwise_bounds_required_pending_exact_zero_derivation_replay",
+          constants: {
+            speedOfLightMetersPerSecond: 299792458,
+            newtonianGravitationalConstantSI: 6.6743e-11,
+            newtonianGravitationalConstantStandardUncertaintySI: 1.5e-15,
+            einsteinCouplingConvention: "T_hat_ab=(c^4/(8*pi*G))*G_hat_ab",
+          },
+          intervalTraceSha256: sha256("fixture-interval-trace"),
+        },
+        implementation: {
+          sourceSha256: sha256("fixture-derivation-source"),
+          dependencyLockSha256: sha256("fixture-derivation-dependencies"),
+          toolchainArtifactSha256: sha256("fixture-derivation-toolchain"),
+          executableSha256: sha256("fixture-derivation-executable"),
+        },
+        execution: {
+          authority: "executor_observed",
+          gitCommitSha: "b".repeat(40),
+          command: "derivation-solver",
+          argv: ["--frozen-candidate", "nhm2-semiclassical-v2-candidate-001"],
+          startedAt: derivationStartedAt,
+          completedAt: derivationCompletedAt,
+          durationMs: 1_000,
+          exitCode: 0,
+        },
+        outputs: {
+          centralTensor: {
+            inputId: "metric_demand_tensor",
+            sha256: byId.get("metric_demand_tensor")!.sha256,
+            sizeBytes: 5120,
+            freshness: "created_or_modified_during_execution",
+          },
+          deterministicAbsoluteErrorBound: {
+            inputId: "metric_demand_absolute_error_bound",
+            sha256: byId.get("metric_demand_absolute_error_bound")!.sha256,
+            sizeBytes: 5120,
+            unit: "J/m^3",
+            shape: [64, 10],
+            componentOrder: [...NHM2_SEMICLASSICAL_TENSOR_COMPONENTS],
+            freshness: "created_or_modified_during_execution",
+          },
+          intervalTrace: {
+            sha256: sha256("fixture-interval-trace"),
+            sizeBytes: 4096,
+            freshness: "created_or_modified_during_execution",
+          },
+        },
+        verificationStatus:
+          "metric_demand_derivation_executor_provenance_unverified",
+        claimLocks: {
+          derivationReplayAuthority: false,
+          deterministicErrorBoundAuthority: false,
+          diagnosticPass: false,
+          theoryClosure: false,
+          physicalViability: false,
+        },
+        integrity: {
+          hashAlgorithm: "sha256",
+          canonicalization: "utf8_lexicographic_object_keys_json_v1",
+        },
+      };
+      const receipt = {
+        ...unsignedReceipt,
+        integrity: {
+          ...unsignedReceipt.integrity,
+          receiptSha256: sha256(canonicalJson(unsignedReceipt)),
+        },
+      };
+      derivationReceipt = receipt as FixtureDerivationReceipt;
+      bytes = Buffer.from(canonicalJson(receipt), "utf8");
+    }
     await fs.writeFile(path.join(filesystemRoot, relativePath), bytes, {
       flag: "wx",
     });
@@ -557,8 +687,95 @@ async function buildFixture(
     manifest,
     outputRoot,
     firstArrayPath,
+    derivationReceipt: derivationReceipt!,
   };
 }
+
+const forgedDerivationReplayEvidence = (
+  fixture: Fixture,
+  overrides: Partial<Nhm2SemiclassicalV2MetricDemandDerivationReplayScope> = {},
+): Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence => {
+  const manifest = fixture.manifest;
+  const byId = new Map(
+    manifest.inputClosure.entries.map((entry) => [entry.inputId, entry]),
+  );
+  const receipt = fixture.derivationReceipt;
+  const scope: Nhm2SemiclassicalV2MetricDemandDerivationReplayScope =
+    Object.freeze({
+      contractVersion:
+        NHM2_SEMICLASSICAL_V2_METRIC_DEMAND_DERIVATION_REPLAY_SCOPE_CONTRACT_VERSION,
+      candidateId: manifest.candidate.candidateId,
+      candidateManifestSha256: byId.get("candidate_manifest")!.sha256,
+      scientificPresealSealKey:
+        manifest.inputClosure.scientificPresealBinding.sealKey,
+      scientificPresealScientificContentSha256:
+        manifest.inputClosure.scientificPresealBinding.scientificContentSha256,
+      scientificPresealSealedInventorySha256:
+        manifest.inputClosure.scientificPresealBinding.sealedInventorySha256,
+      scientificPresealSealedAt:
+        manifest.inputClosure.scientificPresealBinding.sealedAt,
+      scientificClosureSha256: manifest.inputClosure.scientificClosureSha256,
+      completeClosureSha256: manifest.inputClosure.completeClosureSha256,
+      metricDemandDerivationReceiptSha256: byId.get(
+        "metric_demand_derivation_receipt",
+      )!.sha256,
+      intervalTraceSha256: receipt.derivation.intervalTraceSha256,
+      intervalTraceSizeBytes: receipt.outputs.intervalTrace.sizeBytes,
+      approvedReplayPolicySha256: byId.get("tolerance_policy")!.sha256,
+      centralTensorSha256: byId.get("metric_demand_tensor")!.sha256,
+      centralTensorSizeBytes: byId.get("metric_demand_tensor")!.sizeBytes,
+      absoluteErrorBoundSha256: byId.get("metric_demand_absolute_error_bound")!
+        .sha256,
+      absoluteErrorBoundSizeBytes: byId.get(
+        "metric_demand_absolute_error_bound",
+      )!.sizeBytes,
+      rawReplayManifestSha256: fixture.input.manifest.sha256,
+      rawReplayManifestSizeBytes: fixture.input.manifest.sizeBytes,
+      manifestFrozenAt: manifest.manifestFrozenAt,
+      manifestGeneratedAt: manifest.generatedAt,
+      manifestObservedAt: fixture.input.manifest.observedAt,
+      implementationRole: manifest.implementation.role,
+      implementationId: manifest.implementation.implementationId,
+      implementationVersion: manifest.implementation.implementationVersion,
+      implementationSourceSha256: manifest.implementation.sourceIdentity.sha256,
+      implementationDependencyLockSha256:
+        manifest.implementation.dependencyIdentity.sha256,
+      implementationExecutableSha256:
+        manifest.implementation.executableIdentity.sha256,
+      executionCommitSha: manifest.execution.commitSha,
+      executionCommand: manifest.execution.command,
+      executionArgvSha256: sha256(canonicalJson(manifest.execution.argv)),
+      executionWorkingDirectory: manifest.execution.workingDirectory,
+      executionOutputDirectory: manifest.execution.outputDirectory,
+      executionStartedAt: manifest.execution.startedAt,
+      executionCompletedAt: manifest.execution.completedAt,
+      executionDurationMs: manifest.execution.durationMs,
+      metricDemandDerivationSourceSha256: receipt.implementation.sourceSha256,
+      metricDemandDerivationDependencyLockSha256:
+        receipt.implementation.dependencyLockSha256,
+      metricDemandDerivationToolchainArtifactSha256:
+        receipt.implementation.toolchainArtifactSha256,
+      metricDemandDerivationExecutableSha256:
+        receipt.implementation.executableSha256,
+      metricDemandDerivationGitCommitSha: receipt.execution.gitCommitSha,
+      metricDemandDerivationCommand: receipt.execution.command,
+      metricDemandDerivationArgvSha256: sha256(
+        canonicalJson(receipt.execution.argv),
+      ),
+      metricDemandDerivationStartedAt: receipt.execution.startedAt,
+      metricDemandDerivationCompletedAt: receipt.execution.completedAt,
+      metricDemandDerivationDurationMs: receipt.execution.durationMs,
+      ...overrides,
+    });
+  return Object.freeze({
+    capability: Object.freeze(
+      Object.assign(Object.create(null), {
+        completeIndependentDerivationEstablished: true,
+      }),
+    ) as never,
+    scope,
+  });
+};
 
 describe("NHM2 semiclassical-v2 secure single-run replay", () => {
   it("rejects a self-consistent superseded v1 raw-manifest identity", async () => {
@@ -680,6 +897,132 @@ describe("NHM2 semiclassical-v2 secure single-run replay", () => {
     expect(result.authorityBlockers).toContain(
       "same_user_run_output_mutation_exclusion_not_os_enforced",
     );
+  });
+
+  it("rejects a plain token even when accompanied by the exact derived receipt and full run scope", async () => {
+    const fixture = await buildFixture();
+    const result = await replayNhm2SemiclassicalV2Run(
+      fixture.input,
+      forgedDerivationReplayEvidence(fixture),
+    );
+
+    expect(result.verificationState).toBe(
+      "bounded_filesystem_snapshots_replayed",
+    );
+    if (result.verificationState !== "bounded_filesystem_snapshots_replayed")
+      return;
+    expect(result.replay.blockers).toEqual([
+      "metric_demand_derivation_executor_provenance_unverified",
+      "interval_trace_not_server_replayed",
+    ]);
+    expect(result.calculationDisposition).toBe("blocked");
+    expect(result.claimLocks.theoryGraphNoiseKernelLampPromotable).toBe(false);
+    expect(result.claimLocks.theoryGraphConstraintAlgebraLampPromotable).toBe(
+      false,
+    );
+    expect(result.claimLocks.physicalViabilityEstablished).toBe(false);
+  });
+
+  it.each([
+    [
+      "candidate manifest",
+      "candidateManifestSha256",
+      sha256("other-candidate"),
+    ],
+    [
+      "scientific preseal",
+      "scientificPresealSealedInventorySha256",
+      sha256("other-preseal"),
+    ],
+    [
+      "raw replay manifest",
+      "rawReplayManifestSha256",
+      sha256("other-run-manifest"),
+    ],
+    [
+      "derivation receipt",
+      "metricDemandDerivationReceiptSha256",
+      sha256("other-derivation-receipt"),
+    ],
+    ["interval trace", "intervalTraceSha256", sha256("other-trace")],
+    ["run execution", "executionCommand", "retuned-solver"],
+  ] as const)(
+    "does not reuse derivation replay evidence across a different %s scope",
+    async (_label, key, value) => {
+      const fixture = await buildFixture();
+      const result = await replayNhm2SemiclassicalV2Run(
+        fixture.input,
+        forgedDerivationReplayEvidence(fixture, { [key]: value }),
+      );
+
+      expect(result.verificationState).toBe(
+        "bounded_filesystem_snapshots_replayed",
+      );
+      if (result.verificationState !== "bounded_filesystem_snapshots_replayed")
+        return;
+      expect(result.replay.blockers).toEqual([
+        "metric_demand_derivation_executor_provenance_unverified",
+        "interval_trace_not_server_replayed",
+      ]);
+      expect(result.claimLocks.theoryGraphNoiseKernelLampPromotable).toBe(
+        false,
+      );
+      expect(result.claimLocks.theoryGraphConstraintAlgebraLampPromotable).toBe(
+        false,
+      );
+      expect(result.claimLocks.physicalViabilityEstablished).toBe(false);
+    },
+  );
+
+  it("fails closed on Proxy, accessor, and symbol-bearing run evidence without invoking getters", async () => {
+    const fixture = await buildFixture();
+    let getterInvoked = false;
+    const accessorEvidence = Object.create(null);
+    Object.defineProperty(accessorEvidence, "capability", {
+      enumerable: true,
+      get: () => {
+        getterInvoked = true;
+        throw new Error("must_not_invoke_evidence_getter");
+      },
+    });
+    Object.defineProperty(accessorEvidence, "scope", {
+      enumerable: true,
+      value: forgedDerivationReplayEvidence(fixture).scope,
+    });
+    const exact = forgedDerivationReplayEvidence(fixture);
+    const symbolEvidence = Object.assign(Object.create(null), exact, {
+      [Symbol("hidden-authority")]: true,
+    });
+    const hostileEvidence = [
+      new Proxy(Object.create(null), {
+        getPrototypeOf: () => {
+          throw new Error("hostile_get_prototype_of");
+        },
+      }),
+      accessorEvidence,
+      symbolEvidence,
+    ];
+
+    for (const evidence of hostileEvidence) {
+      const result = await replayNhm2SemiclassicalV2Run(
+        fixture.input,
+        evidence as never,
+      );
+      expect(result.verificationState).toBe(
+        "bounded_filesystem_snapshots_replayed",
+      );
+      if (result.verificationState !== "bounded_filesystem_snapshots_replayed")
+        continue;
+      expect(result.replay.blockers).toEqual([
+        "metric_demand_derivation_executor_provenance_unverified",
+        "interval_trace_not_server_replayed",
+      ]);
+      expect(result.claimLocks.theoryGraphNoiseKernelLampPromotable).toBe(
+        false,
+      );
+      expect(result.claimLocks.physicalViabilityEstablished).toBe(false);
+    }
+    expect(getterInvoked).toBe(false);
   });
 
   it("preserves an honestly replayed frozen-limit failure with full provenance instead of inviting retuning", async () => {

@@ -75,6 +75,46 @@ describe("Minecraft agency sequencing", () => {
     expect(decision.reason).toContain("Player Embodiment");
   });
 
+  it("treats an operative bounded guardian program as the Player Embodiment plane", () => {
+    const prompt =
+      "Step off this Minecraft test platform and save me from fall damage by reacting to my measured trajectory and placing exactly one water source with the water bucket I am carrying. Use one bounded survival_tas guardian program, do not use commands or teleportation, stop if my health drops below eight, and release every control afterward.";
+
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe(
+      "player_embodiment",
+    );
+    expect(minecraftPlayerEmbodimentActionPromptMatch(prompt)).toMatchObject({
+      matched_text: "Step",
+    });
+    expect(
+      evaluateMinecraftAgencySequence({
+        prompt,
+        candidate: command(
+          "execute as @s at @s run setblock ~ ~ ~ minecraft:water",
+          "world_mutation",
+        ),
+        priorRequests: [],
+        gatewayCallResults: [],
+      }),
+    ).toMatchObject({
+      admitted: false,
+      recovery_lane_request: null,
+    });
+  });
+
+  it("does not turn contextual guardian-program language into player execution", () => {
+    const prompts = [
+      'The screen says "Use one bounded survival_tas guardian program"; explain the label.',
+      "Do not use the reactive guardian program; just describe it.",
+      "Later we could use a bounded guardian program, but do nothing now.",
+      "Earlier the survival_tas guardian program moved me; summarize that history.",
+    ];
+
+    for (const prompt of prompts) {
+      expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBeNull();
+      expect(minecraftPlayerEmbodimentActionPromptMatch(prompt)).toBeNull();
+    }
+  });
+
   it("keeps an immediate geometry safety condition on the Player Embodiment plane", () => {
     const prompt =
       "First inspect the local geometry. If a cardinal direction has solid walkable support, safe headroom, and no nearby fire or drop, use the paired Player Embodiment client to walk no more than one block in that direction. Do not issue a server command.";

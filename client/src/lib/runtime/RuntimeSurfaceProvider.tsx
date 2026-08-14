@@ -24,6 +24,7 @@ type DesktopRuntimeBridge = Readonly<{
   clearMcpTunnel?: () => Promise<unknown>;
   openMcpTunnelAdmin?: () => Promise<unknown>;
   openAuth0AccountLink?: (authorizationUrl: unknown) => Promise<unknown>;
+  openRobinhoodOAuth?: (authorizationUrl: unknown) => Promise<unknown>;
   onAuth0AccountLinkCompletion?: (
     listener: (state: unknown) => void,
   ) => () => void;

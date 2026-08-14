@@ -21,7 +21,9 @@ export type HelixEnvironmentProbeType =
   | "hazard_check"
   | "inventory_check"
   | "local_map_summary"
-  | "spatial_region";
+  | "spatial_region"
+  | "registry_fact"
+  | "recipe_fact";
 
 export type HelixEnvironmentProbeRequest = {
   schema: typeof HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA;
@@ -44,9 +46,22 @@ export type HelixEnvironmentProbeRequest = {
       | "general"
       | "structure_planning"
       | "build_planning"
+      | "structure_verification"
       | "fire_safety"
       | "landing_safety"
+      | "movement_safety"
       | null;
+    requested_length?: number | null;
+    requested_height?: number | null;
+    orientation?: "north_south" | "east_west" | null;
+    relative_side?: "north" | "south" | "east" | "west" | null;
+    verification_from?: { x: number; y: number; z: number } | null;
+    verification_to?: { x: number; y: number; z: number } | null;
+    expected_block?: string | null;
+    registry_kind?: "block" | "item" | "entity_type" | "mob_effect" | null;
+    query_kind?: "recipe_id" | "output_item_id" | null;
+    resource_id?: string | null;
+    max_results?: number | null;
   };
   constraints: {
     read_only: true;
@@ -116,6 +131,8 @@ const probeTypeSchema = z.enum([
   "inventory_check",
   "local_map_summary",
   "spatial_region",
+  "registry_fact",
+  "recipe_fact",
 ]);
 
 export const helixEnvironmentProbeResultSchema = z.object({

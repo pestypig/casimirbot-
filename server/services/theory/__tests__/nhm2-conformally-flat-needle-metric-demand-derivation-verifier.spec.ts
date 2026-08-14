@@ -43,6 +43,7 @@ import {
   replayNhm2ConformallyFlatNeedleMetricDemandStructuralTrace,
   verifyNhm2ConformallyFlatNeedleMetricDemandDerivation,
 } from "../nhm2-conformally-flat-needle-metric-demand-derivation-verifier";
+import { bridgeNhm2ConformallyFlatNeedleMetricDemandDerivationVerification } from "../nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge";
 
 const sha = (label: string): string =>
   createHash("sha256").update(label, "utf8").digest("hex");
@@ -434,6 +435,13 @@ describe.sequential(
       // Structural consistency is inspectable, but the 1% gate is not met.
       const fixture = makeFixture();
       const artifact = verify(fixture);
+      const bridge =
+        bridgeNhm2ConformallyFlatNeedleMetricDemandDerivationVerification({
+          verificationArtifact: artifact,
+          centralTensorBytes: fixture.centralBytes,
+          absoluteErrorBoundBytes: fixture.errorBytes,
+          intervalTraceBytes: fixture.traceBytes,
+        });
 
       expect(artifact.status).toBe(
         "blocked_structural_replay_only_candidate_input_inadmissible",
@@ -494,6 +502,33 @@ describe.sequential(
         ),
       ).toBe(true);
       expect(Object.isFrozen(artifact)).toBe(true);
+      expect(bridge).toMatchObject({
+        status: "blocked",
+        authority: "diagnostic_binding_bridge_only",
+        capability: null,
+        structuralBinding: {
+          verificationArtifactIntegrityValid: true,
+          centralTensorBytesExact: true,
+          absoluteErrorBoundBytesExact: true,
+          intervalTraceBytesExact: true,
+          reportedTraceRelationsServerReplayed: true,
+        },
+        independentDerivation: {
+          complete: false,
+          transcendentalPrimitivesRecomputed: false,
+          cellwiseIntegrandsRecomputed: false,
+          intervalEnclosuresIndependentlyEstablished: false,
+        },
+      });
+      expect(bridge.blockers).toContain(
+        "independent_transcendental_derivation_not_implemented",
+      );
+      expect(bridge.blockers).toContain(
+        "opaque_content_replay_capability_not_issued",
+      );
+      expect(Object.values(bridge.claimLocks).every((value) => !value)).toBe(
+        true,
+      );
     });
 
     it("fails closed across the outward-squared one-percent boundary", () => {

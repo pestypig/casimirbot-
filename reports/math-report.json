@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-12T01:45:18.308Z",
-  "registryCount": 265,
+  "generatedAt": "2026-08-13T21:32:01.122Z",
+  "registryCount": 316,
   "coverage": {
     "exploratory": {
       "count": 23,
@@ -81,7 +81,7 @@
       ]
     },
     "diagnostic": {
-      "count": 190,
+      "count": 241,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -111,6 +111,26 @@
         "shared/contracts/nhm2-semiclassical-v2-metric-demand-producer.v1.ts",
         "server/services/theory/nhm2-semiclassical-v2-metric-demand-producer.ts",
         "shared/contracts/nhm2-conformally-flat-needle-scalar-reference.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+        "scripts/research/verify-nhm2-semiclassical-primary-source-byte-packet.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.ts",
+        "server/services/theory/nhm2-conformally-flat-needle-mean-rset-diagnostic-kernel.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+        "server/services/theory/nhm2-conformally-flat-needle-connected-noise-fourier-diagnostic.ts",
+        "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-block-diagnostic.ts",
+        "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-connected-noise-diagnostic-cubature-policy.v1.ts",
+        "server/services/theory/nhm2-conformally-flat-needle-connected-noise-full-array-diagnostic.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-fixed-background-run.v1.ts",
+        "shared/contracts/nhm2-conformally-flat-needle-fixed-background-pair-agreement.v1.ts",
+        "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+        "server/services/theory/nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge.ts",
+        "server/services/theory/nhm2-semiclassical-v2-scientific-root-observer.ts",
         "shared/contracts/nhm2-conformally-flat-needle-metric-demand-interval-producer.v1.ts",
         "server/services/theory/nhm2-conformally-flat-needle-metric-demand-interval-producer.ts",
         "shared/contracts/nhm2-conformally-flat-needle-metric-demand-derivation-verification.v1.ts",
@@ -119,12 +139,43 @@
         "shared/contracts/nhm2-adm-regulated-scalar-hybrid-failure-reference.v1.ts",
         "shared/contracts/nhm2-prolate-boson-star-coherent-candidate-plan.v1.ts",
         "shared/contracts/nhm2-semiclassical-v2-constraint-operand-replay.v1.ts",
+        "server/services/theory/nhm2-semiclassical-v2-constraint-operand-replayer.ts",
+        "server/services/theory/nhm2-semiclassical-v2-constraint-filesystem-replayer.ts",
         "shared/contracts/nhm2-semiclassical-v3-replay-epoch.v1.ts",
         "shared/contracts/nhm2-semiclassical-v3-constraint-operand-manifest.v1.ts",
         "server/services/theory/nhm2-semiclassical-v3-constraint-operand-replayer.ts",
         "shared/contracts/nhm2-semiclassical-v3-pair-numeric-agreement-policy.v1.ts",
         "shared/contracts/nhm2-prolate-boson-star-coherent-candidate-plan.v2.ts",
+        "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof.v1.ts",
+        "configs/research/nhm2-spherical-gl256-mpfr256-manifest.v1.json",
+        "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-regulator-definition.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-prescription.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-counterterms.v1.ts",
+        "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+        "tools/nhm2-spherical-boson-star-seed/verifier/f64le_inventory.py",
+        "tools/nhm2-spherical-boson-star-seed/verifier/dyadic_interval.py",
+        "tools/nhm2-spherical-boson-star-seed/verifier/canonical_json.py",
+        "tools/nhm2-spherical-boson-star-seed/verifier/hash_graph.py",
+        "tools/nhm2-spherical-boson-star-seed/verifier/forbidden_roles.py",
+        "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+        "tools/nhm2-spherical-boson-star-seed/verifier/primary_bundle.py",
+        "tools/nhm2-spherical-boson-star-branch/radial_residual.py",
         "shared/contracts/nhm2-prolate-boson-star-branch-bvp.v1.ts",
+        "tools/nhm2-boson-star-branch/covariant_residual.py",
+        "tools/nhm2-boson-star-branch/regular_residual.py",
+        "tools/nhm2-boson-star-branch/collocation_residual.py",
+        "tools/nhm2-boson-star-seed/producer/spectral.py",
         "shared/contracts/nhm2-prolate-boson-star-newtonian-seed.v1.ts",
         "shared/contracts/nhm2-prolate-boson-star-newtonian-seed-run-plan.v1.ts",
         "shared/contracts/nhm2-prolate-boson-star-newtonian-seed-run-plan.v2.ts",
@@ -361,7 +412,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 265,
+    "entriesWithUnits": 316,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -375,8 +426,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 190,
-        "withUnits": 190,
+        "total": 241,
+        "withUnits": 241,
         "missing": []
       },
       "certified": {
@@ -399,8 +450,8 @@
     ]
   },
   "autoGraph": {
-    "nodeCount": 3044,
-    "edgeCount": 7352
+    "nodeCount": 3131,
+    "edgeCount": 7555
   },
   "evidenceProfiles": [
     {

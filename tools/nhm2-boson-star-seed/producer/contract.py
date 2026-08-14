@@ -18,7 +18,23 @@ BOOTSTRAP_PATH = SOURCE_ROOT / "bootstrap.py"
 TOOLCHAIN_ROOT = PurePosixPath("/opt/nhm2-producer/toolchain")
 PYTHON_EXECUTABLE = TOOLCHAIN_ROOT / "python/bin/python3"
 INPUT_MANIFEST_PATH = PurePosixPath("/run/input/00-seed-run-request.v1.json")
+NUMERIC_MATERIALIZATION_POLICY_PATH = PurePosixPath(
+    "/run/input/08-numeric-materialization-policy-v1.canonical.json"
+)
+POSTPROJECTION_POLICY_PATH = PurePosixPath(
+    "/run/input/09-postprojection-policy-v1.canonical.json"
+)
 OUTPUT_ROOT = PurePosixPath("/run/staging")
+POSTPROJECTION_EVIDENCE_ROOT = PurePosixPath("/run/postprojection-evidence")
+
+NUMERIC_MATERIALIZATION_POLICY_CANONICAL_SIZE_BYTES = 243_240
+NUMERIC_MATERIALIZATION_POLICY_CANONICAL_PLAIN_SHA256 = (
+    "3ab28f4e777e201a0b6dac73cf637af901d28f2b86db590d18aced5d89e75b40"
+)
+POSTPROJECTION_POLICY_CANONICAL_SIZE_BYTES = 220_450
+POSTPROJECTION_POLICY_CANONICAL_PLAIN_SHA256 = (
+    "e5cc63fe4f22831ab18bc33ec8f608ea23cbe934cf2160f5be47f9bb2680d2c1"
+)
 
 EXACT_ARGV = (
     str(PYTHON_EXECUTABLE),
@@ -30,8 +46,14 @@ EXACT_ARGV = (
     str(BOOTSTRAP_PATH),
     "--input-manifest",
     str(INPUT_MANIFEST_PATH),
+    "--numeric-materialization-policy",
+    str(NUMERIC_MATERIALIZATION_POLICY_PATH),
+    "--postprojection-policy",
+    str(POSTPROJECTION_POLICY_PATH),
     "--output-root",
     str(OUTPUT_ROOT),
+    "--postprojection-evidence-root",
+    str(POSTPROJECTION_EVIDENCE_ROOT),
 )
 
 EXACT_ENVIRONMENT = {
@@ -175,10 +197,10 @@ AUTHORITATIVE_BINDINGS: Mapping[str, Mapping[str, object]] = {
     "runPlanBinding": _binding(
         artifact_id="nhm2.prolate_boson_star_newtonian_seed_run_plan",
         version_key="contractVersion",
-        version="nhm2_prolate_boson_star_newtonian_seed_run_plan/v1",
-        domain="nhm2-prolate-boson-star-newtonian-seed-run-plan/v1\n",
-        digest="3facc28fc62c9515a4c751f47ac9b6d90ab1179216d3d7c29c2a37b48e7e8f41",
-        size=261_169,
+        version="nhm2_prolate_boson_star_newtonian_seed_run_plan/v3",
+        domain="nhm2-prolate-boson-star-newtonian-seed-run-plan/v3\n",
+        digest="ac223c9b79b621b39d25fe9807492e030da916d8f2c6453a30b612de4ae6562c",
+        size=54_136,
     ),
     "candidatePlanV2Binding": _binding(
         artifact_id="nhm2.prolate_boson_star_coherent_candidate_plan",

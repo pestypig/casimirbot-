@@ -72,6 +72,14 @@ import {
   listProtectiveExitPreviews,
   reconcileProtectiveExitExecution,
 } from "../services/trading/protective-exit-store";
+import {
+  getLatestRobinhoodLiveProviderContractPreflight,
+  runRobinhoodLiveProviderContractPreflight,
+} from "../services/trading/live-provider-contract-preflight-store";
+import { readRobinhoodLiveAcceptanceReadiness } from
+  "../services/trading/live-acceptance-readiness";
+import { runRobinhoodReadAcceptance } from
+  "../services/trading/robinhood-read-acceptance";
 
 const identifier = z
   .string()
@@ -100,6 +108,11 @@ const readRequestSchema = z
     arguments: z.record(z.unknown()).optional(),
   })
   .strict();
+
+const readAcceptanceSchema = z.object({
+  quote_probe_symbol: z.string().trim().toUpperCase()
+    .regex(/^[A-Z][A-Z0-9.-]{0,9}$/u),
+}).strict();
 
 const createPaperAccountSchema = z.object({
   starting_equity_cents: z.number().int().positive().max(100_000_000),
@@ -159,6 +172,10 @@ const liveControlSchema = z.object({
 
 const livePresenceSchema = z.object({
   control_id: identifier,
+}).strict();
+
+const liveContractPreflightSchema = z.object({
+  confirmation_text: z.literal("CHECK ROBINHOOD LIVE CONTRACTS"),
 }).strict();
 
 const liveExecutionSchema = z.object({
@@ -307,10 +324,23 @@ const requireDeveloperBrokerageAccount = async (req: Request) => {
 
 export const brokerageConnectionsRouter = Router();
 
-brokerageConnectionsRouter.use(boundary.noStore);
-brokerageConnectionsRouter.use(boundary.enforceIpRateLimit);
-brokerageConnectionsRouter.use(boundary.enforceSameOrigin);
-brokerageConnectionsRouter.use(json({ limit: "24kb" }));
+// This router is mounted at /api/agi alongside unrelated adapter, room, and
+// environment routes. Keep the cookie/CSRF boundary scoped to the brokerage
+// surface so it cannot intercept a later sibling route before Express reaches
+// that route's own admission policy.
+brokerageConnectionsRouter.use("/brokerage-connections", boundary.noStore);
+brokerageConnectionsRouter.use(
+  "/brokerage-connections",
+  boundary.enforceIpRateLimit,
+);
+brokerageConnectionsRouter.use(
+  "/brokerage-connections",
+  boundary.enforceSameOrigin,
+);
+brokerageConnectionsRouter.use(
+  "/brokerage-connections",
+  json({ limit: "24kb" }),
+);
 
 brokerageConnectionsRouter.get(
   "/brokerage-connections",
@@ -450,10 +480,10 @@ brokerageConnectionsRouter.post(
     const body = protectiveExitExecutionSchema.safeParse(req.body);
     if (!connectionId.success || !roomId.success || !body.success ||
         body.data.placement_confirmation_text !==
-          `PLACE PROTECTIVE STOP ${body.success ? body.data.exit_approval_id : ""}`) {
+          `PLACE APPROVED EXIT ${body.success ? body.data.exit_approval_id : ""}`) {
       throw new PaperTradingError(
         "paper_trading_unavailable", 400,
-        "The exact protective-stop placement confirmation is required.",
+        "The exact approved-exit placement confirmation is required.",
       );
     }
     const context = await requireDeveloperBrokerageAccount(req);
@@ -496,10 +526,10 @@ brokerageConnectionsRouter.post(
     const body = liveReconciliationSchema.safeParse(req.body);
     if (!connectionId.success || !roomId.success || !exitExecutionId.success ||
         !body.success || body.data.confirmation_text !==
-          `RECONCILE PROTECTIVE STOP ${exitExecutionId.success ? exitExecutionId.data : ""}`) {
+          `RECONCILE LIVE EXIT ${exitExecutionId.success ? exitExecutionId.data : ""}`) {
       throw new PaperTradingError(
         "paper_trading_unavailable", 400,
-        "The exact protective-stop reconciliation confirmation is required.",
+        "The exact live-exit reconciliation confirmation is required.",
       );
     }
     const context = await requireDeveloperBrokerageAccount(req);
@@ -522,10 +552,10 @@ brokerageConnectionsRouter.post(
     const body = liveCancellationSchema.safeParse(req.body);
     if (!connectionId.success || !roomId.success || !exitExecutionId.success ||
         !body.success || body.data.confirmation_text !==
-          `CANCEL PROTECTIVE STOP ${exitExecutionId.success ? exitExecutionId.data : ""}`) {
+          `CANCEL LIVE EXIT ${exitExecutionId.success ? exitExecutionId.data : ""}`) {
       throw new PaperTradingError(
         "paper_trading_unavailable", 400,
-        "The exact protective-stop cancellation confirmation is required.",
+        "The exact live-exit cancellation confirmation is required.",
       );
     }
     const context = await requireDeveloperBrokerageAccount(req);
@@ -547,6 +577,78 @@ brokerageConnectionsRouter.post(
     res.status(201).json(await startRobinhoodOAuth({
       ownerProfileId: context.profile_id!,
       publicBaseUrl: resolveCasimirPublicBaseUrl(),
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-readiness",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    if (!connectionId.success || !roomId.success) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 400,
+        "The live acceptance-readiness request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.json(await readRobinhoodLiveAcceptanceReadiness({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/live-contract-preflight",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    if (!connectionId.success || !roomId.success) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 400,
+        "The live provider contract preflight request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    const receipt = await getLatestRobinhoodLiveProviderContractPreflight({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+    });
+    if (!receipt) {
+      res.status(404).json(errorPayload({
+        code: "live_provider_contract_preflight_not_found",
+        message: "No Robinhood live provider contract preflight has been recorded.",
+      }));
+      return;
+    }
+    res.json(receipt);
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/live-contract-preflight",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = liveContractPreflightSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 400,
+        "The live provider contract preflight confirmation is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await runRobinhoodLiveProviderContractPreflight({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
     }));
   }),
 );
@@ -678,10 +780,7 @@ brokerageConnectionsRouter.get(
         "The Robinhood authorization callback is incomplete.",
       );
     }
-    const context = await requireDeveloperBrokerageAccount(req);
-    boundary.enforceAccountRateLimit(res, context.profile_id!);
     const connection = await completeRobinhoodOAuth({
-      ownerProfileId: context.profile_id!,
       state: parsed.data.state,
       code: parsed.data.code,
     });
@@ -782,6 +881,30 @@ brokerageConnectionsRouter.post(
       roomId: roomId.data,
       toolName: body.data.tool_name,
       arguments: body.data.arguments,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/read-acceptance",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = readAcceptanceSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success) {
+      throw new RobinhoodConnectionError(
+        "brokerage_capability_denied",
+        400,
+        "The Robinhood read-acceptance request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await runRobinhoodReadAcceptance({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      quoteProbeSymbol: body.data.quote_probe_symbol,
     }));
   }),
 );

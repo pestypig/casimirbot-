@@ -16,6 +16,7 @@ import java.util.TreeSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,6 +27,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -47,6 +52,7 @@ public final class FabricProbeExecutor {
         String failureCode,
         String failureSummary
     ) {}
+    private record RecipeResultItems(List<String> itemIds, boolean complete) {}
 
     private final MinecraftServer server;
     private final HelixSensorConfig config;
@@ -80,6 +86,13 @@ public final class FabricProbeExecutor {
         if (!guard.isReadOnly(probe)) {
             return blocked(probe, "Probe is not read-only.");
         }
+        String probeType = String.valueOf(probe.get("probe_type"));
+        if ("registry_fact".equals(probeType)) {
+            return registryFact(probe);
+        }
+        if ("recipe_fact".equals(probeType)) {
+            return recipeFact(probe);
+        }
         PlayerResolution resolution = resolvePlayer(probe);
         if (resolution.player() == null) {
             return failed(
@@ -89,7 +102,7 @@ public final class FabricProbeExecutor {
             );
         }
         ServerPlayer player = resolution.player();
-        return switch (String.valueOf(probe.get("probe_type"))) {
+        return switch (probeType) {
             case "actor_status" -> actorStatus(probe, player);
             case "inventory_check" -> inventoryCheck(probe, player);
             case "nearby_entities" -> nearbyEntities(probe, player);
@@ -101,6 +114,178 @@ public final class FabricProbeExecutor {
             case "spatial_region" -> spatialRegion(probe, player);
             default -> blocked(probe, "Probe type is not implemented.");
         };
+    }
+
+    private Map<String, Object> registryFact(Map<String, Object> probe) {
+        Map<?, ?> target = target(probe);
+        String registryKind = text(target.get("registry_kind"));
+        String requestedResourceId = text(target.get("resource_id"));
+        ResourceLocation resourceId = ResourceLocation.tryParse(
+            requestedResourceId
+        );
+        if (resourceId == null) {
+            return failed(
+                probe,
+                "The registry fact request did not contain a valid namespaced resource identifier."
+            );
+        }
+        boolean registered = switch (registryKind) {
+            case "block" -> BuiltInRegistries.BLOCK.containsKey(resourceId);
+            case "item" -> BuiltInRegistries.ITEM.containsKey(resourceId);
+            case "entity_type" -> BuiltInRegistries.ENTITY_TYPE.containsKey(
+                resourceId
+            );
+            case "mob_effect" -> BuiltInRegistries.MOB_EFFECT.containsKey(
+                resourceId
+            );
+            default -> false;
+        };
+        if (
+            !Set.of("block", "item", "entity_type", "mob_effect").contains(
+                registryKind
+            )
+        ) {
+            return failed(
+                probe,
+                "The requested registry kind is not in the admitted registry fact set."
+            );
+        }
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("game_version", server.getServerVersion());
+        details.put("registry_kind", registryKind);
+        details.put("requested_resource_id", requestedResourceId);
+        details.put("registered", registered);
+        if (registered) {
+            details.put("canonical_resource_id", resourceId.toString());
+        }
+        return success(
+            probe,
+            registered
+                ? "The exact resource identifier exists in the live Minecraft registry."
+                : "The exact resource identifier does not exist in the live Minecraft registry.",
+            SensorScope.SENSOR_OBSERVABLE,
+            Map.of("confidence", 1.0, "details", details)
+        );
+    }
+
+    private Map<String, Object> recipeFact(Map<String, Object> probe) {
+        Map<?, ?> target = target(probe);
+        String queryKind = text(target.get("query_kind"));
+        String requestedResourceId = text(target.get("resource_id"));
+        ResourceLocation resourceId = ResourceLocation.tryParse(
+            requestedResourceId
+        );
+        if (resourceId == null) {
+            return failed(
+                probe,
+                "The recipe fact request did not contain a valid namespaced resource identifier."
+            );
+        }
+        if (!Set.of("recipe_id", "output_item_id").contains(queryKind)) {
+            return failed(
+                probe,
+                "The requested recipe query kind is not admitted."
+            );
+        }
+        int maxResults = boundedInteger(
+            target.get("max_results"),
+            8,
+            1,
+            16
+        );
+        List<RecipeHolder<?>> recipes = server
+            .getRecipeManager()
+            .getRecipes()
+            .stream()
+            .sorted(
+                Comparator.comparing(holder -> holder.id().location().toString())
+            )
+            .toList();
+        List<Map<String, Object>> matches = new ArrayList<>();
+        int matchCount = 0;
+        boolean outputScanComplete = true;
+        for (RecipeHolder<?> holder : recipes) {
+            RecipeResultItems resultItems = recipeResultItems(holder.value());
+            if (
+                "output_item_id".equals(queryKind) &&
+                !resultItems.complete()
+            ) {
+                outputScanComplete = false;
+            }
+            boolean matchesQuery = "recipe_id".equals(queryKind)
+                ? holder.id().location().equals(resourceId)
+                : resultItems.itemIds().contains(resourceId.toString());
+            if (!matchesQuery) continue;
+            matchCount++;
+            if (matches.size() >= maxResults) continue;
+            Recipe<?> recipe = holder.value();
+            Map<String, Object> match = new LinkedHashMap<>();
+            match.put("recipe_id", holder.id().location().toString());
+            match.put(
+                "recipe_type",
+                String.valueOf(BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType()))
+            );
+            match.put(
+                "serializer_id",
+                String.valueOf(
+                    BuiltInRegistries.RECIPE_SERIALIZER.getKey(
+                        recipe.getSerializer()
+                    )
+                )
+            );
+            match.put("group", boundedText(recipe.group(), 160));
+            match.put("result_item_ids", resultItems.itemIds());
+            match.put("result_resolution_complete", resultItems.complete());
+            matches.add(match);
+        }
+        boolean matchesComplete =
+            matchCount <= maxResults &&
+            ("recipe_id".equals(queryKind) || outputScanComplete);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("game_version", server.getServerVersion());
+        details.put("query_kind", queryKind);
+        details.put("requested_resource_id", requestedResourceId);
+        details.put("match_count", matchCount);
+        details.put("matches_complete", matchesComplete);
+        details.put("matches", matches);
+        return success(
+            probe,
+            matchCount == 0
+                ? "No matching recipe fact was found in the live recipe manager."
+                : "Live recipe facts were read from the current recipe manager.",
+            SensorScope.SENSOR_OBSERVABLE,
+            Map.of("confidence", 1.0, "details", details)
+        );
+    }
+
+    private static RecipeResultItems recipeResultItems(Recipe<?> recipe) {
+        Set<String> itemIds = new TreeSet<>();
+        boolean complete = !recipe.display().isEmpty();
+        for (RecipeDisplay display : recipe.display()) {
+            SlotDisplay result = display.result();
+            if (result instanceof SlotDisplay.ItemSlotDisplay itemDisplay) {
+                itemIds.add(
+                    String.valueOf(
+                        BuiltInRegistries.ITEM.getKey(
+                            itemDisplay.item().value()
+                        )
+                    )
+                );
+            } else if (
+                result instanceof SlotDisplay.ItemStackSlotDisplay stackDisplay
+            ) {
+                itemIds.add(
+                    String.valueOf(
+                        BuiltInRegistries.ITEM.getKey(
+                            stackDisplay.stack().getItem()
+                        )
+                    )
+                );
+            } else {
+                complete = false;
+            }
+        }
+        return new RecipeResultItems(List.copyOf(itemIds), complete);
     }
 
     private PlayerResolution resolvePlayer(Map<String, Object> probe) {
@@ -836,6 +1021,22 @@ public final class FabricProbeExecutor {
 
     private static Number number(Object value) {
         return value instanceof Number number ? number : null;
+    }
+
+    private static Map<?, ?> target(Map<String, Object> probe) {
+        Object value = probe.get("target");
+        return value instanceof Map<?, ?> map ? map : Map.of();
+    }
+
+    private static String text(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private static String boundedText(String value, int maximumLength) {
+        String normalized = value == null ? "" : value.trim();
+        return normalized.length() <= maximumLength
+            ? normalized
+            : normalized.substring(0, maximumLength);
     }
 
     private static int boundedInteger(

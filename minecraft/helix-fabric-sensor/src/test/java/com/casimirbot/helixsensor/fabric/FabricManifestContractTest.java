@@ -22,7 +22,7 @@ final class FabricManifestContractTest {
             config,
             FabricConnectorRuntime.ADAPTER_VERSION,
             Instant.now().toString(),
-            List.of("spatial_region")
+            List.of("spatial_region", "registry_fact", "recipe_fact")
         );
 
         assertEquals(
@@ -35,11 +35,13 @@ final class FabricManifestContractTest {
                 "hazard_check",
                 "inventory_check",
                 "local_map_summary",
-                "spatial_region"
+                "spatial_region",
+                "registry_fact",
+                "recipe_fact"
             ),
             manifest.get("supported_probe_types")
         );
-        assertEquals(9, ((List<?>) manifest.get("supported_probe_types")).size());
+        assertEquals(11, ((List<?>) manifest.get("supported_probe_types")).size());
         Map<String, Object> execution = HelixJson.asObject(
             manifest.get("execution_policy")
         );

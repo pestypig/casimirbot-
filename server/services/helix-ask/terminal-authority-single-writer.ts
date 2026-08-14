@@ -6633,7 +6633,7 @@ export const shouldRefreshHelixTerminalAuthorityAfterSatisfiedGoal = (input: {
   });
 };
 
-const unavailableRequestedCapabilityFailureForPayload = (
+export const unavailableRequestedCapabilityFailureForPayload = (
   payload: Record<string, unknown>,
 ): {
   errorCode: "capability_unavailable";
@@ -6664,6 +6664,13 @@ const unavailableRequestedCapabilityFailureForPayload = (
       ? requiredFamilies[0]
       : null);
   if (!requestedCapability) return null;
+  const requestedCapabilityIsFamilyFallback = Boolean(
+    !readString(admission?.requested_capability) &&
+      !readString(admission?.mandatory_next_tool_name) &&
+      exactRequiredCapabilities.length !== 1 &&
+      requiredFamilies.length === 1 &&
+      admittedFamilies.length === 1,
+  );
 
   const providerBridge = readRecord(payload.codex_native_provider_bridge);
   const nativeTurn = readRecord(providerBridge?.native_workstation_turn);
@@ -6675,7 +6682,27 @@ const unavailableRequestedCapabilityFailureForPayload = (
   const lockedTools = readStringArray(nativeTurn?.account_locked_tools);
   if (lockedTools.includes(requestedCapability)) return null;
 
-  const modelVisibleTools = readStringArray(nativeTurn?.model_visible_tools);
+  const compatibilityAllowedTools = readStringArray(
+    providerBridge?.allowed_workstation_tools,
+  );
+  // A required observation family is a coverage contract, not an executable
+  // capability identifier. When the compatibility provider still has a
+  // governed, route-scoped tool surface, a native empty-tool fallback cannot
+  // prove that the entire family or connector is unavailable. Preserve the
+  // actual provider/continuation failure instead of inventing a missing
+  // connector diagnosis.
+  if (
+    requestedCapabilityIsFamilyFallback &&
+    compatibilityAllowedTools.length > 0
+  ) {
+    return null;
+  }
+  const modelVisibleTools = Array.from(
+    new Set([
+      ...readStringArray(nativeTurn?.model_visible_tools),
+      ...compatibilityAllowedTools,
+    ]),
+  );
   const executedTools = readStringArray(nativeTurn?.executed_tools);
   if (
     modelVisibleTools.includes(requestedCapability) ||

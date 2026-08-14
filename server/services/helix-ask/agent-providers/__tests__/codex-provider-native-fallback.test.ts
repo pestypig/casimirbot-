@@ -21,6 +21,7 @@ import {
   hasBoundedScholarlyFollowupSourceEvidence,
   isSuccessfulImageLensObservationPacket,
   runCodexProcess,
+  shouldAttemptCodexCompatibilityGatewayRecovery,
 } from "../codex-provider";
 import { callWorkstationGatewayCapability } from "../../workstation-tool-gateway/registry";
 
@@ -95,6 +96,32 @@ describe("Codex native compatibility fallback", () => {
       failReason: "codex_process_aborted",
       bin: null,
     });
+  });
+
+  it("does not substitute a planner-derived action for a runtime-authored schema failure", () => {
+    expect(
+      shouldAttemptCodexCompatibilityGatewayRecovery({
+        nativeProviderBridgeAttempted: true,
+        nativeTurnEligibleForTerminal: false,
+        nativeGatewayCallResults: [{ ok: false }],
+        nativeUnobservedCapabilityIds: [],
+        nativeRouteViolationCapabilityIds: [],
+        compatibilityGatewayRecoveryAvailable: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("retains compatibility recovery for a transport failure with no runtime-authored action", () => {
+    expect(
+      shouldAttemptCodexCompatibilityGatewayRecovery({
+        nativeProviderBridgeAttempted: true,
+        nativeTurnEligibleForTerminal: false,
+        nativeGatewayCallResults: [],
+        nativeUnobservedCapabilityIds: [],
+        nativeRouteViolationCapabilityIds: [],
+        compatibilityGatewayRecoveryAvailable: true,
+      }),
+    ).toBe(true);
   });
 
   it("keeps workspace status fields visible while bounding the model prompt", () => {

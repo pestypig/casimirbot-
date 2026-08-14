@@ -13,6 +13,8 @@ Capabilities:
 - `com.casimirbot.minecraft.line_of_sight.check`
 - `com.casimirbot.minecraft.crop_state.read`
 - `com.casimirbot.minecraft.reachability.check`
+- `com.casimirbot.minecraft.registry.fact.read`
+- `com.casimirbot.minecraft.recipe.fact.read`
 
 Internal action: `room.environment.probe`
 
@@ -60,6 +62,14 @@ that actor. Line of sight and geometric reachability use `position` plus an
 exact `{x,y,z}` object. Crop state uses either `current_focus` or
 `position`; a position object is required only for the positioned form.
 `freshness_requirement_ms` is optional.
+
+Registry facts instead require `registry_kind` plus one exact namespaced
+`resource_id`. Recipe facts require `query_kind` plus one exact namespaced
+`resource_id`, with an optional bounded `max_results` of at most 16. These two
+Fabric-only probes read the live running registry or recipe manager and report
+the game version. They do not enumerate arbitrary registry contents, expose
+recipe JSON, craft, execute commands, or mutate the world. Recipe displays that
+cannot be resolved conservatively are marked incomplete rather than inferred.
 
 The model must not provide a room, source, world, device, installation,
 environment binding, address, credential, producer epoch, adapter identity,

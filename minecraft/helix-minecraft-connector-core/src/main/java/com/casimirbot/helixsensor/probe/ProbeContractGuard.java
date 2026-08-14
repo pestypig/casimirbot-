@@ -22,7 +22,9 @@ public final class ProbeContractGuard {
         "crop_state",
         "hazard_check",
         "local_map_summary",
-        "spatial_region"
+        "spatial_region",
+        "registry_fact",
+        "recipe_fact"
     );
 
     public boolean isForbiddenAction(Map<String, Object> probe) {

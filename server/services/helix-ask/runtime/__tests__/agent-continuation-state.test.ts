@@ -416,6 +416,76 @@ describe("agent continuation state", () => {
     expect(state.allowed_decisions).not.toContain("answer");
   });
 
+  it("continues Codex repair when a guardian transport settled but semantic action evidence remains missing", () => {
+    const capability = "com.casimirbot.minecraft.player.guardian.execute";
+    const subgoalId = "ask:continuation:guardian:semantic-action";
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        final_status: "final_answer",
+        goal_satisfaction_evaluation: {
+          satisfaction: "satisfied",
+        },
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          required_observation_families: ["live_environment"],
+          observed_families: ["live_environment"],
+          missing_observation_families: [],
+          required_capabilities: [],
+          missing_required_capabilities: [capability],
+          missing_compound_subgoal_ids: [subgoalId],
+          missing_required_capability_any_of_groups: [{
+            group_id: "minecraft.player_embodiment.action",
+            satisfied: false,
+          }],
+          compound_subgoal_ledger: [{
+            subgoal_id: subgoalId,
+            requested_capability: capability,
+            runtime_capability: capability,
+            selected_args: {},
+            satisfaction: "pending",
+            rail_status: "pending",
+            rail_failure_code: "subgoal_observation_missing",
+          }],
+          complete: false,
+        },
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation:guardian-transport-settlement",
+      trigger: "post_attempt",
+      lastAttempt: {
+        capability_id: capability,
+        status: "succeeded",
+        failure_code: "gateway_observation_requires_provider_reasoning_reentry",
+      },
+      capabilityProposal: {
+        allowed: true,
+        admittedCapabilityIds: [capability],
+      },
+    });
+
+    expect(state.goal).toMatchObject({
+      status: "in_progress",
+      satisfied: false,
+      terminal_product_allowed: false,
+    });
+    expect(state.missing_requirement_ids).toEqual(
+      expect.arrayContaining([capability, subgoalId]),
+    );
+    expect(state.next_admissible_affordances).toEqual([
+      expect.objectContaining({
+        capability_id: capability,
+        admissible: true,
+        // The no-op transport occurrence is retained in provenance. Codex may
+        // still author a repaired call with new arguments while the semantic
+        // requirement remains unresolved.
+        tried: true,
+      }),
+    ]);
+    expect(state.allowed_decisions).toContain("act");
+    expect(state.allowed_decisions).not.toContain("answer");
+  });
+
   it("marks new observations and resolved requirements as progress after an attempt", () => {
     const firstPayload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {
@@ -1533,6 +1603,72 @@ describe("agent continuation state", () => {
     });
     expect(state.allowed_decisions).toContain("retry");
     expect(state.allowed_decisions).not.toContain("ask_user");
+  });
+
+  it("classifies a frozen input-schema rejection as repairable invalid arguments", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: [
+          "com.casimirbot.minecraft.player.guardian.execute",
+        ],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [],
+    };
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        capability_id:
+          "com.casimirbot.minecraft.player.guardian.execute",
+        status: "failed",
+        failure_code: "precondition_failed",
+        failure_message:
+          "Minecraft player-action arguments did not satisfy the admitted input schema: $.program_schema: Missing required property program_schema.; $.target_entity_selector: Property target_entity_selector is not admitted by the frozen schema.",
+      },
+    });
+
+    expect(state.last_attempt).toMatchObject({
+      failure_class: "invalid_args",
+      failure_code: "precondition_failed",
+      retryability: "retryable",
+    });
+    expect(state.allowed_decisions).toContain("retry");
+  });
+
+  it("classifies a trusted semantic-contract rejection as repairable invalid arguments", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: [
+          "com.casimirbot.minecraft.player.guardian.execute",
+        ],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [],
+    };
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "post_attempt",
+      lastAttempt: {
+        capability_id:
+          "com.casimirbot.minecraft.player.guardian.execute",
+        status: "failed",
+        failure_code: "precondition_failed",
+        failure_message:
+          "The concurrent Minecraft guardian program failed its trusted contract: interrupts.0.activate_lane_id: An interrupt must activate an interrupt-only lane.",
+      },
+    });
+
+    expect(state.last_attempt).toMatchObject({
+      failure_class: "invalid_args",
+      failure_code: "precondition_failed",
+      retryability: "retryable",
+    });
+    expect(state.allowed_decisions).toContain("retry");
   });
 
   it("turns a recoverable terminal rejection into another non-terminal observation", () => {

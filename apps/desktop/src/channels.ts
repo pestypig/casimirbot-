@@ -26,3 +26,5 @@ export const DESKTOP_AUTH0_ACCOUNT_LINK_OPEN_CHANNEL =
   "casimir-desktop:auth0-account-link-open";
 export const DESKTOP_AUTH0_ACCOUNT_LINK_COMPLETION_CHANNEL =
   "casimir-desktop:auth0-account-link-completion";
+export const DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL =
+  "casimir-desktop:robinhood-oauth-open";

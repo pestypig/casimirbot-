@@ -11,6 +11,7 @@ import type { HelixWorkstationGatewayCallResult } from "../../workstation-tool-g
 import { HELIX_SCHOLARLY_NUMERIC_PARAMETER_EXTRACT_CAPABILITY } from "@shared/helix-scholarly-research-observation";
 import { enrichScholarlyNumericArgumentsFromGatewayResults } from "../scholarly-gateway-evidence";
 import { buildSharedLiveRoomGatewayMutationApprovalPlanV1 } from "../../workstation-tool-gateway/shared-live-room";
+import { buildMinecraftLocalLifecycleApprovalPlanV1 } from "../../workstation-tool-gateway/minecraft-local-lifecycle";
 import {
   runCodexNativeAppServerTurn,
   type CodexNativeAppServerTurnResult,
@@ -22,6 +23,7 @@ import {
   findModelSuppliedRuntimeApprovalControlField,
   isCodexNativeRuntimeApprovalCapability,
   isCodexNativeRuntimeApprovalStartCapability,
+  isCodexNativeMinecraftLocalLifecycleApprovalCapability,
   isCodexNativeSharedLiveRoomMutationApprovalCapability,
   readCodexNativeTrustedRuntimeStartPlans,
   resolveCodexNativeTrustedRuntimeStartPlan,
@@ -64,6 +66,7 @@ export type CodexNativeWorkstationTurnResult = {
     runtime_approval_replay_protection:
       "durable_atomic" | "process_local" | "unavailable" | null;
     runtime_approval_start_tools: string[];
+    governed_direct_act_tools: string[];
     account_locked_tools: string[];
     goal_allowed_tools: string[] | null;
     route_prompt_hash: string;
@@ -84,6 +87,9 @@ export type CodexNativeWorkstationTurnResult = {
     native_turn_id: string | null;
     native_final_item_id: string | null;
     native_turn_status: string | null;
+    native_error_code: string | null;
+    native_error_http_status: number | null;
+    native_error_message: string | null;
     terminal_candidate_present: boolean;
     turn_lifecycle: HelixTurnLifecycle | null;
     compatibility_fallback_required: boolean;
@@ -234,6 +240,9 @@ export const runCodexNativeWorkstationTurn = async (input: {
           capability.permission_profile_required === "act" &&
           (isCodexNativeSharedLiveRoomMutationApprovalCapability(
             capability.capability_id,
+          ) ||
+          isCodexNativeMinecraftLocalLifecycleApprovalCapability(
+            capability.capability_id,
           )
             ? capability.mutating === true
             : capability.mutating === false &&
@@ -244,8 +253,38 @@ export const runCodexNativeWorkstationTurn = async (input: {
               }).length > 0),
       )
     : [];
+  // Helix has already reduced an affirmative operator turn to the exact
+  // capability IDs in `allowedWorkstationTools`.  Do not silently erase a
+  // governed Player Embodiment (or other bounded act-plane) capability merely
+  // because its intended effect mutates the connected environment.  Showing
+  // the capability to native Codex grants no direct host access: the runtime
+  // can only propose and call the typed tool, while route validation, account
+  // policy, schema validation, room/player/lease authority, connector
+  // freshness, provenance, and manual override remain enforced by the gateway.
+  //
+  // Confirmation-gated capabilities remain on the separate runtime-approval
+  // seam above.  Wildcards and an omitted goal list never expose direct acts.
+  const governedDirectActCapabilities =
+    input.allowedWorkstationTools != null &&
+    !exactGoalTools.has("*") &&
+    input.accountContext.trusted_account_session === true &&
+    requestedMode === "act" &&
+    listing.policy_gate.effective_mode === "act"
+      ? listing.capabilities.filter(
+          (capability) =>
+            exactGoalTools.has(capability.capability_id) &&
+            capability.mutating === true &&
+            capability.code_mutation === false &&
+            capability.shell_access === false &&
+            capability.requires_confirmation === false &&
+            capability.permission_profile_required === "act",
+        )
+      : [];
   const modelEligibleCapabilityIds = new Set([
     ...nonMutatingCapabilities.map((capability) => capability.capability_id),
+    ...governedDirectActCapabilities.map(
+      (capability) => capability.capability_id,
+    ),
     ...runtimeApprovalStartCapabilities.map(
       (capability) => capability.capability_id,
     ),
@@ -303,6 +342,9 @@ export const runCodexNativeWorkstationTurn = async (input: {
     runtime_approval_start_tools: runtimeApprovalStartCapabilities.map(
       (capability) => capability.capability_id,
     ),
+    governed_direct_act_tools: governedDirectActCapabilities.map(
+      (capability) => capability.capability_id,
+    ),
     account_locked_tools: listing.locked_capabilities.map(
       (capability) => capability.capability_id,
     ),
@@ -325,6 +367,9 @@ export const runCodexNativeWorkstationTurn = async (input: {
     native_turn_id: null,
     native_final_item_id: null,
     native_turn_status: null,
+    native_error_code: null,
+    native_error_http_status: null,
+    native_error_message: null,
     terminal_candidate_present: false,
     turn_lifecycle: null,
     compatibility_fallback_required:
@@ -565,6 +610,31 @@ export const runCodexNativeWorkstationTurn = async (input: {
               observationRef: `${input.turnId}:${capabilityId}:${iteration}:runtime_approval_blocked`,
             };
           }
+        } else if (
+          isCodexNativeMinecraftLocalLifecycleApprovalCapability(capabilityId)
+        ) {
+          try {
+            const lifecyclePlan =
+              await buildMinecraftLocalLifecycleApprovalPlanV1({ args });
+            trustedPlan = {
+              capabilityId,
+              planId: lifecyclePlan.planId,
+              preparedRequestId: null,
+              sealedInputSha256: lifecyclePlan.sealedInputSha256,
+              gatewayArguments: lifecyclePlan.canonicalArguments,
+            };
+          } catch {
+            return {
+              ok: false,
+              content: buildRuntimeApprovalOutcome({
+                capabilityId,
+                planId: null,
+                status: "failed",
+                issue: "runtime_approval_mutation_arguments_invalid",
+              }),
+              observationRef: `${input.turnId}:${capabilityId}:${iteration}:runtime_approval_blocked`,
+            };
+          }
         } else if (isCodexNativeRuntimeApprovalStartCapability(capabilityId)) {
           trustedPlan = resolveCodexNativeTrustedRuntimeStartPlan({
             capabilityId,
@@ -726,6 +796,9 @@ export const runCodexNativeWorkstationTurn = async (input: {
       native_turn_id: native.debug.native_turn_id,
       native_final_item_id: native.debug.native_final_item_id,
       native_turn_status: native.debug.native_turn_status,
+      native_error_code: native.debug.native_error_code,
+      native_error_http_status: native.debug.native_error_http_status,
+      native_error_message: native.debug.native_error_message,
       terminal_candidate_present: native.debug.terminal_candidate_present,
       turn_lifecycle: native.debug.turn_lifecycle,
       compatibility_fallback_required: !native.ok,

@@ -5,6 +5,7 @@ import static com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,6 +61,12 @@ final class NativeFabricWorkflowEngine {
     private boolean inventoryActionIssued;
     private int inventoryCountBeforeIssued;
     private boolean baritoneGoalOwned;
+    private Map<String, Object> latestPlacementForecast = Map.of();
+    private Map<String, Object> dynamicPlacementBindingEvidence = Map.of();
+    private BlockPos dynamicPlacementTarget;
+    private int placementInventoryMutationCount;
+    private HandObservation placementHandBefore = HandObservation.unavailable();
+    private HandObservation placementHandAfter = HandObservation.unavailable();
     private final Set<Long> completedBlockTargets = new HashSet<>();
 
     NativeFabricWorkflowEngine(
@@ -320,9 +327,85 @@ final class NativeFabricWorkflowEngine {
     private WorkflowStep place(long actionTicks) {
         LocalPlayer player = requirePlayer();
         String blockId = text(arguments, "block_id");
-        List<BlockPos> positions = positions(arguments.get("positions"));
+        String placementMethod = text(arguments, "placement_method");
+        if (placementMethod.isBlank()) placementMethod = "block_item";
+        String sourceItemId = "item_use".equals(placementMethod)
+            ? text(arguments, "source_item_id")
+            : blockId;
+        String handName = "item_use".equals(placementMethod)
+            ? text(arguments, "hand")
+            : "main_hand";
+        Map<String, Object> positionBinding = optionalObject(
+            arguments.get("position_binding")
+        );
+        List<BlockPos> positions;
+        if (!positionBinding.isEmpty()) {
+            if (!"predicted_collision_cell".equals(text(positionBinding, "binding_kind"))) {
+                return WorkflowStep.failed(
+                    "The requested placement binding kind is not supported by this client.",
+                    Map.of("position_binding_kind", text(positionBinding, "binding_kind"))
+                );
+            }
+            int horizonTicks = integer(positionBinding, "horizon_ticks");
+            double maximumDistance = number(positionBinding, "max_distance_blocks");
+            boolean requireReplaceable = bool(
+                positionBinding,
+                "require_replaceable"
+            );
+            if (dynamicPlacementTarget == null) {
+                latestPlacementForecast = bridge.predictedCollisionPlacementForecast(
+                    player,
+                    horizonTicks,
+                    maximumDistance,
+                    requireReplaceable
+                );
+                Map<String, Object> resolved = optionalObject(
+                    latestPlacementForecast.get("target_position")
+                );
+                if (
+                    latestPlacementForecast.get("predicted_reachable") != Boolean.TRUE ||
+                    resolved.isEmpty()
+                ) {
+                    return WorkflowStep.running(
+                        0.0,
+                        "The bounded placement binding is waiting for a reachable predicted collision cell.",
+                        withPlacementForecast(Map.of(
+                            "block_id", blockId,
+                            "verified_positions", completedCount,
+                            "requested_positions", 1,
+                            "world_mutations_performed", worldMutationCount
+                        ))
+                    );
+                }
+                dynamicPlacementTarget = new BlockPos(
+                    integer(resolved, "x"),
+                    integer(resolved, "y"),
+                    integer(resolved, "z")
+                );
+                dynamicPlacementBindingEvidence = latestPlacementForecast;
+                if (!dynamicPlacementTargetAdmitted(dynamicPlacementTarget, blockId)) {
+                    return WorkflowStep.failed(
+                        "The resolved predicted collision cell is outside the admitted mutation scope.",
+                        withPlacementForecast(Map.of(
+                            "block_id", blockId,
+                            "target_position", position(dynamicPlacementTarget),
+                            "position_binding_kind", "predicted_collision_cell"
+                        ))
+                    );
+                }
+            }
+            positions = List.of(dynamicPlacementTarget);
+        } else {
+            positions = positions(arguments.get("positions"));
+        }
         while (placeIndex < positions.size() && blockMatches(positions.get(placeIndex), blockId)) {
-            if (blockActionStarted) worldMutationCount++;
+            if (blockActionStarted) {
+                placementHandAfter = bridge.observeHand(handName);
+                if (handChanged(placementHandBefore, placementHandAfter)) {
+                    placementInventoryMutationCount++;
+                }
+                worldMutationCount++;
+            }
             placeIndex++;
             completedCount++;
             blockActionStarted = false;
@@ -331,47 +414,117 @@ final class NativeFabricWorkflowEngine {
         if (placeIndex >= positions.size()) {
             return WorkflowStep.succeeded(
                 "Every admitted placement position now matches the requested block.",
-                Map.of(
+                withPlacementForecast(Map.of(
                     "block_id", blockId,
                     "verified_positions", completedCount,
                     "requested_positions", positions.size(),
-                    "world_mutations_performed", worldMutationCount
-                )
+                    "world_mutations_performed", worldMutationCount,
+                    "inventory_mutations_performed", placementInventoryMutationCount
+                ))
             );
         }
         BlockPos target = positions.get(placeIndex);
+        latestPlacementForecast = dynamicPlacementTarget == null
+            ? bridge.placementForecast(player, target, 10)
+            : mergePlacementForecast(
+                bridge.placementForecast(
+                    player,
+                    target,
+                    integer(positionBinding, "horizon_ticks")
+                ),
+                dynamicPlacementBindingEvidence
+            );
         BlockState existing = minecraft.level.getBlockState(target);
         if (!existing.canBeReplaced()) {
             return WorkflowStep.failed(
                 "An admitted placement position is occupied by a different non-replaceable block.",
-                Map.of("block_id", blockId, "target_position", position(target), "existing_block", blockId(existing))
+                withPlacementForecast(Map.of(
+                    "block_id", blockId,
+                    "target_position", position(target),
+                    "existing_block", blockId(existing)
+                ))
             );
         }
-        if (inventoryCount(blockId) < 1) {
+        HandObservation held = bridge.observeHand(handName);
+        boolean sourceAvailable =
+            (held.available() && sourceItemId.equals(held.itemId())) ||
+            inventoryCount(sourceItemId) > 0;
+        if (!sourceAvailable) {
             return WorkflowStep.failed(
-                "The paired player does not hold the requested placement block.",
-                Map.of("block_id", blockId, "remaining_positions", positions.size() - placeIndex)
+                "The paired player does not hold the declared placement source item.",
+                withPlacementForecast(Map.of(
+                    "block_id", blockId,
+                    "source_item_id", sourceItemId,
+                    "remaining_positions", positions.size() - placeIndex
+                ))
             );
         }
-        double distance = eyeDistance(player, target);
+        double distance = placementInteractionDistance(player, target);
+        if (!Double.isFinite(distance)) {
+            return WorkflowStep.failed(
+                "No valid support face exists for the declared placement target.",
+                withPlacementForecast(Map.of(
+                    "block_id", blockId,
+                    "target_position", position(target)
+                ))
+            );
+        }
         if (distance > player.blockInteractionRange()) {
-            navigateToward(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, 3.5, false);
+            if (dynamicPlacementTarget != null && !player.onGround()) {
+                // Gravity is already moving the player toward the predicted
+                // collision cell. Adding horizontal navigation here changes
+                // that prediction and can move the admitted target out from
+                // under the player before a clutch is reachable.
+                bridge.applyMovement(MovementInput.released());
+            } else {
+                navigateToward(
+                    target.getX() + 0.5,
+                    target.getY(),
+                    target.getZ() + 0.5,
+                    3.5,
+                    false
+                );
+            }
         } else {
             bridge.applyMovement(MovementInput.released());
             bridge.lookAt(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5, 18.0F);
             if (!blockActionStarted) {
-                blockActionStarted = placeBlock(blockId, target);
+                if (!bridge.equip(sourceItemId, handName)) {
+                    return WorkflowStep.failed(
+                        "The declared placement source item could not be equipped in the admitted hand.",
+                        withPlacementForecast(Map.of(
+                            "block_id", blockId,
+                            "source_item_id", sourceItemId,
+                            "hand", handName,
+                            "target_position", position(target)
+                        ))
+                    );
+                }
+                placementHandBefore = bridge.observeHand(handName);
+                blockActionStarted = usePlacementItem(
+                    target,
+                    handName,
+                    placementMethod
+                );
                 if (!blockActionStarted) {
                     return WorkflowStep.failed(
-                        "No valid support face accepted the requested placement.",
-                        Map.of("block_id", blockId, "target_position", position(target))
+                        "No valid support face accepted the declared placement item use.",
+                        withPlacementForecast(Map.of(
+                            "block_id", blockId,
+                            "source_item_id", sourceItemId,
+                            "hand", handName,
+                            "target_position", position(target)
+                        ))
                     );
                 }
             }
             if (++pendingTicks > 20 && !blockMatches(target, blockId)) {
                 return WorkflowStep.failed(
                     "The server did not confirm the requested block placement.",
-                    Map.of("block_id", blockId, "target_position", position(target))
+                    withPlacementForecast(Map.of(
+                        "block_id", blockId,
+                        "target_position", position(target)
+                    ))
                 );
             }
         }
@@ -380,13 +533,14 @@ final class NativeFabricWorkflowEngine {
             distance > player.blockInteractionRange()
                 ? "The paired player is moving within legitimate placement range."
                 : "The client submitted one admitted block placement and is awaiting measured world state.",
-            Map.of(
+            withPlacementForecast(Map.of(
                 "block_id", blockId,
                 "verified_positions", completedCount,
                 "requested_positions", positions.size(),
                 "world_mutations_performed", worldMutationCount,
+                "inventory_mutations_performed", placementInventoryMutationCount,
                 "target_position", position(target)
-            )
+            ))
         );
     }
 
@@ -606,6 +760,14 @@ final class NativeFabricWorkflowEngine {
         return null;
     }
 
+    boolean isCraftable(String outputId) {
+        LocalPlayer player = minecraft.player;
+        if (player == null || minecraft.level == null) return false;
+        AbstractContainerMenu menu = player.containerMenu;
+        if (menu != player.inventoryMenu && !(menu instanceof CraftingMenu)) return false;
+        return findCraftableRecipe(player, outputId, menu instanceof CraftingMenu) != null;
+    }
+
     private static boolean recipeFits(RecipeDisplayEntry entry, boolean largeGrid) {
         if (largeGrid) return true;
         if (entry.display() instanceof ShapedCraftingRecipeDisplay shaped) {
@@ -617,26 +779,87 @@ final class NativeFabricWorkflowEngine {
         return false;
     }
 
-    private boolean placeBlock(String blockId, BlockPos target) {
+    private boolean usePlacementItem(
+        BlockPos target,
+        String handName,
+        String placementMethod
+    ) {
         LocalPlayer player = requirePlayer();
-        int inventorySlot = findInventorySlot(player.getInventory(), blockId);
-        if (inventorySlot < 0) return false;
-        if (inventorySlot < Inventory.getSelectionSize()) player.getInventory().setSelectedSlot(inventorySlot);
-        else player.getInventory().pickSlot(inventorySlot);
+        InteractionHand hand = "off_hand".equals(handName)
+            ? InteractionHand.OFF_HAND
+            : InteractionHand.MAIN_HAND;
         for (Direction direction : Direction.values()) {
             BlockPos support = target.relative(direction);
             BlockState supportState = minecraft.level.getBlockState(support);
             if (supportState.isAir() || supportState.canBeReplaced()) continue;
+            Direction supportFace = direction.getOpposite();
+            Vec3 hitLocation = supportFaceHitLocation(support, supportFace);
             BlockHitResult hit = new BlockHitResult(
-                Vec3.atCenterOf(target),
-                direction.getOpposite(),
+                hitLocation,
+                supportFace,
                 support,
                 false
             );
-            InteractionResult result = minecraft.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
+            if ("item_use".equals(placementMethod)) {
+                bridge.lookAt(
+                    hitLocation.x,
+                    hitLocation.y,
+                    hitLocation.z,
+                    180.0F
+                );
+                // Bucket-like items implement Item.use and perform their own
+                // vanilla POV block ray cast. The caller has already waited
+                // for this exact support face to enter interaction range and
+                // aligned the local view to it.
+                InteractionResult result = minecraft.gameMode.useItem(player, hand);
+                if (result.consumesAction()) return true;
+                continue;
+            }
+            InteractionResult result = minecraft.gameMode.useItemOn(player, hand, hit);
             if (result.consumesAction()) return true;
         }
         return false;
+    }
+
+    private static boolean handChanged(
+        HandObservation before,
+        HandObservation after
+    ) {
+        return before.available() && after.available() &&
+            (before.count() != after.count() || !before.itemId().equals(after.itemId()));
+    }
+
+    static Vec3 supportFaceHitLocation(BlockPos support, Direction supportFace) {
+        return Vec3.atCenterOf(support).add(
+            supportFace.getStepX() * 0.5,
+            supportFace.getStepY() * 0.5,
+            supportFace.getStepZ() * 0.5
+        );
+    }
+
+    private double placementInteractionDistance(LocalPlayer player, BlockPos target) {
+        double nearest = Double.POSITIVE_INFINITY;
+        for (Direction direction : Direction.values()) {
+            BlockPos support = target.relative(direction);
+            BlockState supportState = minecraft.level.getBlockState(support);
+            if (supportState.isAir() || supportState.canBeReplaced()) continue;
+            Vec3 hitLocation = supportFaceHitLocation(
+                support,
+                direction.getOpposite()
+            );
+            nearest = Math.min(
+                nearest,
+                distance(
+                    player.getX(),
+                    player.getEyeY(),
+                    player.getZ(),
+                    hitLocation.x,
+                    hitLocation.y,
+                    hitLocation.z
+                )
+            );
+        }
+        return nearest;
     }
 
     private BlockPos findNearestBlock(BlockPos center, String blockId, int radius) {
@@ -738,12 +961,18 @@ final class NativeFabricWorkflowEngine {
     }
 
     boolean screenAutomationAllowed() {
+        return ownsScreen(actionKind);
+    }
+
+    static boolean ownsScreen(String actionKind) {
         return "craft".equals(actionKind) || "inventory_transfer".equals(actionKind);
     }
 
     void cancel() {
+        boolean closeOwnedScreen = ownsScreen(actionKind);
         if (minecraft.gameMode != null && blockActionStarted) minecraft.gameMode.stopDestroyBlock();
         if (baritoneGoalOwned) baritone.cancel();
+        if (closeOwnedScreen && minecraft.screen != null) minecraft.setScreen(null);
         actionKind = "";
         arguments = Map.of();
         controlEngine = "native_fabric";
@@ -760,6 +989,12 @@ final class NativeFabricWorkflowEngine {
         inventoryActionIssued = false;
         inventoryCountBeforeIssued = 0;
         baritoneGoalOwned = false;
+        latestPlacementForecast = Map.of();
+        dynamicPlacementBindingEvidence = Map.of();
+        dynamicPlacementTarget = null;
+        placementInventoryMutationCount = 0;
+        placementHandBefore = HandObservation.unavailable();
+        placementHandAfter = HandObservation.unavailable();
         completedBlockTargets.clear();
     }
 
@@ -805,12 +1040,115 @@ final class NativeFabricWorkflowEngine {
         return Map.of("x", position.getX(), "y", position.getY(), "z", position.getZ());
     }
 
+    private Map<String, Object> withPlacementForecast(Map<String, Object> measurements) {
+        Map<String, Object> result = new LinkedHashMap<>(measurements);
+        String placementMethod = text(arguments, "placement_method");
+        if (placementMethod.isBlank()) placementMethod = "block_item";
+        result.put("placement_method", placementMethod);
+        result.put(
+            "source_item_id",
+            "item_use".equals(placementMethod)
+                ? text(arguments, "source_item_id")
+                : text(arguments, "block_id")
+        );
+        result.put(
+            "hand",
+            "item_use".equals(placementMethod)
+                ? text(arguments, "hand")
+                : "main_hand"
+        );
+        result.put(
+            "inventory_mutations_performed",
+            placementInventoryMutationCount
+        );
+        if (placementHandBefore.available()) {
+            result.put("held_item_id_before", placementHandBefore.itemId());
+            result.put("held_item_count_before", placementHandBefore.count());
+        }
+        if (placementHandAfter.available()) {
+            result.put("held_item_id_after", placementHandAfter.itemId());
+            result.put("held_item_count_after", placementHandAfter.count());
+        }
+        if (!latestPlacementForecast.isEmpty()) {
+            result.put("placement_prediction", latestPlacementForecast);
+        }
+        return Map.copyOf(result);
+    }
+
+    private Map<String, Object> mergePlacementForecast(
+        Map<String, Object> current,
+        Map<String, Object> binding
+    ) {
+        Map<String, Object> result = new LinkedHashMap<>(current);
+        for (String key : List.of(
+            "position_binding_kind",
+            "first_collision_tick",
+            "max_distance_blocks",
+            "require_replaceable",
+            "actor_position_at_resolution",
+            "resolved_distance_blocks"
+        )) {
+            Object value = binding.get(key);
+            if (value != null) result.put(key, value);
+        }
+        return Map.copyOf(result);
+    }
+
+    private boolean dynamicPlacementTargetAdmitted(BlockPos target, String blockId) {
+        Map<String, Object> scope = optionalObject(
+            arguments.get("_helix_admitted_mutation_scope")
+        );
+        if (scope.isEmpty()) return true;
+        if (!bool(scope, "world_mutation_allowed")) return false;
+        List<String> allowedBlocks = strings(scope.get("allowed_block_ids"));
+        if (!allowedBlocks.isEmpty() && !allowedBlocks.contains(blockId)) return false;
+        List<Map<String, Object>> regions = objects(scope.get("allowed_regions"));
+        if (regions.isEmpty()) return true;
+        return regions.stream().anyMatch(region -> {
+            Map<String, Object> minimum = optionalObject(region.get("min"));
+            Map<String, Object> maximum = optionalObject(region.get("max"));
+            return !minimum.isEmpty() && !maximum.isEmpty() &&
+                target.getX() >= integer(minimum, "x") &&
+                target.getX() <= integer(maximum, "x") &&
+                target.getY() >= integer(minimum, "y") &&
+                target.getY() <= integer(maximum, "y") &&
+                target.getZ() >= integer(minimum, "z") &&
+                target.getZ() <= integer(maximum, "z");
+        });
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> object(Object value) {
         if (!(value instanceof Map<?, ?> map)) {
             throw new IllegalArgumentException("The workflow arguments are incomplete.");
         }
         return (Map<String, Object>) map;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> optionalObject(Object value) {
+        return value instanceof Map<?, ?> map
+            ? (Map<String, Object>) map
+            : Map.of();
+    }
+
+    private static List<Map<String, Object>> objects(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object entry : values) {
+            Map<String, Object> record = optionalObject(entry);
+            if (!record.isEmpty()) result.add(record);
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<String> strings(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        List<String> result = new ArrayList<>();
+        for (Object entry : values) {
+            if (entry instanceof String text && !text.isBlank()) result.add(text);
+        }
+        return List.copyOf(result);
     }
 
     private static List<BlockPos> positions(Object value) {
@@ -848,5 +1186,9 @@ final class NativeFabricWorkflowEngine {
             throw new IllegalArgumentException("The workflow argument " + key + " must be an integer.");
         }
         return (int) value;
+    }
+
+    private static boolean bool(Map<String, Object> map, String key) {
+        return map.get(key) == Boolean.TRUE;
     }
 }

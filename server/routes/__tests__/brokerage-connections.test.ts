@@ -49,6 +49,13 @@ import {
 } from "../../services/trading/protective-exit-store";
 import { runLiveTradingSupervisorCycle } from
   "../../services/trading/live-trading-supervisor";
+import {
+  hasFreshRobinhoodLiveProviderContractAcceptance,
+  runRobinhoodLiveProviderContractPreflight,
+} from
+  "../../services/trading/live-provider-contract-preflight-store";
+import { readRobinhoodLiveAcceptanceReadiness } from
+  "../../services/trading/live-acceptance-readiness";
 
 const SAME_ORIGIN_HEADERS = {
   Host: "casimirbot.test",
@@ -113,6 +120,33 @@ const createApp = (): express.Express => {
   return app;
 };
 
+const acceptedLiveProviderCatalog = [
+  { name: "review_equity_order", annotations: { destructiveHint: false },
+    inputSchema: { type: "object", properties: {
+      account: { type: "string" }, symbol: { type: "string" },
+      side: { type: "string", enum: ["buy", "sell"] },
+      orderType: { type: "string", enum: ["limit", "stop", "market"] },
+      timeInForce: { type: "string", enum: ["gfd"] },
+      quantity: { type: "string" }, limitPrice: { type: "string" },
+      stopPrice: { type: "string" }, extendedHours: { type: "boolean" },
+    }, required: ["account", "symbol", "side", "orderType", "quantity"] } },
+  { name: "place_equity_order", annotations: { destructiveHint: true },
+    inputSchema: { type: "object", properties: {
+      account: { type: "string" }, clientOrderId: { type: "string" },
+      reviewId: { type: "string" }, symbol: { type: "string" },
+      side: { type: "string", enum: ["buy", "sell"] },
+      orderType: { type: "string", enum: ["limit", "stop", "market"] },
+      timeInForce: { type: "string", enum: ["gfd"] },
+      quantity: { type: "string" }, limitPrice: { type: "string" },
+      stopPrice: { type: "string" }, extendedHours: { type: "boolean" },
+    }, required: ["account", "clientOrderId", "reviewId", "symbol", "side",
+      "orderType", "quantity"] } },
+  { name: "cancel_equity_order", annotations: { destructiveHint: true },
+    inputSchema: { type: "object", properties: {
+      account: { type: "string" }, orderId: { type: "string" },
+    }, required: ["account", "orderId"] } },
+] as const;
+
 describe("Robinhood brokerage connection boundary", () => {
   beforeEach(async () => {
     vi.stubEnv(
@@ -132,6 +166,22 @@ describe("Robinhood brokerage connection boundary", () => {
     await resetDbClient();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  it("does not apply the brokerage cookie boundary to sibling AGI routes", async () => {
+    const app = express();
+    app.use(express.json({ limit: "1mb" }));
+    app.use("/api/agi", brokerageConnectionsRouter);
+    app.post("/api/agi/adapter/run", (_req, res) => {
+      res.status(202).json({ reached_adapter: true });
+    });
+
+    const response = await request(app)
+      .post("/api/agi/adapter/run")
+      .send({ mode: "verify" })
+      .expect(202);
+
+    expect(response.body).toEqual({ reached_adapter: true });
   });
 
   it("requires an authenticated developer and exact same-origin writes", async () => {
@@ -232,7 +282,7 @@ describe("Robinhood brokerage connection boundary", () => {
     expect(authorizationUrl.searchParams.get("code_challenge")).toBeTruthy();
     expect(JSON.stringify(started.body)).not.toContain("code_verifier");
 
-    const completed = await owner
+    const completed = await request(app)
       .get("/api/agi/brokerage-connections/robinhood/oauth/callback")
       .query({
         state: authorizationUrl.searchParams.get("state"),
@@ -260,7 +310,7 @@ describe("Robinhood brokerage connection boundary", () => {
     );
     expect(tokenBody.get("code_verifier")).toBeTruthy();
     expect(tokenBody.has("client_secret")).toBe(false);
-    const replayed = await owner
+    const replayed = await request(app)
       .get("/api/agi/brokerage-connections/robinhood/oauth/callback")
       .query({
         state: authorizationUrl.searchParams.get("state"),
@@ -660,10 +710,126 @@ describe("Robinhood brokerage connection boundary", () => {
       roomId,
       action: "arm",
       confirmationText: liveControl.arming_phrase,
-      reason: "must fail without a protective exit plane",
+      reason: "must fail without provider contract acceptance",
       now: new Date("2026-08-12T15:00:06.100Z"),
       deploymentEnabled: true,
-    })).rejects.toMatchObject({ code: "paper_trading_unavailable" });
+    })).rejects.toMatchObject({
+      code: "paper_trading_unavailable",
+      message: expect.stringContaining("fresh PASS"),
+    });
+    const contractAcceptance =
+      await runRobinhoodLiveProviderContractPreflight({
+        ownerProfileId: "profile:brokerage-owner",
+        connectionId: completed.body.connection.connection_id,
+        roomId,
+        now: new Date("2026-08-12T15:00:06.200Z"),
+        catalogCall: async () => acceptedLiveProviderCatalog,
+      });
+    expect(contractAcceptance).toMatchObject({
+      verdict: "pass",
+      fresh: true,
+      provider_order_tool_calls_made: 0,
+      live_order_execution_enabled: false,
+    });
+    const failedContractAcceptance =
+      await runRobinhoodLiveProviderContractPreflight({
+        ownerProfileId: "profile:brokerage-owner",
+        connectionId: completed.body.connection.connection_id,
+        roomId,
+        now: new Date("2026-08-12T15:00:06.210Z"),
+        catalogCall: async () => acceptedLiveProviderCatalog.map((tool) =>
+          tool.name === "place_equity_order"
+            ? { ...tool, inputSchema: {
+              ...tool.inputSchema,
+              required: [
+                ...tool.inputSchema.required,
+                "unreviewed_confirmation",
+              ],
+              properties: {
+                ...tool.inputSchema.properties,
+                unreviewed_confirmation: { type: "string" },
+              },
+            } }
+            : tool),
+      });
+    expect(failedContractAcceptance.verdict).toBe("fail");
+    expect(await hasFreshRobinhoodLiveProviderContractAcceptance({
+      client: getPool(),
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      now: new Date("2026-08-12T15:00:06.215Z"),
+    })).toBe(false);
+    await runRobinhoodLiveProviderContractPreflight({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      now: new Date("2026-08-12T15:00:06.220Z"),
+      catalogCall: async () => acceptedLiveProviderCatalog,
+    });
+    for (const [index, tool] of [
+      "get_portfolio",
+      "get_realized_pnl",
+      "get_equity_positions",
+      "get_equity_quotes",
+      "get_equity_orders",
+    ].entries()) {
+      await getPool().query(
+        `INSERT INTO helix_brokerage_read_audit (
+           observation_id, connection_id, owner_profile_id, room_id, provider,
+           upstream_tool, capability_id, producer_epoch_ref, status,
+           input_hash, output_hash, observed_at
+         ) VALUES ($1,$2,$3,$4,'robinhood',$5,$6,$7,'succeeded',$8,$9,$10);`,
+        [`observation:live-readiness-${index}`,
+          completed.body.connection.connection_id,
+          "profile:brokerage-owner", roomId, tool,
+          tool === "get_portfolio" ? "brokerage.robinhood.portfolio.read"
+            : tool === "get_realized_pnl" ? "brokerage.robinhood.pnl.read"
+              : tool === "get_equity_positions"
+                ? "brokerage.robinhood.equity_positions.read"
+                : tool === "get_equity_orders"
+                  ? "brokerage.robinhood.equity_orders.read"
+                  : "brokerage.robinhood.market_data.read",
+          "producer:live-readiness", `sha256:${String(index + 1).repeat(64)}`,
+          `sha256:${String(index + 5).repeat(64)}`,
+          "2026-08-12T15:00:06.220Z"],
+      );
+    }
+    const readinessBeforeCanary = await readRobinhoodLiveAcceptanceReadiness({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      now: new Date("2026-08-12T15:00:06.221Z"),
+      deploymentEnabled: true,
+      supervisorEnabled: true,
+    });
+    expect(readinessBeforeCanary).toMatchObject({
+      read_acceptance_complete: true,
+      safe_to_enable_live_flags: true,
+      ready_to_start_attended_canary: false,
+      ready_to_arm: false,
+      acceptance_complete: false,
+      live_order_tool_calls_made: 0,
+      unresolved_live_exposure_count: 0,
+      credential_included: false,
+      account_numbers_included: false,
+      raw_provider_payload_included: false,
+      terminal_eligible: false,
+    });
+    expect(readinessBeforeCanary.gates).toHaveLength(11);
+    await expect(setLiveTradingControl({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      action: "arm",
+      confirmationText: liveControl.arming_phrase,
+      reason: "must still fail without a protective exit plane",
+      now: new Date("2026-08-12T15:00:06.225Z"),
+      deploymentEnabled: true,
+    })).rejects.toMatchObject({
+      code: "paper_trading_unavailable",
+      message: expect.stringContaining("protective-exit plane"),
+    });
     const supervisorCycle = await runLiveTradingSupervisorCycle({
       now: new Date("2026-08-12T15:00:06.250Z"),
       enabled: true,
@@ -683,6 +849,20 @@ describe("Robinhood brokerage connection boundary", () => {
       deploymentEnabled: true,
     });
     expect(attendedControl.operator_present).toBe(true);
+    const readinessBeforeArm = await readRobinhoodLiveAcceptanceReadiness({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      now: new Date("2026-08-12T15:00:06.400Z"),
+      deploymentEnabled: true,
+      supervisorEnabled: true,
+    });
+    expect(readinessBeforeArm).toMatchObject({
+      read_acceptance_complete: true,
+      ready_to_start_attended_canary: true,
+      ready_to_arm: true,
+      acceptance_complete: false,
+    });
     const armedLiveControl = await setLiveTradingControl({
       ownerProfileId: "profile:brokerage-owner",
       connectionId: completed.body.connection.connection_id,
@@ -1102,6 +1282,21 @@ describe("Robinhood brokerage connection boundary", () => {
       connectionId: completed.body.connection.connection_id,
       roomId,
     })).executions[0].state).toBe("reconciled_filled");
+    expect(await readRobinhoodLiveAcceptanceReadiness({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      now: new Date("2026-08-12T15:00:09.920Z"),
+      deploymentEnabled: true,
+      supervisorEnabled: true,
+    })).toMatchObject({
+      read_acceptance_complete: true,
+      acceptance_complete: true,
+      reconciled_filled_entry_count: 1,
+      reconciled_filled_exit_count: 1,
+      unresolved_live_exposure_count: 0,
+      live_order_tool_calls_made: 0,
+    });
     await expect(executeApprovedProtectiveExit({
       ownerProfileId: "profile:brokerage-owner",
       connectionId: completed.body.connection.connection_id,
@@ -1344,6 +1539,55 @@ describe("Robinhood brokerage connection boundary", () => {
     expect(automaticStopState.rows[0]?.kill_switch_reason).toMatch(
       /^\[automatic\].*consecutive/u,
     );
+    await runLiveTradingSupervisorCycle({
+      now: new Date("2026-08-12T15:00:20.050Z"), enabled: true,
+    });
+    await recordLiveTradingOperatorPresence({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controlId: liveControl.control_id,
+      now: new Date("2026-08-12T15:00:20.100Z"),
+      deploymentEnabled: true,
+    });
+    expect((await setLiveTradingControl({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      action: "arm",
+      confirmationText: liveControl.arming_phrase,
+      reason: "prove attended-presence dead-man relock after completed canary",
+      now: new Date("2026-08-12T15:00:20.200Z"),
+      deploymentEnabled: true,
+    })).live_order_execution_enabled).toBe(true);
+    const deadmanCycle = await runLiveTradingSupervisorCycle({
+      now: new Date("2026-08-12T15:00:30.200Z"), enabled: true,
+    });
+    expect(deadmanCycle).toMatchObject({
+      deadman_relocks: 1,
+      placed_orders: 0,
+      cancelled_orders: 0,
+    });
+    expect(await getOrCreateLiveTradingControl({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      now: new Date("2026-08-12T15:00:30.250Z"),
+      deploymentEnabled: true,
+    })).toMatchObject({
+      operator_armed: false,
+      operator_present: false,
+      kill_switch_active: true,
+      kill_switch_reason:
+        "Attended operator presence expired; live placement relocked.",
+    });
+    const deadmanEvents = await getPool().query<{ event_type: string }>(
+      `SELECT event_type FROM helix_live_equity_execution_events
+       WHERE control_id = $1 AND event_type =
+         'operator_presence_expired_relocked';`,
+      [liveControl.control_id],
+    );
+    expect(deadmanEvents.rows).toHaveLength(1);
     const lifecycleRoute = await owner
       .get(
         `/api/agi/brokerage-connections/${completed.body.connection.connection_id}/rooms/${roomId}/paper-lifecycle`,

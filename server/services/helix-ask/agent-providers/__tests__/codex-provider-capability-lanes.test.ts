@@ -48,6 +48,7 @@ import {
   attachCodexMinecraftPlayerEmbodimentActionRequirement,
   codexObservationDependentCapabilityProposalIds,
   runtimeProviderAdmittedCapabilityIdsForQuestion,
+  nativeProviderAdmittedCapabilityIdsForTurn,
   runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody,
   selectCodexRuntimeCapabilityProposalIds,
   shouldAllowCodexObservationDependentCapabilityProposal,
@@ -3235,7 +3236,7 @@ describe("Codex provider capability lane adapter", () => {
     ).toEqual([]);
   });
 
-  it("keeps baseline probes available before a required Player Embodiment action, then narrows to the missing action", () => {
+  it("keeps bounded Minecraft observations available until the required Player Embodiment action succeeds", () => {
     const actorStatus = "com.casimirbot.minecraft.actor.status.read";
     const playerLook = "com.casimirbot.minecraft.player.look";
     const playerWalk = "com.casimirbot.minecraft.player.walk";
@@ -3248,6 +3249,7 @@ describe("Codex provider capability lane adapter", () => {
         observationDependentCapabilityProposalIds: [],
         missingSemanticPlayerActionCapabilityIds: [playerLook, playerWalk],
         runtimeProviderAdmittedCapabilityIds: admitted,
+        semanticPlayerEmbodimentActionRequired: true,
       }),
     ).toEqual(admitted);
 
@@ -3258,8 +3260,9 @@ describe("Codex provider capability lane adapter", () => {
         observationDependentCapabilityProposalIds: [],
         missingSemanticPlayerActionCapabilityIds: [playerLook, playerWalk],
         runtimeProviderAdmittedCapabilityIds: admitted,
+        semanticPlayerEmbodimentActionRequired: true,
       }),
-    ).toEqual([playerLook, playerWalk]);
+    ).toEqual(admitted);
 
     expect(
       selectCodexRuntimeCapabilityProposalIds({
@@ -3268,8 +3271,41 @@ describe("Codex provider capability lane adapter", () => {
         observationDependentCapabilityProposalIds: [actorStatus],
         missingSemanticPlayerActionCapabilityIds: [playerLook, playerWalk],
         runtimeProviderAdmittedCapabilityIds: admitted,
+        semanticPlayerEmbodimentActionRequired: true,
       }),
-    ).toEqual([actorStatus]);
+    ).toEqual(admitted);
+  });
+
+  it("keeps native semantic Player Embodiment admission focused on Minecraft observations plus typed actions", () => {
+    const actorStatus = "com.casimirbot.minecraft.actor.status.read";
+    const spatialRegion = "com.casimirbot.minecraft.spatial_region.inspect";
+    const guardian = "com.casimirbot.minecraft.player.guardian.execute";
+    const walk = "com.casimirbot.minecraft.player.walk";
+    const registryFact = "com.casimirbot.minecraft.registry.fact.read";
+    const unrelatedLiveProbe = "live_env.query_visual_summaries";
+
+    expect(
+      nativeProviderAdmittedCapabilityIdsForTurn({
+        semanticPlayerEmbodimentActionRequired: true,
+        runtimeProviderRequiredGroundingCapabilityIds: [actorStatus],
+        runtimeProviderAdmittedCapabilityIds: [
+          actorStatus,
+          spatialRegion,
+          guardian,
+          walk,
+          registryFact,
+          unrelatedLiveProbe,
+        ],
+      }),
+    ).toEqual([actorStatus, spatialRegion, guardian, walk, registryFact]);
+
+    expect(
+      nativeProviderAdmittedCapabilityIdsForTurn({
+        semanticPlayerEmbodimentActionRequired: false,
+        runtimeProviderRequiredGroundingCapabilityIds: [],
+        runtimeProviderAdmittedCapabilityIds: [unrelatedLiveProbe, actorStatus],
+      }),
+    ).toEqual([unrelatedLiveProbe, actorStatus]);
   });
 
   it("does not reopen continuation affordances after a validated runtime terminal decision", () => {

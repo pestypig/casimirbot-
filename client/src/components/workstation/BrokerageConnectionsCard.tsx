@@ -79,11 +79,14 @@ export function BrokerageConnectionsCard() {
       }
       setAuthorizationUrl(target.toString());
       setPendingOAuth(true);
-      const popup = window.open(
-        target.toString(),
-        "casimirbot-robinhood-oauth",
-        "popup,width=720,height=820,noopener,noreferrer",
-      );
+      const nativeOpen = window.casimirDesktop?.openRobinhoodOAuth;
+      const popup = nativeOpen
+        ? (await nativeOpen(target.toString()), true)
+        : Boolean(window.open(
+            target.toString(),
+            "casimirbot-robinhood-oauth",
+            "popup,width=720,height=820,noopener,noreferrer",
+          ));
       setMessage(
         popup
           ? "Finish authorization in the Robinhood window. This card will refresh automatically."
@@ -156,6 +159,18 @@ export function BrokerageConnectionsCard() {
           href={authorizationUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(event) => {
+            const nativeOpen = window.casimirDesktop?.openRobinhoodOAuth;
+            if (!nativeOpen) return;
+            event.preventDefault();
+            void nativeOpen(authorizationUrl)
+              .then(() => setMessage(
+                "Finish authorization in Robinhood. This card will refresh automatically.",
+              ))
+              .catch(() => setMessage(
+                "Unable to open the trusted Robinhood authorization page.",
+              ));
+          }}
           className="mt-2 inline-flex items-center gap-1 text-xs text-emerald-200 underline"
         >
           Continue secure authorization <ExternalLink className="h-3 w-3" />

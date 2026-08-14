@@ -85,6 +85,32 @@ describe("Codex capability-lane request parsing", () => {
     expect(stripCodexCapabilityLaneRequestMarkers(request)).toBe("");
   });
 
+  it("accepts a multiline capability_id envelope with trailing provider prose", () => {
+    const request = [
+      "HELIX_CAPABILITY_LANE_REQUEST_JSON:",
+      "{",
+      '  "capability_id": "com.casimirbot.minecraft.player.guardian.execute",',
+      '  "arguments": {',
+      '    "program_id": "guardian:multiline"',
+      "  }",
+      "}",
+      "I will wait for the observation before answering.",
+    ].join("\n");
+
+    expect(extractCodexCapabilityLaneRequestCandidate(request)).toEqual({
+      capability_id:
+        "com.casimirbot.minecraft.player.guardian.execute",
+      arguments: { program_id: "guardian:multiline" },
+    });
+  });
+
+  it("does not infer an incomplete marked JSON request", () => {
+    const request =
+      'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"docs.search","arguments":{"query":"unfinished"}';
+
+    expect(extractCodexCapabilityLaneRequestCandidate(request)).toBeNull();
+  });
+
   it("recovers a one-character structured marker near miss without exposing it as answer text", () => {
     const request =
       "HELICX_CAPABILITY_LANE_REQUEST_JSON: " +

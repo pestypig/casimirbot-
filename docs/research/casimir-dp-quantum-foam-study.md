@@ -2,7 +2,7 @@
 
 **Document type:** model-specific experimental design and subsystem-commissioning protocol
 
-**Version:** first-reader external-review draft, 9 August 2026
+**Version:** first-reader external-review draft, 14 August 2026
 
 **Authors and affiliations:** to be supplied before external submission
 
@@ -85,6 +85,18 @@ contraction is not evidence for collapse when the same complex-data direction
 can be produced by ordinary electromagnetic, thermal, gas, gravitational,
 control, or readout processes.
 
+**External empirical precedent.** Coordinated IXPE, NICER, and
+Parkes/Murriyang observations of magnetar 1E 1547.0-5408 measured a
+\(2\text{--}8\ {\rm keV}\) polarization degree of \(46\pm4\%\), together with
+structured rotational-phase and energy dependence. Within the authors'
+adopted atmosphere, hotspot-geometry, and radiative-transfer framework,
+calculations including magnetospheric strong-field QED vacuum birefringence
+described the measured Stokes patterns substantially better than the tested
+non-refractive cases [43]. This is external evidence consistent with an
+observable, externally conditioned QED vacuum response in its own regime. It
+is not a Casimir measurement or an input to the present apparatus and supplies
+no collapse rate, gravitational response, or boundary-to-collapse kernel.
+
 Penrose's objective-reduction argument motivates the question of whether
 distinct mass distributions have a finite lifetime [4,5]. The numerical
 prediction here comes instead from one named Gaussian-regularized Diósi
@@ -156,12 +168,13 @@ analysis code are frozen.*
 
 ### 1.3 Evidence tiers and present readiness
 
-Every quantitative statement in this paper belongs to one of four evidence
+Every quantitative statement in this paper belongs to one of five evidence
 tiers:
 
 | Evidence tier | Meaning in this paper | Current state |
 |---|---|---|
 | software recovery | equations, ordering, provenance, and fail-closed behavior recover in synthetic fixtures | available |
+| external empirical precedent | a published external measurement supports a relevant ordinary-physics phenomenon or analysis strategy in its own physical regime | magnetar strong-field QED vacuum response [43], as cited context only; no data replay, parameter transfer, apparatus-authority packet, or likelihood contribution |
 | public-data component replay | a bounded analysis operation runs on a real external dataset | available separately; no cross-apparatus fusion |
 | conditional apparatus forecast | a prediction under the selected synthetic apparatus and covariance assumptions | available, not empirical |
 | same-apparatus measurement | jointly acquired preparation, response, covariance, coherence, and companion evidence | absent |
@@ -1012,7 +1025,18 @@ electromagnetic scalar with an executable ordinary-response chain for the
 leading design. A passive specimen loss table
 is converted to \(\epsilon(i\xi)\), a finite-geometry Green table supplies the
 mean branch potential, and a two-sided fluctuation--dissipation spectrum
-supplies phase/loss covariance [30]. The transparent ordinary prediction is
+supplies phase/loss covariance [30].
+
+Stewart *et al.* [43] provide an analysis-design precedent, not a parameter
+transfer: phase- and energy-resolved photon-polarization quadratures are
+retained and compared with forward calculations in which vacuum birefringence
+is enabled or disabled. The methodological lesson here is to retain both
+quadratures of material coherence and compare them with measured,
+apparatus-specific Green/FDT predictions before scoring any residual
+contraction. The magnetar magnetic field, plasma, atmosphere, emission
+geometry, and polarization amplitudes do not enter Eq. (18).
+
+The transparent ordinary prediction is
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2n-complex-ordinary-null -->
 \[
@@ -2098,6 +2122,10 @@ This paper does not establish:
 - that a Casimir boundary changes a collapse rate;
 - that a superconducting condensate, the Standard-Model Higgs field, or a BEC
   order parameter changes the registered Diósi rate;
+- that evidence consistent with magnetar strong-field QED vacuum
+  birefringence constitutes a model-independent direct detection, a Casimir
+  measurement, apparatus calibration, same-apparatus authority packet, or
+  evidence for Diósi/Penrose collapse, quantum foam, or manifold dynamics;
 - that the synthetic magnetic-toggle candidate is apparatus-ready;
 - that objective collapse occurs;
 - that Penrose's geometric interpretation is observed;
@@ -2318,3 +2346,6 @@ submission.
 42. K. Giesel and T. Thiemann, "Scalar Material Reference Systems and Loop
     Quantum Gravity," *Classical and Quantum Gravity* **32**, 135015 (2015).
     https://doi.org/10.1088/0264-9381/32/13/135015
+43. R. E. Stewart *et al.*, "Vacuum birefringence and the polarized X-ray
+    emission from a radio magnetar," *Nature* (2026).
+    https://doi.org/10.1038/s41586-026-10859-z; arXiv:2509.19446v4.

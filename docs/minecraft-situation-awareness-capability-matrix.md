@@ -65,12 +65,13 @@ can fail with one stable, actionable typed limitation.
 ## Dual-plane action extension
 
 The separately paired Fabric 1.21.8 client companion advertises the following
-13 action capabilities only after exact participant/player authority and
+16 action capabilities only after exact participant/player authority and
 manifest admission:
 
 ```text
 com.casimirbot.minecraft.player.navigate
 com.casimirbot.minecraft.player.look
+com.casimirbot.minecraft.player.camera.track
 com.casimirbot.minecraft.player.walk
 com.casimirbot.minecraft.player.jump
 com.casimirbot.minecraft.player.interact
@@ -82,6 +83,8 @@ com.casimirbot.minecraft.player.mine
 com.casimirbot.minecraft.player.place
 com.casimirbot.minecraft.player.craft
 com.casimirbot.minecraft.player.inventory.transfer
+com.casimirbot.minecraft.player.sequence.execute
+com.casimirbot.minecraft.player.guardian.execute
 ```
 
 Workflow status, resume, cancellation and emergency stop use the separately
@@ -90,7 +93,7 @@ Baritone navigation is optional and is admitted only when the exact live
 manifest declares the discovered `baritone` control engine. Native navigation
 must remain available independently.
 
-The provider catalog exposes all 13 action IDs above, the six reusable
+The provider catalog exposes all 16 action IDs above, the six reusable
 workflow IDs among them, and the typed `workflow.status`, `workflow.resume`,
 `workflow.cancel` and `emergency_stop` controls. The emergency control resolves
 an exact prior workflow to server-owned authority and suspends that authority;
@@ -98,14 +101,16 @@ it is not a general process-control or host-execution tool. Every successful
 action still requires its own canonical terminal measurements. A generic
 `workflow.succeeded` event is insufficient evidence.
 
-| Plane | Capability family | Deterministic evidence | Keyed live status |
-| --- | --- | --- | --- |
-| World Authority | read-only source observations | eight-capability matrix and 2026-07-29 live records below | proven |
-| World Authority | governed Brigadier commands and world mutation | exact command catalog, finite command authority, one-shot result and post-mutation probe contracts | representative live journeys still required for this goal |
-| Player Embodiment | look, walk, jump, interact, hotbar, equipment and native navigation | Fabric client controller, typed broker, progress events and measured postconditions; relative look preserves requested yaw/pitch deltas and broker-validated terminal pose | implementation/tests pass; fresh client manifest/heartbeat and natural live journeys required |
-| Direct reference diagnostics | local walk, jump and relative-look controller checks | same production client controller and terminal measurements, credential-free `HELIX_PLAYER_DIRECT_DIAGNOSTIC` records, no Helix admission or answer authority | build/tests pass; live comparison required after client restart |
-| Player Embodiment | follow, collect, mine, place, craft and inventory transfer | bounded native workflows, cancellation/manual override and action-specific terminal measurements | implementation/tests pass; workflow-by-workflow live acceptance required |
-| Player Embodiment | optional Baritone navigation | runtime discovery plus manifest-declared control engine | typed unavailable path proven; installed-engine live acceptance remains external |
+| Plane                        | Capability family                                                   | Deterministic evidence                                                                                                                                                                                                                                                                                                                                                                                                          | Keyed live status                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| World Authority              | read-only source observations                                       | eight-capability matrix and 2026-07-29 live records below                                                                                                                                                                                                                                                                                                                                                                       | proven                                                                                                      |
+| World Authority              | governed Brigadier commands and world mutation                      | exact command catalog, finite command authority, one-shot result and post-mutation probe contracts                                                                                                                                                                                                                                                                                                                              | representative live journeys still required for this goal                                                   |
+| Player Embodiment            | look, walk, jump, interact, hotbar, equipment and native navigation | Fabric client controller, typed broker, progress events and measured postconditions; relative look preserves requested yaw/pitch deltas and broker-validated terminal pose                                                                                                                                                                                                                                                      | implementation/tests pass; fresh client manifest/heartbeat and natural live journeys required               |
+| Direct reference diagnostics | local walk, jump and relative-look controller checks                | same production client controller and terminal measurements, credential-free `HELIX_PLAYER_DIRECT_DIAGNOSTIC` records, no Helix admission or answer authority                                                                                                                                                                                                                                                                   | build/tests pass; live comparison required after client restart                                             |
+| Player Embodiment            | follow, collect, mine, place, craft and inventory transfer          | bounded native workflows, cancellation/manual override and action-specific terminal measurements                                                                                                                                                                                                                                                                                                                                | implementation/tests pass; workflow-by-workflow live acceptance required                                    |
+| Player Embodiment            | fluid `survival_tas` sequence                                       | finite acyclic tick-addressed graph of the existing actions, current-state branches, explicit checkpoints, separate world-tick/wall-clock measurements and compact changed-condition evidence                                                                                                                                                                                                                                   | 0.3 contract/Fabric/broker tests pass; direct-Codex and keyed-Helix micro-course acceptance pending         |
+| Player Embodiment            | concurrent reactive guardian                                        | finite per-lane graphs, same-tick nonconflicting controls, explicit resource arbitration, races, bounded maintain/repeat/event nodes and one-shot interrupts; 1-20 tick trajectory/collision forecasts can bind one predicted landing cell into an admitted place action without a model round trip; broker validates the resolved actor-relative/in-region target, settled lanes, race outcomes, parallel receipts and effects | 0.4 contract/MCP/broker/Fabric tests pass; direct-Codex and keyed-Helix dynamic-guardian acceptance pending |
+| Player Embodiment            | optional Baritone navigation                                        | runtime discovery plus manifest-declared control engine                                                                                                                                                                                                                                                                                                                                                                         | typed unavailable path proven; installed-engine live acceptance remains external                            |
 
 Readiness is deliberately stricter than pairing:
 
@@ -127,28 +132,28 @@ transport observation, never an assistant answer or terminal product.
 
 ## Player-question matrix
 
-| Family       | Representative question                              | Evidence used                                                  | Release-baseline status                                                              |
-| ------------ | ---------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Inventory    | What am I carrying, and do I have food?              | `inventory_check`                                              | Live proven, including item counts and observed food                                 |
+| Family       | Representative question                              | Evidence used                                                  | Release-baseline status                                                                                                          |
+| ------------ | ---------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory    | What am I carrying, and do I have food?              | `inventory_check`                                              | Live proven, including item counts and observed food                                                                             |
 | Actor        | What is my health, hunger, game mode and view pose?  | `actor_status`, including server-observed yaw/pitch            | Health/hunger/game mode live proven; yaw/pitch schema and Paper/Fabric parity pass deterministic tests, fresh live proof pending |
-| Equipment    | Am I equipped to explore or fight?                   | Actor equipment plus inventory and threats                     | Live proven for held items and armor; durability and enchantments remain unavailable |
-| Threats      | Are hostile mobs or dangerous blocks near me?        | `nearby_entities` + `hazard_check`                             | Live proven for hostile targets/distances and the allowlisted hazard-block set       |
-| Projectile   | Is a projectile about to hit me?                     | Projectile velocity and time-to-contact                        | Unsupported; entity type alone cannot prove collision                                |
-| Terrain      | What does the immediate area look like?              | `local_map_summary` + entities                                 | Live proven for a bounded 9 by 9 floor sample                                        |
-| Step safety  | Is it safe to step forward?                          | Facing, adjacent geometry, fluids, drops and dynamic obstacles | Partial; the bounded map is evidence, not step/path authority                        |
-| Visibility   | Can I see this exact coordinate?                     | `line_of_sight`                                                | Live proven                                                                          |
-| Crops        | Is the wheat at this coordinate mature?              | `crop_state`                                                   | Live proven                                                                          |
-| Navigation   | Is that coordinate nearby?                           | `reachability`                                                 | Live proven as straight-line geometry                                                |
-| Navigation   | Can I safely walk there?                             | Traversable path and dynamic hazards                           | Unsupported; no pathfinding probe is advertised                                      |
-| Container    | What is inside that closed chest?                    | Closed-container observation                                   | Live proven `capability_unavailable`; no inventory/map substitution                  |
-| Multiplayer  | What am I carrying with two players online?          | Exact actor identity                                           | Live proven `target_ambiguous` without an exact binding                              |
-| Follow-up    | What about the food?                                 | Identified newest prior observation or a fresh probe           | Live continuation and evidence reuse proven                                          |
-| Correction   | No, check the dangers around me instead.             | Fresh hazard and entity probes                                 | Natural corrective journey live proven                                               |
-| Constraint   | Tell me what I have, but do not inspect the world.   | No tool admission                                              | Negated/contextual tool-cue regressions pass                                         |
-| Historical   | You previously checked inventory; what did it prove? | Prior evidence identity                                        | Continuation regressions prevent lexical tool-name replay                            |
-| Stale source | What is happening to me right now?                   | Fresh adapter admission and result                             | Live `probe_timeout`, then `result_stale` after freshness expiry                     |
-| Wrong world  | Read a Minehut world while bound locally.            | Exact room/source/world binding                                | Cross-world and cross-room isolation regressions pass                                |
-| Permission   | Read the owner room from an unbound profile.         | Current membership and binding                                 | Live room-membership nondisclosure boundary proven                                   |
+| Equipment    | Am I equipped to explore or fight?                   | Actor equipment plus inventory and threats                     | Live proven for held items and armor; durability and enchantments remain unavailable                                             |
+| Threats      | Are hostile mobs or dangerous blocks near me?        | `nearby_entities` + `hazard_check`                             | Live proven for hostile targets/distances and the allowlisted hazard-block set                                                   |
+| Projectile   | Is a projectile about to hit me?                     | Projectile velocity and time-to-contact                        | Unsupported; entity type alone cannot prove collision                                                                            |
+| Terrain      | What does the immediate area look like?              | `local_map_summary` + entities                                 | Live proven for a bounded 9 by 9 floor sample                                                                                    |
+| Step safety  | Is it safe to step forward?                          | Facing, adjacent geometry, fluids, drops and dynamic obstacles | Partial; the bounded map is evidence, not step/path authority                                                                    |
+| Visibility   | Can I see this exact coordinate?                     | `line_of_sight`                                                | Live proven                                                                                                                      |
+| Crops        | Is the wheat at this coordinate mature?              | `crop_state`                                                   | Live proven                                                                                                                      |
+| Navigation   | Is that coordinate nearby?                           | `reachability`                                                 | Live proven as straight-line geometry                                                                                            |
+| Navigation   | Can I safely walk there?                             | Traversable path and dynamic hazards                           | Unsupported; no pathfinding probe is advertised                                                                                  |
+| Container    | What is inside that closed chest?                    | Closed-container observation                                   | Live proven `capability_unavailable`; no inventory/map substitution                                                              |
+| Multiplayer  | What am I carrying with two players online?          | Exact actor identity                                           | Live proven `target_ambiguous` without an exact binding                                                                          |
+| Follow-up    | What about the food?                                 | Identified newest prior observation or a fresh probe           | Live continuation and evidence reuse proven                                                                                      |
+| Correction   | No, check the dangers around me instead.             | Fresh hazard and entity probes                                 | Natural corrective journey live proven                                                                                           |
+| Constraint   | Tell me what I have, but do not inspect the world.   | No tool admission                                              | Negated/contextual tool-cue regressions pass                                                                                     |
+| Historical   | You previously checked inventory; what did it prove? | Prior evidence identity                                        | Continuation regressions prevent lexical tool-name replay                                                                        |
+| Stale source | What is happening to me right now?                   | Fresh adapter admission and result                             | Live `probe_timeout`, then `result_stale` after freshness expiry                                                                 |
+| Wrong world  | Read a Minehut world while bound locally.            | Exact room/source/world binding                                | Cross-world and cross-room isolation regressions pass                                                                            |
+| Permission   | Read the owner room from an unbound profile.         | Current membership and binding                                 | Live room-membership nondisclosure boundary proven                                                                               |
 
 ## Contract invariants
 
@@ -211,7 +216,7 @@ Credentials are excluded from prompts, traces, evidence and artifacts.
 - durable account-to-player identity binding for multiplayer servers;
 - keyed live acceptance for the separately credentialed World Authority command
   lane and Player Embodiment action lane. Their implementation contract and
-  13-action deterministic baseline now live in
+  16-action deterministic baseline now live in
   `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; they do not
   weaken or become part of this read-only source credential. The Shared Live
   Room owner surface now creates a finite exact-capability player lease and

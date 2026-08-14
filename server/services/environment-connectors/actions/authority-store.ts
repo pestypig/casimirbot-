@@ -25,6 +25,10 @@ export type EnvironmentActionAuthorityErrorCode =
   | "action_authority_forbidden"
   | "action_environment_not_found"
   | "action_environment_not_active"
+  | "action_environment_binding_inactive"
+  | "action_source_binding_inactive"
+  | "action_room_closed"
+  | "action_adapter_admission_inactive"
   | "action_participant_not_found"
   | "action_subject_binding_required"
   | "action_authority_not_found"
@@ -87,6 +91,7 @@ type AuthorityRow = {
 
 type ConnectorReadinessManifestRow = {
   manifest_id: string;
+  manifest_hash: string;
   capabilities: unknown;
   available_control_engines: unknown;
   received_at: Date | string;
@@ -355,16 +360,32 @@ const readEnvironment = async (
       "The room environment was not found.",
     );
   }
-  if (
-    row.environment_status !== "active" ||
-    row.source_status !== "active" ||
-    row.room_status === "closed" ||
-    row.adapter_admission_status !== "active"
-  ) {
+  if (row.environment_status !== "active") {
     throw new EnvironmentActionAuthorityError(
-      "action_environment_not_active",
+      "action_environment_binding_inactive",
       409,
-      "The room environment is not active enough to pair player embodiment.",
+      "The exact environment binding is not active enough to pair player embodiment.",
+    );
+  }
+  if (row.source_status !== "active") {
+    throw new EnvironmentActionAuthorityError(
+      "action_source_binding_inactive",
+      409,
+      "The exact room source binding is not active enough to pair player embodiment.",
+    );
+  }
+  if (row.room_status === "closed") {
+    throw new EnvironmentActionAuthorityError(
+      "action_room_closed",
+      409,
+      "The shared room is closed, so player embodiment cannot be paired.",
+    );
+  }
+  if (row.adapter_admission_status !== "active") {
+    throw new EnvironmentActionAuthorityError(
+      "action_adapter_admission_inactive",
+      409,
+      "The exact environment adapter admission is not active enough to pair player embodiment.",
     );
   }
   return row;
@@ -414,6 +435,57 @@ export const planEnvironmentActionAuthoritySupersession = (
   };
 };
 
+export const isEnvironmentActionAuthorityLeaseExtension = (input: {
+  prior: Pick<
+    AuthorityRow,
+    | "adapter_profile_id"
+    | "domain_adapter"
+    | "participant_id"
+    | "subject_binding_id"
+    | "subject_native_id"
+    | "allowed_capability_ids"
+    | "autonomy_mode"
+    | "manual_override_policy"
+    | "expires_at"
+  >;
+  adapterProfileId: string;
+  domainAdapter: string;
+  participantId: string;
+  subjectBindingId: string;
+  subjectNativeId: string;
+  allowedCapabilityIds: string[];
+  autonomyMode: HelixEnvironmentActionAutonomyMode;
+  manualOverridePolicy: HelixEnvironmentActionManualOverridePolicy;
+  expiresAt: string | null;
+}): boolean => {
+  const priorExpiry = input.prior.expires_at === null
+    ? Number.NaN
+    : Date.parse(iso(input.prior.expires_at));
+  const nextExpiry = input.expiresAt === null
+    ? Number.NaN
+    : Date.parse(input.expiresAt);
+  const priorCapabilities = parseCapabilities(
+    input.prior.allowed_capability_ids,
+  ).sort();
+  const nextCapabilities = [...new Set(input.allowedCapabilityIds)].sort();
+  return (
+    Number.isFinite(priorExpiry) &&
+    Number.isFinite(nextExpiry) &&
+    nextExpiry >= priorExpiry &&
+    input.prior.adapter_profile_id === input.adapterProfileId &&
+    input.prior.domain_adapter === input.domainAdapter &&
+    input.prior.participant_id === input.participantId &&
+    input.prior.subject_binding_id === input.subjectBindingId &&
+    input.prior.subject_native_id === input.subjectNativeId &&
+    input.prior.autonomy_mode === input.autonomyMode &&
+    input.prior.manual_override_policy === input.manualOverridePolicy &&
+    priorCapabilities.length === nextCapabilities.length &&
+    priorCapabilities.every(
+      (capabilityId, index) => capabilityId === nextCapabilities[index],
+    )
+  );
+};
+
 export const readEnvironmentActionAuthorities = async (input: {
   roomId: string;
   profileId: string;
@@ -454,14 +526,31 @@ export const readEnvironmentActionConnectorReadiness = async (input: {
       sourceAdapterProfileId: environment.adapter_profile_id,
     });
     const manifestResult = await db.query<ConnectorReadinessManifestRow>(
-      `SELECT manifest_id, capabilities, available_control_engines, received_at
-       FROM helix_environment_action_connector_manifests
+      `SELECT manifest_id, manifest_hash, capabilities,
+              available_control_engines, received_at
+       FROM helix_environment_action_connector_manifests m
        WHERE action_authority_id = $1 AND status = 'active'
          AND (expires_at IS NULL OR expires_at > now())
        ORDER BY received_at DESC LIMIT 1;`,
       [row.action_authority_id],
     );
-    const manifest = manifestResult.rows[0] ?? null;
+    const candidateManifest = manifestResult.rows[0] ?? null;
+    const catalogResult = candidateManifest
+      ? await db.query<{ catalog_snapshot_id: string }>(
+        `SELECT catalog_snapshot_id
+         FROM helix_environment_capability_catalog_snapshots
+         WHERE environment_binding_id = $1 AND adapter_profile_id = $2
+           AND manifest_hash = $3
+           AND (expires_at IS NULL OR expires_at > now())
+         ORDER BY frozen_at DESC LIMIT 1;`,
+        [
+          row.environment_binding_id,
+          row.adapter_profile_id,
+          candidateManifest.manifest_hash,
+        ],
+      )
+      : { rows: [] as Array<{ catalog_snapshot_id: string }> };
+    const manifest = catalogResult.rows[0] ? candidateManifest : null;
     const heartbeatResult = manifest
       ? await db.query<ConnectorReadinessHeartbeatRow>(
         `SELECT status, active_workflow_ids, control_engines, controls_asserted,
@@ -604,6 +693,34 @@ export const configureEnvironmentActionAuthority = async (input: {
         input.participantId,
       ],
     );
+    const solePrior = prior.rows.length === 1 ? prior.rows[0] : null;
+    if (
+      solePrior &&
+      isEnvironmentActionAuthorityLeaseExtension({
+        prior: solePrior,
+        adapterProfileId: actionAdapter.profile.profile_id,
+        domainAdapter: input.domainAdapter,
+        participantId: input.participantId,
+        subjectBindingId: subject.rows[0].subject_binding_id,
+        subjectNativeId: subject.rows[0].subject_native_id,
+        allowedCapabilityIds: input.allowedCapabilityIds,
+        autonomyMode: input.autonomyMode,
+        manualOverridePolicy: input.manualOverridePolicy,
+        expiresAt: input.expiresAt,
+      })
+    ) {
+      const extended = await db.query<AuthorityRow>(
+        `UPDATE helix_environment_action_authorities
+         SET expires_at = $2, updated_at = now()
+         WHERE action_authority_id = $1 AND status = 'active'
+         RETURNING *;`,
+        [solePrior.action_authority_id, input.expiresAt],
+      );
+      if (!extended.rows[0]) {
+        throw new Error("Player-action authority lease extension failed.");
+      }
+      return projectAuthority(extended.rows[0]);
+    }
     const supersession = planEnvironmentActionAuthoritySupersession(prior.rows);
     const policyVersion = supersession.nextPolicyVersion;
     for (const priorId of supersession.supersededAuthorityIds) {

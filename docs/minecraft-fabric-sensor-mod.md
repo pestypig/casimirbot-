@@ -1,4 +1,4 @@
-# Helix Fabric Sensor 0.2.0
+# Helix Fabric Sensor 0.3.0
 
 `minecraft/helix-fabric-sensor` is the Fabric 1.21.8 host adapter for the
 Helix Minecraft connector. Its default lane is read-only; an independently
@@ -26,14 +26,14 @@ handling, and normalized probe envelopes.
 The production artifact is:
 
 ```text
-minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.2.0.jar
+minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.3.0.jar
 ```
 
 Release artifact:
 
-- candidate size: `183,085` bytes
+- candidate size: `206,566` bytes
 - SHA-256:
-  `c2dbdc2b7c98bcfa3edcd8d1ed5691c0bef845504f3694dfea9e2345b932dc02`
+  `fd9dd38276e901791179d96b71a2d9fe5969e3ee3bace698137d20f44159902d`
 - reproducible receipt:
   `minecraft/helix-fabric-sensor/helix-fabric-sensor-build-receipt.json`
 
@@ -74,8 +74,9 @@ disabled template only and bind each host separately.
 ## Capability boundary
 
 The Fabric sensor advertises the eight shared Minecraft situation probes plus
-one Fabric spatial-planning extension. Paper remains on the shared eight-probe
-contract until it implements the same exact evidence schema:
+one Fabric spatial-planning extension and two live mechanics-fact probes.
+Paper remains on the shared eight-probe contract until it implements the same
+exact evidence schemas:
 
 | Probe               | Northbound capability                           |
 | ------------------- | ----------------------------------------------- |
@@ -88,6 +89,8 @@ contract until it implements the same exact evidence schema:
 | `line_of_sight`     | `com.casimirbot.minecraft.line_of_sight.check`  |
 | `crop_state`        | `com.casimirbot.minecraft.crop_state.read`      |
 | `reachability`      | `com.casimirbot.minecraft.reachability.check`   |
+| `registry_fact`     | `com.casimirbot.minecraft.registry.fact.read`   |
+| `recipe_fact`       | `com.casimirbot.minecraft.recipe.fact.read`     |
 
 The spatial probe is bounded, read-only evidence: a compact block-column survey,
 palette, semantic anchors, and conservative fireplace candidates centered on
@@ -101,6 +104,14 @@ candidates are complete and reports the corresponding retained or omitted
 counts. A solver must narrow and repeat the probe or fail actionably when those
 fields show that a requested conclusion is outside the retained evidence;
 truncation is never permission to guess.
+
+The mechanics probes are equally narrow. `registry_fact` checks one exact
+block, item, entity-type, or effect identifier in the registries of the live
+1.21.8 server. `recipe_fact` checks one exact recipe ID or a bounded set of
+recipes producing one exact item. Both report the live game version and return
+typed nonterminal evidence. They do not enumerate arbitrary registry contents,
+export recipe JSON, craft, execute commands, or choose a strategy. Dynamic
+recipe displays that cannot be resolved exactly are marked incomplete.
 
 The sensor does not advertise pathfinding or closed-container contents. When a room
 owner explicitly configures command authority and completes **Pair command

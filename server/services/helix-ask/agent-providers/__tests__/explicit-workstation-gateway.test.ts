@@ -892,6 +892,58 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
   });
 
+  it("filters a Minecraft command negated in ordinary language while retaining Player Embodiment", () => {
+    const requests = readWorkstationGatewayCallRequestsForTurn({
+      includePlannerDerived: true,
+      body: {
+        agent_runtime: "codex",
+        question:
+          "Step off the test platform using one bounded survival_tas guardian program. Do not use commands or teleportation.",
+        workstation_gateway_calls: [
+          {
+            capability_id: "com.casimirbot.minecraft.command",
+            mode: "write",
+            arguments: {
+              command:
+                "execute as @s at @s run setblock ~ ~ ~ minecraft:water",
+              category: "world_build",
+              effect: "world_mutation",
+            },
+          },
+          {
+            capability_id: "com.casimirbot.minecraft.player.guardian.execute",
+            mode: "write",
+            arguments: {
+              action_kind: "execute_reactive_program",
+            },
+          },
+        ],
+        committed_ask_route: {
+          schema: "helix.committed_ask_route.v1",
+          turn_id: "ask:guardian-command-negation",
+          route: { source_target: "live_environment" },
+          canonical_goal: {
+            goal_kind: "environment_action_workflow",
+            required_terminal_kind: "model_synthesized_answer",
+          },
+          capability_policy: {
+            allowed_tool_families: ["live_environment"],
+            suppressed_tool_families: [],
+          },
+          terminal_product: {
+            allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+            forbidden_terminal_artifact_kinds: [],
+            evidence_reentry_required: true,
+          },
+        },
+      },
+    });
+
+    expect(capabilities(requests)).toEqual([
+      "com.casimirbot.minecraft.player.guardian.execute",
+    ]);
+  });
+
   it("filters an ambient docs request out of a committed Theory-only route", () => {
     const requests = readWorkstationGatewayCallRequestsForTurn({
       includePlannerDerived: true,

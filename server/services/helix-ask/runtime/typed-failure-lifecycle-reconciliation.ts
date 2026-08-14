@@ -63,12 +63,50 @@ const hasCurrentTurnObservation = (payload: RecordLike): boolean => {
   ) {
     return true;
   }
+  const currentTurnId =
+    readString(payload.turn_id) ??
+    readString(payload.active_turn_id) ??
+    readString(payload.backend_turn_id);
+  const isCurrentTurnCapabilityObservationPacket = (
+    value: unknown,
+  ): boolean => {
+    const packet = readRecord(value);
+    if (
+      readString(packet?.schema) !==
+      "helix.agent_step_observation_packet.v1"
+    ) {
+      return false;
+    }
+    const packetTurnId = readString(packet?.turn_id);
+    return Boolean(
+      packetTurnId &&
+        (!currentTurnId || packetTurnId === currentTurnId) &&
+        readString(packet?.call_id) &&
+        readString(packet?.decision_id) &&
+        readString(packet?.capability_key) &&
+        readString(packet?.status),
+    );
+  };
+  const capabilityPackets = Array.isArray(
+    payload.capability_lane_observation_packets,
+  )
+    ? payload.capability_lane_observation_packets
+    : [];
+  if (capabilityPackets.some(isCurrentTurnCapabilityObservationPacket)) {
+    return true;
+  }
   const ledger = Array.isArray(payload.current_turn_artifact_ledger)
     ? payload.current_turn_artifact_ledger
     : [];
   return ledger.some((entry) => {
     const artifact = readRecord(entry);
     const kind = readString(artifact?.kind) ?? "";
+    if (
+      kind === "provider_gateway_observation_packet" &&
+      isCurrentTurnCapabilityObservationPacket(artifact?.payload)
+    ) {
+      return true;
+    }
     return /(?:tool|source|environment|document|scholarly|calculator|workspace)[-_.:]?(?:observation|receipt|evaluation)$/i.test(
       kind,
     );

@@ -6,6 +6,8 @@ export const HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY =
   "com.casimirbot.minecraft.player.navigate" as const;
 export const HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY =
   "com.casimirbot.minecraft.player.look" as const;
+export const HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY =
+  "com.casimirbot.minecraft.player.camera.track" as const;
 export const HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY =
   "com.casimirbot.minecraft.player.walk" as const;
 export const HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY =
@@ -35,11 +37,16 @@ export const HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY =
   "com.casimirbot.minecraft.player.craft" as const;
 export const HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY =
   "com.casimirbot.minecraft.player.inventory.transfer" as const;
+export const HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY =
+  "com.casimirbot.minecraft.player.sequence.execute" as const;
+export const HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY =
+  "com.casimirbot.minecraft.player.guardian.execute" as const;
 
 export const HELIX_MINECRAFT_PLAYER_MVP_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
@@ -62,22 +69,28 @@ export const HELIX_MINECRAFT_PLAYER_WORKFLOW_CAPABILITY_IDS = Object.freeze([
 export const HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
   ...HELIX_MINECRAFT_PLAYER_WORKFLOW_CAPABILITY_IDS,
 ] as const);
 
 export const HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS = Object.freeze([
   ...HELIX_MINECRAFT_PLAYER_MVP_CAPABILITY_IDS,
   ...HELIX_MINECRAFT_PLAYER_WORKFLOW_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
 ] as const);
 
 export const HELIX_MINECRAFT_PLAYER_ACTION_KINDS = [
   "navigate_to",
   "look_at",
+  "track_target",
   "walk",
   "jump",
   "interact",
@@ -127,9 +140,8 @@ export const helixMinecraftBlockPositionSchema = z
   })
   .strict();
 
-export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
-  "action_kind",
-  [
+export const helixMinecraftPlayerActionArgumentsSchema = z
+  .discriminatedUnion("action_kind", [
     z
       .object({
         action_kind: z.literal("navigate_to"),
@@ -149,34 +161,93 @@ export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
       .object({
         action_kind: z.literal("look_at"),
         target: z.discriminatedUnion("target_kind", [
-          z.object({
-            target_kind: z.literal("position"),
-            position: helixMinecraftPositionSchema,
-          }).strict(),
-          z.object({
-            target_kind: z.literal("current_focus"),
-          }).strict(),
-          z.object({
-            target_kind: z.literal("relative_rotation"),
-            yaw_delta_degrees: z
-              .number()
-              .finite()
-              .min(-180)
-              .max(180)
-              .describe("Positive values turn right; negative values turn left."),
-            pitch_delta_degrees: z
-              .number()
-              .finite()
-              .min(-180)
-              .max(180)
-              .describe("Positive values look down; negative values look up."),
-          }).strict(),
-          z.object({
-            target_kind: z.literal("environment_subject"),
-            subject_ref: subjectRefSchema,
-          }).strict(),
+          z
+            .object({
+              target_kind: z.literal("position"),
+              position: helixMinecraftPositionSchema,
+            })
+            .strict(),
+          z
+            .object({
+              target_kind: z.literal("current_focus"),
+            })
+            .strict(),
+          z
+            .object({
+              target_kind: z.literal("relative_rotation"),
+              yaw_delta_degrees: z
+                .number()
+                .finite()
+                .min(-180)
+                .max(180)
+                .describe(
+                  "Positive values turn right; negative values turn left.",
+                ),
+              pitch_delta_degrees: z
+                .number()
+                .finite()
+                .min(-180)
+                .max(180)
+                .describe(
+                  "Positive values look down; negative values look up.",
+                ),
+            })
+            .strict(),
+          z
+            .object({
+              target_kind: z.literal("environment_subject"),
+              subject_ref: subjectRefSchema,
+            })
+            .strict(),
         ]),
         max_turn_degrees_per_tick: z.number().finite().positive().max(180),
+      })
+      .strict(),
+    z
+      .object({
+        action_kind: z.literal("track_target"),
+        target: z.discriminatedUnion("target_kind", [
+          z
+            .object({
+              target_kind: z.literal("entity_type"),
+              entity_type_id: resourceLocationSchema,
+              selection: z.literal("nearest"),
+            })
+            .strict(),
+          z
+            .object({
+              target_kind: z.literal("current_focus_entity"),
+            })
+            .strict(),
+          z
+            .object({
+              target_kind: z.literal("particle_type"),
+              particle_type_id: resourceLocationSchema,
+              selection: z.literal("nearest"),
+              continuity: z.enum(["single_instance", "same_type_stream"]),
+              handoff_radius: z.number().finite().min(0).max(8),
+              max_handoffs: z.number().int().min(0).max(1_000),
+            })
+            .strict(),
+        ]),
+        aim_point: z.enum(["center", "render_center", "eyes", "feet"]),
+        max_acquisition_distance: z.number().finite().min(1).max(128),
+        max_duration_ms: z
+          .number()
+          .int()
+          .min(1_000)
+          .max(5 * 60_000),
+        max_turn_degrees_per_tick: z.number().finite().min(0.1).max(180),
+        max_angular_acceleration_degrees_per_tick_squared: z
+          .number()
+          .finite()
+          .min(0.01)
+          .max(180),
+        prediction_ticks: z.number().int().min(0).max(10),
+        deadband_degrees: z.number().finite().min(0).max(10),
+        reacquire_ticks: z.number().int().min(0).max(200),
+        require_line_of_sight: z.boolean(),
+        stop_below_health: z.number().finite().min(1).max(20),
       })
       .strict(),
     z
@@ -196,7 +267,11 @@ export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
     z
       .object({
         action_kind: z.literal("interact"),
-        target: z.enum(["current_focus", "looked_at_block", "looked_at_entity"]),
+        target: z.enum([
+          "current_focus",
+          "looked_at_block",
+          "looked_at_entity",
+        ]),
         hand: z.enum(["main_hand", "off_hand"]),
         interaction: z.enum(["use", "interact"]),
       })
@@ -226,7 +301,11 @@ export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
         action_kind: z.literal("follow"),
         subject_ref: subjectRefSchema,
         distance: z.number().finite().min(1).max(64),
-        max_duration_ms: z.number().int().min(1_000).max(30 * 60_000),
+        max_duration_ms: z
+          .number()
+          .int()
+          .min(1_000)
+          .max(30 * 60_000),
         stop_below_health: z.number().finite().min(1).max(20),
       })
       .strict(),
@@ -250,7 +329,29 @@ export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
       .object({
         action_kind: z.literal("place"),
         block_id: resourceLocationSchema,
-        positions: z.array(helixMinecraftBlockPositionSchema).min(1).max(256),
+        positions: z
+          .array(helixMinecraftBlockPositionSchema)
+          .min(1)
+          .max(256)
+          .optional()
+          .describe(
+            "Exact admitted integer placement cells. Supply either positions or position_binding, never both.",
+          ),
+        position_binding: z
+          .object({
+            binding_kind: z.literal("predicted_collision_cell"),
+            horizon_ticks: z.number().int().min(1).max(20),
+            max_distance_blocks: z.number().finite().positive().max(6),
+            require_replaceable: z.literal(true),
+          })
+          .strict()
+          .optional()
+          .describe(
+            "A bounded Fabric-local data binding that resolves the predicted landing cell from current measured trajectory. It does not choose strategy or permit arbitrary coordinates.",
+          ),
+        placement_method: z.enum(["block_item", "item_use"]).optional(),
+        source_item_id: resourceLocationSchema.optional(),
+        hand: z.enum(["main_hand", "off_hand"]).optional(),
       })
       .strict(),
     z
@@ -267,11 +368,71 @@ export const helixMinecraftPlayerActionArgumentsSchema = z.discriminatedUnion(
         direction: z.enum(["deposit", "withdraw"]),
         item_id: resourceLocationSchema,
         count: z.number().int().min(1).max(2_304),
-        container_target: z.enum(["current_open_container", "looked_at_container"]),
+        container_target: z.enum([
+          "current_open_container",
+          "looked_at_container",
+        ]),
       })
       .strict(),
-  ],
-);
+  ])
+  .superRefine((value, context) => {
+    if (value.action_kind === "place") {
+      if (
+        (value.positions === undefined) ===
+        (value.position_binding === undefined)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["positions"],
+          message:
+            "Placement requires exactly one target source: exact positions or one bounded position_binding.",
+        });
+      }
+      const method = value.placement_method ?? "block_item";
+      if (method === "item_use") {
+        if (!value.source_item_id) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["source_item_id"],
+            message: "item_use placement requires the exact source item",
+          });
+        }
+        if (!value.hand) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["hand"],
+            message: "item_use placement requires the exact player hand",
+          });
+        }
+      } else if (value.source_item_id || value.hand) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["placement_method"],
+          message:
+            "block_item placement derives its source item and main hand from block_id",
+        });
+      }
+      return;
+    }
+    if (
+      value.action_kind !== "track_target" ||
+      value.target.target_kind !== "particle_type"
+    )
+      return;
+    const target = value.target;
+    const valid =
+      target.continuity === "single_instance"
+        ? target.handoff_radius === 0 && target.max_handoffs === 0
+        : target.handoff_radius > 0 && target.max_handoffs > 0;
+    if (!valid) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["target", "continuity"],
+        message:
+          "single_instance requires zero handoff scope; same_type_stream requires a positive handoff radius and budget",
+      });
+    }
+  });
 
 export type HelixMinecraftPlayerActionArguments = z.infer<
   typeof helixMinecraftPlayerActionArgumentsSchema
@@ -285,6 +446,8 @@ export const minecraftPlayerCapabilityForActionKind = (
       return HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY;
     case "look_at":
       return HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY;
+    case "track_target":
+      return HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY;
     case "walk":
       return HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY;
     case "jump":

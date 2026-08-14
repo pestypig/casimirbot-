@@ -31,6 +31,26 @@ class RawEvidenceSpec:
     byte_length: int
 
 
+@dataclass(frozen=True, slots=True)
+class FrozenRawLevelEvidence:
+    """Immutable preprojection bytes captured at one solver-level boundary."""
+
+    level_id: str
+    scalar_f64le: bytes
+    potential_f64le: bytes
+
+    def __post_init__(self) -> None:
+        if type(self.level_id) is not str:
+            raise TypeError("raw evidence level id must be an exact string")
+        matching = tuple(
+            item for item in RAW_EVIDENCE_INVENTORY if item.level_id == self.level_id
+        )
+        if len(matching) != 2:
+            raise ValueError("raw evidence level id is not frozen")
+        _validate_f64le_payload(matching[0], self.scalar_f64le)
+        _validate_f64le_payload(matching[1], self.potential_f64le)
+
+
 _LEVELS = (
     ("L0", (64, 32)),
     ("L1", (96, 48)),
@@ -91,6 +111,20 @@ if (
 
 
 PreparedRawEvidence = tuple[tuple[str, bytes], ...]
+
+
+def _validate_f64le_payload(item: RawEvidenceSpec, raw: bytes) -> bytes:
+    if type(raw) is not bytes:
+        raise TypeError(f"{item.relative_path}: immutable bytes required")
+    if len(raw) != item.byte_length:
+        raise ValueError(f"{item.relative_path}: payload byte length mismatch")
+    bits = np.frombuffer(raw, dtype=np.dtype("<u8"))
+    exponent = bits & np.uint64(0x7FF0000000000000)
+    if bool(np.any(exponent == np.uint64(0x7FF0000000000000))):
+        raise ValueError(f"{item.relative_path}: nonfinite value forbidden")
+    if bool(np.any(bits == np.uint64(0x8000000000000000))):
+        raise ValueError(f"{item.relative_path}: negative zero forbidden")
+    return raw
 
 
 def _exact_little_endian_bytes(
@@ -156,23 +190,77 @@ def prepare_raw_evidence(
     return tuple(payloads)
 
 
+def freeze_raw_level_evidence(
+    level_id: str,
+    scalar: np.ndarray,
+    potential: np.ndarray,
+) -> FrozenRawLevelEvidence:
+    """Snapshot one exact unpacked Newton result before any projection work."""
+
+    if type(level_id) is not str:
+        raise TypeError("raw evidence level id must be an exact string")
+    matching = tuple(
+        item for item in RAW_EVIDENCE_INVENTORY if item.level_id == level_id
+    )
+    if len(matching) != 2:
+        raise ValueError("raw evidence level id is not frozen")
+    return FrozenRawLevelEvidence(
+        level_id=level_id,
+        scalar_f64le=_exact_little_endian_bytes(matching[0], scalar),
+        potential_f64le=_exact_little_endian_bytes(matching[1], potential),
+    )
+
+
+def prepare_frozen_raw_evidence(
+    levels: tuple[
+        FrozenRawLevelEvidence,
+        FrozenRawLevelEvidence,
+        FrozenRawLevelEvidence,
+    ],
+) -> PreparedRawEvidence:
+    """Assemble the exact six captured byte leaves without reserializing arrays."""
+
+    if type(levels) is not tuple or len(levels) != len(_LEVELS):
+        raise TypeError("frozen raw evidence input must be an exact three-tuple")
+    by_level: dict[str, FrozenRawLevelEvidence] = {}
+    for (expected_level_id, _), level in zip(_LEVELS, levels, strict=True):
+        if type(level) is not FrozenRawLevelEvidence:
+            raise TypeError(f"{expected_level_id}: exact frozen evidence type required")
+        if level.level_id != expected_level_id:
+            raise ValueError("frozen raw evidence order must be exactly L0,L1,L2")
+        by_level[expected_level_id] = level
+    payloads: list[tuple[str, bytes]] = []
+    for item in RAW_EVIDENCE_INVENTORY:
+        level = by_level[item.level_id]
+        raw = (
+            level.scalar_f64le
+            if item.role_index == 0
+            else level.potential_f64le
+        )
+        payloads.append((item.relative_path, _validate_f64le_payload(item, raw)))
+    return tuple(payloads)
+
+
 def _validated_payload_tuple(
     payloads: Sequence[tuple[str, bytes]],
 ) -> PreparedRawEvidence:
-    frozen = tuple(payloads)
-    if len(frozen) != len(RAW_EVIDENCE_INVENTORY):
+    if type(payloads) is not tuple:
+        raise TypeError("raw evidence payload inventory must be an exact tuple")
+    if len(payloads) != len(RAW_EVIDENCE_INVENTORY):
         raise ValueError("raw evidence payload count must be exactly six")
-    for item, payload in zip(RAW_EVIDENCE_INVENTORY, frozen, strict=True):
-        if not isinstance(payload, tuple) or len(payload) != 2:
+    for item, payload in zip(RAW_EVIDENCE_INVENTORY, payloads, strict=True):
+        if type(payload) is not tuple or len(payload) != 2:
             raise TypeError("raw evidence payload entries must be (path, bytes)")
         relative_path, raw = payload
+        if type(relative_path) is not str:
+            raise TypeError("raw evidence payload path must be an exact string")
         if relative_path != item.relative_path:
             raise ValueError("raw evidence payload order/path differs from inventory")
-        if type(raw) is not bytes:
-            raise TypeError(f"{item.relative_path}: immutable bytes required")
-        if len(raw) != item.byte_length:
-            raise ValueError(f"{item.relative_path}: payload byte length mismatch")
-    return frozen
+        _validate_f64le_payload(item, raw)
+    return tuple(
+        (item.relative_path, raw)
+        for item, (_, raw) in zip(RAW_EVIDENCE_INVENTORY, payloads, strict=True)
+    )
 
 
 def _ordinary_directory(metadata: os.stat_result) -> bool:
@@ -287,6 +375,8 @@ def _write_all(descriptor: int, raw: bytes) -> None:
 
 
 def _write_posix(root: Path, payloads: PreparedRawEvidence) -> None:
+    if not os.path.isdir("/proc/self/fd"):
+        raise RuntimeError("Linux procfs descriptor paths are required")
     root_fd, level_fds = _open_posix_empty_tree(root)
     file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
     try:
@@ -297,11 +387,15 @@ def _write_posix(root: Path, payloads: PreparedRawEvidence) -> None:
             if item.level_id != last_level and last_level is not None:
                 os.fsync(level_fds[last_level])
             basename = relative_path.rsplit("/", 1)[1]
+            # CPython's ``open`` audit event omits dir_fd.  Address the same
+            # already-validated held directory descriptor through procfs so
+            # the bootstrap audit hook can bind every write to the exact
+            # level-directory device/inode instead of trusting a basename.
+            destination = f"/proc/self/fd/{level_fds[item.level_id]}/{basename}"
             descriptor = os.open(
-                basename,
+                destination,
                 file_flags,
                 0o600,
-                dir_fd=level_fds[item.level_id],
             )
             try:
                 _write_all(descriptor, raw)
@@ -390,13 +484,16 @@ def prepare_and_write_raw_evidence(
 
 
 __all__ = [
+    "FrozenRawLevelEvidence",
     "RAW_EVIDENCE_INVENTORY",
     "RAW_EVIDENCE_RELATIVE_PATHS",
     "RAW_EVIDENCE_TOTAL_BYTE_LENGTH",
     "RAW_EVIDENCE_TOTAL_ELEMENT_COUNT",
     "PreparedRawEvidence",
     "RawEvidenceSpec",
+    "freeze_raw_level_evidence",
     "prepare_and_write_raw_evidence",
+    "prepare_frozen_raw_evidence",
     "prepare_raw_evidence",
     "write_raw_evidence_exclusive",
 ]

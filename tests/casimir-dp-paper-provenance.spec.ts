@@ -193,6 +193,16 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(supplement).toContain("The runtime adds zero observable bridge edges");
   });
 
+  it("classifies magnetar vacuum birefringence as external QED precedent only", () => {
+    expect(main).toContain("**External empirical precedent.**");
+    expect(main).toContain("one of five evidence");
+    expect(main).toContain("no data replay, parameter transfer");
+    expect(main).toContain("do not enter Eq. (18)");
+    expect(main).toContain("10.1038/s41586-026-10859-z");
+    expect(supplement).toContain("vacuum-to-manifold transfer law");
+    expect(supplement).toContain("not as a Casimir apparatus input, data replay, DP/OR");
+  });
+
   it("integrates Stage-4.2O as separate public-data component validation", () => {
     expect(main).toContain("### 5.6 Public-data component validation");
     expect(main).toContain("cdp-stage4-2o-public-fringe-coefficient");

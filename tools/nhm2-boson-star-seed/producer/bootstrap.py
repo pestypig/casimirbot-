@@ -1,13 +1,20 @@
-"""Hermetic Linux entry point for the untrusted numerical producer stage.
+"""Hermetic Linux entry point for the untrusted v3 numerical producer stage.
 
-Success writes only the 32 raw staging arrays.  It never writes a descriptor,
-gate report, proof receipt, log, or authority-bearing artifact.
+Success writes only the 32 numeric staging arrays and six raw preprojection
+evidence arrays.  It never writes a descriptor, gate report, proof receipt,
+log, or authority-bearing artifact.
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
+import stat
 import sys
+
+
+_O_CLOEXEC = getattr(os, "O_CLOEXEC", 0)
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 
 _SOURCE_DIRECTORY = "/opt/nhm2-producer/source/producer"
@@ -15,13 +22,30 @@ _BOOTSTRAP = f"{_SOURCE_DIRECTORY}/bootstrap.py"
 _PYTHON = "/opt/nhm2-producer/toolchain/python/bin/python3"
 _PYTHON_PREFIX = "/opt/nhm2-producer/toolchain/python"
 _INPUT = "/run/input/00-seed-run-request.v1.json"
+_NUMERIC_POLICY = "/run/input/08-numeric-materialization-policy-v1.canonical.json"
+_POSTPROJECTION_POLICY = "/run/input/09-postprojection-policy-v1.canonical.json"
 _OUTPUT = "/run/staging"
+_RAW_OUTPUT = "/run/postprojection-evidence"
+_NUMERIC_POLICY_SIZE = 243_240
+_NUMERIC_POLICY_SHA256 = (
+    "3ab28f4e777e201a0b6dac73cf637af901d28f2b86db590d18aced5d89e75b40"
+)
+_POSTPROJECTION_POLICY_SIZE = 220_450
+_POSTPROJECTION_POLICY_SHA256 = (
+    "e5cc63fe4f22831ab18bc33ec8f608ea23cbe934cf2160f5be47f9bb2680d2c1"
+)
 _EXPECTED_SCRIPT_ARGV = (
     _BOOTSTRAP,
     "--input-manifest",
     _INPUT,
+    "--numeric-materialization-policy",
+    _NUMERIC_POLICY,
+    "--postprojection-policy",
+    _POSTPROJECTION_POLICY,
     "--output-root",
     _OUTPUT,
+    "--postprojection-evidence-root",
+    _RAW_OUTPUT,
 )
 _EXPECTED_ENVIRONMENT = {
     "BLIS_NUM_THREADS": "1",
@@ -39,10 +63,137 @@ _EXPECTED_ENVIRONMENT = {
     "VECLIB_MAXIMUM_THREADS": "1",
 }
 
+_RAW_EVIDENCE_WRITE_ORDER = (
+    ("L0", "00-raw-scalar-u.f64le"),
+    ("L0", "01-raw-potential-v.f64le"),
+    ("L1", "00-raw-scalar-u.f64le"),
+    ("L1", "01-raw-potential-v.f64le"),
+    ("L2", "00-raw-scalar-u.f64le"),
+    ("L2", "01-raw-potential-v.f64le"),
+)
+
+
+class _RawWriteAuditScope:
+    """Narrowly authorize the six descriptor-relative raw-evidence opens."""
+
+    def __init__(self, staging_paths: set[str]) -> None:
+        self._staging_paths = frozenset(staging_paths)
+        self._raw_queue: list[tuple[str, str]] | None = None
+
+    def begin_raw_writes(self) -> None:
+        if self._raw_queue is not None:
+            raise RuntimeError("raw evidence write authorization is already active")
+        self._raw_queue = list(_RAW_EVIDENCE_WRITE_ORDER)
+
+    def finish_raw_writes(self) -> None:
+        if self._raw_queue is None:
+            raise RuntimeError("raw evidence write authorization is not active")
+        if self._raw_queue:
+            remaining = len(self._raw_queue)
+            self._raw_queue = None
+            raise RuntimeError(
+                f"raw evidence writer opened only {6 - remaining} of six files"
+            )
+        self._raw_queue = None
+
+    def abort_raw_writes(self) -> None:
+        self._raw_queue = None
+
+    def guard(self, event: str, args: tuple[object, ...]) -> None:
+        forbidden_prefixes = ("socket.", "subprocess.", "pty.")
+        forbidden_events = {
+            "os.system",
+            "os.posix_spawn",
+            "os.posix_spawnp",
+            "os.exec",
+            "os.spawn",
+            "os.fork",
+            "os.forkpty",
+            "os.putenv",
+            "os.unsetenv",
+            "os.chdir",
+            "os.mkdir",
+            "os.rmdir",
+            "os.remove",
+            "os.rename",
+            "os.replace",
+            "os.link",
+            "os.symlink",
+            "shutil.copyfile",
+            "shutil.copytree",
+        }
+        if event in forbidden_events or event.startswith(forbidden_prefixes):
+            raise PermissionError(f"producer audit policy rejected {event}")
+        if event != "open" or not args:
+            return
+
+        raw_path = args[0]
+        flags = args[2] if len(args) > 2 and isinstance(args[2], int) else 0
+        mode = args[1] if len(args) > 1 and isinstance(args[1], str) else ""
+        write_mask = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
+        writing = bool(flags & write_mask) or any(character in mode for character in "wax+")
+        if not writing:
+            return
+
+        path = (
+            os.fsdecode(raw_path)
+            if isinstance(raw_path, (bytes, bytearray))
+            else str(raw_path)
+        )
+        required = os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_CLOEXEC | _O_NOFOLLOW
+        forbidden = os.O_RDWR | os.O_TRUNC | os.O_APPEND
+        if flags & required != required or flags & forbidden:
+            raise PermissionError(
+                "producer output write lacks the exclusive frozen flag set"
+            )
+        if path in self._staging_paths:
+            return
+        if self._raw_queue is None or not self._raw_queue:
+            raise PermissionError("producer attempted a non-inventory write")
+        expected_level, expected_basename = self._raw_queue[0]
+        prefix = "/proc/self/fd/"
+        if not path.startswith(prefix):
+            raise PermissionError("producer raw-evidence open is not descriptor-bound")
+        suffix = path[len(prefix) :]
+        descriptor_text, separator, basename = suffix.partition("/")
+        if (
+            not separator
+            or not descriptor_text.isascii()
+            or not descriptor_text.isdecimal()
+            or descriptor_text.startswith("0") and descriptor_text != "0"
+            or basename != expected_basename
+        ):
+            raise PermissionError("producer raw-evidence write order differs from inventory")
+        descriptor = int(descriptor_text, 10)
+        try:
+            opened_directory = os.fstat(descriptor)
+            expected_directory = os.lstat(f"{_RAW_OUTPUT}/{expected_level}")
+        except OSError as error:
+            raise PermissionError("producer raw-evidence directory identity unavailable") from error
+        opened_identity = (
+            opened_directory.st_dev,
+            opened_directory.st_ino,
+            stat.S_IFMT(opened_directory.st_mode),
+        )
+        expected_identity = (
+            expected_directory.st_dev,
+            expected_directory.st_ino,
+            stat.S_IFMT(expected_directory.st_mode),
+        )
+        if (
+            opened_identity != expected_identity
+            or not stat.S_ISDIR(opened_directory.st_mode)
+            or not stat.S_ISDIR(expected_directory.st_mode)
+        ):
+            raise PermissionError("producer raw-evidence directory identity mismatch")
+        self._raw_queue.pop(0)
+
 
 def _freeze_import_path() -> None:
     if os.name != "posix" or not sys.platform.startswith("linux"):
         raise RuntimeError("producer bootstrap is Linux-only")
+    if not _O_CLOEXEC or not _O_NOFOLLOW:
+        raise RuntimeError("producer bootstrap requires CLOEXEC and NOFOLLOW")
     if os.path.abspath(__file__) != _BOOTSTRAP:
         raise RuntimeError("producer bootstrap path differs from frozen invocation")
     if os.path.abspath(sys.executable) != _PYTHON:
@@ -99,7 +250,7 @@ def _assert_binary64_rn_even() -> None:
         raise RuntimeError("binary64 tie parity check failed")
 
 
-def _install_audit_guard() -> None:
+def _install_audit_guard() -> _RawWriteAuditScope:
     array_paths: set[str] = set()
     levels = (("L0", 64, 32), ("L1", 96, 48), ("L2", 128, 64), ("AUDIT", 256, 128))
     stems = (
@@ -116,62 +267,34 @@ def _install_audit_guard() -> None:
         for index, stem in enumerate(stems):
             array_paths.add(f"{_OUTPUT}/arrays/{level}/{index:02d}-{stem}.f64le")
 
-    forbidden_prefixes = ("socket.", "subprocess.", "pty.")
-    forbidden_events = {
-        "os.system",
-        "os.posix_spawn",
-        "os.posix_spawnp",
-        "os.exec",
-        "os.spawn",
-        "os.fork",
-        "os.forkpty",
-        "os.putenv",
-        "os.unsetenv",
-        "os.chdir",
-        "os.mkdir",
-        "os.rmdir",
-        "os.remove",
-        "os.rename",
-        "os.replace",
-        "os.link",
-        "os.symlink",
-        "shutil.copyfile",
-        "shutil.copytree",
-    }
-    write_mask = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
-
-    def guard(event: str, args: tuple[object, ...]) -> None:
-        if event in forbidden_events or event.startswith(forbidden_prefixes):
-            raise PermissionError(f"producer audit policy rejected {event}")
-        if event == "open" and args:
-            raw_path = args[0]
-            flags = args[2] if len(args) > 2 and isinstance(args[2], int) else 0
-            mode = args[1] if len(args) > 1 and isinstance(args[1], str) else ""
-            writing = bool(flags & write_mask) or any(character in mode for character in "wax+")
-            if writing:
-                path = os.fsdecode(raw_path) if isinstance(raw_path, (bytes, bytearray)) else str(raw_path)
-                if path not in array_paths:
-                    raise PermissionError("producer attempted a non-inventory write")
-                required = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
-                forbidden = os.O_RDWR | os.O_TRUNC | os.O_APPEND
-                if flags & required != required or flags & forbidden:
-                    raise PermissionError("producer array write lacks the exclusive frozen flag set")
-
-    sys.addaudithook(guard)
+    scope = _RawWriteAuditScope(array_paths)
+    sys.addaudithook(scope.guard)
+    return scope
 
 
-def _load_run_request(path: str) -> object:
-    import json
+def _read_exact_input_file(
+    path: str,
+    *,
+    expected_size: int | None,
+    expected_sha256: str | None,
+    label: str,
+) -> bytes:
     import stat
 
     metadata = os.lstat(path)
     if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-        raise RuntimeError("run request is not an ordinary no-follow file")
+        raise RuntimeError(f"{label} is not an ordinary no-follow file")
     if metadata.st_nlink != 1:
-        raise RuntimeError("run request hardlink count is not one")
-    if metadata.st_size < 2 or metadata.st_size > 1_048_576:
-        raise RuntimeError("run request byte length is outside the frozen cap")
-    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        raise RuntimeError(f"{label} hardlink count is not one")
+    if expected_size is not None:
+        if metadata.st_size != expected_size:
+            raise RuntimeError(f"{label} byte length differs from the literal pin")
+        maximum_size = expected_size
+    else:
+        if metadata.st_size < 2 or metadata.st_size > 1_048_576:
+            raise RuntimeError(f"{label} byte length is outside the frozen cap")
+        maximum_size = 1_048_576
+    descriptor = os.open(path, os.O_RDONLY | _O_CLOEXEC | _O_NOFOLLOW)
     try:
         opened = os.fstat(descriptor)
         identity = (
@@ -193,9 +316,9 @@ def _load_run_request(path: str) -> object:
             opened.st_ctime_ns,
         )
         if opened_identity != identity:
-            raise RuntimeError("run request changed between lstat and open")
+            raise RuntimeError(f"{label} changed between lstat and open")
         chunks: list[bytes] = []
-        remaining = 1_048_577
+        remaining = maximum_size + 1
         while remaining:
             chunk = os.read(descriptor, min(65_536, remaining))
             if not chunk:
@@ -226,9 +349,25 @@ def _load_run_request(path: str) -> object:
         after.st_ctime_ns,
     )
     if after_identity != identity or final_identity != identity:
-        raise RuntimeError("run request changed during bounded read")
-    if len(raw) != metadata.st_size or len(raw) > 1_048_576:
-        raise RuntimeError("run request changed or exceeded the bounded read")
+        raise RuntimeError(f"{label} changed during bounded read")
+    if len(raw) != metadata.st_size or len(raw) > maximum_size:
+        raise RuntimeError(f"{label} changed or exceeded the bounded read")
+    if expected_sha256 is not None:
+        observed_sha256 = hashlib.sha256(raw).hexdigest()
+        if observed_sha256 != expected_sha256:
+            raise RuntimeError(f"{label} SHA-256 differs from the literal pin")
+    return raw
+
+
+def _load_run_request(path: str) -> object:
+    import json
+
+    raw = _read_exact_input_file(
+        path,
+        expected_size=None,
+        expected_sha256=None,
+        label="run request",
+    )
 
     def no_constant(token: str) -> object:
         raise ValueError(f"nonfinite JSON token forbidden: {token}")
@@ -248,11 +387,26 @@ def _load_run_request(path: str) -> object:
     )
 
 
+def _verify_policy_inputs() -> None:
+    _read_exact_input_file(
+        _NUMERIC_POLICY,
+        expected_size=_NUMERIC_POLICY_SIZE,
+        expected_sha256=_NUMERIC_POLICY_SHA256,
+        label="numeric materialization policy",
+    )
+    _read_exact_input_file(
+        _POSTPROJECTION_POLICY,
+        expected_size=_POSTPROJECTION_POLICY_SIZE,
+        expected_sha256=_POSTPROJECTION_POLICY_SHA256,
+        label="postprojection policy",
+    )
+
+
 def main() -> int:
     _freeze_import_path()
     _assert_launch_surface()
     _assert_binary64_rn_even()
-    _install_audit_guard()
+    audit_scope = _install_audit_guard()
 
     from pathlib import Path
 
@@ -261,10 +415,12 @@ def main() -> int:
     from contract import validate_run_request
     from continuum import assemble_fields
     from output import prepare_payloads, write_staging_arrays_exclusive
+    from raw_evidence import prepare_frozen_raw_evidence, write_raw_evidence_exclusive
     from solver import solve_production_hierarchy
 
     np.seterr(divide="raise", invalid="raise", over="raise", under="ignore")
     validate_run_request(_load_run_request(_INPUT))
+    _verify_policy_inputs()
 
     # No final-path write occurs until every solve, tail synthesis, scaling,
     # shape check, finite check, and byte serialization has completed in memory.
@@ -272,7 +428,17 @@ def main() -> int:
     fields = assemble_fields(l0, l1, l2)
     _assert_binary64_rn_even()
     payloads = prepare_payloads(fields.level_arrays)
+    raw_payloads = prepare_frozen_raw_evidence(
+        (l0.raw_preprojection, l1.raw_preprojection, l2.raw_preprojection)
+    )
     write_staging_arrays_exclusive(Path(_OUTPUT), payloads)
+    audit_scope.begin_raw_writes()
+    try:
+        write_raw_evidence_exclusive(Path(_RAW_OUTPUT), raw_payloads)
+        audit_scope.finish_raw_writes()
+    except BaseException:
+        audit_scope.abort_raw_writes()
+        raise
     return 0
 
 

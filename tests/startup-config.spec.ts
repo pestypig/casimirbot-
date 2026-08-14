@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import crypto from "node:crypto";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -106,6 +107,44 @@ describe("resolveStartupConfig", () => {
     expect(
       shouldLoadLocalEnvFile({ CASIMIR_SKIP_LOCAL_ENV_FILE: "true" }),
     ).toBe(false);
+  });
+
+  it("fails startup for mismatched Robinhood live flags", () => {
+    expect(() => resolveStartupConfig({
+      ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION: "1",
+      ENABLE_ROBINHOOD_LIVE_SUPERVISOR: "0",
+    }, "production")).toThrow(
+      "robinhood_live_flags_must_be_enabled_together",
+    );
+    expect(() => resolveStartupConfig({
+      ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION: "0",
+      ENABLE_ROBINHOOD_LIVE_SUPERVISOR: "1",
+    }, "production")).toThrow(
+      "robinhood_live_flags_must_be_enabled_together",
+    );
+  });
+
+  it("requires an exact 32-byte key before live trading can start", () => {
+    const flags = {
+      ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION: "1",
+      ENABLE_ROBINHOOD_LIVE_SUPERVISOR: "1",
+    };
+    expect(() => resolveStartupConfig({
+      ...flags,
+      HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY: "not-a-production-key",
+    }, "production")).toThrow(
+      "robinhood_live_provider_encryption_key_invalid",
+    );
+    const configured = resolveStartupConfig({
+      ...flags,
+      HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY:
+        crypto.randomBytes(32).toString("base64url"),
+    }, "production");
+    expect(configured.robinhoodLiveTrading).toEqual({
+      executionEnabled: true,
+      supervisorEnabled: true,
+      startupGatePassed: true,
+    });
   });
 });
 

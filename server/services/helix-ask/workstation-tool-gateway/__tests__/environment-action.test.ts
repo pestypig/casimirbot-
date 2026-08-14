@@ -125,6 +125,9 @@ const deps = (
 describe("Minecraft player-action workstation gateway", () => {
   it("treats manual cancellation as a same-turn human intervention boundary", () => {
     expect(environmentActionFailureRepairAction("request_canceled")).toBe("ask_user");
+    expect(environmentActionFailureRepairAction("connector_offline")).toBe("ask_user");
+    expect(environmentActionFailureRepairAction("action_outcome_unknown")).toBe("ask_user");
+    expect(environmentActionFailureRepairAction("failed")).toBe("repair");
     expect(environmentActionGatewayAdmissionStatus("failed")).toBe("admitted");
     expect(environmentActionGatewayAdmissionStatus("blocked")).toBe("blocked");
     expect(environmentActionMinecraftManifests[0]?.description).toContain(
@@ -133,10 +136,13 @@ describe("Minecraft player-action workstation gateway", () => {
     expect(environmentActionMinecraftManifests[0]?.safety_tags).toContain(
       "manual_override_non_retryable_same_turn",
     );
+    expect(environmentActionMinecraftManifests[0]?.safety_tags).toContain(
+      "connector_recovery_non_retryable_same_turn",
+    );
   });
 
   it("publishes the baseline and reusable bounded, nonterminal, host-free player tools", () => {
-    expect(environmentActionMinecraftManifests).toHaveLength(13);
+    expect(environmentActionMinecraftManifests).toHaveLength(16);
     expect(environmentActionMinecraftManifests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ capability_id: CAPABILITY_ID }),
@@ -160,6 +166,15 @@ describe("Minecraft player-action workstation gateway", () => {
         }),
         expect.objectContaining({
           capability_id: "com.casimirbot.minecraft.player.inventory.transfer",
+        }),
+        expect.objectContaining({
+          capability_id: "com.casimirbot.minecraft.player.sequence.execute",
+        }),
+        expect.objectContaining({
+          capability_id: "com.casimirbot.minecraft.player.camera.track",
+        }),
+        expect.objectContaining({
+          capability_id: "com.casimirbot.minecraft.player.guardian.execute",
         }),
       ]),
     );
@@ -250,6 +265,234 @@ describe("Minecraft player-action workstation gateway", () => {
     });
   });
 
+  it("normalizes and admits one bounded predictive entity camera tracker", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.camera.track";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const trackingObservation = {
+      ...observation,
+      capability_id: capabilityId,
+      action_kind: "track_target",
+      summary: "The paired camera retained its locked bat target.",
+    } satisfies HelixEnvironmentActionObservation;
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:track-bat",
+      toolCallId: "tool_call:player-action-track-bat",
+      providerExecutionId: "provider_execution:player-action-track-bat",
+      arguments: {
+        target_kind: "entity_type",
+        entity_type_id: "minecraft:bat",
+        aim_point: "center",
+        max_acquisition_distance: 64,
+        max_duration_ms: 30_000,
+        max_turn_degrees_per_tick: 20,
+        max_angular_acceleration_degrees_per_tick_squared: 4,
+        prediction_ticks: 2,
+        deadband_degrees: 0.5,
+        reacquire_ticks: 10,
+        require_line_of_sight: false,
+        stop_below_health: 4,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "track_target",
+            effectClass: "continuous_control",
+            workflowModes: ["long_running"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => trackingObservation),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(enqueueAction.mock.calls[0]?.[0]?.request).toMatchObject({
+      action_kind: "track_target",
+      requested_control_engine: "native_fabric",
+      workflow_mode: "long_running",
+      arguments: {
+        action_kind: "track_target",
+        target: {
+          target_kind: "entity_type",
+          entity_type_id: "minecraft:bat",
+          selection: "nearest",
+        },
+        max_duration_ms: 30_000,
+      },
+      constraints: { max_duration_ms: 35_000 },
+      postconditions: [expect.objectContaining({
+        condition_kind: "minecraft.player.camera_tracking_completed",
+      })],
+    });
+  });
+
+  it("fails closed when an entity-type tracker omits its exact type", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.camera.track";
+    const enqueueAction = vi.fn();
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:track-missing-type",
+      toolCallId: "tool_call:player-action-track-missing-type",
+      providerExecutionId: "provider_execution:player-action-track-missing-type",
+      arguments: {
+        target_kind: "entity_type",
+        aim_point: "center",
+        max_acquisition_distance: 64,
+        max_duration_ms: 30_000,
+        max_turn_degrees_per_tick: 20,
+        max_angular_acceleration_degrees_per_tick_squared: 4,
+        prediction_ticks: 2,
+        deadband_degrees: 0.5,
+        reacquire_ticks: 10,
+        require_line_of_sight: false,
+        stop_below_health: 4,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "track_target",
+            effectClass: "continuous_control",
+            workflowModes: ["long_running"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+      }),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.observation.outcome).toBe("precondition_failed");
+    expect(enqueueAction).not.toHaveBeenCalled();
+  });
+
+  it("admits one bounded survival TAS graph without exposing a command or host plane", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.sequence.execute";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const sequenceObservation = {
+      ...observation,
+      capability_id: capabilityId,
+      action_kind: "execute_sequence",
+      summary: "The bounded TAS sequence completed its checkpoint.",
+    } satisfies HelixEnvironmentActionObservation;
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:fluid-sequence",
+      toolCallId: "tool_call:player-action-fluid-sequence",
+      providerExecutionId: "provider_execution:player-action-fluid-sequence",
+      arguments: {
+        sequence_schema: "helix.minecraft.player_sequence.v1",
+        sequence_id: "sequence:gateway-test",
+        ruleset: "survival_tas",
+        execution_plane: "player_embodiment",
+        scheduler_engine: "native_fabric",
+        optimization: {
+          primary: "minimize_world_ticks",
+          record_wall_clock: true,
+          stop_on_first_verified_success: true,
+        },
+        start_node_id: "node:input",
+        max_total_ticks: 200,
+        required_checkpoint_ids: [],
+        mutation_scope: {
+          world_mutation_allowed: false,
+          max_block_mutations: 0,
+          max_inventory_transfers: 0,
+          allowed_block_ids: [],
+          allowed_regions: [],
+          combat_allowed: false,
+        },
+        nodes: [
+          {
+            node_id: "node:input",
+            node_kind: "input_segment",
+            earliest_tick: 0,
+            duration_ticks: 2,
+            controls: {
+              forward: 1,
+              strafe: 0,
+              sprint: true,
+              sneak: false,
+              jump: "pulse",
+              use: "idle",
+            },
+            on_complete: "node:succeeded",
+            on_failure: "node:failed",
+          },
+          {
+            node_id: "node:succeeded",
+            node_kind: "terminal",
+            terminal_outcome: "succeeded",
+            reason_code: "gateway_sequence_complete",
+          },
+          {
+            node_id: "node:failed",
+            node_kind: "terminal",
+            terminal_outcome: "failed",
+            reason_code: "gateway_sequence_failed",
+          },
+        ],
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "execute_sequence",
+            effectClass: "continuous_control",
+            workflowModes: ["long_running"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => sequenceObservation),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    const request = enqueueAction.mock.calls[0]?.[0]?.request;
+    expect(request).toMatchObject({
+      capability_id: capabilityId,
+      action_kind: "execute_sequence",
+      requested_control_engine: "native_fabric",
+      workflow_mode: "long_running",
+      constraints: {
+        max_duration_ms: 15_000,
+        max_block_mutations: 0,
+        max_inventory_transfers: 0,
+        world_mutation_allowed: false,
+        combat_allowed: false,
+        host_access_allowed: false,
+        automatic_replay_allowed: false,
+      },
+      postconditions: [expect.objectContaining({
+        condition_kind: "minecraft.player.sequence_checkpoints_satisfied",
+        parameters: {
+          sequence_id: "sequence:gateway-test",
+          ruleset: "survival_tas",
+          max_total_ticks: 200,
+          required_checkpoint_ids: [],
+        },
+      })],
+    });
+    expect(JSON.stringify(request)).not.toContain("command_assisted_sandbox");
+    expect(JSON.stringify(request)).not.toContain("host shell");
+  });
+
   it("fails closed instead of converting an incomplete look request into current-focus success", async () => {
     const capabilityId = "com.casimirbot.minecraft.player.look";
     const enqueueAction = vi.fn();
@@ -273,9 +516,158 @@ describe("Minecraft player-action workstation gateway", () => {
       status: "blocked",
       error: "precondition_failed",
       repairAction: "repair",
+      observation: {
+        provenance_valid: false,
+        eligible_for_current_turn_reentry: true,
+        terminal_eligible: false,
+      },
     });
     expect(result.summary).toContain("did not satisfy the admitted input schema");
     expect(result.summary).toContain("target_kind");
+    expect(enqueueAction).not.toHaveBeenCalled();
+  });
+
+  it("returns exact admitted enum values in a model-repairable schema rejection", async () => {
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: "com.casimirbot.minecraft.player.walk",
+      turnId: "ask:player-action:invalid-walk-enum",
+      toolCallId: "tool_call:player-action-invalid-walk-enum",
+      providerExecutionId: "provider_execution:player-action-invalid-walk-enum",
+      arguments: {
+        direction: "sideways",
+        duration_ms: 250,
+        sprint: false,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps(),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "precondition_failed",
+      repairAction: "repair",
+      observation: {
+        eligible_for_current_turn_reentry: true,
+      },
+    });
+    expect(result.summary).toContain(
+      'Value must be one of the admitted values: "forward", "back", "left", "right".',
+    );
+  });
+
+  it("returns every bounded guardian resource and mutation repair issue to Codex", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.guardian.execute";
+    const enqueueAction = vi.fn();
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:guardian-complete-repair-delta",
+      toolCallId: "tool_call:player-action-guardian-complete-repair-delta",
+      providerExecutionId:
+        "provider_execution:player-action-guardian-complete-repair-delta",
+      arguments: {
+        program_schema: "helix.minecraft.reactive_program.v1",
+        program_id: "guardian:complete-repair-delta",
+        ruleset: "survival_tas",
+        execution_plane: "player_embodiment",
+        scheduler_engine: "native_fabric_concurrent",
+        max_total_ticks: 120,
+        completion_policy: {
+          mode: "all_required",
+          cancel_remaining_on_settle: true,
+        },
+        mutation_scope: {
+          world_mutation_allowed: true,
+          max_block_mutations: 1,
+          max_inventory_transfers: 0,
+          allowed_block_ids: ["minecraft:water"],
+          allowed_regions: [],
+          combat_allowed: false,
+        },
+        lanes: [{
+          lane_id: "lane:place",
+          lane_kind: "world",
+          priority: 100,
+          required: true,
+          activation: "immediate",
+          resource_ceiling: ["world", "native_workflow", "safety"],
+          start_node_id: "node:place",
+          nodes: [{
+            node_id: "node:place",
+            node_kind: "action",
+            earliest_tick: 0,
+            timeout_ticks: 120,
+            action: {
+              action_kind: "place",
+              block_id: "minecraft:water",
+              position_binding: {
+                binding_kind: "predicted_collision_cell",
+                horizon_ticks: 8,
+                max_distance_blocks: 6,
+                require_replaceable: true,
+              },
+              placement_method: "item_use",
+              source_item_id: "minecraft:water_bucket",
+              hand: "main_hand",
+            },
+            on_success: "node:succeeded",
+            on_failure: "node:failed",
+            on_timeout: "node:failed",
+          }, {
+            node_id: "node:succeeded",
+            node_kind: "terminal",
+            terminal_outcome: "succeeded",
+            reason_code: "water:placed",
+          }, {
+            node_id: "node:failed",
+            node_kind: "terminal",
+            terminal_outcome: "failed",
+            reason_code: "water:not_placed",
+          }],
+        }],
+        races: [],
+        interrupts: [],
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "execute_reactive_program",
+            effectClass: "continuous_control",
+            workflowModes: ["long_running"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "precondition_failed",
+      repairAction: "repair",
+      observation: {
+        eligible_for_current_turn_reentry: true,
+      },
+    });
+    for (const resource of [
+      "camera",
+      "locomotion",
+      "hotbar",
+      "main_hand",
+      "inventory",
+    ]) {
+      expect(result.summary).toContain(
+        `Action place requires undeclared lane resource ${resource}.`,
+      );
+    }
+    expect(result.summary).toContain(
+      "The inventory-transfer ceiling must cover all bounded lane iterations: required at least 1, received 0.",
+    );
     expect(enqueueAction).not.toHaveBeenCalled();
   });
 
@@ -396,6 +788,131 @@ describe("Minecraft player-action workstation gateway", () => {
     });
     expect(JSON.stringify(result.executedArgs)).not.toContain("subject_binding");
     expect(JSON.stringify(result.executedArgs)).not.toContain("action_authority");
+  });
+
+  it("uses the sole active Minecraft binding when Codex supplies a generic environment hint", async () => {
+    const resolveContext = vi.fn(async () => context() as never);
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:generic-environment-hint",
+      toolCallId: "tool_call:player-action-generic-environment-hint",
+      providerExecutionId:
+        "provider_execution:player-action-generic-environment-hint",
+      arguments: {
+        destination: { x: 10, y: 64, z: 20 },
+        arrival_radius: 1,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+        environment_label: "minecraft",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({ resolveContext }),
+    });
+
+    expect(result).toMatchObject({ ok: true, status: "completed" });
+    expect(resolveContext).toHaveBeenCalledWith(expect.objectContaining({
+      environmentBindingId: ENVIRONMENT_ID,
+    }));
+  });
+
+  it("still fails closed on a generic environment hint when multiple Minecraft bindings are active", async () => {
+    const resolveContext = vi.fn();
+    const enqueueAction = vi.fn();
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:ambiguous-environment-hint",
+      toolCallId: "tool_call:player-action-ambiguous-environment-hint",
+      providerExecutionId:
+        "provider_execution:player-action-ambiguous-environment-hint",
+      arguments: {
+        destination: { x: 10, y: 64, z: 20 },
+        arrival_radius: 1,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+        environment_label: "minecraft",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        listRoomEnvironments: vi.fn(async () => [
+          {
+            environment_binding_id: "environment_binding:fabric-one",
+            source_label: "Fabric one",
+            domain: "minecraft",
+            connection_status: "active",
+          },
+          {
+            environment_binding_id: "environment_binding:fabric-two",
+            source_label: "Fabric two",
+            domain: "minecraft",
+            connection_status: "active",
+          },
+        ] as never),
+        resolveContext,
+        enqueueAction,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "blocked",
+      error: "wrong_environment",
+      observation: { outcome: "wrong_environment" },
+    });
+    expect(resolveContext).not.toHaveBeenCalled();
+    expect(enqueueAction).not.toHaveBeenCalled();
+  });
+
+  it("uses an exact visible label to disambiguate multiple active Minecraft bindings", async () => {
+    const resolveContext = vi.fn(async ({ environmentBindingId }) => ({
+      ...context(),
+      environmentBindingId,
+    }) as never);
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:exact-environment-label",
+      toolCallId: "tool_call:player-action-exact-environment-label",
+      providerExecutionId:
+        "provider_execution:player-action-exact-environment-label",
+      arguments: {
+        destination: { x: 10, y: 64, z: 20 },
+        arrival_radius: 1,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+        environment_label: "Fabric two",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        listRoomEnvironments: vi.fn(async () => [
+          {
+            environment_binding_id: "environment_binding:fabric-one",
+            source_label: "Fabric one",
+            domain: "minecraft",
+            connection_status: "active",
+          },
+          {
+            environment_binding_id: "environment_binding:fabric-two",
+            source_label: "Fabric two",
+            domain: "minecraft",
+            connection_status: "active",
+          },
+        ] as never),
+        resolveContext,
+      }),
+    });
+
+    expect(result).toMatchObject({ ok: true, status: "completed" });
+    expect(resolveContext).toHaveBeenCalledWith(expect.objectContaining({
+      environmentBindingId: "environment_binding:fabric-two",
+    }));
   });
 
   it("queues exact workflow cancellation when the owning provider turn aborts", async () => {

@@ -1,0 +1,14 @@
+{
+  "base_url": "http://localhost:1522",
+  "room_id": "shared_realtime_room:b9ca6c9a-a6ab-4db9-b7e5-e6c98f01c537",
+  "profile_id": "profile:minecraft-situation-awareness-local",
+  "source_id": "source:room-ingress:d16034a3-6350-4121-adca-545bd042ed4a",
+  "environment_binding_id": "environment_binding:legacy:67af22571e3d95b01c96d362052edb8bfab14ba0",
+  "command_authority_id": "command_authority:0275535e-0144-487d-905f-516b23e4d5f4",
+  "command_policy_version": 3,
+  "command_authority_profile": "server_administrator",
+  "command_autonomy_mode": "autonomous",
+  "command_expires_at": "2026-08-13T16:55:34.993Z",
+  "command_execution_enabled": true,
+  "command_credential_persisted_only_in_plugin_config": true
+}

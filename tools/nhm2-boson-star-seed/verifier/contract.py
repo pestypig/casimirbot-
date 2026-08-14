@@ -14,10 +14,10 @@ from typing import Final, Mapping
 RUN_PLAN_BINDING: Final[Mapping[str, object]] = MappingProxyType(
     {
         "artifactId": "nhm2.prolate_boson_star_newtonian_seed_run_plan",
-        "contractVersion": "nhm2_prolate_boson_star_newtonian_seed_run_plan/v1",
-        "sha256Domain": "nhm2-prolate-boson-star-newtonian-seed-run-plan/v1\n",
-        "sha256": "3facc28fc62c9515a4c751f47ac9b6d90ab1179216d3d7c29c2a37b48e7e8f41",
-        "canonicalSizeBytes": 261169,
+        "contractVersion": "nhm2_prolate_boson_star_newtonian_seed_run_plan/v3",
+        "sha256Domain": "nhm2-prolate-boson-star-newtonian-seed-run-plan/v3\n",
+        "sha256": "ac223c9b79b621b39d25fe9807492e030da916d8f2c6453a30b612de4ae6562c",
+        "canonicalSizeBytes": 54136,
     }
 )
 CANDIDATE_BINDING: Final[Mapping[str, object]] = MappingProxyType(
@@ -403,10 +403,29 @@ if (
     raise RuntimeError("frozen_array_inventory_drift")
 
 RUN_REQUEST_PATH: Final[str] = "/run/input/00-seed-run-request.v1.json"
+NUMERIC_MATERIALIZATION_POLICY_PATH: Final[str] = (
+    "/run/input/08-numeric-materialization-policy-v1.canonical.json"
+)
+POSTPROJECTION_POLICY_PATH: Final[str] = (
+    "/run/input/09-postprojection-policy-v1.canonical.json"
+)
+NUMERIC_MATERIALIZATION_POLICY_CANONICAL_SIZE_BYTES: Final[int] = 243_240
+NUMERIC_MATERIALIZATION_POLICY_CANONICAL_PLAIN_SHA256: Final[str] = (
+    "3ab28f4e777e201a0b6dac73cf637af901d28f2b86db590d18aced5d89e75b40"
+)
+POSTPROJECTION_POLICY_CANONICAL_SIZE_BYTES: Final[int] = 220_450
+POSTPROJECTION_POLICY_CANONICAL_PLAIN_SHA256: Final[str] = (
+    "e5cc63fe4f22831ab18bc33ec8f608ea23cbe934cf2160f5be47f9bb2680d2c1"
+)
 STAGING_ROOT: Final[str] = "/run/staging"
+POSTPROJECTION_EVIDENCE_ROOT: Final[str] = "/run/postprojection-evidence"
 REPLAY_BUNDLE_PATH: Final[str] = (
     "/run/replay/seed-verifier-replay-bundle.canonical.json"
 )
+BROKER_RUNTIME_EVIDENCE_PATH: Final[str] = (
+    "/run/broker-channel/verifier-runtime-evidence.v3.canonical.json"
+)
+VERIFIER_RUNTIME_CHANNEL_MAXIMUM_BYTES: Final[int] = 32 * 1024 * 1024
 BOOTSTRAP_PATH: Final[str] = (
     "/opt/nhm2-verifier/source/verifier/bootstrap.py"
 )

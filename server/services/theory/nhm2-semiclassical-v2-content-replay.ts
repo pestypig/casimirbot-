@@ -3,6 +3,10 @@ import {
   type Nhm2SemiclassicalConstraintBracketId,
 } from "../../../shared/contracts/nhm2-semiclassical-state-realizability.v2";
 import { NHM2_SEMICLASSICAL_V2_APPROVED_REPLAY_POLICY_ID } from "../../../shared/contracts/nhm2-semiclassical-v2-raw-replay-manifest.v1";
+import {
+  inspectNhm2SemiclassicalV2MetricDemandDerivationReplayCapability,
+  type Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence,
+} from "./nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge";
 
 export const NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_CONTRACT_VERSION =
   "nhm2_semiclassical_v2_content_replay/v2" as const;
@@ -42,7 +46,9 @@ export type Nhm2SemiclassicalV2ContentReplayPolicy = Readonly<{
   meanNormalizationFloorSI: number;
   meanMetricDemandRelativeUpper95Tolerance: number;
   maximumMetricDemandRelativeErrorBound: number;
+  /** Legacy v2 compatibility descriptor; never grants replay authority. */
   metricDemandDerivationStatus: "metric_demand_derivation_executor_provenance_unverified";
+  /** Legacy v2 compatibility descriptor; never grants replay authority. */
   metricDemandIntervalTraceStatus: "interval_trace_not_server_replayed";
   minimumMetricDemandFrobeniusSI: number;
   requiredMetricDemandSampleFraction: number;
@@ -995,6 +1001,7 @@ const certifyCentralCovariancePsd = (
  */
 export const replayNhm2SemiclassicalV2Content = (
   input: unknown,
+  metricDemandDerivationReplayEvidence: Nhm2SemiclassicalV2MetricDemandDerivationReplayEvidence | null = null,
 ): Nhm2SemiclassicalV2ContentReplayResult => {
   const issues: Nhm2SemiclassicalV2ContentReplayIssue[] = [];
   const metrics = emptyMetrics();
@@ -1411,12 +1418,17 @@ export const replayNhm2SemiclassicalV2Content = (
     addIssue(issues, "smearing_weights_not_normalized", "blocked");
   }
   if (issues.length > 0) return buildResult(bindings, metrics, issues);
-  addIssue(
-    issues,
-    "metric_demand_derivation_executor_provenance_unverified",
-    "blocked",
-  );
-  addIssue(issues, "interval_trace_not_server_replayed", "blocked");
+  const metricDemandDerivationReplay =
+    inspectNhm2SemiclassicalV2MetricDemandDerivationReplayCapability({
+      evidence: metricDemandDerivationReplayEvidence,
+      centralTensor: arrays.metricDemandRset,
+      absoluteErrorBound: arrays.metricDemandAbsoluteErrorBound,
+    });
+  if (metricDemandDerivationReplay.status === "blocked") {
+    for (const blocker of metricDemandDerivationReplay.blockers) {
+      addIssue(issues, blocker, "blocked");
+    }
+  }
 
   const tensorComponents =
     NHM2_SEMICLASSICAL_V2_CONTENT_REPLAY_COMPONENT_COUNTS.stressTensor;

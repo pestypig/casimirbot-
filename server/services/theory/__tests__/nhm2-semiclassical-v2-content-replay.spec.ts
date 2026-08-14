@@ -354,6 +354,103 @@ describe("NHM2 semiclassical-v2 server-owned content replay", () => {
     expectLocked(result);
   });
 
+  it("rejects a plain-data forgery in place of the server-issued metric-demand replay capability", () => {
+    const forgedCapability = Object.freeze(
+      Object.assign(Object.create(null), {
+        exactCentralErrorAndTraceByteReplayEstablished: true,
+        completeIndependentDerivationEstablished: true,
+        producerImplementationImportedOrCalled: false,
+        retunedAfterExecution: false,
+      }),
+    );
+
+    const result = replayNhm2SemiclassicalV2Content(buildInput(), {
+      capability: forgedCapability as never,
+      scope: forgedCapability as never,
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.blockers).toEqual([
+      "metric_demand_derivation_executor_provenance_unverified",
+      "interval_trace_not_server_replayed",
+    ]);
+    expectLocked(result);
+  });
+
+  it("fails closed without invoking Proxy, accessor, or symbol-bearing evidence surfaces", () => {
+    let getterInvoked = false;
+    const accessorEvidence = Object.create(null);
+    Object.defineProperty(accessorEvidence, "capability", {
+      enumerable: true,
+      get: () => {
+        getterInvoked = true;
+        throw new Error("must_not_invoke_evidence_getter");
+      },
+    });
+    Object.defineProperty(accessorEvidence, "scope", {
+      enumerable: true,
+      value: Object.freeze(Object.create(null)),
+    });
+    const symbolEvidence = Object.assign(Object.create(null), {
+      capability: Object.freeze(Object.create(null)),
+      scope: Object.freeze(Object.create(null)),
+      [Symbol("hidden-authority")]: true,
+    });
+    const hostileEvidence = [
+      new Proxy(Object.create(null), {
+        getPrototypeOf: () => {
+          throw new Error("hostile_get_prototype_of");
+        },
+      }),
+      new Proxy(Object.create(null), {
+        getPrototypeOf: () => null,
+        ownKeys: () => {
+          throw new Error("hostile_own_keys");
+        },
+      }),
+      accessorEvidence,
+      symbolEvidence,
+    ];
+
+    for (const evidence of hostileEvidence) {
+      const result = replayNhm2SemiclassicalV2Content(
+        buildInput(),
+        evidence as never,
+      );
+      expect(result.blockers).toEqual([
+        "metric_demand_derivation_executor_provenance_unverified",
+        "interval_trace_not_server_replayed",
+      ]);
+      expectLocked(result);
+    }
+    expect(getterInvoked).toBe(false);
+  });
+
+  it.each([
+    [
+      "derivation status",
+      "metricDemandDerivationStatus",
+      "replayed_without_server_capability",
+    ],
+    [
+      "interval-trace status",
+      "metricDemandIntervalTraceStatus",
+      "server_replayed_without_server_capability",
+    ],
+  ])("rejects a retuned legacy v2 %s field", (_label, key, value) => {
+    const input = mutable(buildInput());
+    input.policy = Object.freeze({
+      ...buildPolicy(),
+      [key]: value,
+    }) as Nhm2SemiclassicalV2ContentReplayPolicy;
+
+    const result = replayNhm2SemiclassicalV2Content(input);
+
+    expect(result.status).toBe("blocked");
+    expect(result.blockers).toContain("policy_tolerance_invalid");
+    expectLocked(result);
+  });
+
   it("fails a zero-mean zero-noise witness against nonzero metric demand", () => {
     const input = mutable(buildInput());
     input.arrays.meanStressTensor.fill(0);

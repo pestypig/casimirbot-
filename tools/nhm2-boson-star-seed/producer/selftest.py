@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -24,7 +25,6 @@ from contract import (  # noqa: E402
     GridLevel,
 )
 from solver import (  # noqa: E402
-    SpectralSolution,
     _pack,
     _postproject_fields,
     _prolong_guess,
@@ -360,13 +360,12 @@ def _two_dimensional_prolongation_check() -> None:
         (source_level.radial_count, source_level.angular_count // 2),
         dtype=np.float64,
     )
-    previous = SpectralSolution(
-        source_level,
-        canonical_f64(scalar),
-        canonical_f64(potential),
-        dummy_modes,
-        dummy_modes,
-        0.0,
+    previous = SimpleNamespace(
+        level=source_level,
+        scalar_nodal=canonical_f64(scalar),
+        potential_nodal=canonical_f64(potential),
+        scalar_odd=dummy_modes,
+        potential_even=dummy_modes,
     )
     prolonged_scalar, prolonged_potential = _prolong_guess(previous, target_level)
     expected_scalar = (

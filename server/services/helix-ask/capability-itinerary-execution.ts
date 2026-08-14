@@ -1,3 +1,5 @@
+import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from "@shared/helix-minecraft-player-capabilities";
+
 export type HelixCapabilityItineraryArtifactLike = {
   artifact_id?: unknown;
   kind?: unknown;
@@ -704,6 +706,137 @@ const artifactHasExplicitFailureOutcome = (
   );
 };
 
+const MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS = new Set<string>(
+  HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+);
+
+const minecraftActionResultRecords = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+): Record<string, unknown>[] => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const observationResult = readRecord(observation?.result);
+  return [result, observationResult]
+    .filter(
+      (entry: Record<string, unknown> | null): entry is Record<string, unknown> =>
+        Boolean(entry),
+    );
+};
+
+const isCanonicalMinecraftActionResult = (
+  result: Record<string, unknown>,
+): boolean =>
+  [
+    "side_effects_performed",
+    "player_motion_performed",
+    "player_interaction_performed",
+    "inventory_mutation_performed",
+    "world_mutation_performed",
+    "verified_terminal_measurements",
+    "postconditions",
+  ].some((key) => Object.prototype.hasOwnProperty.call(result, key));
+
+const isTransportOnlyMinecraftPostcondition = (conditionKind: string): boolean =>
+  /^(?:minecraft\.player\.)?(?:reactive_program|sequence|workflow|action)_(?:completed|settled)$/i.test(
+    conditionKind,
+  ) || /controls?_released/i.test(conditionKind);
+
+const canonicalMinecraftActionResultProvesSemanticProgress = (
+  result: Record<string, unknown>,
+): boolean => {
+  if (
+    result.side_effects_performed === true ||
+    result.player_motion_performed === true ||
+    result.player_interaction_performed === true ||
+    result.inventory_mutation_performed === true ||
+    result.world_mutation_performed === true
+  ) {
+    return true;
+  }
+  const measurements = readRecord(result.verified_terminal_measurements);
+  const positiveMeasurementKeys = [
+    "executed_action_count",
+    "action_receipt_count",
+    "placement_action_success_count",
+    "placement_mutation_success_count",
+    "world_mutations_performed",
+    "inventory_mutations_performed",
+    "collected_count",
+    "produced_count",
+    "transferred_count",
+    "consumed_item_count",
+  ];
+  if (
+    measurements &&
+    positiveMeasurementKeys.some((key) => {
+      const value = measurements[key];
+      return typeof value === "number" && Number.isFinite(value) && value > 0;
+    })
+  ) {
+    return true;
+  }
+  if (
+    readArray(measurements?.satisfied_checkpoint_ids)
+      .map(readString)
+      .some(Boolean)
+  ) {
+    return true;
+  }
+  return readArray(result.postconditions)
+    .map(readRecord)
+    .filter(
+      (entry: Record<string, unknown> | null): entry is Record<string, unknown> =>
+        Boolean(entry),
+    )
+    .some((condition) => {
+      const conditionKind = readString(condition.condition_kind);
+      return Boolean(
+        conditionKind &&
+        !isTransportOnlyMinecraftPostcondition(conditionKind) &&
+        condition.required === true &&
+        readString(condition.status) === "satisfied" &&
+        readArray(condition.evidence_refs).map(readString).some(Boolean),
+      );
+    });
+};
+
+/**
+ * A connector may successfully settle a bounded workflow without performing
+ * the player/world action requested by the turn (for example, an immediate
+ * safety interrupt). That settlement is still admissible evidence, but it is
+ * not semantic proof that a Player Embodiment action requirement was met.
+ *
+ * Older/non-canonical observation packets do not contain the action-result
+ * envelope, so they retain their existing identity/status behavior. Whenever
+ * the canonical envelope is present, however, its measured effects and
+ * goal-specific postconditions are authoritative.
+ */
+const artifactProvesSemanticCapabilityOutcome = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  capability: string,
+  runtimeCapability: string,
+  substitutions: string[],
+): boolean => {
+  const actualCapability = artifactCapability(artifact);
+  const isMinecraftPlayerAction = uniqueStrings([
+    actualCapability,
+    capability,
+    runtimeCapability,
+    ...substitutions,
+  ]).some((candidate) =>
+    MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.has(candidate),
+  );
+  if (!isMinecraftPlayerAction) return true;
+  const canonicalResults = minecraftActionResultRecords(artifact).filter(
+    isCanonicalMinecraftActionResult,
+  );
+  if (canonicalResults.length === 0) return true;
+  return canonicalResults.some(
+    canonicalMinecraftActionResultProvesSemanticProgress,
+  );
+};
+
 const artifactSupportsSubgoalObservation = (
   artifact: HelixCapabilityItineraryArtifactLike,
   subgoalId: string | null,
@@ -714,6 +847,16 @@ const artifactSupportsSubgoalObservation = (
   argsHint: Record<string, unknown> | null,
 ): boolean => {
   if (artifactHasExplicitFailureOutcome(artifact)) return false;
+  if (
+    !artifactProvesSemanticCapabilityOutcome(
+      artifact,
+      capability,
+      runtimeCapability,
+      substitutions,
+    )
+  ) {
+    return false;
+  }
   if (!artifactMatchesRequiredObservationKind(artifact, requiredObservationKinds, capability, runtimeCapability)) {
     return false;
   }
@@ -869,6 +1012,41 @@ const artifactSupportRefs = (artifact: HelixCapabilityItineraryArtifactLike | nu
   return uniqueStrings(refs);
 };
 
+const artifactGatewayObservationRefs = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+): string[] => {
+  const artifactRecord = artifact as Record<string, unknown>;
+  const payload = artifactPayload(artifact);
+  return uniqueStrings([
+    readString(artifactRecord.provider_gateway_observation_ref),
+    ...readArray(artifactRecord.provider_gateway_packet_refs).map(readString),
+    readString(payload?.provider_gateway_observation_ref),
+    ...readArray(payload?.provider_gateway_packet_refs).map(readString),
+  ]);
+};
+
+/**
+ * Normalized observation artifacts are intentionally grouped ahead of their
+ * provider gateway packets in the terminal ledger. Temporal itinerary checks
+ * therefore cannot treat the array position of a normalized artifact as its
+ * execution order. Follow its exact gateway packet link and use the latest
+ * linked position as the observation's logical order instead.
+ */
+const artifactTemporalOrderIndex = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  artifactIndex: number,
+  artifacts: HelixCapabilityItineraryArtifactLike[],
+): number => {
+  let logicalIndex = artifactIndex;
+  for (const ref of artifactGatewayObservationRefs(artifact)) {
+    const linkedIndex = artifacts.findIndex(
+      (candidate) => artifactId(candidate) === ref,
+    );
+    if (linkedIndex >= 0) logicalIndex = Math.max(logicalIndex, linkedIndex);
+  }
+  return logicalIndex;
+};
+
 const artifactCompletedRuntimeObservation = (
   artifact: HelixCapabilityItineraryArtifactLike,
   capability: string,
@@ -890,6 +1068,16 @@ const artifactProvesCompletedCapability = (
   subgoalId: string | null = null,
 ): boolean => {
   if (artifactHasExplicitFailureOutcome(artifact)) return false;
+  if (
+    !artifactProvesSemanticCapabilityOutcome(
+      artifact,
+      capability,
+      runtimeCapability,
+      substitutions,
+    )
+  ) {
+    return false;
+  }
   if (artifactCompletedRuntimeObservation(artifact, capability, runtimeCapability, substitutions)) return true;
   const artifactSubgoalId = artifactCompoundSubgoalId(artifact);
   const hasCapabilityProof =
@@ -970,6 +1158,16 @@ const artifactProvesSuccessfulCapabilityObservation = (
     authoritativeCapabilityIds.length === 0 ||
     authoritativeCapabilityIds.some(
       (capabilityId) => capabilityId !== capability,
+    )
+  ) {
+    return false;
+  }
+  if (
+    !artifactProvesSemanticCapabilityOutcome(
+      artifact,
+      capability,
+      capability,
+      [],
     )
   ) {
     return false;
@@ -1456,8 +1654,12 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     const temporallyEligibleArtifacts = temporalConstraintApplies
       ? temporalDependenciesSatisfied
         ? artifacts.filter(
-            (_artifact, artifactIndex) =>
-              artifactIndex > temporalObservationLowerBound,
+            (artifact, artifactIndex) =>
+              artifactTemporalOrderIndex(
+                artifact,
+                artifactIndex,
+                artifacts,
+              ) > temporalObservationLowerBound,
           )
         : []
       : artifacts;
@@ -1912,15 +2114,49 @@ export const attachHelixCapabilityItineraryExecutionState = (
     ]);
   }
   const currentCapabilityOccurrenceCounts = new Map<string, number>();
+  const currentCapabilityIdentityTotals = new Map<string, number>();
+  for (const entry of currentSubgoals) {
+    const identityKey = [...capabilityIdentities(entry)].sort().join("|");
+    if (!identityKey) continue;
+    currentCapabilityIdentityTotals.set(
+      identityKey,
+      (currentCapabilityIdentityTotals.get(identityKey) ?? 0) + 1,
+    );
+  }
   const enrichedCurrentSubgoals = currentSubgoals.map((entry) => {
     const identityKey = [...capabilityIdentities(entry)].sort().join("|");
     if (!identityKey) return entry;
     const occurrence =
       (currentCapabilityOccurrenceCounts.get(identityKey) ?? 0) + 1;
     currentCapabilityOccurrenceCounts.set(identityKey, occurrence);
+    const committedOccurrences = baseSubgoalsByIdentity.get(identityKey) ?? [];
+    const exactCommittedOccurrence = committedOccurrences[occurrence - 1];
+    const singletonCommittedOccurrence = committedOccurrences.length === 1
+      ? committedOccurrences[0]
+      : undefined;
+    const singletonTemporalConstraint = Boolean(
+      singletonCommittedOccurrence &&
+      (
+        readArray(
+          singletonCommittedOccurrence.observation_after_capability_ids,
+        ).length > 0 ||
+        readArray(
+          singletonCommittedOccurrence
+            .observation_after_capability_any_of_group_ids,
+        ).length > 0
+      ),
+    );
+    const currentIdentityTotal =
+      currentCapabilityIdentityTotals.get(identityKey) ?? 0;
     const committedOccurrence =
-      baseSubgoalsByIdentity.get(identityKey)?.[occurrence - 1] ??
-      baseSubgoalsByIdentity.get(identityKey)?.[0];
+      singletonTemporalConstraint && currentIdentityTotal > 1
+        ? occurrence === currentIdentityTotal
+          ? singletonCommittedOccurrence
+          : undefined
+        : exactCommittedOccurrence ??
+          (singletonTemporalConstraint && occurrence === currentIdentityTotal
+            ? singletonCommittedOccurrence
+            : undefined);
     if (!committedOccurrence) return entry;
     const observationAfterCapabilityIds = readArray(
       committedOccurrence.observation_after_capability_ids,

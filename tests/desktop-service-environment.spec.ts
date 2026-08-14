@@ -6,6 +6,8 @@ import {
   resolveDesktopUserDataOverride,
 } from "../apps/desktop/src/service-environment";
 
+const TEST_PROVIDER_CREDENTIAL_KEY = Buffer.alloc(32, 7).toString("base64url");
+
 describe("desktop service environment", () => {
   it("inherits only the Windows process allowlist", () => {
     const environment = buildDesktopServiceEnvironment({
@@ -19,6 +21,7 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
+      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
     });
 
     expect(environment.SystemRoot).toBe("C:\\Windows");
@@ -41,6 +44,7 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
+      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
     });
 
     expect(environment.HELIX_DEVELOPER_PROFILE_IDS).toBe(
@@ -56,6 +60,7 @@ describe("desktop service environment", () => {
       processEnv: {},
       userDataPath,
       serviceOrigin: "http://127.0.0.1:43121",
+      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
     });
     const databasePath = environment.HELIX_LOCAL_DB_PATH!;
     const relative = path.relative(userDataPath, databasePath);
@@ -88,6 +93,7 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
+      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
     });
     expect(environment).toMatchObject({
       HELIX_AGENT_OAUTH_ISSUER: "https://tenant.auth0.com/",
@@ -111,6 +117,7 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
+      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
     });
 
     expect(environment.CASIMIR_PUBLIC_BASE_URL).toBe(
@@ -121,6 +128,7 @@ describe("desktop service environment", () => {
         processEnv: {},
         userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
         serviceOrigin: "https://casimirbot.com",
+        providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
       }),
     ).toThrow(/exact HTTP 127\.0\.0\.1 origin/);
   });
@@ -131,6 +139,7 @@ describe("desktop service environment", () => {
         processEnv: {},
         userDataPath: "  ",
         serviceOrigin: "http://127.0.0.1:43121",
+        providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
       }),
     ).toThrow(/userData path is required/);
   });

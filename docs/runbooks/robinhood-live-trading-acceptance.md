@@ -17,6 +17,8 @@ that a strategy can prevent losses.
   `ENABLE_ROBINHOOD_LIVE_SUPERVISOR=0` through read/review acceptance.
 - Use Robinhood's hosted OAuth flow. Do not use browser automation.
 - Keep the Robinhood app available as the out-of-band emergency control.
+- Confirm the process refuses to start if only one live flag is enabled or the
+  provider credential key is not exactly 32 random bytes encoded as base64url.
 
 ## Read and schema acceptance
 
@@ -27,28 +29,47 @@ that a strategy can prevent losses.
    number, credential, or provider payload.
 3. Confirm that exactly one account is labelled Agentic. Ambiguous or missing
    account identity is a failure.
-4. Create a tiny accepted paper decision and request an entry review. Confirm
+4. In the private-room trading panel, run **Check provider contracts** while
+   both live flags remain off. Confirm the stored receipt reports `PASS`, is
+   fresh, contains seven passing gates, and reports
+   `provider_order_tool_calls_made=0`.
+   A PASS expires after 24 hours; arming and placement both reject an expired,
+   missing, or failed receipt.
+5. Create a tiny accepted paper decision and request an entry review. Confirm
    the live MCP descriptor admits only the intended long-equity buy limit,
    fractional quantity, GFD, and no extended hours.
-5. Confirm `place_equity_order` is explicitly marked destructive and exposes a
+6. Confirm `place_equity_order` is explicitly marked destructive and exposes a
    provider client-order/idempotency field. Absence is a failure.
-6. Confirm the review and placement schemas admit a separate full-position
+7. Confirm the review and placement schemas admit a separate full-position
    equity `sell` stop order and a full-position equity `sell` market close.
-7. Confirm `cancel_equity_order` is explicitly marked destructive and accepts
+8. Confirm `cancel_equity_order` is explicitly marked destructive and accepts
    one provider order identity. Unknown required fields, schema ambiguity, or
    unsupported enum values are failures.
 
 Record only sanitized contract hashes and pass/fail reason codes. Do not record
 raw descriptors if they contain account or provider identity.
 
+The private-room **Live acceptance evidence** report must show
+`read_acceptance_complete=true` and `safe_to_enable_live_flags=true` before the
+flags are enabled. This read-only report aggregates sanitized DB receipts and
+performs zero Robinhood order-tool calls; it does not approve or execute work.
+
 ## Attended live canary
 
 1. Enable both live flags and restart one production instance. Confirm the
    control reports `supervisor_status=healthy`, a fresh supervisor heartbeat,
-   and `protective_exit_ready=true`.
+   `protective_exit_ready=true`, and a still-fresh provider-contract PASS.
+   Confirm the evidence report advances to
+   `ready_to_start_attended_canary=true`.
 2. Start the attended live session from the visible private-room UI. Confirm
    the operator heartbeat becomes fresh and expires when the tab is hidden,
    closed, or the attended session is ended.
+   Confirm the evidence report advances to `ready_to_arm=true` only while that
+   visible heartbeat is fresh.
+   Deliberately let the heartbeat expire before an order is approved: within
+   the next supervisor cycle the durable control must disarm, activate its kill
+   switch, clear presence, record `operator_presence_expired_relocked`, and
+   make zero provider order calls.
 3. Use the smallest provider-supported notional, never more than the hard $25
    cap. Confirm the current live account has no position and no open order.
 4. Request a fresh entry review, type its exact approval phrase, type the exact
@@ -69,6 +90,9 @@ raw descriptors if they contain account or provider identity.
    reconciled filled. Confirm a cancelled/rejected stop leaves attention active.
 10. End attended mode and set both deployment flags back to `0` until the
     acceptance evidence is reviewed.
+11. Confirm the final evidence report records one reconciled-filled tiny entry,
+    one reconciled-filled risk-reducing exit, zero unresolved live exposure,
+    and `acceptance_complete=true` before archiving the canary evidence.
 
 ## Pass evidence
 
@@ -76,6 +100,8 @@ Acceptance requires all of the following:
 
 - sanitized successful read receipts for portfolio, positions, quotes, orders,
   and P&L;
+- one immutable, fresh provider-contract PASS receipt proving the catalog was
+  inspected with zero provider order calls;
 - exact provider contract hashes for entry review/placement, exit
   review/placement, and cancellation;
 - one entry reservation, provider result, and reconciliation chain;
@@ -83,6 +109,8 @@ Acceptance requires all of the following:
 - proof that replay, stale approval, stale operator presence, stale supervisor,
   guest-room privacy, unknown schema fields, and ambiguous provider outcomes
   fail closed;
+- one immutable `operator_presence_expired_relocked` event proving the
+  attended-session dead-man path durably relocks without provider mutation;
 - proof that the supervisor itself placed, cancelled, and reconciled zero
   orders.
 

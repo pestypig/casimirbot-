@@ -125,6 +125,44 @@ describe("environment connector conformance fixtures", () => {
     });
   });
 
+  it("supports bounded exact discriminated alternatives without admitting extra fields", () => {
+    const validate = compileConstrainedConnectorSchema({
+      type: "object",
+      oneOf: [
+        {
+          type: "object",
+          properties: {
+            action_kind: { type: "string", enum: ["walk"] },
+            duration_ms: { type: "integer", minimum: 50, maximum: 10_000 },
+          },
+          required: ["action_kind", "duration_ms"],
+          additionalProperties: false,
+        },
+        {
+          type: "object",
+          properties: {
+            action_kind: { type: "string", enum: ["jump"] },
+            count: { type: "integer", minimum: 1, maximum: 10 },
+          },
+          required: ["action_kind", "count"],
+          additionalProperties: false,
+        },
+      ],
+    });
+
+    expect(validate({ action_kind: "walk", duration_ms: 250 })).toEqual({
+      ok: true,
+      issues: [],
+    });
+    expect(validate({ action_kind: "walk", count: 1 })).toMatchObject({
+      ok: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: "one_of" }),
+        expect.objectContaining({ path: "$.duration_ms", code: "required" }),
+      ]),
+    });
+  });
+
   it("rejects prompt-like connector manifest instructions from the protocol lane", () => {
     expect(validateConnectorManifest(manifestFixture)).toMatchObject({
       schema: "helix.environment_source_manifest.v1",

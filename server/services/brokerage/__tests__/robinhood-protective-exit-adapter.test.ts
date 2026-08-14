@@ -108,4 +108,40 @@ describe("Robinhood protective exit contract adapter", () => {
     });
     expect(args).not.toHaveProperty("stop_price");
   });
+
+  it("maps Robinhood's ref_id and regular-hours stop contract", () => {
+    const providerSchema = {
+      type: "object",
+      required: ["account_number", "side", "symbol", "type"],
+      properties: {
+        account_number: { type: "string" },
+        ref_id: { type: "string" },
+        symbol: { type: "string" },
+        side: { type: "string" },
+        type: { type: "string" },
+        time_in_force: { type: "string" },
+        quantity: { type: "string" },
+        stop_price: { type: "string" },
+        market_hours: { type: "string" },
+      },
+    };
+    const refId = "22222222-2222-4222-8222-222222222222";
+    expect(buildRobinhoodProtectiveExitArguments({
+      inputSchema: providerSchema,
+      accountRef: "agentic-account",
+      clientOrderId: `protective_exit:${refId}`,
+      providerReview: {},
+      intent,
+    })).toEqual({
+      account_number: "agentic-account",
+      ref_id: refId,
+      symbol: "TEST",
+      side: "sell",
+      type: "stop_market",
+      time_in_force: "gfd",
+      quantity: "2.5",
+      stop_price: "9.95",
+      market_hours: "regular_hours",
+    });
+  });
 });

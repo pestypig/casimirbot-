@@ -36,6 +36,10 @@ export const HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY =
   "com.casimirbot.minecraft.crop_state.read" as const;
 export const HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY =
   "com.casimirbot.minecraft.reachability.check" as const;
+export const HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY =
+  "com.casimirbot.minecraft.registry.fact.read" as const;
+export const HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY =
+  "com.casimirbot.minecraft.recipe.fact.read" as const;
 /**
  * Stable request identity for the closed-container frontier. This capability
  * is intentionally not included in HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS:
@@ -53,6 +57,14 @@ export const HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+] as const);
+export const HELIX_MINECRAFT_MECHANICS_FACT_CAPABILITY_IDS = Object.freeze([
+  HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+  HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+] as const);
+export const HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS = Object.freeze([
+  ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  ...HELIX_MINECRAFT_MECHANICS_FACT_CAPABILITY_IDS,
 ] as const);
 export const HELIX_SYNTHETIC_REACHABILITY_CAPABILITY =
   "com.casimirbot.synthetic.reachability.check" as const;
@@ -105,6 +117,13 @@ export type HelixEnvironmentConstrainedJsonSchema = {
   type: "object" | "array" | "string" | "number" | "integer" | "boolean";
   description?: string;
   enum?: Array<string | number | boolean>;
+  /**
+   * A bounded, reference-free set of exact alternatives. This is deliberately
+   * the only composition keyword admitted by the connector contract so typed
+   * discriminated unions can be described to an agent without widening the
+   * remote schema vocabulary to refs, conditionals, or arbitrary annotations.
+   */
+  oneOf?: HelixEnvironmentConstrainedJsonSchema[];
   properties?: Record<string, HelixEnvironmentConstrainedJsonSchema>;
   required?: string[];
   additionalProperties?: false;
@@ -128,6 +147,11 @@ export const helixEnvironmentConstrainedJsonSchema = z.lazy(() =>
       type: z.enum(["object", "array", "string", "number", "integer", "boolean"]),
       description: z.string().max(500).optional(),
       enum: z.array(z.union([z.string(), z.number(), z.boolean()])).max(64).optional(),
+      oneOf: z
+        .array(helixEnvironmentConstrainedJsonSchema)
+        .min(2)
+        .max(32)
+        .optional(),
       properties: z
         .record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,79}$/), helixEnvironmentConstrainedJsonSchema)
         .optional(),
@@ -144,16 +168,36 @@ export const helixEnvironmentConstrainedJsonSchema = z.lazy(() =>
     .strict()
     .superRefine((rawSchema: unknown, context: z.RefinementCtx) => {
       const schema = rawSchema as HelixEnvironmentConstrainedJsonSchema;
-      if (schema.type === "object" && !schema.properties) {
+      if (schema.type === "object" && !schema.properties && !schema.oneOf) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Object connector schemas require explicit properties.",
         });
       }
-      if (schema.type === "array" && !schema.items) {
+      if (schema.type === "array" && !schema.items && !schema.oneOf) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Array connector schemas require explicit items.",
+        });
+      }
+      if (
+        schema.oneOf &&
+        (schema.properties !== undefined ||
+          schema.required !== undefined ||
+          schema.additionalProperties !== undefined ||
+          schema.items !== undefined ||
+          schema.enum !== undefined ||
+          schema.minItems !== undefined ||
+          schema.maxItems !== undefined ||
+          schema.minimum !== undefined ||
+          schema.maximum !== undefined ||
+          schema.minLength !== undefined ||
+          schema.maxLength !== undefined)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Connector oneOf schemas must be exclusive alternative wrappers without sibling validation keywords.",
         });
       }
       if (

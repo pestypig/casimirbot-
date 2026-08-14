@@ -20,7 +20,8 @@
     "server/services/helix-ask/workstation-tool-gateway/environment-action-control.ts",
     "server/services/helix-ask/workstation-tool-gateway/__tests__/environment-action*.test.ts",
     "server/__tests__/environment-action*.test.ts",
-    "scripts/helix-minecraft-player-differential-audit.ts"
+    "server/__tests__/helix.minecraft.player-*.test.ts",
+    "scripts/helix-minecraft-player-*.ts"
   ],
   "exclude": []
 }

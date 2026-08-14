@@ -53,6 +53,25 @@ final class PlayerActionClientCommands {
                                 return 1;
                             }))
                             .then(
+                                literal("inbox-enable")
+                                    .then(literal("movement").executes(context -> {
+                                        agent.enableDiagnosticInbox(
+                                            PlayerActionDiagnosticInbox.Scope.MOVEMENT
+                                        );
+                                        return 1;
+                                    }))
+                                    .then(literal("full").executes(context -> {
+                                        agent.enableDiagnosticInbox(
+                                            PlayerActionDiagnosticInbox.Scope.FULL
+                                        );
+                                        return 1;
+                                    }))
+                            )
+                            .then(literal("inbox-disable").executes(context -> {
+                                agent.disableDiagnosticInbox();
+                                return 1;
+                            }))
+                            .then(
                                 literal("walk")
                                     .then(
                                         argument("direction", StringArgumentType.word())

@@ -26,12 +26,21 @@ import {
   type HelixEnvironmentActionWorkflowEvent,
 } from "@shared/helix-environment-action";
 import {
+  HELIX_MINECRAFT_FLUID_CONDITION_OBSERVATION_LIMIT,
+  helixMinecraftFluidConditionObservationSchema,
+  helixMinecraftFluidSequenceArgumentsSchema,
+  type HelixMinecraftFluidSequenceArguments,
+} from "@shared/helix-minecraft-fluid-sequence";
+import {
+  helixMinecraftReactiveProgramArgumentsSchema,
+  helixMinecraftReactiveProgramObservationSchema,
+  type HelixMinecraftReactiveProgramArguments,
+} from "@shared/helix-minecraft-reactive-program";
+import {
   environmentConnectorSha256,
   listEnvironmentConnectorCapabilityDescriptors,
 } from "../catalog";
-import {
-  resolveEnvironmentActionAdapterProfile,
-} from "../../situation-room/environment-action-adapter-registry";
+import { resolveEnvironmentActionAdapterProfile } from "../../situation-room/environment-action-adapter-registry";
 import {
   readSharedRealtimeRoomDatabase,
   withSharedRealtimeRoomTransaction,
@@ -86,6 +95,11 @@ export const isEnvironmentActionBrokerError = (
 ): error is EnvironmentActionBrokerError =>
   error instanceof EnvironmentActionBrokerError;
 
+export const environmentActionEventCursorMatches = (
+  connectorLatestSequence: number | null,
+  serverLatestSequence: number | null,
+): boolean => connectorLatestSequence === serverLatestSequence;
+
 type AuthorityConnectorRow = {
   action_authority_id: string;
   environment_binding_id: string;
@@ -128,6 +142,22 @@ type ManifestRow = {
   status: string;
   received_at: Date | string;
   expires_at: Date | string | null;
+};
+
+type ExistingManifestReplayRow = ManifestRow & {
+  room_id: string;
+  source_id: string;
+  world_id: string;
+  participant_id: string;
+  subject_binding_id: string;
+  subject_native_id: string;
+  domain: string;
+  domain_adapter: string;
+  adapter_profile_id: string;
+  adapter_version: string;
+  protocol_version: string;
+  available_control_engines: unknown;
+  safety_policy: unknown;
 };
 
 type ActionRequestRow = {
@@ -227,6 +257,41 @@ const parseStringArray = (value: unknown): string[] => {
     : [];
 };
 
+export const environmentActionManifestReplayCompatible = (input: {
+  existing: ExistingManifestReplayRow;
+  manifest: HelixEnvironmentActionConnectorManifest;
+}): boolean => {
+  const { existing, manifest } = input;
+  const jsonMatches = (stored: unknown, submitted: unknown): boolean =>
+    environmentConnectorSha256(parseJson(stored, null)) ===
+    environmentConnectorSha256(submitted);
+  return (
+    existing.status === "active" &&
+    existing.manifest_id === manifest.manifest_id &&
+    existing.action_authority_id === manifest.action_authority_id &&
+    existing.environment_binding_id === manifest.environment_binding_id &&
+    existing.connector_installation_id === manifest.connector_installation_id &&
+    existing.producer_epoch_ref === manifest.producer_epoch_ref &&
+    existing.room_id === manifest.room_id &&
+    existing.source_id === manifest.source_id &&
+    existing.world_id === manifest.world_id &&
+    existing.participant_id === manifest.participant_id &&
+    existing.subject_binding_id === manifest.subject_binding_id &&
+    existing.subject_native_id === manifest.subject_native_id &&
+    existing.domain === manifest.domain &&
+    existing.domain_adapter === manifest.domain_adapter &&
+    existing.adapter_profile_id === manifest.adapter_profile_id &&
+    existing.adapter_version === manifest.adapter_version &&
+    existing.protocol_version === manifest.protocol_version &&
+    jsonMatches(existing.capabilities, manifest.capabilities) &&
+    jsonMatches(
+      existing.available_control_engines,
+      manifest.available_control_engines,
+    ) &&
+    jsonMatches(existing.safety_policy, manifest.safety_policy)
+  );
+};
+
 /**
  * Projects an action request onto the operator-visible meaning of the action.
  *
@@ -295,7 +360,9 @@ export const storedEnvironmentActionMatchesIdempotencyContent = (input: {
   const storedRequestHash = storedRequest.success
     ? hashEnvironmentActionIdempotencyContent(storedRequest.data)
     : input.storedRequestHash;
-  return storedRequestHash === hashEnvironmentActionIdempotencyContent(input.request);
+  return (
+    storedRequestHash === hashEnvironmentActionIdempotencyContent(input.request)
+  );
 };
 
 const readAuthorityConnectorRow = async (
@@ -353,7 +420,8 @@ const assertAuthorityUsable = (
   const expired =
     row.authority_expires_at !== null &&
     Date.parse(iso(row.authority_expires_at)) <= Date.now();
-  const authorityStatusValid = row.authority_status === "active" ||
+  const authorityStatusValid =
+    row.authority_status === "active" ||
     (allowSuspendedControl && row.authority_status === "suspended");
   if (
     !authorityStatusValid ||
@@ -529,7 +597,8 @@ const issueCredentialWithSecret = async (input: {
         "Player-action authority was not found.",
       );
     }
-    const installationId = input.connectorInstallationId?.trim() ||
+    const installationId =
+      input.connectorInstallationId?.trim() ||
       `environment_action_connector_installation:${crypto.randomUUID()}`;
     const bootstrapPairingId = input.bootstrapPairingId?.trim() || null;
     if (bootstrapPairingId) {
@@ -633,8 +702,8 @@ export const issueEnvironmentActionConnectorCredential = async (input: {
     secret: `helix_env_action_${crypto.randomBytes(32).toString("base64url")}`,
   });
 
-export const issueEnvironmentActionConnectorCredentialForPairing = async (
-  input: {
+export const issueEnvironmentActionConnectorCredentialForPairing =
+  async (input: {
     roomId: string;
     ownerProfileId: string;
     actionAuthorityId: string;
@@ -643,13 +712,12 @@ export const issueEnvironmentActionConnectorCredentialForPairing = async (
     connectorInstallationId: string;
     trustedCredentialSecret: string;
     ttlMs?: number | null;
-  },
-): Promise<HelixEnvironmentActionConnectorConfig> =>
-  issueCredentialWithSecret({
-    ...input,
-    secret: input.trustedCredentialSecret,
-    bootstrapPairingId: input.pairingId,
-  });
+  }): Promise<HelixEnvironmentActionConnectorConfig> =>
+    issueCredentialWithSecret({
+      ...input,
+      secret: input.trustedCredentialSecret,
+      bootstrapPairingId: input.pairingId,
+    });
 
 const latestManifest = async (
   db: Queryable,
@@ -663,6 +731,51 @@ const latestManifest = async (
     [authorityId],
   );
   return result.rows[0] ?? null;
+};
+
+export const renewEnvironmentActionAdmissionLease = async (input: {
+  db: Queryable;
+  catalogSnapshotId: string;
+  manifestId: string;
+  leaseExpiresAt: string;
+}): Promise<void> => {
+  await input.db.query(
+    `UPDATE helix_environment_capability_catalog_snapshots
+     SET frozen_at = now(), expires_at = $2
+     WHERE catalog_snapshot_id = $1;`,
+    [input.catalogSnapshotId, input.leaseExpiresAt],
+  );
+  await input.db.query(
+    `UPDATE helix_environment_action_connector_manifests
+     SET received_at = now(), expires_at = $2
+     WHERE manifest_id = $1 AND status = 'active';`,
+    [input.manifestId, input.leaseExpiresAt],
+  );
+};
+
+export const assertEnvironmentActionCatalogAvailable = async (input: {
+  db: Queryable;
+  environmentBindingId: string;
+  adapterProfileId: string;
+  manifestHash: string;
+}): Promise<string> => {
+  const catalog = await input.db.query<{ catalog_snapshot_id: string }>(
+    `SELECT catalog_snapshot_id
+     FROM helix_environment_capability_catalog_snapshots
+     WHERE environment_binding_id = $1 AND adapter_profile_id = $2
+       AND manifest_hash = $3
+       AND (expires_at IS NULL OR expires_at > now())
+     ORDER BY frozen_at DESC LIMIT 1;`,
+    [input.environmentBindingId, input.adapterProfileId, input.manifestHash],
+  );
+  if (!catalog.rows[0]) {
+    throw new EnvironmentActionBrokerError(
+      "action_manifest_required",
+      409,
+      "The live player-action catalog is unavailable for this manifest.",
+    );
+  }
+  return catalog.rows[0].catalog_snapshot_id;
 };
 
 const validateManifestIdentity = (
@@ -743,10 +856,12 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
       !allowed.has(capability.capability_id) ||
       trusted.action_kind !== capability.action_kind ||
       trusted.effect_class !== capability.effect_class ||
-      capability.workflow_modes.some((mode) =>
-        !trusted.workflow_modes.includes(mode)) ||
-      capability.control_engines.some((engine) =>
-        !trusted.allowed_control_engines.includes(engine))
+      capability.workflow_modes.some(
+        (mode) => !trusted.workflow_modes.includes(mode),
+      ) ||
+      capability.control_engines.some(
+        (engine) => !trusted.allowed_control_engines.includes(engine),
+      )
     ) {
       throw new EnvironmentActionBrokerError(
         "action_manifest_invalid",
@@ -755,19 +870,39 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
       );
     }
   }
-  const manifestHash = environmentConnectorSha256(manifest);
-  const existing = await db.query<{ manifest_id: string }>(
-    `SELECT manifest_id FROM helix_environment_action_connector_manifests
-     WHERE action_authority_id = $1 AND producer_epoch_ref = $2
-       AND manifest_hash = $3 LIMIT 1;`,
-    [input.claim.authorityId, manifest.producer_epoch_ref, manifestHash],
+  const submittedManifestHash = environmentConnectorSha256(manifest);
+  const existing = await db.query<ExistingManifestReplayRow>(
+    `SELECT * FROM helix_environment_action_connector_manifests
+     WHERE manifest_id = $1 LIMIT 1;`,
+    [manifest.manifest_id],
   );
+  if (
+    existing.rows[0] &&
+    !environmentActionManifestReplayCompatible({
+      existing: existing.rows[0],
+      manifest,
+    })
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_manifest_invalid",
+      409,
+      existing.rows[0].status === "active"
+        ? "The stable player-action manifest identity changed its declared contract. Publish a fresh producer epoch."
+        : "The player-action manifest producer epoch has already been superseded.",
+    );
+  }
+  // `created_at` is a delivery timestamp and changes on an authenticated
+  // re-publication. Preserve the originally admitted content hash after the
+  // stable manifest identity and every contract-bearing field match above.
+  const manifestHash = existing.rows[0]?.manifest_hash ?? submittedManifestHash;
   const descriptors = listEnvironmentConnectorCapabilityDescriptors({
     adapterProfileId: registry.profile.profile_id,
   }).filter((descriptor) =>
-    manifest.capabilities.some((capability) =>
-      capability.capability_id === descriptor.capability_id &&
-      capability.capability_version === descriptor.capability_version),
+    manifest.capabilities.some(
+      (capability) =>
+        capability.capability_id === descriptor.capability_id &&
+        capability.capability_version === descriptor.capability_version,
+    ),
   );
   if (descriptors.length !== manifest.capabilities.length) {
     throw new EnvironmentActionBrokerError(
@@ -787,8 +922,32 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
      WHERE environment_binding_id = $1 AND catalog_hash = $2 LIMIT 1;`,
     [input.claim.environmentBindingId, catalogHash],
   );
-  const catalogSnapshotId = catalogExisting.rows[0]?.catalog_snapshot_id ??
+  const catalogSnapshotId =
+    catalogExisting.rows[0]?.catalog_snapshot_id ??
     `environment_catalog:${crypto.randomUUID()}`;
+  const leaseExpiresAt = new Date(
+    Date.now() + registry.profile.freshness.manifest_max_age_ms,
+  ).toISOString();
+  if (catalogExisting.rows[0] && existing.rows[0]) {
+    // A connector can remain alive while the keyed API is restarted. Its
+    // immutable manifest and catalog hashes are still valid, but their
+    // freshness leases may have expired while the server was unavailable.
+    // Re-admitting the exact authenticated manifest renews only the temporal
+    // lease; identity, capability intersection, descriptors, and hashes have
+    // all been revalidated above.
+    await renewEnvironmentActionAdmissionLease({
+      db,
+      catalogSnapshotId,
+      manifestId: existing.rows[0].manifest_id,
+      leaseExpiresAt,
+    });
+    return {
+      manifestId: existing.rows[0].manifest_id,
+      catalogSnapshotId,
+      manifestHash,
+      replayed: true,
+    };
+  }
   if (!catalogExisting.rows[0]) {
     await db.query(
       `INSERT INTO helix_environment_capability_catalog_snapshots (
@@ -805,12 +964,17 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
         registry.contract_hash,
         manifestHash,
         JSON.stringify(descriptors),
-        new Date(Date.now() + registry.profile.freshness.manifest_max_age_ms)
-          .toISOString(),
+        leaseExpiresAt,
       ],
     );
   }
   if (existing.rows[0]) {
+    await renewEnvironmentActionAdmissionLease({
+      db,
+      catalogSnapshotId,
+      manifestId: existing.rows[0].manifest_id,
+      leaseExpiresAt,
+    });
     return {
       manifestId: existing.rows[0].manifest_id,
       catalogSnapshotId,
@@ -858,8 +1022,7 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
         JSON.stringify(manifest.capabilities),
         JSON.stringify(manifest.available_control_engines),
         JSON.stringify(manifest.safety_policy),
-        new Date(Date.now() + registry.profile.freshness.manifest_max_age_ms)
-          .toISOString(),
+        leaseExpiresAt,
       ],
     );
   });
@@ -891,7 +1054,8 @@ export const recordEnvironmentActionConnectorHeartbeat = async (input: {
   if (
     !manifest ||
     heartbeat.manifest_id !== manifest.manifest_id ||
-    heartbeat.connector_installation_id !== input.claim.connectorInstallationId ||
+    heartbeat.connector_installation_id !==
+      input.claim.connectorInstallationId ||
     heartbeat.producer_epoch_ref !== manifest.producer_epoch_ref ||
     heartbeat.action_authority_id !== input.claim.authorityId ||
     heartbeat.environment_binding_id !== input.claim.environmentBindingId ||
@@ -905,6 +1069,34 @@ export const recordEnvironmentActionConnectorHeartbeat = async (input: {
       "action_heartbeat_invalid",
       403,
       "The heartbeat does not match the current paired manifest identity.",
+    );
+  }
+  await assertEnvironmentActionCatalogAvailable({
+    db,
+    environmentBindingId: input.claim.environmentBindingId,
+    adapterProfileId: input.claim.actionAdapterProfileId,
+    manifestHash: manifest.manifest_hash,
+  });
+  const latestStoredEvent = await db.query<{ sequence: number | string }>(
+    `SELECT sequence
+     FROM helix_environment_events
+     WHERE environment_binding_id = $1 AND producer_epoch_ref = $2
+     ORDER BY sequence DESC LIMIT 1;`,
+    [input.claim.environmentBindingId, heartbeat.producer_epoch_ref],
+  );
+  const serverLatestEventSequence = latestStoredEvent.rows[0]
+    ? Number(latestStoredEvent.rows[0].sequence)
+    : null;
+  if (
+    !environmentActionEventCursorMatches(
+      heartbeat.latest_event_sequence,
+      serverLatestEventSequence,
+    )
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_event_stream_resync_required",
+      409,
+      "The connector and server evidence cursors differ. Publish a fresh producer epoch before polling another action.",
     );
   }
   const hash = environmentConnectorSha256(heartbeat);
@@ -990,7 +1182,7 @@ const assertFreshConnector = async (
     throw new EnvironmentActionBrokerError(
       "action_event_stream_resync_required",
       409,
-      "The player client released controls because its evidence stream no longer matches the server epoch. Pair the Player Embodiment client again before requesting another action.",
+      "The player client released controls because its evidence stream no longer matches the server epoch. Publish a fresh producer epoch before requesting another action.",
     );
   }
   if (
@@ -1009,7 +1201,9 @@ const assertFreshConnector = async (
   return manifest;
 };
 
-const requestProjection = (row: ActionRequestRow): HelixEnvironmentActionRequest => {
+const requestProjection = (
+  row: ActionRequestRow,
+): HelixEnvironmentActionRequest => {
   const parsed = helixEnvironmentActionRequestSchema.safeParse(
     parseJson(row.request_payload, null),
   );
@@ -1030,7 +1224,10 @@ const requiredPostconditionsVerified = (input: {
   const required = input.request.postconditions.filter(
     (condition) => condition.required,
   );
-  const byId = new Map<string, HelixEnvironmentActionResult["postconditions"][number]>();
+  const byId = new Map<
+    string,
+    HelixEnvironmentActionResult["postconditions"][number]
+  >();
   for (const condition of input.result.postconditions) {
     if (byId.has(condition.condition_id)) return false;
     byId.set(condition.condition_id, condition);
@@ -1085,13 +1282,526 @@ const stringMeasurementMatches = (
 ): boolean => {
   const measurement = measurements[measurementKey];
   const argument = argumentsRecord[argumentKey];
-  return typeof measurement === "string" &&
+  return (
+    typeof measurement === "string" &&
     typeof argument === "string" &&
-    measurement === argument;
+    measurement === argument
+  );
 };
 
 const wholeNonnegative = (value: number | null): value is number =>
   value !== null && Number.isInteger(value) && value >= 0;
+
+const recordMeasurement = (value: unknown): Record<string, unknown> | null =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const blockPositionKey = (value: unknown): string | null => {
+  const position = recordMeasurement(value);
+  if (!position) return null;
+  const x = finiteMeasurement(position, "x");
+  const y = finiteMeasurement(position, "y");
+  const z = finiteMeasurement(position, "z");
+  return x !== null &&
+    y !== null &&
+    z !== null &&
+    Number.isInteger(x) &&
+    Number.isInteger(y) &&
+    Number.isInteger(z)
+    ? `${x}:${y}:${z}`
+    : null;
+};
+
+type PredictedCollisionPlacementBinding = {
+  binding_kind: "predicted_collision_cell";
+  horizon_ticks: number;
+  max_distance_blocks: number;
+  require_replaceable: true;
+};
+
+const predictedCollisionPlacementBinding = (
+  value: unknown,
+): PredictedCollisionPlacementBinding | null => {
+  const binding = recordMeasurement(value);
+  const horizon = binding ? finiteMeasurement(binding, "horizon_ticks") : null;
+  const maximumDistance = binding
+    ? finiteMeasurement(binding, "max_distance_blocks")
+    : null;
+  return binding?.binding_kind === "predicted_collision_cell" &&
+    wholeNonnegative(horizon) &&
+    horizon >= 1 &&
+    horizon <= 20 &&
+    maximumDistance !== null &&
+    maximumDistance > 0 &&
+    maximumDistance <= 6 &&
+    binding.require_replaceable === true
+    ? {
+        binding_kind: "predicted_collision_cell",
+        horizon_ticks: horizon,
+        max_distance_blocks: maximumDistance,
+        require_replaceable: true,
+      }
+    : null;
+};
+
+const positionInsideRegion = (position: unknown, region: unknown): boolean => {
+  const target = recordMeasurement(position);
+  const admitted = recordMeasurement(region);
+  const minimum = recordMeasurement(admitted?.min);
+  const maximum = recordMeasurement(admitted?.max);
+  if (!target || !minimum || !maximum) return false;
+  return (["x", "y", "z"] as const).every((axis) => {
+    const value = finiteMeasurement(target, axis);
+    const low = finiteMeasurement(minimum, axis);
+    const high = finiteMeasurement(maximum, axis);
+    return (
+      value !== null &&
+      low !== null &&
+      high !== null &&
+      Number.isInteger(value) &&
+      Number.isInteger(low) &&
+      Number.isInteger(high) &&
+      value >= low &&
+      value <= high
+    );
+  });
+};
+
+const predictedCollisionBindingValid = (input: {
+  prediction: Record<string, unknown>;
+  binding: PredictedCollisionPlacementBinding;
+  allowedRegions: readonly unknown[];
+}): boolean => {
+  const actor = recordMeasurement(
+    input.prediction.actor_position_at_resolution,
+  );
+  const target = recordMeasurement(input.prediction.target_position);
+  const collisionTick = finiteMeasurement(
+    input.prediction,
+    "first_collision_tick",
+  );
+  if (
+    !actor ||
+    !target ||
+    !wholeNonnegative(collisionTick) ||
+    collisionTick < 1
+  ) {
+    return false;
+  }
+  const coordinates = (["x", "y", "z"] as const).map((axis) => ({
+    actor: finiteMeasurement(actor, axis),
+    target: finiteMeasurement(target, axis),
+  }));
+  if (
+    coordinates.some(({ actor, target }) => actor === null || target === null)
+  ) {
+    return false;
+  }
+  const distance = Math.sqrt(
+    coordinates.reduce(
+      (sum, pair) =>
+        sum + ((pair.target as number) - (pair.actor as number)) ** 2,
+      0,
+    ),
+  );
+  return (
+    input.prediction.position_binding_kind === input.binding.binding_kind &&
+    input.prediction.require_replaceable === true &&
+    finiteMeasurement(input.prediction, "horizon_ticks") ===
+      input.binding.horizon_ticks &&
+    collisionTick <= input.binding.horizon_ticks &&
+    distance <= input.binding.max_distance_blocks + 1e-6 &&
+    (input.allowedRegions.length === 0 ||
+      input.allowedRegions.some((region) =>
+        positionInsideRegion(input.prediction.target_position, region),
+      ))
+  );
+};
+
+const placementPredictionValid = (input: {
+  candidate: unknown;
+  admittedPositionKeys: ReadonlySet<string>;
+  admittedBindings?: readonly PredictedCollisionPlacementBinding[];
+  allowedRegions?: readonly unknown[];
+}): boolean => {
+  const prediction = recordMeasurement(input.candidate);
+  if (!prediction) return false;
+  const horizon = finiteMeasurement(prediction, "horizon_ticks");
+  const supportCount = finiteMeasurement(prediction, "support_candidate_count");
+  const firstReachable = finiteMeasurement(prediction, "first_reachable_tick");
+  const initialDistance = finiteMeasurement(prediction, "initial_distance");
+  const minimumDistance = finiteMeasurement(
+    prediction,
+    "minimum_predicted_distance",
+  );
+  const targetKey = blockPositionKey(prediction.target_position);
+  const exactTargetAdmitted =
+    targetKey !== null && input.admittedPositionKeys.has(targetKey);
+  const boundTargetAdmitted = (input.admittedBindings ?? []).some((binding) =>
+    predictedCollisionBindingValid({
+      prediction,
+      binding,
+      allowedRegions: input.allowedRegions ?? [],
+    }),
+  );
+  return (
+    prediction.model_schema === "helix.minecraft.short_horizon_trajectory.v1" &&
+    prediction.applicable === true &&
+    typeof prediction.reason === "string" &&
+    prediction.reason.length > 0 &&
+    prediction.predicted_reachable === true &&
+    wholeNonnegative(horizon) &&
+    horizon >= 1 &&
+    horizon <= 20 &&
+    wholeNonnegative(supportCount) &&
+    supportCount >= 1 &&
+    supportCount <= 6 &&
+    wholeNonnegative(firstReachable) &&
+    firstReachable <= horizon &&
+    initialDistance !== null &&
+    initialDistance >= 0 &&
+    minimumDistance !== null &&
+    minimumDistance >= 0 &&
+    minimumDistance <= initialDistance + 1e-6 &&
+    (exactTargetAdmitted || boundTargetAdmitted)
+  );
+};
+
+const sequenceConditionObservationsValid = (input: {
+  sequence: HelixMinecraftFluidSequenceArguments;
+  measurements: Record<string, unknown>;
+}): boolean => {
+  const raw = input.measurements.condition_observations;
+  const declaredCount = finiteMeasurement(
+    input.measurements,
+    "condition_observation_count",
+  );
+  if (
+    !Array.isArray(raw) ||
+    !wholeNonnegative(declaredCount) ||
+    raw.length !== declaredCount ||
+    raw.length > HELIX_MINECRAFT_FLUID_CONDITION_OBSERVATION_LIMIT
+  )
+    return false;
+  const conditionalNodes = new Map(
+    input.sequence.nodes.flatMap((node) =>
+      node.node_kind === "checkpoint" || node.node_kind === "branch"
+        ? [[node.node_id, node] as const]
+        : [],
+    ),
+  );
+  const lastValues = new Map<string, boolean>();
+  let previousTick = -1;
+  for (const candidate of raw) {
+    const parsed =
+      helixMinecraftFluidConditionObservationSchema.safeParse(candidate);
+    if (!parsed.success) return false;
+    const observation = parsed.data;
+    const node = conditionalNodes.get(observation.node_id);
+    if (
+      !node ||
+      observation.condition_kind !== node.condition.condition_kind ||
+      observation.tick_index < previousTick ||
+      observation.tick_index > input.sequence.max_total_ticks ||
+      lastValues.get(observation.node_id) === observation.satisfied
+    )
+      return false;
+    previousTick = observation.tick_index;
+    lastValues.set(observation.node_id, observation.satisfied);
+  }
+  return true;
+};
+
+const reactiveProgramMeasurementsValid = (input: {
+  program: HelixMinecraftReactiveProgramArguments;
+  measurements: Record<string, unknown>;
+}): boolean => {
+  const parsedObservation =
+    helixMinecraftReactiveProgramObservationSchema.safeParse({
+      program_schema: input.measurements.program_schema,
+      program_id: input.measurements.program_id,
+      tick_index: input.measurements.tick_index,
+      active_lane_count: input.measurements.active_lane_count,
+      lanes: input.measurements.lanes,
+      condition_observations: input.measurements.condition_observations,
+      resource_conflict_count: input.measurements.resource_conflict_count,
+      interrupt_count: input.measurements.interrupt_count,
+      controls_released: input.measurements.controls_released,
+    });
+  if (!parsedObservation.success) return false;
+  const observation = parsedObservation.data;
+  const maxConcurrentLaneCount = finiteMeasurement(
+    input.measurements,
+    "max_concurrent_lane_count",
+  );
+  const parallelTickCount = finiteMeasurement(
+    input.measurements,
+    "parallel_tick_count",
+  );
+  if (
+    observation.program_id !== input.program.program_id ||
+    observation.tick_index > input.program.max_total_ticks ||
+    observation.controls_released !== true ||
+    observation.active_lane_count !== 0 ||
+    observation.lanes.length !== input.program.lanes.length ||
+    observation.condition_observations.length !==
+      finiteMeasurement(input.measurements, "condition_observation_count") ||
+    !wholeNonnegative(maxConcurrentLaneCount) ||
+    maxConcurrentLaneCount > input.program.lanes.length ||
+    !wholeNonnegative(parallelTickCount) ||
+    parallelTickCount > observation.tick_index + 1 ||
+    (parallelTickCount > 0 && maxConcurrentLaneCount < 2)
+  )
+    return false;
+
+  const admittedLanes = new Map(
+    input.program.lanes.map((lane) => [lane.lane_id, lane] as const),
+  );
+  for (const lane of observation.lanes) {
+    const admitted = admittedLanes.get(lane.lane_id);
+    if (
+      !admitted ||
+      lane.lane_kind !== admitted.lane_kind ||
+      lane.tick_index !== observation.tick_index ||
+      lane.held_resources.length !== 0 ||
+      lane.controls_released !== true
+    )
+      return false;
+  }
+  if (input.program.completion_policy.mode === "all_required") {
+    const requiredLanes = input.program.lanes.filter((entry) => entry.required);
+    const everyRequiredSucceeded = requiredLanes.every(
+      (lane) =>
+        observation.lanes.find((entry) => entry.lane_id === lane.lane_id)
+          ?.state === "succeeded",
+    );
+    const settledInterruptId =
+      typeof input.measurements.settled_interrupt_id === "string"
+        ? input.measurements.settled_interrupt_id
+        : null;
+    const settledInterrupt = settledInterruptId
+      ? input.program.interrupts.find(
+          (interrupt) => interrupt.interrupt_id === settledInterruptId,
+        )
+      : null;
+    const interruptTarget = settledInterrupt
+      ? input.program.lanes.find(
+          (lane) => lane.lane_id === settledInterrupt.activate_lane_id,
+        )
+      : null;
+    const interruptTargetObservation = interruptTarget
+      ? observation.lanes.find(
+          (lane) => lane.lane_id === interruptTarget.lane_id,
+        )
+      : null;
+    const interruptTargetNode = interruptTarget && interruptTargetObservation
+      ? interruptTarget.nodes.find(
+          (node) => node.node_id === interruptTargetObservation.node_id,
+        )
+      : null;
+    const triggerObservation = settledInterrupt
+      ? [...observation.condition_observations]
+          .reverse()
+          .find(
+            (entry) => entry.node_id === settledInterrupt.interrupt_id,
+          )
+      : null;
+    const triggerObserved = Boolean(
+      settledInterrupt &&
+        triggerObservation &&
+        (settledInterrupt.trigger_when === "satisfied"
+          ? triggerObservation.satisfied === true
+          : triggerObservation.satisfied === false),
+    );
+    const interruptedRequiredLanes = settledInterrupt
+      ? requiredLanes.filter((lane) =>
+          settledInterrupt.cancel_lane_ids.includes(lane.lane_id),
+        )
+      : [];
+    const handledInterruptValid = Boolean(
+      settledInterrupt &&
+        input.measurements.reason_code === "reactive_program_interrupted" &&
+        observation.interrupt_count >= 1 &&
+        triggerObserved &&
+        interruptTarget?.activation === "interrupt_only" &&
+        interruptTargetNode?.node_kind === "terminal" &&
+        (interruptTargetNode?.terminal_outcome === "succeeded" ||
+          interruptTargetNode?.terminal_outcome === "canceled") &&
+        (interruptTargetObservation?.state === "succeeded" ||
+          interruptTargetObservation?.state === "canceled") &&
+        interruptedRequiredLanes.length >= 1 &&
+        requiredLanes.every((lane) => {
+          const state = observation.lanes.find(
+            (entry) => entry.lane_id === lane.lane_id,
+          )?.state;
+          return (
+            state === "succeeded" ||
+            (state === "canceled" &&
+              settledInterrupt.cancel_lane_ids.includes(lane.lane_id))
+          );
+        }),
+    );
+    if (!everyRequiredSucceeded && !handledInterruptValid) return false;
+  } else if (!observation.lanes.some((lane) => lane.state === "succeeded")) {
+    return false;
+  }
+
+  const conditionKindsByObservationId = new Map<string, string>();
+  for (const lane of input.program.lanes) {
+    for (const node of lane.nodes) {
+      if (
+        node.node_kind === "branch" ||
+        node.node_kind === "event" ||
+        node.node_kind === "checkpoint"
+      ) {
+        conditionKindsByObservationId.set(
+          node.node_id,
+          node.condition.condition_kind,
+        );
+      } else if (node.node_kind === "repeat" && node.until_condition) {
+        conditionKindsByObservationId.set(
+          node.node_id,
+          node.until_condition.condition_kind,
+        );
+      } else if (node.node_kind === "maintain") {
+        conditionKindsByObservationId.set(
+          node.node_id,
+          node.while_condition.condition_kind,
+        );
+      }
+    }
+  }
+  for (const interrupt of input.program.interrupts) {
+    conditionKindsByObservationId.set(
+      interrupt.interrupt_id,
+      interrupt.condition.condition_kind,
+    );
+  }
+  if (
+    !observation.condition_observations.every(
+      (entry) =>
+        conditionKindsByObservationId.get(entry.node_id) ===
+        entry.condition_kind,
+    )
+  )
+    return false;
+
+  const raceOutcomes = input.measurements.race_outcomes;
+  const raceOutcomeCount = finiteMeasurement(
+    input.measurements,
+    "race_outcome_count",
+  );
+  if (
+    !Array.isArray(raceOutcomes) ||
+    !wholeNonnegative(raceOutcomeCount) ||
+    raceOutcomes.length !== raceOutcomeCount ||
+    raceOutcomes.length > input.program.races.length
+  )
+    return false;
+  const admittedRaces = new Map(
+    input.program.races.map((race) => [race.race_id, race] as const),
+  );
+  const seenRaces = new Set<string>();
+  for (const candidate of raceOutcomes) {
+    const outcome = recordMeasurement(candidate);
+    const raceId = outcome?.race_id;
+    const winnerLaneId = outcome?.winner_lane_id;
+    const settledTick = outcome
+      ? finiteMeasurement(outcome, "settled_tick")
+      : null;
+    const canceledLaneIds = outcome?.canceled_lane_ids;
+    const admitted =
+      typeof raceId === "string" ? admittedRaces.get(raceId) : null;
+    if (
+      !outcome ||
+      !admitted ||
+      seenRaces.has(raceId as string) ||
+      outcome.settle_on !== admitted.settle_on ||
+      typeof winnerLaneId !== "string" ||
+      !admitted.lane_ids.includes(winnerLaneId) ||
+      !wholeNonnegative(settledTick) ||
+      settledTick > observation.tick_index ||
+      !Array.isArray(canceledLaneIds) ||
+      canceledLaneIds.some(
+        (laneId) =>
+          typeof laneId !== "string" ||
+          laneId === winnerLaneId ||
+          !admitted.lane_ids.includes(laneId),
+      )
+    )
+      return false;
+    seenRaces.add(raceId as string);
+  }
+
+  const placementPredictions = input.measurements.placement_predictions;
+  const placementPredictionCount = finiteMeasurement(
+    input.measurements,
+    "placement_prediction_count",
+  );
+  const placementActionSuccessCount = finiteMeasurement(
+    input.measurements,
+    "placement_action_success_count",
+  );
+  const placementMutationSuccessCount = finiteMeasurement(
+    input.measurements,
+    "placement_mutation_success_count",
+  );
+  if (
+    !Array.isArray(placementPredictions) ||
+    !wholeNonnegative(placementPredictionCount) ||
+    !wholeNonnegative(placementActionSuccessCount) ||
+    !wholeNonnegative(placementMutationSuccessCount) ||
+    placementPredictions.length !== placementPredictionCount ||
+    placementPredictionCount > placementActionSuccessCount ||
+    placementPredictionCount < placementMutationSuccessCount ||
+    placementMutationSuccessCount > placementActionSuccessCount ||
+    placementPredictions.length > 256
+  )
+    return false;
+  const placePositionsByLane = new Map<string, Set<string>>();
+  const placeBindingsByLane = new Map<
+    string,
+    PredictedCollisionPlacementBinding[]
+  >();
+  for (const lane of input.program.lanes) {
+    const positions = new Set<string>();
+    const bindings: PredictedCollisionPlacementBinding[] = [];
+    for (const node of lane.nodes) {
+      if (
+        (node.node_kind === "action" ||
+          node.node_kind === "repeat" ||
+          node.node_kind === "maintain") &&
+        node.action.action_kind === "place"
+      ) {
+        for (const position of node.action.positions ?? []) {
+          const key = blockPositionKey(position);
+          if (key) positions.add(key);
+        }
+        const binding = predictedCollisionPlacementBinding(
+          node.action.position_binding,
+        );
+        if (binding) bindings.push(binding);
+      }
+    }
+    placePositionsByLane.set(lane.lane_id, positions);
+    placeBindingsByLane.set(lane.lane_id, bindings);
+  }
+  return placementPredictions.every((candidate) => {
+    const prediction = recordMeasurement(candidate);
+    const laneId = prediction?.lane_id;
+    return (
+      prediction?.action_kind === "place" &&
+      typeof laneId === "string" &&
+      placementPredictionValid({
+        candidate,
+        admittedPositionKeys: placePositionsByLane.get(laneId) ?? new Set(),
+        admittedBindings: placeBindingsByLane.get(laneId) ?? [],
+        allowedRegions: input.program.mutation_scope.allowed_regions,
+      })
+    );
+  });
+};
 
 /**
  * Domain proof over a connector's terminal measurements. This is policy-side
@@ -1109,27 +1819,57 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
   const actionKind = request.action_kind;
 
   const motionKinds = new Set([
-    "navigate_to", "look_at", "walk", "jump", "follow", "collect", "mine", "place",
+    "navigate_to",
+    "look_at",
+    "track_target",
+    "walk",
+    "jump",
+    "follow",
+    "collect",
+    "mine",
+    "place",
+    "execute_sequence",
+    "execute_reactive_program",
   ]);
   const interactionKinds = new Set([
-    "interact", "mine", "place", "craft", "inventory_transfer",
+    "interact",
+    "mine",
+    "place",
+    "craft",
+    "inventory_transfer",
+    "execute_sequence",
+    "execute_reactive_program",
   ]);
   const inventoryKinds = new Set([
-    "hotbar_select", "equip", "collect", "mine", "place", "craft", "inventory_transfer",
+    "hotbar_select",
+    "equip",
+    "collect",
+    "mine",
+    "place",
+    "craft",
+    "inventory_transfer",
+    "execute_sequence",
+    "execute_reactive_program",
   ]);
-  const worldMutationKinds = new Set(["mine", "place"]);
+  const worldMutationKinds = new Set([
+    "mine",
+    "place",
+    "execute_sequence",
+    "execute_reactive_program",
+  ]);
   if (
     (result.player_motion_performed && !motionKinds.has(actionKind)) ||
-    (result.player_interaction_performed && !interactionKinds.has(actionKind)) ||
+    (result.player_interaction_performed &&
+      !interactionKinds.has(actionKind)) ||
     (result.inventory_mutation_performed && !inventoryKinds.has(actionKind)) ||
     (result.world_mutation_performed && !worldMutationKinds.has(actionKind)) ||
-    result.side_effects_performed !== (
-      result.player_motion_performed ||
-      result.player_interaction_performed ||
-      result.inventory_mutation_performed ||
-      result.world_mutation_performed
-    )
-  ) return false;
+    result.side_effects_performed !==
+      (result.player_motion_performed ||
+        result.player_interaction_performed ||
+        result.inventory_mutation_performed ||
+        result.world_mutation_performed)
+  )
+    return false;
 
   const worldMutations = finiteMeasurement(
     measurements,
@@ -1139,23 +1879,30 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
     if (
       !wholeNonnegative(worldMutations) ||
       worldMutations > request.constraints.max_block_mutations ||
-      result.world_mutation_performed !== (worldMutations > 0)
-    ) return false;
+      result.world_mutation_performed !== worldMutations > 0
+    )
+      return false;
   }
   if (
     result.world_mutation_performed &&
     (!request.constraints.world_mutation_allowed ||
       request.constraints.max_block_mutations < 1)
-  ) return false;
+  )
+    return false;
 
-  for (const key of ["collected_count", "produced_count", "transferred_count"]) {
+  for (const key of [
+    "collected_count",
+    "produced_count",
+    "transferred_count",
+  ]) {
     const count = finiteMeasurement(measurements, key);
     if (
       count !== null &&
       (!wholeNonnegative(count) ||
         count > request.constraints.max_inventory_transfers ||
         (count > 0 && !result.inventory_mutation_performed))
-    ) return false;
+    )
+      return false;
   }
 
   switch (actionKind) {
@@ -1163,34 +1910,52 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
       const distance = finiteMeasurement(measurements, "distance_blocks");
       const admittedRadius = finiteArgument(args, "arrival_radius");
       const measuredRadius = finiteMeasurement(measurements, "arrival_radius");
-      return distance !== null && admittedRadius !== null && measuredRadius !== null &&
+      return (
+        distance !== null &&
+        admittedRadius !== null &&
+        measuredRadius !== null &&
         Math.abs(measuredRadius - admittedRadius) <= 1e-6 &&
-        distance <= admittedRadius + 1e-6;
+        distance <= admittedRadius + 1e-6
+      );
     }
     case "look_at": {
       const target = args.target;
-      if (!target || typeof target !== "object" || Array.isArray(target)) return false;
+      if (!target || typeof target !== "object" || Array.isArray(target))
+        return false;
       const targetRecord = target as Record<string, unknown>;
       const targetKind = targetRecord.target_kind;
       const finalYaw = finiteMeasurement(measurements, "final_yaw");
       const finalPitch = finiteMeasurement(measurements, "final_pitch");
-      if (finalYaw === null || finalPitch === null || finalPitch < -90 || finalPitch > 90) {
+      if (
+        finalYaw === null ||
+        finalPitch === null ||
+        finalPitch < -90 ||
+        finalPitch > 90
+      ) {
         return false;
       }
       if (targetKind === "current_focus") {
-        return measurements.target_kind === "current_focus" &&
-          measurements.view_retained === true;
+        return (
+          measurements.target_kind === "current_focus" &&
+          measurements.view_retained === true
+        );
       }
       const yawError = finiteMeasurement(measurements, "yaw_error_degrees");
       const pitchError = finiteMeasurement(measurements, "pitch_error_degrees");
       if (yawError === null || pitchError === null) return false;
       if (targetKind === "position") {
-        return measurements.target_kind === "position" &&
-          yawError <= 2 && pitchError <= 2;
+        return (
+          measurements.target_kind === "position" &&
+          yawError <= 2 &&
+          pitchError <= 2
+        );
       }
       if (targetKind !== "relative_rotation") return false;
       const requestedYaw = finiteArgument(targetRecord, "yaw_delta_degrees");
-      const requestedPitch = finiteArgument(targetRecord, "pitch_delta_degrees");
+      const requestedPitch = finiteArgument(
+        targetRecord,
+        "pitch_delta_degrees",
+      );
       const measuredRequestedYaw = finiteMeasurement(
         measurements,
         "requested_yaw_delta_degrees",
@@ -1209,87 +1974,379 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
       );
       const initialPitch = finiteMeasurement(measurements, "initial_pitch");
       if (
-        requestedYaw === null || requestedPitch === null ||
-        measuredRequestedYaw === null || measuredRequestedPitch === null ||
-        appliedYaw === null || appliedPitch === null || initialPitch === null
-      ) return false;
-      const expectedAppliedPitch = Math.max(
-        -90,
-        Math.min(90, initialPitch + requestedPitch),
-      ) - initialPitch;
-      return measurements.target_kind === "relative_rotation" &&
+        requestedYaw === null ||
+        requestedPitch === null ||
+        measuredRequestedYaw === null ||
+        measuredRequestedPitch === null ||
+        appliedYaw === null ||
+        appliedPitch === null ||
+        initialPitch === null
+      )
+        return false;
+      const expectedAppliedPitch =
+        Math.max(-90, Math.min(90, initialPitch + requestedPitch)) -
+        initialPitch;
+      return (
+        measurements.target_kind === "relative_rotation" &&
         Math.abs(measuredRequestedYaw - requestedYaw) <= 1e-6 &&
         Math.abs(measuredRequestedPitch - requestedPitch) <= 1e-6 &&
         Math.abs(appliedYaw - requestedYaw) <= 0.5 &&
         Math.abs(appliedPitch - expectedAppliedPitch) <= 0.5 &&
-        yawError <= 0.5 && pitchError <= 0.5;
+        yawError <= 0.5 &&
+        pitchError <= 0.5
+      );
+    }
+    case "track_target": {
+      const target = args.target;
+      if (!target || typeof target !== "object" || Array.isArray(target))
+        return false;
+      const targetRecord = target as Record<string, unknown>;
+      const targetKind = targetRecord.target_kind;
+      if (
+        (targetKind !== "entity_type" &&
+          targetKind !== "current_focus_entity" &&
+          targetKind !== "particle_type") ||
+        measurements.target_kind !== targetKind ||
+        measurements.tracking_completed !== true
+      )
+        return false;
+      if (
+        targetKind === "entity_type" &&
+        !stringMeasurementMatches(
+          measurements,
+          "target_entity_type_id",
+          targetRecord,
+          "entity_type_id",
+        )
+      )
+        return false;
+      if (
+        targetKind === "particle_type" &&
+        !stringMeasurementMatches(
+          measurements,
+          "target_particle_type_id",
+          targetRecord,
+          "particle_type_id",
+        )
+      )
+        return false;
+      if (targetKind === "particle_type") {
+        const continuity = targetRecord.continuity;
+        const handoffRadius = finiteArgument(targetRecord, "handoff_radius");
+        const maxHandoffs = finiteArgument(targetRecord, "max_handoffs");
+        const measuredHandoffs = finiteMeasurement(
+          measurements,
+          "particle_handoff_count",
+        );
+        const measuredMaxHandoffs = finiteMeasurement(
+          measurements,
+          "particle_max_handoffs",
+        );
+        if (
+          (continuity !== "single_instance" &&
+            continuity !== "same_type_stream") ||
+          handoffRadius === null ||
+          handoffRadius < 0 ||
+          handoffRadius > 8 ||
+          !wholeNonnegative(maxHandoffs) ||
+          maxHandoffs > 1_000 ||
+          !wholeNonnegative(measuredHandoffs) ||
+          measuredHandoffs > maxHandoffs ||
+          measuredMaxHandoffs !== maxHandoffs ||
+          measurements.particle_continuity !== continuity ||
+          (continuity === "single_instance" &&
+            (handoffRadius !== 0 ||
+              maxHandoffs !== 0 ||
+              measuredHandoffs !== 0)) ||
+          (continuity === "same_type_stream" &&
+            (handoffRadius <= 0 || maxHandoffs < 1))
+        )
+          return false;
+      }
+      const targetRef = measurements.target_ref;
+      if (
+        typeof targetRef !== "string" ||
+        !/^target:[a-f0-9]{32,64}$/.test(targetRef)
+      )
+        return false;
+      const durationTicks = finiteMeasurement(measurements, "duration_ticks");
+      const requestedDurationMs = finiteArgument(args, "max_duration_ms");
+      const sampleCount = finiteMeasurement(measurements, "sample_count");
+      const retainedTicks = finiteMeasurement(measurements, "retained_ticks");
+      const targetLossTicks = finiteMeasurement(
+        measurements,
+        "target_loss_ticks",
+      );
+      const reacquisitions = finiteMeasurement(
+        measurements,
+        "reacquisition_count",
+      );
+      const meanError = finiteMeasurement(
+        measurements,
+        "mean_angular_error_degrees",
+      );
+      const p95Error = finiteMeasurement(
+        measurements,
+        "p95_angular_error_degrees",
+      );
+      const maxError = finiteMeasurement(
+        measurements,
+        "max_angular_error_degrees",
+      );
+      const finalYawError = finiteMeasurement(
+        measurements,
+        "final_yaw_error_degrees",
+      );
+      const finalPitchError = finiteMeasurement(
+        measurements,
+        "final_pitch_error_degrees",
+      );
+      const lineOfSightTicks = finiteMeasurement(
+        measurements,
+        "line_of_sight_retained_ticks",
+      );
+      if (
+        requestedDurationMs === null ||
+        !wholeNonnegative(durationTicks) ||
+        durationTicks !== Math.ceil(requestedDurationMs / 50) ||
+        !wholeNonnegative(sampleCount) ||
+        sampleCount !== durationTicks ||
+        !wholeNonnegative(retainedTicks) ||
+        retainedTicks < 1 ||
+        !wholeNonnegative(targetLossTicks) ||
+        retainedTicks + targetLossTicks !== sampleCount ||
+        !wholeNonnegative(reacquisitions) ||
+        !wholeNonnegative(lineOfSightTicks) ||
+        lineOfSightTicks > retainedTicks ||
+        meanError === null ||
+        p95Error === null ||
+        maxError === null ||
+        finalYawError === null ||
+        finalPitchError === null ||
+        meanError < 0 ||
+        p95Error < 0 ||
+        maxError < 0 ||
+        finalYawError < 0 ||
+        finalPitchError < 0 ||
+        meanError > maxError + 1e-6 ||
+        p95Error > maxError + 1e-6 ||
+        maxError > 180 ||
+        finalYawError > 180 ||
+        finalPitchError > 180 ||
+        measurements.line_of_sight_required !== args.require_line_of_sight
+      )
+        return false;
+      return (
+        args.require_line_of_sight !== true ||
+        lineOfSightTicks === retainedTicks
+      );
     }
     case "walk": {
       const distance = finiteMeasurement(measurements, "distance_blocks");
-      return distance !== null && distance > 0 &&
-        distance <= request.constraints.max_distance_blocks;
+      return (
+        distance !== null &&
+        distance > 0 &&
+        distance <= request.constraints.max_distance_blocks
+      );
     }
     case "jump": {
       const confirmed = finiteMeasurement(measurements, "confirmed_jumps");
       const requested = finiteArgument(args, "count");
-      return wholeNonnegative(confirmed) && wholeNonnegative(requested) &&
-        confirmed >= requested;
+      return (
+        wholeNonnegative(confirmed) &&
+        wholeNonnegative(requested) &&
+        confirmed >= requested
+      );
     }
     case "interact":
-      return measurements.interaction_accepted === true &&
+      return (
+        measurements.interaction_accepted === true &&
         stringMeasurementMatches(measurements, "target", args, "target") &&
         stringMeasurementMatches(measurements, "hand", args, "hand") &&
-        stringMeasurementMatches(measurements, "interaction", args, "interaction");
+        stringMeasurementMatches(
+          measurements,
+          "interaction",
+          args,
+          "interaction",
+        )
+      );
     case "hotbar_select":
-      return measurements.selection_matches === true &&
-        finiteMeasurement(measurements, "selected_slot") === finiteArgument(args, "slot");
+      return (
+        measurements.selection_matches === true &&
+        finiteMeasurement(measurements, "selected_slot") ===
+          finiteArgument(args, "slot")
+      );
     case "equip":
-      return measurements.equipment_matches === true &&
+      return (
+        measurements.equipment_matches === true &&
         stringMeasurementMatches(measurements, "item_id", args, "item_id") &&
-        stringMeasurementMatches(measurements, "destination", args, "destination");
+        stringMeasurementMatches(
+          measurements,
+          "destination",
+          args,
+          "destination",
+        )
+      );
     case "follow": {
       const durationTicks = finiteMeasurement(measurements, "duration_ticks");
       const durationMs = finiteArgument(args, "max_duration_ms");
-      return measurements.target_present === true &&
-        wholeNonnegative(durationTicks) && durationMs !== null &&
-        durationTicks >= Math.ceil(durationMs / 50);
+      return (
+        measurements.target_present === true &&
+        wholeNonnegative(durationTicks) &&
+        durationMs !== null &&
+        durationTicks >= Math.ceil(durationMs / 50)
+      );
     }
     case "collect": {
       const collected = finiteMeasurement(measurements, "collected_count");
       const requested = finiteArgument(args, "count");
-      return stringMeasurementMatches(measurements, "item_id", args, "item_or_block_id") &&
-        wholeNonnegative(collected) && wholeNonnegative(requested) &&
-        collected >= requested;
+      return (
+        stringMeasurementMatches(
+          measurements,
+          "item_id",
+          args,
+          "item_or_block_id",
+        ) &&
+        wholeNonnegative(collected) &&
+        wholeNonnegative(requested) &&
+        collected >= requested
+      );
     }
     case "mine": {
       const removed = finiteMeasurement(measurements, "removed_count");
       const requested = finiteArgument(args, "count");
-      return stringMeasurementMatches(measurements, "block_id", args, "block_id") &&
-        wholeNonnegative(removed) && wholeNonnegative(requested) &&
+      return (
+        stringMeasurementMatches(measurements, "block_id", args, "block_id") &&
+        wholeNonnegative(removed) &&
+        wholeNonnegative(requested) &&
         wholeNonnegative(worldMutations) &&
-        removed >= requested && worldMutations >= requested;
+        removed >= requested &&
+        worldMutations >= requested
+      );
     }
     case "place": {
       const verified = finiteMeasurement(measurements, "verified_positions");
-      const requestedPositions = Array.isArray(args.positions) ? args.positions.length : -1;
-      return stringMeasurementMatches(measurements, "block_id", args, "block_id") &&
-        wholeNonnegative(verified) && wholeNonnegative(worldMutations) &&
-        requestedPositions > 0 && verified >= requestedPositions;
+      const binding = predictedCollisionPlacementBinding(args.position_binding);
+      const requestedPositions = Array.isArray(args.positions)
+        ? args.positions.length
+        : binding
+          ? 1
+          : -1;
+      const admittedPositionKeys = new Set(
+        Array.isArray(args.positions)
+          ? args.positions
+              .map(blockPositionKey)
+              .filter((key): key is string => key !== null)
+          : [],
+      );
+      const predictionRequired =
+        wholeNonnegative(worldMutations) && worldMutations > 0;
+      const predictionValid = placementPredictionValid({
+        candidate: measurements.placement_prediction,
+        admittedPositionKeys,
+        admittedBindings: binding ? [binding] : [],
+      });
+      return (
+        stringMeasurementMatches(measurements, "block_id", args, "block_id") &&
+        wholeNonnegative(verified) &&
+        wholeNonnegative(worldMutations) &&
+        requestedPositions > 0 &&
+        (binding
+          ? admittedPositionKeys.size === 0
+          : admittedPositionKeys.size === requestedPositions) &&
+        verified >= requestedPositions &&
+        (!predictionRequired || predictionValid)
+      );
     }
     case "craft": {
       const produced = finiteMeasurement(measurements, "produced_count");
       const requested = finiteArgument(args, "count");
-      return stringMeasurementMatches(measurements, "output_item_id", args, "output_item_id") &&
-        wholeNonnegative(produced) && wholeNonnegative(requested) &&
-        produced >= requested;
+      return (
+        stringMeasurementMatches(
+          measurements,
+          "output_item_id",
+          args,
+          "output_item_id",
+        ) &&
+        wholeNonnegative(produced) &&
+        wholeNonnegative(requested) &&
+        produced >= requested
+      );
     }
     case "inventory_transfer": {
       const transferred = finiteMeasurement(measurements, "transferred_count");
       const requested = finiteArgument(args, "count");
-      return stringMeasurementMatches(measurements, "item_id", args, "item_id") &&
-        stringMeasurementMatches(measurements, "direction", args, "direction") &&
-        wholeNonnegative(transferred) && wholeNonnegative(requested) &&
-        transferred >= requested;
+      return (
+        stringMeasurementMatches(measurements, "item_id", args, "item_id") &&
+        stringMeasurementMatches(
+          measurements,
+          "direction",
+          args,
+          "direction",
+        ) &&
+        wholeNonnegative(transferred) &&
+        wholeNonnegative(requested) &&
+        transferred >= requested
+      );
+    }
+    case "execute_sequence": {
+      const parsed = helixMinecraftFluidSequenceArgumentsSchema.safeParse(args);
+      if (!parsed.success) return false;
+      const executedNodes = finiteMeasurement(
+        measurements,
+        "executed_node_count",
+      );
+      const satisfiedCheckpoints = finiteMeasurement(
+        measurements,
+        "required_checkpoints_satisfied",
+      );
+      const measuredDuration = result.duration_ticks ?? null;
+      return (
+        measurements.sequence_completed === true &&
+        stringMeasurementMatches(
+          measurements,
+          "sequence_id",
+          args,
+          "sequence_id",
+        ) &&
+        stringMeasurementMatches(measurements, "ruleset", args, "ruleset") &&
+        wholeNonnegative(executedNodes) &&
+        executedNodes > 0 &&
+        wholeNonnegative(satisfiedCheckpoints) &&
+        satisfiedCheckpoints >= parsed.data.required_checkpoint_ids.length &&
+        sequenceConditionObservationsValid({
+          sequence: parsed.data,
+          measurements,
+        }) &&
+        wholeNonnegative(measuredDuration) &&
+        measuredDuration <= parsed.data.max_total_ticks
+      );
+    }
+    case "execute_reactive_program": {
+      const parsed =
+        helixMinecraftReactiveProgramArgumentsSchema.safeParse(args);
+      if (!parsed.success) return false;
+      const executedActions = finiteMeasurement(
+        measurements,
+        "executed_action_count",
+      );
+      const measuredDuration = result.duration_ticks ?? null;
+      return (
+        measurements.reactive_program_completed === true &&
+        stringMeasurementMatches(
+          measurements,
+          "program_id",
+          args,
+          "program_id",
+        ) &&
+        wholeNonnegative(executedActions) &&
+        reactiveProgramMeasurementsValid({
+          program: parsed.data,
+          measurements,
+        }) &&
+        wholeNonnegative(measuredDuration) &&
+        measuredDuration <= parsed.data.max_total_ticks
+      );
     }
     default:
       return false;
@@ -1335,12 +2392,11 @@ export const canonicalizeEnvironmentActionResult = (input: {
     ...input.result,
     outcome,
     summary,
-    verified_terminal_measurements:
-      input.verifiedTerminalMeasurements ?? {},
+    verified_terminal_measurements: input.verifiedTerminalMeasurements ?? {},
   });
 };
 
-const readRecordedWorkflowEvidence = async (input: {
+export const readRecordedWorkflowEvidence = async (input: {
   db: Queryable;
   request: HelixEnvironmentActionRequest;
   result: HelixEnvironmentActionResult;
@@ -1348,9 +2404,27 @@ const readRecordedWorkflowEvidence = async (input: {
   valid: boolean;
   terminalMeasurements: Record<string, unknown>;
 }> => {
-  if (input.result.outcome !== "succeeded") {
-    return { valid: true, terminalMeasurements: {} };
-  }
+  const expectedTerminal = (() => {
+    switch (input.result.outcome) {
+      case "succeeded":
+        return { eventType: "workflow.succeeded", state: "succeeded" } as const;
+      case "failed":
+        return { eventType: "workflow.failed", state: "failed" } as const;
+      case "workflow_timeout":
+        return { eventType: "workflow.timed_out", state: "timed_out" } as const;
+      case "request_canceled":
+      case "manual_override":
+        return { eventType: "workflow.canceled", state: "canceled" } as const;
+      case "emergency_stopped":
+        return {
+          eventType: "workflow.emergency_stopped",
+          state: "emergency_stopped",
+        } as const;
+      default:
+        return null;
+    }
+  })();
+  if (!expectedTerminal) return { valid: true, terminalMeasurements: {} };
   const selected = await input.db.query<{
     event_id: string;
     event_payload: unknown;
@@ -1365,7 +2439,9 @@ const readRecordedWorkflowEvidence = async (input: {
     const parsed = helixEnvironmentActionWorkflowEventSchema.safeParse(
       parseJson(row.event_payload, null),
     );
-    return parsed.success ? [{ eventId: row.event_id, event: parsed.data }] : [];
+    return parsed.success
+      ? [{ eventId: row.event_id, event: parsed.data }]
+      : [];
   });
   const byId = new Map(events.map((entry) => [entry.eventId, entry.event]));
   const referenced = new Set([
@@ -1375,7 +2451,10 @@ const readRecordedWorkflowEvidence = async (input: {
     ),
   ]);
   if (referenced.size === 0 || [...referenced].some((ref) => !byId.has(ref))) {
-    return { valid: false, terminalMeasurements: {} };
+    return {
+      valid: input.result.outcome !== "succeeded",
+      terminalMeasurements: {},
+    };
   }
   const startedAt = input.result.started_at
     ? Date.parse(input.result.started_at)
@@ -1385,8 +2464,8 @@ const readRecordedWorkflowEvidence = async (input: {
     const createdAt = Date.parse(event.created_at);
     return (
       referenced.has(eventId) &&
-      event.event_type === "workflow.succeeded" &&
-      event.workflow_state === "succeeded" &&
+      event.event_type === expectedTerminal.eventType &&
+      event.workflow_state === expectedTerminal.state &&
       event.controls_released &&
       event.workflow_id === input.request.workflow_id &&
       event.action_request_id === input.request.action_request_id &&
@@ -1397,13 +2476,21 @@ const readRecordedWorkflowEvidence = async (input: {
       createdAt <= completedAt
     );
   });
-  if (!terminal) return { valid: false, terminalMeasurements: {} };
+  if (!terminal) {
+    return {
+      valid: input.result.outcome !== "succeeded",
+      terminalMeasurements: {},
+    };
+  }
   return {
-    valid: environmentActionWorkflowMeasurementsValid({
-      request: input.request,
-      result: input.result,
-      measurements: terminal.event.measurements,
-    }),
+    valid:
+      input.result.outcome === "succeeded"
+        ? environmentActionWorkflowMeasurementsValid({
+            request: input.request,
+            result: input.result,
+            measurements: terminal.event.measurements,
+          })
+        : true,
     terminalMeasurements: terminal.event.measurements,
   };
 };
@@ -1464,9 +2551,12 @@ export const resolveEnvironmentActionWorkflowControlContext = async (input: {
       "The current account is not an active member of this room.",
     );
   }
-  const participantId = input.requestingParticipantId?.trim() ||
-    membership.participantId;
-  if (membership.role !== "owner" && participantId !== membership.participantId) {
+  const participantId =
+    input.requestingParticipantId?.trim() || membership.participantId;
+  if (
+    membership.role !== "owner" &&
+    participantId !== membership.participantId
+  ) {
     throw new EnvironmentActionBrokerError(
       "action_policy_denied",
       403,
@@ -1524,7 +2614,8 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
   });
   if (
     !membership ||
-    (membership.role !== "owner" && membership.participantId !== input.participantId)
+    (membership.role !== "owner" &&
+      membership.participantId !== input.participantId)
   ) {
     throw new EnvironmentActionBrokerError(
       "action_policy_denied",
@@ -1551,7 +2642,11 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
         )
       : null,
   );
-  if (!parseStringArray(authority.allowed_capability_ids).includes(input.capabilityId)) {
+  if (
+    !parseStringArray(authority.allowed_capability_ids).includes(
+      input.capabilityId,
+    )
+  ) {
     throw new EnvironmentActionBrokerError(
       "action_policy_denied",
       403,
@@ -1575,14 +2670,16 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
     subjectNativeId: authority.subject_native_id,
     policyVersion: Number(authority.policy_version),
   });
-  const manifestCapability = parseJson<Array<{
-    capability_id: string;
-    capability_version: number;
-    action_kind: string;
-    effect_class: EnvironmentActionExecutionContext["capability"]["effectClass"];
-    workflow_modes: Array<"single_action" | "long_running">;
-    control_engines: Array<"native_fabric" | "baritone">;
-  }>>(manifest.capabilities, []).find(
+  const manifestCapability = parseJson<
+    Array<{
+      capability_id: string;
+      capability_version: number;
+      action_kind: string;
+      effect_class: EnvironmentActionExecutionContext["capability"]["effectClass"];
+      workflow_modes: Array<"single_action" | "long_running">;
+      control_engines: Array<"native_fabric" | "baritone">;
+    }>
+  >(manifest.capabilities, []).find(
     (capability) => capability.capability_id === input.capabilityId,
   );
   if (!manifestCapability) {
@@ -1592,26 +2689,12 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
       "The live player connector does not advertise this capability.",
     );
   }
-  const catalog = await db.query<{ catalog_snapshot_id: string }>(
-    `SELECT catalog_snapshot_id
-     FROM helix_environment_capability_catalog_snapshots
-     WHERE environment_binding_id = $1 AND adapter_profile_id = $2
-       AND manifest_hash = $3
-       AND (expires_at IS NULL OR expires_at > now())
-     ORDER BY frozen_at DESC LIMIT 1;`,
-    [
-      authority.environment_binding_id,
-      authority.adapter_profile_id,
-      manifest.manifest_hash,
-    ],
-  );
-  if (!catalog.rows[0]) {
-    throw new EnvironmentActionBrokerError(
-      "action_manifest_required",
-      409,
-      "The live player-action catalog is unavailable for this manifest.",
-    );
-  }
+  const catalogSnapshotId = await assertEnvironmentActionCatalogAvailable({
+    db,
+    environmentBindingId: authority.environment_binding_id,
+    adapterProfileId: authority.adapter_profile_id,
+    manifestHash: manifest.manifest_hash,
+  });
   return {
     actionAuthorityId: authority.action_authority_id,
     environmentBindingId: authority.environment_binding_id,
@@ -1624,10 +2707,11 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
     actionAdapterProfileId: authority.adapter_profile_id,
     actionDomainAdapter: authority.domain_adapter,
     policyVersion: Number(authority.policy_version),
-    autonomyMode: authority.autonomy_mode as EnvironmentActionExecutionContext["autonomyMode"],
+    autonomyMode:
+      authority.autonomy_mode as EnvironmentActionExecutionContext["autonomyMode"],
     manualOverridePolicy:
       authority.manual_override_policy as EnvironmentActionExecutionContext["manualOverridePolicy"],
-    catalogSnapshotId: catalog.rows[0].catalog_snapshot_id,
+    catalogSnapshotId,
     manifestId: manifest.manifest_id,
     capability: {
       capabilityId: manifestCapability.capability_id,
@@ -1654,16 +2738,39 @@ export const enqueueEnvironmentAction = async (input: {
     );
   }
   const request = parsed.data;
+  if (
+    request.action_kind === "execute_sequence" &&
+    !helixMinecraftFluidSequenceArgumentsSchema.safeParse(request.arguments)
+      .success
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_request_invalid",
+      400,
+      "The bounded Minecraft sequence violates its trusted graph, ruleset, or mutation-scope contract.",
+    );
+  }
+  if (
+    request.action_kind === "execute_reactive_program" &&
+    !helixMinecraftReactiveProgramArgumentsSchema.safeParse(request.arguments)
+      .success
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_request_invalid",
+      400,
+      "The concurrent Minecraft guardian program violates its trusted lanes, resource locks, graph, ruleset, interrupt, or mutation-scope contract.",
+    );
+  }
   const membership = await readSharedRealtimeRoomMembership({
     roomId: request.room_id,
     profileId: input.profileId,
   });
-  const requestingParticipantId = input.requestingParticipantId?.trim() ||
-    membership?.participantId || "";
+  const requestingParticipantId =
+    input.requestingParticipantId?.trim() || membership?.participantId || "";
   if (
     !membership ||
     requestingParticipantId !== request.participant_id ||
-    (membership.role !== "owner" && membership.participantId !== request.participant_id)
+    (membership.role !== "owner" &&
+      membership.participantId !== request.participant_id)
   ) {
     throw new EnvironmentActionBrokerError(
       "action_policy_denied",
@@ -1721,20 +2828,23 @@ export const enqueueEnvironmentAction = async (input: {
     subjectNativeId: authority.subject_native_id,
     policyVersion: Number(authority.policy_version),
   });
-  const manifestCapabilities = parseJson<Array<{
-    capability_id: string;
-    capability_version: number;
-    action_kind: string;
-    effect_class: string;
-    workflow_modes: string[];
-    control_engines: string[];
-  }>>(manifest.capabilities, []);
-  const capability = manifestCapabilities.find((candidate) =>
-    candidate.capability_id === request.capability_id &&
-    candidate.capability_version === request.capability_version &&
-    candidate.action_kind === request.action_kind &&
-    candidate.effect_class === request.effect_class &&
-    candidate.workflow_modes.includes(request.workflow_mode),
+  const manifestCapabilities = parseJson<
+    Array<{
+      capability_id: string;
+      capability_version: number;
+      action_kind: string;
+      effect_class: string;
+      workflow_modes: string[];
+      control_engines: string[];
+    }>
+  >(manifest.capabilities, []);
+  const capability = manifestCapabilities.find(
+    (candidate) =>
+      candidate.capability_id === request.capability_id &&
+      candidate.capability_version === request.capability_version &&
+      candidate.action_kind === request.action_kind &&
+      candidate.effect_class === request.effect_class &&
+      candidate.workflow_modes.includes(request.workflow_mode),
   );
   if (
     !capability ||
@@ -1763,7 +2873,10 @@ export const enqueueEnvironmentAction = async (input: {
       authority.adapter_profile_id,
     ],
   );
-  if (!catalog.rows[0] || catalog.rows[0].manifest_hash !== manifest.manifest_hash) {
+  if (
+    !catalog.rows[0] ||
+    catalog.rows[0].manifest_hash !== manifest.manifest_hash
+  ) {
     throw new EnvironmentActionBrokerError(
       "action_manifest_required",
       409,
@@ -1778,11 +2891,13 @@ export const enqueueEnvironmentAction = async (input: {
       [request.action_authority_id, request.idempotency_key],
     );
     if (duplicate.rows[0]) {
-      if (!storedEnvironmentActionMatchesIdempotencyContent({
-        storedPayload: duplicate.rows[0].request_payload,
-        storedRequestHash: duplicate.rows[0].request_hash,
-        request,
-      })) {
+      if (
+        !storedEnvironmentActionMatchesIdempotencyContent({
+          storedPayload: duplicate.rows[0].request_payload,
+          storedRequestHash: duplicate.rows[0].request_hash,
+          request,
+        })
+      ) {
         throw new EnvironmentActionBrokerError(
           "action_request_conflict",
           409,
@@ -1892,14 +3007,20 @@ export const leasePendingEnvironmentActions = async (input: {
        WHERE action_authority_id = $1 AND connector_manifest_id = $2
          AND status = 'admitted' AND deadline_at > now()
        ORDER BY created_at LIMIT $3 FOR UPDATE;`,
-      [input.claim.authorityId, (await latestManifest(db, input.claim.authorityId))!.manifest_id, limit],
+      [
+        input.claim.authorityId,
+        (await latestManifest(db, input.claim.authorityId))!.manifest_id,
+        limit,
+      ],
     );
     const leased: HelixEnvironmentActionRequest[] = [];
     for (const candidate of candidates.rows) {
-      const leaseExpiresAt = new Date(Math.min(
-        Date.parse(iso(candidate.deadline_at)),
-        now.getTime() + DEFAULT_LEASE_MS,
-      )).toISOString();
+      const leaseExpiresAt = new Date(
+        Math.min(
+          Date.parse(iso(candidate.deadline_at)),
+          now.getTime() + DEFAULT_LEASE_MS,
+        ),
+      ).toISOString();
       const updated = await db.query<ActionRequestRow>(
         `UPDATE helix_environment_action_requests
          SET status = 'leased', attempt_count = attempt_count + 1,
@@ -1957,7 +3078,8 @@ export const leasePendingEnvironmentActionControls = async (input: {
     const controls: HelixEnvironmentActionControlRequest[] = [];
     for (const row of selected.rows) {
       const parsed = parseJson<unknown>(row.request_payload, null);
-      const control = helixEnvironmentActionControlRequestSchema.safeParse(parsed);
+      const control =
+        helixEnvironmentActionControlRequestSchema.safeParse(parsed);
       if (!control.success) continue;
       await db.query(
         `UPDATE helix_environment_action_control_requests
@@ -1966,10 +3088,12 @@ export const leasePendingEnvironmentActionControls = async (input: {
         [
           row.control_request_id,
           now.toISOString(),
-          new Date(Math.min(
-            Date.parse(control.data.deadline_at),
-            now.getTime() + DEFAULT_LEASE_MS,
-          )).toISOString(),
+          new Date(
+            Math.min(
+              Date.parse(control.data.deadline_at),
+              now.getTime() + DEFAULT_LEASE_MS,
+            ),
+          ).toISOString(),
         ],
       );
       controls.push(control.data);
@@ -1981,8 +3105,13 @@ export const leasePendingEnvironmentActionControls = async (input: {
 export const submitEnvironmentActionWorkflowEvent = async (input: {
   claim: EnvironmentActionConnectorClaim;
   event: unknown;
-}): Promise<{ event: HelixEnvironmentActionWorkflowEvent; replayed: boolean }> => {
-  const parsed = helixEnvironmentActionWorkflowEventSchema.safeParse(input.event);
+}): Promise<{
+  event: HelixEnvironmentActionWorkflowEvent;
+  replayed: boolean;
+}> => {
+  const parsed = helixEnvironmentActionWorkflowEventSchema.safeParse(
+    input.event,
+  );
   if (!parsed.success) {
     throw new EnvironmentActionBrokerError(
       "action_event_invalid",
@@ -2035,7 +3164,14 @@ export const submitEnvironmentActionWorkflowEvent = async (input: {
         `Expected workflow event sequence ${expected}.`,
       );
     }
-    if (!["leased", "running", "paused_manual_override", "cancel_requested"].includes(request.status)) {
+    if (
+      ![
+        "leased",
+        "running",
+        "paused_manual_override",
+        "cancel_requested",
+      ].includes(request.status)
+    ) {
       throw new EnvironmentActionBrokerError(
         "action_request_not_leased",
         409,
@@ -2136,9 +3272,7 @@ const observationFromRows = (
   });
 };
 
-const terminalRequestStatusForOutcome = (
-  outcome: string,
-): string => {
+const terminalRequestStatusForOutcome = (outcome: string): string => {
   switch (outcome) {
     case "succeeded":
       return "succeeded";
@@ -2262,10 +3396,9 @@ export const submitEnvironmentActionResult = async (input: {
       envelopeValid,
       currentTurn,
       workflowEvidenceValid: recordedWorkflowEvidence.valid,
-      verifiedTerminalMeasurements:
-        provenanceValid
-          ? recordedWorkflowEvidence.terminalMeasurements
-          : {},
+      verifiedTerminalMeasurements: provenanceValid
+        ? recordedWorkflowEvidence.terminalMeasurements
+        : {},
     });
     const canonicalHash = environmentConnectorSha256(canonical);
     const resultId = `environment_action_result:${crypto.randomUUID()}`;
@@ -2348,8 +3481,7 @@ const controlObservationFromRows = (
     provenance_valid: resultRow.provenance_valid,
     eligible_for_current_turn_reentry:
       resultRow.eligible_for_current_turn_reentry,
-    content_role:
-      "environment_action_control_observation_not_assistant_answer",
+    content_role: "environment_action_control_observation_not_assistant_answer",
     reentry_required: true,
     answer_authority: false,
     assistant_answer: false,
@@ -2366,7 +3498,9 @@ export const submitEnvironmentActionControlResult = async (input: {
   controlsReleased: boolean;
   observation: HelixEnvironmentActionControlObservation;
 }> => {
-  const parsed = helixEnvironmentActionControlResultSchema.safeParse(input.result);
+  const parsed = helixEnvironmentActionControlResultSchema.safeParse(
+    input.result,
+  );
   if (!parsed.success) {
     throw new EnvironmentActionBrokerError(
       "action_control_invalid",
@@ -2424,7 +3558,8 @@ export const submitEnvironmentActionControlResult = async (input: {
     );
     const exactIdentity =
       requestEnvelope.action_authority_id === input.claim.authorityId &&
-      requestEnvelope.environment_binding_id === input.claim.environmentBindingId &&
+      requestEnvelope.environment_binding_id ===
+        input.claim.environmentBindingId &&
       requestEnvelope.room_id === input.claim.roomId &&
       requestEnvelope.source_id === input.claim.sourceId &&
       requestEnvelope.world_id === input.claim.worldId &&

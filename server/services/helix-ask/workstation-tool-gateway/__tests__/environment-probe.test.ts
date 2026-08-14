@@ -11,7 +11,7 @@ import {
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
-  HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   helixEnvironmentCatalogSnapshotSchema,
   type HelixEnvironmentProbeObservation,
@@ -851,7 +851,7 @@ describe("environment probe workstation gateway", () => {
       environmentProbeMinecraftManifests.map(
         (manifest) => manifest.capability_id,
       ),
-    ).toEqual(HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS);
+    ).toEqual(HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS);
     for (const manifest of environmentProbeMinecraftManifests) {
       expect(manifest).toMatchObject({
         action_id: "room.environment.probe",

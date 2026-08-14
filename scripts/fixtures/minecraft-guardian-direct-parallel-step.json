@@ -1,0 +1,135 @@
+{
+  "action_kind": "execute_reactive_program",
+  "program_schema": "helix.minecraft.reactive_program.v1",
+  "program_id": "program:direct-parallel-step-v1",
+  "ruleset": "survival_tas",
+  "execution_plane": "player_embodiment",
+  "scheduler_engine": "native_fabric_concurrent",
+  "max_total_ticks": 80,
+  "completion_policy": {
+    "mode": "all_required",
+    "cancel_remaining_on_settle": true
+  },
+  "mutation_scope": {
+    "world_mutation_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 0,
+    "allowed_block_ids": [],
+    "allowed_regions": [],
+    "combat_allowed": false
+  },
+  "lanes": [
+    {
+      "lane_id": "lane:camera",
+      "lane_kind": "camera",
+      "priority": 80,
+      "required": true,
+      "activation": "immediate",
+      "resource_ceiling": ["camera"],
+      "start_node_id": "node:camera:look",
+      "nodes": [
+        {
+          "node_id": "node:camera:look",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 20,
+          "action": {
+            "action_kind": "look_at",
+            "target": {
+              "target_kind": "relative_rotation",
+              "yaw_delta_degrees": 15,
+              "pitch_delta_degrees": 0
+            },
+            "max_turn_degrees_per_tick": 5
+          },
+          "on_success": "node:camera:succeeded",
+          "on_failure": "node:camera:failed",
+          "on_timeout": "node:camera:failed"
+        },
+        {
+          "node_id": "node:camera:succeeded",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "camera_turn_complete"
+        },
+        {
+          "node_id": "node:camera:failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "camera_turn_failed"
+        }
+      ]
+    },
+    {
+      "lane_id": "lane:locomotion",
+      "lane_kind": "locomotion",
+      "priority": 60,
+      "required": true,
+      "activation": "immediate",
+      "resource_ceiling": ["locomotion"],
+      "start_node_id": "node:locomotion:walk",
+      "nodes": [
+        {
+          "node_id": "node:locomotion:walk",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 30,
+          "action": {
+            "action_kind": "walk",
+            "direction": "forward",
+            "duration_ms": 250,
+            "sprint": false
+          },
+          "on_success": "node:locomotion:succeeded",
+          "on_failure": "node:locomotion:failed",
+          "on_timeout": "node:locomotion:failed"
+        },
+        {
+          "node_id": "node:locomotion:succeeded",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "short_step_complete"
+        },
+        {
+          "node_id": "node:locomotion:failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "short_step_failed"
+        }
+      ]
+    },
+    {
+      "lane_id": "lane:safety",
+      "lane_kind": "safety",
+      "priority": 255,
+      "required": false,
+      "activation": "interrupt_only",
+      "resource_ceiling": ["safety"],
+      "start_node_id": "node:safety:stop",
+      "nodes": [
+        {
+          "node_id": "node:safety:stop",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "low_health_stop"
+        }
+      ]
+    }
+  ],
+  "races": [],
+  "interrupts": [
+    {
+      "interrupt_id": "interrupt:low-health",
+      "priority": 255,
+      "condition": {
+        "condition_kind": "health_at_least",
+        "health": 6
+      },
+      "trigger_when": "not_satisfied",
+      "debounce_ticks": 1,
+      "activate_lane_id": "lane:safety",
+      "cancel_lane_ids": ["lane:camera", "lane:locomotion"],
+      "max_activations": 1
+    }
+  ]
+}

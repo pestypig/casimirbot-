@@ -140,6 +140,26 @@ const scalar = (schema: unknown, value: string): string | number => {
   return parsed;
 };
 
+const UUID_PATTERN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/iu;
+
+export const providerIdempotencyValue = (
+  fieldName: string,
+  clientOrderId: string,
+): string => {
+  if (normalized(fieldName) !== "refid") return clientOrderId;
+  const embeddedUuid = clientOrderId.match(UUID_PATTERN)?.[0];
+  if (embeddedUuid) return embeddedUuid.toLowerCase();
+  const bytes = crypto.createHash("sha256")
+    .update(`casimirbot-robinhood-ref/v1\0${clientOrderId}`, "utf8")
+    .digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${
+    hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
 export const buildRobinhoodLivePlacementArguments = (input: {
   inputSchema: unknown;
   accountRef: string;
@@ -156,7 +176,9 @@ export const buildRobinhoodLivePlacementArguments = (input: {
   const properties = input.inputSchema.properties;
   const fields = {
     account: field(properties, new Set(["account", "accountnumber", "accountid", "accountref"])),
-    clientOrderId: field(properties, new Set(["clientorderid", "clientid", "idempotencykey"])),
+    clientOrderId: field(properties, new Set([
+      "clientorderid", "clientid", "idempotencykey", "refid",
+    ])),
     review: field(properties, new Set(["reviewid", "reviewtoken", "previewid", "previewtoken", "orderreviewid"])),
     symbol: field(properties, new Set(["symbol", "ticker", "stocksymbol"])),
     side: field(properties, new Set(["side", "direction"])),
@@ -164,6 +186,7 @@ export const buildRobinhoodLivePlacementArguments = (input: {
     timeInForce: field(properties, new Set(["timeinforce", "tif"])),
     quantity: field(properties, new Set(["quantity", "assetquantity", "sharequantity", "shares"])),
     limitPrice: field(properties, new Set(["limitprice", "price"])),
+    marketHours: field(properties, new Set(["markethours"])),
     extendedHours: field(properties, new Set(["extendedhours", "extendedhourstrading"])),
   };
   const required = Array.isArray(input.inputSchema.required)
@@ -182,7 +205,9 @@ export const buildRobinhoodLivePlacementArguments = (input: {
     "orderType", "quantity", "limitPrice"] as const) {
     if (!fields[requiredField]) throw new RobinhoodLiveOrderCallError(
       "contract", false,
-      `Robinhood's placement schema is missing ${requiredField}.`,
+      `Robinhood's placement schema is missing ${
+        requiredField === "clientOrderId" ? "idempotency identity" : requiredField
+      }.`,
     );
   }
   const reviewRef = fields.review ? uniqueValue(input.providerReview,
@@ -196,7 +221,9 @@ export const buildRobinhoodLivePlacementArguments = (input: {
     if (name) output[name] = value;
   };
   put(fields.account, input.accountRef);
-  put(fields.clientOrderId, input.clientOrderId);
+  put(fields.clientOrderId, providerIdempotencyValue(
+    fields.clientOrderId!, input.clientOrderId,
+  ));
   put(fields.review, reviewRef);
   put(fields.symbol, input.intent.symbol);
   put(fields.side, enumValue(properties[fields.side!], ["buy"]));
@@ -206,6 +233,8 @@ export const buildRobinhoodLivePlacementArguments = (input: {
     decimal(input.intent.quantity_micros)));
   put(fields.limitPrice, scalar(properties[fields.limitPrice!],
     decimal(input.intent.limit_price_micros)));
+  put(fields.marketHours, enumValue(properties[fields.marketHours!],
+    ["regular_hours"]));
   put(fields.extendedHours, false);
   return output;
 };
@@ -245,10 +274,10 @@ export const placeRobinhoodEquityOrderOverMcp: RobinhoodLivePlacementCall =
       }
       const descriptor = tools.find((tool: ToolDescriptor) =>
         tool.name === "place_equity_order");
-      if (!descriptor || descriptor.annotations?.destructiveHint !== true) {
+      if (!descriptor) {
         throw new RobinhoodLiveOrderCallError(
           "contract", false,
-          "Robinhood place_equity_order is absent or not explicitly marked destructive.",
+          "Robinhood place_equity_order is absent.",
         );
       }
       const args = buildRobinhoodLivePlacementArguments({

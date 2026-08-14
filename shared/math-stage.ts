@@ -1668,6 +1668,472 @@ export const mathStageRegistry: MathStageEntry[] = [
   {
     tag: "WARP_AUDIT",
     module:
+      "shared/contracts/nhm2-conformally-flat-needle-fixed-background-observables.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked fixed-background observables preregistration for one frozen conformally-flat needle surrogate. It exact-binds the scalar reference, 64 samples, ten tetrad components, five raw Float64 output roles, no declared lever, and no constraint arrays. Mean-renormalization, connected-noise distribution, algorithms, executions, agreement, lamps, ADM closure, and every physical claim remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-fixed-background-observables.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sampleCount: "1",
+      tensorComponentCount: "1",
+      meanRset: "M L^-1 T^-2",
+      connectedNoiseKernel: "M^2 L^-2 T^-4",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "scripts/research/verify-nhm2-semiclassical-primary-source-byte-packet.ts",
+    stage: "diagnostic",
+    notes:
+      "Isolated source-identity and local-byte-integrity verifier for six exact versioned semiclassical e-print artifacts. It pins the LF manifest bytes, exact ordered source inventory, sizes, hashes, URLs, license boundary, blocker scope, and false authority locks; defaults to offline verification and requires explicit acquisition. The cache is operator-controlled rather than a secure launch/preseal root, and no consumer binding, source-origin, formula, execution, lamp, certificate, or physical authority is established.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-semiclassical-primary-source-byte-packet.spec.ts",
+      },
+      {
+        type: "snapshot",
+        path: "configs/research/nhm2-semiclassical-primary-source-byte-packet.v1.json",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sourceArtifactCount: "1",
+      sourcePacketBytes: "B",
+      localContentIntegrityAuthority: "1",
+      formulaExecutionAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Source-audited but execution-blocked convention for the connected symmetrized stress-noise distribution. It distinguishes ordinary multiplication from the star-algebra involution, admits only compact smooth smearings, records the project-to-Phillips-Hu normalization, forbids termwise principal-value/delta multiplication and Bates Eq. 2.11 as an execution recipe, and keeps source bytes, exact stress operator, Wightman/Hadamard normalization, numerical boundary-value representation, equivalence proof, mean convention, execution, lamps, ADM closure, and physical authority absent.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-connected-noise-distribution-convention.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      symmetrizationFactor: "1",
+      projectToPhillipsHuFactor: "1",
+      conformalScalingExponent: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 semantic mean-RSET convention freezing the Moretti eta_4=1/3 conserved point-split operator, an independently crosschecked Decanini-Folacci anomaly/equivalence packet, a zero finite-Wald-counterterm choice at ell=1 m, and compact smearing/SI restoration. Source artifacts are remotely hash-audited but not locally vendored; formula, recurrence, coincidence, interval, runtime, independent-agreement, array, Ward, ADM, lamp, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-mean-rset-renormalization-convention.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      referenceLength: "L",
+      meanRset: "M L^-1 T^-2",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked local anomaly reduction for the frozen conformal-Minkowski vacuum. It fixes the conformal Ricci/scalar conventions, distinguishes conformalAnomalyK from the variational H3 tensor, freezes (K-H1/6)/(2880*pi^2), its trace and smearing/SI/parity identities, and exact algebra fixtures. Source-byte vendoring, symbolic/runtime/interval implementations, independent agreement, Ward and ADM closure, receipts, lamps, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-mean-rset-anomaly-reduction.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      curvature: "L^-2",
+      geometricMeanRset: "L^-4",
+      smearedMeanRset: "M L^-1 T^-2",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-conformally-flat-needle-mean-rset-diagnostic-kernel.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked binary64 pointwise-algebra diagnostic for the exact mean-RSET anomaly reduction. It evaluates three fixed algebra fixtures, including an independently generated non-axis conformal metric fixture, and checks K, H1, trace, constant-curvature, and SI identities under fixed work caps. Full 64x10 smearing, U95, enclosure, Ward proof, run evidence, independent runtime agreement, lamps, ADM closure, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-mean-rset-diagnostic-kernel.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      curvature: "L^-2",
+      scalarHessian: "L^-4",
+      geometricMeanRset: "L^-4",
+      siMeanRset: "M L^-1 T^-2",
+      pointwiseFixtureCount: "1",
+      workCap: "1",
+      executionAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked additive numerical-design overlay for the exact connected-noise distribution. It freezes the 64x64x100 storage and exchange mapping, support-separation ledger, centered two-particle Gram plan, distinct four-dimensional spectral and six-dimensional mass-shell lineages, deterministic enclosure/U95 semantics, and full 640-dimensional joint-PSD duties. The mean binding, exact operator and formula, source-byte verification, equivalence proof, numerical policy, executors, evidence, run integration, lamps, ADM closure, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-connected-noise-numerical-representation.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sampleCount: "1",
+      covarianceDimension: "1",
+      connectedNoiseKernel: "M^2 L^-2 T^-4",
+      connectedNoiseAbsoluteUncertainty95: "M^2 L^-2 T^-4",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked additive exact-identity overlay binding the connected-noise numerical representation to the frozen mean-RSET renormalization convention. It resolves only the external mean-binding relation; source bytes, exact operator and two-particle symbol, normalization, on-shell measure, Fourier convention, equivalence proof, numerical limits, executors, run evidence, lamps, ADM closure, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-connected-noise-numerical-representation-mean-binding.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      resolvedMeanBindingCount: "1",
+      remainingBlockerCount: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked exact two-particle stress-symbol convention for the fixed conformal scalar lane. It freezes the actual creation coefficient, Bose normalization, on-shell/Fourier conventions, equivalent future-cone and all-cone spectral tensors, a division-free null-boundary polynomial, conformal tetrad-smearing cancellation, and rational fixtures. Source-byte vendoring, executable distributional equivalence, certified tails, work/tolerance policy, PSD certification, independent executors, run evidence, lamps, ADM closure, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-connected-noise-two-particle-symbol.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      stressSymbol: "L^-2",
+      smearedStress: "L^-4",
+      spectralDensity: "L^-4",
+      connectedNoise: "L^-8",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Blocked analytic smearing/Fourier convention for the fixed connected-noise lane. It freezes the exact compact bump, spacetime half-widths, curved-normalization ownership, Q/S_p/C_p transform, sample phase and displacement mapping, and the non-unit flat zero-mode bounds. Certified Q0 and sample-normalization enclosures, derivative norms, cutoffs, work/tolerance policy, executors, run evidence, lamps, ADM closure, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-connected-noise-smearing-fourier.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      halfWidth: "L",
+      supportVolume: "L^4",
+      normalizationConstant: "L^-4",
+      oneDimensionalTransform: "1",
+      spatialNormalizer: "1",
+      smearingFourierTransform: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-conformally-flat-needle-connected-noise-fourier-diagnostic.ts",
+    stage: "diagnostic",
+    notes:
+      "Non-authoritative binary64 diagnostic for the exact compact-smearing Fourier transform. It snapshots hostile inputs, uses fixed nested composite-Simpson policies with hard work caps, evaluates Q, S_p, C_p, phase, zero mode, and f-hat, and canonicalizes every numeric result. Refinement deltas are not enclosures; U95, run admission, execution, lamps, ADM closure, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-connected-noise-fourier-diagnostic.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      momentum: "L^-1",
+      fourierArgument: "1",
+      oneDimensionalTransform: "1",
+      spatialNormalizer: "1",
+      smearingFourierTransform: "1",
+      maximumFunctionEvaluations: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-block-diagnostic.ts",
+    stage: "diagnostic",
+    notes:
+      "Bounded binary64 single-momentum/single-sample-pair diagnostic for the exact future-cone connected-noise spectral tensor. It evaluates the division-free spin-two polynomial, rho-plus normalization, frozen 100-component order, Fourier pairing, and SI restoration under fixed hostile-input and work caps. Full 64x64x100 arrays, certified truncation/enclosure and U95, PSD proof, run evidence, independent agreement, lamps, ADM closure, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-connected-noise-spectral-block-diagnostic.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      momentum: "L^-1",
+      spectralDensity: "L^-4",
+      spectralBlock: "M^2 L^-2 T^-4",
+      maximumFourierDiagnosticCalls: "1",
+      maximumPolynomialTensorEvaluations: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.ts",
+    stage: "diagnostic",
+    notes:
+      "Exact diagnostic integer-over-six map from the parity-projected division-free spin-two spectral polynomial to 22 inversion-even momentum moments. It freezes all 100 component-pair rows, 42 integrated parity zeros, 34 surviving upper-triangle pairs, reflection and y-z symmetries, and the bounded 64x64x100 scatter map. It performs no cubature or file emission; truncation, enclosure, U95, PSD proof, run evidence, independent agreement, lamps, ADM closure, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-connected-noise-spectral-moment-map.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      spectralCoefficientDenominator: "1",
+      inversionEvenMomentCount: "1",
+      admittedUpperComponentPairCount: "1",
+      connectedNoiseArrayOrdinal: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-connected-noise-diagnostic-cubature-policy.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Frozen binary64 diagnostic cubature policy for the full connected-noise central array. It exact-binds the 100x22 spectral moment map and compact smearing, freezes deterministic Sobol prefixes, Gauss-Legendre Q evaluation, inverse-CDF and K0 suffix-table construction, two truncation cutoffs, batching, memory, and work ceilings. Prefix and cutoff deltas are observations only; normalization, tail and compact-core enclosures, joint U95, PSD proof, run admission, independent agreement, lamps, ADM closure, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-connected-noise-diagnostic-cubature-policy.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessMomentumCutoff: "1",
+      physicalMomentumCutoff: "L^-1",
+      sobolPointCount: "1",
+      maximumTransientBytes: "1",
+      maximumAccumulatorUpdates: "1",
+      executionAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-conformally-flat-needle-connected-noise-full-array-diagnostic.ts",
+    stage: "diagnostic",
+    notes:
+      "Current-host binary64 diagnostic emitter for three exact 64x64x100 connected-noise arrays: a central truncated estimate plus refinement and cutoff observations. It exact-pins the frozen cubature policy, 100x22 moment map, Python worker, CPython/NumPy/SciPy runtime versions, fixed 2^18 Sobol work, memory and stream ceilings, and records commit, command, timing, source identities, output hashes, and stdout freshness. Repeated output is byte deterministic and finite with canonical zero, parity, and exchange checks; the observations are not U95 or enclosures and cannot feed a run. PSD proof, independent agreement, lamps, constraints, certificate, viability, propulsion, and transport authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-connected-noise-full-array-diagnostic.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      connectedNoiseArrayElements: "1",
+      connectedNoiseArrayBytes: "B",
+      connectedNoiseCentral: "M^2 L^-2 T^-4",
+      sobolPointCount: "1",
+      peakResidentBytes: "B",
+      executionAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-fixed-background-run.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Output-free fixed-background run preregistration binding one observables contract, the scalar reference, exact five-array inventory, three non-authoritative sidecars, and disjoint planned primary/independent lineages. All paths, hashes, executions, receipts, authority, lamps, ADM closure, and physical claims remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-fixed-background-run.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      plannedArrayCount: "1",
+      plannedArrayBytes: "1",
+      plannedLineageCount: "1",
+      executionStarted: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-conformally-flat-needle-fixed-background-pair-agreement.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Preregistered fixed-background pair policy requiring exact shared science, distinct implementation lineages and roots, componentwise absolute-plus-relative-plus-two-uncertainty envelopes, inclusive interval overlap, bounded uncertainty-factor agreement, and no retuning. Every tolerance, run observation, agreement receipt, lamp, ADM, theory, certificate, and physical authority remains null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "shared/contracts/__tests__/nhm2-conformally-flat-needle-fixed-background-pair-agreement.v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      comparedArrayRoleCount: "1",
+      uncertaintyFactorMaximum: "1",
+      independentAgreementEstablished: "1",
+      lampPromotionAllowed: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-conformally-flat-needle-fixed-background-content-replay.ts",
+    stage: "diagnostic",
+    notes:
+      "Authority-neutral server calculation over exactly five bounded raw Float64 arrays. It uses intrinsic typed-array observations, rejects aliases, shared backing, non-finite values, negative zero, lever and constraint roles, verifies exact weights, replays mean and uncertainty-aware exchange diagnostics, and emits only reconstructible uncertainty-robust negative PSD witnesses. Full 640-dimensional PSD certification remains explicitly unattempted under an unfrozen work policy, the connected-noise convention is semantic-only, and provenance, execution, agreement, lamps, ADM closure, and physical claims remain blocked.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-fixed-background-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sampleCount: "1",
+      covarianceDimension: "1",
+      meanRset: "M L^-1 T^-2",
+      connectedNoiseKernel: "M^2 L^-2 T^-4",
+      replayReceiptAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-semiclassical-v2-metric-demand-derivation-replay-bridge.ts",
+    stage: "diagnostic",
+    notes:
+      "Opaque scoped capability boundary for a future independent metric-demand derivation replay. It accessor-free snapshots an exact v2 run scope and byte bindings, cannot be forged by copying data, and currently has no issuer. The existing conformal-needle adapter remains structurally blocked and cannot clear interval-trace, independent transcendental replay, candidate, lamp, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-conformally-flat-needle-metric-demand-derivation-verifier.spec.ts",
+      },
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-semiclassical-v2-content-replay.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      metricDemand: "M L^-1 T^-2",
+      metricDemandAbsoluteErrorBound: "M L^-1 T^-2",
+      capabilityIssued: "1",
+      independentDerivationComplete: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-semiclassical-v2-scientific-root-observer.ts",
+    stage: "diagnostic",
+    notes:
+      "Server diagnostic observer for one presealed 23-file semiclassical science root. It securely rereads the exact inventory twice, binds file and directory identities, rejects aliases and topology drift, samples Linux mount identity before and after observation, and exposes content integrity only. No opaque origin receipt or lane-mount authority exists; coordinator launch, lamps, theory closure, and every physical claim remain false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-semiclassical-v2-scientific-root-observer.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      scientificInputCount: "1",
+      observedFileBytes: "1",
+      mountIdentityAuthority: "1",
+      coordinatorLaunchAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
       "shared/contracts/nhm2-conformally-flat-needle-metric-demand-interval-producer.v1.ts",
     stage: "diagnostic",
     notes:
@@ -1858,6 +2324,52 @@ export const mathStageRegistry: MathStageEntry[] = [
   },
   {
     tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-semiclassical-v2-constraint-operand-replayer.ts",
+    stage: "diagnostic",
+    notes:
+      "Server-owned calculation-only v2 decoder and arithmetic replayer for all 63 manifest-bound constraint operand arrays. It snapshots distinct full byte views, rehashes and decodes finite little-endian Float64 values, rejects computed/target echo including signed-zero substitution, recomputes all five residual families, conservative interlevel uncertainty bounds, observed order, and final regulator error, and preserves frozen numerical failure precedence across later arithmetic blockers. Caller-supplied bytes, missing target and joint-U95 derivation replay, absent preseal authority, and every candidate, agreement, lamp, theory, empirical, and physical lock keep the overall result blocked.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-semiclassical-v2-constraint-operand-replayer.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      decodedConstraintArrayCount: "1",
+      normalizedConstraintResidual: "1",
+      conservativeObservedOrderLower95: "1",
+      finalRegulatorErrorUpper95: "1",
+      replayAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "server/services/theory/nhm2-semiclassical-v2-constraint-filesystem-replayer.ts",
+    stage: "diagnostic",
+    notes:
+      "Authority-neutral filesystem boundary for the v2 63-array constraint replay. It securely reads one caller-hash-bound manifest and an exact disjoint output inventory, enforces bounded fatal UTF-8 and JSON decoding, canonical descriptor paths, stable file identities, finite Float64 payloads, and detached full byte views before invoking the server arithmetic replayer. The roots are caller selected: root authorization, persisted-preseal origin, pre-execution freshness, target and joint-U95 derivation, agreement, both lamps, candidate admission, viability, propulsion, and transport authority remain false.",
+    checks: [
+      {
+        type: "stability",
+        path: "server/services/theory/__tests__/nhm2-semiclassical-v2-constraint-filesystem-replayer.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      manifestInventoryCount: "1",
+      constraintOperandArrayCount: "1",
+      constraintOperandBytes: "B",
+      currentReadObservationAuthority: "1",
+      replayAuthority: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
     module: "shared/contracts/nhm2-semiclassical-v3-replay-epoch.v1.ts",
     stage: "diagnostic",
     notes:
@@ -1975,6 +2487,554 @@ export const mathStageRegistry: MathStageEntry[] = [
   },
   {
     tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-1s-v3-tolerance-policy.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 candidate-specific tolerance preregistration for the distinct spherical nodeless 1s semiclassical-v3 control. It freezes the self-consistency, smearing, exchange, PSD, fluctuation, metric-demand, bracket, antisymmetry, Jacobi, regulator, recomputation, simultaneous-coverage, and pair-agreement limits before execution and exact-binds the current v3 replay, arithmetic, and pair policies. The metric-demand receipt, preseal, execution, replay, pair agreement, both diagnostic lamps, certificate, and physical authority remain null or false; any observed-limit failure terminates the candidate without retuning.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-1s-v3-tolerance-policy.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      selfConsistencyRelativeLInf: "1",
+      metricDemandFrobeniusFloor: "M L^-1 T^-2",
+      perRunJointCoverageMinimum: "1",
+      pairJointCoverageMinimum: "1",
+      diagnosticPass: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-coherent-candidate-plan.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 preregistration of the genuinely distinct (N,l,m)=(1,0,0) spherical, nodeless, even-parity Einstein-complex-scalar coherent-state control for the semiclassical-v3 lane. It freezes the model, isotropic chart, coherent Hadamard state, renormalization choices, 64 sample/smear geometry, uncompressed 25+3 input and 68-output duties, all 63 constraint operands, independent-implementation separation, and no-retune disposition. The branch, nondegeneracy lower bound, scientific preseal, raw arrays, replay, independent agreement, lamps, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-coherent-candidate-plan-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      scientificInputCount: "1",
+      implementationInputCount: "1",
+      numericalOutputArrayCount: "1",
+      constraintOperandArrayCount: "1",
+      sampleCount: "1",
+      scientificCandidateAdmissible: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-spherical-boson-star-branch-bvp.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 preregistration of the radial isotropic Einstein-complex-scalar BVP for the frozen spherical 1s control. It exact-binds the candidate and tolerance artifacts and freezes the (-+++) dimensionless chart, cancellation-free mixed Einstein/stress/Klein-Gordon rows, residual normalizations, origin and infinity conditions, regular-series and tail-series duties, and nodeless, strictly decreasing, vacuum-connected no-fold branch gates. Solver, grid, continuation, proof receipts, execution, result, preseal, replay, lamps, certificate, and physical authority remain null or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-branch-bvp-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessRadius: "1",
+      dimensionlessFrequency: "1",
+      dimensionlessField: "1",
+      normalizedEinsteinResidual: "1",
+      normalizedKleinGordonResidual: "1",
+      branchSolved: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 preexecution semantic freeze for the distinct spherical 1s Newtonian seed. It exact-binds the spherical candidate, tolerance, and radial BVP; freezes the radial Schrodinger-Poisson eigenproblem, u0(0)=1 gauge, exact lambda=2^-5 target scaling, origin recurrence, finite-core authority, formal Coulomb/exponential exterior duties, per-level byte roles, scalar metadata duties, convergence meanings, and seed-to-BVP initializer map. The deterministic solver, finite tail representative, interval proof budgets, output descriptor, source/toolchain/runtime closure, execution, replay, branch, nondegeneracy, lamps, certificate, and physical authority remain absent, null, or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-newtonian-seed-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessRadius: "1",
+      dimensionlessField: "1",
+      dimensionlessEigenvalue: "1",
+      radialNodeCount: "1",
+      normalizedResidual: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 incomplete prepolicy for the distinct spherical 1s Newtonian seed. It exact-binds the semantic seed and freezes only the primary core/tail candidate-map structure, square-system counts, C1 tail lifts, scaled tail equations, full-mass consistency row, no-retune disposition, and intended output inventory. Quadrature bytes, complete primary operation graphs, directed proof operators, exact proof/interchange schemas, implementations, manifests, runtime, preseal, execution, acceptance, lamps, certificate, and physical authority remain explicitly incomplete, absent, null, or false; this entry authorizes no candidate run.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-newtonian-seed-operation-policy-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      radialNodeCount: "1",
+      tailCoefficientCount: "1",
+      proofBoxBudget: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 directed-proof architecture for the distinct spherical 1s Newtonian seed, canonical binding c8832ae77d1279d400f1fffbc587e413659c111ae90283cb34a016fb7e08ea99 over 42,778 canonical bytes. It freezes checked tail algebra, coefficient-space conventions, projected fixed-point structure, proof-duty inventory, work ceilings, fail-without-retuning disposition, and forbidden lever/tile admission. Exact origin and infinite-tail operators, Z0/Z1 and truncation formulas, closed receipt schemas, final primary-to-verifier ABI, implementations, runtime, preseal, execution, acceptance, lamps, certificate, and physical authority remain explicitly incomplete, absent, null, or false; this entry authorizes no candidate run or proof claim.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-newtonian-seed-directed-proof-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      coefficientNorm: "1",
+      proofRadius: "1",
+      proofRecordCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "configs/research/nhm2-spherical-gl256-mpfr256-manifest.v1.json",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 deterministic Gauss-Legendre-256 prerequisite for the spherical seed. The manifest binds 256 MPFR256/RNDN node-and-weight records, their generator and independent interval/root/weight/moment checks, and exact raw hashes. It is a numerical fixture only: candidate data, execution authority, proof acceptance, lamps, certificate, and physical authority remain false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-gl256-mpfr256-fixture.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      quadraturePointCount: "1",
+      endpointPrecisionBits: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-primary-numerics.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 primary numerical operation freeze for the spherical 1s seed, canonical binding a4ee03e387f9e3e0a9d1f117f6671aa6ac0ca3f97508706c0f52e811d15372a4 over 80,055 canonical bytes. It closes the finite core/tail candidate map, MPFR and binary64 operation schedules, deterministic Newton/LU chronology, fixed quadrature fixture, materialization graph, arenas, and no-retune failures. No bound implementation, native MPFR bridge, toolchain/runtime, preseal, execution, accepted seed, lamp, certificate, or physical authority exists.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-newtonian-seed-primary-numerics-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      radialNodeCount: "1",
+      tailCoefficientCount: "1",
+      quadraturePointCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 directed-proof operator freeze exact-bound to the spherical seed stack and replacement primary numerics, canonical binding 511609501b01560c7e8a15f99a5b94176b51fb0e9add9bf5aa1045ef51d2342b over 34,695 canonical bytes. It closes the origin recurrence/envelope operators, whole-X exterior ball, projected radii-polynomial bounds, Hessian and mass routing, truncation compilers, work limits, and six raw-mode separation. Implementations, receipts, runtime, preseal, execution, proof acceptance, seed acceptance, lamps, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-newtonian-seed-directed-proof-operator-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      coefficientNorm: "1",
+      proofRadius: "1",
+      proofDutyCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-interchange.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 closed primary-to-independent-verifier byte and proof-record grammar for the spherical seed, canonical binding 827eb79c27137dd1649b35884c945c2d6809483acf25c7fd68d2a3ed80936f95 over 67,853 canonical bytes. It fixes five untrusted primary payloads, sixteen typed proof duties, canonical directed endpoints, record/route/summary/aggregate hashes, provenance and preseal shapes, hostile-input ceilings, forbidden lever/tile rejection, source-lineage agreement, and atomic publication. This is schema completeness only; implementations, runtime, preseal instance, execution, acceptance, lamps, certificate, and physical authority remain false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-newtonian-seed-interchange-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      primaryPayloadCount: "1",
+      primaryPayloadElementCount: "1",
+      proofDutyRecordCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-candidate-freeze.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 no-retune freeze for the distinct spherical nodeless 1s candidate in the server-owned semiclassical-v2 replay lane, canonical binding 628092507b7dc1be76722f06a7b591efc59d1799bed0d4b7d1999d852d92f28f over 55,997 canonical bytes. It binds the approved v2 tolerance authority, thirteen ready and nine missing scientific inputs, the minimum thirty-two raw noise/mean/constraint/regulator output arrays, exact provenance/freshness duties, independent replay/agreement prerequisites, and forbidden lever/tile roles. It emits no arrays and authorizes no manifest, preseal, execution, nondegeneracy, replay, lamps, physical viability, propulsion, or transport claim.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-candidate-freeze-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      scientificInputCount: "1",
+      readyScientificInputCount: "1",
+      missingScientificInputCount: "1",
+      minimumOutputArrayCount: "1",
+      executionAuthorized: "1",
+      physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-classical-structure-functions.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 candidate-specific freeze of the three classical ADM structure-function targets required by the spherical semiclassical-v2 replay lane, canonical binding d6f12f0703f5b756c8c08c424f3af8c06990b59005f404691b5b20f6e71ce700 over 8,870 canonical bytes. It fixes family/component ordering, [64,4] normalization, approved derivation dependencies, and the prohibition on computed or residual operands as target inputs. Probe evaluation, raw arrays, replay, execution, lamps, certificate, physical viability, propulsion, and transport authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-classical-structure-functions-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      classicalTargetFamilyCount: "1",
+      sampleCount: "1",
+      componentCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-regulator-definition.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 candidate-specific regulator and complete raw-operand inventory freeze for the spherical semiclassical-v2 lane, canonical binding d3b42d5483abde3db51b2755bbf58e0b35f78abd4980da56a750963362d46ade over 62,592 canonical bytes. It requires five nonconstraint files plus all sixty-three primitive constraint operands across three levels, aliases the historical central twenty-one roles to level_2 without duplicate files, and preserves server recomputation and no-retune rules. The legacy aggregate manifest is explicitly incompatible; successor schema integration, implementations, preseal, execution, replay, agreement, lamps, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-regulator-definition-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      nonconstraintArrayCount: "1",
+      constraintOperandArrayCount: "1",
+      totalPhysicalFileCount: "1",
+      regulatorLevelCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-constraint-formulation.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 candidate-specific total ADM constraint and probe-semantics freeze for the spherical semiclassical-v2 lane, canonical binding 736ce86009ef09e4e7222bebc12638b8889f7129db6443160b1856585aae45ff over 11,571 canonical bytes. It fixes the gravity-plus-state phase space, external probe family, bracket and identity ordering, structural-zero channels, classical targets, and server residual chronology. The base derivation DAG's missing computed-side geometry/chart/sampling edges are recorded as an exact unapproved overlay; a successor authority, implementations, preseal, execution, replay, agreement, lamps, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-constraint-formulation-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sampleCount: "1",
+      constraintComponentCount: "1",
+      requiredDagOverlayEdgeCount: "1",
+      derivationAuthorityComplete: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-prescription.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 candidate-specific Hadamard renormalization prescription for the spherical semiclassical-v2 lane, canonical binding 0c9e38c5dec82db015ccb8eeac23c55257b3fd667c774a34f68cf5ee0fc8ae89 over 10,670 canonical bytes. It fixes the two-real normalization of the complex field, K_C subtraction, the symmetric Moretti eta=1/3 point-split operator, the exclusive Decanini-Folacci crosscheck, order-three subtraction duty, and centered-noise c-number cancellation. Source derivation packets, recurrence and noise implementations, preseal, execution, replay, agreement, lamps, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-renormalization-prescription-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      canonicalRealScalarCount: "1",
+      pointSplitEta: "1",
+      subtractionOrder: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-renormalization-counterterms.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 candidate-specific finite renormalization counterterm basis for the spherical semiclassical-v2 lane, canonical binding ce189a901d951d839cba823e32b8b5e56b532bc7cad5b5ae5b1ad372d76afcfa over 10,182 canonical bytes. It fixes the cosmological, Einstein, H1, and H2 basis, the four-dimensional Gauss-Bonnet relation, the massive-Minkowski-zero cLambda coefficient, and zero cG/c1/c2 at ell=mu^-1 while preserving one-way prescription dependency and centered-noise cancellation. Derivation packets, implementation, preseal, execution, replay, agreement, lamps, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-renormalization-counterterms-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      finiteCountertermBasisCount: "1",
+      complexScalarMultiplicity: "1",
+      cLambdaBinary64Bits: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module:
+      "shared/contracts/nhm2-spherical-boson-star-v2-initializer-bridge.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-v3-to-target-v2 initializer semantics bridge, canonical binding c5c4c45755e0dc682694f8a107c31780d85d860b2a71be567a2cfe0d06300631 over 7,715 canonical bytes. It binds the five source seed payloads and directed-proof conclusion to a domain-separated target-v2 initializer identity, preserves the v2 replay policy as sole tolerance authority, requires the relativistic branch to resolve frequency again, and forbids automatic identity or authority inheritance. No initializer instance, branch execution, nondegeneracy, replay, lamps, certificate, or physical authority exists.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-spherical-boson-star-v2-initializer-bridge-v1.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      sourcePayloadCount: "1",
+      sourceTargetIdentitySeparation: "1",
+      maximumAttempts: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/f64le_inventory.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint verifier primitive for the spherical seed's exact five-payload binary64 boundary. It enforces path/order/count/size, little-endian finite values, negative-zero rejection, immutable byte capture, and domain-separated payload hashes without importing producer code. It is not the complete independent verifier and grants no proof, seed, replay, agreement, lamp, certificate, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_f64le_inventory.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      primaryPayloadCount: "1",
+      decodedElementCount: "1",
+      decodedByteCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/dyadic_interval.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint exact parser for the interchange's canonical MPFR256 directed-endpoint JSON-array ABI. It validates normalized dyadics as exact fractions, RNDD/RNDU orientation, and lower-upper ordering without binary floating conversion. It is a boundary primitive only and grants no directed-proof, seed, replay, agreement, lamp, certificate, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_dyadic_interval.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      endpointPrecisionBits: "1",
+      directedIntervalAuthority: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/canonical_json.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint bounded canonical-JSON boundary for persisted spherical seed descriptors and proof records. It rejects duplicate keys, invalid Unicode, noncanonical bytes, forbidden numeric forms, unsafe integers, excessive depth/nodes/width/strings, and freezes the accepted tree and plain hash. It performs no schema-duty replay and grants no proof, seed, replay, agreement, lamp, certificate, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_canonical_json.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      maximumDocumentBytes: "1",
+      maximumTokenCount: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/hash_graph.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint implementation of only the spherical seed interchange hash recipes that are already closed: primary payload binding, descriptor, five-payload input binding, manifest aggregate, and output-root identity. Command, static-input, freshness, dirty-tree, implementation, runtime, execution, replay, agreement, lamps, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_hash_graph.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      hashOctets: "1",
+      pathUtf8Bytes: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/forbidden_roles.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint admission scan over the already bounded canonical-JSON tree. It rejects every frozen declared lever/tile key or role-bearing identifier before numeric payload open, while granting no execution, candidate, replay, agreement, lamp, certificate, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_forbidden_roles.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      visitedJsonNodes: "1",
+      numericPayloadOpened: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/descriptor.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint structural validator for the frozen spherical seed primary descriptor. It enforces the v3 source-candidate identity, exact policy and five-payload bindings, bounded provenance/freshness shapes, forbidden-role rejection, and closed descriptor/input hash recipes. The distinct v2 candidate mapping, complete provenance profile, payload decoding, proof replay, execution, agreement, lamps, certificate, and physical authority remain absent or false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_descriptor.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      primaryPayloadCount: "1",
+      freshnessObservationCount: "1",
+      provenanceAuthoritative: "1",
+      v2CandidateBindingPresent: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-seed/verifier/primary_bundle.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 source-disjoint composition of the frozen source descriptor with its exact five raw primary payloads. Admission orders descriptor and forbidden-role validation before numeric open, then checks every path/shape/hash before the global nonfinite and negative-zero passes. It retains the v3 source identity and grants no v2 bridge, provenance, proof-duty, seed, replay, agreement, lamp, certificate, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-seed/verifier/test_primary_bundle.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      primaryPayloadCount: "1",
+      primaryPayloadByteCount: "1",
+      v2CandidateBindingPresent: "1",
+      proofDutiesReplayed: "1",
+      executionAuthorized: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-spherical-boson-star-branch/radial_residual.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 bounded pointwise implementation of the exact spherical-isotropic EKG reduction frozen by the spherical branch-BVP contract. It evaluates three solved rows and the unused radial Einstein constraint from one finite strict-interior radial jet, canonicalizes numerical zero, and is independently compared with the established two-dimensional coordinate-regular evaluator. It performs no grid assembly, solve, continuation, output, preseal, replay, lamp, certificate, or physical claim; all authority locks remain false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-spherical-boson-star-branch/test_radial_residual.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessRadius: "1",
+      dimensionlessFrequency: "1",
+      dimensionlessField: "1",
+      normalizedEinsteinResidual: "1",
+      normalizedKleinGordonResidual: "1",
+      branchSolved: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
     module: "shared/contracts/nhm2-prolate-boson-star-branch-bvp.v1.ts",
     stage: "diagnostic",
     notes:
@@ -1994,6 +3054,101 @@ export const mathStageRegistry: MathStageEntry[] = [
       offSystemEinsteinResidualLInf: "1",
       classicalBranchSolved: "1",
       physicalViabilityClaimAllowed: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-boson-star-branch/covariant_residual.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 pointwise diagnostic implementation of the exact dimensionless covariant Einstein-complex-scalar equations frozen by the prolate branch-BVP contract. It evaluates the four solved rows and two unused Einstein constraints from one strict-interior field jet, with the frozen mixed-index ordering and residual normalizations. Independent symbolic differential-geometry replay agrees at binary64 roundoff. It does not assemble boundary or tau rows, solve the branch, establish a peak, nodelessness, branch identity, convergence, candidate admissibility, or any empirical or physical claim; all authority locks remain false.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-boson-star-branch/test_covariant_residual.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessRadius: "1",
+      dimensionlessFrequency: "1",
+      dimensionlessField: "1",
+      einsteinResidual: "1",
+      kleinGordonResidual: "1",
+      branchSolved: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-boson-star-branch/regular_residual.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 coordinate-regular pointwise EKG diagnostic derived symbolically from the frozen prolate metric. It evaluates the same four solved rows and two unused Einstein constraints as the generic covariant reference after exact cancellation of spherical-coordinate background terms. Flat and constant-rescaled-flat data return exact positive zero at every strict-interior node on all three frozen grids; independent symbolic identities and randomized well-conditioned comparisons are green. It remains pointwise-only and grants no boundary assembly, solve, branch, candidate, lamp, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-boson-star-branch/test_regular_residual.py",
+      },
+      {
+        type: "fixture",
+        path: "tools/nhm2-boson-star-branch/derive_regular_residual.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessRadius: "1",
+      dimensionlessFrequency: "1",
+      dimensionlessField: "1",
+      normalizedEinsteinResidual: "1",
+      normalizedKleinGordonResidual: "1",
+      branchSolved: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-boson-star-branch/collocation_residual.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 structured collocation diagnostic over the frozen 16x12, 32x24, and 64x48 prolate grids. It constructs exact mapped-node derivatives and compactified jets, evaluates the coordinate-regular EKG rows, applies all four boundary families with literal radial corner precedence, and reports two separate continuous-peak equations plus the computable rail subset. It deliberately exposes no flattened Newton/JFNK ABI, solver step, continuation, oversampled/global-maximum/branch replay, output artifact, lamp, or physical authority.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-boson-star-branch/test_collocation_residual.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      dimensionlessRadius: "1",
+      dimensionlessFrequency: "1",
+      continuationAmplitude: "1",
+      normalizedPdeResidual: "1",
+      normalizedUnusedConstraintResidual: "1",
+      branchSolved: "1",
+      physicalAuthority: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "tools/nhm2-boson-star-seed/producer/spectral.py",
+    stage: "diagnostic",
+    notes:
+      "Stage-2 binary64 spectral primitive implementation used by the current Newtonian seed and branch-collocation diagnostics: frozen mapped Lobatto nodes, barycentric differentiation/interpolation, parity Legendre projection/reconstruction, nonlinear products, and radial multipole Laplacians. It is not the sealed v3 MPFR operation graph, carries no runtime or proof-kernel authority, and cannot establish a seed artifact, branch solution, candidate, or physical claim.",
+    checks: [
+      {
+        type: "stability",
+        path: "tools/nhm2-boson-star-seed/producer/selftest.py",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      compactRadius: "1",
+      polarAngle: "1",
+      scalarMultipole: "1",
+      potentialMultipole: "1",
+      executionAuthority: "1",
+      physicalAuthority: "1",
     },
   },
   {

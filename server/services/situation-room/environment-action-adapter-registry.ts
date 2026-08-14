@@ -16,9 +16,11 @@ import {
   HELIX_ENVIRONMENT_ACTION_WORKFLOW_EVENT_SCHEMA,
 } from "@shared/helix-environment-action";
 import {
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
@@ -30,6 +32,7 @@ import {
   HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
+import { HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY } from "@shared/helix-minecraft-fluid-sequence";
 
 export type EnvironmentActionAdapterRegistryErrorCode =
   | "environment_action_adapter_unknown"
@@ -78,6 +81,7 @@ const capability = (
     actionKind === "navigate_to"
       ? ["native_fabric", "baritone"]
       : ["native_fabric"],
+  worldMutationScopeRequired = effectClass === "world_mutation",
 ) => ({
   capability_id: capabilityId,
   capability_version: 1,
@@ -86,13 +90,13 @@ const capability = (
   workflow_modes: workflowModes,
   allowed_control_engines: allowedControlEngines,
   default_confirmation_required: true,
-  world_mutation_scope_required: effectClass === "world_mutation",
+  world_mutation_scope_required: worldMutationScopeRequired,
 });
 
 const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.parse({
   schema: HELIX_ENVIRONMENT_ACTION_ADAPTER_PROFILE_SCHEMA,
   profile_id: HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID,
-  profile_version: 1,
+  profile_version: 4,
   domain: "minecraft",
   action_family: "minecraft_player",
   accepted_domain_adapters: ["minecraft.fabric_client.v1"],
@@ -118,6 +122,12 @@ const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.
       "look_at",
       "player_motion",
       ["single_action"],
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+      "track_target",
+      "continuous_control",
+      ["long_running"],
     ),
     capability(
       HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
@@ -184,6 +194,22 @@ const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.
       "inventory_transfer",
       "player_inventory",
       ["long_running"],
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+      "execute_sequence",
+      "continuous_control",
+      ["long_running"],
+      ["native_fabric"],
+      true,
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+      "execute_reactive_program",
+      "continuous_control",
+      ["long_running"],
+      ["native_fabric"],
+      true,
     ),
   ],
   freshness: {

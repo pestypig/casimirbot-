@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY } from "@shared/helix-environment-connector";
+import {
+  HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+  HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-connector";
 import {
   HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA,
   type HelixEnvironmentProbeResult,
@@ -535,5 +539,93 @@ describe("Minecraft legacy probe normalization", () => {
       }),
     );
     expect(inconsistent).not.toHaveProperty("target_geometry_verification");
+  });
+
+  it("normalizes a bounded live registry fact against its catalog schema", () => {
+    const normalized = normalizeLegacyEnvironmentProbeResultForTests(
+      result("registry_fact", {
+        confidence: 1,
+        details: {
+          game_version: "1.21.8",
+          registry_kind: "block",
+          requested_resource_id: "minecraft:netherrack",
+          registered: true,
+          canonical_resource_id: "minecraft:netherrack",
+          ignored_connector_field: "not admitted",
+        },
+      }),
+    );
+    const descriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
+    );
+
+    expect(normalized).toEqual({
+      result_summary: "registry_fact observation",
+      game_version: "1.21.8",
+      registry_kind: "block",
+      requested_resource_id: "minecraft:netherrack",
+      registered: true,
+      canonical_resource_id: "minecraft:netherrack",
+    });
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        descriptor!.output_schema,
+        normalized,
+      ),
+    ).toEqual([]);
+  });
+
+  it("normalizes bounded live recipe facts without admitting arbitrary payload", () => {
+    const normalized = normalizeLegacyEnvironmentProbeResultForTests(
+      result("recipe_fact", {
+        confidence: 1,
+        details: {
+          game_version: "1.21.8",
+          query_kind: "output_item_id",
+          requested_resource_id: "minecraft:stone_bricks",
+          match_count: 1,
+          matches_complete: true,
+          matches: [
+            {
+              recipe_id: "minecraft:stone_bricks",
+              recipe_type: "minecraft:crafting",
+              serializer_id: "minecraft:crafting_shaped",
+              group: "",
+              result_item_ids: ["minecraft:stone_bricks"],
+              result_resolution_complete: true,
+              arbitrary_recipe_json: { ignored: true },
+            },
+          ],
+        },
+      }),
+    );
+    const descriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
+    );
+
+    expect(normalized).toEqual({
+      result_summary: "recipe_fact observation",
+      game_version: "1.21.8",
+      query_kind: "output_item_id",
+      requested_resource_id: "minecraft:stone_bricks",
+      match_count: 1,
+      matches_complete: true,
+      matches: [
+        {
+          recipe_id: "minecraft:stone_bricks",
+          recipe_type: "minecraft:crafting",
+          serializer_id: "minecraft:crafting_shaped",
+          group: "",
+          result_item_ids: ["minecraft:stone_bricks"],
+          result_resolution_complete: true,
+        },
+      ],
+    });
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        descriptor!.output_schema,
+        normalized,
+      ),
+    ).toEqual([]);
   });
 });

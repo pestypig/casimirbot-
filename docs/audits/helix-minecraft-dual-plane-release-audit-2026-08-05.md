@@ -20,18 +20,18 @@ presentation.
 | Provider-neutral action/workflow lifecycle               | `shared/helix-environment-action.ts`, migrations 046–048, action broker, progress/control/result schemas and typed outcomes                                                                                                                                                                         | focused action/event/control suites passed                                                                                                                                                                                                                                                                                                                                                                                   |
 | Codex plans and synthesizes; Helix governs               | workstation action gateway emits nonterminal observations; differential audit observes without deciding; terminal writer remains Helix-owned                                                                                                                                                        | deterministic lifecycle/parity tests passed; live actor-read, look, second actor-read re-entry and Codex synthesis proven in `ask:3102c5c8-c1cf-43e3-8cc8-1e2eba783760`                                                                                                                                                                                                                                                      |
 | Raw event ledger plus compact situation digest           | Player Embodiment action-event ingress and admitted World Authority `world-events/batch` ingress both persist plane-labeled, content-hashed batches and digests with raw evidence refs                                                                                                              | deterministic store and source-route suites passed; cross-plane live digest pending                                                                                                                                                                                                                                                                                                                                          |
-| Initial embodied actions                                 | navigate, look, walk, jump, interact, hotbar and equip in the Fabric client companion                                                                                                                                                                                                               | implementation and Java build passed; live `look` measured exactly +15.00 degrees, live `jump` confirmed exactly 1/1, and a guarded live `walk` measured 0.832 blocks with fresh post-action status; remaining action measurements pending                                                                                                                                                                                   |
-| Optional Baritone behind a declaration                   | reflective `BaritoneFacade`; manifest may advertise Baritone only when discovered                                                                                                                                                                                                                   | conditional implementation complete; unavailable-engine typed-failure journey pending                                                                                                                                                                                                                                                                                                                                        |
+| Initial embodied actions                                 | navigate, look, walk, jump, interact, hotbar and equip in the Fabric client companion                                                                                                                                                                                                               | implementation and Java build passed; all seven initial action families now have direct live evidence. Codex-owned interaction was accepted at the looked-at chest, hotbar selection chose slot 1 and was independently confirmed as a diamond pickaxe, and equip placed an iron helmet in the head slot; keyed natural parity remains pending                                                                                                                                          |
+| Optional Baritone behind a declaration                   | reflective `BaritoneFacade`; manifest may advertise Baritone only when discovered                                                                                                                                                                                                                   | direct live unavailable-engine journey passed: the explicit Baritone request failed on its first execution tick with `engine_available=false`, released controls and did not fall back or move; matching keyed Helix replay remains pending                                                                                                                                                                                    |
 | Reusable workflows                                       | follow, collect, mine, place, craft and inventory transfer with bounded native execution and postcondition fields                                                                                                                                                                                   | implementation and focused broker/profile tests passed; workflow-by-workflow live acceptance pending                                                                                                                                                                                                                                                                                                                         |
 | Cancellation, manual override and emergency stop         | typed control queue/results, client control release paths and provider-visible `workflow.status`, `workflow.resume`, `workflow.cancel` and `emergency_stop` controls                                                                                                                                | deterministic tests passed; a natural walk request detected manual input, canceled with the typed reason and released controls; live emergency-stop acceptance remains pending                                                                                                                                                                                                                                               |
 | Owner can provision a finite action lease                | `SharedLiveRoomPlayerEmbodimentPanel.tsx` submits exact 13-capability authority, finite expiry, manual override and explicit mutation/autonomy acknowledgement                                                                                                                                      | focused tests passed; a live audit exposed duplicate active leases across subject-binding epochs, and the store now supersedes every older lease for the same environment and participant when authority is saved                                                                                                                                                                                                            |
 | Owner can distinguish authority from connector readiness | sanitized `connector_readiness` projects admitted manifest, heartbeat freshness, capability count, engines and control flags with no credential or answer authority                                                                                                                                 | focused projection/UI tests passed; the latest live restart recovered the Fabric source, active lease and 13-capability native-Fabric client readiness without re-pairing                                                                                                                                                                                                                                                    |
 | Action credential remains isolated                       | action-only connector pairing delivers `/helix-player` setup directly to the client and retains only credential hashes                                                                                                                                                                              | a one-time live action-only code was transported to client chat without chat/debug disclosure and redeemed successfully; no credential entered model evidence or debug output                                                                                                                                                                                                                                                |
-| Direct-Codex-versus-Helix first-divergence trace         | typed differential trace/audit contracts, a provenance-bound public capture normalizer/CLI, and workflow fixtures including observation/support-ref continuity through candidate, route product and terminal writer                                                                                 | direct gateway control and Helix each measured an exact +15.00-degree look; the live comparison found and repaired schema retry plus re-entry projection defects; provenance-bound normalized pairs remain pending for the other workflows                                                                                                                                                                                   |
+| Direct-Codex-versus-Helix first-divergence trace         | typed differential trace/audit contracts, strict exact-path direct/Helix public capture builders, a disabled-by-default typed local diagnostic inbox, and workflow fixtures including observation/support-ref continuity through candidate, route product and terminal writer | direct and Helix each completed the same 250 ms walk with zero divergence; direct native navigation and declared-unavailable Baritone traces are now provenance-bound to their exact workflows. The remaining Helix navigation traces and workflow-by-workflow pairs are pending                                                                                       |
 | Natural world-mutation journey                           | World Authority command journeys have prior evidence                                                                                                                                                                                                                                                | Player Embodiment mine/place journey pending                                                                                                                                                                                                                                                                                                                                                                                 |
-| Natural embodied-play journey                            | natural walk request reached the separately paired client, detected manual input and returned the exact typed cancellation after observation re-entry; later natural look, exact one-jump, guarded one-step and combined walk+jump+status requests completed with measured motion                    | typed manual-interruption plus uninterrupted look, jump, walk and multi-action paths passed; native navigate remains pending                                                                                                                                                                                                                                                                                                  |
+| Natural embodied-play journey                            | natural walk request reached the separately paired client, detected manual input and returned the exact typed cancellation after observation re-entry; later natural look, exact one-jump, guarded one-step and combined walk+jump+status requests completed with measured motion                    | typed manual-interruption plus uninterrupted look, jump, walk and multi-action paths passed; direct native navigation also passed with a measured terminal radius, while keyed natural navigation remains pending                                                                                                                                                                                                              |
 | Hybrid inspect–act–verify journey                        | one natural turn executed fresh actor status, relative player look and a second distinct fresh actor status; a later turn executed spatial-region inspect, guarded player walk and a fresh actor-status read                                                                                        | look- and guarded-walk-based hybrid journeys passed with current-turn support coverage and one Codex synthesis; mutation-based hybrid remains pending                                                                                                                                                                                                                                                                        |
-| Typed failure                                            | deterministic and API parity coverage exists                                                                                                                                                                                                                                                        | live no-Baritone or unavailable/precondition case pending                                                                                                                                                                                                                                                                                                                                                                    |
+| Typed failure                                            | deterministic/API parity coverage plus direct live Baritone-unavailable trace                                                                                                                                                                                                                       | direct live failure passed without movement or engine fallback; matching natural keyed terminal remains pending                                                                                                                                                                                                                                                                                                               |
 | Text/voice parity                                        | existing Shared GPT Live infrastructure and terminal equivalence tests                                                                                                                                                                                                                              | live Player Embodiment text passed for the look workflow and terminal equivalence remains green; voice relay pending                                                                                                                                                                                                                                                                                                         |
 | Resource-safe keyed operation                            | opaque keyed launcher, low-memory server mode, serialized tests and exact-process monitoring                                                                                                                                                                                                        | repository-standard `npm run build:client` passed after closing the Minecraft client, parking the local page and stopping only the verified keyed Node tree while retaining the Fabric server/world; keyed CasimirBot then restarted through the opaque launcher and all three health endpoints plus Codex availability passed. Earlier capped and temporary-Vite attempts remain resource diagnostics, not acceptance paths |
 | Retired `server/routes/agi.plan.ts` does not grow        | new behavior is in environment connector, action broker, goals helper and dedicated room UI/component paths                                                                                                                                                                                         | satisfied for this implementation lane                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -63,6 +63,107 @@ presentation.
   tests, the complete Fabric client test task and the full remapped JAR build
   passed. The stdin-only repository staging helper also passed an end-to-end
   fake-code test without returning pairing material in output.
+- A post-restart same-host acceptance used the authenticated in-app-browser
+  session clipboard as an opaque bridge and atomically delivered a fresh
+  action-only pairing to the Fabric client inbox without player relay or
+  credential disclosure. Sanitized readiness advanced from
+  `awaiting_manifest` to `ready`. Natural keyed turn
+  `ask:512b81fd-4310-498d-983e-a1fdcdfa3127` then selected
+  `com.casimirbot.minecraft.player.walk`, executed five ticks, measured
+  `0.8322909587884493` blocks, released controls, re-entered both observation
+  and evidence, ran follow-up reasoning, and received single-writer terminal
+  authority. The lifecycle projection reported no first divergence.
+- The direct-reference lane now has a separate typed diagnostic inbox for
+  workflow-by-workflow differential acceptance. The local operator selects
+  movement or full scope; the non-secret preference survives client restarts,
+  while startup clears every offline-staged request and emergency stop durably
+  revokes the preference and clears the inbox.
+  Requests are regular, bounded, fresh, atomically claimed files and are
+  validated twice against the 13 action kinds. They cannot contain Minecraft
+  commands, host operations, credentials or arbitrary code. Six Java inbox
+  regressions, four TypeScript staging regressions, the complete Java 21 client
+  build, and the existing direct/Helix capture regressions passed.
+- Repeated companion rebuilds exposed an operator-friction defect: local action
+  scope reset after every restart even though the typed request contract and
+  emergency stop were unchanged. Malformed saved preferences now fail closed
+  and are removed. Focused persistence/placement tests and the full Java 21
+  Fabric build passed. The final rebuild also closes only workflow-owned craft
+  and container screens on settlement, so a later action does not encounter a
+  stale `screen_open` manual-override condition. The rebuilt installed JAR has
+  SHA-256
+  `131D924B4FA5A5C5462ADE34B3BE6B7020E1EAE082C487211989D6ECE17F1348`.
+- Direct workflow
+  `direct_player_action_workflow:77234e83-7284-4ae5-a71c-bcbfb15b73f8`
+  and keyed Ask turn `ask:2332ece6-b143-4da2-80d8-97f5e7ce55ba` each executed
+  the same careful 250 ms forward walk. Both reported distance
+  `0.8322909356748315` blocks and duration `5` ticks. The Helix exact-turn
+  export proved action execution, current-turn observation re-entry, later
+  Codex synthesis and terminal authority; the normalized differential audit
+  reported no mismatches and no first divergent stage. Public evidence is in
+  `artifacts/minecraft-player-direct-vs-helix-walk-audit.json` and its bound
+  direct/Helix captures and traces.
+- Direct native-navigation workflow
+  `direct_player_action_workflow:cdfaaa01-fbab-4a68-9ca1-c5dc270f3c19`
+  moved from `(-47.06505816071773, 68, -4.993154199834148)` toward the
+  independently verified two-block-east target. The client terminal event
+  measured `0.5306785059178623` blocks from target with every control released;
+  the subsequent World Authority console read measured
+  `(-45.334191135034457, 68, -4.993154199834148)`, still within the admitted
+  `0.6`-block radius after normal motion settling. Public capture and trace are
+  `artifacts/minecraft-player-direct-native-navigation-east-two-capture.json`
+  and `artifacts/minecraft-player-direct-native-navigation-east-two-trace.json`.
+- Direct workflow
+  `direct_player_action_workflow:a2f4443a-4340-45a4-90f8-8e1b109c2b53`
+  requested the optional `baritone` engine while it was not installed. It
+  failed on the first execution tick with `engine_available=false`, released
+  controls and did not fall back. The public typed-failure evidence is in
+  `artifacts/minecraft-player-direct-baritone-unavailable-capture.json` and
+  `artifacts/minecraft-player-direct-baritone-unavailable-trace.json`.
+- Direct follow workflow
+  `direct_player_action_workflow:50c0e8af-546c-4c9b-b2a7-4ab7057f4c69`
+  resolved the exact requested native identity instead of substituting a fuzzy
+  match. Because `NotPresentHelixFixture` was absent, it failed on its first
+  execution tick with `target_present=false`, did not move and released all
+  controls. The public evidence is in
+  `artifacts/minecraft-player-direct-follow-absent-capture.json` and
+  `artifacts/minecraft-player-direct-follow-absent-trace.json`.
+- Direct craft workflow
+  `direct_player_action_workflow:a468c34e-b486-44da-a509-67935ca81d3b`
+  selected a craftable stick recipe through the normal 2x2 player grid and
+  verified four produced sticks in inventory. Direct inventory-transfer
+  workflows `direct_player_action_workflow:0af08c77-88e3-439e-a1f6-fbecf6e704ec`
+  and `direct_player_action_workflow:76171f30-f10f-4770-8641-9502abb1c4ac`
+  then opened the looked-at chest, deposited exactly four sticks, and withdrew
+  exactly four sticks with measured player-side deltas. Their provenance-bound
+  public captures/traces are under
+  `artifacts/minecraft-player-direct-craft-sticks-*` and
+  `artifacts/minecraft-player-direct-transfer-*-sticks-*`.
+- Codex-owned task-entry workflow
+  `direct_player_action_workflow:b93a382f-86cc-48f9-bf11-f1fc098a13da`
+  was staged without Minecraft chat or operator clipboard input after Codex
+  closed one verified stale chest screen. It completed two observed airborne
+  transitions, reported `confirmed_jumps=2`, and released all controls. The
+  immediately preceding attempt remains in the log as a typed
+  `manual_override_detected` cancellation with reason `screen_open`; the
+  successful retry therefore proves bounded correction rather than erasing the
+  failed attempt. Public evidence is in
+  `artifacts/minecraft-player-direct-codex-owned-jump-capture.json`.
+- Codex then staged the remaining initial inventory-facing actions without
+  Minecraft chat input. Workflow
+  `direct_player_action_workflow:b6912949-7605-47d3-a37d-b9aced8ae640`
+  opened the looked-at chest and reported `interaction_accepted=true`;
+  workflow `direct_player_action_workflow:ef7430d3-119a-4d5e-baac-7b1c83119ab4`
+  selected hotbar slot 1 and reported `selection_matches=true`; and workflow
+  `direct_player_action_workflow:87bb9778-3526-4315-841e-76b8436bc019`
+  equipped `minecraft:iron_helmet` to the head slot. Independent Fabric server
+  reads confirmed the selected diamond pickaxe and head equipment. Public
+  captures are `artifacts/minecraft-player-direct-codex-owned-interact-capture.json`,
+  `artifacts/minecraft-player-direct-codex-owned-hotbar-capture.json`, and
+  `artifacts/minecraft-player-direct-codex-owned-equip-capture.json`.
+- The direct capture observer now derives all 13 action capability IDs from the
+  shared player-capability catalog and preserves the request's exact control
+  engine. A focused navigation/Baritone regression plus the existing capture
+  cases pass 5/5; the observer remains non-authoritative.
 - Cross-language event-batch hash parity was repaired after the first live
   action replay. Java floating-point spellings such as `0.0` and `3.0E7` did
   not match the Node canonical JSON spellings `0` and `30000000`, so the event
@@ -224,7 +325,7 @@ presentation.
 - Client JAR:
   `minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.2.0.jar`.
 - Client JAR SHA-256:
-  `4113feef4c1ee10cd5079cefd44d6a6d0fa1f01d854f648bd16c4b20a2c0a02a`.
+  `37eddaf3af6a2727a7c7b2b3e561a5f56f117564d24a967a8415a77203ec3c03`.
 - Installed client target:
   `C:\Users\dan\AppData\Roaming\.minecraft\mods\HelixFabricPlayerAgent-0.2.0.jar`,
   with matching SHA-256.
@@ -259,17 +360,24 @@ presentation.
 
 ## Current live dependency
 
-The Fabric server and Minecraft client are currently live, and the current
-Minecraft process loaded the rebuilt 0.2.0 companion with installed SHA-256
-`4113FEEF4C1EE10CD5079CEFD44D6A6D0FA1F01D854F648BD16C4B20A2C0A02A`.
-The keyed Helix server is intentionally stopped: an opaque keyed restart made
-all three health endpoints return HTTP 200, but combined host memory then
-crossed the 95% hard-stop boundary before a live action was sent. Restart only
-through the opaque launcher after restoring resource headroom. Then require a
-fresh manifest/heartbeat and canonical authority before replaying navigation.
+As of 2026-08-12, the Fabric server is live and the player is connected on
+`localhost:25565`, while keyed Helix is intentionally parked to keep the direct
+reference run below the workstation memory ceiling. The currently loaded client
+has already completed native navigation, exact absent-identity follow, collect,
+mine, craft, and bidirectional inventory-transfer tasks. The rebuilt 0.2.0 JAR
+on disk has SHA-256
+`131D924B4FA5A5C5462ADE34B3BE6B7020E1EAE082C487211989D6ECE17F1348`;
+its saved `full` local-control preference and GUI cleanup will take effect on
+the next natural client launch without another enable command.
 
-The next live step is native navigation followed by one deliberate typed
-unavailable-engine case. The repair gives semantic current-turn retries a stable idempotency
+The next direct steps are reloading that final JAR once, replaying the corrected
+orange-wool placement, then exercising interruption/emergency stop. After the
+direct workflow matrix is captured, check host memory, start keyed Helix only
+through the opaque launcher, verify the three health endpoints, recover or
+re-pair the Player Embodiment authority, and replay the identical natural
+prompts through Helix.
+
+The repair gives semantic current-turn retries a stable idempotency
 projection and retains workflow-event, raw-event and terminal-result delivery
 in one bounded acknowledged outbox; it does not replay physical input. Java
 build/tests, the 14-case action contract, 5-case gateway action suite, 31-case

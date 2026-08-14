@@ -40,6 +40,8 @@ import {
   type LiveAccountPreflightSnapshot,
 } from "./live-account-preflight";
 import { PaperTradingError } from "./paper-trading-errors";
+import { hasFreshRobinhoodLiveProviderContractAcceptance } from
+  "./live-provider-contract-preflight-store";
 import { readUsMarketClock } from "./us-market-clock";
 
 const LIVE_DEPLOYMENT_ENV = "ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION";
@@ -348,6 +350,16 @@ export const setLiveTradingControl = async (input: {
           "The live arming text must exactly match the current control phrase.",
         );
       }
+      if (!await hasFreshRobinhoodLiveProviderContractAcceptance({
+        client,
+        ownerProfileId: input.ownerProfileId,
+        connectionId: input.connectionId,
+        roomId: input.roomId,
+        now,
+      })) throw new PaperTradingError(
+        "paper_trading_unavailable", 409,
+        "Live trading requires a fresh PASS from the read-only Robinhood provider contract preflight.",
+      );
       const supervisorAge = row.supervisor_heartbeat_at === null
         ? Number.POSITIVE_INFINITY
         : now.getTime() - new Date(row.supervisor_heartbeat_at).getTime();
@@ -556,7 +568,16 @@ export const executeApprovedLiveEquityEntry = async (input: {
         control?.operator_presence_at === undefined
       ? Number.POSITIVE_INFINITY
       : now.getTime() - new Date(control.operator_presence_at).getTime();
-    if (!control || !control.operator_armed || control.kill_switch_active ||
+    const providerContractAccepted = await
+      hasFreshRobinhoodLiveProviderContractAcceptance({
+        client,
+        ownerProfileId: input.ownerProfileId,
+        connectionId: input.connectionId,
+        roomId: input.roomId,
+        now,
+      });
+    if (!providerContractAccepted || !control || !control.operator_armed ||
+        control.kill_switch_active ||
         !control.protective_exit_ready || control.supervisor_status !== "healthy" ||
         supervisorAge < 0 ||
         supervisorAge > SUPERVISOR_FRESH_MS || operatorAge < 0 ||

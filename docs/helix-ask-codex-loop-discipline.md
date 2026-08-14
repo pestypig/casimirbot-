@@ -7,6 +7,10 @@ defined in `docs/architecture/helix-ask-canonical-turn-lifecycle.md`. Any new
 provider projection, continuation rule, or terminal shortcut must conform to
 that lifecycle contract.
 
+For environment tools, concurrent reasoning roles, reaction timescales,
+reference-Codex/keyed-Helix parity and durable goals, also follow
+`docs/architecture/helix-environment-agent-reasoning-v1.md`.
+
 This note compares the current Helix Ask backend posture against the bundled
 Codex clone and sets the boundary for future work. It is intentionally a
 procedure contract, not a claim that Helix Ask behavior is deterministic.
@@ -83,6 +87,80 @@ provider selected
 -> Helix terminal authority
 -> visible/debug projection
 ```
+
+### Transparent-governor rule
+
+Helix is a transparent governor around the selected runtime, not a second
+planner. For a natural action request, Helix may commit the admitted source,
+tool family, participant/world identity, permission, effect ceiling, and
+terminal evidence requirements. It must not preselect an exact action or
+arguments merely because lexical text resembles one capability. An exact
+capability may be prebound only when the operator explicitly names that
+capability or a separate policy contract requires it.
+
+The runtime-visible capability schema must match the trusted execution parser.
+A permissive catalog followed by a stricter hidden validator is adapter
+interference: it spends model retries on a contract Helix taught incorrectly.
+Use bounded, reference-free discriminated alternatives when an action, node, or
+condition is a typed union. Keep semantic execution notes in the capability
+description, especially when an optional construct changes completion behavior
+(for example, a race cancels losing lanes and is not a synchronization group).
+
+After execution:
+
+- preserve every failed attempt in provenance and debug history;
+- return repairable schema, program, or executor failures to Codex with the
+  exact failed invariant and bounded current-turn diagnostics;
+- never replace a runtime-authored failed request with a planner-derived
+  capability or guessed arguments;
+- require human input only when the typed evidence identifies an external
+  change or consent boundary, such as manual override, revoked permission, or
+  an unavailable source;
+- let a later verified success satisfy the corresponding subgoal while keeping
+  earlier failures visible; and
+- project a supported Codex terminal candidate unchanged after evidence
+  re-entry and terminal eligibility pass.
+
+The behavior is proven with one unchanged natural prompt across the full
+lifecycle. Record family-only admission, runtime-selected capability, all
+attempts, the successful current-turn observation, evidence re-entry, the final
+candidate, and a clean lifecycle differential audit. Changing the prompt to fit
+the adapter is not parity evidence.
+
+### Advisory policy versus enforcement kernel
+
+Keep Helix policy out of the semantic reasoning path unless a non-negotiable
+boundary is actually crossed. Route preferences, capability ordering, suggested
+repairs, quality heuristics, retry hints, response structure, and presentation
+preferences are advisory context for Codex. They may help Codex decide, but they
+must not silently replace its selected action, arguments, retry, or grounded
+terminal candidate.
+
+The enforcement kernel is intentionally smaller. It may hard-block only the
+contracts Helix must own: account/tenant/room/player identity, consent and
+authority, secret isolation, live-source identity and freshness, trusted input
+schema, lease and effect ceilings, mutation scope, manual override, Emergency
+Stop, evidence identity/provenance, applicable scientific proof or certification
+gates, and terminal eligibility. A hard block emits the exact typed invariant
+and either re-enters Codex while repair budget remains or returns that same
+actionable failure. It never invents a substitute answer.
+
+The preferred fast path is:
+
+```txt
+one Codex turn
+-> one or more Codex-selected admitted capability calls
+-> observation re-entry in that same runtime turn
+-> one Codex terminal candidate
+-> Helix eligibility check and unchanged projection
+```
+
+Do not add a second planner, planner-authored argument repair, redundant model
+resampling, or compatibility fallback to this path merely to satisfy advisory
+heuristics. Measure provider startup, model sampling, tool execution,
+observation re-entry, continuation, and terminal projection separately. An
+environment action that settles in a few ticks but takes a minute to answer is
+an adapter/provider latency defect until that timing trace proves otherwise.
 
 ## Capability-First Adapter Development Order
 

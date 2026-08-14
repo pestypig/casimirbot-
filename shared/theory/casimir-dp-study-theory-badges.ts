@@ -1426,6 +1426,12 @@ export const CASIMIR_DP_STUDY_THEORY_BADGES: TheoryBadgeV1[] = [
         "Fuchs-et-al-2017",
         "Polarization-mixing reflection matrices in macroscopic QED.",
       ),
+      sourceRef(
+        "literature_ref",
+        "https://doi.org/10.1038/s41586-026-10859-z",
+        "Stewart-et-al-2026-magnetar-vacuum-birefringence",
+        "External empirical precedent for phase-sensitive strong-field QED vacuum response and mechanism-on/off Stokes-model comparison; not a Casimir apparatus input, collapse result, or boundary-to-collapse bridge.",
+      ),
     ],
   }),
   stage4StudyBadge({

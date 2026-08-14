@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 
 final class PlayerActionRuntime implements AutoCloseable {
     private static final String PROTOCOL_VERSION = "helix.environment_action.v1";
-    static final String ADAPTER_VERSION = "0.2.0";
+    static final String ADAPTER_VERSION = "0.4.0";
     private static final int POLL_INTERVAL_TICKS = 20;
     private static final int HEARTBEAT_INTERVAL_TICKS = 100;
     private static final int MAX_PENDING_DELIVERIES = 768;
@@ -44,6 +44,8 @@ final class PlayerActionRuntime implements AutoCloseable {
         String workflowId,
         String actionKind,
         Map<String, Object> arguments,
+        String controlEngine,
+        String stagingRequestRef,
         Map<String, Object> startingState,
         String startedAt,
         Map<String, Object> startedClock
@@ -57,8 +59,8 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final ExecutorService network;
     private final PlayerActionHttpClient http;
     private final Consumer<String> localDiagnosticMessage;
-    private final String producerEpochRef = id("environment_action_epoch");
-    private final String manifestId = id("environment_action_manifest");
+    private volatile String producerEpochRef = id("environment_action_epoch");
+    private volatile String manifestId = id("environment_action_manifest");
     private final String executionClockId = id("minecraft_client_tick_clock");
     private final AtomicBoolean cyclePending = new AtomicBoolean(false);
     private final AtomicBoolean manifestPending = new AtomicBoolean(false);
@@ -109,6 +111,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             // evidence is stranded behind that boundary.
             bridge.releaseAll();
         } else if (activeControlPlaneFailureRequiresStop(
+            activeEnvelope != null,
             controller.activeWorkflowId(),
             lastTransportError
         )) {
@@ -157,6 +160,10 @@ final class PlayerActionRuntime implements AutoCloseable {
         }
     }
 
+    void renderFrame(long frameNanos) {
+        controller.renderFrame(frameNanos);
+    }
+
     boolean ready() {
         return config.ready() && manifestReady && heartbeatReady &&
             !emergencyStopLatched && !eventStreamResyncRequired;
@@ -188,6 +195,37 @@ final class PlayerActionRuntime implements AutoCloseable {
         Map<String, Object> arguments,
         long maxDurationTicks
     ) {
+        return startLocalDiagnostic(
+            actionKind,
+            arguments,
+            maxDurationTicks,
+            "native_fabric",
+            null
+        );
+    }
+
+    String startLocalDiagnostic(
+        String actionKind,
+        Map<String, Object> arguments,
+        long maxDurationTicks,
+        String controlEngine
+    ) {
+        return startLocalDiagnostic(
+            actionKind,
+            arguments,
+            maxDurationTicks,
+            controlEngine,
+            null
+        );
+    }
+
+    String startLocalDiagnostic(
+        String actionKind,
+        Map<String, Object> arguments,
+        long maxDurationTicks,
+        String controlEngine,
+        String stagingRequestRef
+    ) {
         if (minecraft.player == null || minecraft.getConnection() == null) {
             return "Helix direct diagnostics require an active Minecraft world connection.";
         }
@@ -198,8 +236,19 @@ final class PlayerActionRuntime implements AutoCloseable {
             controller.activeWorkflowId() != null) {
             return "Helix cannot start a direct diagnostic while another player workflow is active.";
         }
-        if (!List.of("walk", "jump", "look_at").contains(actionKind)) {
+        if (!List.of(
+            "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
+            "hotbar_select", "equip", "follow", "collect", "mine", "place",
+            "craft", "inventory_transfer", "execute_sequence",
+            "execute_reactive_program"
+        ).contains(actionKind)) {
             return "Helix direct diagnostics do not expose that action kind.";
+        }
+        if (!List.of("native_fabric", "baritone").contains(controlEngine)) {
+            return "Helix direct diagnostics do not expose that control engine.";
+        }
+        if ("baritone".equals(controlEngine) && !"navigate_to".equals(actionKind)) {
+            return "Helix direct diagnostics expose Baritone only for navigation.";
         }
         String actionRequestId = id("direct_player_action_request");
         String workflowId = id("direct_player_action_workflow");
@@ -213,11 +262,14 @@ final class PlayerActionRuntime implements AutoCloseable {
         startingState.put("pitch", initialSnapshot.pitch());
         startingState.put("health", initialSnapshot.health());
         startingState.put("on_ground", initialSnapshot.onGround());
+        startingState.putAll(bridge.compactFluidState());
         LocalDiagnosticEnvelope diagnostic = new LocalDiagnosticEnvelope(
             actionRequestId,
             workflowId,
             actionKind,
             Map.copyOf(arguments),
+            controlEngine,
+            stagingRequestRef,
             Map.copyOf(startingState),
             Instant.now().toString(),
             clockSnapshot()
@@ -230,7 +282,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             arguments,
             Math.max(1, Math.min(36_000, maxDurationTicks)),
             ManualOverridePolicy.CANCEL,
-            "native_fabric"
+            controlEngine
         );
         if (!controller.start(request)) {
             localDiagnosticEnvelope = null;
@@ -299,13 +351,46 @@ final class PlayerActionRuntime implements AutoCloseable {
         try {
             PlayerActionHttpClient.Response response = http.post("/heartbeat", heartbeat());
             heartbeatReady = response.ok();
-            if (!response.ok()) recordTransportError(response.error());
-            else clearTransportErrorIfDeliveryComplete();
+            if (!response.ok()) {
+                recordTransportError(response.error());
+                if (heartbeatFailureRequiresManifestRepublish(response.error())) {
+                    // A deferred/local server restore can legitimately forget
+                    // the most recently admitted manifest while this connector
+                    // remains alive. Re-enter manifest admission before any
+                    // further action poll; never replay an action.
+                    manifestReady = false;
+                } else if (requiresFreshProducerEpoch(response.error())) {
+                    if (rotateEvidenceEpochIfIdle()) {
+                        publishManifest();
+                    } else {
+                        eventStreamResyncRequired = true;
+                        bridge.releaseAll();
+                    }
+                }
+            } else clearTransportErrorIfDeliveryComplete();
         } catch (Exception error) {
             heartbeatReady = false;
             recordTransportError("heartbeat_unreachable");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
+    }
+
+    private boolean rotateEvidenceEpochIfIdle() {
+        if (!evidenceEpochRotationAllowed(
+            controller.activeWorkflowId() != null,
+            activeEnvelope != null,
+            !deliveryOutbox.isEmpty()
+        )) return false;
+        producerEpochRef = id("environment_action_epoch");
+        manifestId = id("environment_action_manifest");
+        latestEventSequence = -1;
+        manifestReady = false;
+        heartbeatReady = false;
+        eventStreamResyncRequired = false;
+        logger.warn(
+            "Helix player-action evidence cursor changed across server persistence; publishing a fresh producer epoch without replaying an action."
+        );
+        return true;
     }
 
     private void pollControlsThenActions() {
@@ -561,7 +646,8 @@ final class PlayerActionRuntime implements AutoCloseable {
         record.put("starting_state", diagnostic.startingState());
         record.put("started_at", diagnostic.startedAt());
         record.put("started_clock", diagnostic.startedClock());
-        record.put("control_engine", "native_fabric");
+        record.put("control_engine", diagnostic.controlEngine());
+        record.put("staging_request_ref", diagnostic.stagingRequestRef());
         record.put("admission_status", "local_operator_diagnostic");
         record.put("helix_terminal_authority_status", "not_applicable");
         record.put("assistant_answer", false);
@@ -789,17 +875,23 @@ final class PlayerActionRuntime implements AutoCloseable {
                         longNumber(startedClock, "tick_index")
                 )
         );
+        boolean programKind = "execute_sequence".equals(actionKind) ||
+            "execute_reactive_program".equals(actionKind);
         boolean motionKind = List.of(
-            "navigate_to", "look_at", "walk", "jump", "follow", "collect", "mine", "place"
-        ).contains(actionKind);
+            "navigate_to", "look_at", "track_target", "walk", "jump", "follow", "collect", "mine", "place"
+        ).contains(actionKind) ||
+            (programKind && Boolean.TRUE.equals(measurements.get("player_motion_performed")));
         boolean interactionKind = List.of(
             "interact", "mine", "place", "craft", "inventory_transfer"
-        ).contains(actionKind);
-        boolean directInventoryKind = List.of("hotbar_select", "equip").contains(actionKind);
+        ).contains(actionKind) ||
+            (programKind && Boolean.TRUE.equals(measurements.get("player_interaction_performed")));
+        boolean directInventoryKind = List.of("hotbar_select", "equip").contains(actionKind) ||
+            (programKind && Boolean.TRUE.equals(measurements.get("inventory_mutation_performed")));
         boolean measuredInventoryMutation =
             positiveMeasurement(measurements, "collected_count") ||
             positiveMeasurement(measurements, "produced_count") ||
-            positiveMeasurement(measurements, "transferred_count");
+            positiveMeasurement(measurements, "transferred_count") ||
+            positiveMeasurement(measurements, "inventory_mutations_performed");
         boolean measuredWorldMutation = positiveMeasurement(
             measurements,
             "world_mutations_performed"
@@ -961,6 +1053,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         ));
         capabilities.addAll(List.of(
             capability("com.casimirbot.minecraft.player.look", "look_at", "player_motion", List.of("single_action")),
+            capability("com.casimirbot.minecraft.player.camera.track", "track_target", "continuous_control", List.of("long_running")),
             capability("com.casimirbot.minecraft.player.walk", "walk", "continuous_control", List.of("long_running")),
             capability("com.casimirbot.minecraft.player.jump", "jump", "player_motion", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.interact", "interact", "player_interaction", List.of("single_action")),
@@ -971,7 +1064,23 @@ final class PlayerActionRuntime implements AutoCloseable {
             capability("com.casimirbot.minecraft.player.mine", "mine", "world_mutation", List.of("long_running"), List.of("native_fabric"), true),
             capability("com.casimirbot.minecraft.player.place", "place", "world_mutation", List.of("long_running"), List.of("native_fabric"), true),
             capability("com.casimirbot.minecraft.player.craft", "craft", "player_inventory", List.of("long_running")),
-            capability("com.casimirbot.minecraft.player.inventory.transfer", "inventory_transfer", "player_inventory", List.of("long_running"))
+            capability("com.casimirbot.minecraft.player.inventory.transfer", "inventory_transfer", "player_inventory", List.of("long_running")),
+            capability(
+                "com.casimirbot.minecraft.player.sequence.execute",
+                "execute_sequence",
+                "continuous_control",
+                List.of("long_running"),
+                List.of("native_fabric"),
+                true
+            ),
+            capability(
+                "com.casimirbot.minecraft.player.guardian.execute",
+                "execute_reactive_program",
+                "continuous_control",
+                List.of("long_running"),
+                List.of("native_fabric"),
+                true
+            )
         ));
         return List.copyOf(capabilities);
     }
@@ -1073,10 +1182,12 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     static boolean activeControlPlaneFailureRequiresStop(
+        boolean remoteActionActive,
         String activeWorkflowId,
         String transportError
     ) {
-        return activeWorkflowId != null &&
+        return remoteActionActive &&
+            activeWorkflowId != null &&
             transportError != null &&
             !transportError.isBlank();
     }
@@ -1098,9 +1209,24 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     static boolean requiresFreshProducerEpoch(String transportError) {
-        return transportError != null && transportError.equals(
-            "action_delivery_environment_event_batch_http_409_action_event_conflict"
+        return transportError != null && (
+            transportError.equals(
+                "action_delivery_environment_event_batch_http_409_action_event_conflict"
+            ) || transportError.equals("action_event_stream_resync_required")
         );
+    }
+
+    static boolean heartbeatFailureRequiresManifestRepublish(String error) {
+        return "action_heartbeat_invalid".equals(error) ||
+            "action_manifest_required".equals(error);
+    }
+
+    static boolean evidenceEpochRotationAllowed(
+        boolean controllerWorkflowActive,
+        boolean remoteEnvelopeActive,
+        boolean deliveryPending
+    ) {
+        return !controllerWorkflowActive && !remoteEnvelopeActive && !deliveryPending;
     }
 
     private static String wireState(State state) {

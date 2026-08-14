@@ -42,6 +42,12 @@ type PaperLifecycle = {
 
 type BrokerageObservation = { observation_id: string };
 
+type ReadAcceptanceReceipt = {
+  receipts: Array<{ upstream_tool: string; observation_id: string }>;
+  provider_order_tool_calls_made: 0;
+  live_order_execution_enabled: false;
+};
+
 type LiveEquityPreview = {
   preview_id: string;
   risk_decision_id: string;
@@ -98,6 +104,42 @@ type LiveExecution = {
 };
 
 type LiveExecutionList = { executions: LiveExecution[] };
+
+type LiveProviderContractPreflight = {
+  acceptance_id: string;
+  verdict: "pass" | "fail";
+  catalog_hash: string;
+  checked_at: string;
+  expires_at: string;
+  fresh: boolean;
+  provider_order_tool_calls_made: 0;
+  live_order_execution_enabled: false;
+  gates: Array<{
+    gate_id: string;
+    tool_name: string;
+    verdict: "pass" | "fail";
+    reason_code: string;
+    message: string;
+    input_schema_hash: string | null;
+  }>;
+};
+
+type LiveAcceptanceReadiness = {
+  generated_at: string;
+  read_acceptance_complete: boolean;
+  safe_to_enable_live_flags: boolean;
+  ready_to_start_attended_canary: boolean;
+  ready_to_arm: boolean;
+  acceptance_complete: boolean;
+  unresolved_live_exposure_count: number;
+  live_order_tool_calls_made: 0;
+  gates: Array<{
+    gate_id: string;
+    verdict: "pass" | "pending" | "fail";
+    reason_code: string;
+    message: string;
+  }>;
+};
 
 type ProtectiveExitPreview = {
   exit_preview_id: string;
@@ -159,11 +201,16 @@ export function SharedLiveRoomPaperTradingPanel({
   const [account, setAccount] = React.useState<PaperAccount | null>(null);
   const [lifecycle, setLifecycle] = React.useState<PaperLifecycle | null>(null);
   const [startingDollars, setStartingDollars] = React.useState("");
+  const [readProbeSymbol, setReadProbeSymbol] = React.useState("SPY");
   const [riskDecisionId, setRiskDecisionId] = React.useState("");
   const [approvalText, setApprovalText] = React.useState<Record<string, string>>({});
   const [livePreviews, setLivePreviews] = React.useState<LiveEquityPreview[]>([]);
   const [liveControl, setLiveControl] = React.useState<LiveTradingControl | null>(null);
   const [liveExecutions, setLiveExecutions] = React.useState<LiveExecution[]>([]);
+  const [liveContractPreflight, setLiveContractPreflight] =
+    React.useState<LiveProviderContractPreflight | null>(null);
+  const [liveAcceptanceReadiness, setLiveAcceptanceReadiness] =
+    React.useState<LiveAcceptanceReadiness | null>(null);
   const [protectivePreviews, setProtectivePreviews] = React.useState<ProtectiveExitPreview[]>([]);
   const [protectiveExecutions, setProtectiveExecutions] = React.useState<ProtectiveExitExecution[]>([]);
   const [armingText, setArmingText] = React.useState("");
@@ -196,7 +243,8 @@ export function SharedLiveRoomPaperTradingPanel({
 
   const refreshLifecycle = React.useCallback(async (accountId: string) => {
     const [nextLifecycle, nextPreviews, nextControl, nextExecutions,
-      nextProtectivePreviews, nextProtectiveExecutions] = await Promise.all([
+      nextProtectivePreviews, nextProtectiveExecutions,
+      nextContractPreflight, nextAcceptanceReadiness] = await Promise.all([
       request<PaperLifecycle>(
         `paper-lifecycle?account_id=${encodeURIComponent(accountId)}`,
       ),
@@ -205,6 +253,8 @@ export function SharedLiveRoomPaperTradingPanel({
       request<LiveExecutionList>("live-equity-executions"),
       request<ProtectiveExitPreviewList>("protective-exit-previews"),
       request<ProtectiveExitExecutionList>("protective-exit-executions"),
+      request<LiveProviderContractPreflight>("live-contract-preflight"),
+      request<LiveAcceptanceReadiness>("live-acceptance-readiness"),
     ]);
     setLifecycle(nextLifecycle);
     setLivePreviews(nextPreviews?.previews ?? []);
@@ -212,6 +262,8 @@ export function SharedLiveRoomPaperTradingPanel({
     setLiveExecutions(nextExecutions?.executions ?? []);
     setProtectivePreviews(nextProtectivePreviews?.previews ?? []);
     setProtectiveExecutions(nextProtectiveExecutions?.executions ?? []);
+    setLiveContractPreflight(nextContractPreflight);
+    setLiveAcceptanceReadiness(nextAcceptanceReadiness);
   }, [request]);
 
   const refresh = React.useCallback(async () => {
@@ -309,6 +361,32 @@ export function SharedLiveRoomPaperTradingPanel({
         : "Paper risk evaluations resumed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to change the kill switch.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyReadOnlyAccess = async (): Promise<void> => {
+    const symbol = readProbeSymbol.trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9.-]{0,9}$/u.test(symbol)) {
+      setMessage("Enter one valid quote-probe symbol.");
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const receipt = await request<ReadAcceptanceReceipt>("read-acceptance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quote_probe_symbol: symbol }),
+      });
+      await refresh();
+      setMessage(receipt
+        ? `${receipt.receipts.length} sanitized Robinhood read receipts recorded. No review or order tool was called.`
+        : "Robinhood read acceptance returned no receipt.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message :
+        "Unable to verify Robinhood read-only access.");
     } finally {
       setBusy(false);
     }
@@ -469,6 +547,33 @@ export function SharedLiveRoomPaperTradingPanel({
         : "Live placement stopped. This does not cancel or sell an existing Robinhood order or position.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to change live controls.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkLiveProviderContracts = async (): Promise<void> => {
+    if (!account) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const receipt = await request<LiveProviderContractPreflight>(
+        "live-contract-preflight",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmation_text: "CHECK ROBINHOOD LIVE CONTRACTS",
+          }),
+        },
+      );
+      setLiveContractPreflight(receipt);
+      setMessage(receipt?.verdict === "pass"
+        ? "Robinhood MCP contracts passed the read-only gate. No provider order tool was called."
+        : "Robinhood MCP contract drift was detected. Live arming remains locked.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message :
+        "Unable to inspect Robinhood's live provider contracts.");
     } finally {
       setBusy(false);
     }
@@ -657,7 +762,7 @@ export function SharedLiveRoomPaperTradingPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             confirmation_text:
-              `RECONCILE PROTECTIVE STOP ${execution.exit_execution_id}`,
+              `RECONCILE LIVE EXIT ${execution.exit_execution_id}`,
           }),
         },
       );
@@ -687,7 +792,7 @@ export function SharedLiveRoomPaperTradingPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             confirmation_text:
-              `CANCEL PROTECTIVE STOP ${execution.exit_execution_id}`,
+              `CANCEL LIVE EXIT ${execution.exit_execution_id}`,
           }),
         },
       );
@@ -865,13 +970,19 @@ export function SharedLiveRoomPaperTradingPanel({
                           ...current,
                           [preview.approval_id!]: event.target.value,
                         }))}
-                        disabled={busy || disabled || !liveControl?.live_order_execution_enabled}
+                        disabled={busy || disabled ||
+                          !liveControl?.live_order_execution_enabled ||
+                          liveContractPreflight?.verdict !== "pass" ||
+                          liveContractPreflight?.fresh !== true}
                         className="min-w-48 flex-1 rounded border border-rose-300/20 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50"
                       />
                       <button
                         type="button"
                         onClick={() => void placeApprovedOrder(preview)}
-                        disabled={busy || disabled || !liveControl?.live_order_execution_enabled ||
+                        disabled={busy || disabled ||
+                          !liveControl?.live_order_execution_enabled ||
+                          liveContractPreflight?.verdict !== "pass" ||
+                          liveContractPreflight?.fresh !== true ||
                           placementText[preview.approval_id] !==
                             `PLACE APPROVED ORDER ${preview.approval_id}`}
                         className="rounded border border-rose-300/40 bg-rose-400/10 px-2 py-1 text-rose-100 disabled:opacity-50"
@@ -884,6 +995,110 @@ export function SharedLiveRoomPaperTradingPanel({
               </div>
             ))}
           </div>
+          {liveAcceptanceReadiness ? (
+            <div className="mt-2 rounded border border-amber-300/20 bg-amber-400/5 p-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <p className="font-semibold text-amber-100">
+                  Live acceptance evidence
+                </p>
+                <span className={liveAcceptanceReadiness.acceptance_complete
+                  ? "text-emerald-200" : "text-amber-200"}>
+                  {liveAcceptanceReadiness.acceptance_complete
+                    ? "ACCEPTED" : liveAcceptanceReadiness.ready_to_arm
+                      ? "READY TO ARM" : liveAcceptanceReadiness.ready_to_start_attended_canary
+                        ? "READY FOR ATTENDED CANARY"
+                        : liveAcceptanceReadiness.safe_to_enable_live_flags
+                          ? "READ ACCEPTED · SAFE TO ENABLE CANARY FLAGS"
+                          : "INCOMPLETE"}
+                </span>
+              </div>
+              <p className="mt-1 text-slate-400">
+                Evidence report only · order tool calls {liveAcceptanceReadiness.live_order_tool_calls_made} · unresolved exposure {liveAcceptanceReadiness.unresolved_live_exposure_count}
+              </p>
+              <div className="mt-1 grid gap-1 sm:grid-cols-2">
+                {liveAcceptanceReadiness.gates.map((gate) => (
+                  <div key={gate.gate_id}
+                    className="rounded border border-white/10 bg-slate-950/60 p-1">
+                    <span className={gate.verdict === "pass"
+                      ? "text-emerald-200" : gate.verdict === "fail"
+                        ? "text-rose-200" : "text-amber-200"}>
+                      {gate.verdict.toUpperCase()} · {gate.gate_id}
+                    </span>
+                    <p className="text-slate-500">{gate.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-2 rounded border border-emerald-300/20 bg-emerald-400/5 p-1.5">
+            <p className="font-semibold text-emerald-100">
+              Robinhood read-only acceptance
+            </p>
+            <p className="mt-1 text-slate-400">
+              Selects only the account Robinhood marks agentic_allowed, then records five sanitized account/market receipts. It calls no review, placement, cancellation, option, crypto, transfer, or watchlist tool.
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              <input
+                aria-label="Read-only quote probe symbol"
+                value={readProbeSymbol}
+                onChange={(event) => setReadProbeSymbol(event.target.value.toUpperCase())}
+                disabled={busy || disabled}
+                className="w-24 rounded border border-white/15 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-50"
+              />
+              <button type="button" onClick={() => void verifyReadOnlyAccess()}
+                disabled={busy || disabled}
+                className="rounded border border-emerald-300/30 px-2 py-1 text-emerald-100 disabled:opacity-50">
+                Verify read-only access
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 rounded border border-cyan-300/20 bg-cyan-400/5 p-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <div>
+                <p className="font-semibold text-cyan-100">
+                  Robinhood live contract preflight
+                </p>
+                <p className="text-slate-400">
+                  Lists and validates MCP schemas only; it calls no review, placement, or cancellation tool.
+                </p>
+              </div>
+              <button type="button" onClick={() => void checkLiveProviderContracts()}
+                disabled={busy || disabled}
+                className="rounded border border-cyan-300/30 px-2 py-1 text-cyan-100 disabled:opacity-50">
+                Check provider contracts
+              </button>
+            </div>
+            {liveContractPreflight ? (
+              <div className="mt-1.5 space-y-1">
+                <p className={liveContractPreflight.verdict === "pass" &&
+                    liveContractPreflight.fresh
+                  ? "text-emerald-200" : "text-rose-200"}>
+                  {liveContractPreflight.verdict.toUpperCase()} · {liveContractPreflight.fresh
+                    ? `valid until ${new Date(liveContractPreflight.expires_at).toLocaleString()}`
+                    : "expired"} · provider order tool calls {liveContractPreflight.provider_order_tool_calls_made}
+                </p>
+                <p className="break-all font-mono text-[9px] text-slate-500">
+                  Catalog {liveContractPreflight.catalog_hash}
+                </p>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {liveContractPreflight.gates.map((gate) => (
+                    <div key={gate.gate_id}
+                      className="rounded border border-white/10 bg-slate-950/60 p-1">
+                      <span className={gate.verdict === "pass"
+                        ? "text-emerald-200" : "text-rose-200"}>
+                        {gate.verdict === "pass" ? "PASS" : "FAIL"} · {gate.gate_id}
+                      </span>
+                      <p className="text-slate-500">{gate.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-1 text-slate-500">
+                Not checked. Live trading cannot be armed.
+              </p>
+            )}
+          </div>
           {liveControl ? (
             <div className="mt-2 rounded border border-rose-300/20 bg-rose-400/5 p-1.5">
               <p className="font-semibold text-rose-200">Real-money execution control</p>
@@ -892,7 +1107,9 @@ export function SharedLiveRoomPaperTradingPanel({
               </p>
               <p className="mt-1 text-slate-300">
                 {liveControl.deployment_enabled
-                  ? liveControl.live_order_execution_enabled
+                  ? liveControl.live_order_execution_enabled &&
+                      liveContractPreflight?.verdict === "pass" &&
+                      liveContractPreflight?.fresh === true
                     ? "ARMED · the next exact approved placement can move real money"
                     : `LOCKED · ${liveControl.kill_switch_reason} · protective exit ${liveControl.protective_exit_ready ? "ready" : "not ready"} · supervisor ${liveControl.supervisor_fresh ? "fresh" : "offline/stale"}`
                   : "DEPLOYMENT LOCKED · server live-execution flag is off"}
@@ -931,6 +1148,8 @@ export function SharedLiveRoomPaperTradingPanel({
                     <button type="button" onClick={() => void updateLiveControl("arm")}
                       disabled={busy || disabled || !liveControl.operator_present ||
                         liveControl.attention_required ||
+                        liveContractPreflight?.verdict !== "pass" ||
+                        liveContractPreflight?.fresh !== true ||
                         armingText !== liveControl.arming_phrase}
                       className="rounded border border-rose-300/30 px-2 py-1 text-rose-100 disabled:opacity-50">
                       Arm one live entry
@@ -1053,7 +1272,7 @@ export function SharedLiveRoomPaperTradingPanel({
                   {preview.status === "approved" && preview.approval_id ? (
                     <div className="mt-1 space-y-1">
                       <p className="break-all font-mono text-[9px] text-rose-300">
-                        Type exactly: PLACE PROTECTIVE STOP {preview.approval_id}
+                        Type exactly: PLACE APPROVED EXIT {preview.approval_id}
                       </p>
                       <div className="flex flex-wrap gap-1">
                         <input aria-label={`Protective stop placement for ${preview.intent.symbol}`}
@@ -1067,7 +1286,7 @@ export function SharedLiveRoomPaperTradingPanel({
                           onClick={() => void placeProtectiveExit(preview)}
                           disabled={busy || disabled ||
                             protectivePlacementText[preview.approval_id] !==
-                              `PLACE PROTECTIVE STOP ${preview.approval_id}`}
+                              `PLACE APPROVED EXIT ${preview.approval_id}`}
                           className="rounded border border-rose-300/40 px-2 py-1 text-rose-100 disabled:opacity-50">
                           Place protective stop once
                         </button>

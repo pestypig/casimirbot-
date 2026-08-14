@@ -146,6 +146,85 @@ describe("local pg-mem persistence", () => {
     expect(fs.readFileSync(snapshotPath, "utf8")).toBe(before);
   });
 
+  it("restores encrypted brokerage connections, private-room bindings, and paper accounts", async () => {
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_WRITE_MODE", "deferred");
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS", "60000");
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS", "60000");
+
+    const signedUp = await signUpPasswordAccountSession({
+      email: "brokerage-persistence@example.com",
+      password: "CorrectHorseBrokerage123!",
+      display_name: "Brokerage Persistence Owner",
+    });
+    expect(signedUp.ok).toBe(true);
+    const profileId = signedUp.session!.profile.profile_id;
+    await ensureDatabase();
+    const pool = getPool();
+    await pool.query(`
+      INSERT INTO helix_shared_realtime_rooms (
+        room_id, owner_profile_id, title, status
+      ) VALUES (
+        'shared_realtime_room:brokerage-persistence', $1,
+        'Brokerage persistence', 'ready'
+      );
+      INSERT INTO helix_brokerage_connections (
+        connection_id, owner_profile_id, provider, resource_url,
+        oauth_issuer, oauth_client_id, encrypted_credential_bundle,
+        encryption_key_id, encryption_algorithm, granted_capability_ids,
+        producer_epoch_ref
+      ) VALUES (
+        'brokerage_connection:persistence', $1, 'robinhood',
+        'https://mcp.robinhood.com/mcp', 'https://robinhood.com',
+        'casimirbot-persistence-client', 'v1:ciphertext-only-fixture',
+        'sha256:${"a".repeat(64)}', 'aes-256-gcm',
+        '["brokerage.robinhood.market_data.read"]'::jsonb,
+        'producer_epoch:persistence'
+      );
+      INSERT INTO helix_brokerage_room_bindings (
+        binding_id, connection_id, owner_profile_id, room_id,
+        consent_capability_ids
+      ) VALUES (
+        'brokerage_binding:persistence', 'brokerage_connection:persistence',
+        $1, 'shared_realtime_room:brokerage-persistence',
+        '["brokerage.robinhood.market_data.read"]'::jsonb
+      );
+      INSERT INTO helix_paper_trading_accounts (
+        account_id, owner_profile_id, connection_id, room_id,
+        policy_json, policy_hash, starting_equity_cents,
+        account_equity_cents, buying_power_cents, trading_day
+      ) VALUES (
+        'paper_account:persistence', $1, 'brokerage_connection:persistence',
+        'shared_realtime_room:brokerage-persistence',
+        '{"long_equities_only":true}'::jsonb, 'sha256:${"b".repeat(64)}',
+        100000, 100000, 100000, '2026-08-12'
+      );
+    `, [profileId]);
+    await flushLocalDatabaseSnapshotIfEnabled();
+    await resetDbClient();
+    await ensureDatabase();
+
+    const restoredConnection = await getPool().query<{
+      encrypted_credential_bundle: string;
+      status: string;
+    }>(`SELECT encrypted_credential_bundle, status
+        FROM helix_brokerage_connections
+        WHERE connection_id = 'brokerage_connection:persistence';`);
+    const restoredBinding = await getPool().query(
+      `SELECT binding_id FROM helix_brokerage_room_bindings
+       WHERE binding_id = 'brokerage_binding:persistence';`,
+    );
+    const restoredPaper = await getPool().query(
+      `SELECT account_id FROM helix_paper_trading_accounts
+       WHERE account_id = 'paper_account:persistence';`,
+    );
+    expect(restoredConnection.rows[0]).toEqual({
+      encrypted_credential_bundle: "v1:ciphertext-only-fixture",
+      status: "connected",
+    });
+    expect(restoredBinding.rowCount).toBe(1);
+    expect(restoredPaper.rowCount).toBe(1);
+  });
+
   it("restores environment command authority and its evidence ledger after restart", async () => {
     vi.stubEnv("HELIX_LOCAL_PG_MEM_WRITE_MODE", "deferred");
     vi.stubEnv("HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS", "60000");

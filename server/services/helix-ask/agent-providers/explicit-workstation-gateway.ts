@@ -96,6 +96,7 @@ import {
 } from "../committed-ask-route";
 import { isAskTurnCapabilityHelpIntent } from "../capability-catalog-intent";
 import { HELIX_RESEARCH_LIBRARY_READ_CAPABILITY } from "@shared/helix-research-library";
+import { HELIX_MINECRAFT_COMMAND_CAPABILITY } from "@shared/helix-environment-command";
 import { filterRealtimeReadOnlyHandoffGatewayRequests } from "../realtime-session/read-only-handoff-policy";
 
 const MORAL_SUBSTRATE_PRIMARY_CAPABILITY =
@@ -268,6 +269,11 @@ const gatewayCapabilityNegatedByPrompt = (
     clauseSafePrompt.match(
       /\b(?:do\s+not|don't|dont|without|exclude|avoid|no\s+need\s+to|not\s+asking\s+to)\b(?:(?!\b(?:but|however|instead)\b)[^.!?;\n]){0,280}/gi,
     ) ?? [];
+  if (capability === HELIX_MINECRAFT_COMMAND_CAPABILITY) {
+    return clauses.some((clause) =>
+      /\b(?:(?:minecraft|server|world)\s+)?commands?\b/iu.test(clause),
+    );
+  }
   if (capability === SCHOLARLY_RESEARCH_SEARCH_CAPABILITY) {
     return clauses.some((clause) =>
       /\b(?:scholarly-research_lookup_papers|lookup[_\s-]*papers|run\s+(?:the\s+)?(?:scholarly\s+)?lookup)\b/i.test(

@@ -11,6 +11,7 @@ import {
   DESKTOP_MCP_TUNNEL_START_CHANNEL,
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
+  DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
   DESKTOP_UPDATE_CHECK_CHANNEL,
   DESKTOP_UPDATE_DOWNLOAD_CHANNEL,
   DESKTOP_UPDATE_INSTALL_CHANNEL,
@@ -43,6 +44,11 @@ const desktopBridge = Object.freeze({
   openAuth0AccountLink: (authorizationUrl: unknown) =>
     ipcRenderer.invoke(
       DESKTOP_AUTH0_ACCOUNT_LINK_OPEN_CHANNEL,
+      authorizationUrl,
+    ),
+  openRobinhoodOAuth: (authorizationUrl: unknown) =>
+    ipcRenderer.invoke(
+      DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
       authorizationUrl,
     ),
   onAuth0AccountLinkCompletion: (listener: (state: unknown) => void) => {

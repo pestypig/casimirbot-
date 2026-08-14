@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { planEnvironmentActionAuthoritySupersession } from "../authority-store";
+import {
+  isEnvironmentActionAuthorityLeaseExtension,
+  planEnvironmentActionAuthoritySupersession,
+} from "../authority-store";
 
 describe("environment action authority supersession", () => {
   it("retires every older active lease across player subject epochs", () => {
@@ -40,5 +43,68 @@ describe("environment action authority supersession", () => {
       canonicalPriorAuthorityId: null,
       supersededAuthorityIds: [],
     });
+  });
+
+  it("extends an unchanged finite lease without rotating connector identity", () => {
+    expect(isEnvironmentActionAuthorityLeaseExtension({
+      prior: {
+        adapter_profile_id: "minecraft.player_client.fabric.v1",
+        domain_adapter: "minecraft.player_client.fabric.v1",
+        participant_id: "participant:owner",
+        subject_binding_id: "subject:player",
+        subject_native_id: "DatDamPig",
+        allowed_capability_ids: ["capability:b", "capability:a"],
+        autonomy_mode: "approved_capabilities",
+        manual_override_policy: "cancel",
+        expires_at: "2026-08-14T03:00:00.000Z",
+      },
+      adapterProfileId: "minecraft.player_client.fabric.v1",
+      domainAdapter: "minecraft.player_client.fabric.v1",
+      participantId: "participant:owner",
+      subjectBindingId: "subject:player",
+      subjectNativeId: "DatDamPig",
+      allowedCapabilityIds: ["capability:a", "capability:b"],
+      autonomyMode: "approved_capabilities",
+      manualOverridePolicy: "cancel",
+      expiresAt: "2026-08-14T04:00:00.000Z",
+    } as never)).toBe(true);
+  });
+
+  it("requires supersession when authority policy or subject identity changes", () => {
+    const base = {
+      prior: {
+        adapter_profile_id: "minecraft.player_client.fabric.v1",
+        domain_adapter: "minecraft.player_client.fabric.v1",
+        participant_id: "participant:owner",
+        subject_binding_id: "subject:player",
+        subject_native_id: "DatDamPig",
+        allowed_capability_ids: ["capability:a"],
+        autonomy_mode: "approved_capabilities",
+        manual_override_policy: "cancel",
+        expires_at: "2026-08-14T03:00:00.000Z",
+      },
+      adapterProfileId: "minecraft.player_client.fabric.v1",
+      domainAdapter: "minecraft.player_client.fabric.v1",
+      participantId: "participant:owner",
+      subjectBindingId: "subject:player",
+      subjectNativeId: "DatDamPig",
+      allowedCapabilityIds: ["capability:a"],
+      autonomyMode: "approved_capabilities",
+      manualOverridePolicy: "cancel",
+      expiresAt: "2026-08-14T04:00:00.000Z",
+    } as const;
+
+    expect(isEnvironmentActionAuthorityLeaseExtension({
+      ...base,
+      allowedCapabilityIds: ["capability:a", "capability:b"],
+    } as never)).toBe(false);
+    expect(isEnvironmentActionAuthorityLeaseExtension({
+      ...base,
+      subjectNativeId: "AnotherPlayer",
+    } as never)).toBe(false);
+    expect(isEnvironmentActionAuthorityLeaseExtension({
+      ...base,
+      expiresAt: "2026-08-14T02:00:00.000Z",
+    } as never)).toBe(false);
   });
 });

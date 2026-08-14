@@ -10,6 +10,12 @@
       "com.casimirbot.helixplayer.fabric.HelixFabricPlayerAgentClient"
     ]
   },
+  "mixins": [
+    {
+      "config": "helix-fabric-player-agent.mixins.json",
+      "environment": "client"
+    }
+  ],
   "depends": {
     "fabricloader": ">=0.18.4",
     "minecraft": "~1.21.8",

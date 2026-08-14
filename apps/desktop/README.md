@@ -44,6 +44,46 @@ terminal completion.
   permissions, and renderer-initiated downloads. Signed updates use only the
   main-process updater.
 
+## Runtime surfaces
+
+The packaged application is now a first-class local Helix Ask smoke surface,
+but it remains separate from both the repository's provider-keyed debug server
+and the OpenAI MCP tunnel:
+
+- **Packaged desktop:** the EXE owns an ephemeral loopback compiled service,
+  its per-launch session boundary, the desktop-local profile database, and the
+  Helix Ask renderer. Use this for installed startup, account policy, one
+  natural runtime-agent prompt, and local Device Check.
+- **Keyed repository runtime:** the opaque `start-myapp-for-codex` launcher owns
+  the canonical source checkout and live provider configuration. Use this for
+  live provider, Realtime, Shared Live Room, connector, and browser/API parity.
+- **Desktop MCP tunnel:** the app supervises the pinned OpenAI client and
+  exposes only owner-scoped, read-only Device Check to a supported external
+  OpenAI surface. It is not the full Helix Ask runtime.
+
+Minecraft Fabric loopback launch and join is intentionally identical in the
+localhost browser and packaged EXE. Their shared lifecycle card calls the same
+server executor and emits the same
+`helix.minecraft.workstation_launch_receipt.v1` receipt. The packaged runtime
+stages only the fixed `scripts/helix-minecraft-launch-fabric-loopback.ps1`
+provider; it does not grant the renderer a process API, arbitrary executable
+selection, shell access, launcher credentials, or Minecraft account material.
+Codex may request the same capability only through the trusted confirmation-
+bound workstation gateway.
+
+The packaged service does not inherit `OPENAI_API_KEY` or load the repository
+`.env`. It can locate the installed Codex binary through the allowed Windows
+user paths, so an exact-turn debug export must identify whether a successful
+prompt used native `codex_app_server`, compatibility `codex_exec`, Helix
+Native, or a typed failure. Never infer the provider transport from the prose
+alone and never add provider credentials to the desktop environment allowlist
+to force a result.
+
+The repeatable packaged-app procedure and evidence requirements live in
+`docs/runbooks/desktop-release-and-update.md`; the surface-selection decision
+and keyed/browser comparison live in
+`docs/helix-ask-readiness-debug-loop.md`.
+
 Build the root client and desktop host before launching in development. The
 desktop host command builds its own production service bundle:
 

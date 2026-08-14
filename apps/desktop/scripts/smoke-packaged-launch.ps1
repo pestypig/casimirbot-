@@ -60,6 +60,9 @@ $userDataFileCount = 0
 $processCount = 0
 $readyReceiptValid = $false
 $readyReceiptPath = Join-Path $testRoot "state\desktop-service-ready.json"
+$providerCredentialKeyVaultPath = Join-Path $testRoot (
+  "brokerage\provider-credential-key.dpapi"
+)
 $protocolCommandKey =
   "Registry::HKEY_CURRENT_USER\Software\Classes\casimirbot\shell\open\command"
 $protocolCommandBefore = if (Test-Path -LiteralPath $protocolCommandKey) {
@@ -151,6 +154,12 @@ try {
   if (-not $readyReceiptValid) {
     throw "The packaged application did not reach full API readiness."
   }
+  if (
+    -not (Test-Path -LiteralPath $providerCredentialKeyVaultPath) -or
+    (Get-Item -LiteralPath $providerCredentialKeyVaultPath).Length -le 0
+  ) {
+    throw "The packaged application did not create its protected provider credential key vault."
+  }
   $protocolCommandAfter = if (Test-Path -LiteralPath $protocolCommandKey) {
     (Get-ItemProperty `
       -LiteralPath $protocolCommandKey `
@@ -171,6 +180,7 @@ try {
     LoopbackListeners = $listenerCount
     IsolatedUserDataFiles = $userDataFileCount
     FullReadinessReceipt = "PASS"
+    ProviderCredentialKeyVault = "PASS"
     ProtocolRegistrationPreserved = "PASS"
     MinFreePhysicalGiB = [math]::Round($minFreePhysicalGiB, 2)
     MaxCommitPercent = [math]::Round($maxCommitPercent, 1)

@@ -1,0 +1,275 @@
+{
+  "schemaVersion": "nhm2_semiclassical_primary_source_byte_packet/1",
+  "packetId": "nhm2_conformally_flat_needle_semiclassical_primary_source_bytes_v1",
+  "packetVersion": "1.0.0",
+  "maturity": "stage_2_source_identity_only",
+  "status": "manifest_pinned_local_receipt_absent",
+  "scope": {
+    "candidateFamily": "nhm2_conformally_flat_needle",
+    "lanes": [
+      "fixed_background_mean_rset_convention",
+      "fixed_background_connected_noise_convention"
+    ],
+    "declaredSourceCount": 6,
+    "declaredArtifactCount": 6,
+    "declaredTotalSizeBytes": 1111386,
+    "sourceSelection": "exact_six_source_versions_declared_for_this_packet",
+    "knownMeanConventionSourcesOutsideThisPacket": [
+      "arXiv:1202.5107v2",
+      "arXiv:gr-qc/0512118v2"
+    ],
+    "blanketMeanConventionSourceClosureAllowed": false,
+    "blanketNoiseExecutionClosureAllowed": false
+  },
+  "remoteProbeObservation": {
+    "observedOn": "2026-08-12",
+    "observationEnvironment": "unique_os_temp_directory_outside_repository",
+    "observationPurpose": "measure_exact_versioned_eprint_bytes_before_manifest_freeze",
+    "bytesCopiedIntoRepository": false,
+    "bytesCopiedIntoRepositoryCache": false,
+    "localVerificationReceiptProduced": false,
+    "remoteObservationAloneCountsAsLocalVerification": false
+  },
+  "localCachePolicy": {
+    "defaultRelativeRoot": "artifacts/research/semiclassical-source-bytes/nhm2-primary-source-packet-v1",
+    "repositoryInternalCacheMustRemainUnder": "artifacts/research/semiclassical-source-bytes",
+    "trustBoundary": "operator_controlled_local_content_cache_not_secure_launch_or_preseal_root",
+    "receiptAdmissionAlwaysReopensAndRehashesBytes": true,
+    "parentPathRaceClosureGuaranteed": false,
+    "repositoryInternalCacheIgnoredByGitPolicy": true,
+    "trackedSourceArchivesAllowed": false,
+    "callerSelectedExternalCacheAllowed": true,
+    "defaultCommandMode": "verify_only",
+    "networkAcquisitionRequiresExplicitFlag": "--acquire",
+    "receiptFilenamePrefix": "nhm2-primary-source-byte-verification-receipt",
+    "maximumArtifactSizeBytes": 1048576,
+    "maximumPacketSizeBytes": 2097152,
+    "perArtifactTimeoutMs": 30000,
+    "totalAcquisitionTimeoutMs": 180000,
+    "maximumRedirects": 3,
+    "allowedHttpsHosts": ["arxiv.org", "export.arxiv.org"]
+  },
+  "licensingBoundary": {
+    "status": "repository_redistribution_permission_not_established",
+    "arxivLicenseIsNotInterpretedAsRepositoryRedistributionPermission": true,
+    "sourceArchivesVendored": false,
+    "licenseReviewAuthorizesLocalIntegrityCachingOnly": true,
+    "licenseReviewAuthorizesRepositoryRedistribution": false,
+    "licenseReviewAuthorizesFormulaExecution": false,
+    "licenseReviewAuthorizesPhysicalClaims": false
+  },
+  "blockerBoundary": {
+    "manifestAloneResolvesAnyBlocker": false,
+    "remoteProbeAloneResolvesAnyBlocker": false,
+    "successfulLocalReceiptRequired": true,
+    "receiptMayResolveOnly": [
+      "primary_source_artifact_bytes_not_verified",
+      "primary_source_artifact_bytes_not_observed_or_pinned"
+    ],
+    "receiptDoesNotResolve": [
+      "primary_source_artifacts_not_vendored_and_locally_hash_verified",
+      "formula_transcriptions_not_implemented",
+      "distributional_equivalence_proof_not_discharged",
+      "execution_contract_absent"
+    ],
+    "vendoringComponentRemainsUnresolved": true,
+    "formulaInterpretationComponentRemainsUnresolved": true,
+    "executionComponentRemainsUnresolved": true
+  },
+  "authorityLocks": {
+    "originProvenanceAuthority": false,
+    "sourceRedistributionAuthority": false,
+    "sourceFormulaAuthority": false,
+    "distributionalEquivalenceAuthority": false,
+    "numericalExecutionAuthority": false,
+    "meanRsetExecutionAuthority": false,
+    "connectedNoiseExecutionAuthority": false,
+    "lampAuthority": false,
+    "physicalClaimAuthority": false,
+    "certificateEligibility": false,
+    "certificateAuthority": false
+  },
+  "sources": [
+    {
+      "sourceId": "moretti_conserved_stress_and_local_wick_algebra",
+      "sourceVersion": "arXiv:gr-qc/0109048v2",
+      "arxivId": "gr-qc/0109048v2",
+      "abstractUrl": "https://arxiv.org/abs/gr-qc/0109048v2",
+      "equationAnchors": [
+        "2-3",
+        "6",
+        "9-10",
+        "12-23",
+        "27-29",
+        "33-43",
+        "44-45",
+        "47-53",
+        "55-60"
+      ],
+      "sourceRoles": [
+        "mean_rset_conserved_point_split_stress_baseline",
+        "connected_noise_extended_local_wick_star_algebra",
+        "compact_test_function_distribution_domain"
+      ],
+      "consumingContracts": [
+        "nhm2_conformally_flat_needle_mean_rset_renormalization_convention_v1",
+        "nhm2_conformally_flat_needle_connected_noise_distribution_convention_v1"
+      ],
+      "artifact": {
+        "kind": "arxiv_eprint_source_archive",
+        "downloadUrl": "https://arxiv.org/e-print/gr-qc/0109048v2",
+        "localFilename": "gr-qc_0109048v2.eprint",
+        "sha256": "f28fb4b058978cf95817bc22326dc6e1d41267608f1880cf0773f81fc142425f",
+        "sizeBytes": 38039
+      },
+      "license": {
+        "classification": "arxiv_assumed_nonexclusive_distribution_1991_2003",
+        "url": "https://arxiv.org/licenses/assumed-1991-2003/",
+        "repositoryRedistributionPermissionEstablished": false,
+        "localIntegrityCacheOnly": true
+      }
+    },
+    {
+      "sourceId": "phillips_hu_noise_normalization_and_stress_construction",
+      "sourceVersion": "arXiv:gr-qc/0010019v2",
+      "arxivId": "gr-qc/0010019v2",
+      "abstractUrl": "https://arxiv.org/abs/gr-qc/0010019v2",
+      "equationAnchors": ["22-34", "40", "3.9-3.12", "3.21-3.25", "4.4-4.7"],
+      "sourceRoles": [
+        "noise_kernel_normalization_crosswalk",
+        "point_separated_stress_construction",
+        "wightman_boundary_value_structure"
+      ],
+      "consumingContracts": [
+        "nhm2_conformally_flat_needle_connected_noise_distribution_convention_v1",
+        "nhm2_conformally_flat_needle_connected_noise_two_particle_symbol_v1"
+      ],
+      "artifact": {
+        "kind": "arxiv_eprint_source_archive",
+        "downloadUrl": "https://arxiv.org/e-print/gr-qc/0010019v2",
+        "localFilename": "gr-qc_0010019v2.eprint",
+        "sha256": "fdb4ccfff441524ef4f65629c3a66628f02dfca793a3c8862d03f6e283865374",
+        "sizeBytes": 30809
+      },
+      "license": {
+        "classification": "arxiv_assumed_nonexclusive_distribution_1991_2003",
+        "url": "https://arxiv.org/licenses/assumed-1991-2003/",
+        "repositoryRedistributionPermissionEstablished": false,
+        "localIntegrityCacheOnly": true
+      }
+    },
+    {
+      "sourceId": "cho_hu_conformal_mean_and_connected_noise_mapping",
+      "sourceVersion": "arXiv:1407.3907v1",
+      "arxivId": "1407.3907v1",
+      "abstractUrl": "https://arxiv.org/abs/1407.3907v1",
+      "equationAnchors": ["1", "6", "17-21"],
+      "sourceRoles": [
+        "minkowski_wightman_boundary_value",
+        "conformal_state_mapping",
+        "coordinate_covariant_connected_noise_scaling"
+      ],
+      "consumingContracts": [
+        "nhm2_conformally_flat_needle_mean_rset_renormalization_convention_v1",
+        "nhm2_conformally_flat_needle_connected_noise_distribution_convention_v1",
+        "nhm2_conformally_flat_needle_connected_noise_two_particle_symbol_v1"
+      ],
+      "artifact": {
+        "kind": "arxiv_eprint_source_archive",
+        "downloadUrl": "https://arxiv.org/e-print/1407.3907v1",
+        "localFilename": "1407.3907v1.eprint",
+        "sha256": "a6aadd6363c4105c2571ddae2e889d4056dfc249da4f0f2fdc48e9a05905443f",
+        "sizeBytes": 11844
+      },
+      "license": {
+        "classification": "arxiv_nonexclusive_distribution_1_0",
+        "url": "https://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+        "repositoryRedistributionPermissionEstablished": false,
+        "localIntegrityCacheOnly": true
+      }
+    },
+    {
+      "sourceId": "bates_centered_symmetrized_noise_distribution_audit",
+      "sourceVersion": "arXiv:1301.2501v1",
+      "arxivId": "1301.2501v1",
+      "abstractUrl": "https://arxiv.org/abs/1301.2501v1",
+      "equationAnchors": ["2.1-2.6", "2.11", "pp.16-17_discussion"],
+      "sourceRoles": [
+        "centered_connected_symmetrized_noise_definition",
+        "termwise_distribution_execution_caution",
+        "two_particle_gram_normalization_audit"
+      ],
+      "consumingContracts": [
+        "nhm2_conformally_flat_needle_connected_noise_distribution_convention_v1",
+        "nhm2_conformally_flat_needle_connected_noise_two_particle_symbol_v1"
+      ],
+      "artifact": {
+        "kind": "arxiv_eprint_source_archive",
+        "downloadUrl": "https://arxiv.org/e-print/1301.2501v1",
+        "localFilename": "1301.2501v1.eprint",
+        "sha256": "1c53226a4dec6fb20b755989926ebd929b809dfabd7f67627e901e1a502f17cf",
+        "sizeBytes": 295571
+      },
+      "license": {
+        "classification": "arxiv_nonexclusive_distribution_1_0",
+        "url": "https://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+        "repositoryRedistributionPermissionEstablished": false,
+        "localIntegrityCacheOnly": true
+      }
+    },
+    {
+      "sourceId": "serino_flat_improved_conformal_scalar_stress",
+      "sourceVersion": "arXiv:2004.08668v2",
+      "arxivId": "2004.08668v2",
+      "abstractUrl": "https://arxiv.org/abs/2004.08668v2",
+      "equationAnchors": ["11"],
+      "sourceRoles": [
+        "flat_improved_real_scalar_stress_formula",
+        "conformal_coupling_xi_one_sixth_audit_anchor"
+      ],
+      "consumingContracts": [
+        "nhm2_conformally_flat_needle_connected_noise_two_particle_symbol_v1"
+      ],
+      "artifact": {
+        "kind": "arxiv_eprint_source_archive",
+        "downloadUrl": "https://arxiv.org/e-print/2004.08668v2",
+        "localFilename": "2004.08668v2.eprint",
+        "sha256": "b054efb1adc181072815a2eefeea7b8970fe9cfa8f395170636d6246cdcd9a22",
+        "sizeBytes": 721733
+      },
+      "license": {
+        "classification": "arxiv_nonexclusive_distribution_1_0",
+        "url": "https://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+        "repositoryRedistributionPermissionEstablished": false,
+        "localIntegrityCacheOnly": true
+      }
+    },
+    {
+      "sourceId": "herzog_huang_weyl_flat_trace_anomaly_stress",
+      "sourceVersion": "arXiv:1301.5002v3",
+      "arxivId": "1301.5002v3",
+      "abstractUrl": "https://arxiv.org/abs/1301.5002v3",
+      "equationAnchors": ["1", "5-13", "20-23", "page_9_a4_equals_1_over_360"],
+      "sourceRoles": [
+        "weyl_flat_conformal_vacuum_type_A_stress",
+        "conformal_scalar_trace_anomaly_coefficient_crosscheck"
+      ],
+      "consumingContracts": [
+        "nhm2_conformally_flat_needle_mean_rset_anomaly_reduction_v1"
+      ],
+      "artifact": {
+        "kind": "arxiv_eprint_source_archive",
+        "downloadUrl": "https://arxiv.org/e-print/1301.5002v3",
+        "localFilename": "1301.5002v3.eprint",
+        "sha256": "49421e70657a38ca275fa2c3ecd4fb2a99a758abb84090f66257c35ca435fcec",
+        "sizeBytes": 13390
+      },
+      "license": {
+        "classification": "arxiv_nonexclusive_distribution_1_0",
+        "url": "https://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+        "repositoryRedistributionPermissionEstablished": false,
+        "localIntegrityCacheOnly": true
+      }
+    }
+  ]
+}

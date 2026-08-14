@@ -129,6 +129,13 @@ const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
       !contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research") ||
       (scholarlyIntent.fullTextRequested && narrowerSearchSuppression)
     );
+  const affirmativeGeneralKnowledgeScope =
+    /\b(?:use|using|from|rely(?:ing)?\s+on|answer\s+from)\s+(?:only\s+)?general\s+(?:knowledge|reasoning)\b/i.test(
+      prompt,
+    ) ||
+    /\bgeneral\s+(?:knowledge|reasoning)\s+(?:only|is\s+(?:enough|fine)|will\s+do)\b/i.test(
+      prompt,
+    );
   return (
     fullyNegatedSourceExamples ||
     (Boolean(contextualSuppression) &&
@@ -146,9 +153,10 @@ const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
     /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(
       prompt,
     ) ||
-    /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(
+    /\b(?:background\s+only|background\s+mode|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(
       prompt,
-    )
+    ) ||
+    affirmativeGeneralKnowledgeScope
   );
 };
 

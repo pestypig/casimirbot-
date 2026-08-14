@@ -22,6 +22,9 @@ import type { HelixRuntimeToolConfirmationReceiptV1 } from "@shared/contracts/he
 import {
   HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
+import {
+  HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+} from "@shared/helix-minecraft-local-lifecycle";
 import type { HelixWorkstationGatewayCallResult } from "../../../workstation-tool-gateway/types";
 import {
   resetAccountSessionStore,
@@ -48,6 +51,8 @@ const NUMERICAL_START_CAPABILITY =
 const CANARY_PLAN_CAPABILITY = "theory-runtime-canary.plan";
 const CANARY_START_CAPABILITY = "theory-runtime-canary.start";
 const ROOM_CREATE_CAPABILITY = HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY;
+const MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY =
+  HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY;
 const FORMAL_PLAN_ID = "formal-plan:test";
 const FORMAL_PREPARED_REQUEST_ID = "formal-prepared:test";
 const NUMERICAL_PLAN_ID = "numerical-plan:test";
@@ -266,6 +271,7 @@ const nativeResult = (input: {
       native_turn_status: "completed",
       native_error_code: null,
       native_error_http_status: null,
+      native_error_message: null,
       terminal_candidate_present: input.execution.ok,
       turn_lifecycle: lifecycle.snapshot(),
     },
@@ -729,6 +735,80 @@ describe("Codex native runtime approval host seam", () => {
     );
     expect(JSON.stringify(result.debug)).not.toContain(
       "receipt:shared-live-room-create",
+    );
+  });
+
+  it("derives the fixed loopback Minecraft lifecycle material before asking the trusted host", async () => {
+    const turnId = "ask:test:approved:minecraft-local-lifecycle";
+    let approvedReceipt: HelixRuntimeToolConfirmationReceiptV1 | null = null;
+    const host = vi.fn(async (request) => {
+      approvedReceipt = await buildRuntimeToolConfirmationTestReceipt({
+        binding: request.binding,
+        requestId: "request:minecraft-local-lifecycle",
+        receiptId: "receipt:minecraft-local-lifecycle",
+      });
+      return { status: "approved" as const, receipt: approvedReceipt };
+    });
+    gatewayMocks.call.mockImplementation(async (gatewayInput) => ({
+      status_code: 200,
+      body: startedGatewayResult({
+        capabilityId: gatewayInput.capabilityId,
+        turnId: gatewayInput.turnId,
+        iteration: gatewayInput.iteration,
+      }),
+    }));
+    const nativeTurnRunner = vi.fn(
+      async (turn: RunCodexNativeAppServerTurnInput) =>
+        routeAndExecute({
+          turn,
+          capabilityId: MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY,
+          arguments: { address: "localhost" },
+        }),
+    );
+    const result = await runCodexNativeWorkstationTurn({
+      prompt: "Start Minecraft Fabric and join my local server now.",
+      turnId,
+      cwd: process.cwd(),
+      accountContext: await developerContext(),
+      requestedMode: "act",
+      allowedWorkstationTools: [MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY],
+      runtimeApproval: durableApproval(host),
+      nativeTurnRunner,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.debug).toMatchObject({
+      model_visible_tools: [MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY],
+      runtime_approval_start_tools: [MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY],
+    });
+    expect(host).toHaveBeenCalledWith({
+      schema: "helix.codex_native_runtime_approval_request.v1",
+      requiredReplayProtection: "durable_atomic",
+      binding: expect.objectContaining({
+        capabilityId: MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY,
+        planId: expect.stringMatching(/^minecraft-local-lifecycle:[a-f0-9]{64}$/),
+        accountType: "developer",
+        turnId,
+        sealedInputSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+      summary: expect.objectContaining({
+        capabilityId: MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY,
+        preparedRequestId: null,
+        sealedInputSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    });
+    expect(gatewayMocks.call).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedMode: "act",
+        requestedRuntime: "codex",
+        capabilityId: MINECRAFT_LOCAL_LIFECYCLE_CAPABILITY,
+        arguments: { address: "localhost:25565" },
+        approvalReceipt: approvedReceipt,
+        turnId,
+      }),
+    );
+    expect(JSON.stringify(result.debug)).not.toContain(
+      "receipt:minecraft-local-lifecycle",
     );
   });
 

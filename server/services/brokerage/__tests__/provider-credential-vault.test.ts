@@ -38,4 +38,10 @@ describe("provider credential vault", () => {
     expect(() => encryptProviderCredential({ token: "secret" }, "owner"))
       .toThrow("provider_credential_encryption_key_missing");
   });
+
+  it("rejects configured keys that are not exactly 32 base64url bytes", () => {
+    vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY", "short-secret");
+    expect(() => encryptProviderCredential({ token: "secret" }, "owner"))
+      .toThrow("provider_credential_encryption_key_invalid");
+  });
 });
