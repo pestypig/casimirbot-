@@ -637,15 +637,13 @@ export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_CANON
 // recomputes and explicitly acknowledges semantic SHA-256, plain canonical
 // SHA-256, and canonical byte size. They are outside the semantic payload.
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_SEMANTIC_SHA256:
-  string | null =
-  "2b52c4955f18b67db6bfac50e9ec49785e76ab29ee39b6ec2919f18ff133f9f6";
+  string | null = null;
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_PLAIN_CANONICAL_SHA256:
-  string | null =
-  "3e87d902a110b4cc042c2c421cf711721dc95987fc522d8bffe71e64c4529330";
+  string | null = null;
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_CANONICAL_SIZE_BYTES:
-  number | null = 27_843;
+  number | null = null;
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_LITERAL_SEAL_STATUS =
-  "sealed_after_independent_parent_acknowledgement_definition_only_no_verifier_implementation" as const;
+  "unsealed_pending_independent_parent_acknowledgement_before_any_verifier_implementation" as const;
 
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_BINDING =
   Object.freeze({
