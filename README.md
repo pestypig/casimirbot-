@@ -658,6 +658,8 @@ Important paths (new lifecycle behavior belongs under `server/services/helix-ask
 - `docs/helix-ask/workstation-tool-contracts/README.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-codex-loop-discipline.md`
+- `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`
+- `docs/architecture/helix-environment-agent-reasoning-v1.md`
 - `docs/architecture/voice-service-contract.md`
 
 ### Workstation Launch Panels

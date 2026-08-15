@@ -2,6 +2,10 @@
 
 Status: architecture and acceptance contract.
 
+The enabled baseline, intended user experience, cross-domain product scope and
+release ladder are consolidated in
+`casimirbot-environment-harness-product-goal-v1.md`.
+
 ## Outcome
 
 Helix gives interchangeable reasoning runtimes governed access to connected
