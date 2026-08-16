@@ -5,6 +5,10 @@ the currently implemented capability baseline with the intended environment
 harness. It is not proof that a projected adapter, public deployment, or live
 mutation path has passed acceptance.
 
+The active development gate, dependency order, capability-specific maturity
+and required evidence are maintained only in
+`docs/helix-environment-harness-work-program-v1.md`.
+
 ## Product thesis
 
 CasimirBot extends Codex into software people already use. An existing program
@@ -321,6 +325,7 @@ The honest current-stage claim is:
 
 ## Governing references
 
+- `docs/helix-environment-harness-work-program-v1.md`
 - `docs/architecture/helix-environment-agent-reasoning-v1.md`
 - `docs/helix-ask-codex-loop-discipline.md`
 - `docs/helix-ask-turn-solver-spine.md`
@@ -331,4 +336,3 @@ The honest current-stage claim is:
 - `docs/audits/helix-minecraft-fluid-execution-audit-2026-08-12.md`
 - `apps/desktop/README.md`
 - `docs/architecture/helix-robinhood-brokerage-environment-v1.md`
-

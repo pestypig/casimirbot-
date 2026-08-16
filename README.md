@@ -85,6 +85,13 @@ system, context format, or terminal path. The normative specifications are
 `docs/helix-ask-api-parity-matrix.md`. The repeatable diagnostic procedure is
 `docs/helix-ask-readiness-debug-loop.md`.
 
+Environment-harness development additionally follows
+`docs/helix-environment-harness-work-program-v1.md`. That document is the sole
+current source for the active program gate, dependency order,
+capability-specific maturity, required evidence, and work-packet vocabulary.
+Product and architecture documents define what the system means; dated audits
+retain immutable evidence; neither maintains a competing current roadmap.
+
 ### Adapter parity and first-divergence debugging
 
 When Codex appears to finish a grounded tool workflow but Helix shows a
@@ -219,6 +226,7 @@ sequence without contacting a server. Tool-specific contracts live under
 | Area | Why it matters | Entry points |
 | --- | --- | --- |
 | Helix Ask + Live Answer loop | Primary user and agent interface. Handles prompt interpretation, tool admission, evidence re-entry, terminal authority, streamed debug, and the visible answer. | `server/services/helix-ask/`, `server/routes/agi.plan.ts` (retired compatibility wiring; do not grow), `docs/helix-ask-agentic-loop-current-overview.md`, `docs/helix-ask-codex-loop-discipline.md`, `npm run helix:ask:regression:light` |
+| Environment harness work program | One current gate, dependency order, capability-specific maturity, evidence requirements, and bounded development work packets for Minecraft-first environment work. | `docs/helix-environment-harness-work-program-v1.md`, `npm run helix:environment-harness:docs-audit` |
 | GPT Realtime + Codex handoff | Live voice can answer locally, converse while Codex reasons in parallel, or present a worker-grounded result without receiving workstation authority. Final relay grounding comes from the canonical terminal certificate, not a voice-owned tool evaluator. | `docs/architecture/voice-service-contract.md#gpt-realtime-grounded-worker-relay-additive`, `server/services/helix-ask/terminal-grounding-authority.ts`, `server/services/helix-ask/realtime-session/`, `shared/helix-terminal-grounding-authority.ts` |
 | Agent runtime adapter | Provider edge for Codex Workstation Mode. Future providers must conform to the same edge and are not user options by default. | `server/services/helix-ask/agent-providers/`, `server/services/helix-ask/workstation-tool-gateway/`, `shared/helix-agent-runtime.ts`, `docs/helix-ask-codex-loop-discipline.md` |
 | External agent API and MCP | Provider-neutral, tenant-owned durable runs for outside agents. REST and Streamable HTTP MCP share the same bounded completion, evidence, account-binding, and terminal-authority contract. | `docs/architecture/helix-agent-api-v1.md`, `server/services/helix-agent-api/`, `server/routes/helix-agent-api.ts`, `server/mcp/helix-mcp-server.ts` |
@@ -658,6 +666,7 @@ Important paths (new lifecycle behavior belongs under `server/services/helix-ask
 - `docs/helix-ask/workstation-tool-contracts/README.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-codex-loop-discipline.md`
+- `docs/helix-environment-harness-work-program-v1.md`
 - `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`
 - `docs/architecture/helix-environment-agent-reasoning-v1.md`
 - `docs/architecture/voice-service-contract.md`

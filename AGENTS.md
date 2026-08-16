@@ -16,6 +16,46 @@ This repo uses `WARP_AGENTS.md` for warp-physics constraints and required tests.
 Always read and follow those requirements when working on warp/GR features.
 For deterministic G4 debugging workflow, also follow `AGENT_PLAYBOOK.md`.
 
+## Environment harness work program
+
+Before changing environment connectors, Minecraft World Authority or Player
+Embodiment, environment MCP capabilities, live-source wake integration,
+durable environment goals, or related Helix Ask lifecycle authority, read and
+follow:
+
+- `docs/helix-environment-harness-work-program-v1.md`
+- `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`
+- `docs/architecture/helix-environment-agent-reasoning-v1.md`
+- the applicable environment adapter contract
+
+The work-program document is the sole source for the active gate, dependency
+order, capability-specific maturity and evidence required to advance. Dated
+audits are immutable evidence snapshots and must not be edited into a current
+roadmap. Use only the work program's defined capability-maturity terms for new
+status claims.
+
+Every environment-harness development work packet must begin with:
+
+```text
+Program gate:
+Workstream:
+Capability or component:
+Lifecycle stage:
+Reaction timescale:
+Authority owner:
+Current maturity:
+Target maturity:
+Required evidence:
+Explicit non-goals:
+Downstream gate unlocked:
+```
+
+Work outside the active gate is permitted only when the work program marks it
+as a parallel lane or the packet explains why it does not depend on an open
+prerequisite. Run `npm run helix:environment-harness:docs-audit` for changes to
+the work program, its canonical backlinks, maturity/status claims, or
+environment-harness acceptance documentation.
+
 ## Account/workstation access contract
 
 CasimirBot has two workstation account modes: `developer` and `user`.

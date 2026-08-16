@@ -6,6 +6,10 @@ The enabled baseline, intended user experience, cross-domain product scope and
 release ladder are consolidated in
 `casimirbot-environment-harness-product-goal-v1.md`.
 
+The active development gate, dependency order, capability-specific maturity
+and required evidence are maintained only in
+`docs/helix-environment-harness-work-program-v1.md`.
+
 ## Outcome
 
 Helix gives interchangeable reasoning runtimes governed access to connected
@@ -681,17 +685,24 @@ The same Codex/Helix authority split and MCP/native northbound catalog remain.
 
 ## Acceptance sequence
 
-1. Complete the unchanged keyed water-bucket rescue with exact current-turn
-   observation re-entry and an authoritative visible answer.
-2. Capture interval timing and remove avoidable provider/adapter round trips.
-3. Prove bounded unexpected-event replanning and safe cancellation.
-4. Prove representative perception, target tracking, building, hazard response,
-   inventory/crafting and navigation journeys.
-5. Verify player/world isolation, authority expiry, manual override, Emergency
-   Stop, mutation ceilings and cross-room rejection.
-6. Verify natural Ask, MCP/runtime parity and consistent text/voice projection.
-7. Add durable checkpointed goal progress, then attempt an open-ended survival
-   objective such as completing all advancements.
+The keyed water-bucket rescue completed its capability-specific acceptance at
+Attempt 34 and remains an unchanged regression benchmark. It does not accept
+the broader guardian, fluid-sequence, viability, unexpected-event, durable-goal
+or multi-surface program.
+
+The current ordered program is maintained in
+`docs/helix-environment-harness-work-program-v1.md`. Its runtime sequence is:
+
+1. make one canonical lifecycle fact stream authoritative and prove poisoned
+   projections cannot regress execution, re-entry or the Codex candidate;
+2. complete equivalent-state A0 direct Fabric, A1 Codex-through-MCP and B keyed
+   Helix parity for the fluid micro-course while retaining the rescue benchmark;
+3. prove persistent viability and representative unexpected-event recovery;
+4. integrate live mail as a nonterminal, deduplicated semantic wake;
+5. add durable checkpointed survival-goal progress and recovery;
+6. introduce revision-bound concurrent reasoning roles behind one execution
+   arbiter; and
+7. transfer the accepted lifecycle to a contrasting environment.
 
 Every acceptance run uses the direct-Codex/keyed-Helix differential, the
 canonical lifecycle audit and the memory-bounded keyed test discipline. A
