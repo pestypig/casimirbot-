@@ -231,9 +231,11 @@ An implementation profile should identify its artifact/version hash, sensor and
 state revisions, maximum observation age, compute deadline, confidence and
 abstention rules, permitted response vocabulary, resource ownership, reset
 semantics, control-release behavior and escalation conditions. Learned policies
-initially operate proposal-only; trusted deterministic controllers may execute
-pre-admitted local effects directly. In both cases the local arbiter and Helix
-ledger retain authority over identity, freshness, scope and evidence.
+initially operate proposal-only, and deterministic controllers may only cause
+an already-admitted response to be activated through the same trusted local
+arbiter and Fabric action lane. No resident profile directly mutates the
+environment. In all cases the local arbiter and Helix ledger retain authority
+over identity, freshness, scope and evidence.
 
 This is the generic mechanism behind a Minecraft guardian, browser monitor,
 DAW timing controller, server circuit breaker, robot balance policy or future

@@ -55,7 +55,7 @@ without the qualifier that identifies the actual contract.
 | Goal progress | A durable milestone advanced and that advancement was verified. |
 | Turn completion | Codex completed its current reasoning turn. |
 | Terminal eligibility | Helix verified that the selected candidate may be projected. |
-| Resident closed-loop capability | A versioned local controller that continuously observes and may propose or execute only pre-admitted bounded effects while Codex is delayed or reasoning. |
+| Resident closed-loop capability | A versioned local controller that continuously observes and may select or propose only pre-admitted bounded responses while Codex is delayed or reasoning; every effect still passes through the trusted local arbiter and Fabric action lane. |
 | Resident controller profile | The exact implementation, sensor schema, artifact hash, deadlines, proposal vocabulary, confidence/abstention policy, and reset behavior allowed for one environment. |
 | Resident decision | A causal record linking an observation revision to a controller proposal, arbiter outcome, effect, postcondition, interruption, abstention, or semantic escalation. |
 
@@ -99,7 +99,7 @@ The harness has three distinct Codex/controller roles:
 | --- | --- | --- |
 | Development Codex | Modify contracts, server/companion code, tests, training harnesses, documentation, and evaluation workflows. | Invent live authority, accept external licenses, or claim live acceptance without evidence. |
 | Runtime Codex | Choose an admitted resident profile, author a finite response repertoire, set escalation/completion conditions, interpret summaries, replan, and explain results. | Process every tick, maintain continuous key state, or serve as the millisecond reflex. |
-| Resident controller | Continuously sense, maintain bounded local state, select or propose pre-admitted responses, release controls, and emit compact causal evidence. | Set the durable goal, expand permissions, invent actions, write answers, or bypass the execution arbiter. |
+| Resident controller | Continuously sense, maintain bounded local state, select or propose pre-admitted responses, request control release, and emit compact causal evidence. | Execute effects directly, set the durable goal, expand permissions, invent actions, write answers, or bypass the execution arbiter. |
 
 Codex can coordinate the entire engineering and evaluation program in bounded
 work packets. Runtime operation still requires compiled local control code.
@@ -292,6 +292,22 @@ path. Cloud launches require an approved experiment manifest, maximum runtime
 and cost, checkpoint destination, evaluation seeds, and automatic cleanup.
 Codex may orchestrate an already approved job, but expanding budget, region,
 GPU class, or credentials requires fresh user approval.
+
+The training data boundary is explicit. The topology package supplies an
+architectural prior; it is not a Minecraft controller. Minecraft episodes,
+teacher-controller traces, failed/abstained traces, and synthetic perturbations
+teach a candidate how compact sensor histories map to the bounded response
+vocabulary. The staged experiment is imitation learning, reinforcement or
+simulator learning, topology comparison against equal-capacity controls, and
+optional distillation into a predictable local artifact. The deployable result
+must contain the policy/topology hash, input schema, response vocabulary,
+confidence and abstention thresholds, resource requirements, deterministic
+fallback, evaluation receipt, and Helix admission metadata.
+
+The learned artifact remains proposal-only until the local arbiter promotion
+gate accepts a narrowly scoped response family. The deterministic Fabric
+guardian remains the safety and performance reference even if a learned profile
+is eventually promoted.
 
 DAW is a strong later transfer candidate because it shares continuous temporal
 control but has different sensors, effects, and success criteria. It remains
