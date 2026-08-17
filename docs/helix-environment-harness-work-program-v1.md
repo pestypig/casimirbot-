@@ -55,6 +55,9 @@ without the qualifier that identifies the actual contract.
 | Goal progress | A durable milestone advanced and that advancement was verified. |
 | Turn completion | Codex completed its current reasoning turn. |
 | Terminal eligibility | Helix verified that the selected candidate may be projected. |
+| Resident closed-loop capability | A versioned local controller that continuously observes and may propose or execute only pre-admitted bounded effects while Codex is delayed or reasoning. |
+| Resident controller profile | The exact implementation, sensor schema, artifact hash, deadlines, proposal vocabulary, confidence/abstention policy, and reset behavior allowed for one environment. |
+| Resident decision | A causal record linking an observation revision to a controller proposal, arbiter outcome, effect, postcondition, interruption, abstention, or semantic escalation. |
 
 ### Capability maturity vocabulary
 
@@ -71,6 +74,35 @@ The only maturity terms allowed in the canonical capability-status table are:
 Maturity belongs to an exact capability and acceptance surface. It must never be
 inferred from a broader phrase such as “the guardian passed” or “Minecraft is
 accepted.” A higher maturity claim requires an evidence reference in the table.
+
+### Reaction requirements
+
+Each environment adapter declares the fastest reaction it requires. This is a
+control requirement, not a claim that every adapter needs a learned policy:
+
+| Requirement | Meaning | Example |
+| --- | --- | --- |
+| `none` | No resident controller is required; ordinary request/observation turns are sufficient. | Static document |
+| `monitor_only` | Local change detection and cancellation may run, but no resident effect is activated. | Browser workflow |
+| `bounded_reflex` | A local controller may select or activate pre-admitted bounded responses under a deadline. | Server circuit breaker, DAW transport guard |
+| `continuous_control` | A local controller must sense and maintain bounded control while Codex is delayed. | Minecraft guardian, robot balance controller |
+
+The reaction requirement does not grant authority. Identity, leases, effect
+ceilings, manual override, Emergency Stop, provenance, and terminal eligibility
+remain governed boundaries.
+
+### Codex and resident-controller roles
+
+The harness has three distinct Codex/controller roles:
+
+| Role | Can do | Cannot do |
+| --- | --- | --- |
+| Development Codex | Modify contracts, server/companion code, tests, training harnesses, documentation, and evaluation workflows. | Invent live authority, accept external licenses, or claim live acceptance without evidence. |
+| Runtime Codex | Choose an admitted resident profile, author a finite response repertoire, set escalation/completion conditions, interpret summaries, replan, and explain results. | Process every tick, maintain continuous key state, or serve as the millisecond reflex. |
+| Resident controller | Continuously sense, maintain bounded local state, select or propose pre-admitted responses, release controls, and emit compact causal evidence. | Set the durable goal, expand permissions, invent actions, write answers, or bypass the execution arbiter. |
+
+Codex can coordinate the entire engineering and evaluation program in bounded
+work packets. Runtime operation still requires compiled local control code.
 
 ## Dependency order
 
@@ -98,8 +130,8 @@ overrule current-turn execution and re-entry facts.
 | G0 — Program vocabulary and status | closed | none | this document, canonical backlinks, required task header, and `npm run helix:environment-harness:docs-audit` | G1 |
 | G1 — Canonical lifecycle authority | active | G0 | poisoned-projection fixtures, canonical-ledger unit evidence, narrow API/terminal parity, and one unchanged natural keyed regression with a clean differential audit | G2 |
 | G2 — A0 / A1 / B parity | blocked | G1 | equivalent-state direct Fabric, Codex-through-MCP, and keyed Helix traces for the fluid micro-course, with first-divergence hashes and support refs | G3 |
-| G3 — Viability and unexpected events | blocked | G2 | persistent cross-deliberation viability plus representative mid-execution hazard/event recovery and safe cancellation | G4 |
-| G4 — Live-mail wake bridge | blocked | G3 | deduplicated nonterminal situation-digest wake evidence re-enters the existing sequential Codex solver without controlling reflexes or authoring an answer | G5 |
+| G3 — Viability and unexpected events | blocked | G2 | persistent resident control across Codex delays plus representative mid-execution hazard/event recovery and safe cancellation | G4 |
+| G4 — Live-mail wake bridge | blocked | G3 | deduplicated nonterminal resident/event escalation evidence re-enters the existing sequential Codex solver without controlling reflexes or authoring an answer | G5 |
 | G5 — Durable survival goal | blocked | G4 and converged OAuth/desktop/room identity lane | checkpointed advancement progress and recovery across disconnect, death, restart, and authorized phone continuation | G6 |
 | G6 — Concurrent reasoning roles | blocked | G5 | revision-bound perception and prospective outputs converge through one execution arbiter without stale-plan mutation | G7 |
 | G7 — Second-domain transfer | blocked | G6 | the accepted lifecycle transfers to a contrasting environment without Minecraft-specific strategy in the generic harness | release evaluation |
@@ -122,6 +154,9 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Pre-action unavailable-inventory cancellation | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-37-focused-source-projection/guardian_unavailable_inventory_replan`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Does not prove mid-execution unexpected-event breadth. |
 | Mid-execution health interruption contract | implemented | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-46-safe-interrupt-terminal/guardian_mid_execution_health_interrupt`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Preserve exact child measurements and pass the stronger live acceptance. |
 | Persistent viability across model-deliberation gaps | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` (Attempt 39 and viability sections) | Keep protection active between finite programs and prove recovery in G3. |
+| Generic resident closed-loop capability contract | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | Reserve causal fields in G1; extract the provider-neutral contract only after G3. |
+| Minecraft deterministic resident guardian baseline | specified | `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/water-bucket-rescue/attempt-34-balanced-clear-screen/guardian_water_bucket_rescue` | Prove continuous protection, abstention, control release, and Codex-delay survival in G3. |
+| Learned resident policies and FlyWire profile | projected | `docs/helix-environment-harness-work-program-v1.md` | Shadow-evaluate only after the deterministic baseline and generic contract pass. |
 | Live-mail Minecraft wake bridge | specified | `shared/helix-live-source-mail.ts`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | Convert situation digests into deduplicated nonterminal wake evidence in G4. |
 | Durable all-advancements survival goal | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Prove checkpointed progress and recovery in G5. |
 | Concurrent runtime reasoning roles | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Add only after the sequential wake/solver path is reliable in G6. |
@@ -148,6 +183,9 @@ route-authority, or terminal-eligibility boundaries.
 - Establish one append-only authoritative lifecycle fact stream with exact turn,
   route, call, occurrence, capability, observation, candidate, and terminal
   identities.
+- Reserve generic causal references sufficient to express
+  `observation → resident decision → arbiter outcome → effect → postcondition → escalation`
+  without introducing continuous controller traffic or a new runtime in G1.
 - Make one reducer the source of execution, normalization, re-entry,
   post-observation completion, and terminal continuity facts.
 - Convert rail tables, compatibility records, itinerary summaries, debug
@@ -197,6 +235,9 @@ route-authority, or terminal-eligibility boundaries.
    terminal hashes. A direct reference run remains diagnostic evidence rather
    than Helix acceptance.
 
+Resident-control causality is reserved here as a generic lifecycle relation;
+implementing a persistent resident controller remains a G3 task.
+
 Closure advances the active marker to G2 in this document. It does not silently
 advance any capability maturity row; each row changes only with its own evidence.
 
@@ -207,6 +248,54 @@ deployment, and multi-device continuation may proceed in parallel after G1's
 contracts are respected. Their work packets must not claim G2–G6 closure. They
 must converge before G5 because a durable room goal depends on stable account,
 host, room, participant, subject, source, and device identity.
+
+## G2 and G3 resident-control acceptance
+
+G2 pins the existing deterministic Minecraft guardian as a resident baseline.
+Direct Fabric, Codex-through-MCP, and keyed Helix traces must carry the same
+program schema, scheduler/implementation version, sensor and condition
+vocabulary, mutation scope, program hash, player/world identity, starting
+observation revision, and authority lease. This is differential identity, not
+generic resident-controller implementation.
+
+G3 is the first positive resident-control acceptance gate. It must demonstrate:
+
+1. protection remains active during a Codex delay;
+2. continuous sensing does not wake Codex on every tick;
+3. a pre-admitted stabilization can execute locally;
+4. manual input and Emergency Stop override the controller;
+5. every control and resource is released on every terminal path;
+6. the outcome is compacted into exact causal evidence;
+7. Codex receives that evidence and materially replans; and
+8. player viability remains preserved after local response, not merely after
+   one action completes.
+
+The deterministic guardian is the first concrete implementation. A resident
+controller is not a second Codex reasoning lane and cannot become an answer
+writer or an authority-expanding planner.
+
+## Post-G3 resident-controller workstreams
+
+These workstreams are intentionally blocked until G3 proves the concrete
+Minecraft mechanism:
+
+| Workstream | Purpose | Initial implementation | Promotion boundary |
+| --- | --- | --- | --- |
+| EH-RCC1 — Extract generic contract | Create provider-neutral profile, lease, revision, proposal, arbiter, postcondition, abstention, interruption, reset, and escalation schemas. | `shared/helix-resident-controller.ts`; `server/services/environment-connectors/resident-control/` | Must fit the accepted guardian without Minecraft strategy leaking into shared types. |
+| EH-RCC2 — Re-express Minecraft | Migrate the existing Fabric guardian to the generic contract without changing accepted behavior. | Fabric adapter compatibility layer | Existing rescue and G3 evidence must remain equivalent. |
+| EH-RCC3 — Second controller | Prove the contract is reusable with a deliberately different resident implementation. | Threshold controller, conventional RNN shadow, or another safe local controller | Same identity, deadline, arbiter, evidence, and terminal semantics across implementations. |
+| EH-FW-CLOUD — Offline policy training | Produce candidate learned/FlyWire artifacts for shadow evaluation. | CPU reproduction first; then one approved ephemeral L4 Spot benchmark; A100/H100 only after profiling | Immutable artifact hash, evaluation receipt, hard TTL, cost ceiling, checkpoint recovery, and local-controller acceptance. |
+
+GCP or another cloud provider is an offline experiment surface only. It may
+produce a versioned policy artifact; it never sits in the Minecraft reflex
+path. Cloud launches require an approved experiment manifest, maximum runtime
+and cost, checkpoint destination, evaluation seeds, and automatic cleanup.
+Codex may orchestrate an already approved job, but expanding budget, region,
+GPU class, or credentials requires fresh user approval.
+
+DAW is a strong later transfer candidate because it shares continuous temporal
+control but has different sensors, effects, and success criteria. It remains
+part of the later second-domain evaluation, not the active Minecraft gate.
 
 ## Development work-packet header
 
@@ -260,5 +349,6 @@ npm run helix:environment-harness:docs-audit
 The audit checks that the canonical files link to this work program, that the
 canonical status table uses only the allowed maturity vocabulary, that exactly
 one program gate is active, and that acceptance-level maturity claims name
-existing evidence references. It is a program-consistency check, not runtime
-acceptance evidence.
+existing evidence references. It also checks that resident-controller status
+uses `specified` or `projected` until its later gates provide stronger proof.
+It is a program-consistency check, not runtime acceptance evidence.

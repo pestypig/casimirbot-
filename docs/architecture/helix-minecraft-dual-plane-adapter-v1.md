@@ -114,6 +114,15 @@ request, progress publication, manual-input detection, cancellation, control
 release and measured result publication. It never samples a model or writes an
 answer.
 
+The Fabric guardian is the first concrete resident closed-loop controller. It
+may continuously evaluate the admitted program while Runtime Codex is delayed,
+but it cannot expand the program, invent a goal, or become a second reasoning
+lane. The future generic resident-controller contract must preserve the same
+profile identity, observation revision, effect envelope, local arbiter outcome,
+postcondition, abstention/interruption and semantic-escalation evidence.
+Learned profiles remain proposal-only until a separately accepted local arbiter
+promotion path exists.
+
 ## Contract locations
 
 - Generic action/workflow lifecycle:

@@ -202,6 +202,43 @@ an adapter/provider latency defect until the timing trace demonstrates a real
 external boundary. Reducing latency must not remove identity, consent,
 provenance, effect limits or Emergency Stop.
 
+## Resident closed-loop capability
+
+Some environments change faster than a remote reasoning turn can observe and
+respond. The harness therefore distinguishes Runtime Codex from a resident
+closed-loop controller. Codex understands the objective, selects a verified
+profile, authors a bounded response repertoire, interprets summaries and
+replans. Compiled local code continuously senses and responds while Codex is
+delayed, absent, or reasoning.
+
+The resident controller is not another Codex mind, a background answer writer,
+or an authority-expanding planner. It may only select or propose responses
+inside an already admitted program, lease, resource envelope and effect scope.
+Manual input, authority loss and Emergency Stop remain higher priority. Every
+resident decision must preserve the causal chain:
+
+```text
+observation revision
+  -> resident proposal or deterministic response
+  -> local execution arbiter outcome
+  -> bounded effect
+  -> measured postcondition
+  -> abstention, interruption, reset, or semantic escalation
+  -> Codex re-entry when meaningfully changed
+```
+
+An implementation profile should identify its artifact/version hash, sensor and
+state revisions, maximum observation age, compute deadline, confidence and
+abstention rules, permitted response vocabulary, resource ownership, reset
+semantics, control-release behavior and escalation conditions. Learned policies
+initially operate proposal-only; trusted deterministic controllers may execute
+pre-admitted local effects directly. In both cases the local arbiter and Helix
+ledger retain authority over identity, freshness, scope and evidence.
+
+This is the generic mechanism behind a Minecraft guardian, browser monitor,
+DAW timing controller, server circuit breaker, robot balance policy or future
+learned profile. It does not imply that every environment needs training.
+
 The keyed development server exposes a developer-only, observer-only stage
 ledger at
 `GET /api/agi/agent-providers/codex/turn-stage/:turnId`. It retains timing,
@@ -229,6 +266,11 @@ lanes, typed conditions, races, events, interrupts and recovery edges. Helix
 checks the exact player/world authority and effect envelope. Fabric schedules
 the accepted program and publishes measured lane, condition, tick, mutation,
 inventory and terminal facts.
+
+The guardian is Minecraft's first concrete resident closed-loop controller. Its
+acceptance does not by itself prove a generic resident contract, persistent
+viability across Codex delays, or learned-policy superiority. Those belong to
+the work-program G3 and post-G3 resident-controller gates.
 
 A helper such as `predicted_collision_cell` is an observation/dataflow
 primitive, not strategy. It can resolve a short-horizon landing cell for an

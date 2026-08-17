@@ -50,6 +50,21 @@ const readWorkspaceFile = (relativePath: string): string => {
 
 const workProgram = readWorkspaceFile(workProgramPath);
 
+for (const requiredTerm of [
+  "Resident closed-loop capability",
+  "`none`",
+  "`monitor_only`",
+  "`bounded_reflex`",
+  "`continuous_control`",
+  "EH-RCC1",
+  "EH-FW-CLOUD",
+  "semantic escalation",
+]) {
+  if (workProgram && !workProgram.includes(requiredTerm)) {
+    failures.push(`resident_control_program_term_missing:${requiredTerm}`);
+  }
+}
+
 for (const backlinkPath of requiredBacklinks) {
   const content = readWorkspaceFile(backlinkPath);
   if (content && !content.includes(workProgramPath)) {
@@ -142,6 +157,14 @@ for (const row of statusRows) {
     failures.push(
       `invalid_maturity:${row.capability}:${row.maturity || "empty"}`,
     );
+  }
+  if (
+    /resident closed-loop|resident guardian|resident policies|flywire/i.test(
+      row.capability,
+    ) &&
+    !new Set(["specified", "projected"]).has(row.maturity)
+  ) {
+    failures.push(`resident_maturity_premature:${row.capability}:${row.maturity}`);
   }
   if (!acceptanceMaturityTerms.has(row.maturity)) continue;
 
