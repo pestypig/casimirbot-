@@ -13,6 +13,8 @@ export interface HelixDebugCaptureOptions {
   prompt: string;
   scenarioId?: string | null;
   requestedCapabilityId?: string | null;
+  lane?: "helix" | "helix_ask";
+  startingState?: unknown;
 }
 
 const argument = (name: string): string | null => {
@@ -93,6 +95,8 @@ export const buildHelixDebugCapture = ({
   prompt,
   scenarioId,
   requestedCapabilityId,
+  lane = "helix",
+  startingState,
 }: HelixDebugCaptureOptions): EnvironmentActionDifferentialCaptureInput => {
   const root = record(debugExport);
   const payload = Object.keys(record(root.payload)).length > 0
@@ -183,10 +187,10 @@ export const buildHelixDebugCapture = ({
 
   return environmentActionDifferentialCaptureInputSchema.parse({
     scenario_id: scenarioId ?? `minecraft_player_helix:${actionKind}`,
-    lane: "helix",
+    lane,
     action_kind: actionKind,
     prompt,
-    starting_state: {
+    starting_state: startingState ?? {
       fixture_kind: "bounded_player_action",
       required_preconditions: ["connected", "on_ground"],
     },
@@ -261,6 +265,10 @@ export const runHelixDebugCaptureCli = async (): Promise<void> => {
     prompt,
     requestedCapabilityId: argument("--capability"),
     scenarioId: argument("--scenario"),
+    lane: process.argv.includes("--g2") ? "helix_ask" : "helix",
+    startingState: argument("--starting-state")
+      ? JSON.parse(fs.readFileSync(path.resolve(argument("--starting-state")!), "utf8"))
+      : undefined,
   });
   const resolvedOutput = path.resolve(outputPath);
   fs.mkdirSync(path.dirname(resolvedOutput), { recursive: true });

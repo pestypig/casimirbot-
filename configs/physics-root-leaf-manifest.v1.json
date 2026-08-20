@@ -195,6 +195,11 @@
       "statement": "Any Casimir-boundary-conditioned collapse or manifold claim must fail closed unless measured evidence, ordinary-decoherence closure, replayable phase residuals, a collapse discriminator, and a sourced boundary-to-coherence transfer kernel are all present; ordinary QED boundary phase and decoherence remain independently testable controls."
     },
     {
+      "id": "leaf_casimir_dp_evolutionary_coherence_conditional",
+      "prompt_family": "conditional evolutionary implications of a replicated boundary-sensitive coherence law",
+      "statement": "Evolutionary coherence-control claims remain hypothetical unless a non-biological law is independently replicated and a prespecified biological phenotype has measured functional lifetime surplus, heritable variation, fitness covariance, and replicated selection response; no such path implies purpose, consciousness, or Orch-OR."
+    },
+    {
       "id": "leaf_penrose_branch_geometry_to_coherence_candidate",
       "prompt_family": "equivalence principle and branch geometry to a Penrose-inspired coherence candidate",
       "statement": "A Penrose-inspired branch-geometry-to-coherence claim remains exploratory until relational branch identification, complete conserved sources, gauge and coordinate treatment, an invariant energy functional, causal reduction dynamics, probability and energy consistency, standard-theory limits, a coherence projection, a companion prediction, and preregistered falsifiers are supplied; agreement with tau approximately hbar over E_G alone is insufficient."
@@ -682,6 +687,10 @@
         "bridge-branch-relative-self-energy-to-or-rate-diagnostic",
         "bridge-boundary-coherence-residual-to-collapse-discriminator",
         "bridge-casimir-stress-to-branch-geometry-coherence-kernel",
+        "bridge-magnetar-qed-precedent-to-polarization-control",
+        "bridge-branch-conditioned-complete-stress-to-metric-kernel",
+        "bridge-retarded-metric-noise-to-coherence-extension",
+        "bridge-boundary-coherence-extension-to-orch-conditional-nonclaim",
         "bridge-stage3-complex-coherence-to-model-discrimination",
         "bridge-stage3-ordinary-physics-null-to-residual",
         "bridge-stage3-named-dp-to-companion-falsifier",
@@ -773,7 +782,7 @@
       "falsifier": {
         "observable": "preregistered complex boundary-conditioned coherence and companion-observable signature with immutable authority, measured-preparation-class complete joint-system branch equivalence, response-corrected apparatus spectral thermometry, sensor-self-noise-separated ordinary-physics covariance, Stage-4.2C empirical control-response and covariance receipts reproducing the bounded redesign gates, Stage-4.2D selected Stark/Zeeman/polarization/blackbody witness response and covariance receipts, conventional-gravity recovery and spinor-semantic nonbridge, Stage-4.2E ADM causal recovery with measured optical-path and endpoint-clock controls, Stage-4.2F finite-geometry Maxwell/Green/FDT/stress authority with measured material response, exact candidate transport identity, a companion regenerated from that same identity, a companion detector noise receipt, measured state preparation, quasistatic modulation validation, and a complete conserved apparatus stress tensor, explicit QED/GR/DP signature separation, an authentic selected-candidate state-preparation receipt, a measured witness-to-complex-coherence transfer, a pilot-frozen likelihood and prediction vector, measured Stage-4.2P three-dimensional worldlines, local gravity gradient and apparatus-mass geometry, frequency-resolved tilt/echo transfer, and clock/control covariance closing the ordinary proper-time phase budget, a measured Stage-4.2Q normal/superconducting specimen impedance and Green response with transition, magnetic, vortex, trap, sham, and joint-coherence covariance, a Stage-4.2R same-apparatus packet set joining measured preparation, geometry/Green response, material spectra, phase covariance, gas kernel, four-cell complex coherence, companion channel, and exact registered-model bound recast without cross-apparatus covariance fusion, Stage-4 polarization and thermal/FDT closure, tensor/dimensional/semantic congruence, source-backed electron-mass/Higgs-tree and solar-radiometric calibration with explicit dependency nonbridges, a verified custodian receipt and authorized powered measured comparison for the confirmatory lane, held-out model discrimination, and a separately registered numerical boundary-to-coherence kernel for any bridge claim",
         "readiness_block_rule": "upstreamAuthorityIntegrity != true OR preregistrationFrozen != true OR syntheticBlindingContractPass != true OR stage4_2bForecastContractReady != true OR stage4_2cNoGoRecoveryReady != true OR stage4_2cBoundedRedesignReady != true OR stage4_2cPacketSchemasReady != true OR stage4_2cMeasuredControlResponseReady != true OR stage4_2cMeasuredCovarianceReady != true OR stage4_2cStatePreparationReady != true OR stage4_2dRecoveryReady != true OR stage4_2dSpectroscopicResponseReady != true OR stage4_2dWitnessToCoherenceReady != true OR stage4_2dZeroBridgePreserved != true OR stage4_2eCausalRecoveryReady != true OR stage4_2eQEDMetricNonbridgePreserved != true OR stage4_2eStandardDpBoundaryIndependence != true OR stage4_2eMeasuredTimingControlReady != true OR stage4_2eCompleteApparatusMetricReady != true OR stage4_2fSoftwareEquationRecoveryReady != true OR stage4_2fFiniteGeometryMaxwellReady != true OR stage4_2fMeasuredMaterialGreenReady != true OR stage4_2fCandidateTransportIdentityReady != true OR stage4_2fDpParameterRegionReady != true OR stage4_2fCompanionModelIdentityReady != true OR stage4_2fCompanionDetectorReady != true OR stage4_2fStatePreparationReady != true OR stage4_2fQuasistaticModulationReady != true OR stage4_2fCompleteApparatusStressEnergyReady != true OR stage4_2fZeroBridgePreserved != true OR stage4_2gDesignIdentityFrozen != true OR stage4_2gDpCompanionConsistent != true OR stage4_2gMeasuredPacketIntegrityReady != true OR stage4_2gFiniteGeometryMaterialReady != true OR stage4_2gStatePreparationReady != true OR stage4_2gBranchMetrologyReady != true OR stage4_2gModulationReady != true OR stage4_2gMeasuredCovarianceReady != true OR stage4_2gCompanionDetectorReady != true OR stage4_2gBlindReplicationReady != true OR stage4_2gPilotIdentifiabilityReady != true OR stage4_2gCompleteStressEnergyReady != true OR stage4_2gZeroBridgePreserved != true OR stage4_2hCommissioningContractReady != true OR stage4_2hInstrumentRegistryReady != true OR stage4_2hCalibrationAncestryReady != true OR stage4_2hCustodyBlindFreezeReady != true OR stage4_2hRawDataReady != true OR stage4_2hPacketCompilationReady != true OR stage4_2hIndependentReplicationReady != true OR stage4_2hZeroBridgePreserved != true OR stage4_2iFourCellContractReady != true OR stage4_2iWavepacketEmpiricalReady != true OR stage4_2iOrdinaryInteractionResponseReady != true OR stage4_2iMeasuredContrastReady != true OR stage4_2iStandardDpBoundaryIndependence != true OR stage4_2iTransferKernelRegistered != true OR stage4_2jSoftwareDiagnosticReady != true OR stage4_2jCompleteDensityRepresentationReady != true OR stage4_2jMeasuredEnvironmentModelReady != true OR stage4_2jEnvironmentalCandidateReady != true OR stage4_2jStatePreparationReady != true OR stage4_2jExternalBoundMappingReady != true OR stage4_2jZeroBridgePreserved != true OR stage4_2kSoftwareDiagnosticReady != true OR stage4_2kMeasuredMaterialSpectrumReady != true OR stage4_2kFiniteGeometryGreenReady != true OR stage4_2kBranchOrientationReady != true OR stage4_2kOrdinaryPhaseCovarianceReady != true OR stage4_2kQlbeEnvironmentReady != true OR stage4_2kResidualAttributionReady != true OR stage4_2kZeroBridgePreserved != true OR stage4_2lSoftwareDiagnosticReady != true OR stage4_2lAsBuiltGeometryReady != true OR stage4_2lFullFiniteGeometryGreenReady != true OR stage4_2lMeasuredMaterialSpectrumReady != true OR stage4_2lEmpiricalPhaseCovarianceReady != true OR stage4_2lMeasuredQlbeEnvironmentReady != true OR stage4_2lStatePreparationReady != true OR stage4_2lExactExternalBoundMappingReady != true OR stage4_2lCompleteMassDensityAuthorityReady != true OR stage4_2lZeroBridgePreserved != true OR stage4_2mSoftwareSearchReady != true OR stage4_2mSyntheticRegionReady != true OR stage4_2mMeasuredMaterialReady != true OR stage4_2mAsBuiltGeometryReady != true OR stage4_2mFullMaxwellReady != true OR stage4_2mMeasuredPhaseCovarianceReady != true OR stage4_2mMeasuredQlbeReady != true OR stage4_2mStatePreparationReady != true OR stage4_2mMeasuredCompanionReady != true OR stage4_2mIndependentReplicationReady != true OR stage4_2mZeroBridgePreserved != true OR stage4_2nSoftwarePipelineReady != true OR stage4_2nSpecimenMaterialReady != true OR stage4_2nAsBuiltGeometryReady != true OR stage4_2nFullMaxwellGreenReady != true OR stage4_2nIndependentSolverReady != true OR stage4_2nMeasuredCalibrationReady != true OR stage4_2nMeasuredCovarianceReady != true OR stage4_2nOrdinaryNullAuthorityReady != true OR stage4_2nZeroBridgePreserved != true OR stage4_2oComponentReplayReady != true OR stage4_2oJointProtocolValidationReady != true OR stage4_2oCrossApparatusIsolationReady != true OR stage4_2oExactExternalBoundMappingReady != true OR stage4_2oZeroBridgePreserved != true OR stage4_2pSoftwareClosureReady != true OR stage4_2pMeasuredWorldlineReady != true OR stage4_2pMeasuredGravityCovarianceReady != true OR stage4_2pMeasuredEchoTransferReady != true OR stage4_2pMeasuredClockControlCovarianceReady != true OR stage4_2pInternalEnergyAuthorityReady != true OR stage4_2pTotalPhaseBudgetReady != true OR stage4_2pZeroBridgePreserved != true OR stage4_2qSoftwareRecoveryReady != true OR stage4_2qSpecimenImpedanceReady != true OR stage4_2qGreenResponseReady != true OR stage4_2qSwitchCovarianceReady != true OR stage4_2qJointCoherenceReady != true OR stage4_2qZeroCollapseBridgePreserved != true OR stage4_2rPacketContractReady != true OR stage4_2rStatePreparationReady != true OR stage4_2rGeometryGreenReady != true OR stage4_2rMaterialSpectrumReady != true OR stage4_2rPhaseCovarianceReady != true OR stage4_2rGasKernelReady != true OR stage4_2rFourCellCoherenceReady != true OR stage4_2rCompanionReady != true OR stage4_2rExactBoundRecastReady != true OR stage4_2rZeroBridgePreserved != true OR apparatusScaleTransportReady != true OR responseCorrectedSpectralThermometryReady != true OR physicalSensorNoiseSeparated != true OR fullCrossSpectralCovarianceReady != true OR frozenDpSignatureReady != true OR completeJointSystemEquivalenceReady != true OR residualLikelihoodFrozen != true OR signatureIdentifiabilityReady != true OR apparatusDpPowerReady != true OR stage4_2bMeasuredEvidenceCampaignVersioned != true OR measuredEvidenceReady != true OR measuredComparisonAuthorized != true OR custodianReceiptVerified != true OR unblindingAuthorized != true OR fixedDeltaRhoMatched != true OR complexCoherenceIdentifiable != true OR ordinaryDecoherenceClosure != true OR polarizationQEDControlReady != true OR thermalFdtControlReady != true OR tensorDimensionalCongruence != true OR qedScaleHierarchyCalibration != true OR electronMassHiggsAnchorCalibration != true OR planckSolarCalibration != true OR crossScaleDpNonbridgePreserved != true OR namedDpManifestUnchanged != true OR phaseResidualReplayDeterministic != true OR collapseDiscriminatorPresent != true OR heldOutModelComparisonReady != true OR boundaryToCoherenceTransferKernelRegistered != true OR (bridgeCompared == true AND registeredNumericBridgeKernel != true)",
-        "reject_rule": "measuredComparisonAuthorized == true AND heldOutReplicationReady == true AND stage4_2cMeasuredControlResponseReady == true AND stage4_2cMeasuredCovarianceReady == true AND stage4_2cStatePreparationReady == true AND apparatusDpPowerReady == true AND ordinaryDecoherenceClosure == true AND (registeredNonunitarySignatureMatch != true OR frozenDpScalingMatch != true OR (boundaryExtensionClaimed == true AND registeredNumericBridgeKernelMatch != true))",
+        "reject_rule": "measuredComparisonAuthorized == true AND heldOutReplicationReady == true AND stage4_2cMeasuredControlResponseReady == true AND stage4_2cMeasuredCovarianceReady == true AND stage4_2cStatePreparationReady == true AND apparatusDpPowerReady == true AND ordinaryDecoherenceClosure == true AND (registeredNonunitarySignatureMatch != true OR frozenDpScalingMatch != true OR (boundaryExtensionClaimed == true AND (branchConditionedCompleteStressReady != true OR boundaryMetricNoiseKernelRegistered != true OR boundaryCoherenceExtensionRegistered != true OR registeredNumericBridgeKernelMatch != true)))",
         "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
         "test_refs": [
           "tests/casimir-dp-data-readiness.spec.ts",
@@ -851,6 +860,44 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_CASIMIR_DP_OR_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_casimir_dp_residual_to_evolutionary_coherence_conditional",
+      "bundle_id": "casimir-dp.or-boundary-coherence",
+      "root_id": "physics_quantum_semiclassical",
+      "leaf_id": "leaf_casimir_dp_evolutionary_coherence_conditional",
+      "nodes": [
+        "physics_quantum_semiclassical",
+        "physics_information_dynamics",
+        "physics_biology_life",
+        "leaf_casimir_dp_evolutionary_coherence_conditional"
+      ],
+      "dag_bridges": [
+        "bridge-replicated-nonbiological-coherence-law-to-biological-test-entry",
+        "bridge-biological-state-and-lifetime-surplus-to-functional-phenotype",
+        "bridge-heritable-phenotype-to-fitness-covariance",
+        "bridge-replicated-selection-response-to-conditional-evolutionary-claim",
+        "bridge-evolutionary-coherence-control-to-teleology-nonclaim"
+      ],
+      "falsifier": {
+        "observable": "a powered replicated non-biological boundary-conditioned coherence law followed by an independently prepared biological state and mass-density map, a prespecified operational phenotype, measured coherence and functional timescales, heritable variation, controlled fitness covariance, and held-out phylogenetic, intervention, or experimental-evolution replication",
+        "readiness_block_rule": "replicatedNonbiologicalCoherenceLawReady != true OR biologicalStateMassDensityMapReady != true OR ordinaryBiochemicalNullReady != true OR usefulCoherenceLifetimeSurplusReady != true OR operationalPhenotypeFrozen != true OR heritableVariationReady != true OR fitnessTraitCovarianceReady != true OR replicatedSelectionResponseReady != true OR adaptationTeleologySeparationPreserved != true",
+        "reject_rule": "evolutionaryClaimCompared == true AND (usefulCoherenceLifetimeSurplusPositive != true OR heritableVariationDetected != true OR controlledFitnessTraitCovarianceDetected != true OR heldOutSelectionResponseReplicated != true)",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+        "test_refs": [
+          "shared/theory/__tests__/casimir-dp-study-theory-badges.spec.ts",
+          "tests/casimir-dp-paper-provenance.spec.ts",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_CASIMIR_DP_EVOLUTIONARY_COHERENCE_CONDITIONAL_FAIL"
       }
     },
     {
@@ -1136,6 +1183,7 @@
       "max_claim_tier": "diagnostic",
       "path_ids": [
         "path_quantum_semiclassical_to_casimir_dp_or_test",
+        "path_casimir_dp_residual_to_evolutionary_coherence_conditional",
         "path_complete_casimir_apparatus_to_ordinary_gravity_control"
       ]
     },

@@ -165,8 +165,8 @@ const nativeCapabilityTerminalPayload = (input: {
       turn_id: input.turnId,
       required: true,
       completed: true,
-      reentry_authority: "compatibility_projection",
-      runtime_lifecycle_verified: false,
+      reentry_authority: "runtime_event_log",
+      runtime_lifecycle_verified: true,
       selected_evidence_refs: [input.observationRef],
     },
     route_evidence_authority: {
@@ -205,6 +205,11 @@ const nativeCapabilityTerminalPayload = (input: {
       reentered_solver: true,
     }],
   },
+  turn_lifecycle: buildLifecycle({
+    turnId: input.turnId,
+    capabilityId: input.capabilityId,
+    observationRef: input.observationRef,
+  }),
 });
 
 const createHandoff = (suffix: string) => {

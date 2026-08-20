@@ -6,7 +6,7 @@ import {
   type HelixTerminalGroundingAuthoritySource,
 } from "@shared/helix-terminal-grounding-authority";
 import { hashHelixTerminalText } from "./turn-terminal-authority";
-import { providerBridgeAllEvidenceReentryCompatible } from "./provider-evidence-reentry-compatibility";
+import { helixTerminalKindIsSelfTerminal } from "@shared/helix-terminal-authority";
 
 type RecordLike = Record<string, unknown>;
 
@@ -288,78 +288,17 @@ export const buildHelixTerminalGroundingAuthority = (input: {
     terminalAuthority?.server_authoritative === true &&
     terminalAuthority?.terminal_eligible !== false;
   const currentTurnOnly = routeEvidenceAuthority?.current_turn_only === true;
-  const providerBridge =
-    readRecord(payload.provider_terminal_authority_bridge) ??
-    readRecord(debug?.provider_terminal_authority_bridge);
-  const providerReentry =
-    readRecord(payload.provider_reasoning_reentry) ??
-    readRecord(debug?.provider_reasoning_reentry);
-  const providerSupportedRefs = new Set(
-    unique([
-      ...readStringArray(providerBridge?.successful_gateway_observation_refs),
-      ...readStringArray(
-        providerBridge?.successful_capability_lane_observation_refs,
-      ),
-      ...readStringArray(providerBridge?.normalized_observation_refs),
-      ...readStringArray(providerReentry?.normalized_observation_refs),
-    ]),
+  const routeSelfTerminalGroundingValid = Boolean(
+    terminalArtifactKind &&
+      helixTerminalKindIsSelfTerminal(terminalArtifactKind) &&
+      routeProductContractAllowsTerminal &&
+      evidenceReentryGate?.completed === true &&
+      selectedEvidenceRefs.length > 0,
   );
-  const currentTurnLedger = [
-    ...(Array.isArray(payload.current_turn_artifact_ledger)
-      ? payload.current_turn_artifact_ledger
-      : []),
-    ...(Array.isArray(debug?.current_turn_artifact_ledger)
-      ? debug.current_turn_artifact_ledger
-      : []),
-  ];
-  for (const rawEntry of currentTurnLedger) {
-    const entry = readRecord(rawEntry);
-    const entryPayload = readRecord(entry?.payload);
-    if (
-      !entry ||
-      (readString(entry.turn_id) && readString(entry.turn_id) !== turnId)
-    )
-      continue;
-    const status = readString(entry.status) ?? readString(entryPayload?.status);
-    if (status && /failed|rejected|blocked/i.test(status)) continue;
-    const aliases = unique([
-      readString(entry.artifact_id),
-      readString(entryPayload?.artifact_id),
-      readString(entry.provider_gateway_observation_ref),
-      readString(entryPayload?.provider_gateway_observation_ref),
-      ...readStringArray(entry.provider_gateway_packet_refs),
-      ...readStringArray(entryPayload?.provider_gateway_packet_refs),
-    ]);
-    if (aliases.some((ref) => providerSupportedRefs.has(ref))) {
-      aliases.forEach((ref) => providerSupportedRefs.add(ref));
-    }
-  }
-  const providerBridgeReentryValid =
-    readString(providerBridge?.schema) ===
-      "helix.provider_terminal_authority_bridge.v1" &&
-    readString(providerBridge?.turn_id) === turnId &&
-    providerBridgeAllEvidenceReentryCompatible(providerBridge) &&
-    providerBridge?.normalized_observations_ready === true &&
-    providerBridge?.terminal_authority_granted === true &&
-    providerBridge?.final_visible_answer_authorized === true &&
-    readString(providerReentry?.schema) ===
-      "helix.provider_reasoning_reentry.v1" &&
-    readString(providerReentry?.turn_id) === turnId &&
-    readString(providerReentry?.status) === "completed" &&
-    providerReentry?.evidence_reentered === true &&
-    providerReentry?.solver_completed === true &&
-    providerReentry?.goal_satisfaction_compatible === true &&
-    selectedEvidenceRefs.length > 0 &&
-    selectedEvidenceRefs.every((ref) => providerSupportedRefs.has(ref));
   const evidenceReentryAuthorityValid =
     evidenceReentryGate?.reentry_authority === "runtime_event_log"
       ? evidenceReentryGate.runtime_lifecycle_verified === true
-      : evidenceReentryGate?.reentry_authority ===
-          "provider_terminal_authority_bridge"
-        ? providerBridgeReentryValid
-        : evidenceReentryGate?.reentry_authority === "compatibility_projection"
-          ? procedureTrace?.evidence_reentry_status === "reentered"
-          : false;
+      : routeSelfTerminalGroundingValid;
   const evidenceReentryCompleted =
     evidenceReentryGate?.completed === true &&
     (!groundingRequired || evidenceReentryAuthorityValid);
@@ -462,12 +401,11 @@ export const buildHelixTerminalGroundingAuthority = (input: {
     selected_evidence_refs: groundingRequired ? selectedEvidenceRefs : [],
     evidence_reentry_authority:
       groundingRequired &&
-      (evidenceReentryGate?.reentry_authority === "runtime_event_log" ||
-        evidenceReentryGate?.reentry_authority ===
-          "provider_terminal_authority_bridge" ||
-        evidenceReentryGate?.reentry_authority === "compatibility_projection")
-        ? evidenceReentryGate.reentry_authority
-        : null,
+      evidenceReentryGate?.reentry_authority === "runtime_event_log"
+        ? "runtime_event_log"
+        : groundingRequired && routeSelfTerminalGroundingValid
+          ? "route_self_terminal"
+          : null,
     runtime_lifecycle_verified:
       groundingRequired &&
       evidenceReentryGate?.runtime_lifecycle_verified === true,

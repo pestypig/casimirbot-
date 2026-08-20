@@ -188,6 +188,99 @@ describe("terminal grounding authority", () => {
     });
   });
 
+  it("rejects compatibility-only re-entry for a grounded terminal", () => {
+    const evidenceRef = "ask:grounding:1:observation:docs:compatibility";
+    const payload = terminalPayload({
+      groundingRequired: true,
+      evidenceRefs: [evidenceRef],
+    });
+    payload.ask_turn_solver_trace.evidence_reentry_gate = {
+      ...payload.ask_turn_solver_trace.evidence_reentry_gate,
+      reentry_authority: "compatibility_projection",
+      runtime_lifecycle_verified: false,
+    };
+    payload.ask_turn_procedure_trace = {
+      ...payload.ask_turn_procedure_trace,
+      evidence_reentry_status: "reentered",
+    };
+
+    const authority = buildHelixTerminalGroundingAuthority({ payload });
+
+    expect(authority.status).toBe("rejected");
+    expect(authority.failure_codes).toContain(
+      "evidence_reentry_not_completed",
+    );
+    expect(authority.evidence_reentry_authority).toBeNull();
+  });
+
+  it("accepts an exact self-terminal route product without claiming Codex re-entry", () => {
+    const evidenceRef = "ask:grounding:1:live_environment_binding_diagnosis:1";
+    const payload = terminalPayload({
+      groundingRequired: true,
+      evidenceRefs: [evidenceRef],
+    }) as ReturnType<typeof terminalPayload> & Record<string, unknown>;
+    const terminalKind = "live_environment_binding_diagnosis";
+    const terminalRef = evidenceRef;
+    payload.final_answer_source = terminalKind;
+    payload.terminal_artifact_kind = terminalKind;
+    payload.terminal_answer_authority = {
+      ...payload.terminal_answer_authority,
+      terminal_artifact_ref: terminalRef,
+      terminal_artifact_kind: terminalKind,
+      final_answer_source: terminalKind,
+    };
+    payload.terminal_presentation = {
+      ...payload.terminal_presentation,
+      terminal_authority_ref: terminalRef,
+      terminal_artifact_kind: terminalKind,
+      final_answer_source: terminalKind,
+    };
+    payload.ask_turn_procedure_trace = {
+      ...payload.ask_turn_procedure_trace,
+      selected_terminal_product: {
+        kind: terminalKind,
+        ref: terminalRef,
+        allowed_by_route: true,
+      },
+    };
+    payload.ask_turn_solver_trace = {
+      ...payload.ask_turn_solver_trace,
+      evidence_reentry_gate: {
+        ...payload.ask_turn_solver_trace.evidence_reentry_gate,
+        reentry_authority: "compatibility_projection",
+        runtime_lifecycle_verified: false,
+      },
+      final_arbitration: {
+        terminal_artifact_kind: terminalKind,
+        final_answer_source: terminalKind,
+      },
+    };
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: payload.turn_id,
+      required_terminal_kind: terminalKind,
+      allowed_terminal_artifact_kinds: [terminalKind, "typed_failure"],
+      forbidden_terminal_artifact_kinds: [],
+    };
+    payload.live_environment_binding_diagnosis = {
+      schema: "helix.live_environment_binding_diagnosis.v2",
+      diagnosis_id: terminalRef,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const authority = buildHelixTerminalGroundingAuthority({ payload });
+
+    expect(authority).toMatchObject({
+      status: "validated",
+      grounding_required: true,
+      evidence_reentry_authority: "route_self_terminal",
+      runtime_lifecycle_verified: false,
+      selected_evidence_refs: [evidenceRef],
+      failure_code: null,
+    });
+  });
+
   it("uses the exact route-product contract when route evidence is an unresolved projection", () => {
     const evidenceRef = "ask:grounding:1:observation:scientific-closure:1";
     const payload = terminalPayload({
@@ -246,7 +339,7 @@ describe("terminal grounding authority", () => {
     expect(authority.failure_codes).toContain("route_authority_rejected");
   });
 
-  it("validates current-turn evidence proven by the provider terminal bridge", () => {
+  it("rejects current-turn evidence claimed only by the provider terminal bridge", () => {
     const turnId = "ask:grounding:provider-bridge";
     const evidenceRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;
     const normalizedRef = `${turnId}:codex_normalized:scholarly_research_observation:1`;
@@ -297,13 +390,13 @@ describe("terminal grounding authority", () => {
     const authority = buildHelixTerminalGroundingAuthority({ payload });
 
     expect(authority).toMatchObject({
-      status: "validated",
+      status: "rejected",
       grounding_required: true,
       selected_evidence_refs: [evidenceRef, normalizedRef, observationAlias],
-      evidence_reentry_authority: "provider_terminal_authority_bridge",
+      evidence_reentry_authority: null,
       runtime_lifecycle_verified: false,
       current_turn_only: true,
-      failure_code: null,
+      failure_code: "evidence_reentry_not_completed",
     });
   });
 

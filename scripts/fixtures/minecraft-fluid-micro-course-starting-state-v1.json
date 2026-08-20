@@ -1,0 +1,71 @@
+{
+  "schema": "helix.minecraft.g2_starting_state.v1",
+  "fixture_id": "fixture:g2_fluid_micro_course_v1",
+  "fixture_revision": 1,
+  "minecraft_version": "1.21.8",
+  "fabric_loader_version": "0.18.4",
+  "world_identity": {
+    "dimension": "minecraft:overworld",
+    "fixture_anchor": {
+      "x": 1000,
+      "y": 81,
+      "z": 1000
+    },
+    "floor_block": "minecraft:stone",
+    "interaction_target": {
+      "block_id": "minecraft:note_block",
+      "x": 1000,
+      "y": 81,
+      "z": 1004
+    }
+  },
+  "player_identity": {
+    "subject_label": "DatDamPig",
+    "game_mode": "survival",
+    "position": {
+      "x": 1000.5,
+      "y": 81,
+      "z": 1000.5
+    },
+    "look_target": {
+      "x": 1000.5,
+      "y": 81.5,
+      "z": 1004.5
+    },
+    "health": 20,
+    "food": 20,
+    "required_inventory": {
+      "minecraft:stick": 1,
+      "minecraft:oak_log": 1
+    },
+    "required_absent_inventory": {
+      "minecraft:oak_planks": 0
+    }
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+    "sequence_id": "sequence:g2_fluid_micro_course_v1",
+    "ruleset": "survival_tas",
+    "scheduler_engine": "native_fabric",
+    "required_checkpoint_ids": [
+      "checkpoint:landed",
+      "checkpoint:focus_reachable",
+      "checkpoint:equipped",
+      "checkpoint:crafted"
+    ]
+  },
+  "artifact_identity": {
+    "player_companion_sha256": "1e2b79848b9e542dbb4c5742a1a656a667be1fdff63f6b4d4f3e07c9d3d2b7cd",
+    "fabric_sensor_sha256": "45aa48662534e800fb82f0a43714fe82caab1f67200eb134a9f06eb39418db9f"
+  },
+  "restore_contract": {
+    "clear_fixture_air": true,
+    "rebuild_stone_floor": true,
+    "replace_note_block": true,
+    "clear_inventory": true,
+    "give_required_inventory": true,
+    "teleport_and_face_target": true,
+    "require_fresh_player_observation": true,
+    "require_controls_released_before_start": true
+  }
+}

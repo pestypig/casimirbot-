@@ -2357,7 +2357,6 @@ export function buildAskTurnSolverTrace(input: {
   );
   const runtimeLifecycleCycleCompleted = Boolean(
     verifiedRuntimeLifecycle?.reduction.runtime_turn_completed &&
-    verifiedRuntimeLifecycle.reduction.terminal_outcome === "completed" &&
     verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
   );
   const runtimeObservationReentryRefs = runtimeLifecycleCycleCompleted
@@ -2417,19 +2416,18 @@ export function buildAskTurnSolverTrace(input: {
   // Both identities belong to the same completed current-turn re-entry.
   const effectiveObservationReentryRefs = unique([
     ...runtimeObservationReentryRefs,
-    ...providerObservationReentryRefs,
+    ...(runtimePostObservationReasoningCompleted === true
+      ? providerObservationReentryRefs
+      : []),
   ]);
   const effectivePostObservationReasoningCompleted =
-    runtimePostObservationReasoningCompleted === true ||
-    providerProjectionCompletesReasoning;
+    runtimePostObservationReasoningCompleted === true;
   const effectiveReentryAuthority =
     runtimePostObservationReasoningCompleted === true
       ? ("runtime_event_log" as const)
-      : providerProjectionCompletesReasoning
-        ? ("provider_terminal_authority_bridge" as const)
-        : verifiedRuntimeLifecycle
-          ? ("runtime_event_log" as const)
-          : ("compatibility_projection" as const);
+      : verifiedRuntimeLifecycle
+        ? ("runtime_event_log" as const)
+        : ("compatibility_projection" as const);
   const effectiveFinalArbitrationRan =
     finalArbitrationRan ||
     routeApprovedSelfTerminalProduct ||

@@ -58,6 +58,22 @@ const capture = (
 });
 
 describe("environment action differential trace capture", () => {
+  it("captures explicit G2 MCP and Ask lanes without granting answer authority", () => {
+    const mcp = capture("direct_codex") as EnvironmentActionDifferentialCaptureInput;
+    mcp.lane = "codex_mcp";
+    mcp.admission_status = "admitted";
+    mcp.terminal_outcome = "not_applicable";
+    const ask = capture("helix") as EnvironmentActionDifferentialCaptureInput;
+    ask.lane = "helix_ask";
+
+    const mcpTrace = captureEnvironmentActionDifferentialTrace(mcp);
+    const askTrace = captureEnvironmentActionDifferentialTrace(ask);
+    expect(mcpTrace.lane).toBe("codex_mcp");
+    expect(askTrace.lane).toBe("helix_ask");
+    expect(mcpTrace.answer_authority).toBe(false);
+    expect(askTrace.terminal_eligible).toBe(false);
+  });
+
   it("builds comparable public direct-Codex and Helix traces", () => {
     const reference = captureEnvironmentActionDifferentialTrace(
       capture("direct_codex"),

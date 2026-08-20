@@ -767,6 +767,122 @@ additionally require a covariant source, a complete apparatus stress-energy
 tensor, a specified dynamical metric response, and a causal observable. Those
 objects are absent.
 
+#### 4.4.1 QED-vacuum precedent and the gated bridge
+
+The magnetar vacuum-birefringence result is relevant in one precise sense: it
+is empirical evidence that a strong external field can make photon propagation
+through the QED vacuum polarization dependent [43]. It does **not** measure a
+Casimir stress tensor, gravitational curvature, coherence loss, or objective
+collapse, and none of its field strengths, atmosphere, geometry, or fitted
+amplitudes is transferred into this apparatus. The study therefore represents
+the proposed connection as three blocked obligations rather than one inferred
+arrow.
+
+First, the complete branch-and-boundary-conditioned source would have to be
+constructed:
+
+<!-- helix-doc-equation-action/v1 id=cdp-branch-conditioned-total-stress-energy -->
+\[
+\Delta T_{\mu\nu}^{AB,\beta}(x)
+=T_{\mu\nu}^{A,\beta}(x)-T_{\mu\nu}^{B,\beta}(x),
+\qquad
+\nabla^\mu T_{\mu\nu}^{j,\beta}=0.
+\]
+
+Here each \(T_{\mu\nu}^{j,\beta}\) must include the material object, plates,
+supports, classical electromagnetic fields, and renormalized QED contribution
+without double counting. A Casimir pressure, negative renormalized scalar
+energy density, or polarization-dependent refractive index is not by itself
+this conserved tensor.
+
+Second, a gravitational response model would have to map the complete source
+and its fluctuations into a gauge-controlled, causal metric response:
+
+<!-- helix-doc-equation-action/v1 id=cdp-boundary-metric-response-slot -->
+\[
+\delta g_{\mu\nu}^{AB,\beta}
+=\frac{8\pi G}{c^4}
+G^{\rm ret}_{\mu\nu\rho\sigma}*\Delta T_{AB,\beta}^{\rho\sigma},
+\qquad
+N_{\mu\nu\rho\sigma}^{AB,\beta}(x,x')
+=\frac12\left\langle
+\left\{\hat t_{\mu\nu}(x),\hat t_{\rho\sigma}(x')\right\}
+\right\rangle_{\rm ren}.
+\]
+
+This is a notation slot, not an apparatus calculation. The retarded kernel,
+gauge, boundary conditions, renormalization, noise kernel, covariance, and GR
+recovery limits are not registered. In particular, an effective optical metric
+is not automatically the gravitational metric.
+
+Third, even a validated metric or stress-noise response would still require a
+separate physical law mapping it into complex matter-wave coherence:
+
+<!-- helix-doc-equation-action/v1 id=cdp-boundary-conditioned-coherence-extension -->
+\[
+C_\beta(t)=C(0)
+e^{i\Phi_{{\rm EM},\beta}(t)-\chi_{0,\beta}(t)}
+e^{-\Gamma_{\rm D}t}
+e^{-\chi_{{\rm bridge},\beta}(t)},
+\qquad
+\chi_{{\rm bridge},\beta}
+=\mathcal D_{\rm coh}[\delta g^{AB,\beta},N^{AB,\beta};\theta],
+\quad \mathcal D_{\rm coh}\ \text{not registered}.
+\]
+
+The first factor is the measured ordinary electromagnetic phase and loss, the
+second is the frozen boundary-independent Diósi prediction, and the last is the
+hypothetical extension. A support-eligible extension would need causal and
+normalization consistency, a complete-positive or explicitly justified
+alternative dynamics, recovery limits, a companion prediction, and powered
+held-out replication. Until then, all three nodes are Stage-0, noncomputable,
+and non-promotable in the Theory Badge graph.
+
+Only after that non-biological chain survived replication could it constrain an
+Orch-OR or biological model. It would still not establish microtubule
+coherence, neural relevance, consciousness, or evolutionary control; each
+biological proposal would need its own prepared state, mass-density map,
+lifetime prediction, ordinary-decoherence budget, and independent falsifier.
+
+#### 4.4.2 Conditional evolutionary coherence control
+
+The scientifically admissible evolutionary implication is not that life
+"seeks coherence" or that collapse contains purpose. It is narrower: **if** a
+replicated intrinsic coherence lifetime exists, natural selection could in
+principle favor heritable molecular geometries, dielectric environments,
+collective modes, or operating times that let a useful transformation finish
+before that lifetime expires. The selected object would be an operational
+phenotype and its functional consequence, not coherence as an abstract good.
+
+The Theory Badge graph therefore admits the hypothesis only through the
+following dependency gate:
+
+<!-- helix-doc-equation-action/v1 id=cdp-evolutionary-coherence-control-conditional-gate -->
+\[
+\operatorname{Admit}(H_{\rm evo})=
+R_{\rm bridge}^{\rm rep}
+\land M_{\rm bio}
+\land (\tau_{\rm coh}-\tau_{\rm function}>0)
+\land h_z^2>0
+\land \operatorname{Cov}(w,z)\ne0
+\land R_{\rm selection}^{\rm rep}.
+\]
+
+Here \(R_{\rm bridge}^{\rm rep}\) is a powered replicated non-biological
+result, \(M_{\rm bio}\) is a separately validated biological state and
+mass-density mapping, \(z\) is a prespecified measurable phenotype, \(h_z^2\)
+records heritable variation, and \(w\) is reproductive or survival fitness.
+The final term requires a replicated phylogenetic, selection, or experimental-
+evolution response after ordinary biochemical mechanisms are modeled. These
+conditions are all presently absent. The badge is consequently Stage-0,
+noncomputable, and non-promotable.
+
+This dependency makes the implication falsifiable in both directions. A
+positive non-biological result need not produce a biological adaptation; and a
+negative comparative or experimental-evolution result would constrain this
+life extension without falsifying the underlying non-biological coherence law.
+Neither outcome establishes Orch-OR, consciousness, intention, or teleology.
+
 ### 4.5 Compton-frequency non-bridge
 
 Rest energy may be written as a frequency,

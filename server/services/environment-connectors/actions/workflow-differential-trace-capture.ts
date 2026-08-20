@@ -20,7 +20,7 @@ const boundedText = z.string().max(200_000);
 export const environmentActionDifferentialCaptureInputSchema = z
   .object({
     scenario_id: identifier,
-    lane: z.enum(["direct_codex", "helix"]),
+    lane: z.enum(["direct_codex", "codex_mcp", "helix_ask", "helix"]),
     action_kind: identifier,
     prompt: boundedText,
     starting_state: z.unknown(),

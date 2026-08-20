@@ -1,0 +1,200 @@
+{
+  "action_kind": "execute_sequence",
+  "sequence_schema": "helix.minecraft.player_sequence.v1",
+  "sequence_id": "sequence:g2_fluid_micro_course_v1",
+  "ruleset": "survival_tas",
+  "execution_plane": "player_embodiment",
+  "scheduler_engine": "native_fabric",
+  "optimization": {
+    "primary": "minimize_world_ticks",
+    "record_wall_clock": true,
+    "stop_on_first_verified_success": true
+  },
+  "start_node_id": "node:look_sprint_jump",
+  "max_total_ticks": 240,
+  "required_checkpoint_ids": [
+    "checkpoint:landed",
+    "checkpoint:focus_reachable",
+    "checkpoint:equipped",
+    "checkpoint:crafted"
+  ],
+  "mutation_scope": {
+    "world_mutation_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 5,
+    "allowed_block_ids": [],
+    "allowed_regions": [],
+    "combat_allowed": false
+  },
+  "nodes": [
+    {
+      "node_id": "node:look_sprint_jump",
+      "node_kind": "input_segment",
+      "earliest_tick": 0,
+      "duration_ticks": 6,
+      "controls": {
+        "forward": 1,
+        "strafe": 0,
+        "sprint": true,
+        "sneak": false,
+        "jump": "pulse",
+        "use": "idle",
+        "look_delta": {
+          "yaw_degrees": 4,
+          "pitch_degrees": 0,
+          "max_degrees_per_tick": 2
+        }
+      },
+      "on_complete": "node:landed",
+      "on_failure": "node:failed"
+    },
+    {
+      "node_id": "node:landed",
+      "node_kind": "checkpoint",
+      "earliest_tick": 6,
+      "checkpoint_id": "checkpoint:landed",
+      "condition": {
+        "condition_kind": "player_grounded",
+        "expected": true
+      },
+      "wait_up_to_ticks": 40,
+      "on_satisfied": "node:look_at_target",
+      "on_timeout": "node:failed"
+    },
+    {
+      "node_id": "node:look_at_target",
+      "node_kind": "workflow_action",
+      "earliest_tick": 6,
+      "timeout_ticks": 20,
+      "action": {
+        "action_kind": "look_at",
+        "target": {
+          "target_kind": "position",
+          "position": { "x": 1000.5, "y": 81.5, "z": 1004.5 }
+        },
+        "max_turn_degrees_per_tick": 12
+      },
+      "on_success": "node:focus_reachable",
+      "on_failure": "node:failed"
+    },
+    {
+      "node_id": "node:focus_reachable",
+      "node_kind": "checkpoint",
+      "earliest_tick": 6,
+      "checkpoint_id": "checkpoint:focus_reachable",
+      "condition": {
+        "condition_kind": "focus_reachable",
+        "expected": true,
+        "max_distance": 4.5
+      },
+      "wait_up_to_ticks": 20,
+      "on_satisfied": "node:interact",
+      "on_timeout": "node:failed"
+    },
+    {
+      "node_id": "node:interact",
+      "node_kind": "workflow_action",
+      "earliest_tick": 6,
+      "timeout_ticks": 20,
+      "action": {
+        "action_kind": "interact",
+        "target": "looked_at_block",
+        "hand": "main_hand",
+        "interaction": "use"
+      },
+      "on_success": "node:hotbar",
+      "on_failure": "node:failed"
+    },
+    {
+      "node_id": "node:hotbar",
+      "node_kind": "workflow_action",
+      "earliest_tick": 6,
+      "timeout_ticks": 20,
+      "action": {
+        "action_kind": "hotbar_select",
+        "slot": 0
+      },
+      "on_success": "node:equip",
+      "on_failure": "node:failed"
+    },
+    {
+      "node_id": "node:equip",
+      "node_kind": "workflow_action",
+      "earliest_tick": 6,
+      "timeout_ticks": 30,
+      "action": {
+        "action_kind": "equip",
+        "item_id": "minecraft:stick",
+        "destination": "main_hand"
+      },
+      "on_success": "node:equipped",
+      "on_failure": "node:failed"
+    },
+    {
+      "node_id": "node:equipped",
+      "node_kind": "checkpoint",
+      "earliest_tick": 6,
+      "checkpoint_id": "checkpoint:equipped",
+      "condition": {
+        "condition_kind": "equipment_item_is",
+        "destination": "main_hand",
+        "item_id": "minecraft:stick"
+      },
+      "wait_up_to_ticks": 20,
+      "on_satisfied": "node:craftable",
+      "on_timeout": "node:failed"
+    },
+    {
+      "node_id": "node:craftable",
+      "node_kind": "branch",
+      "earliest_tick": 6,
+      "condition": {
+        "condition_kind": "recipe_craftable",
+        "output_item_id": "minecraft:oak_planks",
+        "expected": true
+      },
+      "on_true": "node:craft",
+      "on_false": "node:failed"
+    },
+    {
+      "node_id": "node:craft",
+      "node_kind": "workflow_action",
+      "earliest_tick": 6,
+      "timeout_ticks": 40,
+      "action": {
+        "action_kind": "craft",
+        "output_item_id": "minecraft:oak_planks",
+        "count": 4,
+        "recipe_id": null
+      },
+      "on_success": "node:crafted",
+      "on_failure": "node:failed"
+    },
+    {
+      "node_id": "node:crafted",
+      "node_kind": "checkpoint",
+      "earliest_tick": 6,
+      "checkpoint_id": "checkpoint:crafted",
+      "condition": {
+        "condition_kind": "inventory_count_at_least",
+        "item_id": "minecraft:oak_planks",
+        "count": 4
+      },
+      "wait_up_to_ticks": 20,
+      "on_satisfied": "node:succeeded",
+      "on_timeout": "node:failed"
+    },
+    {
+      "node_id": "node:succeeded",
+      "node_kind": "terminal",
+      "terminal_outcome": "succeeded",
+      "reason_code": "g2_fluid_micro_course_complete"
+    },
+    {
+      "node_id": "node:failed",
+      "node_kind": "terminal",
+      "terminal_outcome": "failed",
+      "reason_code": "g2_fluid_micro_course_failed"
+    }
+  ]
+}

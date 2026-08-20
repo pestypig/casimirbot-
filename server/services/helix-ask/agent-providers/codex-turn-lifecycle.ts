@@ -32,16 +32,69 @@ export const buildCodexProviderTurnLifecycle = (input: {
   terminalEligible: boolean;
   ok: boolean;
   terminalReasonCode?: string | null;
+  settleTerminal?: boolean;
+  nativeProviderLifecycle?: HelixTurnLifecycle | null;
 }): HelixTurnLifecycle => {
+  const nativeRuntimeEvents =
+    input.nativeProviderLifecycle?.turn_id === input.turnId &&
+    input.nativeProviderLifecycle.scope === "codex_native_provider_cycle" &&
+    input.nativeProviderLifecycle.integrity.ok === true
+      ? input.nativeProviderLifecycle.events.filter(
+          (event) =>
+            event.kind !== "terminal.eligibility.checked" &&
+            event.kind !== "turn.completed" &&
+            event.kind !== "turn.failed" &&
+            event.kind !== "turn.needs_input",
+        )
+      : [];
   const recorder = createHelixTurnLifecycleRecorder({
     turnId: input.turnId,
     scope: "helix_ask_turn",
+    initialEvents: nativeRuntimeEvents,
   });
-  let prior = recorder.append({
-    kind: "turn.started",
-    producer: "helix_adapter",
-    status: "started",
-  });
+  const nativeRuntimeCompleted = Boolean(
+    input.nativeProviderLifecycle?.reduction.runtime_turn_completed &&
+      input.nativeProviderLifecycle.reduction.final_agent_message_event_id,
+  );
+  let prior = recorder.latest();
+  if (!prior) {
+    prior = recorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+  }
+
+  if (nativeRuntimeEvents.length > 0 && nativeRuntimeCompleted) {
+    if (input.settleTerminal === false) return recorder.snapshot();
+    const eligibility = recorder.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_terminal_authority",
+      status: input.terminalEligible ? "succeeded" : "blocked",
+      causation_id: prior.event_id,
+      terminal_kind: input.terminalArtifactKind ?? "typed_failure",
+      terminal_eligible: input.terminalEligible,
+      ...(input.terminalEligible
+        ? {}
+        : {
+            reason_code:
+              input.terminalReasonCode ?? "terminal_authority_rejected",
+          }),
+    });
+    const turnCompleted = input.ok && input.terminalEligible;
+    recorder.append({
+      kind: turnCompleted ? "turn.completed" : "turn.failed",
+      producer: "helix_adapter",
+      status: turnCompleted ? "succeeded" : "failed",
+      causation_id: eligibility.event_id,
+      terminal_kind: input.terminalArtifactKind ?? "typed_failure",
+      terminal_eligible: input.terminalEligible,
+      ...(turnCompleted
+        ? {}
+        : { reason_code: input.terminalReasonCode ?? "turn_failed" }),
+    });
+    return recorder.snapshot();
+  }
 
   if (input.routeCommitId) {
     prior = recorder.append({
@@ -213,6 +266,9 @@ export const buildCodexProviderTurnLifecycle = (input: {
     status: "succeeded",
     causation_id: message.event_id,
   });
+  if (input.settleTerminal === false) {
+    return recorder.snapshot();
+  }
   const eligibility = recorder.append({
     kind: "terminal.eligibility.checked",
     producer: "helix_terminal_authority",

@@ -1945,6 +1945,108 @@ coherence; and why the term is objective collapse rather than an unmodeled bath.
 It must also recover the ordinary QED/open-system and DP limits when its new
 coupling is set to zero.
 
+#### 5.4.1 Branch-conditioned stress--metric--coherence chain
+
+The broad functional above is decomposed in the live Theory Badge graph so
+that evidence cannot skip a physical layer. The magnetar birefringence result
+[Stewart et al. 2026] documents an environment-conditioned QED propagation
+response only. It supplies no numerical apparatus input and no optical-to-
+gravitational identity.
+
+**Source obligation.** For branches \(A,B\) and boundary state \(\beta\), the
+complete, conserved source candidate is
+
+<!-- helix-doc-equation-action/v1 id=cdp-supplement-branch-conditioned-total-stress-energy -->
+\[
+\Delta T_{\mu\nu}^{AB,\beta}(x)
+=T_{\mu\nu}^{A,\beta}(x)-T_{\mu\nu}^{B,\beta}(x),
+\qquad \nabla^\mu T_{\mu\nu}^{j,\beta}=0.
+\]
+
+The manifest must declare matter, supports, classical fields, material
+response, and renormalized QED terms; prevent double counting; bind the
+renormalization prescription to the geometry and state; and demonstrate
+conservation. Scalar Casimir energy, plate pressure, or refractive index cannot
+stand in for this object.
+
+**Gravitational-response obligation.** A candidate may then specify a retarded
+tensor response and the connected stress-fluctuation kernel,
+
+<!-- helix-doc-equation-action/v1 id=cdp-supplement-boundary-metric-response-slot -->
+\[
+\delta g_{\mu\nu}^{AB,\beta}
+=\frac{8\pi G}{c^4}G^{\rm ret}_{\mu\nu\rho\sigma}
+*\Delta T_{AB,\beta}^{\rho\sigma},
+\qquad
+N_{\mu\nu\rho\sigma}^{AB,\beta}
+=\frac12\langle\{\hat t_{\mu\nu},\hat t_{\rho\sigma}\}\rangle_{\rm ren}.
+\]
+
+The displayed relation is schematic. Numerical admission requires the
+background, gauge, causal boundary conditions, conservation and Ward checks,
+regularization, covariance, uncertainty, and ordinary-GR recovery. Mean stress
+and stress fluctuations are different authorities.
+
+**Coherence-dynamics obligation.** Only a separately registered dynamics may
+introduce an additional factor,
+
+<!-- helix-doc-equation-action/v1 id=cdp-supplement-boundary-conditioned-coherence-extension -->
+\[
+C_\beta(t)=C(0)e^{i\Phi_{{\rm EM},\beta}-\chi_{0,\beta}}
+e^{-\Gamma_{\rm D}t}e^{-\chi_{{\rm bridge},\beta}},
+\qquad
+\chi_{{\rm bridge},\beta}
+=\mathcal D_{\rm coh}[\delta g^{AB,\beta},N^{AB,\beta};\theta],
+\quad \mathcal D_{\rm coh}\ \text{not registered}.
+\]
+
+| Rung | What could establish it | What it cannot establish alone | Current standing |
+|---|---|---|---|
+| field-conditioned QED propagation | replicated polarization/Stokes response with the QED term required by model comparison | apparatus stress, curvature, coherence loss, or collapse | external empirical precedent only |
+| complete branch-conditioned source | conserved, renormalized, as-built \(\Delta T_{\mu\nu}^{AB,\beta}\) with uncertainty | metric response or collapse | blocked |
+| metric and stress-noise response | registered causal kernel with gauge, recovery, and validation receipts | nonunitary coherence dynamics | blocked |
+| boundary-conditioned coherence law | consistent dynamics, companion observable, complete ordinary null, and held-out replication | Penrose geometry, Orch-OR, consciousness, or biological function | blocked |
+
+The graph relations are therefore `documents`, `requires`, and `blocks`, never
+`derives` or an observable bridge. A biological projection is conditional on a
+replicated non-biological result and then requires a new biological state,
+mass-density, timescale, environmental, and functional-evidence chain.
+
+#### 5.4.2 Conditional evolutionary coherence control
+
+The life implication is registered as a hypothesis dependency rather than an
+inherited conclusion. Its admissibility gate is
+
+<!-- helix-doc-equation-action/v1 id=cdp-supplement-evolutionary-coherence-control-conditional-gate -->
+\[
+\operatorname{Admit}(H_{\rm evo})=
+R_{\rm bridge}^{\rm rep}\land M_{\rm bio}
+\land \Delta\tau_{\rm useful}>0
+\land h_z^2>0
+\land \operatorname{Cov}(w,z)\ne0
+\land R_{\rm selection}^{\rm rep},
+\qquad
+\Delta\tau_{\rm useful}=\tau_{\rm coh}-\tau_{\rm function}.
+\]
+
+The terms have separate evidence owners:
+
+| Dependency | Minimum evidence | Failure interpretation |
+|---|---|---|
+| replicated non-biological law \(R_{\rm bridge}^{\rm rep}\) | powered held-out same-apparatus replication of a registered coherence extension | the evolutionary extension is not opened |
+| biological mapping \(M_{\rm bio}\) | prepared biological state, material/mass-density model, environmental covariance, and ordinary open-system prediction | no transport from apparatus to organism is allowed |
+| useful lifetime surplus \(\Delta\tau_{\rm useful}>0\) | measured coherence lifetime longer than a prespecified functional transformation time | coherence is not shown to be functionally available |
+| heritable phenotype \(z\) | reproducible trait definition, variation, and transmission or genomic/structural ancestry | adaptation language is unavailable |
+| fitness relation \(\operatorname{Cov}(w,z)\ne0\) | blinded population or experimental-evolution analysis controlling ordinary biochemical alternatives | usefulness or persistence is not selection evidence |
+| replicated selection response | held-out lineage, intervention, or experimental-evolution confirmation | the association remains noncausal or population-specific |
+
+Candidate phenotypes may include molecular geometry, dielectric boundaries,
+collective modes, or operating times, but must be declared before the outcome
+data are examined. Selection may favor a functional phenotype without favoring
+objective collapse itself. No term in the gate supplies purpose, intention,
+consciousness, or Orch-OR. A null result at a biological rung constrains that
+rung and does not retroactively falsify a separately replicated physical law.
+
 ### 5.5 Quantum-foam model requirements
 
 "Quantum foam" is a model-family label until a study version supplies all of:

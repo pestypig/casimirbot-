@@ -37,6 +37,8 @@ export const HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_TRACE_SCHEMA =
   "helix.environment_action.differential_trace.v1" as const;
 export const HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_AUDIT_SCHEMA =
   "helix.environment_action.differential_audit.v1" as const;
+export const HELIX_ENVIRONMENT_ACTION_G2_PARITY_AUDIT_SCHEMA =
+  "helix.environment_action.g2_parity_audit.v1" as const;
 export const HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA =
   "helix.environment_clock_snapshot.v1" as const;
 
@@ -229,6 +231,17 @@ export const HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_STAGES = [
 
 export type HelixEnvironmentActionDifferentialStage =
   (typeof HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_STAGES)[number];
+
+export const HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_LANES = [
+  "direct_codex",
+  "codex_mcp",
+  "helix_ask",
+  // Compatibility lane retained for differential_trace.v1 artifacts.
+  "helix",
+] as const;
+
+export type HelixEnvironmentActionDifferentialLane =
+  (typeof HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_LANES)[number];
 
 export type HelixEnvironmentActionConnectorConfig = {
   schema: typeof HELIX_ENVIRONMENT_ACTION_CONNECTOR_CONFIG_SCHEMA;
@@ -1103,7 +1116,7 @@ export const helixEnvironmentActionDifferentialTraceSchema = z
     schema: z.literal(HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_TRACE_SCHEMA),
     trace_id: identifierSchema,
     scenario_id: identifierSchema,
-    lane: z.enum(["direct_codex", "helix"]),
+    lane: z.enum(HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_LANES),
     action_kind: identifierSchema,
     prompt_hash: sha256Schema,
     starting_state_hash: sha256Schema,
@@ -1209,6 +1222,43 @@ export const helixEnvironmentActionDifferentialAuditSchema = z
 
 export type HelixEnvironmentActionDifferentialAudit = z.infer<
   typeof helixEnvironmentActionDifferentialAuditSchema
+>;
+
+export const helixEnvironmentActionG2ParityAuditSchema = z
+  .object({
+    schema: z.literal(HELIX_ENVIRONMENT_ACTION_G2_PARITY_AUDIT_SCHEMA),
+    audit_id: identifierSchema,
+    scenario_id: identifierSchema,
+    action_kind: identifierSchema,
+    ok: z.boolean(),
+    first_divergence_stage: z.enum(
+      HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_STAGES,
+    ).nullable(),
+    mismatches: z.array(z.object({
+      comparison: z.enum(["a0_to_a1", "a1_to_b"]),
+      stage: z.enum(HELIX_ENVIRONMENT_ACTION_DIFFERENTIAL_STAGES),
+      code: identifierSchema,
+      expected_value: z.string().max(4_000).nullable(),
+      observed_value: z.string().max(4_000).nullable(),
+    }).strict()).max(256),
+    a0_trace_ref: identifierSchema,
+    a1_trace_ref: identifierSchema,
+    b_trace_ref: identifierSchema,
+    compared_at: timestampSchema,
+    observer_only: z.literal(true),
+    hidden_reasoning_included: z.literal(false),
+    content_role: z.literal(
+      "environment_action_g2_parity_audit_not_assistant_answer",
+    ),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+    raw_content_included: z.literal(false),
+  })
+  .strict();
+
+export type HelixEnvironmentActionG2ParityAudit = z.infer<
+  typeof helixEnvironmentActionG2ParityAuditSchema
 >;
 
 export const environmentActionRequestFingerprint = (

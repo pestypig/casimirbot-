@@ -33069,6 +33069,45 @@ export const codexProvider: HelixAgentProvider = {
         concise_text: scientificImageRetryTerminalText,
       };
     }
+    const preTerminalProviderReasoningReentry = readRecord(
+      providerReentry.providerReasoningReentry,
+    );
+    if (providerProcessOk && authorityGuardedText.trim()) {
+      const preTerminalCommittedRoute = readRecord(
+        request.body.committed_ask_route,
+      );
+      const preTerminalLifecycle = buildCodexProviderTurnLifecycle({
+        turnId,
+        routeCommitId: readString(preTerminalCommittedRoute?.commit_id),
+        gatewayCallResults,
+        capabilityLaneObservationPackets:
+          capabilityLaneContext.observation_packets,
+        providerReasoningReentry: preTerminalProviderReasoningReentry,
+        providerText: authorityGuardedText,
+        terminalArtifactKind: null,
+        terminalEligible: false,
+        ok: false,
+        settleTerminal: false,
+        nativeProviderLifecycle: nativeTurnLifecycle,
+      });
+      const preTerminalResponseRecord = responsePayload as Record<
+        string,
+        unknown
+      >;
+      preTerminalResponseRecord.turn_lifecycle = preTerminalLifecycle;
+      if (nativeTurnLifecycle) {
+        preTerminalResponseRecord.native_provider_turn_lifecycle =
+          nativeTurnLifecycle;
+      }
+      const preTerminalDebug = readRecord(preTerminalResponseRecord.debug);
+      if (preTerminalDebug) {
+        preTerminalDebug.turn_lifecycle = preTerminalLifecycle;
+        if (nativeTurnLifecycle) {
+          preTerminalDebug.native_provider_turn_lifecycle =
+            nativeTurnLifecycle;
+        }
+      }
+    }
     let providerTerminalWriterResult = applyHelixTerminalAuthoritySingleWriter({
       payload: responsePayload as Record<string, unknown>,
       turnId,
@@ -33892,6 +33931,7 @@ export const codexProvider: HelixAgentProvider = {
       terminalEligible: finalLifecycleTerminalEligible,
       ok: responsePayload.ok === true,
       terminalReasonCode: readString(responseRecord.terminal_error_code),
+      nativeProviderLifecycle: nativeTurnLifecycle,
     });
     responseRecord.turn_lifecycle = canonicalTurnLifecycle;
     if (nativeTurnLifecycle) {

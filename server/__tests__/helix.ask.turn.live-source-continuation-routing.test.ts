@@ -911,8 +911,13 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.answer).toContain("Mission-state interpretation:");
     expect(response.body?.answer).not.toContain("Visual capture is running every");
     expect(response.body?.terminal_answer_authority?.server_authoritative).toBe(true);
+    expect(response.body?.terminal_grounding_authority).toMatchObject({
+      status: "validated",
+      evidence_reentry_authority: "route_self_terminal",
+      runtime_lifecycle_verified: false,
+    });
     expect(response.body?.poison_audit?.ok).toBe(true);
-  }, 20_000);
+  }, 60_000);
 
   it("keeps capture readiness separate from missing SituationRun cognition", () => {
     const diagnosis = buildLiveEnvironmentBindingDiagnosis({

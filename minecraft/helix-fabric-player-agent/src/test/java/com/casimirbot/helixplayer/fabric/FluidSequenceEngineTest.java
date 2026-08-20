@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 final class FluidSequenceEngineTest {
@@ -60,7 +61,7 @@ final class FluidSequenceEngineTest {
 
     @Test
     void reusesTheProductionControllerForEmbeddedActions() {
-        FakeBridge bridge = new FakeBridge();
+        SequenceBridge bridge = new SequenceBridge();
         FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
         engine.begin(sequence(
             "node:hotbar",
@@ -85,6 +86,44 @@ final class FluidSequenceEngineTest {
         WorkflowStep terminal = engine.step(2);
         assertEquals(WorkflowStepStatus.SUCCEEDED, terminal.status());
         assertEquals(true, terminal.measurements().get("inventory_mutation_performed"));
+        assertEquals(1, bridge.scopedReleaseCount);
+        assertEquals(0, bridge.globalReleaseCount);
+    }
+
+    @Test
+    void removesNullOptionalFieldsBeforeStartingAnEmbeddedAction() {
+        FakeBridge bridge = new FakeBridge();
+        FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+        engine.begin(sequence(
+            "node:craft",
+            List.of(),
+            List.of(
+                Map.ofEntries(
+                    Map.entry("node_id", "node:craft"),
+                    Map.entry("node_kind", "workflow_action"),
+                    Map.entry("earliest_tick", 0),
+                    Map.entry("timeout_ticks", 20),
+                    Map.entry("action", nullableCraftAction()),
+                    Map.entry("on_success", "node:succeeded"),
+                    Map.entry("on_failure", "node:failed")
+                ),
+                terminal("node:succeeded", "succeeded"),
+                terminal("node:failed", "failed")
+            )
+        ));
+
+        assertDoesNotThrow(() -> engine.step(1));
+        assertEquals("craft", bridge.startedArguments.get("action_kind"));
+        assertFalse(bridge.startedArguments.containsKey("recipe_id"));
+    }
+
+    private static Map<String, Object> nullableCraftAction() {
+        Map<String, Object> action = new LinkedHashMap<>();
+        action.put("action_kind", "craft");
+        action.put("output_item_id", "minecraft:oak_planks");
+        action.put("count", 4);
+        action.put("recipe_id", null);
+        return action;
     }
 
     @Test
@@ -476,6 +515,8 @@ final class FluidSequenceEngineTest {
 
     private static final class SequenceBridge extends FakeBridge {
         private final FluidSequenceEngine sequenceEngine = new FluidSequenceEngine(this);
+        private int globalReleaseCount;
+        private int scopedReleaseCount;
 
         @Override
         public void beginWorkflow(
@@ -496,6 +537,18 @@ final class FluidSequenceEngineTest {
             return "execute_sequence".equals(actionKind)
                 ? sequenceEngine.step(actionTicks)
                 : WorkflowStep.failed("unsupported", Map.of());
+        }
+
+        @Override
+        public void releaseResources(Set<String> resources) {
+            scopedReleaseCount++;
+            super.releaseAll();
+        }
+
+        @Override
+        public void releaseAll() {
+            globalReleaseCount++;
+            super.releaseAll();
         }
     }
 }

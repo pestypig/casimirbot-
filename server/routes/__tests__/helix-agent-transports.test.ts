@@ -476,6 +476,33 @@ describe("Helix agent REST transport", () => {
     }
   });
 
+  it("publishes an endpoint-matching MCP resource on a verified loopback request", async () => {
+    process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
+    const verifier = {
+      verify: vi.fn(),
+      authorizationServer: () => "https://issuer.example",
+      audience: () => "https://agent.example/mcp",
+      providerAlias: () => "oidc",
+    };
+    const app = express();
+    app.use(
+      createHelixAgentProtectedResourceMetadataRouter({
+        verifier,
+        useLoopbackRequestResource: true,
+      }),
+    );
+
+    const response = await request(app)
+      .get("/.well-known/oauth-protected-resource/mcp")
+      .set("Host", "localhost:1522")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      resource: "http://localhost:1522/mcp",
+      authorization_servers: ["https://issuer.example"],
+    });
+  });
+
   it("publishes a least-privilege Device Check resource profile", async () => {
     process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
     const verifier = {
@@ -949,8 +976,11 @@ describe("Helix MCP HTTP transport", () => {
     expect(response.headers["www-authenticate"]).toContain(
       'error="invalid_token"',
     );
-    expect(response.headers["www-authenticate"]).toContain(
-      `resource_metadata="https://agent.example${HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH}"`,
+    expect(response.headers["www-authenticate"]).toMatch(
+      new RegExp(
+        `resource_metadata="http://127\\.0\\.0\\.1:\\d+${HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH.replaceAll("/", "\\/")}"`,
+        "u",
+      ),
     );
   });
 });

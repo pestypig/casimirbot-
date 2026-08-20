@@ -387,8 +387,16 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
 
   it("keeps the canonical article connected to the live Theory Badge graph", () => {
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(46);
-    expect(graph.edges).toHaveLength(132);
+    expect(graph.badges).toHaveLength(50);
+    expect(graph.edges).toHaveLength(146);
+    expect(main).toContain("QED-vacuum precedent and the gated bridge");
+    expect(main).toContain("cdp-branch-conditioned-total-stress-energy");
+    expect(main).toContain("cdp-boundary-metric-response-slot");
+    expect(main).toContain("cdp-boundary-conditioned-coherence-extension");
+    expect(main).toContain("Conditional evolutionary coherence control");
+    expect(main).toContain("cdp-evolutionary-coherence-control-conditional-gate");
+    expect(supplement).toContain("Branch-conditioned stress--metric--coherence chain");
+    expect(supplement).toContain("cdp-supplement-evolutionary-coherence-control-conditional-gate");
     expect(
       graph.badges.some((badge) =>
         badge.sourceRefs.some((source) =>

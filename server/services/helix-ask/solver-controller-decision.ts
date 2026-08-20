@@ -350,6 +350,47 @@ const hasSatisfiedLivePipelineReceipt = (payload: RecordLike, terminalArtifactKi
   });
 };
 
+const hasSatisfiedLiveEnvironmentBindingDiagnosis = (
+  payload: RecordLike,
+  terminalArtifactKind: string | null,
+): boolean => {
+  if (terminalArtifactKind !== "live_environment_binding_diagnosis") return false;
+  if (readString(payload.final_answer_source) !== terminalArtifactKind) return false;
+  const goal = readRecord(payload.canonical_goal_frame);
+  if (
+    readString(goal?.goal_kind) !== terminalArtifactKind ||
+    readString(goal?.required_terminal_kind) !== terminalArtifactKind
+  ) {
+    return false;
+  }
+  const routeContract = readRecord(payload.route_product_contract);
+  const allowedKinds = readStringArray(
+    routeContract?.allowed_terminal_artifact_kinds,
+  );
+  const requiredKind =
+    readString(routeContract?.required_terminal_artifact_kind) ??
+    readString(routeContract?.required_terminal_kind);
+  if (
+    readString(routeContract?.schema) !== "helix.route_product_contract.v1" ||
+    (!allowedKinds.includes(terminalArtifactKind) &&
+      requiredKind !== terminalArtifactKind) ||
+    readStringArray(routeContract?.forbidden_terminal_artifact_kinds).includes(
+      terminalArtifactKind,
+    )
+  ) {
+    return false;
+  }
+  const diagnosis = readRecord(payload.live_environment_binding_diagnosis);
+  return Boolean(
+    /^helix\.live_environment_binding_diagnosis\.v\d+$/i.test(
+      readString(diagnosis?.schema) ?? "",
+    ) &&
+      diagnosis?.assistant_answer === false &&
+      diagnosis?.raw_content_included === false &&
+      readString(diagnosis?.diagnosis_id),
+  );
+};
+
 const hasSatisfiedDocOpenReceipt = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (terminalArtifactKind !== "doc_open_receipt") return false;
   const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
@@ -757,6 +798,7 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
   if (hasMaterializedScholarlyResearchAnswer(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
+  if (hasSatisfiedLiveEnvironmentBindingDiagnosis(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocOpenReceipt(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocSummary(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocumentTerminal(payload, terminalArtifactKind)) return true;

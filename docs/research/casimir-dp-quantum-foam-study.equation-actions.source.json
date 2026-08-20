@@ -612,6 +612,34 @@
         "claimBoundaryNote": "Synthetic local correspondence recovery does not select a unique physical map, define an invariant incompatibility functional, or generate collapse."
       }],
       "claimBoundaryNotes": ["Five same-apparatus reference packets remain absent.", "The parent candidate remains blocked at PCT_BRANCH_CORRESPONDENCE_MISSING."]
+    },
+    {
+      "equationId": "cdp-branch-conditioned-total-stress-energy",
+      "label": "Branch-conditioned complete stress-energy obligation",
+      "aliases": ["Delta T AB beta complete conserved apparatus source"],
+      "actions": [{"actionId":"open-cdp-branch-conditioned-total-stress-energy","kind":"artifact_backed_theory_run","label":"Open complete-source hypothesis gate","badgeIds":["study.casimir_dp.polarization_resolved_qed_control","study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.gated_bridge","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The equation defines a conserved complete-source obligation; it is not a measured tensor, curvature result, or collapse bridge."}],
+      "claimBoundaryNotes": ["Magnetar birefringence is methodological QED precedent only.", "No magnetar parameters are transferred into the apparatus."]
+    },
+    {
+      "equationId": "cdp-boundary-metric-response-slot",
+      "label": "Retarded metric and stress-noise response slot",
+      "aliases": ["delta g retarded Green tensor Delta T and noise kernel"],
+      "actions": [{"actionId":"open-cdp-boundary-metric-response-slot","kind":"artifact_backed_theory_run","label":"Open blocked gravitational-response gate","badgeIds":["study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis","study.casimir_dp.boundary_metric_noise_response_hypothesis","study.casimir_dp.manifold_kernel_registry","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.boundary_metric_noise_response_hypothesis","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.gated_bridge","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The retarded expression is an unregistered notation slot; an optical metric is not identified with a gravitational metric."}],
+      "claimBoundaryNotes": ["Gauge, causal boundary conditions, renormalization, noise, covariance, and GR recovery remain blocked."]
+    },
+    {
+      "equationId": "cdp-boundary-conditioned-coherence-extension",
+      "label": "Boundary-conditioned coherence-extension slot",
+      "aliases": ["C beta ordinary QED times Diósi times unregistered bridge"],
+      "actions": [{"actionId":"open-cdp-boundary-conditioned-coherence-extension","kind":"artifact_backed_theory_run","label":"Open blocked coherence-extension gate","badgeIds":["study.casimir_dp.boundary_metric_noise_response_hypothesis","study.casimir_dp.boundary_conditioned_coherence_extension","study.casimir_dp.boundary_branch_interaction_stage4_2i","orch_or.claim_boundary.exploratory_only","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.boundary_conditioned_coherence_extension","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.gated_bridge","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"No coherence dynamics is registered; standard Diósi remains boundary independent and biological implications remain conditional."}],
+      "claimBoundaryNotes": ["Held-out non-biological replication and a companion prediction are required before downstream interpretation."]
+    },
+    {
+      "equationId": "cdp-evolutionary-coherence-control-conditional-gate",
+      "label": "Conditional evolutionary coherence-control dependency gate",
+      "aliases": ["replicated bridge biological map lifetime heritability fitness selection gate"],
+      "actions": [{"actionId":"open-cdp-evolutionary-coherence-control-conditional-gate","kind":"artifact_backed_theory_run","label":"Open conditional evolutionary hypothesis path","badgeIds":["study.casimir_dp.boundary_conditioned_coherence_extension","study.casimir_dp.evolutionary_coherence_control_conditional","biology.evolution.selection_fitness_context","plant.photosynthesis.coherence_lifetime_gate","consciousness.claim_boundary.evolutionary_biology_context_only","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.evolutionary_coherence_control_conditional","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.conditional_life_implication","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"This gate records a hypothetical dependency only; every physical, biological, heritability, fitness, and selection authority is presently absent."}],
+      "claimBoundaryNotes": ["Selection may favor a functional phenotype, not coherence or collapse as an abstract goal.", "No purpose, consciousness, or Orch-OR conclusion is admitted."]
     }
   ]
 }

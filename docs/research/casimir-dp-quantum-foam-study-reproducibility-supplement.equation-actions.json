@@ -3106,6 +3106,146 @@
         "Common-input equality is not full equivalence-principle recovery.",
         "No collapse output is emitted."
       ]
+    },
+    {
+      "equationId": "cdp-supplement-branch-conditioned-total-stress-energy",
+      "label": "Supplement complete stress-energy obligation",
+      "sectionAnchor": "541-branch-conditioned-stress--metric--coherence-chain",
+      "latex": "\\Delta T_{\\mu\\nu}^{AB,\\beta}(x) =T_{\\mu\\nu}^{A,\\beta}(x)-T_{\\mu\\nu}^{B,\\beta}(x), \\qquad \\nabla^\\mu T_{\\mu\\nu}^{j,\\beta}=0.",
+      "aliases": [
+        "Delta T AB beta complete conserved apparatus source"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-supplement-branch-conditioned-total-stress-energy",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open source-obligation badge path",
+          "badgeIds": [
+            "study.casimir_dp.polarization_resolved_qed_control",
+            "study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.gated_bridge",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "This is a noncomputable source obligation, not a measured or derived gravitational source."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Scalar Casimir energy and vacuum birefringence cannot substitute for the complete conserved tensor."
+      ]
+    },
+    {
+      "equationId": "cdp-supplement-boundary-metric-response-slot",
+      "label": "Supplement metric and stress-noise response slot",
+      "sectionAnchor": "541-branch-conditioned-stress--metric--coherence-chain",
+      "latex": "\\delta g_{\\mu\\nu}^{AB,\\beta} =\\frac{8\\pi G}{c^4}G^{\\rm ret}_{\\mu\\nu\\rho\\sigma} *\\Delta T_{AB,\\beta}^{\\rho\\sigma}, \\qquad N_{\\mu\\nu\\rho\\sigma}^{AB,\\beta} =\\frac12\\langle\\{\\hat t_{\\mu\\nu},\\hat t_{\\rho\\sigma}\\}\\rangle_{\\rm ren}.",
+      "aliases": [
+        "retarded gravitational response and stress noise kernel"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-supplement-boundary-metric-response-slot",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open metric/noise registry path",
+          "badgeIds": [
+            "study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis",
+            "study.casimir_dp.boundary_metric_noise_response_hypothesis",
+            "study.casimir_dp.manifold_kernel_registry",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.boundary_metric_noise_response_hypothesis",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.gated_bridge",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The expression is schematic and remains blocked by the registry's tensor, gauge, causal, noise, and recovery requirements."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Mean stress and stress fluctuations are separate authorities."
+      ]
+    },
+    {
+      "equationId": "cdp-supplement-boundary-conditioned-coherence-extension",
+      "label": "Supplement boundary-conditioned coherence slot",
+      "sectionAnchor": "541-branch-conditioned-stress--metric--coherence-chain",
+      "latex": "C_\\beta(t)=C(0)e^{i\\Phi_{{\\rm EM},\\beta}-\\chi_{0,\\beta}} e^{-\\Gamma_{\\rm D}t}e^{-\\chi_{{\\rm bridge},\\beta}}, \\qquad \\chi_{{\\rm bridge},\\beta} =\\mathcal D_{\\rm coh}[\\delta g^{AB,\\beta},N^{AB,\\beta};\\theta], \\quad \\mathcal D_{\\rm coh}\\ \\text{not registered}.",
+      "aliases": [
+        "unregistered D coh metric noise to complex coherence"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-supplement-boundary-conditioned-coherence-extension",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open coherence-extension and conditional-scope path",
+          "badgeIds": [
+            "study.casimir_dp.boundary_metric_noise_response_hypothesis",
+            "study.casimir_dp.boundary_conditioned_coherence_extension",
+            "study.casimir_dp.boundary_branch_interaction_stage4_2i",
+            "orch_or.claim_boundary.exploratory_only",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.boundary_conditioned_coherence_extension",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.gated_bridge",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "No physical coherence kernel or biological implication is admitted by this blocked path."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Standard Diósi remains boundary independent.",
+        "Orch-OR and biology require independent downstream evidence."
+      ]
+    },
+    {
+      "equationId": "cdp-supplement-evolutionary-coherence-control-conditional-gate",
+      "label": "Supplement evolutionary coherence-control evidence ladder",
+      "sectionAnchor": "542-conditional-evolutionary-coherence-control",
+      "latex": "\\operatorname{Admit}(H_{\\rm evo})= R_{\\rm bridge}^{\\rm rep}\\land M_{\\rm bio} \\land \\Delta\\tau_{\\rm useful}>0 \\land h_z^2>0 \\land \\operatorname{Cov}(w,z)\\ne0 \\land R_{\\rm selection}^{\\rm rep}, \\qquad \\Delta\\tau_{\\rm useful}=\\tau_{\\rm coh}-\\tau_{\\rm function}.",
+      "aliases": [
+        "Delta tau useful heritability fitness covariance replicated selection"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-supplement-evolutionary-coherence-control-conditional-gate",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open evolutionary evidence ladder",
+          "badgeIds": [
+            "study.casimir_dp.boundary_conditioned_coherence_extension",
+            "study.casimir_dp.evolutionary_coherence_control_conditional",
+            "biology.evolution.selection_fitness_context",
+            "plant.photosynthesis.coherence_lifetime_gate",
+            "consciousness.claim_boundary.evolutionary_biology_context_only",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.evolutionary_coherence_control_conditional",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.conditional_life_implication",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The six-rung gate is noncomputable until independent physical and biological evidence packets exist."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A null biological rung does not falsify an independently replicated non-biological law.",
+        "Adaptation is not teleology."
+      ]
     }
   ]
 }

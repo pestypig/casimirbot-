@@ -38,8 +38,11 @@ export const createHelixTurnLifecycleRecorder = (input: {
   turnId: string;
   scope?: HelixTurnLifecycleScope;
   now?: () => number;
+  initialEvents?: HelixTurnLifecycleEvent[];
 }): HelixTurnLifecycleRecorder => {
-  const events: HelixTurnLifecycleEvent[] = [];
+  const events: HelixTurnLifecycleEvent[] = (input.initialEvents ?? []).map(
+    (event) => ({ ...event }),
+  );
   const now = input.now ?? Date.now;
 
   const append = (entry: AppendLifecycleEvent): HelixTurnLifecycleEvent => {
@@ -192,12 +195,32 @@ export const readVerifiedHelixTurnLifecycleFromPayload = (input: {
   turnId: string;
   requiredScope?: HelixTurnLifecycleScope;
 }): HelixTurnLifecycle | null => {
-  const debug = readRecord(input.payload.debug);
-  for (const value of [input.payload.turn_lifecycle, debug?.turn_lifecycle]) {
+  // The top-level payload is the authority surface. `debug.turn_lifecycle` is
+  // a read-only projection and must never become a fallback fact stream when
+  // the authoritative payload is absent, stale, or poisoned.
+  return readVerifiedHelixTurnLifecycle({
+    value: input.payload.turn_lifecycle,
+    turnId: input.turnId,
+    requiredScope: input.requiredScope,
+  });
+};
+
+export const readVerifiedHelixNativeProviderLifecycleFromPayload = (input: {
+  payload: Record<string, unknown>;
+  turnId: string;
+}): HelixTurnLifecycle | null => {
+  const nativeBridge = readRecord(input.payload.codex_native_provider_bridge);
+  const nativeWorkstationTurn = readRecord(nativeBridge?.native_workstation_turn);
+  const candidates = [
+    input.payload.native_provider_turn_lifecycle,
+    input.payload.turn_lifecycle,
+    nativeWorkstationTurn?.turn_lifecycle,
+  ];
+  for (const value of candidates) {
     const lifecycle = readVerifiedHelixTurnLifecycle({
       value,
       turnId: input.turnId,
-      requiredScope: input.requiredScope,
+      requiredScope: "codex_native_provider_cycle",
     });
     if (lifecycle) return lifecycle;
   }
@@ -208,52 +231,19 @@ export const readVerifiedHelixRuntimeLifecycleFromPayload = (input: {
   payload: Record<string, unknown>;
   turnId: string;
 }): HelixTurnLifecycle | null => {
-  const debug = readRecord(input.payload.debug);
-  const nativeBridge =
-    readRecord(input.payload.codex_native_provider_bridge) ??
-    readRecord(debug?.codex_native_provider_bridge);
-  const nativeWorkstationTurn = readRecord(nativeBridge?.native_workstation_turn);
-  const nativeCandidates = [
-    input.payload.native_provider_turn_lifecycle,
-    debug?.native_provider_turn_lifecycle,
-    nativeWorkstationTurn?.turn_lifecycle,
-  ];
-  const verifiedCandidates: HelixTurnLifecycle[] = [];
-  for (const value of nativeCandidates) {
-    const lifecycle = readVerifiedHelixTurnLifecycle({
-      value,
-      turnId: input.turnId,
-      requiredScope: "codex_native_provider_cycle",
-    });
-    if (lifecycle) verifiedCandidates.push(lifecycle);
-  }
   const canonicalLifecycle = readVerifiedHelixTurnLifecycleFromPayload({
     payload: input.payload,
     turnId: input.turnId,
+    requiredScope: "helix_ask_turn",
   });
-  if (canonicalLifecycle) verifiedCandidates.push(canonicalLifecycle);
-  if (verifiedCandidates.length === 0) return null;
-
-  // The native Codex lifecycle is authoritative for its own transport cycle,
-  // but adapter gateway execution may occur immediately outside that cycle.
-  // Prefer whichever verified log carries the most complete current-turn
-  // observation -> re-entry -> reasoning sequence. Stable ordering keeps the
-  // native log preferred when both logs carry equivalent facts.
-  const lifecycleCompletenessScore = (lifecycle: HelixTurnLifecycle): number =>
-    (lifecycle.reduction.complete ? 32 : 0) +
-    (lifecycle.reduction.post_observation_reasoning_completed ? 16 : 0) +
-    Math.min(lifecycle.reduction.observation_reentry_refs.length, 8) * 2 +
-    (lifecycle.reduction.runtime_turn_completed ? 1 : 0);
-  return verifiedCandidates.reduce((selected, candidate) =>
-    lifecycleCompletenessScore(candidate) > lifecycleCompletenessScore(selected)
-      ? candidate
-      : selected,
-  );
+  if (canonicalLifecycle) return canonicalLifecycle;
+  return readVerifiedHelixNativeProviderLifecycleFromPayload(input);
 };
 
 export type HelixRuntimeObservationReentryResolution = {
   authority: "runtime_event_log" | "compatibility_projection";
   runtime_lifecycle_verified: boolean;
+  compatibility_projected: boolean;
   reentered: boolean;
   candidate_refs: string[];
   matched_reentry_refs: string[];
@@ -276,8 +266,17 @@ export const resolveHelixRuntimeObservationReentry = (input: {
   const canonicalTurnLifecycle = readVerifiedHelixTurnLifecycleFromPayload({
     payload: input.payload,
     turnId: input.turnId,
+    requiredScope: "helix_ask_turn",
   });
-  const verifiedLifecycles = [preferredLifecycle, canonicalTurnLifecycle]
+  const nativeProviderLifecycle = readVerifiedHelixNativeProviderLifecycleFromPayload({
+    payload: input.payload,
+    turnId: input.turnId,
+  });
+  const verifiedLifecycles = [
+    canonicalTurnLifecycle,
+    nativeProviderLifecycle,
+    preferredLifecycle,
+  ]
     .filter((lifecycle): lifecycle is HelixTurnLifecycle => Boolean(lifecycle))
     .filter((lifecycle, index, lifecycles) =>
       lifecycles.findIndex((candidate) =>
@@ -296,6 +295,7 @@ export const resolveHelixRuntimeObservationReentry = (input: {
     return {
       authority: "runtime_event_log",
       runtime_lifecycle_verified: true,
+      compatibility_projected: input.compatibilityProjected === true,
       reentered: matchedReentryRefs.length > 0,
       candidate_refs: candidateRefs,
       matched_reentry_refs: matchedReentryRefs,
@@ -305,9 +305,13 @@ export const resolveHelixRuntimeObservationReentry = (input: {
   return {
     authority: "compatibility_projection",
     runtime_lifecycle_verified: false,
-    reentered: input.compatibilityProjected === true,
+    compatibility_projected: input.compatibilityProjected === true,
+    // Compatibility is visible diagnostic state, never proof that an
+    // observation crossed the runtime boundary. Consumers that need factual
+    // re-entry must wait for an exact observation.reentered event.
+    reentered: false,
     candidate_refs: candidateRefs,
-    matched_reentry_refs: input.compatibilityProjected === true ? candidateRefs : [],
+    matched_reentry_refs: [],
     runtime_observation_reentry_refs: [],
   };
 };

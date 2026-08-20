@@ -46,6 +46,9 @@ type McpRouterDependencies = {
   resourceMetadataPath?: string;
 };
 
+const MCP_RESOURCE_METADATA_PATH =
+  "/.well-known/oauth-protected-resource/mcp";
+
 const jsonRpcMethodNotAllowed = (res: Response): void => {
   res.setHeader("Allow", "POST");
   res.status(405).json({
@@ -268,7 +271,12 @@ export const createHelixMcpRouter = (
   );
   router.use(
     createHelixAgentApiErrorHandler({
-      resourceMetadataPath: dependencies.resourceMetadataPath,
+      resourceMetadataPath:
+        dependencies.resourceMetadataPath ?? MCP_RESOURCE_METADATA_PATH,
+      // Keep transport discovery on the same loopback origin during local
+      // Codex acceptance. The metadata document still advertises the
+      // canonical deployed OAuth resource and issuer.
+      useLoopbackRequestOrigin: true,
     }),
   );
   return router;

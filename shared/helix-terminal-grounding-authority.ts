@@ -49,6 +49,7 @@ export type HelixTerminalGroundingAuthority = {
   selected_evidence_refs: string[];
   evidence_reentry_authority:
     | "runtime_event_log"
+    | "route_self_terminal"
     | "provider_terminal_authority_bridge"
     | "compatibility_projection"
     | null;

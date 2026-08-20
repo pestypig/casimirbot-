@@ -26,6 +26,7 @@ export interface DirectDiagnosticCaptureOptions {
   requestedWorkflowId?: string | null;
   scenarioId?: string | null;
   comparisonMode?: boolean;
+  comparisonStartingState?: unknown;
 }
 
 const argument = (name: string): string | null => {
@@ -69,6 +70,7 @@ export const buildDirectDiagnosticCapture = ({
   requestedWorkflowId,
   scenarioId,
   comparisonMode = false,
+  comparisonStartingState,
 }: DirectDiagnosticCaptureOptions): EnvironmentActionDifferentialCaptureInput => {
   const records = parseDirectDiagnosticRecords(logText);
   const requests = records.filter(
@@ -195,7 +197,7 @@ export const buildDirectDiagnosticCapture = ({
     action_kind: actionKind,
     prompt,
     starting_state: comparisonMode
-      ? {
+      ? comparisonStartingState ?? {
           fixture_kind: "bounded_player_action",
           required_preconditions: ["connected", "on_ground"],
         }
@@ -258,6 +260,9 @@ export const runDirectDiagnosticCaptureCli = (): void => {
     requestedWorkflowId: argument("--workflow-id"),
     scenarioId: argument("--scenario"),
     comparisonMode: process.argv.includes("--comparison-mode"),
+    comparisonStartingState: argument("--starting-state")
+      ? JSON.parse(fs.readFileSync(path.resolve(argument("--starting-state")!), "utf8"))
+      : undefined,
   });
   const resolvedOutput = path.resolve(outputPath);
   fs.mkdirSync(path.dirname(resolvedOutput), { recursive: true });

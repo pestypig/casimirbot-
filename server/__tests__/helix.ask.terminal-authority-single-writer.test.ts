@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,6 +19,7 @@ import {
 import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
 import { buildCommittedAskRoute } from "../services/helix-ask/committed-ask-route";
 import { buildTheoryExecutionClosureTerminalFixture } from "./fixtures/theory-execution-closure-terminal-fixture";
+import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
 
 const makePostToolObservation = (turnId: string) => ({
   artifact_id: `${turnId}:obs`,
@@ -1062,8 +1064,82 @@ describe("Helix terminal authority single writer", () => {
       },
     }));
     const providerCandidateRef = `${turnId}:agent_provider_terminal_candidate:codex:docs`;
+    const lifecycleRecorder = createHelixTurnLifecycleRecorder({
+      turnId,
+      scope: "helix_ask_turn",
+      now: () => 100,
+    });
+    let lifecyclePrior = lifecycleRecorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const lifecycleRoute = lifecycleRecorder.append({
+      kind: "route.committed",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: lifecyclePrior.event_id,
+      route_commit_id: `${turnId}:route`,
+      capability_ids: ["docs.search"],
+    });
+    lifecyclePrior = lifecycleRecorder.append({
+      kind: "capability.admitted",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: lifecycleRoute.event_id,
+      route_commit_id: `${turnId}:route`,
+      capability_id: "docs.search",
+    });
+    for (const [index, observationRef] of observationRefs.entries()) {
+      const call = lifecycleRecorder.append({
+        kind: "tool.call.started",
+        producer: "codex_runtime",
+        status: "started",
+        causation_id: lifecyclePrior.event_id,
+        route_commit_id: `${turnId}:route`,
+        call_id: `${turnId}:docs:${index + 1}`,
+        capability_id: "docs.search",
+      });
+      const completed = lifecycleRecorder.append({
+        kind: "tool.call.completed",
+        producer: "helix_adapter",
+        status: "succeeded",
+        causation_id: call.event_id,
+        route_commit_id: `${turnId}:route`,
+        call_id: `${turnId}:docs:${index + 1}`,
+        capability_id: "docs.search",
+        observation_refs: [observationRef],
+      });
+      lifecyclePrior = lifecycleRecorder.append({
+        kind: "observation.reentered",
+        producer: "helix_adapter",
+        status: "succeeded",
+        causation_id: completed.event_id,
+        route_commit_id: `${turnId}:route`,
+        call_id: `${turnId}:docs:${index + 1}`,
+        capability_id: "docs.search",
+        observation_refs: [observationRef],
+      });
+    }
+    const lifecycleMessage = lifecycleRecorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: lifecyclePrior.event_id,
+      message_sha256: crypto
+        .createHash("sha256")
+        .update(answerText)
+        .digest("hex"),
+    });
+    lifecycleRecorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: lifecycleMessage.event_id,
+    });
     const payload: Record<string, unknown> = {
       turn_id: turnId,
+      turn_lifecycle: lifecycleRecorder.snapshot(),
       current_turn_artifact_ledger: artifacts,
       committed_ask_route: {
         schema: "helix.committed_ask_route.v1",
@@ -1164,6 +1240,10 @@ describe("Helix terminal authority single writer", () => {
         turn_id: turnId,
         status: "completed",
         evidence_reentered: true,
+        observation_reentered: true,
+        input_observation_refs: observationRefs,
+        reentered_observation_refs: observationRefs,
+        normalized_observation_refs: observationRefs,
         solver_completed: true,
         goal_satisfaction_compatible: true,
         assistant_answer: false,
@@ -1337,14 +1417,14 @@ describe("Helix terminal authority single writer", () => {
     const artifactIndex = buildArtifactQueryIndex({ turnId, payload });
     expect(artifactIndex.tool_turn_chain_audit).toMatchObject({
       reentry_executed: true,
-      reentry_proof_source: "provider_route_product_materialization_with_support_refs",
+      reentry_proof_source: "runtime_event_log.observation_reentered",
       reentry_proven: true,
       rail_status: "complete",
       rail_failure_code: null,
     });
     expect(artifactIndex.codex_parity_agent_spine_rail_table).toMatchObject({
       reentry_status: "reentered",
-      reentry_proof_source: "provider_route_product_materialization_with_support_refs",
+      reentry_proof_source: "runtime_event_log.observation_reentered",
       reentry_proven: true,
       rail_status: "complete",
       rail_failure_code: null,

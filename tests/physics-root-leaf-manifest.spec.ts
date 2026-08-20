@@ -737,6 +737,40 @@ describe("validatePhysicsRootLeafManifest", () => {
       expect.arrayContaining(["measured", "proxy", "inferred"]),
     );
 
+    const evolutionaryPath = manifest.paths?.find(
+      (entry) =>
+        entry.id ===
+        "path_casimir_dp_residual_to_evolutionary_coherence_conditional",
+    );
+    expect(evolutionaryPath).toEqual(expect.objectContaining({
+      root_id: "physics_quantum_semiclassical",
+      leaf_id: "leaf_casimir_dp_evolutionary_coherence_conditional",
+      bundle_id: "casimir-dp.or-boundary-coherence",
+    }));
+    expect(evolutionaryPath?.nodes).toEqual(expect.arrayContaining([
+      "physics_information_dynamics",
+      "physics_biology_life",
+    ]));
+    expect(evolutionaryPath?.dag_bridges).toEqual(expect.arrayContaining([
+      "bridge-replicated-nonbiological-coherence-law-to-biological-test-entry",
+      "bridge-heritable-phenotype-to-fitness-covariance",
+      "bridge-evolutionary-coherence-control-to-teleology-nonclaim",
+    ]));
+    expect(evolutionaryPath?.falsifier?.readiness_block_rule).toContain(
+      "replicatedNonbiologicalCoherenceLawReady != true",
+    );
+    expect(evolutionaryPath?.falsifier?.readiness_block_rule).toContain(
+      "fitnessTraitCovarianceReady != true",
+    );
+    expect(evolutionaryPath?.falsifier?.readiness_block_rule).toContain(
+      "adaptationTeleologySeparationPreserved != true",
+    );
+    expect(evolutionaryPath?.maturity_gate).toEqual(expect.objectContaining({
+      max_claim_tier: "diagnostic",
+      strict_fail_reason:
+        "ROOT_LEAF_CASIMIR_DP_EVOLUTIONARY_COHERENCE_CONDITIONAL_FAIL",
+    }));
+
     const readinessBlockRule = (
       pathEntry?.falsifier as {
         readiness_block_rule?: string;
@@ -999,6 +1033,9 @@ describe("validatePhysicsRootLeafManifest", () => {
       "registeredNonunitarySignatureMatch != true",
     );
     expect(rejectRule).toContain("frozenDpScalingMatch != true");
+    expect(rejectRule).toContain("branchConditionedCompleteStressReady != true");
+    expect(rejectRule).toContain("boundaryMetricNoiseKernelRegistered != true");
+    expect(rejectRule).toContain("boundaryCoherenceExtensionRegistered != true");
     expect(rejectRule).not.toContain(
       "electronMassHiggsAnchorCalibration",
     );
@@ -1008,6 +1045,10 @@ describe("validatePhysicsRootLeafManifest", () => {
         "bridge-stage3-ordinary-physics-null-to-residual",
         "bridge-stage3-named-dp-to-companion-falsifier",
         "bridge-stage3-manifold-registry-to-bridge-admission",
+        "bridge-magnetar-qed-precedent-to-polarization-control",
+        "bridge-branch-conditioned-complete-stress-to-metric-kernel",
+        "bridge-retarded-metric-noise-to-coherence-extension",
+        "bridge-boundary-coherence-extension-to-orch-conditional-nonclaim",
         "bridge-stage4-transverse-polarization-to-qed-null",
         "bridge-stage4-planck-fdt-to-thermal-null",
         "bridge-stage4-congruence-to-model-admission",
@@ -1180,6 +1221,7 @@ describe("validatePhysicsRootLeafManifest", () => {
         max_claim_tier: "diagnostic",
         path_ids: [
           "path_quantum_semiclassical_to_casimir_dp_or_test",
+          "path_casimir_dp_residual_to_evolutionary_coherence_conditional",
           "path_complete_casimir_apparatus_to_ordinary_gravity_control",
         ],
       }),

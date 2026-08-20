@@ -124,9 +124,8 @@ const authorityIntegrityValid = (
     Array.isArray(authority.selected_evidence_refs) &&
     authority.selected_evidence_refs.length > 0 &&
     (
-      authority.evidence_reentry_authority === "runtime_event_log" ||
-      authority.evidence_reentry_authority === "provider_terminal_authority_bridge" ||
-      authority.evidence_reentry_authority === "compatibility_projection"
+      (authority.evidence_reentry_authority === "runtime_event_log" ||
+        authority.evidence_reentry_authority === "route_self_terminal")
     )
   );
 };

@@ -91,6 +91,27 @@ not only as retrieval metadata.
   - a frozen registered numerical bridge kernel before any bridge comparison
 - Passing algebraic, synthetic, or fixed-branch replay checks does not close
   any missing measured-evidence or bridge-dynamics gate.
+- The magnetar vacuum-birefringence result enters this bundle only as
+  field-conditioned QED propagation precedent. The proposed extension is
+  decomposed into four explicitly non-promoting bridges:
+  `bridge-magnetar-qed-precedent-to-polarization-control`,
+  `bridge-branch-conditioned-complete-stress-to-metric-kernel`,
+  `bridge-retarded-metric-noise-to-coherence-extension`, and
+  `bridge-boundary-coherence-extension-to-orch-conditional-nonclaim`.
+  A boundary-extension claim fails unless a conserved complete branch source,
+  a retarded gauge-controlled metric/noise kernel, and a consistent coherence
+  dynamics are separately registered. Even then, Orch-OR and biological
+  consequences remain downstream conditional hypotheses, not inherited
+  evidence.
+- The life-facing implication has its own diagnostic path,
+  `path_casimir_dp_residual_to_evolutionary_coherence_conditional`, ending at
+  `leaf_casimir_dp_evolutionary_coherence_conditional`. It requires a powered
+  replicated non-biological law before any biological study opens, followed by
+  a validated biological state map, a positive coherence-versus-function
+  lifetime surplus, a frozen operational phenotype, heritable variation,
+  controlled fitness covariance, and held-out selection replication. The path
+  explicitly separates adaptation from teleology and cannot validate
+  consciousness or Orch-OR.
 - Stage 3 extends this same bundle; it does not create a second
   curvature-collapse authority. Its six runtimes and evidence-map integration
   test must remain in the path falsifier receipts.

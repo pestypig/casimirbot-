@@ -6,6 +6,7 @@ import {
   authoritativeTypedFailureRequiresNoContinuation,
   reconcileAuthoritativeTypedFailureLifecycle,
 } from "../typed-failure-lifecycle-reconciliation";
+import { createHelixTurnLifecycleRecorder } from "../turn-lifecycle";
 
 const basePayload = (): Record<string, unknown> => ({
   terminal_artifact_kind: "typed_failure",
@@ -95,6 +96,142 @@ const basePayload = (): Record<string, unknown> => ({
 });
 
 describe("authoritative typed-failure lifecycle reconciliation", () => {
+  it("keeps stale projections read-only when a verified lifecycle already owns the facts", () => {
+    const turnId = "ask:test:canonical-typed-failure-read-only";
+    const observationRef = `${turnId}:observation:connector-offline`;
+    const recorder = createHelixTurnLifecycleRecorder({
+      turnId,
+      scope: "helix_ask_turn",
+      now: () => 100,
+    });
+    const started = recorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const route = recorder.append({
+      kind: "route.committed",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: started.event_id,
+      route_commit_id: `${turnId}:route`,
+      capability_ids: ["com.casimirbot.minecraft.inventory.check"],
+    });
+    const admitted = recorder.append({
+      kind: "capability.admitted",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: route.event_id,
+      route_commit_id: `${turnId}:route`,
+      capability_id: "com.casimirbot.minecraft.inventory.check",
+    });
+    const call = recorder.append({
+      kind: "tool.call.started",
+      producer: "codex_runtime",
+      status: "started",
+      causation_id: admitted.event_id,
+      route_commit_id: `${turnId}:route`,
+      call_id: `${turnId}:call`,
+      capability_id: "com.casimirbot.minecraft.inventory.check",
+    });
+    const failed = recorder.append({
+      kind: "tool.call.failed",
+      producer: "helix_adapter",
+      status: "failed",
+      causation_id: call.event_id,
+      route_commit_id: `${turnId}:route`,
+      call_id: `${turnId}:call`,
+      capability_id: "com.casimirbot.minecraft.inventory.check",
+      observation_refs: [observationRef],
+      reason_code: "connector_offline",
+    });
+    const reentered = recorder.append({
+      kind: "observation.reentered",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: failed.event_id,
+      route_commit_id: `${turnId}:route`,
+      call_id: `${turnId}:call`,
+      capability_id: "com.casimirbot.minecraft.inventory.check",
+      observation_refs: [observationRef],
+    });
+    const message = recorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: reentered.event_id,
+      message_sha256: "hash:typed-failure",
+    });
+    const runtime = recorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+    });
+    const eligibility = recorder.append({
+      kind: "terminal.eligibility.checked",
+      producer: "helix_terminal_authority",
+      status: "succeeded",
+      causation_id: runtime.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: true,
+    });
+    recorder.append({
+      kind: "turn.failed",
+      producer: "helix_adapter",
+      status: "failed",
+      causation_id: eligibility.event_id,
+      terminal_kind: "typed_failure",
+      terminal_eligible: true,
+      reason_code: "connector_offline",
+    });
+    const payload = basePayload();
+    payload.turn_id = turnId;
+    payload.turn_lifecycle = recorder.snapshot();
+    payload.terminal_error_code = "connector_offline";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "connector_offline",
+    };
+    payload.route_authority_audit = { route_authority_ok: true };
+    payload.provider_reasoning_reentry = {
+      schema: "helix.provider_reasoning_reentry.v1",
+      status: "not_run",
+      evidence_reentered: false,
+      solver_completed: false,
+    };
+    payload.codex_parity_agent_spine_rail_table = {
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
+    };
+
+    expect(
+      reconcileAuthoritativeTypedFailureLifecycle({
+        payload,
+        turnId,
+        selectedTerminalArtifactKind: "typed_failure",
+        finalAnswerSource: "typed_failure",
+      }),
+    ).toBe(true);
+    expect(payload.provider_reasoning_reentry).toMatchObject({
+      status: "not_run",
+      evidence_reentered: false,
+      solver_completed: false,
+    });
+    expect(payload.codex_parity_agent_spine_rail_table).toMatchObject({
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
+    });
+    expect(payload.typed_failure_lifecycle_reconciliation).toMatchObject({
+      schema: "helix.typed_failure_lifecycle_reconciliation.v1",
+      mode: "read_only_projection",
+      status: "canonical_lifecycle_preserved",
+      error_code: "connector_offline",
+      runtime_observation_reentry_refs: [observationRef],
+      runtime_turn_completed: true,
+      projections_mutated: false,
+    });
+  });
   it("accepts the canonical single writer as typed-failure authority before later mirrors settle", () => {
     const payload = basePayload();
     payload.terminal_error_code = "procedure_memory_unavailable";

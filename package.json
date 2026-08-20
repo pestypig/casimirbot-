@@ -164,6 +164,8 @@
     "helix:ask:ui-debug-parity": "tsx scripts/helix-ask-ui-debug-parity-harness.ts",
     "helix:ask:api-parity": "tsx scripts/helix-ask-api-parity-probe.ts",
     "helix:minecraft:player-differential": "tsx scripts/helix-minecraft-player-differential-audit.ts",
+    "helix:minecraft:player-g2-parity": "tsx scripts/helix-minecraft-player-g2-parity-audit.ts",
+    "helix:minecraft:player-mcp-capture": "tsx scripts/helix-minecraft-player-mcp-capture.ts",
     "helix:environment-harness:docs-audit": "tsx scripts/audit-environment-harness-work-program.ts",
     "helix:minecraft:player-trace": "tsx scripts/helix-minecraft-player-differential-capture.ts",
     "helix:minecraft:player-direct-capture": "tsx scripts/helix-minecraft-player-direct-diagnostic-capture.ts",

@@ -2,7 +2,7 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G1**
+Active program gate: **G2**
 
 This document answers the operational question that the product and architecture
 contracts intentionally do not:
@@ -128,8 +128,8 @@ overrule current-turn execution and re-entry facts.
 | Gate | State | Depends on | Closure evidence | Downstream gate unlocked |
 | --- | --- | --- | --- | --- |
 | G0 — Program vocabulary and status | closed | none | this document, canonical backlinks, required task header, and `npm run helix:environment-harness:docs-audit` | G1 |
-| G1 — Canonical lifecycle authority | active | G0 | poisoned-projection fixtures, canonical-ledger unit evidence, narrow API/terminal parity, and one unchanged natural keyed regression with a clean differential audit | G2 |
-| G2 — A0 / A1 / B parity | blocked | G1 | equivalent-state direct Fabric, Codex-through-MCP, and keyed Helix traces for the fluid micro-course, with first-divergence hashes and support refs | G3 |
+| G1 — Canonical lifecycle authority | closed | G0 | `docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md` | G2 |
+| G2 — A0 / A1 / B parity | active | G1 | equivalent-state direct Fabric, Codex-through-MCP, and keyed Helix traces for the fluid micro-course, with first-divergence hashes and support refs | G3 |
 | G3 — Viability and unexpected events | blocked | G2 | persistent resident control across Codex delays plus representative mid-execution hazard/event recovery and safe cancellation | G4 |
 | G4 — Live-mail wake bridge | blocked | G3 | deduplicated nonterminal resident/event escalation evidence re-enters the existing sequential Codex solver without controlling reflexes or authoring an answer | G5 |
 | G5 — Durable survival goal | blocked | G4 and converged OAuth/desktop/room identity lane | checkpointed advancement progress and recovery across disconnect, death, restart, and authorized phone continuation | G6 |
@@ -149,7 +149,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Environment-harness product and authority architecture | specified | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Advance through the gated program below. |
 | Keyed natural water-bucket rescue benchmark | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/water-bucket-rescue/attempt-34-balanced-clear-screen/guardian_water_bucket_rescue`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Retain unchanged as a regression; it does not accept other guardian or fluid workflows. |
 | Direct Fabric water-bucket rescue feasibility | live accepted | `artifacts/helix-minecraft-guardian-v0.4/direct-codex/water-bucket-rescue/attempt-4-dynamic-collision-success.json`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Use as a feasibility oracle, not a hardcoded strategy. |
-| Canonical lifecycle authority and poisoned-projection resistance | specified | `docs/helix-ask-readiness-debug-loop.md`; `server/services/helix-ask/runtime/turn-lifecycle-differential-audit.ts` | Complete G1; one fact stream must outrank every derived projection. |
+| Canonical lifecycle authority and poisoned-projection resistance | live accepted | `docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md`; `server/services/helix-ask/runtime/turn-lifecycle-differential-audit.ts` | Retain the keyed natural tool turn and poisoned-projection battery as G2+ regressions. |
 | Fabric fluid sequence 0.3 | deterministically verified | `docs/audits/helix-minecraft-fluid-execution-audit-2026-08-12.md` | Complete the live micro-course and A0/A1/B parity in G2. |
 | Pre-action unavailable-inventory cancellation | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-37-focused-source-projection/guardian_unavailable_inventory_replan`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Does not prove mid-execution unexpected-event breadth. |
 | Mid-execution health interruption contract | implemented | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-46-safe-interrupt-terminal/guardian_mid_execution_health_interrupt`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Preserve exact child measurements and pass the stronger live acceptance. |
@@ -162,7 +162,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Concurrent runtime reasoning roles | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Add only after the sequential wake/solver path is reliable in G6. |
 | Second-domain harness transfer | projected | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Demonstrate the accepted lifecycle in Robinhood shadow observation or another contrasting domain in G7. |
 
-## Active gate: G1 canonical lifecycle authority
+## Closed gate: G1 canonical lifecycle authority
 
 ### Problem statement
 
@@ -240,6 +240,21 @@ implementing a persistent resident controller remains a G3 task.
 
 Closure advances the active marker to G2 in this document. It does not silently
 advance any capability maturity row; each row changes only with its own evidence.
+
+G1 closed on 2026-08-20. Its exact closure evidence is recorded in
+`docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md`.
+
+## Active gate: G2 A0 / A1 / B parity
+
+G2 must now run equivalent-state direct Fabric, Codex-through-MCP, and keyed
+Helix Ask traces against the same deterministic guardian artifact, player/world
+identity, authority envelope, initial observation revision, and fluid
+micro-course. A route passes only when action postconditions, observation
+re-entry, candidate text hashes, support references, and terminal presentation
+remain continuous. The first divergence must be reported when parity fails.
+
+G2 does not implement learned controllers, persistent cross-deliberation
+viability, live-mail wake control, durable goals, or concurrent reasoning.
 
 ## Parallel delivery lane
 

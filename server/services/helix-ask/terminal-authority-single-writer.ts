@@ -6858,6 +6858,16 @@ export function applyHelixTerminalAuthoritySingleWriter(
 
   const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] =
     [];
+  const verifiedRuntimeLifecycle = readVerifiedHelixRuntimeLifecycleFromPayload(
+    {
+      payload: input.payload,
+      turnId: input.turnId,
+    },
+  );
+  const lifecycleProviderSolverCompletionObserved = Boolean(
+    verifiedRuntimeLifecycle?.reduction.runtime_turn_completed &&
+    verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
+  );
   const legacySolverContinuationPending =
     readRecord(input.payload.solver_continuation_observation)?.schema ===
       "helix.solver_continuation_observation.v1" &&
@@ -6866,8 +6876,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
         ?.required_next_step,
     ) !== "typed_failure";
   const agentContinuationDecisionPending =
+    !lifecycleProviderSolverCompletionObserved &&
     agentContinuationRequiresNonterminalDecision(input.payload);
   const agentContinuationAnswerBlocked =
+    !lifecycleProviderSolverCompletionObserved &&
     agentContinuationDisallowsAnswer(input.payload);
   const rawSolverContinuationPending =
     legacySolverContinuationPending || agentContinuationDecisionPending;
@@ -7525,17 +7537,6 @@ export function applyHelixTerminalAuthoritySingleWriter(
     readRecord(
       readRecord(input.payload.debug)?.provider_terminal_authority_bridge,
     );
-  const verifiedRuntimeLifecycle = readVerifiedHelixRuntimeLifecycleFromPayload(
-    {
-      payload: input.payload,
-      turnId: input.turnId,
-    },
-  );
-  const lifecycleProviderSolverCompletionObserved = Boolean(
-    verifiedRuntimeLifecycle?.reduction.runtime_turn_completed &&
-    verifiedRuntimeLifecycle.reduction.terminal_outcome === "completed" &&
-    verifiedRuntimeLifecycle.reduction.final_agent_message_event_id,
-  );
   const providerSolverCompletionObserved = Boolean(
     currentProviderReasoningReentry?.solver_completed === true ||
     currentProviderTerminalBridge?.solver_completed === true ||
@@ -7626,6 +7627,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     currentScholarlyTerminalCanSurface &&
     scholarlyFollowupEvidenceLookup?.followup_reference_detected === true,
   );
+  const selectedLiveEnvironmentBindingDiagnosis =
+    findLiveEnvironmentBindingDiagnosisTerminal(input.payload);
   const solverContinuationPending =
     !authoritativeInitialTypedFailureReady &&
     ((agentContinuationDecisionPending &&
@@ -7645,6 +7648,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
           noteMutationTerminalMaterialized ||
           Boolean(selectedImageLensObservationReport) ||
           Boolean(selectedImageLensNamedReceiptEvaluation) ||
+          Boolean(selectedLiveEnvironmentBindingDiagnosis) ||
           Boolean(selectedProviderTerminalCandidate) ||
           currentScholarlyTerminalCanSurface ||
           providerRouteProductCanSurface ||
@@ -7859,8 +7863,6 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : earlyDeterministicReceiptFallbackDraft;
-  const selectedLiveEnvironmentBindingDiagnosis =
-    findLiveEnvironmentBindingDiagnosisTerminal(input.payload);
   const latestRequiredObservationSequence =
     selectedDraft?.latestObservationSequence ??
     artifacts.reduce(

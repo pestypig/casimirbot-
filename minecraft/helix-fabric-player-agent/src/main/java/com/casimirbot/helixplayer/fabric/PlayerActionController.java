@@ -140,10 +140,28 @@ public final class PlayerActionController {
         } catch (IllegalArgumentException error) {
             settle(State.FAILED, "workflow.failed", error.getMessage());
         } catch (RuntimeException error) {
+            java.util.List<String> failureTrace = new java.util.ArrayList<>();
+            for (StackTraceElement frame : error.getStackTrace()) {
+                if (!frame.getClassName().startsWith("com.casimirbot.")) continue;
+                failureTrace.add(frame.toString());
+                if (failureTrace.size() >= 4) break;
+            }
+            String failureSite = error.getStackTrace().length > 0
+                ? error.getStackTrace()[0].toString()
+                : "unavailable";
+            lastMeasurements = Map.of(
+                "executor_failure_class",
+                error.getClass().getSimpleName(),
+                "executor_failure_site",
+                failureSite,
+                "executor_failure_trace",
+                java.util.List.copyOf(failureTrace)
+            );
             settle(
                 State.FAILED,
                 "workflow.failed",
-                "The native Fabric executor could not complete the admitted action."
+                "The native Fabric executor could not complete the admitted action (" +
+                    error.getClass().getSimpleName() + ")."
             );
         }
     }

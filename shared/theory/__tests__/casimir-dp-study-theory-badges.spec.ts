@@ -16,6 +16,10 @@ describe("Casimir / DP quantum-foam study badges", () => {
       expect.arrayContaining([
         "study.casimir_dp.protocol",
         "study.casimir_dp.manifold_response_hypothesis",
+        "study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis",
+        "study.casimir_dp.boundary_metric_noise_response_hypothesis",
+        "study.casimir_dp.boundary_conditioned_coherence_extension",
+        "study.casimir_dp.evolutionary_coherence_control_conditional",
         "study.casimir_dp.decoherence_collapse_gate",
         "study.casimir_dp.quantum_foam_hypothesis",
         "study.casimir_dp.observable_separation_gate",
@@ -59,8 +63,8 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.claim_boundary",
       ]),
     );
-    expect(branch.badges).toHaveLength(46);
-    expect(branch.edges).toHaveLength(132);
+    expect(branch.badges).toHaveLength(50);
+    expect(branch.edges).toHaveLength(146);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
   });
@@ -615,6 +619,76 @@ describe("Casimir / DP quantum-foam study badges", () => {
       ]),
     );
     expect(branch.edges.some((edge) => edge.from === gate?.id && edge.relation === "blocks")).toBe(true);
+  });
+
+  it("plots the QED-precedent to stress, metric/noise, and coherence hypothesis without an evidence bridge", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const ids = [
+      "study.casimir_dp.branch_conditioned_total_stress_energy_hypothesis",
+      "study.casimir_dp.boundary_metric_noise_response_hypothesis",
+      "study.casimir_dp.boundary_conditioned_coherence_extension",
+    ];
+    const badges = branch.badges.filter((badge) => ids.includes(badge.id));
+    const incidentEdges = branch.edges.filter((edge) =>
+      ids.includes(edge.from) || ids.includes(edge.to));
+
+    expect(badges).toHaveLength(3);
+    expect(badges.every((badge) => badge.status === "blocked")).toBe(true);
+    expect(badges.every((badge) => badge.calculatorPayloads.length === 0)).toBe(true);
+    expect(badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
+    expect(badges.flatMap((badge) => badge.equations.map((equation) => equation.id))).toEqual(
+      expect.arrayContaining([
+        "casimir_dp_branch_conditioned_total_stress_energy",
+        "casimir_dp_boundary_metric_retarded_response_slot",
+        "casimir_dp_boundary_stress_noise_kernel_slot",
+        "casimir_dp_boundary_conditioned_coherence_extension_slot",
+      ]),
+    );
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_qed_polarization_documents_complete_branch_stress_precedent",
+      "casimir_dp_complete_branch_stress_requires_metric_noise_response",
+      "casimir_dp_manifold_registry_blocks_unregistered_metric_noise_response",
+      "casimir_dp_metric_noise_response_requires_coherence_extension",
+      "casimir_dp_coherence_extension_requires_four_cell_discriminator",
+      "casimir_dp_coherence_extension_documents_conditional_orch_scope",
+      "casimir_dp_unregistered_coherence_extension_blocks_claim_boundary",
+    ]));
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
+  });
+
+  it("keeps the evolutionary implication conditional on physical replication and biological selection evidence", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const badge = branch.badges.find((candidate) =>
+      candidate.id === "study.casimir_dp.evolutionary_coherence_control_conditional");
+    const incidentEdges = branch.edges.filter((edge) =>
+      edge.from === badge?.id || edge.to === badge?.id);
+
+    expect(badge).toEqual(expect.objectContaining({
+      status: "blocked",
+      calculatorPayloads: [],
+    }));
+    expect(badge?.tags).toEqual(expect.arrayContaining([
+      "depends_on_replicated_nonbiological_residual",
+      "heritability_not_ready",
+      "fitness_covariance_not_ready",
+      "selection_evidence_not_ready",
+      "adaptation_not_teleology",
+      "orch_or_not_implied",
+    ]));
+    expect(badge?.equations.map((equation) => equation.id)).toEqual([
+      "casimir_dp_evolutionary_coherence_control_conditional_gate",
+    ]);
+    expect(incidentEdges.map((edge) => edge.id)).toEqual(expect.arrayContaining([
+      "casimir_dp_replicated_coherence_extension_required_for_evolutionary_hypothesis",
+      "casimir_dp_selection_fitness_context_required_for_evolutionary_hypothesis",
+      "casimir_dp_photosynthesis_lifetime_documents_biological_test_pattern",
+      "casimir_dp_evolutionary_hypothesis_blocks_biology_promotion",
+      "casimir_dp_evolutionary_hypothesis_blocks_study_claim_boundary",
+    ]));
+    expect(incidentEdges).toHaveLength(5);
+    expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
 
   it("records Penrose OR as context without importing Orch OR or phase-of-matter dynamics", () => {
@@ -1228,8 +1302,10 @@ describe("Casimir / DP quantum-foam study badges", () => {
       "casimir_dp_stage4_2h_requires_stage4_2i_boundary_branch_interaction",
       "casimir_dp_stage4_2i_interaction_nonbridge_blocks_claim_boundary",
       "casimir_dp_stage4_2i_requires_stage4_2j_schrodinger_mass_density",
+      "casimir_dp_stage4_2i_documents_branch_boundary_interaction_target",
+      "casimir_dp_coherence_extension_requires_four_cell_discriminator",
     ]));
-    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges).toHaveLength(5);
     expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
     expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
@@ -1569,7 +1645,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
       input: {
         query: "Open the CDP-QF-1 Casimir Diósi-Penrose quantum foam manifold-response study and explain the decoherence and observable gates",
         simulationOwners: ["casimir_dp_study"],
-        limit: 40,
+        limit: 60,
       },
     });
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toEqual(

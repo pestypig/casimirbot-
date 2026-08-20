@@ -6,6 +6,7 @@ import {
   requireHelixAgentApiScope,
 } from "../../auth/helix-agent-principal";
 import {
+  createHelixAgentApiErrorHandler,
   handleHelixAgentApiError,
 } from "../helix-agent-api";
 import {
@@ -80,6 +81,40 @@ describe("Helix agent OAuth HTTP challenges", () => {
       request_id: null,
       retryable: false,
     });
+  });
+
+  it("keeps local MCP metadata discovery on the verified loopback origin", async () => {
+    process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
+    const app = express();
+    app.get(
+      "/mcp",
+      (_req: Request, _res: Response, next: NextFunction): void =>
+        next(
+          new HelixAgentApiServiceError(
+            401,
+            "unauthorized",
+            "A bearer access token is required.",
+          ),
+        ),
+    );
+    app.use(
+      createHelixAgentApiErrorHandler({
+        resourceMetadataPath:
+          "/.well-known/oauth-protected-resource/mcp",
+        useLoopbackRequestOrigin: true,
+      }),
+    );
+
+    const response = await request(app)
+      .get("/mcp")
+      .set("Host", "127.0.0.1:1522")
+      .expect(401);
+
+    expect(response.headers["www-authenticate"]).toBe(
+      'Bearer resource_metadata="http://127.0.0.1:1522/.well-known/oauth-protected-resource/mcp", ' +
+        'error="invalid_token", ' +
+        'error_description="A bearer access token is required."',
+    );
   });
 
   it("advertises the exact required scope for insufficient_scope", async () => {

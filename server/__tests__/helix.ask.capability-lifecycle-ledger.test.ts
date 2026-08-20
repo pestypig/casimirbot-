@@ -3,6 +3,67 @@ import { describe, expect, it } from "vitest";
 import { buildCapabilityLifecycleLedger } from "../services/helix-ask/capability-lifecycle-ledger";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
+import { createHelixTurnLifecycleRecorder } from "../services/helix-ask/runtime/turn-lifecycle";
+
+const buildReenteredLifecycle = (input: {
+  turnId: string;
+  observationRef: string;
+}) => {
+  const recorder = createHelixTurnLifecycleRecorder({
+    turnId: input.turnId,
+    now: () => 100,
+  });
+  const started = recorder.append({
+    kind: "turn.started",
+    producer: "helix_adapter",
+    status: "started",
+  });
+  const route = recorder.append({
+    kind: "route.committed",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: started.event_id,
+    route_commit_id: `${input.turnId}:route`,
+    capability_ids: ["workstation.panel_control"],
+  });
+  recorder.append({
+    kind: "capability.admitted",
+    producer: "helix_policy",
+    status: "succeeded",
+    causation_id: route.event_id,
+    route_commit_id: `${input.turnId}:route`,
+    capability_id: "workstation.panel_control",
+  });
+  const call = recorder.append({
+    kind: "tool.call.started",
+    producer: "codex_runtime",
+    status: "started",
+    route_commit_id: `${input.turnId}:route`,
+    call_id: `${input.turnId}:call`,
+    capability_id: "workstation.panel_control",
+  });
+  const completed = recorder.append({
+    kind: "tool.call.completed",
+    producer: "helix_adapter",
+    status: "succeeded",
+    causation_id: call.event_id,
+    route_commit_id: `${input.turnId}:route`,
+    call_id: `${input.turnId}:call`,
+    capability_id: "workstation.panel_control",
+    observation_refs: [input.observationRef],
+  });
+  recorder.append({
+    kind: "observation.reentered",
+    producer: "helix_adapter",
+    status: "succeeded",
+    causation_id: completed.event_id,
+    route_commit_id: `${input.turnId}:route`,
+    call_id: `${input.turnId}:call`,
+    capability_id: "workstation.panel_control",
+    observation_refs: [input.observationRef],
+  });
+  return recorder.snapshot();
+};
 
 const sourceTarget = (target_source: string, target_kind = target_source) => ({
   schema: "helix.ask_source_target_intent.v1",
@@ -345,6 +406,10 @@ describe("Helix capability lifecycle ledger", () => {
         capability_result: result,
         canonical_goal_frame: canonicalGoal("panel_control", "workspace_action_receipt"),
         current_turn_artifact_ledger: [receipt],
+        turn_lifecycle: buildReenteredLifecycle({
+          turnId: "ask:click",
+          observationRef: "ask:click:workspace_action_receipt",
+        }),
       },
     });
 

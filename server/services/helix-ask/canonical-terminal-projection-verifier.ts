@@ -87,8 +87,7 @@ export const verifyHelixCanonicalTerminalProjection = (input: {
           supportingEvidenceRefs.length === 0 ||
           ![
             "runtime_event_log",
-            "provider_terminal_authority_bridge",
-            "compatibility_projection",
+            "route_self_terminal",
           ].includes(String(grounding.evidence_reentry_authority))
         )
       : grounding.status !== "not_required" ||

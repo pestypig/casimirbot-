@@ -268,9 +268,44 @@ const responseHeaders = (res: Response, version?: number): void => {
 const DEFAULT_RESOURCE_METADATA_PATH =
   "/.well-known/oauth-protected-resource";
 
+const loopbackHost = (value: string | undefined): boolean => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "[::1]" ||
+    normalized === "::ffff:127.0.0.1"
+  );
+};
+
+const loopbackRequestOrigin = (req: Request): string | null => {
+  if (
+    !loopbackHost(req.socket.remoteAddress) ||
+    !loopbackHost(req.socket.localAddress)
+  ) {
+    return null;
+  }
+  const host = (req.get("host") ?? "").trim();
+  if (!host || /[\s\\/]/u.test(host)) return null;
+  try {
+    const parsed = new URL(`http://${host}`);
+    return loopbackHost(parsed.hostname) ? parsed.origin : null;
+  } catch {
+    return null;
+  }
+};
+
 const resourceMetadataUrl = (
   resourceMetadataPath = DEFAULT_RESOURCE_METADATA_PATH,
-): string => `${resolveCasimirPublicBaseUrl()}${resourceMetadataPath}`;
+  req?: Request,
+  useLoopbackRequestOrigin = false,
+): string => {
+  const base = useLoopbackRequestOrigin && req
+    ? loopbackRequestOrigin(req) ?? resolveCasimirPublicBaseUrl()
+    : resolveCasimirPublicBaseUrl();
+  return `${base}${resourceMetadataPath}`;
+};
 
 const bearerAuthParam = (name: string, value: string): string => {
   const safeValue = value
@@ -305,6 +340,8 @@ const requiredOAuthScopes = (error: HelixAgentApiServiceError): string[] => {
 const bearerChallengeFor = (
   error: HelixAgentApiServiceError,
   resourceMetadataPath = DEFAULT_RESOURCE_METADATA_PATH,
+  req?: Request,
+  useLoopbackRequestOrigin = false,
 ): string | null => {
   const isAuthenticationFailure = error.status === 401;
   const isScopeFailure =
@@ -316,7 +353,11 @@ const bearerChallengeFor = (
     params.push(
       bearerAuthParam(
         "resource_metadata",
-        resourceMetadataUrl(resourceMetadataPath),
+        resourceMetadataUrl(
+          resourceMetadataPath,
+          req,
+          useLoopbackRequestOrigin,
+        ),
       ),
     );
   } catch {
@@ -340,9 +381,10 @@ const bearerChallengeFor = (
 
 export const createHelixAgentApiErrorHandler = (options: {
   resourceMetadataPath?: string;
+  useLoopbackRequestOrigin?: boolean;
 } = {}) => (
     error: unknown,
-    _req: Request,
+    req: Request,
     res: Response,
     _next: NextFunction,
   ): void => {
@@ -392,6 +434,8 @@ export const createHelixAgentApiErrorHandler = (options: {
   const bearerChallenge = bearerChallengeFor(
     normalized,
     options.resourceMetadataPath,
+    req,
+    options.useLoopbackRequestOrigin === true,
   );
   if (bearerChallenge) res.setHeader("WWW-Authenticate", bearerChallenge);
   res.status(normalized.status).json(
@@ -633,6 +677,7 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
     scopes?: readonly string[];
     additionalResourcePaths?: readonly string[];
     additionalScopes?: readonly string[];
+    useLoopbackRequestResource?: boolean;
   } = {},
 ): Router => {
   const router = Router();
@@ -655,12 +700,26 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
   ];
   router.get(
     resourcePaths,
-    (_req: Request, res: Response, next: NextFunction): void => {
+    (req: Request, res: Response, next: NextFunction): void => {
       try {
         const base = resolveCasimirPublicBaseUrl();
+        const metadataPrefix = "/.well-known/oauth-protected-resource";
+        const protectedPath = req.path.startsWith(metadataPrefix)
+          ? req.path.slice(metadataPrefix.length)
+          : "";
+        const localOrigin = dependencies.useLoopbackRequestResource === true
+          ? loopbackRequestOrigin(req)
+          : null;
+        const resource =
+          localOrigin &&
+          (protectedPath === "/mcp" ||
+            protectedPath === "/mcp/device-check" ||
+            protectedPath.startsWith("/api/v1/"))
+            ? `${localOrigin}${protectedPath}`
+            : verifier.audience();
         responseHeaders(res);
         res.json({
-          resource: verifier.audience(),
+          resource,
           authorization_servers: [verifier.authorizationServer()],
           scopes_supported: Array.from(new Set(scopes)),
           bearer_methods_supported: ["header"],

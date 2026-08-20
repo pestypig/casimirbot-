@@ -522,6 +522,7 @@ app.use(createAgentAccessDiscoveryRouter());
 app.use(createHelixAgentProtectedResourceMetadataRouter({
   resourcePaths: [HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH],
   scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+  useLoopbackRequestResource: true,
 }));
 app.use(createHelixAgentProtectedResourceMetadataRouter({
   additionalResourcePaths: [
@@ -534,6 +535,7 @@ app.use(createHelixAgentProtectedResourceMetadataRouter({
     HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
     HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
   ],
+  useLoopbackRequestResource: true,
 }));
 app.use("/api/v1/agent-runs", createHelixAgentApiRouter());
 app.use("/api/v1/rooms", createHelixSharedLiveRoomRouter());

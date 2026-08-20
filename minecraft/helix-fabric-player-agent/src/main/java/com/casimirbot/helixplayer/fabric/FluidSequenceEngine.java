@@ -245,9 +245,15 @@ final class FluidSequenceEngine {
                 );
             }
             childTerminalEvent = null;
-            childController = new PlayerActionController(bridge, event -> {
-                if (terminal(event.state())) childTerminalEvent = event;
-            });
+            Set<String> childResources =
+                ConcurrentReactiveScheduler.resourcesFor(action);
+            childController = new PlayerActionController(
+                bridge,
+                event -> {
+                    if (terminal(event.state())) childTerminalEvent = event;
+                },
+                () -> bridge.releaseResources(childResources)
+            );
             String engine = "navigate_to".equals(actionKind) &&
                 "baritone".equals(action.get("engine_preference"))
                 ? "baritone"
@@ -493,11 +499,14 @@ final class FluidSequenceEngine {
     }
 
     private Map<String, Object> actionForRuntime(Map<String, Object> action) {
+        Map<String, Object> runtimeAction = new LinkedHashMap<>();
+        action.forEach((key, value) -> {
+            if (value != null) runtimeAction.put(key, value);
+        });
         if (
             !"place".equals(text(action, "action_kind")) ||
             !(action.get("position_binding") instanceof Map<?, ?>)
-        ) return action;
-        Map<String, Object> runtimeAction = new LinkedHashMap<>(action);
+        ) return Map.copyOf(runtimeAction);
         runtimeAction.put(
             "_helix_admitted_mutation_scope",
             object(sequence.get("mutation_scope"))

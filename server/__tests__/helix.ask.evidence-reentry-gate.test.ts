@@ -323,6 +323,15 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       finalAnswerSource: "scholarly_research_answer",
       payload: {
         turn_id: turnId,
+        turn_lifecycle: verifiedLifecycle({
+          turnId,
+          terminalKind: "scholarly_research_answer",
+          calls: [{
+            capabilityId: "research-library.read_document",
+            callId: `${turnId}:read-document:1`,
+            observationRefs: [packetRef, normalizedRef],
+          }],
+        }),
         source_target_intent: {
           target_source: "scholarly_research",
           target_kind: "saved_scholarly_full_text",
@@ -434,6 +443,11 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       finalAnswerSource: "agent_provider_terminal_candidate",
       payload: {
         turn_id: turnId,
+        turn_lifecycle: verifiedLifecycle({
+          turnId,
+          terminalKind: "agent_provider_terminal_candidate",
+          calls: [],
+        }),
         source_target_intent: {
           target_source: "model_only",
           target_kind: "general_background",
@@ -990,6 +1004,10 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       terminalArtifactKind: "agent_provider_terminal_candidate",
       finalAnswerSource: "agent_provider_terminal_candidate",
       finalArbitrationRan: true,
+      runtimeLifecycleVerified: true,
+      reentryAuthority: "runtime_event_log",
+      runtimeObservationReentryRefs: [moralRef, packetRef],
+      postEvidenceReasoningCompleted: true,
       sourceEvidenceRequired: true,
       allowedTerminalProducts: ["agent_provider_terminal_candidate", "typed_failure"],
     });
@@ -1098,6 +1116,10 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
       terminalArtifactKind: "theory_context_reflection_answer",
       finalAnswerSource: "theory_context_reflection_answer",
       finalArbitrationRan: true,
+      runtimeLifecycleVerified: true,
+      reentryAuthority: "runtime_event_log",
+      runtimeObservationReentryRefs: [theoryRef, packetRef],
+      postEvidenceReasoningCompleted: true,
       sourceEvidenceRequired: true,
       allowedTerminalProducts: ["theory_context_reflection_answer", "typed_failure"],
     });
@@ -1337,6 +1359,15 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
           payload: { turn_id: turnId, artifact_id: normalizedRef },
         },
       ],
+      turn_lifecycle: verifiedLifecycle({
+        turnId,
+        terminalKind: "agent_provider_terminal_candidate",
+        calls: [{
+          capabilityId: "workstation.active_context",
+          callId: `${turnId}:active-context:1`,
+          observationRefs: [observationRef, normalizedRef],
+        }],
+      }),
     };
 
     const trace = buildAskTurnSolverTrace({

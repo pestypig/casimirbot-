@@ -2,6 +2,7 @@ import { auditRouteAuthority } from "../route-authority-audit";
 import { buildRouteProductContract } from "../route-product-contract";
 import { resolveToolFamilyContract } from "../tool-family-contract";
 import { readCommittedAskRoute } from "../committed-ask-route";
+import { readVerifiedHelixRuntimeLifecycleFromPayload } from "./turn-lifecycle";
 
 type RecordLike = Record<string, unknown>;
 
@@ -531,6 +532,33 @@ export const reconcileAuthoritativeTypedFailureLifecycle = (args: {
     (currentTurnObservationPresent && !settledSourceObservationFailure)
   ) {
     return false;
+  }
+  const verifiedRuntimeLifecycle =
+    readVerifiedHelixRuntimeLifecycleFromPayload({
+      payload: args.payload,
+      turnId: args.turnId,
+    });
+  if (verifiedRuntimeLifecycle) {
+    const errorCode =
+      readString(readTypedFailure(args.payload)?.error_code) ??
+      readString(args.payload.terminal_error_code);
+    args.payload.typed_failure_lifecycle_reconciliation = {
+      schema: "helix.typed_failure_lifecycle_reconciliation.v1",
+      turn_id: args.turnId,
+      mode: "read_only_projection",
+      status: "canonical_lifecycle_preserved",
+      error_code: errorCode,
+      runtime_phase: verifiedRuntimeLifecycle.reduction.phase,
+      runtime_observation_reentry_refs:
+        verifiedRuntimeLifecycle.reduction.observation_reentry_refs,
+      runtime_turn_completed:
+        verifiedRuntimeLifecycle.reduction.runtime_turn_completed,
+      projections_mutated: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    return true;
   }
   const sourceTargetIntent =
     readRecord(args.payload.source_target_intent) ??

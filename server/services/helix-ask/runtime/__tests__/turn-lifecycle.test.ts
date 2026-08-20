@@ -251,6 +251,78 @@ describe("Helix factual turn lifecycle", () => {
     });
   });
 
+  it("uses fixed canonical precedence instead of selecting a more complete competing snapshot", () => {
+    const canonicalLifecycle = buildCompletedLifecycle();
+    const nativeLifecycle = {
+      ...buildCompletedLifecycle(),
+      scope: "codex_native_provider_cycle" as const,
+      events: buildCompletedLifecycle().events.map((event) =>
+        event.kind === "observation.reentered"
+          ? {
+              ...event,
+              observation_refs: ["paper:full-text:1", "poison:extra-observation"],
+            }
+          : event.kind === "tool.call.completed"
+            ? {
+                ...event,
+                observation_refs: ["paper:full-text:1", "poison:extra-observation"],
+              }
+            : event,
+      ),
+    };
+
+    const selected = readVerifiedHelixRuntimeLifecycleFromPayload({
+      payload: {
+        turn_lifecycle: canonicalLifecycle,
+        native_provider_turn_lifecycle: nativeLifecycle,
+      },
+      turnId: canonicalLifecycle.turn_id,
+    });
+
+    expect(selected?.scope).toBe("helix_ask_turn");
+    expect(selected?.reduction.observation_reentry_refs).toEqual([
+      "paper:full-text:1",
+    ]);
+  });
+
+  it("never promotes a debug-only lifecycle mirror to runtime authority", () => {
+    const lifecycle = buildCompletedLifecycle();
+
+    const selected = readVerifiedHelixRuntimeLifecycleFromPayload({
+      payload: {
+        debug: {
+          turn_lifecycle: lifecycle,
+          native_provider_turn_lifecycle: {
+            ...lifecycle,
+            scope: "codex_native_provider_cycle",
+          },
+        },
+      },
+      turnId: lifecycle.turn_id,
+    });
+
+    expect(selected).toBeNull();
+  });
+
+  it("exposes compatibility re-entry only as a diagnostic projection", () => {
+    const resolution = resolveHelixRuntimeObservationReentry({
+      payload: {},
+      turnId: "ask:test:compatibility-only",
+      candidateRefs: ["observation:compatibility-only"],
+      compatibilityProjected: true,
+    });
+
+    expect(resolution).toEqual({
+      authority: "compatibility_projection",
+      runtime_lifecycle_verified: false,
+      compatibility_projected: true,
+      reentered: false,
+      candidate_refs: ["observation:compatibility-only"],
+      matched_reentry_refs: [],
+      runtime_observation_reentry_refs: [],
+    });
+  });
+
   it("rejects a lifecycle whose event history fails recomputed integrity", () => {
     const lifecycle = buildCompletedLifecycle();
     const value = {

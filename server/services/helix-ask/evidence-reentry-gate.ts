@@ -925,8 +925,6 @@ export function buildEvidenceReentryGate(input: {
     ...collectCapabilityItineraryEvidenceRefs(input.payload),
   ]);
   const rejectedEvidenceRefs = collectRejectedEvidence(loopTrace);
-  const rejectedRefSet = new Set(rejectedEvidenceRefs.map((entry) => entry.ref));
-  const evidenceRefSet = new Set([...selectedEvidenceRefs, ...rejectedEvidenceRefs.map((entry) => entry.ref)]);
   const actualToolCalls = collectActualToolCalls(loopTrace);
   const observationRefs = collectObservationRefs(loopTrace);
   const runtimeObservationReentryRefs = unique(input.runtimeObservationReentryRefs ?? []);
@@ -952,8 +950,7 @@ export function buildEvidenceReentryGate(input: {
     (input.allowedTerminalProducts ?? []).includes(input.terminalArtifactKind) &&
     selectedEvidenceRefs.length > 0;
   const receiptsReentered = receiptRefs.filter((ref) =>
-    runtimeObservationReentryRefSet.has(ref) ||
-    (!runtimeLifecycleVerified && evidenceRefSet.has(ref))
+    runtimeObservationReentryRefSet.has(ref)
   );
   const receiptsNotReentered = receiptRefs.filter((ref) => !receiptsReentered.includes(ref));
   const selfTerminalReceiptRefs = allowedReceiptTerminal ? receiptRefs : [];
@@ -962,8 +959,7 @@ export function buildEvidenceReentryGate(input: {
     isProjectionKind(input.finalAnswerSource) ? input.finalAnswerSource : "",
   ].filter(Boolean));
   const projectionsReentered = projectionRefs.filter((ref) =>
-    runtimeObservationReentryRefSet.has(ref) ||
-    (!runtimeLifecycleVerified && (evidenceRefSet.has(ref) || rejectedRefSet.has(ref)))
+    runtimeObservationReentryRefSet.has(ref)
   );
   const projectionsNotReentered = projectionRefs.filter((ref) => !projectionsReentered.includes(ref));
   const hasTerminalReceipt = isReceiptKind(input.terminalArtifactKind) || isReceiptKind(input.finalAnswerSource);
