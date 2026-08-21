@@ -61,6 +61,29 @@ export const BRIDGE_MAPPINGS: readonly TheoryIdeologyBridgeMapping[] = [
       "Prevent self-confirming evidence loops and route high-impact uncertainty toward review or repair.",
   },
   {
+    theoryHints: [
+      "coherence lifetime",
+      "coherence window",
+      "selection fitness",
+      "heritable molecular",
+      "dielectric environment",
+      "transformation timescale",
+      "useful transformation",
+    ],
+    ideologyNodeIds: [
+      "transformation-window-stewardship",
+      "right-effort-loop",
+      "interdependence-yin-yang-balance",
+      "impermanence-entropy-and-revision",
+      "skillful-action-under-uncertainty",
+      "non-harm-and-compassionate-constraint",
+      "falsifiability-and-truth-convergence",
+    ],
+    relation: "analogy_only",
+    proceduralEffect:
+      "Require independent replication before strengthening the physical premise; compare the support window with the transformation window, prefer environmental scaffolding or staged work when support is too short, and never treat persistence, fitness, heredity, or dominance as moral worth or execution authority.",
+  },
+  {
     theoryHints: ["jurisdiction", "boundary_conditions", "boundary condition"],
     ideologyNodeIds: [
       "fairness-due-process-and-justification",

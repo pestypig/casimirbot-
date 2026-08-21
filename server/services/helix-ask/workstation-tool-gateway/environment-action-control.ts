@@ -206,7 +206,7 @@ const selectedParticipantId = async (input: {
   const actor = input.account.trusted_turn_actor_context;
   if (!actor) return membership.participantId;
   if (
-    actor.origin !== "realtime_voice" ||
+    !["realtime_voice", "environment_interaction"].includes(actor.origin) ||
     actor.room_id !== input.roomId ||
     actor.requester_profile_id !== input.profileId ||
     actor.resolution !== "resolved" ||

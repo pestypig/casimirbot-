@@ -226,5 +226,90 @@ describe("Helix agent account-binding management routes", () => {
       .set("Cookie", `helix_session=${SESSION_ID}`)
       .expect(404);
   });
-});
 
+  it("binds only an explicitly confirmed, server-verified OAuth identity", async () => {
+    const dependencies = createDependencies();
+    const verifier = {
+      verify: vi.fn(async () => ({
+        issuer: "https://auth.example",
+        subject: "verified-subject",
+        tenantId: "verified-tenant",
+        scopes: new Set<string>(),
+        expiresAt: "2026-08-20T23:00:00.000Z",
+        claims: {},
+      })),
+      authorizationServer: () => "https://auth.example",
+      audience: () => "https://casimirbot.example/mcp",
+      providerAlias: () => "auth0",
+    };
+    const createLinkIntent = vi.fn(async () => ({
+      schema: "helix.agent_account_link_intent.v1" as const,
+      intent_id: "intent-1",
+      state: "a".repeat(43),
+      expected_issuer: "https://auth.example",
+      expected_audience: "https://casimirbot.example/mcp",
+      expected_provider: "auth0",
+      expires_at: "2026-08-20T23:00:00.000Z",
+      state_persisted_raw: false as const,
+    }));
+    const completeLinkIntent = vi.fn(async () => ({
+      schema: "helix.agent_account_binding_receipt.v1" as const,
+      operation: "agent_account_binding.complete" as const,
+      binding,
+      reactivated: false,
+      reused_binding: false,
+      answer_authority: false as const,
+      assistant_answer: false as const,
+      raw_identity_included: false as const,
+      bearer_included: false as const,
+    }));
+    const app = express();
+    app.use(
+      "/api/account",
+      createHelixAgentAccountBindingsRouter({
+        ...dependencies,
+        verifier,
+        linkStore: { createLinkIntent, completeLinkIntent },
+      }),
+    );
+
+    await request(app)
+      .post("/api/account/session/agent-bindings/oauth/complete")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .set("Authorization", "Bearer verified-token")
+      .expect(400);
+    expect(verifier.verify).not.toHaveBeenCalled();
+
+    const response = await request(app)
+      .post("/api/account/session/agent-bindings/oauth/complete")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .set("Authorization", "Bearer verified-token")
+      .set("X-Helix-Agent-Link-Confirm", "bind-current-oauth-subject")
+      .expect(200);
+
+    expect(verifier.verify).toHaveBeenCalledWith("verified-token");
+    expect(createLinkIntent).toHaveBeenCalledWith({
+      session: { sessionId: SESSION_ID, profileId: PROFILE_ID },
+      expectedIssuer: "https://auth.example",
+      expectedAudience: "https://casimirbot.example/mcp",
+      expectedProvider: "auth0",
+      ttlSeconds: 60,
+    });
+    expect(completeLinkIntent).toHaveBeenCalledWith({
+      session: { sessionId: SESSION_ID, profileId: PROFILE_ID },
+      state: "a".repeat(43),
+      identity: {
+        issuer: "https://auth.example",
+        audience: "https://casimirbot.example/mcp",
+        tenantId: "verified-tenant",
+        providerAlias: "auth0",
+        subject: "verified-subject",
+      },
+    });
+    expect(response.body).toMatchObject({
+      operation: "agent_account_binding.complete",
+      bearer_included: false,
+      raw_identity_included: false,
+    });
+  });
+});

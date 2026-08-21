@@ -1,6 +1,11 @@
 export type MinecraftExecutionPlaneConstraint =
   "player_embodiment" | "world_authority" | "hybrid" | null;
 
+type MinecraftExecutionPlaneContext = {
+  trusted_environment_domain?: "minecraft" | null;
+  authorized_player_action_capability_ids?: string[];
+};
+
 const PLAYER_EMBODIMENT_PLANE_CUE_RE =
   /\b(?:player\s+embodiment(?:\s+plane)?|paired(?:\s+minecraft)?(?:\s+player)?\s+client|minecraft\s+player\s+client|normal\s+player\s+controls?|player-side\s+(?:client|control)|client-side\s+player\s+control|(?:bounded\s+)?(?:reactive\s+)?guardian\s+program|survival_tas(?:\s+guardian)?\s+program)\b/iu;
 const WORLD_AUTHORITY_PLANE_CUE_RE =
@@ -147,12 +152,24 @@ const playerEmbodimentActionClauseIsOperative = (input: {
  */
 export const minecraftPlayerEmbodimentActionPromptMatch = (
   promptText: string,
+  context?: MinecraftExecutionPlaneContext | null,
 ): MinecraftPlayerEmbodimentActionPromptMatch | null => {
   const prompt = stripQuotedMinecraftPlaneExamples(promptText).trim();
-  if (
-    !prompt ||
-    resolveMinecraftExecutionPlaneConstraint(prompt) !== "player_embodiment"
-  ) {
+  if (!prompt) {
+    return null;
+  }
+
+  const explicitPlane = resolveMinecraftExecutionPlaneConstraint(prompt);
+  if (explicitPlane === "world_authority" || explicitPlane === "hybrid") {
+    return null;
+  }
+  const authorizedPlayerCapabilities = new Set(
+    context?.authorized_player_action_capability_ids ?? [],
+  );
+  const trustedPlayerPlaneAvailable =
+    context?.trusted_environment_domain === "minecraft" &&
+    authorizedPlayerCapabilities.size > 0;
+  if (explicitPlane !== "player_embodiment" && !trustedPlayerPlaneAvailable) {
     return null;
   }
 
@@ -176,6 +193,16 @@ export const minecraftPlayerEmbodimentActionPromptMatch = (
     planeThenAction,
     actionThenPlane,
   ];
+  if (
+    explicitPlane !== "player_embodiment" &&
+    authorizedPlayerCapabilities.has(
+      "com.casimirbot.minecraft.player.sequence.execute",
+    )
+  ) {
+    directActionPatterns.push(
+      /\b(?:perform|complete)\b[\s\S]{0,180}?\b(look|sprint|jump|interact|equip|craft|release)\b/iu,
+    );
+  }
   for (const pattern of directActionPatterns) {
     const match = prompt.match(pattern);
     if (!match || typeof match.index !== "number") continue;
@@ -202,7 +229,8 @@ export const minecraftPlayerEmbodimentActionPromptMatch = (
 
 export const isAffirmativeMinecraftPlayerEmbodimentActionPrompt = (
   prompt: string,
-): boolean => minecraftPlayerEmbodimentActionPromptMatch(prompt) !== null;
+  context?: MinecraftExecutionPlaneContext | null,
+): boolean => minecraftPlayerEmbodimentActionPromptMatch(prompt, context) !== null;
 
 /**
  * Reads the already-admitted source contract without reclassifying the prompt.

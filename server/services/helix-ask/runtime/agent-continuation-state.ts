@@ -940,6 +940,20 @@ const readBudget = (payload: RecordLike): HelixAgentContinuationBudget => {
   const budget =
     readRecord(payload.agent_loop_budget) ?? readRecord(payload.budget) ?? {};
   const loop = readRecord(payload.agent_runtime_loop) ?? {};
+  const runtimeLaneRequestLoop = readRecord(payload.runtime_lane_request_loop);
+  const providerContinuation = readRecord(
+    runtimeLaneRequestLoop?.generic_provider_continuation,
+  );
+  const providerContinuationHardExhausted =
+    readString(providerContinuation?.stop_reason) === "budget_exhausted";
+  const providerTerminalReviewLimitExhausted =
+    providerContinuation?.terminal_review_limit_exhausted === true;
+  const providerContinuationMaxSteps = readNumber(
+    providerContinuation?.max_steps,
+  );
+  const providerContinuationConsumedSteps = providerContinuationHardExhausted
+    ? providerContinuationMaxSteps
+    : readNumber(providerContinuation?.step_count);
   const softMaxIterations =
     readNumber(loop.max_iterations) ?? readNumber(budget.max_iterations);
   const softMaxTools =
@@ -950,10 +964,14 @@ const readBudget = (payload: RecordLike): HelixAgentContinuationBudget => {
     readNumber(loop.hard_max_iterations) ??
     readNumber(budget.hard_max_iterations) ??
     softMaxIterations;
-  const hardMaxTools =
-    readNumber(loop.hard_max_tool_calls) ??
-    readNumber(budget.hard_max_tool_calls) ??
-    softMaxTools;
+  const hardMaxTools = providerContinuationHardExhausted
+    ? (providerContinuationMaxSteps ??
+      readNumber(loop.hard_max_tool_calls) ??
+      readNumber(budget.hard_max_tool_calls) ??
+      softMaxTools)
+    : (readNumber(loop.hard_max_tool_calls) ??
+      readNumber(budget.hard_max_tool_calls) ??
+      softMaxTools);
   const hardMaxDecisions =
     readNumber(loop.hard_max_llm_decisions) ??
     readNumber(budget.hard_max_llm_decisions) ??
@@ -962,10 +980,15 @@ const readBudget = (payload: RecordLike): HelixAgentContinuationBudget => {
     (Array.isArray(loop.iterations) ? loop.iterations.length : null) ??
     readNumber(budget.consumed_iterations) ??
     0;
-  const consumedTools =
-    readNumber(loop.executed_tool_call_count) ??
-    readNumber(budget.consumed_tool_calls) ??
-    0;
+  const consumedTools = providerContinuationHardExhausted
+    ? (providerContinuationConsumedSteps ??
+      readNumber(loop.executed_tool_call_count) ??
+      readNumber(budget.consumed_tool_calls) ??
+      0)
+    : (readNumber(loop.executed_tool_call_count) ??
+      readNumber(budget.consumed_tool_calls) ??
+      providerContinuationConsumedSteps ??
+      0);
   const consumedDecisions =
     readNumber(loop.llm_decision_count) ??
     readNumber(budget.consumed_llm_decisions) ??
@@ -1009,7 +1032,10 @@ const readBudget = (payload: RecordLike): HelixAgentContinuationBudget => {
     },
     hard: {
       ...hard,
-      exhausted: hardRemaining.some((value: number) => value <= 0),
+      exhausted:
+        providerContinuationHardExhausted ||
+        providerTerminalReviewLimitExhausted ||
+        hardRemaining.some((value: number) => value <= 0),
     },
     extension_count:
       readNumber(loop.budget_extension_count) ??

@@ -911,6 +911,133 @@ describe("Minecraft agency sequencing", () => {
     expect(resolutions).toEqual([]);
   });
 
+  it("preserves successful sequence prefixes across later failed repair nodes", () => {
+    const sequence = (
+      id: string,
+      requiredCheckpointIds: string[],
+      nodes: Array<Record<string, unknown>>,
+    ) => ({
+      capability: "com.casimirbot.minecraft.player.sequence.execute",
+      arguments: {
+        sequence_id: id,
+        required_checkpoint_ids: requiredCheckpointIds,
+        nodes,
+      },
+    });
+    const failedSequenceResult = (
+      callId: string,
+      nodeOutcomes: Record<string, string>,
+      satisfiedCheckpointIds: string[],
+    ) =>
+      observedResult(
+        "com.casimirbot.minecraft.player.sequence.execute",
+        callId,
+        false,
+        {
+          result: {
+            controls_released: true,
+            verified_terminal_measurements: {
+              node_outcomes: nodeOutcomes,
+              satisfied_checkpoint_ids: satisfiedCheckpointIds,
+            },
+          },
+        },
+      );
+    const movement = sequence("movement", ["cp1"], [
+      {
+        node_id: "move",
+        node_kind: "input_segment",
+        controls: {
+          sprint: true,
+          jump: "pulse",
+          look_delta: { yaw_degrees: 4 },
+        },
+      },
+    ]);
+    const craft = sequence("craft", ["cp3", "cp4"], [
+      {
+        node_id: "equip",
+        node_kind: "workflow_action",
+        action: { action_kind: "equip", item_id: "minecraft:stick" },
+      },
+      {
+        node_id: "craft",
+        node_kind: "workflow_action",
+        action: {
+          action_kind: "craft",
+          output_item_id: "minecraft:oak_planks",
+          count: 4,
+        },
+      },
+      {
+        node_id: "late_interact",
+        node_kind: "workflow_action",
+        action: { action_kind: "interact" },
+      },
+    ]);
+    const interact = sequence("interact", ["cp2"], [
+      {
+        node_id: "interact",
+        node_kind: "workflow_action",
+        action: { action_kind: "interact" },
+      },
+    ]);
+    const requests = [
+      { capability: "com.casimirbot.minecraft.actor.status.read", arguments: {} },
+      movement,
+      craft,
+      interact,
+    ];
+    const resolutions = buildMinecraftAgencyCompoundCoverageResolutions({
+      compoundContract: {
+        requirements: [
+          { id: "R1", text: "inspect the current player state" },
+          { id: "R2", text: "perform the bounded look/sprint/jump" },
+          { id: "R3", text: "interact with the verified reachable target" },
+          { id: "R4", text: "equip the stick" },
+          { id: "R5", text: "craft four oak planks" },
+          { id: "R6", text: "verify every checkpoint" },
+          { id: "R7", text: "release all controls" },
+        ],
+      },
+      priorRequests: requests,
+      gatewayCallResults: [
+        observedResult(
+          "com.casimirbot.minecraft.actor.status.read",
+          "actor-status",
+        ),
+        failedSequenceResult("movement", { move: "succeeded" }, ["cp1"]),
+        failedSequenceResult(
+          "craft",
+          {
+            equip: "succeeded",
+            craft: "succeeded",
+            late_interact: "failed",
+          },
+          ["cp3", "cp4"],
+        ),
+        failedSequenceResult(
+          "interact",
+          { interact: "succeeded" },
+          ["cp2"],
+        ),
+      ],
+    });
+
+    expect(resolutions.map((entry) => entry.requirement_id)).toEqual([
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+    ]);
+    expect(
+      resolutions.find((entry) => entry.requirement_id === "R5")?.reason,
+    ).toContain("later node in its enclosing sequence failed");
+  });
+
   it("derives a bounded exact-footprint verification request from an absolute fill", () => {
     expect(
       buildMinecraftPostMutationVerificationRequest(

@@ -142,11 +142,11 @@ describe("MoralGraph coverage audit", () => {
     expect(audit.rootId).toBe("wisdom-first-principles");
     expect(audit.summary.total).toBe(audit.nodes.length);
     expect(audit.summary).toEqual({
-      mapped: 26,
+      mapped: 53,
       partial: 15,
-      conceptual_only: 34,
+      conceptual_only: 51,
       unmapped: 0,
-      total: 75,
+      total: 119,
     });
     expect(audit.nodes.find((entry) => entry.ideologyNodeId === "direct-observation-before-claim")?.coverageStatus).toBe(
       "mapped",

@@ -56,6 +56,7 @@ import { migration054 } from "./migrations/054_live_equity_execution";
 import { migration055 } from "./migrations/055_live_protective_exits";
 import { migration056 } from "./migrations/056_live_trading_supervisor";
 import { migration057 } from "./migrations/057_live_provider_contract_acceptance";
+import { migration058 } from "./migrations/058_environment_interaction_credentials";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -116,6 +117,7 @@ const MIGRATIONS = [
   migration055,
   migration056,
   migration057,
+  migration058,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

@@ -28,6 +28,7 @@ export const buildCodexProviderTurnLifecycle = (input: {
   capabilityLaneObservationPackets?: HelixAgentStepObservationPacket[];
   providerReasoningReentry?: RecordLike | null;
   providerText: string;
+  providerMessageSha256?: string | null;
   terminalArtifactKind?: string | null;
   terminalEligible: boolean;
   ok: boolean;
@@ -258,7 +259,15 @@ export const buildCodexProviderTurnLifecycle = (input: {
     producer: "codex_runtime",
     status: "succeeded",
     causation_id: prior.event_id,
-    message_sha256: crypto.createHash("sha256").update(input.providerText).digest("hex"),
+    // The provider message and the later Helix terminal projection are
+    // separate lifecycle facts. When terminal authority substitutes a typed
+    // failure, preserve the already-recorded provider candidate identity
+    // rather than re-labelling the presentation text as Codex's message.
+    message_sha256:
+      typeof input.providerMessageSha256 === "string" &&
+      /^[a-f0-9]{64}$/iu.test(input.providerMessageSha256.trim())
+        ? input.providerMessageSha256.trim().toLowerCase()
+        : crypto.createHash("sha256").update(input.providerText).digest("hex"),
   });
   const runtime = recorder.append({
     kind: "runtime.turn.completed",

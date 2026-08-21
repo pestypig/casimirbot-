@@ -423,6 +423,10 @@ public final class FabricProbeExecutor {
         );
         details.put("yaw", round(player.getYRot()));
         details.put("pitch", round(player.getXRot()));
+        Map<String, Object> lookedAtBlock = lookedAtBlock(player);
+        if (!lookedAtBlock.isEmpty()) {
+            details.put("looked_at_block", lookedAtBlock);
+        }
         details.put("status_flags", List.copyOf(flags));
         details.put("active_effects", effects);
         Map<String, Object> mechanicsState =
@@ -435,6 +439,30 @@ public final class FabricProbeExecutor {
             "Actor status read-only probe completed.",
             SensorScope.PLAYER_OBSERVABLE,
             Map.of("confidence", 0.98, "details", details)
+        );
+    }
+
+    private Map<String, Object> lookedAtBlock(ServerPlayer player) {
+        HitResult hit = player.pick(6.0d, 0.0f, false);
+        if (
+            hit.getType() != HitResult.Type.BLOCK ||
+            !(hit instanceof BlockHitResult blockHit)
+        ) return Map.of();
+        BlockPos position = blockHit.getBlockPos();
+        BlockState state = serverLevel(player).getBlockState(position);
+        Vec3 aim = Vec3.atCenterOf(position);
+        double distance = player.getEyePosition().distanceTo(hit.getLocation());
+        return Map.of(
+            "block_id",
+            blockId(state),
+            "position",
+            Map.of("x", position.getX(), "y", position.getY(), "z", position.getZ()),
+            "aim_position",
+            Map.of("x", round(aim.x), "y", round(aim.y), "z", round(aim.z)),
+            "distance_blocks",
+            round(distance),
+            "within_interaction_range",
+            distance <= 4.5d
         );
     }
 

@@ -6,7 +6,7 @@ const ROOM_THREAD_PREFIX = "helix-ask:room:";
 
 export type HelixRealtimeRoomTurnActorContext = {
   schema: "helix.realtime_room.turn_actor_context.v1";
-  origin: "realtime_voice";
+  origin: "realtime_voice" | "environment_interaction";
   room_id: string;
   requester_profile_id: string;
   realtime_session_id: string;
@@ -15,6 +15,7 @@ export type HelixRealtimeRoomTurnActorContext = {
   resolution_source:
     | "active_speaker_floor"
     | "authenticated_realtime_participant"
+    | "paired_environment_participant"
     | "speaker_unavailable";
   captured_at_ms: number;
 };

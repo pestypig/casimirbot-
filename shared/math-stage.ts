@@ -3498,6 +3498,53 @@ export const mathStageRegistry: MathStageEntry[] = [
   },
   {
     tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-tile-cycle-energy-ledger.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Fail-closed one-cycle NHM2 energy ledger with declared system boundary and reservoirs, mutually exclusive import/export channels, signed stored-energy change, uncertainty-aware first-law closure, input-exergy attribution, and permanent source/viability/propulsion/transport claim locks; plain TypeScript evidence remains unauthenticated.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-tile-cycle-energy-ledger.spec.ts",
+      },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      cyclePeriodSeconds: "T",
+      declaredCycleFrequencyHz: "T^-1",
+      totalImportedEnergyJ: "M L^2 T^-2",
+      totalExportedEnergyJ: "M L^2 T^-2",
+      storedEnergyDeltaJ: "M L^2 T^-2",
+      firstLawResidualJ: "M L^2 T^-2",
+      usefulPowerW: "M L^2 T^-3",
+      exergyEfficiency: "1",
+      diagnosticCycleComputationComplete: "1",
+      cycleEnergyLedgerReceiptReady: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/nhm2-casimir-cycle-work.ts",
+    stage: "diagnostic",
+    notes:
+      "Bounded two-state Casimir force-loop work integrator for a fixed 96 nm coupon campaign, with exact shared-grid admission, propagated force uncertainty, explicit operating-energy and input-exergy accounting, a gap-only null control, thermal Carnot bound, reservoir blockers, and permanent vacuum-extraction/viability/propulsion/transport locks.",
+    checks: [
+      { type: "stability", path: "tests/nhm2-casimir-cycle-work.spec.ts" },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      couponTargetGapMeters: "L",
+      forceNewtons: "M L T^-2",
+      grossMechanicalWorkByFieldJ: "M L^2 T^-2",
+      integratedForceUncertaintyJ: "M L^2 T^-2",
+      totalKnownOperatingInputJ: "M L^2 T^-2",
+      identifiedInputExergyJ: "M L^2 T^-2",
+      exergyEfficiency: "1",
+      carnotEfficiencyLimit: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
     module: "shared/contracts/nhm2-full-apparatus-source-tensor.v1.ts",
     stage: "diagnostic",
     notes:

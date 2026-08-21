@@ -1193,6 +1193,44 @@ const normalizeLegacyResult = (
       z: position.z,
     };
   }
+  const lookedAtBlock = asRecord(details.looked_at_block);
+  const lookedAtBlockPosition = asRecord(lookedAtBlock.position);
+  const lookedAtBlockAim = asRecord(lookedAtBlock.aim_position);
+  if (
+    typeof lookedAtBlock.block_id === "string" &&
+    lookedAtBlock.block_id.trim().length > 0 &&
+    lookedAtBlock.block_id.trim().length <= 160 &&
+    Number.isInteger(lookedAtBlockPosition.x) &&
+    Number.isInteger(lookedAtBlockPosition.y) &&
+    Number.isInteger(lookedAtBlockPosition.z) &&
+    typeof lookedAtBlockAim.x === "number" &&
+    Number.isFinite(lookedAtBlockAim.x) &&
+    typeof lookedAtBlockAim.y === "number" &&
+    Number.isFinite(lookedAtBlockAim.y) &&
+    typeof lookedAtBlockAim.z === "number" &&
+    Number.isFinite(lookedAtBlockAim.z) &&
+    typeof lookedAtBlock.distance_blocks === "number" &&
+    Number.isFinite(lookedAtBlock.distance_blocks) &&
+    lookedAtBlock.distance_blocks >= 0 &&
+    lookedAtBlock.distance_blocks <= 6 &&
+    typeof lookedAtBlock.within_interaction_range === "boolean"
+  ) {
+    normalized.looked_at_block = {
+      block_id: lookedAtBlock.block_id.trim(),
+      position: {
+        x: Number(lookedAtBlockPosition.x),
+        y: Number(lookedAtBlockPosition.y),
+        z: Number(lookedAtBlockPosition.z),
+      },
+      aim_position: {
+        x: Number(lookedAtBlockAim.x),
+        y: Number(lookedAtBlockAim.y),
+        z: Number(lookedAtBlockAim.z),
+      },
+      distance_blocks: Number(lookedAtBlock.distance_blocks),
+      within_interaction_range: lookedAtBlock.within_interaction_range,
+    };
+  }
   const spatialPurposes = new Set([
     "general",
     "structure_planning",
@@ -1296,7 +1334,7 @@ const normalizeLegacyResult = (
     const compactColumns =
       details.column_encoding ===
       "relative_xz_relative_y_palette_flags_v1";
-    normalized.columns = compactColumns
+    const normalizedSpatialColumns = compactColumns
       ? details.columns
           .map((column) => {
             if (Array.isArray(column)) return column;
@@ -1397,6 +1435,49 @@ const normalizeLegacyResult = (
                   .slice(0, 7),
               })),
           }));
+    const paletteCounts = new Map(
+      (normalized.palette as Array<Record<string, unknown>>).map((entry) => [
+        String(entry.block),
+        Number(entry.count),
+      ]),
+    );
+    const blockPositionSamples = new Map<
+      string,
+      Array<Record<string, number>>
+    >();
+    for (const column of normalizedSpatialColumns) {
+      for (const run of column.runs) {
+        if (run.flags.includes("air")) continue;
+        const positions = blockPositionSamples.get(run.block) ?? [];
+        for (
+          let y = run.y_start;
+          y <= run.y_end && positions.length < 8;
+          y += 1
+        ) {
+          positions.push({ x: column.x, y, z: column.z });
+        }
+        blockPositionSamples.set(run.block, positions);
+      }
+    }
+    // Put this concise index before the potentially large column evidence in
+    // the normalized object. It is a lossless sample projection over the same
+    // trusted scan, not a target selector: Codex still decides which observed
+    // block is relevant to the user's request.
+    normalized.block_position_samples = Array.from(
+      blockPositionSamples.entries(),
+    )
+      .map(([block, positions]) => ({
+        block,
+        total_count: paletteCounts.get(block) ?? positions.length,
+        positions,
+      }))
+      .sort(
+        (left, right) =>
+          left.total_count - right.total_count ||
+          left.block.localeCompare(right.block),
+      )
+      .slice(0, 32);
+    normalized.columns = normalizedSpatialColumns;
     normalized.column_encoding = compactColumns
       ? "expanded_relative_xz_relative_y_palette_flags_v1"
       : "absolute_xyz_verbose_v1";

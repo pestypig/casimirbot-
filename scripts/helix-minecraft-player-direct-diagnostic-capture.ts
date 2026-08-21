@@ -136,6 +136,16 @@ export const buildDirectDiagnosticCapture = ({
 
   const capabilityId = capabilityIdForActionKind(actionKind);
   const controlEngine = readString(request.control_engine) || "native_fabric";
+  const requestArguments = request.arguments &&
+      typeof request.arguments === "object" &&
+      !Array.isArray(request.arguments)
+    ? request.arguments as JsonRecord
+    : null;
+  const normalizedArguments = requestArguments
+    ? Object.fromEntries(
+        Object.entries(requestArguments).filter(([key]) => key !== "action_kind"),
+      )
+    : null;
 
   const logHash = crypto
     .createHash("sha256")
@@ -210,7 +220,7 @@ export const buildDirectDiagnosticCapture = ({
       `direct_diagnostic_workflow:${workflowId}`,
     ],
     selected_capability_id: capabilityId,
-    normalized_arguments: request.arguments ?? null,
+    normalized_arguments: normalizedArguments,
     admission_status: "not_applicable",
     execution_outcome: executionOutcome,
     normalized_progress: normalizedProgress,

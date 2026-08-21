@@ -129,6 +129,10 @@ final class ConnectorPairingClientTest {
             );
             assertEquals(Boolean.FALSE, paired.actionConfig().get("host_access_enabled"));
             assertEquals(Boolean.FALSE, paired.actionConfig().get("automatic_replay_enabled"));
+            assertEquals(
+                "helix.environment_interaction.config.v1",
+                paired.interactionConfig().get("schema")
+            );
         }
     }
 
@@ -168,10 +172,27 @@ final class ConnectorPairingClientTest {
                       "automatic_replay_enabled":false,
                       "emergency_stop_required":true,
                       "expires_at":"2099-01-01T00:00:00.000Z"
+                    },
+                    "interaction":{
+                      "schema":"helix.environment_interaction.config.v1",
+                      "endpoint":"%s/api/agi/ask/turn",
+                      "bearer_token":"helix_env_interact_%s",
+                      "interaction_credential_id":"environment_interaction_credential:test",
+                      "action_authority_id":"environment_action_authority:test",
+                      "environment_binding_id":"environment_binding:test",
+                      "room_id":"room:test",
+                      "participant_id":"participant:test",
+                      "subject_binding_id":"subject_binding:test",
+                      "subject_native_id":"minecraft-player-uuid",
+                      "source_id":"source:room-ingress:test",
+                      "world_id":"minecraft:fabric:test",
+                      "connector_installation_id":"environment_action_connector_installation:test",
+                      "expires_at":"2099-01-01T00:00:00.000Z",
+                      "scopes":["ask.submit","ask.cancel","ask.status"]
                     }
                   }
                 }
-                """.formatted(baseUrl, baseUrl, "d".repeat(43));
+                """.formatted(baseUrl, baseUrl, "d".repeat(43), baseUrl, "e".repeat(43));
             send(exchange, 200, response);
             return;
         }

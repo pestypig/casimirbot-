@@ -224,6 +224,15 @@ const tenantFromPayload = (
 
 const remoteJwks = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
+const developmentLoopbackAudience = (): string | null => {
+  if (process.env.NODE_ENV === "production") return null;
+  const rawPort = normalize(process.env.PORT);
+  if (!/^\d{1,5}$/u.test(rawPort)) return null;
+  const port = Number.parseInt(rawPort, 10);
+  if (port < 1 || port > 65_535) return null;
+  return `http://127.0.0.1:${port}/mcp`;
+};
+
 export class DefaultHelixAgentAccessTokenVerifier implements HelixAgentAccessTokenVerifier {
   private config(): AuthConfig {
     return resolveAuthConfig();
@@ -247,7 +256,13 @@ export class DefaultHelixAgentAccessTokenVerifier implements HelixAgentAccessTok
     try {
       const verificationOptions = {
         issuer: config.issuer,
-        audience: config.audience,
+        audience: Array.from(
+          new Set(
+            [config.audience, developmentLoopbackAudience()].filter(
+              (value): value is string => Boolean(value),
+            ),
+          ),
+        ),
         algorithms: config.algorithms,
         clockTolerance: 5,
       };

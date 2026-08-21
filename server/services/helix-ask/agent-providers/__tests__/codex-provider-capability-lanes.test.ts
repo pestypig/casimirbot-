@@ -65,6 +65,7 @@ import {
   codexRouteAllowsTerminalKind,
   codexProvider,
   continuationStateAdmitsPreparedLaneRequest,
+  continuationStateAdmitsPostObservationLaneRequest,
   continuationStateAdmitsGenericProviderLaneRequest,
   continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest,
   continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest,
@@ -100,6 +101,7 @@ import {
   validateCodexScholarlyEvidenceDecision,
 } from "../codex-provider";
 import { attachHelixCapabilityItineraryExecutionState } from "../../capability-itinerary-execution";
+import { environmentActionMinecraftManifests } from "../../workstation-tool-gateway/environment-action";
 
 const buildIntegrityValidLanyonReceipt = async (input: {
   request: CasimirArtifactGenerationRequestV1;
@@ -475,6 +477,62 @@ describe("Codex provider capability lane adapter", () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }, 15_000);
+
+  it("preserves an unresolved provider compound gate through terminal authority after bounded reviews", async () => {
+    const previousStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
+    const previousStdoutSequence = process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+    const previousCallIndex = process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+    const previousExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+    delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = JSON.stringify({
+      sequence: [
+        'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"utility_text.normalize_text","text":"  FIRST  ","normalization_mode":"lowercase"}',
+        "Only the first normalization completed; the second is still not evidenced.",
+        "Only the first normalization completed; the second is still not evidenced.",
+        "Only the first normalization completed; the second is still not evidenced.",
+        "Only the first normalization completed; the second is still not evidenced.",
+      ],
+    });
+    process.env.CODEX_AGENT_FAKE_CALL_INDEX = "0";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "0";
+    try {
+      const result = await codexProvider.runTurn({
+        runtime: "codex",
+        route: "/ask/turn",
+        body: {
+          turn_id: "turn-codex-unresolved-compound-gate",
+          question:
+            'Use the text-normalization tool on " FIRST " and verify it. Then use the text-normalization tool on " SECOND " and verify it.',
+        },
+      });
+
+      expect(result.compound_prompt_coverage_gate).toMatchObject({
+        schema: "helix.compound_prompt_coverage_gate.v1",
+        passed: false,
+        decision: "FAIL_CLOSED",
+      });
+      expect(result.debug?.compound_prompt_coverage_gate).toMatchObject({
+        passed: false,
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        response_type: "final_failure",
+      });
+      expect(result.answer).not.toContain("Only the first normalization completed");
+    } finally {
+      if (previousStdout === undefined) delete process.env.CODEX_AGENT_FAKE_STDOUT;
+      else process.env.CODEX_AGENT_FAKE_STDOUT = previousStdout;
+      if (previousStdoutSequence === undefined)
+        delete process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE;
+      else process.env.CODEX_AGENT_FAKE_STDOUT_SEQUENCE = previousStdoutSequence;
+      if (previousCallIndex === undefined)
+        delete process.env.CODEX_AGENT_FAKE_CALL_INDEX;
+      else process.env.CODEX_AGENT_FAKE_CALL_INDEX = previousCallIndex;
+      if (previousExitCode === undefined)
+        delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+      else process.env.CODEX_AGENT_FAKE_EXIT_CODE = previousExitCode;
+    }
+  }, 30_000);
 
   it("does not coerce an unbound calculator result referent into scholarly follow-up", () => {
     const question = "Now double that result and tell me the new value.";
@@ -2490,6 +2548,58 @@ describe("Codex provider capability lane adapter", () => {
     })).toBe(false);
   });
 
+  it("lets Codex select an admitted player action after a successful status observation when Helix prescribed no exact affordance", () => {
+    const jumpCapability = "com.casimirbot.minecraft.player.jump";
+    const state = {
+      next_admissible_affordances: [],
+      allowed_decisions: ["act"],
+      last_attempt: {
+        attempt_id: "attempt:minecraft-status",
+        capability_id: "com.casimirbot.minecraft.actor.status.read",
+        action_fingerprint: "sha256:minecraft-status",
+        status: "succeeded",
+        failure_class: "none",
+        failure_code: "gateway_observation_requires_provider_reasoning_reentry",
+        failure_message: "Actor status read-only probe completed.",
+        retryability: "not_applicable",
+        observation_refs: ["observation:minecraft-status"],
+      },
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [jumpCapability],
+        authority: "helix_policy_admits_runtime_proposal",
+      },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const jumpManifest = environmentActionMinecraftManifests.find(
+      (manifest) => manifest.capability_id === jumpCapability,
+    );
+
+    expect(jumpManifest).toBeDefined();
+    expect(
+      continuationStateAdmitsPostObservationLaneRequest({
+        state,
+        candidate: {
+          capability: jumpCapability,
+          arguments: { count: 1 },
+        },
+        admittedCapabilityIds: [jumpCapability],
+        availableCapabilities: [jumpManifest!],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsPostObservationLaneRequest({
+        state,
+        candidate: {
+          capability: "host.shell.execute",
+          arguments: { command: "whoami" },
+        },
+        admittedCapabilityIds: [jumpCapability],
+        availableCapabilities: [jumpManifest!],
+      }),
+    ).toBe(false);
+  });
+
   it("closes provider-selected side lanes after a schema-complete exact operator command", () => {
     const state = {
       next_admissible_affordances: [],
@@ -3282,6 +3392,8 @@ describe("Codex provider capability lane adapter", () => {
     const guardian = "com.casimirbot.minecraft.player.guardian.execute";
     const walk = "com.casimirbot.minecraft.player.walk";
     const registryFact = "com.casimirbot.minecraft.registry.fact.read";
+    const workflowStatus =
+      "com.casimirbot.minecraft.player.workflow.status";
     const unrelatedLiveProbe = "live_env.query_visual_summaries";
 
     expect(
@@ -3294,6 +3406,7 @@ describe("Codex provider capability lane adapter", () => {
           guardian,
           walk,
           registryFact,
+          workflowStatus,
           unrelatedLiveProbe,
         ],
       }),

@@ -120,6 +120,51 @@ describe("environment action differential trace capture", () => {
     );
   });
 
+  it("retains exact timing in captures but compares causal progress", () => {
+    const firstCapture = capture("helix");
+    firstCapture.normalized_progress = [
+      { sequence: 0, event_type: "workflow.started", tick_index: 100 },
+      {
+        sequence: 1,
+        event_type: "workflow.succeeded",
+        measurements: {
+          scheduler_ticks_elapsed: 19,
+          wall_clock_elapsed_ms: 901,
+          satisfied_checkpoint_ids: ["cp0", "cp1"],
+          condition_observations: [
+            { condition_kind: "health_at_least", satisfied: true, tick_index: 0 },
+          ],
+          node_outcomes: { n0: "succeeded", t_ok: "succeeded" },
+        },
+        controls_released: true,
+      },
+    ];
+    const secondCapture = structuredClone(firstCapture);
+    (secondCapture.normalized_progress[0] as Record<string, unknown>).tick_index = 250;
+    const secondMeasurements = (
+      secondCapture.normalized_progress[1] as { measurements: Record<string, unknown> }
+    ).measurements;
+    secondMeasurements.scheduler_ticks_elapsed = 24;
+    secondMeasurements.wall_clock_elapsed_ms = 1_145;
+    (
+      secondMeasurements.condition_observations as Array<Record<string, unknown>>
+    )[0].tick_index = 16;
+
+    const first = captureEnvironmentActionDifferentialTrace(firstCapture);
+    const second = captureEnvironmentActionDifferentialTrace(secondCapture);
+    expect(second.normalized_progress_hashes).toEqual(
+      first.normalized_progress_hashes,
+    );
+
+    (secondMeasurements.node_outcomes as Record<string, string>).n0 = "failed";
+    const causalDivergence = captureEnvironmentActionDifferentialTrace(
+      secondCapture,
+    );
+    expect(causalDivergence.normalized_progress_hashes).not.toEqual(
+      first.normalized_progress_hashes,
+    );
+  });
+
   it("preserves a downstream public-text mismatch for the observer", () => {
     const helixCapture = capture("helix");
     helixCapture.route_product_text = "A deterministic adapter replaced the answer.";

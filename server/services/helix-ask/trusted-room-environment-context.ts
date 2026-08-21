@@ -6,6 +6,7 @@ import {
 import type { HelixWorkstationGatewayAccountContext } from "./workstation-tool-gateway/account-policy";
 import { listRoomEnvironmentParticipantSubjectContexts } from "../environment-connectors/subjects";
 import { listEnvironmentAdapterProfiles } from "../situation-room/environment-adapter-registry";
+import { readEnvironmentActionAuthorities } from "../environment-connectors/actions/authority-store";
 
 export type TrustedRoomEnvironmentIntentContext =
   ExplicitCapabilityExtractionContext & {
@@ -17,6 +18,7 @@ export type TrustedRoomEnvironmentIntentContext =
     domain_adapter: string;
     subject_kind: string;
     subject_label: string;
+    authorized_player_action_capability_ids: string[];
     source: "authenticated_room_environment_subject";
     terminal_eligible: false;
     assistant_answer: false;
@@ -176,6 +178,21 @@ export const resolveTrustedRoomEnvironmentIntentContextWithAudit = async (input:
   }
 
   const subject = activeMinecraftSubjects[0];
+  const actionAuthorities = await readEnvironmentActionAuthorities({
+    roomId,
+    profileId,
+    environmentBindingId: subject.environment_binding_ref,
+  });
+  const authorizedPlayerActionCapabilityIds = Array.from(
+    new Set(
+      actionAuthorities
+        .filter((authority) => authority.participant_id === participantId)
+        .flatMap((authority) => authority.allowed_capability_ids)
+        .filter((capabilityId) =>
+          capabilityId.startsWith("com.casimirbot.minecraft.player."),
+        ),
+    ),
+  ).sort();
   const context: TrustedRoomEnvironmentIntentContext = {
       schema: "helix.trusted_room_environment_intent_context.v1",
       trusted_environment_domain: "minecraft",
@@ -186,6 +203,8 @@ export const resolveTrustedRoomEnvironmentIntentContextWithAudit = async (input:
       domain_adapter: subject.domain_adapter,
       subject_kind: subject.subject_kind,
       subject_label: subject.subject_label,
+      authorized_player_action_capability_ids:
+        authorizedPlayerActionCapabilityIds,
       source: "authenticated_room_environment_subject",
       terminal_eligible: false,
       assistant_answer: false,

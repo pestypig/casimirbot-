@@ -383,7 +383,7 @@ const classifyCompoundRequirementKind = (
 };
 
 const compoundActionCuePattern =
-  /\b(?:use|find|locate|build|create|inspect|capture|avoid|execute|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b/i;
+  /\b(?:use|find|locate|build|create|inspect|capture|avoid|execute|perform|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|interact|equip|craft|release|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b/i;
 
 const negativeOnlyRequirementPattern =
   /^(?:do\s+not|don't|never|without|no\s+(?:file|files|write|writing|mutat|mutation|notes?))\b/i;
@@ -429,7 +429,7 @@ const isCoordinatedNegativeContinuation = (
 const extractCoordinatedCompoundClauses = (prompt: string): string[] => {
   const clauses = prompt
     .split(
-      /\s*(?:;|\.\s+|,\s*(?:and\s+)?|\band\s+|\bthen\s+)\s*(?=(?:use|find|locate|build|create|inspect|capture|avoid|execute|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b)/i,
+      /\s*(?:;|\.\s+|,\s*(?:and\s+)?|\band\s+|\bthen\s+)\s*(?=(?:use|find|locate|build|create|inspect|capture|avoid|execute|perform|run|check|read|restore|start|stop|remove|ignite|light|extinguish|summon|teleport|give|set|fill|break|clear|observe|interact|equip|craft|release|report|leave|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b)/i,
     )
     .map(cleanCompoundRequirementText)
     .filter(

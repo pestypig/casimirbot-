@@ -643,7 +643,7 @@ export const helixMinecraftFluidSequenceArgumentsSchema = z
         code: z.ZodIssueCode.custom,
         path: ["mutation_scope"],
         message:
-          "A non-mutating sequence must carry an empty zero-valued world mutation scope.",
+          "When world_mutation_allowed is false, max_block_mutations must be 0 and allowed_block_ids and allowed_regions must be empty. max_inventory_transfers is independent and must still cover declared collect, equip, craft, and inventory-transfer effects.",
       });
     }
     if (

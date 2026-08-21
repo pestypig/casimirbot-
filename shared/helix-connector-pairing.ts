@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { HelixEnvironmentCommandConnectorConfig } from "./helix-environment-command";
 import type { HelixEnvironmentActionConnectorConfig } from "./helix-environment-action";
+import type { HelixEnvironmentInteractionConfig } from "./helix-environment-interaction";
 import type { HelixRoomSourcePluginConfig } from "./helix-room-source-ingress";
 
 export const HELIX_CONNECTOR_PAIRING_SCHEMA =
@@ -213,6 +214,7 @@ export type HelixConnectorPairingRedemptionReceipt = {
         world_id: string;
         domain_adapter: string;
         action: HelixEnvironmentActionConnectorConfig;
+        interaction: HelixEnvironmentInteractionConfig;
       }
     | null;
   replayed: boolean;

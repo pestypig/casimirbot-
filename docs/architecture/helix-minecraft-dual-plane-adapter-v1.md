@@ -123,6 +123,52 @@ postcondition, abstention/interruption and semantic-escalation evidence.
 Learned profiles remain proposal-only until a separately accepted local arbiter
 promotion path exists.
 
+## Projected companion embodiment
+
+Minecraft may later expose two embodiment subjects behind the same
+provider-neutral catalog:
+
+- `player_proxy` acts through the selected user's client and remains governed
+  by the existing Player Embodiment lease; and
+- `companion_entity` controls a separate in-world assistant actor through a
+  distinct finite actor lease.
+
+This does not create a third ambient authority plane. The companion actor is a
+server/Fabric-owned subject whose entity-local navigation, orientation and
+presentation are separately admitted. Any block, inventory, command, summon,
+weather or other broader world mutation still requires the applicable World
+Authority capability and lease. Companion authority never inherits from the
+selected player's authority, and player authority never follows from owning or
+benefiting from a companion.
+
+The initial projected profile is
+`resident.minecraft.companion-follow.v1`. Its bounded repertoire is follow,
+hold position, look at an admitted target, move to a nearby admitted waypoint,
+return to owner, release controls, or abstain and request replanning. Follow is
+one semantic mode executed by native local pathfinding with a declared start
+and stop distance band; hysteresis prevents boundary chatter. It stops on
+obstruction, stale identity, world/epoch change, lease expiry, manual override
+or Emergency Stop and emits current causal evidence.
+
+The binding must carry exact `environment_id`, `world_id`, `connector_epoch`,
+`actor_entity_id`, `controller_profile_id`, `authority_subject_id`,
+`beneficiary_player_id`, `observation_revision`, and `lease_id`. Actor-owner
+association cannot be inferred from proximity. Several room members may be
+authorized beneficiaries, but one serialized execution lease controls the
+actor. Presence and chunk activity remain finite and bounded; the adapter may
+not silently keep arbitrary chunks loaded.
+
+Slow model work runs off the Minecraft tick, while every entity or world effect
+returns through the authoritative Fabric/server execution thread and trusted
+local arbiter. This profile is reserved for post-G3 EH-RCC3 and must not broaden
+the active G3 viability and unexpected-event surface.
+
+The complete projected spawn/bind/admit/activate/suspend/release/despawn state
+machine, durable companion versus runtime-incarnation identity, observation
+origins, room arbitration, spatial presentation, restart behavior, resource
+release and EH-RCC3 acceptance cases are defined in
+`helix-minecraft-companion-embodiment-v1.md`.
+
 ## Contract locations
 
 - Generic action/workflow lifecycle:

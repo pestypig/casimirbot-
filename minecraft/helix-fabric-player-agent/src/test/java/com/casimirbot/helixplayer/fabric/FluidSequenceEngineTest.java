@@ -117,6 +117,99 @@ final class FluidSequenceEngineTest {
         assertFalse(bridge.startedArguments.containsKey("recipe_id"));
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void returnsTheFirstEmbeddedFailureDiagnosisForCodexRepair() {
+        FakeBridge bridge = new FakeBridge() {
+            @Override
+            public boolean interact(String target, String hand, String interaction) {
+                return false;
+            }
+        };
+        FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+        engine.begin(sequence(
+            "node:interact",
+            List.of(),
+            List.of(
+                Map.of(
+                    "node_id", "node:interact",
+                    "node_kind", "workflow_action",
+                    "earliest_tick", 0,
+                    "timeout_ticks", 40,
+                    "action", Map.of(
+                        "action_kind", "interact",
+                        "target", "current_focus",
+                        "hand", "main_hand",
+                        "interaction", "use"
+                    ),
+                    "on_success", "node:succeeded",
+                    "on_failure", "node:failed"
+                ),
+                terminal("node:succeeded", "succeeded"),
+                terminal("node:failed", "failed")
+            )
+        ));
+
+        WorkflowStep terminal = null;
+        for (int tick = 1; tick <= 30; tick++) {
+            terminal = engine.step(tick);
+            if (terminal.status() == WorkflowStepStatus.FAILED) break;
+        }
+
+        assertNotNull(terminal);
+        assertEquals(WorkflowStepStatus.FAILED, terminal.status());
+        assertEquals("node:interact", terminal.measurements().get("first_failure_node_id"));
+        assertEquals("workflow_action", terminal.measurements().get("first_failure_node_kind"));
+        assertEquals("interact", terminal.measurements().get("first_failure_action_kind"));
+        assertEquals(
+            "No compatible block or entity became available during the bounded focus acquisition window.",
+            terminal.measurements().get("first_failure_summary")
+        );
+        Map<String, Object> measurements = (Map<String, Object>) terminal
+            .measurements()
+            .get("first_failure_measurements");
+        assertEquals(true, measurements.get("focus_acquisition_pending"));
+        assertEquals(10, measurements.get("interaction_attempt_count"));
+    }
+
+    @Test
+    void acceptsTheSchemaAdmittedTrackingActionInsideASequence() {
+        FakeBridge bridge = new FakeBridge();
+        FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+        Map<String, Object> trackingAction = Map.ofEntries(
+            Map.entry("action_kind", "track_target"),
+            Map.entry("target", Map.of("target_kind", "current_focus_entity")),
+            Map.entry("aim_point", "center"),
+            Map.entry("max_acquisition_distance", 6),
+            Map.entry("max_duration_ms", 1_000),
+            Map.entry("max_turn_degrees_per_tick", 30),
+            Map.entry("max_angular_acceleration_degrees_per_tick_squared", 60),
+            Map.entry("prediction_ticks", 0),
+            Map.entry("deadband_degrees", 2),
+            Map.entry("reacquire_ticks", 10),
+            Map.entry("require_line_of_sight", true),
+            Map.entry("stop_below_health", 1)
+        );
+
+        assertDoesNotThrow(() -> engine.begin(sequence(
+            "node:track",
+            List.of(),
+            List.of(
+                Map.of(
+                    "node_id", "node:track",
+                    "node_kind", "workflow_action",
+                    "earliest_tick", 0,
+                    "timeout_ticks", 40,
+                    "action", trackingAction,
+                    "on_success", "node:succeeded",
+                    "on_failure", "node:failed"
+                ),
+                terminal("node:succeeded", "succeeded"),
+                terminal("node:failed", "failed")
+            )
+        )));
+    }
+
     private static Map<String, Object> nullableCraftAction() {
         Map<String, Object> action = new LinkedHashMap<>();
         action.put("action_kind", "craft");

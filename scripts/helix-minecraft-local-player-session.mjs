@@ -225,6 +225,19 @@ const setup = async ({ statePath, minecraftRoot, baseUrl, playerLabel }) => {
   const roomId = requireString(state.room_id, "room_id_missing");
   const profileId = requireString(state.profile_id, "profile_id_missing");
   const cookie = await signIn(baseUrl, profileId);
+  // An authenticated API session is not itself room presence. Mirror the
+  // explicit UI lifecycle before deriving participant or environment
+  // authority so a restarted keyed server cannot leave a valid test session
+  // attached to a restored `away` membership.
+  await request(
+    baseUrl,
+    cookie,
+    `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/presence`,
+    {
+      method: "POST",
+      body: { presence: "present" },
+    },
+  );
   const roomReceipt = await request(
     baseUrl,
     cookie,
@@ -246,7 +259,14 @@ const setup = async ({ statePath, minecraftRoot, baseUrl, playerLabel }) => {
   const environment = environments.find(
     (entry) =>
       entry?.domain_adapter === "minecraft.fabric_mod.v1" &&
-      entry?.room_source_binding_id === state.binding_id,
+      (
+        (typeof state.binding_id === "string" &&
+          entry?.room_source_binding_id === state.binding_id) ||
+        (typeof state.source_id === "string" &&
+          entry?.source_id === state.source_id) ||
+        (typeof state.environment_binding_id === "string" &&
+          entry?.environment_binding_id === state.environment_binding_id)
+      ),
   );
   if (!environment) fail("fabric_environment_unavailable");
   const subjects = Array.isArray(environment.subject_directory?.subjects)

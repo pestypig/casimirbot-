@@ -99,20 +99,37 @@ export const buildHelixDebugCapture = ({
   startingState,
 }: HelixDebugCaptureOptions): EnvironmentActionDifferentialCaptureInput => {
   const root = record(debugExport);
-  const payload = Object.keys(record(root.payload)).length > 0
-    ? record(root.payload)
-    : root;
+  const askCapture = record(root.ask_response);
+  const debugPayload = record(record(root.debug_export).payload);
+  const payload = Object.keys(askCapture).length > 0
+    ? askCapture
+    : Object.keys(record(root.payload)).length > 0
+      ? record(root.payload)
+      : Object.keys(debugPayload).length > 0
+        ? debugPayload
+        : root;
+  const finalStatus = readString(payload.final_status) || readString(payload.status);
   const actionCalls = records(payload.capability_lane_call_results).filter(
     (call) => Object.keys(actionObservationFromCall(call)).length > 0,
   );
-  const actionCall = requestedCapabilityId
-    ? actionCalls.find(
+  const matchingActionCalls = requestedCapabilityId
+    ? actionCalls.filter(
         (call) =>
           readString(actionObservationFromCall(call).capability_id) ===
           requestedCapabilityId,
       )
-    : actionCalls.length === 1
-      ? actionCalls[0]
+    : actionCalls;
+  const actionCall = requestedCapabilityId
+    ? finalStatus === "final_answer"
+      ? [...matchingActionCalls]
+          .reverse()
+          .find(
+            (call) =>
+              readString(actionObservationFromCall(call).outcome) === "succeeded",
+          ) ?? matchingActionCalls.at(-1)
+      : matchingActionCalls.at(-1)
+    : matchingActionCalls.length === 1
+      ? matchingActionCalls[0]
       : undefined;
   if (!actionCall) {
     throw new Error(
@@ -168,7 +185,6 @@ export const buildHelixDebugCapture = ({
   const authorized =
     readString(payload.terminal_authority_status).startsWith("authorized_") &&
     authority.terminal_eligible === true;
-  const finalStatus = readString(payload.final_status) || readString(payload.status);
   const terminalOutcome = finalStatus === "final_answer" && authorized
     ? "success"
     : finalStatus.includes("blocked")

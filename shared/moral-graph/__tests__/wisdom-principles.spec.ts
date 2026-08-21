@@ -12,7 +12,7 @@ const VAGUE_RULE_PATTERNS = [
 
 describe("Moral wisdom procedural principle catalog", () => {
   it("requires every principle mapping to carry procedural source, rule, trace, and boundaries", () => {
-    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(51);
+    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(53);
 
     for (const principle of MORAL_WISDOM_PRINCIPLES) {
       expect(principle.sourceIdeologyNodeId).toBe(principle.id);
@@ -106,6 +106,27 @@ describe("Moral wisdom procedural principle catalog", () => {
     expect(getMoralWisdomPrinciple("recognition-before-transcendence")).toMatchObject({
       proceduralRole: "constraint",
       refusesAuthority: ["assimilation_as_transcendence", "abandonment_as_transcendence"],
+    });
+    expect(getMoralWisdomPrinciple("transformation-window-stewardship")).toMatchObject({
+      proceduralRole: "balancer",
+      procedureOperator: "balances",
+      evidenceNeeds: expect.arrayContaining(["estimated_completion_window", "support_window"]),
+      refusesAuthority: expect.arrayContaining([
+        "biological_persistence_as_moral_worth",
+        "fitness_as_human_rank",
+        "unreplicated_physics_as_policy",
+      ]),
+    });
+    expect(getMoralWisdomPrinciple("love-without-projection")).toMatchObject({
+      proceduralRole: "constraint",
+      procedureOperator: "constrains",
+      evidenceNeeds: expect.arrayContaining(["observed_context", "named_assumptions", "consent_boundaries"]),
+      refusesAuthority: expect.arrayContaining([
+        "love_as_proof",
+        "projection_as_understanding",
+        "affection_as_consent",
+        "uncertainty_as_indifference",
+      ]),
     });
   });
 

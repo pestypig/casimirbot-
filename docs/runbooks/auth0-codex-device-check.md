@@ -41,6 +41,81 @@ tenant administration credentials, client secrets, authorization codes, or
 bearer tokens in Git, the desktop package, updater metadata, logs, or the
 plugin.
 
+## G2 local Codex CLI full-action client
+
+The environment-harness A1 route is distinct from Device Check and desktop
+account linking. It needs the full local `/mcp` resource plus explicitly
+delegated `helix.rooms.read`, `helix.environment_actions.read`, and
+`helix.environment_actions.write` scopes.
+
+Prefer one pre-registered Auth0 **Native/public** client over enabling
+tenant-wide dynamic client registration:
+
+- callback base: `http://127.0.0.1:8766/callback`;
+- allowed callback URL: the full Codex-derived URI
+  `http://127.0.0.1:8766/callback/<server-specific-callback-id>`;
+- authorization-code flow with PKCE `S256`;
+- token endpoint authentication method `none`;
+- no client secret;
+- API audience equal to the resource advertised by local
+  `/.well-known/oauth-protected-resource/mcp`;
+- only the three G2 scopes above for this acceptance client.
+
+For the G2 direct-local acceptance route, Codex uses the exact MCP transport URL
+as its RFC 8707 resource indicator. Register a separate Auth0 API whose
+identifier is exactly `http://127.0.0.1:1522/mcp`, with only the three G2 scopes
+listed above. In non-production only, the keyed server accepts that exact
+port-derived loopback audience in addition to its configured canonical
+audience. Production continues to accept only the configured canonical
+audience; never add a wildcard, arbitrary host, or arbitrary caller-selected
+audience. The guarded packaged-desktop tunnel remains a separate release path.
+
+Credential-free discovery preflight:
+
+```powershell
+npx tsx scripts/helix-codex-mcp-oauth-preflight.ts `
+  --base-url http://127.0.0.1:1522 `
+  --callback-port 8766 `
+  --out artifacts/g2-fluid-parity/a1-oauth-preflight.json
+```
+
+Codex treats `mcp_oauth_callback_url` as a base and appends a stable
+server-specific callback ID. Auth0 requires exact redirect matching and does
+not support a wildcard in the path. After creating the public client, run one
+Codex MCP login, obtain the derived `redirect_uri` from the authorization URL
+or the Auth0 callback-mismatch tenant log, validate that it is the expected
+loopback host/port and one opaque path segment, and register that full exact
+URI. Do not register `callback/*`.
+
+Then rerun the preflight with both `--oauth-client-id <public-client-id>` and
+`--derived-callback-url <full-derived-uri>`. A ready result proves metadata,
+scopes, PKCE and callback shape only; it does not prove user consent, token
+audience, account binding, or an MCP action.
+
+Configure the local Codex profile with the public Client ID and resource, then
+use the fixed callback for login:
+
+```powershell
+node node_modules/@openai/codex/bin/codex.js mcp add casimirbot_local `
+  --url http://127.0.0.1:1522/mcp `
+  --oauth-client-id <public-client-id>
+
+node node_modules/@openai/codex/bin/codex.js mcp login casimirbot_local `
+  --scopes helix.rooms.read,helix.environment_actions.read,helix.environment_actions.write `
+  -c mcp_oauth_callback_port=8766 `
+  -c 'mcp_oauth_callback_url="http://127.0.0.1:8766/callback"'
+```
+
+Do not pass `--oauth-resource` for this profile. CasimirBot's protected-resource
+metadata is the single RFC 8707 resource authority. Supplying the same resource
+again through a Codex override can serialize duplicate `resource` parameters;
+Auth0 then rejects the request because the resource is an array rather than one
+string.
+
+The login and subsequent A1 call remain explicit user/Codex actions. The
+preflight never registers a client, opens a browser, obtains a token, modifies
+Codex configuration, or performs an environment action.
+
 ## CasimirBot deployment configuration
 
 Configure these values only in the deployment secret/configuration store:

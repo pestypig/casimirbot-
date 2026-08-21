@@ -38,6 +38,7 @@ import {
 import {
   readSharedRealtimeRoom,
   readSharedRealtimeRoomMembership,
+  updateSharedRealtimeRoomPresence,
   type SharedRealtimeRoomMembership,
 } from "../realtime-room/room-store";
 import {
@@ -90,6 +91,7 @@ export type EnvironmentProbeSchemaRepair = {
 
 export type EnvironmentProbeGatewayDependencies = {
   bindingStore: Pick<SharedLiveRoomBindingStore, "getActiveRunRoomBinding">;
+  refreshPresence: typeof updateSharedRealtimeRoomPresence;
   readMembership: typeof readSharedRealtimeRoomMembership;
   readRoom: typeof readSharedRealtimeRoom;
   listSourceCandidates: (
@@ -107,6 +109,8 @@ const dependencies = (
   overrides: Partial<EnvironmentProbeGatewayDependencies> = {},
 ): EnvironmentProbeGatewayDependencies => ({
   bindingStore: overrides.bindingStore ?? new SharedLiveRoomBindingStore(),
+  refreshPresence:
+    overrides.refreshPresence ?? updateSharedRealtimeRoomPresence,
   readMembership: overrides.readMembership ?? readSharedRealtimeRoomMembership,
   readRoom: overrides.readRoom ?? readSharedRealtimeRoom,
   listSourceCandidates:
@@ -480,17 +484,33 @@ const ownerFromPolicy = (
   };
 };
 
+const bindingIdentityMismatchReasons = (input: {
+  binding: SharedLiveRoomRunRoomBinding;
+  membership: SharedRealtimeRoomMembership;
+}): string[] => [
+  input.binding.authorizedByProfileId !== input.membership.profileId
+    ? "profile_identity_changed"
+    : null,
+  input.binding.participantIdAtBind !== input.membership.participantId
+    ? "participant_identity_changed"
+    : null,
+  input.binding.memberRoleAtBind !== input.membership.role
+    ? "membership_role_changed"
+    : null,
+  input.binding.consentVersionAtBind !==
+  input.membership.consent.consent_version
+    ? "consent_version_changed"
+    : null,
+  input.binding.consentReceiptRefAtBind !==
+  input.membership.consent.consent_receipt_ref
+    ? "consent_receipt_changed"
+    : null,
+].filter((reason): reason is string => Boolean(reason));
+
 const bindingIdentityMatches = (input: {
   binding: SharedLiveRoomRunRoomBinding;
   membership: SharedRealtimeRoomMembership;
-}): boolean =>
-  input.binding.authorizedByProfileId === input.membership.profileId &&
-  input.binding.participantIdAtBind === input.membership.participantId &&
-  input.binding.memberRoleAtBind === input.membership.role &&
-  input.binding.consentVersionAtBind ===
-    input.membership.consent.consent_version &&
-  input.binding.consentReceiptRefAtBind ===
-    input.membership.consent.consent_receipt_ref;
+}): boolean => bindingIdentityMismatchReasons(input).length === 0;
 
 const syntheticRef = (prefix: string, value: string): string =>
   `${prefix}:${crypto
@@ -554,6 +574,7 @@ const failed = (input: {
   capabilityId?: string;
   outcome: Exclude<HelixEnvironmentProbeOutcome, "succeeded">;
   summary: string;
+  result?: Record<string, unknown>;
   status?: "blocked" | "failed";
   schemaRepair?: EnvironmentProbeSchemaRepair;
 }): EnvironmentProbeGatewayExecution => ({
@@ -566,8 +587,15 @@ const failed = (input: {
       input.capabilityId ?? HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
     outcome: input.outcome,
     summary: input.summary,
-    ...(input.schemaRepair
-      ? { result: { schema_repair: input.schemaRepair } }
+    ...(input.result || input.schemaRepair
+      ? {
+          result: {
+            ...(input.result ?? {}),
+            ...(input.schemaRepair
+              ? { schema_repair: input.schemaRepair }
+              : {}),
+          },
+        }
       : {}),
   }),
   ...(input.schemaRepair ? { schemaRepair: input.schemaRepair } : {}),
@@ -976,21 +1004,85 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
             : "This first-party continuation is not bound to an active Shared GPT Live Room.",
       });
     }
+    const trustedTurnActor =
+      authority.kind === "first_party_shared_room"
+        ? (input.accountContext?.trusted_turn_actor_context ?? null)
+        : null;
+    const environmentInteractionActor =
+      trustedTurnActor?.origin === "environment_interaction"
+        ? trustedTurnActor
+        : null;
+    if (environmentInteractionActor) {
+      if (
+        environmentInteractionActor.room_id !== roomId ||
+        environmentInteractionActor.requester_profile_id !==
+          authority.accountProfileId ||
+        environmentInteractionActor.resolution !== "resolved" ||
+        !environmentInteractionActor.participant_id
+      ) {
+        return fail({
+          outcome: "permission_revoked",
+          summary:
+            "The authenticated in-game participant identity no longer matches this room-scoped turn.",
+        });
+      }
+      try {
+        // The authenticated Minecraft request is itself an active room client.
+        // Refresh only its exact membership immediately before the probe so a
+        // slow model step cannot turn ordinary presence aging into revocation.
+        // Explicit leave, room closure, or inaccessible membership still fail
+        // closed inside the room store and consent is checked below.
+        await deps.refreshPresence({
+          roomId,
+          profileId: authority.accountProfileId,
+          presence: "present",
+        });
+      } catch {
+        return fail({
+          outcome: "permission_revoked",
+          summary:
+            "The authenticated in-game participant is no longer eligible to remain present in this room.",
+        });
+      }
+    }
     const membership = await deps.readMembership({
       roomId,
       profileId: authority.accountProfileId,
     });
+    const bindingMismatchReasons =
+      binding && membership
+        ? bindingIdentityMismatchReasons({ binding, membership })
+        : [];
+    const interactionParticipantMismatch = Boolean(
+      environmentInteractionActor &&
+        membership &&
+        membership.participantId !== environmentInteractionActor.participant_id,
+    );
     if (
       !membership ||
       membership.roomStatus === "closed" ||
-      (binding
-        ? !bindingIdentityMatches({ binding, membership })
-        : membership.presence !== "present")
+      bindingMismatchReasons.length > 0 ||
+      interactionParticipantMismatch ||
+      (!binding && membership.presence !== "present")
     ) {
       return fail({
         outcome: "permission_revoked",
         summary:
           "The room membership or consent that authorized this run binding changed.",
+        result: {
+          binding_identity_mismatch_reasons:
+            bindingMismatchReasons.length > 0
+              ? bindingMismatchReasons
+              : [
+                  !membership
+                    ? "membership_missing"
+                    : membership.roomStatus === "closed"
+                      ? "room_closed"
+                      : interactionParticipantMismatch
+                        ? "participant_identity_changed"
+                      : "participant_not_present",
+                ],
+        },
       });
     }
     const room = await deps.readRoom({
@@ -1023,6 +1115,21 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       boundAuthorizationMismatch ||
       firstPartyPresenceMismatch
     ) {
+      const roomIdentityMismatchReasons = [
+        room.status === "closed" ? "room_closed" : null,
+        participantIdentityMismatch ? "participant_identity_changed" : null,
+        roomSelf &&
+        roomSelf.consent.consent_version !== membership.consent.consent_version
+          ? "consent_version_changed"
+          : null,
+        roomSelf &&
+        roomSelf.consent.consent_receipt_ref !==
+          membership.consent.consent_receipt_ref
+          ? "consent_receipt_changed"
+          : null,
+        boundAuthorizationMismatch ? "bound_authorization_changed" : null,
+        firstPartyPresenceMismatch ? "participant_not_present" : null,
+      ].filter((reason): reason is string => Boolean(reason));
       return fail({
         outcome: "permission_revoked",
         summary:
@@ -1033,6 +1140,9 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
               : consentIdentityMismatch || boundAuthorizationMismatch
                 ? "The current room consent identity no longer matches the authorizing membership."
                 : "The first-party room member is not currently present in the exact server-validated Shared GPT Live Room chat.",
+        result: {
+          binding_identity_mismatch_reasons: roomIdentityMismatchReasons,
+        },
       });
     }
     const allCandidates = await deps.listSourceCandidates(roomId);

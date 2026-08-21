@@ -11,7 +11,9 @@ import {
   NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_PLAIN_CANONICAL_SHA256,
   NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_SEMANTIC_SHA256,
   NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_LITERAL_SEAL_STATUS,
+  NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_PAYLOAD_HASH_DOMAIN,
   NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_PLAIN_CANONICAL_SHA256,
+  NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_RECORD_SELF_HASH_DOMAIN,
   NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_SEMANTIC_SHA256,
   NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_SYNTHETIC_RECORD_HASH_DOMAIN,
   nhm2SphericalBosonStarV2VacuumContinuationProofAbiV1CalculateSyntheticFixtureSelfHash,
@@ -21,6 +23,18 @@ import {
 
 const sha256 = (bytes: Uint8Array): string =>
   createHash("sha256").update(bytes).digest("hex");
+
+const u16le = (value: number): Buffer => {
+  const bytes = Buffer.alloc(2);
+  bytes.writeUInt16LE(value);
+  return bytes;
+};
+
+const u64le = (value: number): Buffer => {
+  const bytes = Buffer.alloc(8);
+  bytes.writeBigUInt64LE(BigInt(value));
+  return bytes;
+};
 
 const dependencyPaths = {
   finalBranchSelectionNumerics:
@@ -141,6 +155,142 @@ describe("NHM2 spherical boson-star v2 vacuum-continuation proof ABI v1", () => 
       ["face", 1_023],
       ["summary", 1],
     ]);
+    expect(CONTRACT.logicalProducts.productKindOrdinalMap).toEqual({
+      lambda_zero: 0,
+      cell: 1,
+      face: 2,
+      summary: 3,
+    });
+    for (const route of CONTRACT.logicalProducts.orderedRoutes) {
+      expect(
+        CONTRACT.logicalProducts.productKindOrdinalMap[
+          route.productKind as keyof typeof CONTRACT.logicalProducts.productKindOrdinalMap
+        ],
+      ).toBe(route.ordinal);
+    }
+  });
+
+  it("freezes one payload/record ordinal map and four independent golden hash vectors", () => {
+    const vectors = [
+      {
+        kind: "lambda_zero",
+        kindOrdinal: 0,
+        productOrdinal: 0,
+        payloadSha256:
+          "ce9616fed1e1ec7a839e3d1e409669722f9b4a84f2e129fae7317fe957604147",
+        recordSha256:
+          "fa8128c8e2bef89921ffaca8e72287302056f8b0114bb1b35d71bf714d28ba39",
+      },
+      {
+        kind: "cell",
+        kindOrdinal: 1,
+        productOrdinal: 1,
+        payloadSha256:
+          "3d032e4606b43bf0b8cf8b0945139fe456f266eca739134c7897112027659ff7",
+        recordSha256:
+          "29d39311a6f42c66cd95365de603c48faaee358159bcc70530121fc2966c26a6",
+      },
+      {
+        kind: "face",
+        kindOrdinal: 2,
+        productOrdinal: 1_025,
+        payloadSha256:
+          "72a3000a979ad752a305ad710e894ab1686fc8fa08ce8046be243f6a8ce067c5",
+        recordSha256:
+          "e43146ed3c9a5b652abf41dbb1fcbebdf515cca00f0c0d88a6936cc8b4029b49",
+      },
+      {
+        kind: "summary",
+        kindOrdinal: 3,
+        productOrdinal: 2_048,
+        payloadSha256:
+          "5f402e337ad8478dee5c6b24080de52bbd889e12ceaaa28e2fe61b32e27c3783",
+        recordSha256:
+          "5f51edfecee1acd91eaf90477ae729c1eb359d44e485a5b5f23aaf9998b50a35",
+      },
+    ] as const;
+
+    expect(CONTRACT.hashingAndSerialization.productKindOrdinalMap).toEqual(
+      CONTRACT.logicalProducts.productKindOrdinalMap,
+    );
+    expect(
+      CONTRACT.hashingAndSerialization.productKindOrdinalBinding,
+    ).toContain("orderedRoutes.find");
+    expect(CONTRACT.hashingAndSerialization.payloadCanonicalBytes).toContain(
+      "without_BOM_CR_or_LF",
+    );
+    expect(
+      CONTRACT.hashingAndSerialization.recordPayloadHashPrecondition,
+    ).toContain("reject_any_payload_kind_or_ordinal_transplant");
+
+    const observedPayloadHashes = new Map<string, string>();
+    for (const vector of vectors) {
+      const payload = {
+        decision: "synthetic_fixture_only",
+        productKind: vector.kind,
+      };
+      const payloadBytes = Buffer.from(canonical(payload), "utf8");
+      const payloadSha256 = createHash("sha256")
+        .update(
+          NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_PAYLOAD_HASH_DOMAIN,
+          "utf8",
+        )
+        .update(u16le(vector.kindOrdinal))
+        .update(u64le(vector.productOrdinal))
+        .update(u64le(payloadBytes.byteLength))
+        .update(payloadBytes)
+        .digest("hex");
+      expect(payloadSha256).toBe(vector.payloadSha256);
+      observedPayloadHashes.set(vector.kind, payloadSha256);
+
+      const record = {
+        authorityFalse: true,
+        candidateId:
+          "nhm2.semiclassical_v2.spherical_boson_star_1s_weak_field_control/v1",
+        contractVersion:
+          "nhm2_spherical_boson_star_v2_vacuum_continuation_proof_abi/v1",
+        inputManifestRawSha256: "1".repeat(64),
+        payload,
+        payloadSha256,
+        productKind: vector.kind,
+        productOrdinal: vector.productOrdinal,
+      };
+      const recordBytes = Buffer.from(canonical(record), "utf8");
+      const recordSha256 = createHash("sha256")
+        .update(
+          NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_RECORD_SELF_HASH_DOMAIN,
+          "utf8",
+        )
+        .update(u16le(vector.kindOrdinal))
+        .update(u64le(vector.productOrdinal))
+        .update(u64le(recordBytes.byteLength))
+        .update(recordBytes)
+        .digest("hex");
+      expect(recordSha256).toBe(vector.recordSha256);
+
+      expect(
+        createHash("sha256")
+          .update(
+            NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_PAYLOAD_HASH_DOMAIN,
+            "utf8",
+          )
+          .update(u16le((vector.kindOrdinal + 1) % 4))
+          .update(u64le(vector.productOrdinal))
+          .update(u64le(payloadBytes.byteLength))
+          .update(payloadBytes)
+          .digest("hex"),
+      ).not.toBe(payloadSha256);
+    }
+
+    for (const left of vectors) {
+      for (const right of vectors) {
+        if (left.kind !== right.kind) {
+          expect(observedPayloadHashes.get(left.kind)).not.toBe(
+            observedPayloadHashes.get(right.kind),
+          );
+        }
+      }
+    }
   });
 
   it("freezes exact manifest, envelope, and product-payload key orders", () => {
@@ -208,6 +358,8 @@ describe("NHM2 spherical boson-star v2 vacuum-continuation proof ABI v1", () => 
       terminalStateSourceBinding: null,
       terminalStateLiftDefinition: null,
       terminalStateContainmentPredicateDefinition: null,
+      inputManifestOrderedBindingInventoryDefinition: null,
+      inputManifestExactBindingCount: null,
     });
     expect(CONTRACT.blockers).toHaveLength(keys.length);
     expect(CONTRACT.blockers.map(({ choiceKey }) => choiceKey)).toEqual(keys);
@@ -217,6 +369,15 @@ describe("NHM2 spherical boson-star v2 vacuum-continuation proof ABI v1", () => 
           blockerId === `missing_exact_${choiceKey}`,
       ),
     ).toBe(true);
+    expect(CONTRACT.inputManifestClosure).toEqual({
+      orderedBindingInventoryDefinition: null,
+      exactBindingCount: null,
+      perCellOrPerFaceBindingInventoryMayBeInferred: false,
+      manifestGranularityMayBeRetunedByVerifier: false,
+      traversalAllowedBeforeBothChoicesAreBound: false,
+      disposition:
+        "block_verifier_implementation_until_a_successor_freezes_one_bounded_ordered_role_inventory_and_exact_count",
+    });
   });
 
   it("freezes first-failure chronology and forbids every retune or fallback", () => {
@@ -340,6 +501,31 @@ describe("NHM2 spherical boson-star v2 vacuum-continuation proof ABI v1", () => 
         canonical("x".repeat(16_385)),
       ).some((violation) => violation.includes("_string:")),
     ).toBe(true);
+
+    const loneHighValueWire = String.raw`"\ud800"`;
+    const loneLowKeyWire = String.raw`{"\udc00":0}`;
+    for (const hostileWire of [loneHighValueWire, loneLowKeyWire]) {
+      expect(
+        nhm2SphericalBosonStarV2VacuumContinuationProofAbiV1WireViolations(
+          hostileWire,
+        ).some((violation) => violation.includes("_unpaired_utf16_surrogate:")),
+      ).toBe(true);
+    }
+    expect(
+      nhm2SphericalBosonStarV2VacuumContinuationProofAbiV1WireViolations(
+        JSON.stringify("\ud83d\ude00"),
+      ),
+    ).toEqual(["vacuum_proof_abi_semantic_drift"]);
+
+    const surrogatePreimageWire = canonical({
+      ...syntheticPreimage(),
+      disposition: "\ud800",
+    });
+    expect(() =>
+      nhm2SphericalBosonStarV2VacuumContinuationProofAbiV1CalculateSyntheticFixtureSelfHash(
+        surrogatePreimageWire,
+      ),
+    ).toThrow("vacuum_proof_abi_synthetic_unpaired_utf16_surrogate:");
   });
 
   it("calculates and validates only a domain-separated authority-false synthetic fixture", () => {
@@ -404,6 +590,11 @@ describe("NHM2 spherical boson-star v2 vacuum-continuation proof ABI v1", () => 
       );
     } else {
       expect(
+        NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_LITERAL_SEAL_STATUS,
+      ).toBe(
+        "sealed_after_independent_parent_acknowledgement_before_any_verifier_implementation",
+      );
+      expect(
         NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_SEMANTIC_SHA256,
       ).toBe(
         NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_SEMANTIC_SHA256,
@@ -418,6 +609,11 @@ describe("NHM2 spherical boson-star v2 vacuum-continuation proof ABI v1", () => 
       ).toBe(
         NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_CANONICAL_SIZE_BYTES,
       );
+      expect(expected).toEqual([
+        "2fb589d024463ec1e656a2b180b9fdfcd61713e474666afdc217c49f1bd03251",
+        "4af8b689f175a418cacf252f260aa513407bcdba6161cd6497ec17932b17c732",
+        29_628,
+      ]);
     }
   });
 });

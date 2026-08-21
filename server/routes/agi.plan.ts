@@ -325,6 +325,11 @@ import {
 } from "../services/helix-ask/workspace-context-predicates";
 import type { HelixCalculatorSubgoalReceipt } from "../../shared/helix-calculator-compound-plan";
 import { selectEvidenceForAskTurn } from "../services/helix-ask/evidence-selection-policy";
+import {
+  admitEnvironmentInteractionAskTurn,
+  environmentInteractionHeadersForProvider,
+  getAdmittedEnvironmentInteraction,
+} from "../services/environment-connectors/interactions";
 import { buildReasoningSubgoalLedger } from "../services/helix-ask/subgoal-ledger";
 import { decideHelixToolChoice } from "../services/helix-ask/tool-choice-policy";
 import { planContextEconomy } from "../services/helix-ask/context-economy-planner";
@@ -169244,12 +169249,15 @@ const resolveHelixAskRuntimeAccountAccess = async (
       reason: "vitest_legacy_helix_native_contract_runtime",
     };
   }
-  let accountPolicy = buildHelixAccountCapabilityPolicy("user");
-  try {
-    const status = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
-    accountPolicy = status.account_policy;
-  } catch {
-    // Fail closed to the public user policy when session lookup is unavailable.
+  const trustedInteraction = getAdmittedEnvironmentInteraction(req);
+  let accountPolicy = trustedInteraction?.accountPolicy ?? buildHelixAccountCapabilityPolicy("user");
+  if (!trustedInteraction) {
+    try {
+      const status = await getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+      accountPolicy = status.account_policy;
+    } catch {
+      // Fail closed to the public user policy when session lookup is unavailable.
+    }
   }
   const access = resolveHelixRuntimeAgentAccess(accountPolicy, runtimeId);
   return {
@@ -170445,19 +170453,22 @@ const enforceHelixSharedRoomAskSessionAccess = async (args: {
   if (!readHelixSharedRoomIdFromAskSession(askSessionId)) {
     return null;
   }
-  let accountStatus: Awaited<ReturnType<typeof getAccountSessionStatus>>;
-  try {
-    accountStatus = await getAccountSessionStatus(
-      readHelixSessionCookie(args.req.headers.cookie),
-    );
-  } catch {
-    return buildHelixSharedRoomAskGuardFailure({
-      turnId: args.turnId,
-      statusCode: 503,
-      error: "shared_realtime_room_account_unavailable",
-      message:
-        "The Shared GPT Live Room account boundary is temporarily unavailable.",
-    });
+  const trustedInteraction = getAdmittedEnvironmentInteraction(args.req);
+  let accountStatus: Awaited<ReturnType<typeof getAccountSessionStatus>> | null = null;
+  if (!trustedInteraction) {
+    try {
+      accountStatus = await getAccountSessionStatus(
+        readHelixSessionCookie(args.req.headers.cookie),
+      );
+    } catch {
+      return buildHelixSharedRoomAskGuardFailure({
+        turnId: args.turnId,
+        statusCode: 503,
+        error: "shared_realtime_room_account_unavailable",
+        message:
+          "The Shared GPT Live Room account boundary is temporarily unavailable.",
+      });
+    }
   }
   let access: Awaited<
     ReturnType<typeof resolveHelixSharedRoomAskSessionAccess>
@@ -170465,8 +170476,12 @@ const enforceHelixSharedRoomAskSessionAccess = async (args: {
   try {
     access = await resolveHelixSharedRoomAskSessionAccess({
       sessionId: askSessionId,
-      profileId: accountStatus.session?.profile.profile_id ?? null,
-      accountPolicy: accountStatus.account_policy,
+      profileId:
+        trustedInteraction?.participantProfileId ??
+        accountStatus?.session?.profile.profile_id ??
+        null,
+      accountPolicy:
+        trustedInteraction?.accountPolicy ?? accountStatus!.account_policy,
     });
   } catch {
     return buildHelixSharedRoomAskGuardFailure({
@@ -170513,17 +170528,39 @@ const enforceHelixSharedRoomAskSessionAccess = async (args: {
     terminal_eligible: false,
     raw_content_included: false,
   };
+  if (
+    trustedInteraction &&
+    (access.participantId !== trustedInteraction.participantId ||
+      readHelixSharedRoomIdFromAskSession(askSessionId) !== trustedInteraction.roomId)
+  ) {
+    return buildHelixSharedRoomAskGuardFailure({
+      turnId: args.turnId,
+      statusCode: 409,
+      error: "environment_interaction_identity_mismatch",
+      message: "The in-game request no longer matches the paired room participant.",
+    });
+  }
   return null;
 };
 
 planRouter.post("/ask/turn", async (req, res) => {
   maybeRecordAskTurnSteering(req);
   const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
-  await attachResearchLibraryOwnerContext(req, body);
   const admissionTurnId = readHelixAskRuntimeTurnId(body) ?? `ask:${crypto.randomUUID()}`;
   if (readHelixAskRuntimeTurnId(body) === null) {
     body.turn_id = admissionTurnId;
   }
+  const interactionAdmission = await admitEnvironmentInteractionAskTurn({
+    req,
+    res,
+    body,
+    prompt: readHelixAskRuntimePrompt(body) ?? "",
+    sessionId: readHelixAskRuntimeSessionId(body),
+    roomId: readHelixSharedRoomIdFromAskSession(readHelixAskRuntimeSessionId(body)),
+    turnId: admissionTurnId,
+  });
+  if (interactionAdmission === "responded") return;
+  await attachResearchLibraryOwnerContext(req, body);
   const sharedRoomAskGuard = await enforceHelixSharedRoomAskSessionAccess({
     req,
     body,
@@ -170694,7 +170731,7 @@ planRouter.post("/ask/turn", async (req, res) => {
     if (provider.id !== "helix") {
       const requestedRuntime = selectHelixAgentRuntime({
         body,
-        headers: req.headers,
+        headers: environmentInteractionHeadersForProvider(req),
       });
       const providerBody = attachHelixProviderConversationMemoryContext({
         body: attachHelixProviderPreflightRouteContext({
@@ -170751,8 +170788,10 @@ planRouter.post("/ask/turn", async (req, res) => {
         runtime: provider.id,
         route: "/ask/turn",
         body: providerBody,
-        headers: req.headers,
+        headers: environmentInteractionHeadersForProvider(req),
         signal: askTurnAbortBoundary.signal,
+        workstationAccountContext:
+          getAdmittedEnvironmentInteraction(req)?.accountContext,
       });
       if (askTurnAbortBoundary.signal.aborted) {
         runtimeReleaseOutcome = "aborted";

@@ -37,6 +37,7 @@ import {
 } from "@shared/helix-environment-command";
 import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
@@ -252,6 +253,68 @@ describe("Minecraft environment connector capability routing", () => {
         source_goal_capability_terminal_compatible: true,
         violations: [],
       },
+    });
+  });
+
+  it("uses current authenticated player authority to keep an ambiguous fluid procedure out of World Authority", () => {
+    const prompt =
+      "Complete the G2 fluid micro-course: inspect the current player state, perform the bounded look/sprint/jump, interact with the verified reachable target, equip the stick, craft four oak planks, verify every checkpoint, and release all controls.";
+    const trustedEnvironmentContext = {
+      trusted_environment_domain: "minecraft" as const,
+      authorized_player_action_capability_ids: [
+        HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+      ],
+    };
+
+    const contracts = extractExplicitCapabilityContracts(
+      prompt,
+      trustedEnvironmentContext,
+    );
+    expect(contracts.map((entry) => entry.capability)).not.toContain(
+      HELIX_MINECRAFT_COMMAND_CAPABILITY,
+    );
+    expect(contracts.map((entry) => entry.capability)).not.toContain(
+      HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+    );
+    expect(contracts.map((entry) => entry.capability)).not.toContain(
+      HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+    );
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "turn:g2-fluid-authorized-player-plane",
+      threadId: "thread:g2-fluid-authorized-player-plane",
+      promptText: prompt,
+      trustedEnvironmentContext,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      precedence_reason: "explicit_minecraft_player_embodiment_source_target",
+    });
+    expect(sourceTargetIntent.reasons).toContain(
+      "player_action_capability_selection_owned_by_runtime",
+    );
+
+    const committedRoute = buildCommittedAskRoute({
+      turnId: "turn:g2-fluid-authorized-player-plane",
+      promptText: prompt,
+      selectedRoute: "/ask",
+      payload: {
+        source_target_intent: sourceTargetIntent,
+        canonical_goal_frame: {
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+        },
+        tool_call_admission_decision: {
+          admitted_tool_families: ["live_environment"],
+        },
+      },
+    });
+    expect(committedRoute.canonical_goal).toMatchObject({
+      goal_kind: "environment_action_workflow",
+      requested_capability: null,
+      required_terminal_kind: "model_synthesized_answer",
     });
   });
 

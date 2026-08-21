@@ -25,6 +25,7 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     );
     private Minecraft minecraft;
     private volatile PlayerActionRuntime runtime;
+    private volatile PlayerInteractionClient interactionClient;
     private final AtomicBoolean connectorOperation = new AtomicBoolean(false);
     private int pairingInboxTicks;
     private int diagnosticInboxTicks;
@@ -37,8 +38,8 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     @Override
     public void onInitializeClient() {
         minecraft = Minecraft.getInstance();
-        PlayerActionConfig initialConfig = PlayerActionConfigLoader.load(LOGGER);
-        replaceRuntime(initialConfig);
+        PlayerActionConfigLoader.LoadedConfig initialConfig = PlayerActionConfigLoader.loadAll(LOGGER);
+        replaceRuntime(initialConfig.action(), initialConfig.interaction());
         restoreDiagnosticInboxScope();
         PlayerActionClientCommands.register(this);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -55,8 +56,10 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             PlayerActionRuntime active = runtime;
             if (active != null) active.close();
+            PlayerInteractionClient interaction = interactionClient;
+            if (interaction != null) interaction.close();
         });
-        LOGGER.info(initialConfig.ready()
+        LOGGER.info(initialConfig.action().ready()
             ? "Helix Fabric Player Agent loaded with a separately paired action authority."
             : "Helix Fabric Player Agent loaded disabled; a separate action pairing is required before capabilities are advertised.");
     }
@@ -108,11 +111,11 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
                     return;
                 }
                 try {
-                    PlayerActionConfig config = PlayerActionConfigLoader.savePairedAction(
+                    PlayerActionConfigLoader.LoadedConfig config = PlayerActionConfigLoader.savePairedAction(
                         paired,
                         LOGGER
                     );
-                    replaceRuntime(config);
+                    replaceRuntime(config.action(), config.interaction());
                     message(paired.replayed()
                         ? "Helix player-action pairing recovered and embodiment restarted."
                         : "Helix player-action pairing succeeded. The client companion is publishing its capabilities.");
@@ -123,7 +126,27 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     }
 
     void showStatus() {
-        message(runtime == null ? "Helix player embodiment is not initialized." : runtime.statusText());
+        String action = runtime == null ? "Helix player embodiment is not initialized." : runtime.statusText();
+        String interaction = interactionClient == null
+            ? "Helix in-game Ask is not initialized."
+            : interactionClient.statusText();
+        message(action + " " + interaction);
+    }
+
+    void ask(String prompt) {
+        PlayerInteractionClient interaction = interactionClient;
+        if (interaction == null) {
+            message("Helix in-game Ask is not initialized. Pair the player connector again.");
+            return;
+        }
+        message("Helix accepted your room-bound request and is reasoning...");
+        interaction.ask(prompt, answer -> minecraft.execute(() -> message(answer)));
+    }
+
+    void cancelAsk() {
+        message(interactionClient == null
+            ? "Helix in-game Ask is not initialized."
+            : interactionClient.cancel());
     }
 
     void showDiagnosticStatus() {
@@ -257,7 +280,7 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     void disconnectLocal() {
         try {
             PlayerActionConfigLoader.clear(LOGGER);
-            replaceRuntime(PlayerActionConfig.disabled());
+            replaceRuntime(PlayerActionConfig.disabled(), PlayerInteractionConfig.disabled());
             message("The local Helix player connector is disconnected. Revoke or expire the room authority separately if it should no longer exist.");
         } catch (java.io.IOException error) {
             message("The local player connector could not clear its saved pairing state.");
@@ -375,10 +398,16 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         );
     }
 
-    private void replaceRuntime(PlayerActionConfig config) {
+    private void replaceRuntime(
+        PlayerActionConfig config,
+        PlayerInteractionConfig interactionConfig
+    ) {
         PlayerActionRuntime prior = runtime;
         if (prior != null) prior.close();
+        PlayerInteractionClient priorInteraction = interactionClient;
+        if (priorInteraction != null) priorInteraction.close();
         runtime = new PlayerActionRuntime(config, minecraft, LOGGER, this::message);
+        interactionClient = new PlayerInteractionClient(interactionConfig);
         runtime.start();
     }
 

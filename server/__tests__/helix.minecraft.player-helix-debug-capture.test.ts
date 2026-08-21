@@ -120,6 +120,75 @@ describe("Minecraft Helix exact-turn debug capture", () => {
     expect(capture.observation_reentered).toBe(true);
   });
 
+  it("accepts the public G2 Ask capture wrapper", () => {
+    const capture = buildHelixDebugCapture({
+      debugExport: {
+        schema: "helix.minecraft.g2_ask_capture.v1",
+        ask_response: debugExport.payload,
+        debug_export: { ok: true, payload: { truncated: true } },
+      },
+      prompt: "Take one careful step forward.",
+    });
+
+    expect(capture.execution_outcome).toBe("succeeded");
+    expect(capture.selected_capability_id).toBe(
+      "com.casimirbot.minecraft.player.walk",
+    );
+  });
+
+  it("selects the final successful repair attempt without erasing earlier failures", () => {
+    const failedRef = `${turnId}:workstation_gateway:com.casimirbot.minecraft.player.walk:failed`;
+    const repairedRef = `${turnId}:workstation_gateway:com.casimirbot.minecraft.player.walk:repaired`;
+    const failedCall = {
+      ...debugExport.payload.capability_lane_call_results[0],
+      tool_lifecycle_trace: { observation_refs: [failedRef] },
+      observation: {
+        ...debugExport.payload.capability_lane_call_results[0].observation,
+        outcome: "failed",
+        evidence_ref: "environment_action_evidence:test-walk-failed",
+        result: {
+          ...debugExport.payload.capability_lane_call_results[0].observation.result,
+          postconditions: [{ required: true, status: "not_satisfied" }],
+          controls_released: true,
+        },
+      },
+    };
+    const repairedCall = {
+      ...debugExport.payload.capability_lane_call_results[0],
+      arguments: { direction: "forward", duration_ms: 300, sprint: false },
+      tool_lifecycle_trace: { observation_refs: [repairedRef] },
+      observation: {
+        ...debugExport.payload.capability_lane_call_results[0].observation,
+        evidence_ref: "environment_action_evidence:test-walk-repaired",
+      },
+    };
+    const capture = buildHelixDebugCapture({
+      debugExport: {
+        ...debugExport,
+        payload: {
+          ...debugExport.payload,
+          capability_lane_call_results: [failedCall, repairedCall],
+          provider_reasoning_reentry: {
+            observation_reentered: true,
+            reentered_observation_refs: [failedRef, repairedRef],
+          },
+          provider_terminal_candidate: {
+            grounded_in_observation_refs: [failedRef, repairedRef],
+          },
+        },
+      },
+      prompt: "Take one careful step forward and repair a failed attempt.",
+      requestedCapabilityId: "com.casimirbot.minecraft.player.walk",
+    });
+
+    expect(capture.execution_outcome).toBe("succeeded");
+    expect(capture.normalized_arguments).toEqual(repairedCall.arguments);
+    expect(capture.observation_refs).toEqual([repairedRef]);
+    expect(capture.source_artifact_refs).toContain(
+      "ask_turn_debug_export:ask:test-walk",
+    );
+  });
+
   it("fails closed when no exact executed action observation exists", () => {
     expect(() =>
       buildHelixDebugCapture({

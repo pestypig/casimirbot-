@@ -573,6 +573,39 @@ describe("Codex provider terminal pass-through", () => {
     expect(guarded).toContain("scholarly-research.fetch_full_text: fetchable_paper_identity_required");
   });
 
+  it("preserves a grounded compound synthesis after coverage proves failed sequence prefixes", () => {
+    const answer =
+      "The bounded movement, interaction, equip, craft, checkpoints, and control release all completed from current-turn evidence.";
+    const guarded = applyGatewayFailureAuthorityGuard({
+      text: answer,
+      compoundPromptCoveragePassed: true,
+      gatewayCallResults: [
+        {
+          ok: false,
+          capability_id:
+            "com.casimirbot.minecraft.player.sequence.execute",
+          gateway_admission: {
+            requested_capability:
+              "com.casimirbot.minecraft.player.sequence.execute",
+            admission_reason: "environment_action_requested",
+            blocked_reason: null,
+          },
+          observation_packet: {
+            status: "failed",
+            produced_artifact_refs: ["sequence:partial-prefix"],
+            observation_summary:
+              "The admitted sequence reached its typed failure terminal after verified successful prefix nodes.",
+          },
+          observation: { outcome: "failed" },
+          artifact_refs: ["sequence:partial-prefix"],
+          error: "failed",
+        } as never,
+      ],
+    });
+
+    expect(guarded).toBe(answer);
+  });
+
   it("accepts exact runtime-selected lookup papers despite an unrelated provider failure", () => {
     const gatewayCallResults = [buildRuntimeSelectedScholarlyLookupResult()] as never;
 

@@ -2,7 +2,7 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G2**
+Active program gate: **G3**
 
 This document answers the operational question that the product and architecture
 contracts intentionally do not:
@@ -58,6 +58,7 @@ without the qualifier that identifies the actual contract.
 | Resident closed-loop capability | A versioned local controller that continuously observes and may select or propose only pre-admitted bounded responses while Codex is delayed or reasoning; every effect still passes through the trusted local arbiter and Fabric action lane. |
 | Resident controller profile | The exact implementation, sensor schema, artifact hash, deadlines, proposal vocabulary, confidence/abstention policy, and reset behavior allowed for one environment. |
 | Resident decision | A causal record linking an observation revision to a controller proposal, arbiter outcome, effect, postcondition, interruption, abstention, or semantic escalation. |
+| Environment embodiment | The exact actor through which an admitted controller acts. `player_proxy` uses the selected user's player body; `companion_entity` uses a separate bounded in-world actor. Actor, authority subject, owner, and beneficiary identities must never be inferred to be the same. |
 
 ### Capability maturity vocabulary
 
@@ -129,8 +130,8 @@ overrule current-turn execution and re-entry facts.
 | --- | --- | --- | --- | --- |
 | G0 — Program vocabulary and status | closed | none | this document, canonical backlinks, required task header, and `npm run helix:environment-harness:docs-audit` | G1 |
 | G1 — Canonical lifecycle authority | closed | G0 | `docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md` | G2 |
-| G2 — A0 / A1 / B parity | active | G1 | equivalent-state direct Fabric, Codex-through-MCP, and keyed Helix traces for the fluid micro-course, with first-divergence hashes and support refs | G3 |
-| G3 — Viability and unexpected events | blocked | G2 | persistent resident control across Codex delays plus representative mid-execution hazard/event recovery and safe cancellation | G4 |
+| G2 — A0 / A1 / B parity | closed | G1 | `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md` | G3 |
+| G3 — Viability and unexpected events | active | G2 | persistent resident control across Codex delays plus representative mid-execution hazard/event recovery and safe cancellation | G4 |
 | G4 — Live-mail wake bridge | blocked | G3 | deduplicated nonterminal resident/event escalation evidence re-enters the existing sequential Codex solver without controlling reflexes or authoring an answer | G5 |
 | G5 — Durable survival goal | blocked | G4 and converged OAuth/desktop/room identity lane | checkpointed advancement progress and recovery across disconnect, death, restart, and authorized phone continuation | G6 |
 | G6 — Concurrent reasoning roles | blocked | G5 | revision-bound perception and prospective outputs converge through one execution arbiter without stale-plan mutation | G7 |
@@ -150,12 +151,14 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Keyed natural water-bucket rescue benchmark | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/water-bucket-rescue/attempt-34-balanced-clear-screen/guardian_water_bucket_rescue`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Retain unchanged as a regression; it does not accept other guardian or fluid workflows. |
 | Direct Fabric water-bucket rescue feasibility | live accepted | `artifacts/helix-minecraft-guardian-v0.4/direct-codex/water-bucket-rescue/attempt-4-dynamic-collision-success.json`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Use as a feasibility oracle, not a hardcoded strategy. |
 | Canonical lifecycle authority and poisoned-projection resistance | live accepted | `docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md`; `server/services/helix-ask/runtime/turn-lifecycle-differential-audit.ts` | Retain the keyed natural tool turn and poisoned-projection battery as G2+ regressions. |
-| Fabric fluid sequence 0.3 | deterministically verified | `docs/audits/helix-minecraft-fluid-execution-audit-2026-08-12.md` | Complete the live micro-course and A0/A1/B parity in G2. |
+| Fabric fluid sequence 0.3 through A0 direct, A1 Codex-through-MCP, and B keyed Helix | integrated accepted | `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md`; `docs/audits/helix-environment-harness-g2-a0-b-partial-audit-2026-08-20.md` | Preserve the exact tripath hashes as a regression while G3 tests persistent viability and unexpected events. |
+| G2 A0/A1/B differential parity observer | live accepted | `server/services/environment-connectors/actions/workflow-g2-parity-audit.ts`; `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md` | Retain observer-only semantics and fail with the first divergent lifecycle stage on future parity regressions. |
 | Pre-action unavailable-inventory cancellation | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-37-focused-source-projection/guardian_unavailable_inventory_replan`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Does not prove mid-execution unexpected-event breadth. |
 | Mid-execution health interruption contract | implemented | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-46-safe-interrupt-terminal/guardian_mid_execution_health_interrupt`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Preserve exact child measurements and pass the stronger live acceptance. |
 | Persistent viability across model-deliberation gaps | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` (Attempt 39 and viability sections) | Keep protection active between finite programs and prove recovery in G3. |
 | Generic resident closed-loop capability contract | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | Reserve causal fields in G1; extract the provider-neutral contract only after G3. |
 | Minecraft deterministic resident guardian baseline | specified | `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/water-bucket-rescue/attempt-34-balanced-clear-screen/guardian_water_bucket_rescue` | Prove continuous protection, abstention, control release, and Codex-delay survival in G3. |
+| Optional Minecraft companion-entity embodiment | projected | `docs/architecture/helix-minecraft-companion-embodiment-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; `docs/research/helix-minecraft-environment-adapter-reference-prompt.md` | Specify and implement only after the deterministic guardian passes G3 and EH-RCC1/EH-RCC2 preserve its accepted behavior. |
 | Learned resident policies and FlyWire profile | projected | `docs/helix-environment-harness-work-program-v1.md` | Shadow-evaluate only after the deterministic baseline and generic contract pass. |
 | Live-mail Minecraft wake bridge | specified | `shared/helix-live-source-mail.ts`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | Convert situation digests into deduplicated nonterminal wake evidence in G4. |
 | Durable all-advancements survival goal | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Prove checkpointed progress and recovery in G5. |
@@ -244,17 +247,37 @@ advance any capability maturity row; each row changes only with its own evidence
 G1 closed on 2026-08-20. Its exact closure evidence is recorded in
 `docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md`.
 
-## Active gate: G2 A0 / A1 / B parity
+## Closed gate: G2 A0 / A1 / B parity
 
-G2 must now run equivalent-state direct Fabric, Codex-through-MCP, and keyed
-Helix Ask traces against the same deterministic guardian artifact, player/world
-identity, authority envelope, initial observation revision, and fluid
-micro-course. A route passes only when action postconditions, observation
-re-entry, candidate text hashes, support references, and terminal presentation
-remain continuous. The first divergence must be reported when parity fails.
+G2 ran equivalent-state direct Fabric, authenticated Codex-through-MCP, and
+keyed Helix Ask traces against the same player/world fixture, authority
+envelope, deterministic action program, and fluid micro-course. The observer
+reported `ok=true`, no mismatches, and no first divergent stage. Exact closure
+evidence is recorded in
+`docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md`.
 
-G2 does not implement learned controllers, persistent cross-deliberation
-viability, live-mail wake control, durable goals, or concurrent reasoning.
+G2 did not implement learned controllers, persistent cross-deliberation
+viability, companion embodiment, live-mail wake control, durable goals, or
+concurrent reasoning.
+
+## Active gate: G3 viability and unexpected events
+
+G3 must prove that the deterministic Fabric guardian preserves player viability
+while Codex is delayed, unavailable, or semantically replanning. The resident
+loop must sense continuously without waking Codex every tick, admit only its
+bounded repertoire, verify postconditions, compact meaningful deviations into
+causal evidence, and release every asserted control on success, failure,
+cancellation, manual override, lease loss, or Emergency Stop.
+
+Representative acceptance must include water/submersion, fall or landing risk,
+fire or comparable damage pressure, and an unexpected mid-execution event. A
+single successful action is insufficient: the subject must remain able to
+continue observing and acting after the local response, and the resulting
+evidence must materially re-enter Codex for replanning.
+
+G3 must not extract the provider-neutral resident-controller contract, add a
+learned controller, turn live mail into a reflex path, add concurrent Codex
+roles, or broaden companion embodiment. Those remain downstream workstreams.
 
 ## Parallel delivery lane
 
@@ -298,8 +321,75 @@ Minecraft mechanism:
 | --- | --- | --- | --- |
 | EH-RCC1 — Extract generic contract | Create provider-neutral profile, lease, revision, proposal, arbiter, postcondition, abstention, interruption, reset, and escalation schemas. | `shared/helix-resident-controller.ts`; `server/services/environment-connectors/resident-control/` | Must fit the accepted guardian without Minecraft strategy leaking into shared types. |
 | EH-RCC2 — Re-express Minecraft | Migrate the existing Fabric guardian to the generic contract without changing accepted behavior. | Fabric adapter compatibility layer | Existing rescue and G3 evidence must remain equivalent. |
-| EH-RCC3 — Second controller | Prove the contract is reusable with a deliberately different resident implementation. | Threshold controller, conventional RNN shadow, or another safe local controller | Same identity, deadline, arbiter, evidence, and terminal semantics across implementations. |
+| EH-RCC3 — Second controller | Prove the contract is reusable across a different embodied actor and resident behavior. | `resident.minecraft.companion-follow.v1`, controlling a separate companion entity through native bounded pathfinding | Same identity, deadline, arbiter, evidence, interruption, reset, and terminal semantics as the guardian; no implicit player takeover or world authority. |
 | EH-FW-CLOUD — Offline policy training | Produce candidate learned/FlyWire artifacts for shadow evaluation. | CPU reproduction first; then one approved ephemeral L4 Spot benchmark; A100/H100 only after profiling | Immutable artifact hash, evaluation receipt, hard TTL, cost ceiling, checkpoint recovery, and local-controller acceptance. |
+
+### Companion-embodiment design reservation
+
+EH-RCC3 should prove the generic contract with a deterministic companion before
+learned controllers are promoted. Minecraft may expose two independently bound
+embodiment kinds:
+
+- `player_proxy`: Codex acts through the selected user's player body under the
+  Player Embodiment lease; and
+- `companion_entity`: Codex directs a distinct in-world actor under its own
+  finite actor-presence and effect lease.
+
+The first companion profile is intentionally narrow: follow, hold position,
+look at an admitted target, move to a nearby admitted waypoint, return to the
+owner, release control, or abstain and request semantic replanning. `follow`
+is a semantic mode backed by local pathfinding and a declared distance band
+with hysteresis, not repeated model-authored movement calls. Obstruction,
+identity loss, world or connector-epoch change, lease expiry, manual override,
+Emergency Stop, or exhausted local behavior stops or suspends the mode and
+emits exact causal evidence.
+
+Every companion observation and decision binds at least:
+
+```text
+environment_id
+world_id
+connector_epoch
+companion_id
+actor_entity_id
+actor_incarnation_id
+controller_profile_id
+controller_artifact_hash
+owner_account_id
+authority_subject_id
+beneficiary_player_id
+target_subject_id (when applicable)
+observation_origin
+observation_revision
+lease_id
+room_id (when room-scoped)
+```
+
+Actor ownership must never be inferred from proximity. A room may expose one
+companion to several beneficiaries, but only one admitted execution lease may
+control it at a time. Presence is finite, chunk activity is bounded and
+explicit, and no profile silently forces indefinite chunk loading. Slow model
+or semantic work may run asynchronously; every Minecraft entity or world
+effect returns through the authoritative Fabric/server execution thread and
+the trusted local arbiter.
+
+The complete projected lifecycle, viewpoint, room-arbitration, presence,
+resource-release and acceptance contract is
+`docs/architecture/helix-minecraft-companion-embodiment-v1.md`. Death, respawn,
+replacement or server reconstruction rotates `actor_incarnation_id`; no prior
+proposal, observation or lease may control the new body. Reconnect restores
+only durable logical identity until the current entity is observed, rebound
+and admitted under a fresh lease.
+
+EH-RCC3 must prove follow hysteresis, obstruction and target-loss replanning,
+Codex-delay continuity, lease-expiry stopping, manual/Emergency Stop release,
+death/restart stale-proposal resistance, origin-labeled observations,
+serialized multi-member control, spatial-presentation separation and bounded
+chunk/resource cleanup across A0, A1 and B.
+
+The companion is a deterministic clean-room implementation target. Threshold,
+RNN, FlyWire-derived, and shuffled-topology profiles remain later proposal-only
+comparisons behind the same arbiter and do not inherit authority from EH-RCC3.
 
 GCP or another cloud provider is an offline experiment surface only. It may
 produce a versioned policy artifact; it never sits in the Minecraft reflex

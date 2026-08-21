@@ -303,6 +303,27 @@ describe("Helix Ask prompt interpretation", () => {
     ]);
   });
 
+  it("keeps each affirmative operation in a coordinated environment course independently accountable", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Complete the G2 fluid micro-course: inspect the current player state, perform the bounded look/sprint/jump, interact with the verified reachable target, equip the stick, craft four oak planks, verify every checkpoint, and release all controls.",
+    );
+
+    expect(
+      interpretation.compound_contract?.requirements.map((entry) => entry.text),
+    ).toEqual([
+      "Complete the G2 fluid micro-course: inspect the current player state",
+      "perform the bounded look/sprint/jump",
+      "interact with the verified reachable target",
+      "equip the stick",
+      "craft four oak planks",
+      "verify every checkpoint",
+      "release all controls.",
+    ]);
+    expect(
+      interpretation.compound_contract?.output_contract.allow_partial_answer,
+    ).toBe(false);
+  });
+
   it("does not promote coordinated verbs under one prohibition into positive requirements", () => {
     const interpretation = interpretHelixAskPrompt(
       "Using the active Minecraft Fabric environment, make one fresh read-only check and report the world status. Do not move anything, use server commands, or change the world.",

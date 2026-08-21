@@ -94,6 +94,12 @@ const ORDERED_CELL_ORDINALS = Object.freeze(
 const ORDERED_RADIUS_EXPONENTS = Object.freeze(
   Array.from({ length: 73 }, (_, ordinal) => -80 + ordinal),
 );
+const PRODUCT_KIND_ORDINAL_MAP = Object.freeze({
+  lambda_zero: 0,
+  cell: 1,
+  face: 2,
+  summary: 3,
+} as const);
 
 const INPUT_MANIFEST_EXACT_KEY_ORDER = Object.freeze([
   "artifactId",
@@ -274,6 +280,8 @@ const MISSING_EXACT_CHOICES = Object.freeze({
   terminalStateSourceBinding: null,
   terminalStateLiftDefinition: null,
   terminalStateContainmentPredicateDefinition: null,
+  inputManifestOrderedBindingInventoryDefinition: null,
+  inputManifestExactBindingCount: null,
   intervalArithmeticDependencyLock: null,
   proofSourceManifestBinding: null,
   proofToolchainBinding: null,
@@ -360,6 +368,8 @@ const AUTHORITY_LOCKS = Object.freeze({
 
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_MANIFEST_SELF_HASH_DOMAIN =
   "nhm2-spherical-boson-star-v2-vacuum-continuation-proof-abi/manifest/v1\n" as const;
+export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_PAYLOAD_HASH_DOMAIN =
+  "nhm2-spherical-boson-star-v2-vacuum-continuation-proof-abi/payload/v1\n" as const;
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_RECORD_SELF_HASH_DOMAIN =
   "nhm2-spherical-boson-star-v2-vacuum-continuation-proof-abi/record/v1\n" as const;
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_STREAM_HASH_DOMAIN =
@@ -437,6 +447,7 @@ const CONTRACT = {
     exactTotalProductCount: 2_049,
     exactRadiusEvaluationsPerCell: 73,
     exactAllPassRadiusEvaluationCount: 74_752,
+    productKindOrdinalMap: PRODUCT_KIND_ORDINAL_MAP,
     exactProductOrdinalPlan: {
       lambdaZero: "0",
       cells: "1_through_1024_map_cell_ordinal_plus_1",
@@ -469,6 +480,16 @@ const CONTRACT = {
         exactRecordCount: 1,
       },
     ],
+  },
+  inputManifestClosure: {
+    orderedBindingInventoryDefinition:
+      MISSING_EXACT_CHOICES.inputManifestOrderedBindingInventoryDefinition,
+    exactBindingCount: MISSING_EXACT_CHOICES.inputManifestExactBindingCount,
+    perCellOrPerFaceBindingInventoryMayBeInferred: false,
+    manifestGranularityMayBeRetunedByVerifier: false,
+    traversalAllowedBeforeBothChoicesAreBound: false,
+    disposition:
+      "block_verifier_implementation_until_a_successor_freezes_one_bounded_ordered_role_inventory_and_exact_count",
   },
   dyadicEndpointCodec: {
     exactKeyOrder: [
@@ -505,11 +526,22 @@ const CONTRACT = {
   },
   hashingAndSerialization: {
     canonicalJson:
-      "RFC8785_compatible_UTF8_sorted_keys_compact_without_BOM_duplicate_keys_nonfinite_numbers_or_negative_zero",
+      "RFC8785_compatible_UTF8_sorted_keys_compact_without_BOM_duplicate_keys_nonfinite_numbers_negative_zero_or_unpaired_UTF16_surrogates",
     manifestSelfHashDomain:
       NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_MANIFEST_SELF_HASH_DOMAIN,
     manifestSelfHash:
       "SHA256(domain_utf8||u64le(canonical_manifest_without_self_hash_byte_length)||canonical_manifest_without_self_hash_bytes)",
+    productKindOrdinalMap: PRODUCT_KIND_ORDINAL_MAP,
+    productKindOrdinalBinding:
+      "product_kind_ordinal=productKindOrdinalMap[record.productKind]=orderedRoutes.find(route=>route.productKind===record.productKind).ordinal",
+    payloadHashDomain:
+      NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_PAYLOAD_HASH_DOMAIN,
+    payloadHash:
+      "SHA256(domain_utf8||u16le(product_kind_ordinal)||u64le(product_ordinal)||u64le(canonical_payload_byte_length)||canonical_payload_bytes)",
+    payloadCanonicalBytes:
+      "RFC8785_compatible_canonical_UTF8_payload_without_BOM_CR_or_LF",
+    recordPayloadHashPrecondition:
+      "before_record_self_hash_validation_require_record.payloadSha256=payloadHash(record.productKind,record.productOrdinal,record.payload)_and_reject_any_payload_kind_or_ordinal_transplant",
     recordSelfHashDomain:
       NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_RECORD_SELF_HASH_DOMAIN,
     recordSelfHash:
@@ -637,13 +669,15 @@ export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_CANON
 // recomputes and explicitly acknowledges semantic SHA-256, plain canonical
 // SHA-256, and canonical byte size. They are outside the semantic payload.
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_SEMANTIC_SHA256:
-  string | null = null;
+  string | null =
+  "2fb589d024463ec1e656a2b180b9fdfcd61713e474666afdc217c49f1bd03251";
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_PLAIN_CANONICAL_SHA256:
-  string | null = null;
+  string | null =
+  "4af8b689f175a418cacf252f260aa513407bcdba6161cd6497ec17932b17c732";
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_EXPECTED_CANONICAL_SIZE_BYTES:
-  number | null = null;
+  number | null = 29_628;
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_LITERAL_SEAL_STATUS =
-  "unsealed_pending_independent_parent_acknowledgement_before_any_verifier_implementation" as const;
+  "sealed_after_independent_parent_acknowledgement_before_any_verifier_implementation" as const;
 
 export const NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_BINDING =
   Object.freeze({
@@ -756,6 +790,18 @@ const assertDefinitionInvariants = (): void => {
     ) ||
     contract.logicalProducts.exactTotalProductCount !== 2_049 ||
     contract.logicalProducts.exactAllPassRadiusEvaluationCount !== 74_752 ||
+    Object.entries(contract.logicalProducts.productKindOrdinalMap).some(
+      ([productKind, ordinal]) =>
+        contract.logicalProducts.orderedRoutes[ordinal]?.productKind !==
+          productKind ||
+        contract.logicalProducts.orderedRoutes[ordinal]?.ordinal !== ordinal,
+    ) ||
+    contract.inputManifestClosure.orderedBindingInventoryDefinition !== null ||
+    contract.inputManifestClosure.exactBindingCount !== null ||
+    contract.inputManifestClosure
+      .perCellOrPerFaceBindingInventoryMayBeInferred !== false ||
+    contract.inputManifestClosure.traversalAllowedBeforeBothChoicesAreBound !==
+      false ||
     new Set(contract.firstFailurePolicy.codesInPrecedenceOrder).size !==
       contract.firstFailurePolicy.codesInPrecedenceOrder.length ||
     !allNullLeaves(contract.instances) ||
@@ -813,6 +859,20 @@ const FORBIDDEN_KEYS = new Set([
   "valueOf",
 ]);
 
+const hasUnpairedUtf16Surrogate = (value: string): boolean => {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1;
+      continue;
+    }
+    if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) return true;
+  }
+  return false;
+};
+
 const parsedTreeViolation = (root: unknown): string | null => {
   const limits =
     NHM2_SPHERICAL_BOSON_STAR_V2_VACUUM_CONTINUATION_PROOF_ABI_V1_VALIDATOR_LIMITS;
@@ -837,6 +897,9 @@ const parsedTreeViolation = (root: unknown): string | null => {
       continue;
     }
     if (typeof value === "string") {
+      if (hasUnpairedUtf16Surrogate(value)) {
+        return `unpaired_utf16_surrogate:${frame.pointer || "/"}`;
+      }
       const bytes = Buffer.byteLength(value, "utf8");
       aggregateStringUtf8Bytes += bytes;
       if (bytes > limits.maximumStringUtf8Bytes) {
@@ -873,6 +936,9 @@ const parsedTreeViolation = (root: unknown): string | null => {
     }
     for (let index = keys.length - 1; index >= 0; index -= 1) {
       const key = keys[index] as string;
+      if (hasUnpairedUtf16Surrogate(key)) {
+        return `unpaired_utf16_surrogate:${frame.pointer || "/"}/<property_key>`;
+      }
       const keyBytes = Buffer.byteLength(key, "utf8");
       aggregateStringUtf8Bytes += keyBytes;
       if (

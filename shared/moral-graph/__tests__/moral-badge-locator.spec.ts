@@ -218,4 +218,60 @@ describe("Moral badge locator", () => {
       ]),
     );
   });
+
+  it("locates transformation-window stewardship through its moral alias and preserves its root binding", async () => {
+    const canonicalGraph = await loadIdeologyGraphFromFile();
+    const locator = locateMoralBadges(canonicalGraph, {
+      kind: "user_prompt",
+      text: "Use environment before blame when the support window keeps collapsing before recovery can finish.",
+      refs: ["turn:transformation-window"],
+      generatedAt: "2026-08-20T00:00:00.000Z",
+      locatorId: "moral-badge-locator:transformation-window",
+    });
+    const located = [
+      ...locator.locatedBadges.exact,
+      ...locator.locatedBadges.likely,
+      ...locator.locatedBadges.inferred,
+    ].find((badge) => badge.nodeId === "transformation-window-stewardship");
+
+    expect(validateMoralBadgeLocatorV1(locator)).toEqual([]);
+    expect(located).toMatchObject({
+      nodeId: "transformation-window-stewardship",
+      matchType: "alias",
+    });
+    expect(located?.pathToBinding).toEqual(
+      expect.arrayContaining(["citizens-arc-derived-principles", "wisdom-first-principles"]),
+    );
+  });
+
+  it("locates love without projection from the original philosophy language", async () => {
+    const canonicalGraph = await loadIdeologyGraphFromFile();
+    const locator = locateMoralBadges(canonicalGraph, {
+      kind: "user_prompt",
+      text:
+        "Handling the unknown is like approaching nature without it being assumed. Wish an open mind upon yourself, and let the reservation of love have the freedom to be true.",
+      refs: ["turn:love-without-projection"],
+      generatedAt: "2026-08-20T00:00:00.000Z",
+      locatorId: "moral-badge-locator:love-without-projection",
+    });
+    const located = locator.locatedBadges.exact.find(
+      (badge) => badge.nodeId === "love-without-projection",
+    );
+
+    expect(validateMoralBadgeLocatorV1(locator)).toEqual([]);
+    expect(located).toMatchObject({
+      nodeId: "love-without-projection",
+      matchType: "alias",
+      confidence: 0.9,
+    });
+    expect(located?.pathToBinding).toEqual([
+      "love-without-projection",
+      "identity-view-and-non-attachment",
+      "wisdom-first-principles",
+    ]);
+    expect(locator.authority).toMatchObject({
+      terminal_eligible: false,
+      agent_executable: false,
+    });
+  });
 });

@@ -318,6 +318,7 @@ const dependencies = (
   bindingStore: {
     getActiveRunRoomBinding: async () => runBinding,
   },
+  refreshPresence: async () => room,
   readMembership: async () => membership,
   readRoom: async () => room,
   listSourceCandidates: async () => [sourceCandidate],
@@ -359,6 +360,87 @@ const dependencies = (
 });
 
 describe("environment probe workstation gateway", () => {
+  it("refreshes exact authenticated in-game presence before a delayed probe", async () => {
+    let currentPresence: SharedRealtimeRoomMembership["presence"] = "away";
+    const refreshPresence = vi.fn(async () => {
+      currentPresence = "present";
+      return room;
+    });
+    const interactionAccountContext = firstPartyAccountContext();
+    interactionAccountContext.trusted_turn_actor_context = {
+      schema: "helix.realtime_room.turn_actor_context.v1",
+      origin: "environment_interaction",
+      room_id: ROOM_ID,
+      requester_profile_id: membership.profileId,
+      realtime_session_id: "environment-interaction:credential:test",
+      participant_id: membership.participantId,
+      resolution: "resolved",
+      resolution_source: "paired_environment_participant",
+      captured_at_ms: NOW.getTime(),
+    };
+
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:interaction-presence-refresh`,
+      toolCallId: `${TOOL_CALL_ID}:interaction-presence-refresh`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: interactionAccountContext,
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        refreshPresence,
+        readMembership: async () => ({
+          ...membership,
+          presence: currentPresence,
+        }),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(refreshPresence).toHaveBeenCalledWith({
+      roomId: ROOM_ID,
+      profileId: membership.profileId,
+      presence: "present",
+    });
+  });
+
+  it("does not revive an in-game membership that the room store rejects", async () => {
+    const interactionAccountContext = firstPartyAccountContext();
+    interactionAccountContext.trusted_turn_actor_context = {
+      schema: "helix.realtime_room.turn_actor_context.v1",
+      origin: "environment_interaction",
+      room_id: ROOM_ID,
+      requester_profile_id: membership.profileId,
+      realtime_session_id: "environment-interaction:credential:test",
+      participant_id: membership.participantId,
+      resolution: "resolved",
+      resolution_source: "paired_environment_participant",
+      captured_at_ms: NOW.getTime(),
+    };
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:interaction-left`,
+      toolCallId: `${TOOL_CALL_ID}:interaction-left`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: interactionAccountContext,
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        refreshPresence: async () => {
+          throw new Error("membership_left");
+        },
+        dispatchProbe,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "permission_revoked",
+    });
+    expect(result.summary).toContain("no longer eligible");
+    expect(dispatchProbe).not.toHaveBeenCalled();
+  });
+
   it("keeps stale current-turn probe results on the model-owned retry path", () => {
     expect(
       environmentProbeFailureRepairAction(
@@ -1360,6 +1442,14 @@ describe("environment probe workstation gateway", () => {
     expect(result).toMatchObject({
       ok: false,
       error: "permission_revoked",
+      observation: {
+        result: {
+          binding_identity_mismatch_reasons: [
+            "consent_version_changed",
+            "consent_receipt_changed",
+          ],
+        },
+      },
     });
     expect(result.summary).toContain("authorizing membership");
     expect(dispatchProbe).not.toHaveBeenCalled();

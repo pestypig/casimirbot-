@@ -241,6 +241,51 @@ This is the generic mechanism behind a Minecraft guardian, browser monitor,
 DAW timing controller, server circuit breaker, robot balance policy or future
 learned profile. It does not imply that every environment needs training.
 
+### Embodiment identity and semantic modes
+
+A resident controller always acts through an exact embodiment. Minecraft's
+first accepted direction is `player_proxy`, where the selected user's player
+body is the actor. A later `companion_entity` profile may control a separate
+bounded in-world actor without taking over the player's controls. The two
+embodiments may observe the same world but never share identity or authority by
+implication.
+
+Every resident decision therefore binds the environment, world, connector
+epoch, actor entity, controller profile, authority subject, beneficiary player,
+observation revision, and lease. Owner or beneficiary association is explicit;
+proximity is never sufficient. Respawn, world change, connector rotation, actor
+replacement, or lease expiry invalidates stale proposals.
+
+Runtime Codex may select a semantic mode such as “follow this beneficiary.” A
+local deterministic controller then maintains the admitted mode through native
+pathfinding, a bounded distance band and hysteresis, while reporting meaningful
+deviation rather than asking the model for every movement tick. The mode ends
+or abstains on obstruction, identity loss, authority loss, manual override,
+Emergency Stop, or exhausted local behavior. A separate companion may speak or
+present from its own measured location, but presentation never becomes action
+or terminal authority.
+
+Discrete events such as damage, interaction, actor departure, target attention,
+time progression or idle state may trigger semantic consideration. The
+connector assigns exact event identity, debounces or coalesces repeated events,
+and sends only a compact nonterminal escalation through live mail. Cooldowns or
+an “already processing” flag are load-control mechanisms, not canonical event
+identity and not decision authority.
+
+Model calls and other slow semantic work may run asynchronously. Minecraft
+entity and world effects must return to the authoritative Fabric/server thread,
+pass the trusted local arbiter, and publish measured postconditions. Network or
+model latency must never block the game tick or authorize a mutation from a
+background thread.
+
+The Minecraft-specific companion state machine, incarnation rotation,
+viewpoint provenance, multiplayer arbitration, resource release and acceptance
+matrix are defined in
+`docs/architecture/helix-minecraft-companion-embodiment-v1.md`. The generic
+rule is that durable logical identity may survive a restart, but runtime control
+never does: a new actor incarnation requires current observation, binding and
+admission before any resident effect resumes.
+
 The keyed development server exposes a developer-only, observer-only stage
 ledger at
 `GET /api/agi/agent-providers/codex/turn-stage/:turnId`. It retains timing,

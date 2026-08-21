@@ -47,6 +47,11 @@ final class FluidSequenceEngine {
     private int inventoryMutationsPerformed;
     private int deviations;
     private int retries;
+    private String firstFailureNodeId;
+    private String firstFailureNodeKind;
+    private String firstFailureActionKind;
+    private String firstFailureSummary;
+    private Map<String, Object> firstFailureMeasurements = Map.of();
 
     FluidSequenceEngine(ControlBridge bridge) {
         this.bridge = Objects.requireNonNull(bridge, "bridge");
@@ -83,6 +88,11 @@ final class FluidSequenceEngine {
         inventoryMutationsPerformed = 0;
         deviations = 0;
         retries = 0;
+        firstFailureNodeId = null;
+        firstFailureNodeKind = null;
+        firstFailureActionKind = null;
+        firstFailureSummary = null;
+        firstFailureMeasurements = Map.of();
     }
 
     WorkflowStep step(long actionTicks) {
@@ -133,6 +143,14 @@ final class FluidSequenceEngine {
                     long waited = tickIndex - nodeEnteredAt;
                     if (waited >= longNumber(node, "wait_up_to_ticks")) {
                         deviations++;
+                        recordFirstFailure(
+                            node,
+                            "The required checkpoint timed out.",
+                            Map.of(
+                                "condition_kind", text(condition, "condition_kind"),
+                                "waited_ticks", waited
+                            )
+                        );
                         transition(text(node, "on_timeout"), "timed_out");
                         continue;
                     }
@@ -197,6 +215,11 @@ final class FluidSequenceEngine {
                 if (!bridge.selectHotbar(integer(controls, "hotbar_slot"))) {
                     bridge.releaseAll();
                     deviations++;
+                    recordFirstFailure(
+                        node,
+                        "The sequence could not select its admitted hotbar slot.",
+                        Map.of("hotbar_slot", integer(controls, "hotbar_slot"))
+                    );
                     transition(text(node, "on_failure"), "failed");
                     return running(actionTicks, "The sequence could not select its admitted hotbar slot.");
                 }
@@ -208,6 +231,15 @@ final class FluidSequenceEngine {
                 if (!bridge.interact("current_focus", "main_hand", "use")) {
                     bridge.releaseAll();
                     deviations++;
+                    recordFirstFailure(
+                        node,
+                        "The sequence interaction was not accepted.",
+                        Map.of(
+                            "target", "current_focus",
+                            "hand", "main_hand",
+                            "interaction", "use"
+                        )
+                    );
                     transition(text(node, "on_failure"), "failed");
                     return running(actionTicks, "The sequence interaction was not accepted.");
                 }
@@ -238,6 +270,11 @@ final class FluidSequenceEngine {
         if (childController == null) {
             if (!mutationScopeAdmits(action)) {
                 deviations++;
+                recordFirstFailure(
+                    node,
+                    "The embedded workflow was outside the admitted mutation scope.",
+                    Map.of("action_kind", actionKind)
+                );
                 transition(text(node, "on_failure"), "failed");
                 return running(
                     actionTicks,
@@ -269,6 +306,11 @@ final class FluidSequenceEngine {
             );
             if (!childController.start(request)) {
                 deviations++;
+                recordFirstFailure(
+                    node,
+                    "The embedded typed workflow could not start.",
+                    Map.of("action_kind", actionKind)
+                );
                 transition(text(node, "on_failure"), "failed");
                 return running(actionTicks, "The embedded typed workflow could not start.");
             }
@@ -283,7 +325,16 @@ final class FluidSequenceEngine {
         if (terminalEvent != null) aggregateMeasurements(terminalEvent.measurements());
         boolean succeeded = childState == State.SUCCEEDED;
         String target = text(node, succeeded ? "on_success" : "on_failure");
-        if (!succeeded) deviations++;
+        if (!succeeded) {
+            deviations++;
+            recordFirstFailure(
+                node,
+                terminalEvent == null
+                    ? "The embedded typed player workflow produced a bounded failure."
+                    : terminalEvent.summary(),
+                terminalEvent == null ? Map.of() : terminalEvent.measurements()
+            );
+        }
         transition(target, succeeded ? "succeeded" : stateOutcome(childState));
         childController = null;
         childTerminalEvent = null;
@@ -363,12 +414,40 @@ final class FluidSequenceEngine {
         values.put("condition_observation_count", conditionObservations.size());
         values.put("deviation_count", deviations);
         values.put("retry_count", retries);
+        if (firstFailureNodeId != null) {
+            values.put("first_failure_node_id", firstFailureNodeId);
+            values.put("first_failure_node_kind", firstFailureNodeKind);
+            values.put("first_failure_summary", firstFailureSummary);
+            if (firstFailureActionKind != null) {
+                values.put("first_failure_action_kind", firstFailureActionKind);
+            }
+            values.put("first_failure_measurements", firstFailureMeasurements);
+        }
         values.put("player_motion_performed", motionPerformed);
         values.put("player_interaction_performed", interactionPerformed);
         values.put("inventory_mutation_performed", inventoryMutationPerformed);
         values.put("inventory_mutations_performed", inventoryMutationsPerformed);
         values.put("world_mutations_performed", worldMutationsPerformed);
         return Map.copyOf(values);
+    }
+
+    private void recordFirstFailure(
+        Map<String, Object> node,
+        String summary,
+        Map<String, Object> measurements
+    ) {
+        if (firstFailureNodeId != null) return;
+        firstFailureNodeId = text(node, "node_id");
+        firstFailureNodeKind = text(node, "node_kind");
+        firstFailureSummary = summary == null || summary.isBlank()
+            ? "The sequence node failed without a diagnostic summary."
+            : summary.substring(0, Math.min(summary.length(), 1_000));
+        if (node.get("action") instanceof Map<?, ?>) {
+            firstFailureActionKind = text(object(node.get("action")), "action_kind");
+        }
+        firstFailureMeasurements = measurements == null
+            ? Map.of()
+            : Map.copyOf(measurements);
     }
 
     private void recordConditionObservation(
@@ -577,12 +656,12 @@ final class FluidSequenceEngine {
             if ("workflow_action".equals(kind)) {
                 String actionKind = text(object(node.get("action")), "action_kind");
                 if (!Set.of(
-                    "navigate_to", "look_at", "walk", "jump", "interact",
+                    "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
                     "hotbar_select", "equip", "follow", "collect", "mine", "place",
                     "craft", "inventory_transfer"
                 ).contains(actionKind)) {
                     throw new IllegalArgumentException(
-                        "Fluid sequence workflow nodes must reuse one of the 13 typed player actions."
+                        "Fluid sequence workflow nodes must reuse one of the 14 typed player actions."
                     );
                 }
             }

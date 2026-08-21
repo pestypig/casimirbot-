@@ -2,9 +2,13 @@ import {
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
 } from "@shared/helix-environment-command";
-import { HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY } from "@shared/helix-environment-connector";
+import {
+  HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-connector";
 import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
 import type { HelixWorkstationGatewayCallResult } from "../workstation-tool-gateway/types";
@@ -326,10 +330,69 @@ export const buildMinecraftAgencyCompoundCoverageResolutions = (input: {
   if (requirements.length === 0) return [];
 
   const steps = alignMinecraftAgencyExecutedSteps(input);
+  const sequenceSteps = steps.filter(
+    (step) =>
+      requestCapability(step.request) ===
+      HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+  );
+  const successfulSequenceNodes = sequenceSteps.flatMap((step) => {
+    const result = readRecord(readRecord(step.result.observation)?.result);
+    const measurements = readRecord(result?.verified_terminal_measurements);
+    const nodeOutcomes = readRecord(measurements?.node_outcomes);
+    const nodes = readArray(requestArguments(step.request).nodes)
+      .map(readRecord)
+      .filter((node): node is RecordLike => Boolean(node));
+    return nodes
+      .filter(
+        (node) =>
+          readString(node.node_id) &&
+          readString(nodeOutcomes?.[readString(node.node_id)!]) === "succeeded",
+      )
+      .map((node) => ({ step, node }));
+  });
+  const successfulSequenceActions = successfulSequenceNodes
+    .map((entry) => ({ ...entry, action: readRecord(entry.node.action) }))
+    .filter(
+      (entry): entry is typeof entry & { action: RecordLike } =>
+        Boolean(entry.action),
+    );
+  const successfulInputSegments = successfulSequenceNodes.filter(
+    (entry) => readString(entry.node.node_kind) === "input_segment",
+  );
+  const satisfiedCheckpointIds = new Set(
+    sequenceSteps.flatMap((step) => {
+      const result = readRecord(readRecord(step.result.observation)?.result);
+      const measurements = readRecord(result?.verified_terminal_measurements);
+      return readArray(measurements?.satisfied_checkpoint_ids)
+        .map(readString)
+        .filter((value): value is string => Boolean(value));
+    }),
+  );
+  const requiredCheckpointIds = new Set(
+    sequenceSteps.flatMap((step) =>
+      readArray(requestArguments(step.request).required_checkpoint_ids)
+        .map(readString)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const everyObservedCheckpointSatisfied =
+    requiredCheckpointIds.size > 0 &&
+    Array.from(requiredCheckpointIds).every((id) =>
+      satisfiedCheckpointIds.has(id),
+    );
+  const controlsReleasedSteps = sequenceSteps.filter((step) => {
+    const result = readRecord(readRecord(step.result.observation)?.result);
+    return readBoolean(result?.controls_released) === true;
+  });
+  const successfulActorStatus = steps.find(
+    (step) =>
+      step.result.ok === true &&
+      requestCapability(step.request) ===
+        HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+  );
   const successfulMutation = steps.find(
     (step) => step.result.ok === true && isStateChangingMinecraftCommand(step.request),
   );
-  if (!successfulMutation) return [];
 
   const successfulBlockMutations = steps.filter((step) =>
     Boolean(blockMutationFootprintForStep(step)),
@@ -340,7 +403,7 @@ export const buildMinecraftAgencyCompoundCoverageResolutions = (input: {
       step.result.ok === true &&
       requestCapability(step.request) ===
         HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY &&
-      step.resultIndex < successfulMutation.resultIndex,
+      successfulMutation && step.resultIndex < successfulMutation.resultIndex,
   );
   const successfulPreCheckpoint = steps.find((step) => {
     const command = minecraftCommandText(step.request);
@@ -348,7 +411,7 @@ export const buildMinecraftAgencyCompoundCoverageResolutions = (input: {
       step.result.ok === true &&
         command &&
         isCheckpointCaptureCommand(command) &&
-        step.resultIndex < successfulMutation.resultIndex,
+        successfulMutation && step.resultIndex < successfulMutation.resultIndex,
     );
   });
   const successfulPostVerifications = successfulBlockMutations.map(
@@ -368,6 +431,103 @@ export const buildMinecraftAgencyCompoundCoverageResolutions = (input: {
     const text = readString(requirement.text) ?? "";
     if (!requirementId) return [];
     if (
+      successfulActorStatus &&
+      /\binspect\b/iu.test(text) &&
+      /\b(?:current\s+player|player\s+state|current\s+state)\b/iu.test(text)
+    ) {
+      return [{
+        requirement_id: requirementId,
+        status: "answered" as const,
+        reason:
+          "A successful current-turn actor-status observation inspected the current player state.",
+        evidence_refs: evidenceRefsForResult(successfulActorStatus.result),
+      }];
+    }
+    if (/\b(?:look|sprint|jump)\b/iu.test(text)) {
+      const namedActions = ["look", "sprint", "jump"].filter((name) =>
+        new RegExp(`\\b${name}\\b`, "iu").test(text),
+      );
+      const supportingSegments = successfulInputSegments.filter((entry) => {
+        const controls = readRecord(entry.node.controls);
+        return namedActions.every((name) =>
+          name === "look"
+            ? Boolean(readRecord(controls?.look_delta))
+            : name === "sprint"
+              ? readBoolean(controls?.sprint) === true
+              : readString(controls?.jump) === "pulse",
+        );
+      });
+      if (supportingSegments.length > 0) {
+        return [{
+          requirement_id: requirementId,
+          status: "answered" as const,
+          reason:
+            "A verified successful input segment performed every named bounded look/sprint/jump control.",
+          evidence_refs: uniqueStrings(
+            supportingSegments.flatMap((entry) =>
+              evidenceRefsForResult(entry.step.result),
+            ),
+          ),
+        }];
+      }
+    }
+    const actionRequirement = [
+      { pattern: /\binteract\b/iu, actionKind: "interact" },
+      { pattern: /\bequip\b/iu, actionKind: "equip" },
+      { pattern: /\bcraft\b/iu, actionKind: "craft" },
+    ].find((candidate) => candidate.pattern.test(text));
+    if (actionRequirement) {
+      const supportingActions = successfulSequenceActions.filter(
+        (entry) =>
+          readString(entry.action.action_kind) ===
+          actionRequirement.actionKind,
+      );
+      if (supportingActions.length > 0) {
+        return [{
+          requirement_id: requirementId,
+          status: "answered" as const,
+          reason: `A current-turn sequence observation proves the ${actionRequirement.actionKind} node succeeded even though a later node in its enclosing sequence failed.`,
+          evidence_refs: uniqueStrings(
+            supportingActions.flatMap((entry) =>
+              evidenceRefsForResult(entry.step.result),
+            ),
+          ),
+        }];
+      }
+    }
+    if (
+      everyObservedCheckpointSatisfied &&
+      /\b(?:verify|verified|confirm)\b/iu.test(text) &&
+      /\b(?:every|all)\b[^.!?;\n]{0,40}\bcheckpoint/iu.test(text)
+    ) {
+      return [{
+        requirement_id: requirementId,
+        status: "answered" as const,
+        reason:
+          "The union of current-turn sequence measurements satisfies every checkpoint identity required by the provider-authored repair attempts.",
+        evidence_refs: uniqueStrings(
+          sequenceSteps.flatMap((step) => evidenceRefsForResult(step.result)),
+        ),
+      }];
+    }
+    if (
+      controlsReleasedSteps.length > 0 &&
+      /\brelease\b[^.!?;\n]{0,40}\bcontrols?\b/iu.test(text)
+    ) {
+      return [{
+        requirement_id: requirementId,
+        status: "answered" as const,
+        reason:
+          "The native sequence runtime reported controls_released after every observed terminal path.",
+        evidence_refs: uniqueStrings(
+          controlsReleasedSteps.flatMap((step) =>
+            evidenceRefsForResult(step.result),
+          ),
+        ),
+      }];
+    }
+    if (
+      successfulMutation &&
       successfulPreInspection &&
       /\binspect\b/iu.test(text) &&
       /\b(?:first|before)\b/iu.test(text)
@@ -384,6 +544,7 @@ export const buildMinecraftAgencyCompoundCoverageResolutions = (input: {
       }];
     }
     if (
+      successfulMutation &&
       successfulPreCheckpoint &&
       /\bcheckpoint\b/iu.test(text) &&
       /\b(?:before|without|until)\b/iu.test(text)

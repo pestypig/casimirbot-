@@ -290,7 +290,19 @@ public static class HelixMinecraftLauncherAutomation {
                 int width = rectangle.Right - rectangle.Left;
                 int height = rectangle.Bottom - rectangle.Top;
                 if (width < 640 || height < 480) {
-                    throw new InvalidOperationException("minecraft_launcher_bounds_invalid");
+                    // A launcher reopened from the tray can retain a tiny
+                    // restored rectangle. Maximize this exact verified window,
+                    // then recapture rather than guessing a stale coordinate.
+                    ShowWindow(window, 3);
+                    System.Threading.Thread.Sleep(500);
+                    if (!GetWindowRect(window, out rectangle)) {
+                        throw new InvalidOperationException("minecraft_launcher_bounds_unavailable");
+                    }
+                    width = rectangle.Right - rectangle.Left;
+                    height = rectangle.Bottom - rectangle.Top;
+                    if (width < 640 || height < 480) {
+                        throw new InvalidOperationException("minecraft_launcher_bounds_invalid");
+                    }
                 }
                 Point target;
                 using (Bitmap image = new Bitmap(width, height))
@@ -442,7 +454,9 @@ if ($existingMinecraftClient) {
         "minecraft_launcher_play_control_not_found",
         "minecraft_launcher_foreground_activation_failed",
         "minecraft_launcher_click_target_occluded",
-        "minecraft_launcher_click_delivery_failed"
+        "minecraft_launcher_click_delivery_failed",
+        "minecraft_launcher_bounds_unavailable",
+        "minecraft_launcher_bounds_invalid"
       )) {
         throw
       }

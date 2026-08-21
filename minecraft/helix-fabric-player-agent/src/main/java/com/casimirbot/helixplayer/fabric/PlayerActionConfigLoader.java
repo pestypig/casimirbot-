@@ -20,9 +20,21 @@ final class PlayerActionConfigLoader {
 
     private PlayerActionConfigLoader() {}
 
-    static PlayerActionConfig load(Logger logger) {
+    record LoadedConfig(
+        PlayerActionConfig action,
+        PlayerInteractionConfig interaction
+    ) {}
+
+    static LoadedConfig loadAll(Logger logger) {
         Map<String, Object> root = readRoot(path(), logger);
-        return PlayerActionConfig.fromMap(object(root.get("action")));
+        return new LoadedConfig(
+            PlayerActionConfig.fromMap(object(root.get("action"))),
+            PlayerInteractionConfig.fromMap(object(root.get("interaction")))
+        );
+    }
+
+    static PlayerActionConfig load(Logger logger) {
+        return loadAll(logger).action();
     }
 
     static String pairingEndpoint(Logger logger) {
@@ -52,7 +64,7 @@ final class PlayerActionConfigLoader {
         return nonce;
     }
 
-    static synchronized PlayerActionConfig savePairedAction(
+    static synchronized LoadedConfig savePairedAction(
         ConnectorPairingClient.PairedSourceConfig paired,
         Logger logger
     ) throws IOException {
@@ -60,7 +72,10 @@ final class PlayerActionConfigLoader {
             throw new IOException("The pairing receipt did not contain a player-action configuration.");
         }
         PlayerActionConfig config = PlayerActionConfig.fromMap(paired.actionConfig());
-        if (!config.ready()) {
+        PlayerInteractionConfig interaction = PlayerInteractionConfig.fromMap(
+            paired.interactionConfig()
+        );
+        if (!config.ready() || !interaction.ready()) {
             throw new IOException("The player-action pairing configuration is incomplete or unsafe.");
         }
         Path path = path();
@@ -68,9 +83,10 @@ final class PlayerActionConfigLoader {
         root.put("schema", CONFIG_SCHEMA);
         root.put("pairing_endpoint", paired.pairingEndpoint());
         root.put("action", new LinkedHashMap<>(paired.actionConfig()));
+        root.put("interaction", new LinkedHashMap<>(paired.interactionConfig()));
         root.remove("pairing_pending");
         writeRoot(path, root);
-        return config;
+        return new LoadedConfig(config, interaction);
     }
 
     static synchronized void clear(Logger logger) throws IOException {
@@ -78,6 +94,7 @@ final class PlayerActionConfigLoader {
         Map<String, Object> root = readRoot(path, logger);
         root.put("schema", CONFIG_SCHEMA);
         root.remove("action");
+        root.remove("interaction");
         root.remove("pairing_pending");
         writeRoot(path, root);
     }

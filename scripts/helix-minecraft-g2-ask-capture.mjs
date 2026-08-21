@@ -2,6 +2,7 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import http from "node:http";
 import path from "node:path";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:1522";
@@ -80,7 +81,10 @@ const request = async (baseUrl, cookie, requestPath, options = {}) => {
       : { body: JSON.stringify(options.body) }),
   });
   const payload = await readJson(response);
-  if (!response.ok || payload?.ok === false) {
+  if (
+    !response.ok ||
+    (payload?.ok === false && options.allowApplicationFailure !== true)
+  ) {
     fail(
       typeof payload?.error === "string"
         ? payload.error
@@ -89,6 +93,70 @@ const request = async (baseUrl, cookie, requestPath, options = {}) => {
   }
   return record(payload, "response_body_missing");
 };
+
+// A complete provider-selected Minecraft turn can legitimately exceed the
+// Fetch implementation's default response-header deadline while Codex performs
+// several admitted capability continuations. Keep the local capture transport
+// open without changing the bounded Ask lifecycle itself.
+const requestLongRunningTurn = async (
+  baseUrl,
+  cookie,
+  requestPath,
+  options = {},
+) =>
+  new Promise((resolve, reject) => {
+    const bodyText = JSON.stringify(options.body ?? {});
+    const requestHandle = http.request(
+      new URL(requestPath, baseUrl),
+      {
+        method: options.method || "POST",
+        headers: {
+          Cookie: cookie,
+          Origin: baseUrl,
+          "Sec-Fetch-Site": "same-origin",
+          Accept: "application/json",
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(bodyText),
+        },
+      },
+      (response) => {
+        let responseText = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          responseText += chunk;
+        });
+        response.on("end", () => {
+          let payload = {};
+          try {
+            payload = responseText ? JSON.parse(responseText) : {};
+          } catch {
+            reject(new Error(`invalid_json_response_${response.statusCode}`));
+            return;
+          }
+          if (
+            (response.statusCode ?? 500) < 200 ||
+            (response.statusCode ?? 500) >= 300 ||
+            (payload?.ok === false && options.allowApplicationFailure !== true)
+          ) {
+            reject(
+              new Error(
+                typeof payload?.error === "string"
+                  ? payload.error
+                  : `http_${response.statusCode}`,
+              ),
+            );
+            return;
+          }
+          resolve(record(payload, "response_body_missing"));
+        });
+      },
+    );
+    requestHandle.setTimeout(12 * 60_000, () => {
+      requestHandle.destroy(new Error("ask_turn_capture_timeout"));
+    });
+    requestHandle.once("error", reject);
+    requestHandle.end(bodyText);
+  });
 
 const signIn = async (baseUrl, profileId) => {
   const response = await fetch(`${baseUrl}/api/account/session/sign-in`, {
@@ -145,6 +213,26 @@ const run = async ({ statePath, outputPath, baseUrl, prompt }) => {
   const roomId = string(state.room_id, "room_id_missing");
   const profileId = string(state.profile_id, "profile_id_missing");
   const cookie = await signIn(baseUrl, profileId);
+  // API parity must reproduce the UI's explicit room-presence lifecycle. The
+  // signed-in account alone is not authority to observe or mutate a room.
+  await request(
+    baseUrl,
+    cookie,
+    `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/presence`,
+    { method: "POST", body: { presence: "present" } },
+  );
+  // A multi-step keyed turn can outlive the room client's ordinary presence
+  // refresh interval. Keep this API participant explicitly present for the
+  // duration of the capture, just as the interactive room client does.
+  const presenceHeartbeat = setInterval(() => {
+    void request(
+      baseUrl,
+      cookie,
+      `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/presence`,
+      { method: "POST", body: { presence: "present" } },
+    ).catch(() => undefined);
+  }, 15_000);
+  presenceHeartbeat.unref();
   const body = {
     question: prompt,
     sessionId: `helix-ask:room:${roomId}`,
@@ -159,13 +247,37 @@ const run = async ({ statePath, outputPath, baseUrl, prompt }) => {
     debug: true,
     max_tokens: 3200,
   };
+  const pendingPath = `${outputPath}.pending.json`;
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  await fs.writeFile(
+    pendingPath,
+    `${JSON.stringify({
+      schema: "helix.minecraft.g2_ask_capture_pending.v1",
+      started_at: new Date().toISOString(),
+      room_id: roomId,
+      turn_id: body.turnId,
+      trace_id: body.traceId,
+      prompt,
+      credentials_included: false,
+    }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
 
   let askPayload = null;
   for (let attempt = 1; attempt <= 90; attempt += 1) {
-    askPayload = await request(baseUrl, cookie, "/api/agi/ask/turn", {
+    askPayload = await requestLongRunningTurn(
+      baseUrl,
+      cookie,
+      "/api/agi/ask/turn",
+      {
       method: "POST",
       body,
-    });
+      // A typed Ask failure is still a valid G2 differential artifact. Do not
+      // confuse the application's terminal status with an HTTP transport
+      // failure or discard the exact-turn debug export that explains it.
+      allowApplicationFailure: true,
+      },
+    );
     const queued = queuedAdmission(askPayload);
     if (!queued) break;
     body.turnId = string(queued.turn_id, "queued_turn_id_missing");
@@ -201,6 +313,8 @@ const run = async ({ statePath, outputPath, baseUrl, prompt }) => {
   await fs.writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`, {
     mode: 0o600,
   });
+  await fs.rm(pendingPath, { force: true });
+  clearInterval(presenceHeartbeat);
   process.stdout.write(
     `${JSON.stringify({
       ok: true,

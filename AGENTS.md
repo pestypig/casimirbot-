@@ -16,6 +16,41 @@ This repo uses `WARP_AGENTS.md` for warp-physics constraints and required tests.
 Always read and follow those requirements when working on warp/GR features.
 For deterministic G4 debugging workflow, also follow `AGENT_PLAYBOOK.md`.
 
+## NHM2 spherical boson-star v2 work program
+
+Before changing the NHM2 spherical-boson-star v2 candidate, proof, SI, metric,
+lane, replay, or Theory Graph surfaces, read and follow:
+
+- `docs/research/nhm2-spherical-boson-star-v2-work-program.md`
+- its linked active-gate packet, currently
+  `docs/research/nhm2-spherical-boson-star-v2-initializer-production-runtime-repair.md`
+- `WARP_AGENTS.md`
+
+The work program is the sole current dependency/status roadmap for this effort.
+Dated audits and overviews are immutable evidence snapshots, not replacement
+roadmaps. Exactly one program gate is active. Work outside it is permitted only
+when the work program marks a parallel lane or the work packet explains why it
+cannot perturb an open prerequisite.
+
+Every NHM2 spherical-boson-star v2 development packet must begin with:
+
+```text
+Program gate:
+Workstream:
+Capability or component:
+Current maturity:
+Target maturity:
+Required frozen inputs:
+Required evidence:
+Stop/fail criteria:
+Explicit non-goals:
+Downstream gate unlocked:
+```
+
+Do not retune a frozen candidate after observing results, treat a schema seal as
+proof execution, or promote diagnostic, physical, propulsion, or transport
+authority beyond the exact authenticated evidence.
+
 ## Environment harness work program
 
 Before changing environment connectors, Minecraft World Authority or Player
@@ -73,6 +108,7 @@ launch entries are presentation guidance only; server-side account policy is
 the access boundary.
 
 Primary policy locations:
+
 - Shared policy shape and panel/tool allowlists:
   `shared/helix-account-session.ts`
 - Session defaults and account-type assignment:
@@ -99,48 +135,57 @@ proof of adapter or certificate integrity.
 
 When the gate applies:
 
-1) Propose the patch (diff) as usual.
-2) Run the verifier using the adapter endpoint.
-3) If the verdict is FAIL:
+1. Propose the patch (diff) as usual.
+2. Run the verifier using the adapter endpoint.
+3. If the verdict is FAIL:
    - fix the first failing HARD constraint
    - re-run verification
    - repeat until PASS
-4) Do not claim completion unless you have a PASS and (when required by policy)
+4. Do not claim completion unless you have a PASS and (when required by policy)
    a certificate hash with integrity OK.
 
 ### Verification call (adapter)
+
 - Endpoint: `POST /api/agi/adapter/run`
 - Expect: `verdict`, `firstFail`, `deltas`, and artifact refs.
 
 ### Trace export (for training/analytics)
+
 - Endpoint: `GET /api/agi/training-trace/export` (JSONL)
 
 ## Training data lifecycle
+
 The training data pipeline is always present (trace capture -> gates -> export).
 Do not rebuild infrastructure per patch; re-run exports only when you want fresh
 datasets. A PASS Casimir verify confirms gate integrity at that moment but does
 not replace training data checks or guarantee future patches remain valid.
 
 ### Auth + tenant isolation (when enabled)
+
 - If `ENABLE_AGI_AUTH=1` or `AGI_TENANT_REQUIRED=1`, include:
   - `Authorization: Bearer <token>`
   - `X-Tenant-Id` (or `X-Customer-Id`)
 
 ### CI enforcement
+
 - GitHub Actions workflow: `.github/workflows/casimir-verify.yml`
 
 ## Math maturity (informal)
+
 - Treat math as staged: exploratory -> reduced-order -> diagnostic -> certified.
 - Match claims and checks to maturity; don’t over-claim results from early stages.
 
 ## Ideology references
+
 When a user asks for ideology references, anchor to the base of the ideology tree
 (`docs/ethos/ideology.json`) and use the relevant branches to relate wisdom to
 the scenario presented for advice.
 
 ## Mission-control context pack (voice + Go Board work)
+
 When touching mission-overwatch, voice-callout, or Go Board workflows, read these
 files before proposing changes:
+
 - `docs/BUSINESS_MODEL.md`
 - `docs/helix-ask-flow.md`
 - `docs/helix-ask-agent-policy.md`
@@ -148,21 +193,26 @@ files before proposing changes:
 - `docs/architecture/mission-go-board-spec.md`
 
 ## Helix Ask readiness debug loop (routing/scaffold/fallback changes)
+
 When touching Helix Ask routing, frontier scaffolds, fallback behavior, output
 cleaning, or ideology narrative contracts, use:
+
 - `docs/helix-ask-readiness-debug-loop.md`
 
 ## Helix Ask / Codex loop discipline (required for agent-loop changes)
+
 When touching Helix Ask agent-loop, source-target, route admission,
 tool-admission, live-source, workstation-action, route-product, terminal
 authority, loop-parity, debug-export, or Ask API behavior, also read and follow:
+
 - `docs/helix-ask-codex-loop-discipline.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-api-parity-matrix.md`
 
 Patch-time contract:
+
 - Classify the change before editing as `prompt interpretation`, `intent
-  arbitration`, `source admission`, `tool admission`, `evidence normalization`,
+arbitration`, `source admission`, `tool admission`, `evidence normalization`,
   `evidence re-entry`, `follow-up reasoning`, `terminal authority`,
   `presentation`, or Codex-owned runtime behavior.
 - Codex owns model sampling, generic tool execution, tool-result re-entry,
@@ -214,6 +264,7 @@ Patch-time contract:
   changes.
 
 Agent expectations for readiness loop:
+
 - Run contract battery + variety battery and report probability scorecard.
 - Treat Casimir verification as a hard gate for completion claims only when the
   patch touches its verification scope: warp/GR, adapter, constraint-pack,
@@ -221,6 +272,7 @@ Agent expectations for readiness loop:
 - Include prompt/output/verdict evidence for representative pass and fail cases.
 
 Mission-control expectations:
+
 - Keep voice certainty no stronger than text certainty.
 - Favor event-driven low-noise callouts over long narration.
 - Preserve deterministic error/fail reasons for replay and operator trust.

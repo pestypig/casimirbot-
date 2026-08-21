@@ -282,6 +282,26 @@ const minecraftActorStatusOutputSchema: HelixEnvironmentConstrainedJsonSchema =
         description:
           "Measured Minecraft view pitch in degrees; increasing values look down.",
       },
+      looked_at_block: {
+        type: "object",
+        description:
+          "Fresh read-only block focus measured from the actor's current view. Use aim_position for an evidence-grounded look_at position before a later looked_at_block interaction; movement or camera changes invalidate this focus.",
+        properties: {
+          block_id: { type: "string", maxLength: 160 },
+          position: minecraftBlockPositionSchema,
+          aim_position: minecraftPositionSchema,
+          distance_blocks: { type: "number", minimum: 0, maximum: 6 },
+          within_interaction_range: { type: "boolean" },
+        },
+        required: [
+          "block_id",
+          "position",
+          "aim_position",
+          "distance_blocks",
+          "within_interaction_range",
+        ],
+        additionalProperties: false,
+      },
       status_flags: {
         type: "array",
         maxItems: 32,
@@ -718,6 +738,25 @@ const minecraftSpatialRegionOutputSchema: HelixEnvironmentConstrainedJsonSchema 
           "absolute_xyz_verbose_v1",
         ],
       },
+      block_position_samples: {
+        type: "array",
+        maxItems: 32,
+        items: {
+          type: "object",
+          properties: {
+            block: { type: "string", minLength: 1, maxLength: 160 },
+            total_count: { type: "integer", minimum: 1, maximum: 10_000 },
+            positions: {
+              type: "array",
+              minItems: 1,
+              maxItems: 8,
+              items: minecraftPositionSchema,
+            },
+          },
+          required: ["block", "total_count", "positions"],
+          additionalProperties: false,
+        },
+      },
       columns: {
         type: "array",
         maxItems: 225,
@@ -1047,6 +1086,7 @@ const minecraftSpatialRegionOutputSchema: HelixEnvironmentConstrainedJsonSchema 
       "palette_complete",
       "omitted_palette_block_types",
       "column_encoding",
+      "block_position_samples",
       "columns",
       "columns_complete",
       "retained_column_count",
@@ -2151,6 +2191,8 @@ const minecraftFluidSequenceInputSchema: HelixEnvironmentConstrainedJsonSchema =
       max_total_ticks: { type: "integer", minimum: 1, maximum: 36_000 },
       required_checkpoint_ids: {
         type: "array",
+        description:
+          "Each value must equal the checkpoint_id field of a reachable checkpoint node exactly; values are not node_id references or descriptive labels.",
         maxItems: 64,
         items: { type: "string", minLength: 1, maxLength: 160 },
       },

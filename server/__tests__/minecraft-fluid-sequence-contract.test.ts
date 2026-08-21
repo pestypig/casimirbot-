@@ -95,6 +95,40 @@ describe("Minecraft fluid sequence contract", () => {
       });
   });
 
+  it("keeps inventory mutation admission independent from world mutation", () => {
+    const candidate = validSequence();
+    candidate.mutation_scope.max_inventory_transfers = 4;
+    const hotbar = candidate.nodes.find(
+      (node) => node.node_id === "node:hotbar",
+    )!;
+    hotbar.on_success = "node:craft";
+    candidate.nodes.splice(candidate.nodes.length - 2, 0, {
+      node_id: "node:craft",
+      node_kind: "workflow_action" as const,
+      earliest_tick: 6,
+      timeout_ticks: 40,
+      action: {
+        action_kind: "craft" as const,
+        output_item_id: "minecraft:oak_planks",
+        count: 4,
+        recipe_id: null,
+      },
+      on_success: "node:succeeded",
+      on_failure: "node:failed",
+    } as never);
+
+    expect(
+      helixMinecraftFluidSequenceArgumentsSchema.safeParse(candidate).success,
+    ).toBe(true);
+    expect(candidate.mutation_scope).toMatchObject({
+      world_mutation_allowed: false,
+      max_block_mutations: 0,
+      max_inventory_transfers: 4,
+      allowed_block_ids: [],
+      allowed_regions: [],
+    });
+  });
+
   it("defines future rulesets without admitting them through Player Embodiment", () => {
     const candidate = validSequence();
     candidate.ruleset = "command_assisted_sandbox" as never;

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-20T14:24:51.313Z",
-  "registryCount": 316,
+  "generatedAt": "2026-08-21T13:56:09.609Z",
+  "registryCount": 318,
   "coverage": {
     "exploratory": {
       "count": 23,
@@ -81,7 +81,7 @@
       ]
     },
     "diagnostic": {
-      "count": 241,
+      "count": 243,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -191,6 +191,8 @@
         "server/services/theory/nhm2-semiclassical-v2-pair-coordinator.ts",
         "shared/contracts/nhm2-prediction-falsifier-freeze.v1.ts",
         "shared/contracts/nhm2-numerical-observable-prediction.v1.ts",
+        "shared/contracts/nhm2-tile-cycle-energy-ledger.v1.ts",
+        "shared/nhm2-casimir-cycle-work.ts",
         "shared/contracts/nhm2-full-apparatus-source-tensor.v1.ts",
         "shared/contracts/nhm2-covariant-conservation.v1.ts",
         "shared/contracts/nhm2-dynamic-backreaction-stability-causality.v1.ts",
@@ -412,7 +414,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 316,
+    "entriesWithUnits": 318,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -426,8 +428,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 241,
-        "withUnits": 241,
+        "total": 243,
+        "withUnits": 243,
         "missing": []
       },
       "certified": {
@@ -450,8 +452,8 @@
     ]
   },
   "autoGraph": {
-    "nodeCount": 3162,
-    "edgeCount": 7562
+    "nodeCount": 3169,
+    "edgeCount": 7580
   },
   "evidenceProfiles": [
     {

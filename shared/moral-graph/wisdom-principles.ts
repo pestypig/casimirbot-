@@ -592,6 +592,69 @@ export const MORAL_WISDOM_PRINCIPLES: readonly MoralWisdomPrinciple[] = [
     refusesAuthority: ["permanent_reject_identity", "opaque_denial", "unappealable_score", "stale_record_exclusion"],
     tags: ["trust", "threshold", "appeal", "repair", "reentry", "due_process", "action_gate"],
   },
+  {
+    id: "transformation-window-stewardship",
+    sourceIdeologyNodeId: "transformation-window-stewardship",
+    label: "Transformation-Window Stewardship",
+    glyph: "W",
+    summary: "Preserve enabling conditions long enough for a worthwhile transformation to finish, then review the result.",
+    proceduralRole: "balancer",
+    procedureOperator: "balances",
+    proceduralRule:
+      "Compare the estimated support window with the transformation window before assigning failure or increasing commitment.",
+    traceBehavior:
+      "Trace the transformation goal, completion estimate, support duration, interruption risks, checkpoints, and renewal or exit trigger.",
+    actionEffect:
+      "Extend support, improve the environment, stage the work, or stop with a documented reason when the available window is mismatched.",
+    evidenceNeeds: [
+      "transformation_goal",
+      "estimated_completion_window",
+      "support_window",
+      "environmental_conditions",
+      "interruption_risks",
+    ],
+    refusesAuthority: [
+      "biological_persistence_as_moral_worth",
+      "fitness_as_human_rank",
+      "heredity_as_authority",
+      "noncompletion_as_character_verdict",
+      "unreplicated_physics_as_policy",
+    ],
+    tags: ["stewardship", "tempo", "support_window", "environment", "non-harm", "analogy_boundary"],
+  },
+  {
+    id: "love-without-projection",
+    sourceIdeologyNodeId: "love-without-projection",
+    label: "Love Without Projection",
+    glyph: "L",
+    summary: "Withhold premature assumptions, not care, so love can answer to what is actually present.",
+    proceduralRole: "constraint",
+    procedureOperator: "constrains",
+    proceduralRule:
+      "Separate observation, assumption, desire, fear, and care before treating affection as understanding, reciprocity, or consent.",
+    traceBehavior:
+      "Trace observed context, named assumptions, desire or fear projections, affected agency, consent boundaries, caring commitments, and revision triggers.",
+    actionEffect:
+      "Preserve compassionate attention while downgrading projected certainty and keeping the subject free to contradict the preferred interpretation.",
+    evidenceNeeds: [
+      "observed_context",
+      "named_assumptions",
+      "desire_or_fear_projection",
+      "affected_agency",
+      "consent_boundaries",
+      "revision_trigger",
+    ],
+    refusesAuthority: [
+      "love_as_proof",
+      "projection_as_understanding",
+      "affection_as_consent",
+      "care_as_possession",
+      "uncertainty_as_indifference",
+      "emotional_withholding_as_wisdom",
+      "open_mindedness_as_avoidance",
+    ],
+    tags: ["inner_practice", "not_knowing", "love", "compassion", "non-attachment", "projection", "agency", "consent"],
+  },
   ...CIVIC_ORDER_MORAL_PRINCIPLES,
   ...PROVISIONING_MORAL_PRINCIPLES,
 ] as const;

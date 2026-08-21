@@ -394,6 +394,101 @@ describe("compound prompt coverage gate", () => {
     expect(result.unresolved_requirement_ids).toContain("R2");
   });
 
+  it("does not count requirements listed under a not-yet-completed heading as answered", () => {
+    const contract = contractWith(["R1", "R2", "R3", "R4"]);
+    contract.requirements = [
+      {
+        ...contract.requirements[0],
+        text: "Inspect the current player state.",
+      },
+      {
+        ...contract.requirements[1],
+        text: "Interact with the verified reachable target.",
+      },
+      {
+        ...contract.requirements[2],
+        text: "Equip the stick and craft four oak planks.",
+      },
+      {
+        ...contract.requirements[3],
+        text: "Verify every checkpoint and release all controls.",
+      },
+    ];
+    const result = evaluateCompoundPromptCoverageGate({
+      contract,
+      finalAnswerText: [
+        "Current turn is only partially complete.",
+        "Completed:",
+        "- Inspected the current player state.",
+        "Not yet completed:",
+        "- Interact with the verified reachable target.",
+        "- Equip the stick and craft four oak planks.",
+        "- Verify every checkpoint and release all controls.",
+      ].join("\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R1")?.status).toBe("answered");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R2")?.status).toBe("blocked_with_reason");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R3")?.status).toBe("blocked_with_reason");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R4")?.status).toBe("blocked_with_reason");
+    expect(result.unresolved_requirement_ids).toEqual(["R2", "R3", "R4"]);
+  });
+
+  it("does not count requirements listed under a not-confirmed heading as answered", () => {
+    const contract = contractWith(["R1", "R2", "R3", "R4"]);
+    contract.requirements = [
+      { ...contract.requirements[0], text: "Execute the bounded jump." },
+      { ...contract.requirements[1], text: "Perform the bounded sprint step." },
+      { ...contract.requirements[2], text: "Interact with the verified reachable target." },
+      { ...contract.requirements[3], text: "Equip the stick and craft four oak planks." },
+    ];
+    const result = evaluateCompoundPromptCoverageGate({
+      contract,
+      finalAnswerText: [
+        "The bounded jump was executed.",
+        "What is not confirmed in the available evidence:",
+        "- The bounded sprint step.",
+        "- The verified reachable target interaction.",
+        "- Equipping the stick and crafting four oak planks.",
+      ].join("\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R1")?.status).toBe("answered");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R2")?.status).toBe("blocked_with_reason");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R3")?.status).toBe("blocked_with_reason");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R4")?.status).toBe("blocked_with_reason");
+    expect(result.unresolved_requirement_ids).toEqual(["R2", "R3", "R4"]);
+  });
+
+  it("does not count requirements listed under a not-evidenced heading as answered", () => {
+    const contract = contractWith(["R1", "R2"]);
+    contract.requirements = [
+      { ...contract.requirements[0], text: "Craft four oak planks." },
+      { ...contract.requirements[1], text: "Equip the stick and interact with the reachable target." },
+    ];
+    const result = evaluateCompoundPromptCoverageGate({
+      contract,
+      finalAnswerText: [
+        "Four oak planks were crafted and verified in inventory.",
+        "What is not evidenced in the current turn:",
+        "- equipping the stick and interacting with the reachable target",
+      ].join("\n"),
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "agent_provider_terminal_candidate",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R1")?.status).toBe("answered");
+    expect(result.resolutions.find((entry) => entry.requirement_id === "R2")?.status).toBe("blocked_with_reason");
+    expect(result.unresolved_requirement_ids).toEqual(["R2"]);
+  });
+
   it("rejects the exact live restore-and-verify evidence disclaimer", () => {
     const result = evaluateCompoundPromptCoverageGate({
       contract: {

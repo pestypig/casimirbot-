@@ -205,6 +205,17 @@ Browser, DAW, CAD, generic server and physical-device adapters in this table are
 product projections unless a separate adapter contract and acceptance artifact
 says otherwise.
 
+Minecraft may eventually offer two separately governed embodiments. A
+`player_proxy` acts through the selected user's player body; an optional
+`companion_entity` is a distinct in-world assistant that may follow, hold,
+look, scout within an admitted nearby envelope, or speak from its own measured
+location without taking over the player. The companion remains projected until
+the deterministic guardian, generic resident-controller contract, separate
+actor identity, finite presence/effect lease, bounded chunk policy, local
+arbiter and clean-room live acceptance all pass their scheduled gates.
+Its complete projected lifecycle and acceptance contract is
+`docs/architecture/helix-minecraft-companion-embodiment-v1.md`.
+
 ## Autonomy follows consequence
 
 The harness should not use one autonomy setting for every capability:

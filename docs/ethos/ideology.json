@@ -644,7 +644,8 @@
         "inherited-conditioning-check",
         "rumination-to-practice",
         "spiritual-friendship-mirror",
-        "comparison-pressure-and-equanimity"
+        "comparison-pressure-and-equanimity",
+        "love-without-projection"
       ],
       "links": [
         {
@@ -662,6 +663,10 @@
         {
           "rel": "see-also",
           "to": "direct-observation-before-claim"
+        },
+        {
+          "rel": "child",
+          "to": "love-without-projection"
         }
       ],
       "summary": "Treat identity language as a provisional lens, not a fixed verdict.",
@@ -670,6 +675,126 @@
         "move": "Restate the claim as observations, choices, and present practice conditions.",
         "missingCheck": "What current observable behavior supports or revises this identity language?",
         "antiPattern": "Treating identity language as a final character verdict."
+      }
+    },
+    {
+      "id": "love-without-projection",
+      "slug": "love-without-projection",
+      "title": "Love Without Projection",
+      "excerpt": "Withhold premature assumptions, not care: let love respond to what is present rather than what imagination demands.",
+      "bodyMD": "Handling the unknown requires two disciplines at once: suspend the assumption that we already know what nature, another person, or a relationship must be, and keep care available while understanding forms. An open mind is not an empty heart. It protects love from being forced to validate a prior image.\n\nHere, the reservation of love means preserving love's freedom from projection, possession, fear, or demanded certainty. It does not mean withholding affection, avoiding commitment, or remaining indifferent. Love becomes more truthful when it can answer to observation, affected agency, consent, and revision rather than to an imposed story.\n\nProcedural rule: separate observation, assumption, desire, fear, and care before defining the subject or relationship. Name what is actually present, what is inferred, what is hoped for, and what the other party has freely expressed. Keep compassionate attention active while allowing the view to change.\n\nAnti-patterns: projecting an ideal and calling attachment to that image love; treating affection as consent or proof; using uncertainty as emotional distance; or using open-mindedness to avoid responsibility and repair.\n\nMinimal artifact: Unpresumed Regard Note with observations, named assumptions, desire/fear projections, affected agency, consent boundaries, caring commitments, and revision triggers.\n\nSee [[node:direct-observation-before-claim]], [[node:identity-view-and-non-attachment]], [[node:non-harm-and-compassionate-constraint]], [[node:spiritual-friendship-mirror]], [[node:skillful-action-under-uncertainty]], and [[node:beginners-mind]].",
+      "tags": [
+        "inner_practice",
+        "not_knowing",
+        "open_mind",
+        "love",
+        "compassion",
+        "non-attachment",
+        "projection",
+        "agency",
+        "consent",
+        "revision"
+      ],
+      "aliases": [
+        "unpresumed regard",
+        "reservation of love",
+        "love free from projection",
+        "love without assumptions",
+        "approach nature without assumption",
+        "open mind upon yourself",
+        "handling the unknown"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "see-also",
+          "to": "direct-observation-before-claim"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "spiritual-friendship-mirror"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-action-under-uncertainty"
+        },
+        {
+          "rel": "see-also",
+          "to": "beginners-mind"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Preserve compassionate attention while suspending projection, so care can respond to observed reality and freely expressed agency.",
+      "nodeType": "concept",
+      "inputs": [
+        "observed_context",
+        "named_assumptions",
+        "desire_or_fear_projection",
+        "affected_agency",
+        "consent_boundaries",
+        "caring_commitment"
+      ],
+      "outputs": [
+        "projection_separated_from_observation",
+        "agency_preserving_care",
+        "revision_trigger"
+      ],
+      "assumptions": [
+        "Care does not establish factual certainty, consent, reciprocity, or moral approval.",
+        "Suspending assumptions does not suspend non-harm, responsibility, or repair obligations.",
+        "The subject remains free to contradict the observer's preferred interpretation."
+      ],
+      "validity": {
+        "claim_tier": "diagnostic",
+        "requires_user_confirmation": true,
+        "avoid_character_judgment": true
+      },
+      "deterministic": false,
+      "tolerance": null,
+      "environment": "Applies when uncertainty, affection, identity, nature, relationship, or aspiration could invite projection or emotional withdrawal.",
+      "dependencies": [
+        "identity-view-and-non-attachment",
+        "direct-observation-before-claim",
+        "non-harm-and-compassionate-constraint"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "love-without-projection"
+        },
+        {
+          "type": "code",
+          "path": "shared/moral-graph/wisdom-principles.ts"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "another_persons_unexpressed_inner_state",
+          "unverified_reciprocity",
+          "future_relationship_outcome"
+        ]
+      },
+      "proceduralLanguage": {
+        "pattern": "The unknown is being filled with an ideal, fear, fixed identity, or desired story while that projection is treated as love or understanding.",
+        "move": "Separate observation, assumption, desire, fear, and care; preserve compassion while leaving the interpretation revisable.",
+        "missingCheck": "What is actually observed, what has the affected party freely expressed, and what part of the view belongs to the observer's hope or fear?",
+        "antiPattern": "Withholding care in the name of openness, or using love, affection, or projection as proof, consent, possession, or a character verdict."
       }
     },
     {
@@ -3309,7 +3434,8 @@
         "stewardship"
       ],
       "children": [
-        "citizens-arc-convergence-compact"
+        "citizens-arc-convergence-compact",
+        "transformation-window-stewardship"
       ],
       "links": [
         {
@@ -3391,6 +3517,10 @@
         {
           "rel": "child",
           "to": "citizens-arc-convergence-compact"
+        },
+        {
+          "rel": "child",
+          "to": "transformation-window-stewardship"
         }
       ],
       "summary": "Additional conclusions from maturation under constraint, mapped to existing ideology rails.",
@@ -3460,6 +3590,126 @@
           "deterministic",
           "tolerance",
           "environment"
+        ]
+      }
+    },
+    {
+      "id": "transformation-window-stewardship",
+      "slug": "transformation-window-stewardship",
+      "title": "Transformation-Window Stewardship",
+      "excerpt": "Preserve enabling conditions long enough for a worthwhile transformation to finish, then review what the completed change actually produced.",
+      "bodyMD": "A valuable transformation can fail because its support window collapses before the work can finish. Stewardship therefore asks whether the person, process, or institution has a stable enough environment and realistic enough cadence to complete the intended change.\n\nProcedural rule: identify the transformation, estimate the support and completion windows, name interruption risks, and choose among extending support, improving the environment, dividing the work into survivable stages, or stopping with a documented reason. If either timescale is unknown, gather evidence instead of assigning blame or declaring impossibility.\n\nThis is an analogy-guided practice, not a biological ranking rule. Natural selection describes persistence under conditions; it does not establish moral worth. Heredity, fitness, coherence, survival, or dominance must never be used to justify caste, eugenics, obedience, coercion, or entitlement to authority. Selection signals in moral systems must evidence service, agency, repair, and non-harm.\n\nAnti-pattern: repeatedly disrupting a recovery, reform, education, trust-repair, or research process and then treating non-completion as proof that the subject or idea lacked merit.\n\nMinimal artifact: Transformation Window Card naming the intended change, estimated completion window, required environmental supports, interruption risks, checkpoints, and renewal or exit criteria.\n\nSee [[node:right-effort-loop]], [[node:interdependence-yin-yang-balance]], [[node:impermanence-entropy-and-revision]], [[node:skillful-action-under-uncertainty]], [[node:non-harm-and-compassionate-constraint]], and [[node:falsifiability-and-truth-convergence]].",
+      "tags": [
+        "stewardship",
+        "tempo",
+        "timing",
+        "support_window",
+        "environment",
+        "transformation",
+        "non-harm",
+        "review",
+        "analogy_boundary"
+      ],
+      "aliases": [
+        "coherence-window stewardship",
+        "transformation window",
+        "support window",
+        "tempo-environment fit",
+        "finish within the support window",
+        "environment before blame"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "citizens-arc-derived-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-effort-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "interdependence-yin-yang-balance"
+        },
+        {
+          "rel": "see-also",
+          "to": "impermanence-entropy-and-revision"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-action-under-uncertainty"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "falsifiability-and-truth-convergence"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        },
+        {
+          "kind": "repo_module",
+          "title": "Evolutionary Biophysics Theory Badges",
+          "path": "shared/theory/evolutionary-biophysics-theory-badges.ts"
+        }
+      ],
+      "summary": "Match the duration and environment of support to the transformation being asked for, without confusing biological persistence with moral worth.",
+      "nodeType": "concept",
+      "inputs": [
+        "transformation_goal",
+        "estimated_completion_window",
+        "support_window",
+        "environmental_conditions",
+        "interruption_risks"
+      ],
+      "outputs": [
+        "support_adjustment",
+        "staged_transformation_plan",
+        "review_or_exit_trigger"
+      ],
+      "assumptions": [
+        "The intended transformation is independently justified as worthwhile and non-harmful.",
+        "Timescale comparisons remain estimates unless supported by observation.",
+        "Biological selection and persistence do not confer moral status or authority."
+      ],
+      "validity": {
+        "claim_tier": "diagnostic",
+        "relation": "analogy_only",
+        "requires_independent_replication_for_physical_claim": true
+      },
+      "deterministic": false,
+      "tolerance": null,
+      "environment": "Applies to recovery, learning, institutional reform, trust repair, research incubation, and other time-bounded transformations.",
+      "dependencies": [
+        "citizens-arc-derived-principles",
+        "non-harm-and-compassionate-constraint",
+        "falsifiability-and-truth-convergence"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "contains": "transformation-window-stewardship"
+        },
+        {
+          "type": "code",
+          "path": "shared/theory-ideology/bridge-mappings.ts"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "validated_cross-domain_timescale_measure",
+          "replicated_physical_mechanism",
+          "outcome-specific_harm_evidence"
         ]
       }
     },

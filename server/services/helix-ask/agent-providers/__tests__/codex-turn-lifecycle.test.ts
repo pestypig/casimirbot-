@@ -20,6 +20,29 @@ const gatewayResult = (capabilityId: string, index: number) => ({
 }) as any;
 
 describe("Codex provider outer turn lifecycle", () => {
+  it("preserves the provider candidate identity when Helix later presents a typed failure", () => {
+    const providerMessageSha256 = "a".repeat(64);
+    const lifecycle = buildCodexProviderTurnLifecycle({
+      turnId: "ask:test:provider-message-identity",
+      gatewayCallResults: [],
+      providerReasoningReentry: {
+        observation_reentered: false,
+        evidence_reentered: false,
+      },
+      providerText: "A later Helix typed-failure presentation.",
+      providerMessageSha256,
+      terminalArtifactKind: "typed_failure",
+      terminalEligible: true,
+      ok: false,
+    });
+
+    expect(
+      lifecycle.events.find(
+        (event) => event.kind === "agent.message.completed",
+      )?.message_sha256,
+    ).toBe(providerMessageSha256);
+  });
+
   it("materializes runtime facts before terminal authority without inventing a terminal outcome", () => {
     const lifecycle = buildCodexProviderTurnLifecycle({
       turnId: "ask:test:pre-terminal",

@@ -45,6 +45,7 @@ public final class ConnectorPairingClient implements AutoCloseable {
         String domainAdapter,
         Map<String, Object> commandConfig,
         Map<String, Object> actionConfig,
+        Map<String, Object> interactionConfig,
         boolean commandOnly,
         boolean actionOnly,
         boolean replayed
@@ -160,6 +161,9 @@ public final class ConnectorPairingClient implements AutoCloseable {
         Map<String, Object> actionConfig = config.get("action") instanceof Map<?, ?>
             ? new LinkedHashMap<>(HelixJson.asObject(config.get("action")))
             : Map.of();
+        Map<String, Object> interactionConfig = config.get("interaction") instanceof Map<?, ?>
+            ? new LinkedHashMap<>(HelixJson.asObject(config.get("interaction")))
+            : Map.of();
         boolean sourceIdentityInvalid =
             !domainAdapter.trim().equals(returnedAdapter) ||
             !HelixSensorConfig.secureEndpointAllowed(returnedPairingEndpoint) ||
@@ -192,9 +196,18 @@ public final class ConnectorPairingClient implements AutoCloseable {
             worldId,
             returnedAdapter
         );
+        validateInteractionConfig(
+            interactionConfig,
+            actionConfig,
+            sourceId,
+            roomId,
+            worldId
+        );
         if (
             (actionOnly && actionConfig.isEmpty()) ||
+            (actionOnly && interactionConfig.isEmpty()) ||
             (!actionOnly && !actionConfig.isEmpty()) ||
+            (!actionOnly && !interactionConfig.isEmpty()) ||
             (commandOnly && commandConfig.isEmpty()) ||
             (actionOnly && commandOnly)
         ) {
@@ -214,10 +227,40 @@ public final class ConnectorPairingClient implements AutoCloseable {
             returnedAdapter,
             Map.copyOf(commandConfig),
             Map.copyOf(actionConfig),
+            Map.copyOf(interactionConfig),
             commandOnly,
             actionOnly,
             Boolean.TRUE.equals(body.get("replayed"))
         );
+    }
+
+    private static void validateInteractionConfig(
+        Map<String, Object> interaction,
+        Map<String, Object> action,
+        String sourceId,
+        String roomId,
+        String worldId
+    ) throws PairingException {
+        if (interaction.isEmpty()) return;
+        boolean valid =
+            "helix.environment_interaction.config.v1".equals(string(interaction, "schema")) &&
+            HelixSensorConfig.secureEndpointAllowed(string(interaction, "endpoint")) &&
+            string(interaction, "bearer_token").matches("^helix_env_interact_[a-zA-Z0-9_-]{43,96}$") &&
+            roomId.equals(string(interaction, "room_id")) &&
+            sourceId.equals(string(interaction, "source_id")) &&
+            worldId.equals(string(interaction, "world_id")) &&
+            string(action, "action_authority_id").equals(string(interaction, "action_authority_id")) &&
+            string(action, "connector_installation_id").equals(string(interaction, "connector_installation_id")) &&
+            string(action, "participant_id").equals(string(interaction, "participant_id")) &&
+            string(action, "subject_binding_id").equals(string(interaction, "subject_binding_id")) &&
+            string(action, "subject_native_id").equals(string(interaction, "subject_native_id"));
+        if (!valid) {
+            throw new PairingException(
+                "connector_pairing_response_invalid",
+                502,
+                "Helix returned a mismatched or unsafe interaction configuration."
+            );
+        }
     }
 
     private static void validateActionConfig(

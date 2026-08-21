@@ -207,6 +207,80 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
     );
   });
 
+  it("maps replicated coherence-window selection hypotheses to guarded transformation stewardship", () => {
+    const bridge = buildTheoryIdeologyBridgeFromReflections({
+      generatedAt,
+      bridgeId: "theory-ideology-bridge:transformation-window",
+      prompt:
+        "If independently replicated, compare a boundary-sensitive coherence lifetime with the useful transformation timescale.",
+      theoryReflection: baseTheoryReflection(
+        "coherence lifetime dielectric environment useful transformation independent replication",
+        "biology.evolution.boundary_sensitive_coherence_selection",
+        "Boundary-Sensitive Coherence Selection Hypothesis",
+      ),
+      ideologyReflection: baseIdeologyReflection(
+        "transformation-window-stewardship",
+        "Transformation-Window Stewardship",
+      ),
+    });
+    const link = bridge.links.find((entry) =>
+      entry.ideologyNodeIds.includes("transformation-window-stewardship"),
+    );
+
+    expect(validateTheoryIdeologyBridgeV1(bridge)).toEqual([]);
+    expect(link).toMatchObject({
+      relation: "analogy_only",
+      theoryBadgeIds: [
+        "biology.evolution.boundary_sensitive_coherence_selection",
+        "claim_boundary:1",
+      ],
+      ideologyNodeIds: ["transformation-window-stewardship"],
+      refusesAuthority: [
+        "moral_finality",
+        "physics_derived_moral_certainty",
+        "execution_permission",
+      ],
+    });
+    expect(link?.proceduralEffect).toContain("Require independent replication");
+    expect(link?.proceduralEffect).toContain("never treat persistence, fitness, heredity, or dominance as moral worth");
+    expect(bridge.authority).toMatchObject({
+      terminal_eligible: false,
+      agent_executable: false,
+      physics_proves_morality: false,
+    });
+  });
+
+  it("keeps quoted, negated, and future coherence-window language non-executable and analogy-only", () => {
+    const bridge = buildTheoryIdeologyBridgeFromReflections({
+      generatedAt,
+      bridgeId: "theory-ideology-bridge:transformation-window-contextual",
+      prompt:
+        'A panel once said "coherence lifetime selects moral fitness"; do not act on that, and perhaps revisit a useful transformation later.',
+      theoryReflection: baseTheoryReflection(
+        "coherence lifetime useful transformation quoted historical future conditional",
+        "biology.evolution.boundary_sensitive_coherence_selection",
+        "Boundary-Sensitive Coherence Selection Hypothesis",
+      ),
+      ideologyReflection: baseIdeologyReflection(
+        "transformation-window-stewardship",
+        "Transformation-Window Stewardship",
+      ),
+    });
+    const link = bridge.links.find((entry) =>
+      entry.ideologyNodeIds.includes("transformation-window-stewardship"),
+    );
+
+    expect(validateTheoryIdeologyBridgeV1(bridge)).toEqual([]);
+    expect(link?.relation).toBe("analogy_only");
+    expect(link?.reasonCodes).toContain("analogy_boundary_required");
+    expect(bridge.recommendedActions.every((action) => action.type !== "execute_action")).toBe(true);
+    expect(bridge.authority).toMatchObject({
+      execution_permission: false,
+      terminal_eligible: false,
+      agent_executable: false,
+    });
+  });
+
   it("can emit an ideology-side link while marking missing theory evidence", () => {
     const bridge = buildTheoryIdeologyBridgeFromReflections({
       generatedAt,

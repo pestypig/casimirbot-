@@ -25,6 +25,8 @@ export type BoundedProviderContinuationResult<TResult, TRequest, TObservation> =
   pending_request: TRequest | null;
   terminal_reviewed: boolean;
   terminal_review_count: number;
+  max_terminal_reviews: number;
+  terminal_review_limit_exhausted: boolean;
 };
 
 /**
@@ -113,6 +115,8 @@ export const runBoundedProviderSelectedContinuation = async <
         pending_request: input.requestFromResult(result),
         terminal_reviewed: terminalReviewCount > 0,
         terminal_review_count: terminalReviewCount,
+        max_terminal_reviews: maxTerminalReviews,
+        terminal_review_limit_exhausted: false,
       };
     }
 
@@ -140,6 +144,10 @@ export const runBoundedProviderSelectedContinuation = async <
         pending_request: null,
         terminal_reviewed: terminalReviewCount > 0,
         terminal_review_count: terminalReviewCount,
+        max_terminal_reviews: maxTerminalReviews,
+        terminal_review_limit_exhausted:
+          maxTerminalReviews > 0 &&
+          terminalReviewsSinceProgress >= maxTerminalReviews,
       };
     }
 
@@ -173,6 +181,8 @@ export const runBoundedProviderSelectedContinuation = async <
         pending_request: request,
         terminal_reviewed: terminalReviewCount > 0,
         terminal_review_count: terminalReviewCount,
+        max_terminal_reviews: maxTerminalReviews,
+        terminal_review_limit_exhausted: false,
       };
     }
     if (!(await input.admitRequest(request, iteration))) {
@@ -204,6 +214,8 @@ export const runBoundedProviderSelectedContinuation = async <
         pending_request: request,
         terminal_reviewed: terminalReviewCount > 0,
         terminal_review_count: terminalReviewCount,
+        max_terminal_reviews: maxTerminalReviews,
+        terminal_review_limit_exhausted: false,
       };
     }
 
@@ -227,5 +239,10 @@ export const runBoundedProviderSelectedContinuation = async <
     pending_request: pendingRequest,
     terminal_reviewed: terminalReviewCount > 0,
     terminal_review_count: terminalReviewCount,
+    max_terminal_reviews: maxTerminalReviews,
+    terminal_review_limit_exhausted:
+      !pendingRequest &&
+      maxTerminalReviews > 0 &&
+      terminalReviewsSinceProgress >= maxTerminalReviews,
   };
 };

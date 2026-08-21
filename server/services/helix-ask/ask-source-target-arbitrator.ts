@@ -835,7 +835,10 @@ export function arbitrateAskSourceTarget(input: {
   // mixed request; they must not replace the environment action itself.
   if (
     isMinecraftMechanicsDocsPrompt(prompt) &&
-    !isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)
+    !isAffirmativeMinecraftPlayerEmbodimentActionPrompt(
+      prompt,
+      input.trustedEnvironmentContext,
+    )
   ) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -870,7 +873,12 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)) {
+  if (
+    isAffirmativeMinecraftPlayerEmbodimentActionPrompt(
+      prompt,
+      input.trustedEnvironmentContext,
+    )
+  ) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,

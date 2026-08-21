@@ -1851,6 +1851,87 @@ describe("agent continuation state", () => {
     });
   });
 
+  it("does not advertise a retry after the bounded provider continuation exhausted its hard step budget", () => {
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: ["R3", "R4"],
+      },
+      runtime_lane_request_loop: {
+        generic_provider_continuation: {
+          schema: "helix.generic_provider_selected_continuation.v1",
+          max_steps: 12,
+          step_count: 10,
+          stop_reason: "budget_exhausted",
+          pending_request: {
+            capability_id: "com.casimirbot.minecraft.player.sequence.execute",
+          },
+        },
+      },
+      current_turn_artifact_ledger: [],
+    };
+    const rejection = buildHelixTerminalRejectionObservation({
+      turnId: "ask:continuation",
+      candidateKind: "direct_answer_text",
+      reason: "solver_continuation_pending",
+    });
+    const state = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:continuation",
+      trigger: "terminal_rejection",
+      lastAttempt: rejection,
+    });
+
+    expect(state.budget.hard).toMatchObject({
+      exhausted: true,
+      tool_calls: { max: 12, consumed: 12, remaining: 0 },
+    });
+    expect(state.allowed_decisions).toContain("fail");
+    expect(state.allowed_decisions).not.toContain("retry");
+    expect(state.progress.reason_codes).toContain(
+      "hard_resource_boundary_exhausted",
+    );
+  });
+
+  it("does not advertise a retry after the provider exhausted bounded terminal repair reviews", () => {
+    const state = buildHelixAgentContinuationState({
+      payload: {
+        goal_satisfaction_evaluation: {
+          satisfaction: "unsatisfied",
+          missing_requirement_ids: ["R3", "R4"],
+        },
+        runtime_lane_request_loop: {
+          generic_provider_continuation: {
+            schema: "helix.generic_provider_selected_continuation.v1",
+            max_steps: 12,
+            step_count: 10,
+            stop_reason: "no_next_request",
+            pending_request: null,
+            terminal_reviewed: true,
+            terminal_review_count: 6,
+            max_terminal_reviews: 2,
+            terminal_review_limit_exhausted: true,
+          },
+        },
+        current_turn_artifact_ledger: [],
+      },
+      turnId: "ask:continuation",
+      trigger: "terminal_rejection",
+      lastAttempt: buildHelixTerminalRejectionObservation({
+        turnId: "ask:continuation",
+        candidateKind: "direct_answer_text",
+        reason: "solver_continuation_pending",
+      }),
+    });
+
+    expect(state.budget.hard.exhausted).toBe(true);
+    expect(state.allowed_decisions).toContain("fail");
+    expect(state.allowed_decisions).not.toContain("retry");
+    expect(state.progress.reason_codes).toContain(
+      "hard_resource_boundary_exhausted",
+    );
+  });
+
   it("mirrors an authorized provider route product as terminal-product allowed", () => {
     const state = buildHelixAgentContinuationState({
       payload: {

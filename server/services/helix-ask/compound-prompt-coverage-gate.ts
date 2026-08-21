@@ -185,7 +185,7 @@ const visibleNonCompletionForRequirement = (
     .map((segment) => segment.replace(/\s+/g, " ").trim())
     .filter(Boolean);
   const nonCompletionPattern =
-    /\b(?:cannot|can't|could not|couldn't|unable to|do not have|don't have|did not|didn't|not completed|not complete|not performed|not executed|not verified|not available|missing|remains? (?:unfinished|unresolved|incomplete))\b/i;
+    /\b(?:cannot|can't|could not|couldn't|unable to|do not have|don't have|did not|didn't|(?:(?:not yet|still not|not)\s+(?:completed?|performed|executed|verified|confirmed|satisfied|resolved|available|done|observed|evidenced|supported|shown|demonstrated|established|proven))|un(?:confirmed|verified|resolved|finished|completed|proven)|missing|remains? (?:unfinished|unresolved|incomplete))\b/i;
   const mentionsKeyword = (segment: string, keyword: string): boolean => {
     const words = segment
       .toLowerCase()

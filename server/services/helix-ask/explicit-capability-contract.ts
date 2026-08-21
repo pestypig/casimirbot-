@@ -3270,6 +3270,7 @@ export type ExplicitCapabilityExtractionContext = {
    * participant subject.
    */
   trusted_environment_domain?: "minecraft" | null;
+  authorized_player_action_capability_ids?: string[];
 };
 
 /**
@@ -3294,7 +3295,20 @@ export const readTrustedRoomEnvironmentCapabilityExtractionContext = (
   ) {
     return null;
   }
-  return { trusted_environment_domain: "minecraft" };
+  const authorizedPlayerActionCapabilityIds = Array.isArray(
+    record.authorized_player_action_capability_ids,
+  )
+    ? record.authorized_player_action_capability_ids.filter(
+        (capabilityId): capabilityId is string =>
+          typeof capabilityId === "string" &&
+          capabilityId.startsWith("com.casimirbot.minecraft.player."),
+      )
+    : [];
+  return {
+    trusted_environment_domain: "minecraft",
+    authorized_player_action_capability_ids:
+      authorizedPlayerActionCapabilityIds,
+  };
 };
 
 const NATURAL_MINECRAFT_COMMAND_ACTION = String.raw`(?:make|create|build|construct|surround|enclose|give|grant|apply|remove|clear|summon|spawn|teleport|bring|move|kill|damage|heal|feed|equip|enchant|fill|replace|place|put|take|turn|set|change|toggle|enable|disable|start|stop|freeze|unfreeze|save|flush|kick|ban|pardon|whitelist|op|deop|show|display|title|message|say|play(?:ing)?|trigger|award|drop|locate|break|rescue|protect|arm|ignite|light|extinguish)`;
@@ -3322,7 +3336,8 @@ const naturalMinecraftCommandActionPromptMatch = (
   if (!hasMinecraftScope) return null;
   if (isMinecraftSituationSessionSetupPrompt(prompt)) return null;
   if (
-    resolveMinecraftExecutionPlaneConstraint(prompt) === "player_embodiment"
+    (resolveMinecraftExecutionPlaneConstraint(prompt) === "player_embodiment" ||
+      isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt, context))
   ) {
     return null;
   }

@@ -792,6 +792,15 @@ public final class PlayerActionController {
             HandObservation beforeAttempt = bridge.observeHand(hand);
             if (!bridge.interact(target, hand, interaction)) {
                 if (interactionAttemptCount >= INTERACTION_FOCUS_ACQUISITION_TICKS) {
+                    lastMeasurements = Map.of(
+                        "interaction_accepted", false,
+                        "target", target,
+                        "hand", hand,
+                        "interaction", interaction,
+                        "focus_acquisition_pending", true,
+                        "interaction_attempt_count", interactionAttemptCount,
+                        "post_interaction_observed", false
+                    );
                     throw new IllegalArgumentException(
                         "No compatible block or entity became available during the bounded focus acquisition window."
                     );

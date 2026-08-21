@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateIdeologyContextReflectionV1 } from "../../ideology-context-reflection";
 import type { IdeologyGraphDocument } from "../ideology-graph-types";
-import { buildIdeologyGraph } from "../load-ideology-graph";
+import { buildIdeologyGraph, loadIdeologyGraphFromFile } from "../load-ideology-graph";
 import { reflectIdeologyContext } from "../reflect-ideology-context";
 
 const graphDocument: IdeologyGraphDocument = {
@@ -165,5 +165,41 @@ describe("deterministic MoralGraph ideology reflection", () => {
     expect(reflection.claim_boundaries.missing_evidence).toEqual(
       expect.arrayContaining(["input_refs", "deterministic_ideology_lens_match"]),
     );
+  });
+
+  it("reflects not-knowing plus care as love without projection, never as relational authority", async () => {
+    const canonicalGraph = await loadIdeologyGraphFromFile();
+    const reflection = reflectIdeologyContext(canonicalGraph, {
+      kind: "user_prompt",
+      text:
+        "Handling the unknown means approaching nature without assumption. Wish an open mind upon yourself and preserve the reservation of love so it can be true.",
+      refs: ["turn:love-without-projection"],
+      generatedAt: "2026-08-20T00:00:00.000Z",
+      reflectionId: "ideology-reflection:love-without-projection",
+    });
+    const match = reflection.matches.exact.find(
+      (entry) => entry.nodeId === "love-without-projection",
+    );
+
+    expect(validateIdeologyContextReflectionV1(reflection)).toEqual([]);
+    expect(match).toMatchObject({
+      nodeId: "love-without-projection",
+      score: 0.9,
+      pathToRoot: [
+        "love-without-projection",
+        "identity-view-and-non-attachment",
+        "wisdom-first-principles",
+      ],
+    });
+    expect(reflection.claim_boundaries).toMatchObject({
+      diagnostic_only: true,
+      avoid_character_judgment: true,
+      needs_user_confirmation: true,
+    });
+    expect(reflection.authority).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      agent_executable: false,
+    });
   });
 });

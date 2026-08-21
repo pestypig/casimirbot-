@@ -307,6 +307,8 @@ describe("bounded provider-selected continuation", () => {
       stop_reason: "no_next_request",
       terminal_reviewed: true,
       terminal_review_count: 4,
+      max_terminal_reviews: 2,
+      terminal_review_limit_exhausted: true,
       steps: [{ request: { capability: "tool.restore" } }],
       result: { answer: "Restored and verified." },
     });

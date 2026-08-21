@@ -90,6 +90,20 @@ describe("MoralGraph ideology loader and traversal", () => {
       expect.arrayContaining(["direct-observation-before-claim", "mission-ethos"]),
     );
     expect(getIdeologyPathToRoot(graph, "mission-ethos")).toEqual(["mission-ethos", "wisdom-first-principles"]);
+    const transformationPath = getIdeologyPathToRoot(graph, "transformation-window-stewardship");
+    expect(transformationPath[0]).toBe("transformation-window-stewardship");
+    expect(transformationPath).toEqual(
+      expect.arrayContaining([
+        "citizens-arc-derived-principles",
+        "citizens-arc-maturation-under-constraint",
+        "wisdom-first-principles",
+      ]),
+    );
+    expect(getIdeologyPathToRoot(graph, "love-without-projection")).toEqual([
+      "love-without-projection",
+      "identity-view-and-non-attachment",
+      "wisdom-first-principles",
+    ]);
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(getIdeologyActionGatePolicy(graph)?.hard_fail_ids?.missing_legal_key).toBe("IDEOLOGY_MISSING_LEGAL_KEY");
   });

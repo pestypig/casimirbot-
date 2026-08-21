@@ -28,6 +28,7 @@ import type { Queryable } from "../../helix-ask/realtime-room/room-store/types";
 import { listEnvironmentAdapterProfiles } from "../../situation-room/environment-adapter-registry";
 import { issueEnvironmentCommandConnectorCredentialForPairing } from "../commands";
 import { issueEnvironmentActionConnectorCredentialForPairing } from "../actions";
+import { issueEnvironmentInteractionCredentialForPairing } from "../interactions";
 
 const DEFAULT_CREDENTIAL_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_REDEEM_ATTEMPTS = 8;
@@ -177,6 +178,21 @@ const deriveActionCredential = (input: {
   `helix_env_action_${crypto
     .createHash("sha256")
     .update("helix.connector_pairing.action_credential.v1\0", "utf8")
+    .update(input.pairingId, "utf8")
+    .update("\0", "utf8")
+    .update(input.pairingCode.toUpperCase(), "utf8")
+    .update("\0", "utf8")
+    .update(input.redemptionNonce, "utf8")
+    .digest("base64url")}`;
+
+const deriveInteractionCredential = (input: {
+  pairingId: string;
+  pairingCode: string;
+  redemptionNonce: string;
+}): string =>
+  `helix_env_interact_${crypto
+    .createHash("sha256")
+    .update("helix.connector_pairing.interaction_credential.v1\0", "utf8")
     .update(input.pairingId, "utf8")
     .update("\0", "utf8")
     .update(input.pairingCode.toUpperCase(), "utf8")
@@ -983,6 +999,7 @@ export const redeemConnectorBootstrapPairing = async (input: {
     });
   }
   let actionConfig;
+  let interactionConfig;
   if (outcome.row.action_credential_requested === true) {
     if (!outcome.row.action_authority_id || !outcome.row.action_connector_installation_id) {
       throw new ConnectorBootstrapPairingError(
@@ -999,6 +1016,20 @@ export const redeemConnectorBootstrapPairing = async (input: {
       pairingId: outcome.row.pairing_id,
       connectorInstallationId: outcome.row.action_connector_installation_id,
       trustedCredentialSecret: deriveActionCredential({
+        pairingId: outcome.row.pairing_id,
+        pairingCode,
+        redemptionNonce: input.redemptionNonce,
+      }),
+      ttlMs: Number(outcome.row.credential_ttl_ms),
+    });
+    interactionConfig = await issueEnvironmentInteractionCredentialForPairing({
+      roomId: binding.room_id,
+      ownerProfileId: outcome.row.owner_profile_id,
+      actionAuthorityId: outcome.row.action_authority_id,
+      publicBaseUrl: publicBaseUrlForPairing(input.pairingEndpoint),
+      pairingId: outcome.row.pairing_id,
+      connectorInstallationId: outcome.row.action_connector_installation_id,
+      trustedCredentialSecret: deriveInteractionCredential({
         pairingId: outcome.row.pairing_id,
         pairingCode,
         redemptionNonce: input.redemptionNonce,
@@ -1035,6 +1066,7 @@ export const redeemConnectorBootstrapPairing = async (input: {
         world_id: binding.world_id,
         domain_adapter: actionConfig.domain_adapter,
         action: actionConfig,
+        interaction: interactionConfig!,
       },
     };
   }

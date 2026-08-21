@@ -10,12 +10,14 @@ const requiredBacklinks = [
   "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
   "docs/architecture/helix-environment-agent-reasoning-v1.md",
   "docs/architecture/helix-minecraft-dual-plane-adapter-v1.md",
+  "docs/architecture/helix-minecraft-companion-embodiment-v1.md",
 ] as const;
 
 const canonicalLinkedTargets = [
   "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
   "docs/architecture/helix-environment-agent-reasoning-v1.md",
   "docs/architecture/helix-minecraft-dual-plane-adapter-v1.md",
+  "docs/architecture/helix-minecraft-companion-embodiment-v1.md",
   "docs/helix-ask-readiness-debug-loop.md",
   "docs/helix-ask-codex-loop-discipline.md",
   "AGENTS.md",
@@ -57,6 +59,12 @@ for (const requiredTerm of [
   "`bounded_reflex`",
   "`continuous_control`",
   "EH-RCC1",
+  "resident.minecraft.companion-follow.v1",
+  "`player_proxy`",
+  "`companion_entity`",
+  "actor_entity_id",
+  "actor_incarnation_id",
+  "observation_origin",
   "EH-FW-CLOUD",
   "semantic escalation",
 ]) {
@@ -159,7 +167,7 @@ for (const row of statusRows) {
     );
   }
   if (
-    /resident closed-loop|resident guardian|resident policies|flywire/i.test(
+    /resident closed-loop|resident guardian|resident policies|flywire|companion-entity embodiment/i.test(
       row.capability,
     ) &&
     !new Set(["specified", "projected"]).has(row.maturity)

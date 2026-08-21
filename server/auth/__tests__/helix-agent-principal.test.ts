@@ -30,6 +30,7 @@ import {
 
 const relevantEnvironmentKeys = [
   "NODE_ENV",
+  "PORT",
   "HELIX_AGENT_OAUTH_ISSUER",
   "HELIX_AGENT_OAUTH_AUDIENCE",
   "HELIX_AGENT_OAUTH_PROVIDER",
@@ -67,6 +68,7 @@ const configureLocalVerifier = (): {
   process.env.HELIX_AGENT_OAUTH_PROVIDER = "oidc-test";
   delete process.env.HELIX_AGENT_OAUTH_JWKS_URL;
   delete process.env.HELIX_AGENT_OAUTH_ALGORITHMS;
+  delete process.env.HELIX_AGENT_OAUTH_TENANT_CLAIM;
   process.env.HELIX_AGENT_ALLOW_LOCAL_HS256 = "1";
   process.env.HELIX_AGENT_LOCAL_JWT_SECRET = secret;
   return { issuer, audience, secret };
@@ -210,6 +212,37 @@ describe("DefaultHelixAgentAccessTokenVerifier", () => {
     await expect(verifier.verify(missingTenant)).rejects.toMatchObject({
       status: 401,
       code: "tenant_required",
+    });
+  });
+
+  it("accepts only the exact port-derived loopback MCP audience outside production", async () => {
+    const config = configureLocalVerifier();
+    process.env.PORT = "1522";
+    const verifier = new DefaultHelixAgentAccessTokenVerifier();
+    const loopbackToken = await signToken({
+      ...config,
+      audience: "http://127.0.0.1:1522/mcp",
+      tenantId: "tenant-1",
+    });
+
+    await expect(verifier.verify(loopbackToken)).resolves.toMatchObject({
+      tenantId: "tenant-1",
+    });
+
+    const wrongPortToken = await signToken({
+      ...config,
+      audience: "http://127.0.0.1:1523/mcp",
+      tenantId: "tenant-1",
+    });
+    await expect(verifier.verify(wrongPortToken)).rejects.toMatchObject({
+      status: 401,
+      code: "unauthorized",
+    });
+
+    process.env.NODE_ENV = "production";
+    await expect(verifier.verify(loopbackToken)).rejects.toMatchObject({
+      status: 503,
+      code: "auth_not_configured",
     });
   });
 

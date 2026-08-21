@@ -5,6 +5,10 @@ import {
   helixAgentAccountLinkStore,
   type HelixAgentAccountLinkStore,
 } from "../services/helix-account/agent-account-link-store";
+import {
+  DefaultHelixAgentAccessTokenVerifier,
+  type HelixAgentAccessTokenVerifier,
+} from "../auth/helix-agent-principal";
 import { getAccountSessionById } from "../services/helix-account/account-session-store";
 import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
 
@@ -29,6 +33,11 @@ type ResolveSession = (
 
 export type HelixAgentAccountBindingsRouterDependencies = {
   store?: HelixAgentAccountBindingManagementStore;
+  linkStore?: Pick<
+    HelixAgentAccountLinkStore,
+    "createLinkIntent" | "completeLinkIntent"
+  >;
+  verifier?: HelixAgentAccessTokenVerifier;
   resolveSession?: ResolveSession;
 };
 
@@ -108,12 +117,85 @@ const requireActiveSession = async (
   };
 };
 
+const bearerToken = (req: Request): string => {
+  const match = (req.get("authorization") ?? "").match(/^Bearer ([^\s]+)$/u);
+  if (!match || match[1].length > 32_768) {
+    throw new HelixAgentAccountLinkError(
+      401,
+      "invalid_request",
+      "A verified OAuth bearer token is required.",
+    );
+  }
+  return match[1];
+};
+
 export const createHelixAgentAccountBindingsRouter = (
   dependencies: HelixAgentAccountBindingsRouterDependencies = {},
 ): Router => {
   const router = Router();
   const store = dependencies.store ?? helixAgentAccountLinkStore;
+  const linkStore = dependencies.linkStore ?? helixAgentAccountLinkStore;
+  const verifier =
+    dependencies.verifier ?? new DefaultHelixAgentAccessTokenVerifier();
   const resolveSession = dependencies.resolveSession ?? getAccountSessionById;
+
+  router.post(
+    "/session/agent-bindings/oauth/complete",
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        if (req.get("x-helix-agent-link-confirm") !== "bind-current-oauth-subject") {
+          throw new HelixAgentAccountLinkError(
+            400,
+            "invalid_request",
+            "Explicit OAuth account-link confirmation is required.",
+          );
+        }
+        const session = await requireActiveSession(req, resolveSession);
+        let verified;
+        try {
+          verified = await verifier.verify(bearerToken(req));
+        } catch {
+          throw new HelixAgentAccountLinkError(
+            401,
+            "invalid_request",
+            "The OAuth identity could not be verified.",
+          );
+        }
+        const issuer = verifier.authorizationServer();
+        const audience = verifier.audience();
+        const providerAlias = verifier.providerAlias();
+        if (verified.issuer !== issuer) {
+          throw new HelixAgentAccountLinkError(
+            401,
+            "invalid_request",
+            "The OAuth identity does not match this Helix provider.",
+          );
+        }
+        const intent = await linkStore.createLinkIntent({
+          session,
+          expectedIssuer: issuer,
+          expectedAudience: audience,
+          expectedProvider: providerAlias,
+          ttlSeconds: 60,
+        });
+        const receipt = await linkStore.completeLinkIntent({
+          session,
+          state: intent.state,
+          identity: {
+            issuer: verified.issuer,
+            audience,
+            tenantId: verified.tenantId,
+            providerAlias,
+            subject: verified.subject,
+          },
+        });
+        setPrivateResponseHeaders(res);
+        res.status(200).json(receipt);
+      } catch (error) {
+        safeError(res, error);
+      }
+    },
+  );
 
   router.get(
     "/session/agent-bindings",

@@ -150,5 +150,32 @@ final class PlayerActionClientCommands {
                     }))
             )
         );
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+            dispatcher.register(
+                literal("helix")
+                    .then(
+                        literal("ask")
+                            .then(
+                                argument("prompt", StringArgumentType.greedyString())
+                                    .executes(context -> {
+                                        agent.ask(StringArgumentType.getString(context, "prompt"));
+                                        return 1;
+                                    })
+                            )
+                    )
+                    .then(literal("status").executes(context -> {
+                        agent.showStatus();
+                        return 1;
+                    }))
+                    .then(literal("cancel").executes(context -> {
+                        agent.cancelAsk();
+                        return 1;
+                    }))
+                    .then(literal("emergency-stop").executes(context -> {
+                        agent.emergencyStop();
+                        return 1;
+                    }))
+            )
+        );
     }
 }

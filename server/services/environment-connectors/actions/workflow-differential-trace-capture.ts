@@ -96,6 +96,36 @@ const publicTextHash = (value: string | null): `sha256:${string}` | null => {
 const uniqueRefs = (values: string[]): string[] =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
+const volatileProgressFields = new Set([
+  "clock_id",
+  "completed_at",
+  "created_at",
+  "duration_ticks",
+  "observed_at",
+  "scheduler_ticks_elapsed",
+  "started_at",
+  "tick_index",
+  "wall_clock_elapsed_ms",
+  "world_tick_index",
+]);
+
+/**
+ * Live executions retain exact clocks in their public source captures, while
+ * parity compares the causal workflow: ordered events, node/checkpoint
+ * outcomes, mutations, postconditions, and control release. Two executions of
+ * the same admitted program are not contradictory merely because physics or
+ * scheduler observation completed on different ticks.
+ */
+const normalizeProgressForParity = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(normalizeProgressForParity);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !volatileProgressFields.has(key))
+      .map(([key, child]) => [key, normalizeProgressForParity(child)]),
+  );
+};
+
 export const captureEnvironmentActionDifferentialTrace = (
   rawInput: EnvironmentActionDifferentialCaptureInput,
 ): HelixEnvironmentActionDifferentialTrace => {
@@ -123,7 +153,7 @@ export const captureEnvironmentActionDifferentialTrace = (
     admission_status: input.admission_status,
     execution_outcome: input.execution_outcome,
     normalized_progress_hashes: input.normalized_progress.map((entry) =>
-      environmentConnectorSha256(entry),
+      environmentConnectorSha256(normalizeProgressForParity(entry)),
     ),
     postcondition_status: input.postcondition_status,
     observation_refs: uniqueRefs(input.observation_refs),

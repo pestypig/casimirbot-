@@ -1,17 +1,93 @@
 import { describe, expect, it } from "vitest";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
+  buildGenericCompoundContinuationReviewGuidance,
   buildCodexContinuationCapabilitySets,
   buildCodexContinuationCapabilityInputContractLines,
   buildCodexFocusedInitialCapabilityRetryPrompt,
   buildCodexModelCapabilityPromptProjection,
   buildCodexTurnModelVisibleCapabilityCatalog,
   carryCodexDetailedActionsIntoContinuationPreferences,
+  codexProviderCapabilityUsageNotes,
   selectCodexCompoundRequiredCapabilityIds,
   shouldUseCodexFocusedCapabilityProjection,
 } from "../codex-provider";
 
 describe("Codex focused initial capability retry", () => {
+  it("keeps missing executable compound requirements actionable", () => {
+    const guidance = buildGenericCompoundContinuationReviewGuidance([
+      "com.casimirbot.minecraft.player.craft",
+    ]).join("\n");
+
+    expect(guidance).toContain(
+      "without current-turn postcondition evidence remains unfinished",
+    );
+    expect(guidance).toContain(
+      "request the next admitted capability needed to perform or verify it",
+    );
+    expect(guidance).not.toContain(
+      "Do not call an executable step blocked merely because",
+    );
+  });
+
+  it("describes each strict fluid-sequence node shape without choosing gameplay", () => {
+    const notes = codexProviderCapabilityUsageNotes(
+      "com.casimirbot.minecraft.player.sequence.execute",
+    ).join("\n");
+
+    expect(notes).toContain(
+      "input_segment requires earliest_tick, duration_ticks, controls, on_complete, and on_failure",
+    );
+    expect(notes).toContain(
+      "workflow_action requires earliest_tick, timeout_ticks, action, on_success, and on_failure",
+    );
+    expect(notes).toContain(
+      "checkpoint has wait_up_to_ticks but no timeout_ticks, duration_ticks, or controls",
+    );
+    expect(notes).toContain(
+      "terminal permits only node_id, node_kind, terminal_outcome, and reason_code",
+    );
+    expect(notes).toContain(
+      "combines several causally ordered player actions, explicit checkpoints, and final control release",
+    );
+    expect(notes).toContain(
+      "must equal the checkpoint_id field of a reachable checkpoint node exactly",
+    );
+    expect(notes).toContain(
+      "place that checkpoint before the dependent workflow_action",
+    );
+    expect(notes).toContain("exact frozen input schema lists them");
+    expect(notes).toContain(
+      "current_focus means only the player's present view",
+    );
+    expect(notes).toContain(
+      "aim with look_at target_kind position at the observed block center",
+    );
+    expect(notes).toContain("interact with looked_at_block");
+    expect(notes).toContain("Mutation ceilings are independent");
+    expect(notes).toContain(
+      "Do not enable world mutation or add minecraft:air merely to admit inventory effects",
+    );
+    expect(notes).toContain(
+      "If actor status has no looked_at_block or reports within_interaction_range false",
+    );
+    expect(notes).toContain("preserve the successful prefix evidence");
+    expect(notes).not.toMatch(/note_block|oak_planks|g2.fluid/i);
+  });
+
+  it("states that spatial evidence does not silently become interaction focus", () => {
+    const notes = codexProviderCapabilityUsageNotes(
+      "com.casimirbot.minecraft.player.interact",
+    ).join("\n");
+
+    expect(notes).toContain("does not move the camera");
+    expect(notes).toContain(
+      "first request com.casimirbot.minecraft.player.look",
+    );
+    expect(notes).toContain("Do not substitute the spatial scan center");
+    expect(notes).not.toMatch(/note_block|oak_planks|g2.fluid/i);
+  });
+
   it("focuses hard source routes without making generic direct answers tool-shaped", () => {
     expect(
       shouldUseCodexFocusedCapabilityProjection({
@@ -612,6 +688,22 @@ describe("Codex focused initial capability retry", () => {
     }).join("\n");
     expect(validatorRepair).toContain(guardian);
     expect(validatorRepair).not.toContain(actorStatus);
+
+    const admittedInputSchemaRepair =
+      buildCodexContinuationCapabilityInputContractLines({
+        continuationState: {
+          ...state,
+          last_attempt: {
+            ...state.last_attempt!,
+            failure_message:
+              "Minecraft player-action arguments did not satisfy the admitted input schema: $.sequence_schema: Missing required property sequence_schema.",
+          },
+        },
+        availableCapabilities: capabilities,
+        admittedCapabilityIds: [guardian, actorStatus],
+      }).join("\n");
+    expect(admittedInputSchemaRepair).toContain(guardian);
+    expect(admittedInputSchemaRepair).not.toContain(actorStatus);
 
     const runtimeFailure = buildCodexContinuationCapabilityInputContractLines({
       continuationState: {

@@ -33,6 +33,33 @@ Additional server-authority reference:
   - Typed actions and server-command fallback: `GptActions.java` and
     `GenerateCommands.java`
 
+Optional clean-room companion-embodiment reference:
+
+- Verity JE official project:
+  <https://modrinth.com/mod/verity-je-official>
+  - The official metadata identifies a Forge 1.20.1 client-and-server mod,
+    Groq-backed AI assistance, and an All Rights Reserved license. Modrinth
+    currently publishes no official source-repository URL for this project.
+  - Pin any behavioral comparison to an exact published artifact. The
+    `v5.7.4` primary artifact is `verity-5.7.4.jar`, with official Modrinth
+    SHA-512
+    `1e9ccc1a5166112d96213e0f44d1dbb607d6dc7418b0b99c871ec00b6a07722c7072477864134113431253837727e36592f9d8fa1b298bde3f6e70f5a4e34f3c`.
+  - Study only public behavior and general clean-room patterns: a distinct
+    embodied actor, semantic mode selection followed by local persistent
+    behavior, pathfinding hysteresis, event coalescing, asynchronous semantic
+    work, authoritative-thread effects, spatial presentation, and tool-result
+    re-entry.
+  - Do not copy or redistribute its code, decompiled implementation, models,
+    textures, sounds, archives, prompts, or other assets. Third-party source
+    mirrors are not an implementation dependency or authority for CasimirBot.
+  - CasimirBot's projected `companion_entity` must add exact actor/owner/
+    beneficiary identity, finite leases, bounded chunk activity, a trusted
+    local arbiter, canonical proposal-to-effect evidence, manual override, and
+    Emergency Stop. Verity is comparative evidence for the product pattern,
+    not acceptance evidence for those guarantees.
+  - The clean-room CasimirBot target and its lifecycle acceptance cases are
+    `docs/architecture/helix-minecraft-companion-embodiment-v1.md`.
+
 ## Required development order
 
 For every new Minecraft objective family, run two separate validations:

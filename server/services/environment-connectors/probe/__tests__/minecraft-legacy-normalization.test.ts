@@ -62,6 +62,14 @@ describe("Minecraft legacy probe normalization", () => {
           position: { x: 1.5, y: 64, z: -2.25 },
           yaw: 149.03,
           pitch: 10.95,
+          looked_at_block: {
+            block_id: "minecraft:note_block",
+            position: { x: 1, y: 64, z: 2 },
+            aim_position: { x: 1.5, y: 64.5, z: 2.5 },
+            distance_blocks: 3.25,
+            within_interaction_range: true,
+            private_hit_payload: "must-not-leak",
+          },
           status_flags: ["sprinting"],
           active_effects: [
             {
@@ -95,6 +103,13 @@ describe("Minecraft legacy probe normalization", () => {
         position: { x: 1.5, y: 64, z: -2.25 },
         yaw: 149.03,
         pitch: 10.95,
+        looked_at_block: {
+          block_id: "minecraft:note_block",
+          position: { x: 1, y: 64, z: 2 },
+          aim_position: { x: 1.5, y: 64.5, z: 2.5 },
+          distance_blocks: 3.25,
+          within_interaction_range: true,
+        },
         status_flags: ["sprinting"],
           active_effects: [
           {
@@ -419,6 +434,16 @@ describe("Minecraft legacy probe normalization", () => {
           target_cells_air: true,
           safe_candidate: true,
         }),
+      ],
+      block_position_samples: [
+        {
+          block: "minecraft:stone_bricks",
+          total_count: 18,
+          positions: [
+            { x: 10, y: 63, z: -4 },
+            { x: 10, y: 64, z: -4 },
+          ],
+        },
       ],
       columns: [
         {
