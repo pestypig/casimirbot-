@@ -247,6 +247,20 @@ export type StagePlayLiveSourceMailItemV1 = {
   environmentId?: string | null;
   sourceId: string;
   sourceKind: StagePlayLiveSourceMailSourceKindV1;
+  environmentIdentity?: {
+    producerPlane: "world_authority" | "player_embodiment";
+    roomSourceBindingId: string;
+    worldId: string;
+    producerEpochRef: string;
+    subjectRef: string | null;
+    participantId: string | null;
+    selectedPlayerRef: string | null;
+    selectedPlayerNativeId: string | null;
+    observationRevision: number;
+    digestId: string;
+    digestHash: string;
+    provenanceValid: true;
+  } | null;
   sourceRefs: {
     sourceId: string;
     frameRef?: string | null;

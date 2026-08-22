@@ -597,6 +597,10 @@ export function startStagePlayLiveSourceMailWakeService(): boolean {
     },
     resume: () => {
       servicePaused = false;
+      // A foreground Ask turn may have paused the service after semantic mail
+      // was enqueued. Resume with an immediate bounded admission cycle so a
+      // short-lived wake cannot expire while waiting for the interval timer.
+      requestStagePlayLiveSourceMailWakeRun();
     },
   });
   const intervalMs = readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_RUNNER_INTERVAL_MS", DEFAULT_WAKE_SERVICE_INTERVAL_MS);

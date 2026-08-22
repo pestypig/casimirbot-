@@ -1873,9 +1873,7 @@ const resolveLiveSourceToolScope = (input: {
     environmentThreadId: input.environmentThreadId ?? null,
     explicitMailboxThreadId:
       readString(input.args.mailbox_thread_id) ??
-      readString(input.args.mailboxThreadId) ??
-      readString(input.args.thread_id) ??
-      readString(input.args.threadId),
+      readString(input.args.mailboxThreadId),
     mailIds: readStringArray(input.args.mail_ids ?? input.args.mailIds),
   });
   const scopedInput: ExecuteLiveEnvironmentToolInput = {

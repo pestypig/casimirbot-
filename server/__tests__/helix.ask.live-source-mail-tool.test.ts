@@ -122,24 +122,31 @@ const seedVisualSummary = () => {
   });
 };
 
-const seedVisualSummaryText = (summary: string, suffix: string) => {
+const seedVisualSummaryText = (
+  summary: string,
+  suffix: string,
+  scope: { threadId?: string; roomId?: string; sourceId?: string } = {},
+) => {
+  const seededThreadId = scope.threadId ?? threadId;
+  const seededRoomId = scope.roomId ?? roomId;
+  const seededSourceId = scope.sourceId ?? sourceId;
   startVisualSnapshotSource({
-    source_id: sourceId,
-    thread_id: threadId,
-    room_id: roomId,
+    source_id: seededSourceId,
+    thread_id: seededThreadId,
+    room_id: seededRoomId,
     source_surface: "browser_tab",
     capture_mode: "interval",
     status: "active",
   });
   const frame = recordVisualFrame({
-    source_id: sourceId,
-    thread_id: threadId,
-    room_id: roomId,
+    source_id: seededSourceId,
+    thread_id: seededThreadId,
+    room_id: seededRoomId,
     frame_id: `visual_frame:helix-ask-live-source-mail-tool:${suffix}`,
     ts: "2026-06-04T12:10:00.000Z",
   });
   analyzeVisualFrame({
-    thread_id: threadId,
+    thread_id: seededThreadId,
     frame_id: frame.frame_id,
     evidence_id: `visual_evidence:helix-ask-live-source-mail-tool:${suffix}`,
     summary,
@@ -187,6 +194,43 @@ const seedVisualSummaries = (count: number) => {
 };
 
 describe("live-source mail live environment tools", () => {
+  it("preserves required loop provenance when a goal-context update has a large evidence set", () => {
+    const loopRefs = ["thread:room:large-evidence", "stage_play_mail_loop:room:large-evidence"];
+    const update = recordStagePlayGoalContextUpdate({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      updateId: "stage_play_goal_context_update:large-evidence",
+      createdAtMs: Date.now(),
+      sourceRefs: Array.from({ length: 100 }, (_, index) => `source_ref:${index}`),
+      loopRefs,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: "stage_play_processed_mail_packet:large-evidence",
+      preview: "A bounded packet retained its canonical loop provenance.",
+      evidenceRefs: Array.from({ length: 180 }, (_, index) => `packet_evidence:${index}`),
+      receiptRefs: ["receipt:large-evidence"],
+      freshness: { observedAtMs: Date.now(), staleAfterMs: 30_000, status: "fresh" },
+      goalRelevance: null,
+      suggestedDispatch: [],
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+
+    expect(update.sourceRefs).toHaveLength(80);
+    expect(update.evidenceRefs).toEqual(expect.arrayContaining([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...loopRefs,
+    ]));
+    expect(update.evidenceRefs.length).toBeLessThanOrEqual(256);
+  });
+
   it("advertises live-source mail tools as automatic evidence-only capabilities", () => {
     const packet = buildLiveEnvironmentRuntimePacket({
       threadId,
@@ -2788,6 +2832,74 @@ describe("live-source mail live environment tools", () => {
     expect(readPayload.terminal_eligible).toBe(false);
   });
 
+  it("keeps a transient model thread argument from overriding the canonical room mailbox", () => {
+    const canonicalRoomThreadId = `helix-ask:room:${roomId}`;
+    const transientAskThreadId = "ask:current-turn-only";
+    seedVisualSummaryText(
+      "Minecraft guardian completed a bounded step and released controls.",
+      "canonical-room-mailbox",
+      { threadId: canonicalRoomThreadId },
+    );
+
+    const processed = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: canonicalRoomThreadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const processedPacketId = (processed.observation as any).processedPacketRefs[0];
+    const read = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_processed_live_source_mail",
+      thread_id: canonicalRoomThreadId,
+      args: {
+        thread_id: transientAskThreadId,
+        room_id: roomId,
+        source_id: sourceId,
+        read_only: true,
+      },
+    });
+    const payload = read.observation as any;
+
+    expect(read.ok).toBe(true);
+    expect(payload.mailboxThreadId).toBe(canonicalRoomThreadId);
+    expect(payload.mailboxThreadResolution.reason).not.toBe("explicit_mailbox_thread_id");
+    expect(payload.processedPacketRefs).toContain(processedPacketId);
+  });
+
+  it("still honors an explicit mailbox_thread_id and does not cross into room mail", () => {
+    const canonicalRoomThreadId = `helix-ask:room:${roomId}`;
+    const isolatedMailboxThreadId = "helix-ask:room:room:other";
+    seedVisualSummaryText(
+      "Minecraft guardian completed a bounded step and released controls.",
+      "explicit-mailbox-isolation",
+      { threadId: canonicalRoomThreadId },
+    );
+    executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: canonicalRoomThreadId,
+      args: { room_id: roomId, source_id: sourceId, source_kind: "visual_frame" },
+    });
+    const read = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_processed_live_source_mail",
+      thread_id: canonicalRoomThreadId,
+      args: {
+        mailbox_thread_id: isolatedMailboxThreadId,
+        room_id: "room:other",
+        source_id: sourceId,
+        read_only: true,
+      },
+    });
+    const payload = read.observation as any;
+
+    expect(read.ok).toBe(false);
+    expect(payload.mailboxThreadId).toBe(isolatedMailboxThreadId);
+    expect(payload.mailboxThreadResolution.reason).toBe("explicit_mailbox_thread_id");
+    expect(payload.processedPacketRefs).toEqual([]);
+  });
+
   it("starts an agent goal session through live_env.start_agent_goal_session as non-terminal tool evidence", () => {
     const observation = executeLiveEnvironmentTool({
       tool_name: "live_env.start_agent_goal_session",
@@ -2900,7 +3012,7 @@ describe("live-source mail live environment tools", () => {
           }),
         ]),
         authority: hardenedGoalSessionAuthority({
-          allowedTerminalArtifactKinds: ["final_answer"],
+          allowedTerminalArtifactKinds: expect.arrayContaining(["final_answer"]),
           requiredEvidenceKinds: expect.arrayContaining([
             "goal_context_update",
             "agent_step_observation_packet",

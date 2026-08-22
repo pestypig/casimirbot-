@@ -173,6 +173,13 @@ export const isGuestSharedRealtimeRoomSourceIngressEnabled = (): boolean =>
 
 const PUBLIC_ROOM_SOURCE_CAPABILITY_IDS = [
   "room.evidence.read_bound",
+  // G4 semantic wake handling is part of the governed room-source surface.
+  // The mailbox read and its exact-packet interpretation receipt remain
+  // scoped by room membership, source identity, subject binding, and the
+  // live-mail service itself; account policy must not make those authorized
+  // room operations unreachable for public experiment participants.
+  "live_env.read_processed_live_source_mail",
+  "live_env.record_live_source_mail_decision",
   ...HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS,
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CAPABILITY,

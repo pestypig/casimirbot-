@@ -21,11 +21,15 @@ const DEFAULT_CODEX_ARGS = [
   "never",
 ] as const;
 
-const readBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
+const readBooleanEnv = (
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean => {
   if (value === undefined) return defaultValue;
   const normalized = value.trim().toLowerCase();
   if (!normalized) return defaultValue;
-  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized))
+    return false;
   if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
   return defaultValue;
 };
@@ -87,7 +91,8 @@ const resolveFromPath = (command: string): string[] => {
 };
 
 const resolveFromWindowsApps = (): string[] => {
-  if (process.platform !== "win32" && !process.env.CODEX_WINDOWS_APPS_DIR) return [];
+  if (process.platform !== "win32" && !process.env.CODEX_WINDOWS_APPS_DIR)
+    return [];
   const windowsAppsDir =
     process.env.CODEX_WINDOWS_APPS_DIR ??
     path.join(process.env.ProgramFiles ?? "C:\\Program Files", "WindowsApps");
@@ -112,7 +117,9 @@ const resolveFromWindowsApps = (): string[] => {
   return candidates;
 };
 
-const resolveFromCodexInstallLocation = (installLocation: string | null): string[] => {
+const resolveFromCodexInstallLocation = (
+  installLocation: string | null,
+): string[] => {
   if (!installLocation) return [];
   return [
     path.join(installLocation, "app", "resources", "codex.exe"),
@@ -125,7 +132,8 @@ const resolveFromCodexInstallLocation = (installLocation: string | null): string
 };
 
 const resolveFromLocalNpmPackage = (): string[] => {
-  if (readBooleanEnv(process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN, false)) return [];
+  if (readBooleanEnv(process.env.CODEX_DISABLE_LOCAL_PACKAGE_BIN, false))
+    return [];
   let moduleResolvedBin: string | null = null;
   try {
     moduleResolvedBin = moduleRequire.resolve("@openai/codex/bin/codex.js");
@@ -134,8 +142,20 @@ const resolveFromLocalNpmPackage = (): string[] => {
   }
   return [
     ...(moduleResolvedBin ? [moduleResolvedBin] : []),
-    path.join(process.cwd(), "node_modules", "@openai", "codex", "bin", "codex.js"),
-    path.join(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "codex.cmd" : "codex"),
+    path.join(
+      process.cwd(),
+      "node_modules",
+      "@openai",
+      "codex",
+      "bin",
+      "codex.js",
+    ),
+    path.join(
+      process.cwd(),
+      "node_modules",
+      ".bin",
+      process.platform === "win32" ? "codex.cmd" : "codex",
+    ),
   ].filter(fileExists);
 };
 
@@ -146,7 +166,8 @@ export const resolveCodexDesktopInstallCandidates = (
   const binDir = path.join(localAppData, "OpenAI", "Codex", "bin");
   let versionDirectories: Array<{ path: string; modifiedAtMs: number }> = [];
   try {
-    versionDirectories = fs.readdirSync(binDir, { withFileTypes: true })
+    versionDirectories = fs
+      .readdirSync(binDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => {
         const directory = path.join(binDir, entry.name);
@@ -198,13 +219,75 @@ export const appendCodexModelPolicyArgs = (
   const reasoningEffort = readString(policy.reasoningEffort);
   if (model) next.push("--model", model);
   if (reasoningEffort) {
-    next.push("-c", `model_reasoning_effort=${JSON.stringify(reasoningEffort)}`);
+    next.push(
+      "-c",
+      `model_reasoning_effort=${JSON.stringify(reasoningEffort)}`,
+    );
   }
   return next;
 };
 
+const CODEX_COMPATIBILITY_ISOLATION_ARGS = [
+  "--ignore-user-config",
+  "-c",
+  "features.remote_plugin=false",
+  "-c",
+  "features.apps=false",
+  "-c",
+  'model_provider="helix_openai_api"',
+  "-c",
+  'model_providers.helix_openai_api={ name = "Helix OpenAI API", base_url = "https://api.openai.com/v1", env_key = "OPENAI_API_KEY", wire_api = "responses" }',
+] as const;
+
+/**
+ * The compatibility process is a Helix-owned model step, not a nested Codex
+ * desktop session. Keep it independent of the operator's personal plugins,
+ * apps, MCP registry, and user configuration while retaining the explicit
+ * read-only sandbox and model policy supplied by the provider. The custom
+ * provider is intentional: ignored user config still resolves built-in OpenAI
+ * authentication from CODEX_HOME. Helix uses its keyed server credential via
+ * env_key instead, without persisting that credential into the isolated home.
+ */
+export const appendCodexCompatibilityIsolationArgs = (
+  args: readonly string[],
+): string[] => {
+  const next = [...args];
+  if (!next.includes("--ignore-user-config")) {
+    next.push("--ignore-user-config");
+  }
+  for (
+    let index = 1;
+    index < CODEX_COMPATIBILITY_ISOLATION_ARGS.length;
+    index += 2
+  ) {
+    const flag = CODEX_COMPATIBILITY_ISOLATION_ARGS[index];
+    const value = CODEX_COMPATIBILITY_ISOLATION_ARGS[index + 1];
+    if (flag === "-c" && value && !next.includes(value)) {
+      next.push(flag, value);
+    }
+  }
+  return next;
+};
+
+export const resolveCodexCompatibilityHome = (
+  input: {
+    configuredHome?: string | null;
+    workingDirectory?: string;
+  } = {},
+): string => {
+  const workingDirectory = input.workingDirectory ?? process.cwd();
+  const configuredHome = readString(
+    input.configuredHome ?? process.env.HELIX_CODEX_COMPATIBILITY_HOME,
+  );
+  return configuredHome
+    ? path.resolve(workingDirectory, configuredHome)
+    : path.join(workingDirectory, ".cal", "helix-codex-compatibility-home");
+};
+
 const resolveFromWindowsAppxPackage = (): string[] => {
-  const configuredInstallLocation = readString(process.env.CODEX_APPX_INSTALL_LOCATION);
+  const configuredInstallLocation = readString(
+    process.env.CODEX_APPX_INSTALL_LOCATION,
+  );
   if (configuredInstallLocation) {
     return resolveFromCodexInstallLocation(configuredInstallLocation);
   }
@@ -254,9 +337,13 @@ const resolveFromWindowsAppxPackage = (): string[] => {
   }
 };
 
-const withLaunchProbe = (resolution: CodexBinaryResolution): CodexBinaryResolution => {
+const withLaunchProbe = (
+  resolution: CodexBinaryResolution,
+): CodexBinaryResolution => {
   if (!resolution.launchable || !resolution.resolved_bin) return resolution;
-  const probeCommand = buildCodexSpawnCommand(resolution.resolved_bin, ["--version"]);
+  const probeCommand = buildCodexSpawnCommand(resolution.resolved_bin, [
+    "--version",
+  ]);
   const probe = spawnSync(probeCommand.bin, probeCommand.args, {
     encoding: "utf8",
     timeout: CODEX_LAUNCH_PROBE_TIMEOUT_MS,
@@ -276,9 +363,10 @@ const withLaunchProbe = (resolution: CodexBinaryResolution): CodexBinaryResoluti
     return {
       ...resolution,
       launchable: false,
-      reason: probe.error?.name === "TimeoutError"
-        ? "codex_binary_probe_timeout"
-        : "codex_binary_not_spawnable",
+      reason:
+        probe.error?.name === "TimeoutError"
+          ? "codex_binary_probe_timeout"
+          : "codex_binary_not_spawnable",
     };
   }
 
@@ -300,7 +388,8 @@ export const resolveFirstLaunchableCodexBinary = (
   const seen = new Set<string>();
   let firstFailure: CodexBinaryResolution | null = null;
   for (const candidate of candidates) {
-    const identity = process.platform === "win32" ? candidate.toLowerCase() : candidate;
+    const identity =
+      process.platform === "win32" ? candidate.toLowerCase() : candidate;
     if (seen.has(identity) || !fileExists(candidate)) continue;
     seen.add(identity);
     const resolution = withLaunchProbe({
@@ -323,16 +412,20 @@ export const resolveCodexBinary = (): CodexBinaryResolution => {
     const configuredCandidates = isPathLikeCommand(configured)
       ? [configured]
       : resolveFromPath(configured);
-    return resolveFirstLaunchableCodexBinary(configuredCandidates, args) ?? {
-      launchable: false,
-      reason: "codex_binary_not_found",
-      resolved_bin: null,
-      args,
-    };
+    return (
+      resolveFirstLaunchableCodexBinary(configuredCandidates, args) ?? {
+        launchable: false,
+        reason: "codex_binary_not_found",
+        resolved_bin: null,
+        args,
+      }
+    );
   }
 
   let firstFailure: CodexBinaryResolution | null = null;
-  const tryCandidates = (candidates: readonly string[]): CodexBinaryResolution | null => {
+  const tryCandidates = (
+    candidates: readonly string[],
+  ): CodexBinaryResolution | null => {
     const resolution = resolveFirstLaunchableCodexBinary(candidates, args);
     if (resolution?.launchable) return resolution;
     firstFailure ??= resolution;
@@ -348,7 +441,9 @@ export const resolveCodexBinary = (): CodexBinaryResolution => {
     if (configuredWindowsApps) return configuredWindowsApps;
   }
   if (process.env.CODEX_APPX_INSTALL_LOCATION) {
-    const configuredAppxPackage = tryCandidates(resolveFromWindowsAppxPackage());
+    const configuredAppxPackage = tryCandidates(
+      resolveFromWindowsAppxPackage(),
+    );
     if (configuredAppxPackage) return configuredAppxPackage;
   }
   const desktopInstall = tryCandidates(resolveCodexDesktopInstallCandidates());
@@ -362,10 +457,12 @@ export const resolveCodexBinary = (): CodexBinaryResolution => {
     if (windowsApps) return windowsApps;
   }
 
-  return firstFailure ?? {
-    launchable: false,
-    reason: "codex_binary_not_found",
-    resolved_bin: null,
-    args,
-  };
+  return (
+    firstFailure ?? {
+      launchable: false,
+      reason: "codex_binary_not_found",
+      resolved_bin: null,
+      args,
+    }
+  );
 };

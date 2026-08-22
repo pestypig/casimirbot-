@@ -189,6 +189,7 @@ const reviewedSharedProviderGatewayCapabilityIds = [
   "live_env.check_live_source_mail",
   "live_env.read_live_source_mail",
   "live_env.read_processed_live_source_mail",
+  "live_env.record_live_source_mail_decision",
   "live_env.reflect_live_source_mail_loop",
   "live_env.compare_mail_to_interpreter_profile",
   "live_env.validate_live_source_prediction",
@@ -286,7 +287,6 @@ const reviewedNonSharedProviderCapabilityClassifications = [
   "live_env.project_live_source_narrative|helix_native_only|ui_projection|live_environment",
   "live_env.read_card|requires_confirmation_contract|user_confirmed_side_effect|live_environment",
   "live_env.record_commentary|requires_confirmation_contract|user_confirmed_side_effect|live_environment",
-  "live_env.record_live_source_mail_decision|helix_native_only|ui_projection|live_environment",
   "live_env.record_voice_steering|requires_confirmation_contract|user_confirmed_side_effect|live_environment",
   "live_env.reflect_stage_play_context|requires_confirmation_contract|user_confirmed_side_effect|live_environment",
   "live_env.repair_loop|blocked_pending_contract|mutating_control|live_environment",
@@ -916,7 +916,6 @@ describe("provider-agent capability contract catalog", () => {
       "live_env.request_visual_action_replay",
       "live_env.project_live_source_narrative",
       "live_env.update_live_source_immersion_state",
-      "live_env.record_live_source_mail_decision",
     ];
     const voiceProcedureBoundaries = [
       ["live_env.record_voice_steering", "requires_confirmation_contract"],
@@ -950,6 +949,18 @@ describe("provider-agent capability contract catalog", () => {
         },
       });
     }
+    expect(
+      classifyProviderAgentCapability(
+        "live_env.record_live_source_mail_decision",
+      ),
+    ).toMatchObject({
+      availability: "shared_gateway_now",
+      permission_class: "mutating_control",
+      provider_availability: {
+        codex_workstation: true,
+        future_provider: true,
+      },
+    });
   });
 
   it("derives shared gateway permission classes from the gateway manifest shape", () => {
@@ -1313,7 +1324,6 @@ describe("provider-agent capability contract catalog", () => {
       "live_env.project_live_source_narrative",
       "live_env.configure_route_watch",
       "live_env.configure_interpreter_profile",
-      "live_env.record_live_source_mail_decision",
     ]) {
       expect(gatewayIds).not.toContain(heldBackCapability);
       expect(classifyProviderAgentCapability(heldBackCapability)).toMatchObject({

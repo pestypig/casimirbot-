@@ -28,6 +28,8 @@ import {
 } from "@shared/helix-environment-connector";
 import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
@@ -109,6 +111,7 @@ import type {
 import { buildWorkstationGatewayObservationPacket } from "../workstation-tool-gateway/observation-packet";
 import {
   buildHelixProviderReasoningReentry,
+  hasCurrentTurnResidentSemanticReplanRecovery,
   hasSuccessfulLaterRetryForFailedGatewayCapability,
   providerRequestUserInputBoundaryObservationRefs,
 } from "./provider-terminal-authority";
@@ -239,11 +242,17 @@ import {
   formatHelixScholarlyRetrySelectionForRuntime,
 } from "../runtime/agent-continuation-state";
 import { buildHelixDomainContinuationDecision } from "../domain-continuation-decision";
+import {
+  mandatoryToolForPhase,
+  resolveLiveSourceTurnPhase,
+} from "../live-source-turn-phase-resolver";
 import { buildPriorDocumentContinuationHint } from "../prior-document-continuation";
 import { isMinecraftMechanicsDocsPrompt } from "../minecraft-mechanics-docs-intent";
 import {
+  affirmativeMinecraftPlayerControlCapabilityIds,
   isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
   minecraftPlayerEmbodimentActionPromptMatch,
+  requiredMinecraftResidentRecoveryCapabilityIds,
   sourceTargetIntentRequiresMinecraftPlayerEmbodimentAction,
 } from "../minecraft-execution-plane-intent";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
@@ -271,8 +280,10 @@ import {
   type HelixWorkstationGatewayAccountContext,
 } from "../workstation-tool-gateway/account-policy";
 import {
+  appendCodexCompatibilityIsolationArgs,
   appendCodexModelPolicyArgs,
   buildCodexSpawnCommand,
+  resolveCodexCompatibilityHome,
   resolveCodexBinary,
 } from "./codex-native/codex-binary";
 import {
@@ -6182,7 +6193,6 @@ export const classifyCodexProcessFailureForUser = (input: {
   stderr: string;
   exitCode: number | null;
 }): { error_code: string; text: string; model: string | null } | null => {
-  if (input.exitCode === 0) return null;
   const diagnostic = `${input.stdout}\n${input.stderr}`;
   const unsupportedChatGptModel = diagnostic.match(
     /The ['`]?([^'`\s]+)['`]? model is not supported when using Codex with a ChatGPT account/i,
@@ -6194,9 +6204,34 @@ export const classifyCodexProcessFailureForUser = (input: {
       model,
       text:
         `Codex was called, but the pinned model \`${model}\` is not available with the active ChatGPT-account authentication. ` +
-        "Choose a Codex-supported model such as GPT-5.4 mini, or use an isolated API-key-authenticated Codex home for API-only models.",
+      "Choose a Codex-supported model such as GPT-5.4 mini, or use an isolated API-key-authenticated Codex home for API-only models.",
     };
   }
+  if (/You have no credits remaining\. Add credits to continue using the API/i.test(diagnostic)) {
+    return {
+      error_code: "openai_api_credits_exhausted",
+      model: null,
+      text:
+        "Runtime Codex reached OpenAI with the configured API credential, but that API account has no credits remaining. Add API credits or authorize another funded API key, then retry this turn; no connector re-pairing is required.",
+    };
+  }
+  if (
+    /Missing bearer or basic authentication in header/i.test(diagnostic) ||
+    /failed to connect to websocket: HTTP error: 401 Unauthorized/i.test(
+      diagnostic,
+    )
+  ) {
+    return {
+      error_code: "openai_api_authentication_missing",
+      model: null,
+      text:
+      "Runtime Codex could not authenticate its OpenAI API request. Confirm that the opaque keyed-server launcher supplies OPENAI_API_KEY, then restart the keyed server; do not paste the credential into chat or debug output.",
+    };
+  }
+  // App-server transports may report provider failure through protocol events
+  // while their host process exits cleanly. Known provider diagnostics remain
+  // authoritative; unrelated diagnostics from a successful process do not.
+  if (input.exitCode === 0) return null;
   const incompatibleModel = diagnostic.match(
     /The ['`]?([^'`\s]+)['`]? model requires a newer version of Codex/i,
   );
@@ -6209,6 +6244,41 @@ export const classifyCodexProcessFailureForUser = (input: {
       `Codex runtime could not start because the configured model \`${model}\` requires a newer Codex app or CLI. ` +
       "Upgrade Codex, then restart the Helix server.",
   };
+};
+
+export const classifyCodexNativeProviderFailureForUser = (input: {
+  nativeErrorCode?: string | null;
+  fallbackReason?: string | null;
+  compatibilityTerminalCandidateSucceeded: boolean;
+}): { error_code: string; text: string; model: string | null } | null => {
+  // A completed compatibility turn is a legitimate recovery path. Do not let
+  // a failed native attempt poison a later supported candidate.
+  if (input.compatibilityTerminalCandidateSucceeded) return null;
+  const nativeErrorCode = readString(input.nativeErrorCode);
+  const fallbackReason = readString(input.fallbackReason);
+  if (
+    nativeErrorCode === "provider_quota_exhausted" ||
+    fallbackReason === "native_provider_quota_exhausted"
+  ) {
+    return {
+      error_code: "openai_api_credits_exhausted",
+      model: null,
+      text:
+        "Runtime Codex reached OpenAI with the configured API credential, but that API account has no credits remaining. Add API credits or authorize another funded API key, then retry this turn; no connector re-pairing is required.",
+    };
+  }
+  if (
+    nativeErrorCode === "provider_auth_failed" ||
+    fallbackReason === "openai_api_key_missing"
+  ) {
+    return {
+      error_code: "openai_api_authentication_missing",
+      model: null,
+      text:
+        "Runtime Codex could not authenticate its OpenAI API request. Confirm that the opaque keyed-server launcher supplies OPENAI_API_KEY, then restart the keyed server; do not paste the credential into chat or debug output.",
+    };
+  }
+  return null;
 };
 
 const CODEX_CAPABILITY_LANE_REQUEST_MARKER =
@@ -10510,16 +10580,39 @@ const continuationAliasRequestsAreExecutionEquivalent = (
   );
 };
 
-const mutationEpochCapabilityLaneRequestFingerprint = (input: {
+export const residentSemanticReplanRecoveryRevision = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+): number =>
+  gatewayCallResults.reduce(
+    (revision, _result, index) =>
+      revision +
+      (hasCurrentTurnResidentSemanticReplanRecovery(
+        gatewayCallResults,
+        index,
+      )
+        ? 1
+        : 0),
+    0,
+  );
+
+export const mutationEpochCapabilityLaneRequestFingerprint = (input: {
   request: Record<string, unknown>;
   mutationEpoch: number;
   mutatingCapabilityIds: ReadonlySet<string>;
+  residentSemanticReplanRevision?: number;
 }): string => {
   const fingerprint = capabilityLaneRequestFingerprint(input.request);
   const capability = capabilityLaneCandidateCapability(input.request);
-  return capability && input.mutatingCapabilityIds.has(capability)
-    ? fingerprint
-    : `${fingerprint}::mutation_epoch:${Math.max(0, input.mutationEpoch)}`;
+  if (capability && input.mutatingCapabilityIds.has(capability)) {
+    const residentSemanticReplanRevision = Math.max(
+      0,
+      Math.floor(input.residentSemanticReplanRevision ?? 0),
+    );
+    return residentSemanticReplanRevision > 0
+      ? `${fingerprint}::resident_semantic_replan_revision:${residentSemanticReplanRevision}`
+      : fingerprint;
+  }
+  return `${fingerprint}::mutation_epoch:${Math.max(0, input.mutationEpoch)}`;
 };
 
 export const buildCapabilityLaneMutationEpochHistory = (input: {
@@ -10685,6 +10778,82 @@ export const continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest =
           affordanceRequest: affordance.lane_request,
           candidate: input.candidate as Record<string, unknown>,
         }),
+      );
+    });
+  };
+
+export const continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest =
+  (input: {
+    state: HelixAgentContinuationState;
+    candidate: Record<string, unknown> | null;
+    availableCapabilities: HelixWorkstationCapabilityManifest[];
+  }): boolean => {
+    if (
+      !input.candidate ||
+      !continuationStateRequiresLaneRequest(input.state)
+    ) {
+      return false;
+    }
+    const candidateManifest = continuationCapabilityManifest({
+      request: input.candidate,
+      availableCapabilities: input.availableCapabilities,
+    });
+    if (
+      !candidateManifest ||
+      candidateManifest.capability_id !==
+        "live_env.record_live_source_mail_decision" ||
+      candidateManifest.mutating !== true
+    ) {
+      return false;
+    }
+    const candidateArgs = canonicalContinuationAliasRequest(
+      input.candidate,
+    ).arguments;
+    const requiredFields = Array.isArray(
+      candidateManifest.input_schema.required,
+    )
+      ? candidateManifest.input_schema.required
+      : [];
+    if (requiredFields.some((field) => !(field in candidateArgs))) return false;
+    const allowedFields = new Set(
+      Object.keys(candidateManifest.input_schema.properties ?? {}),
+    );
+    if (
+      candidateManifest.input_schema.additionalProperties === false &&
+      Object.keys(candidateArgs).some((field) => !allowedFields.has(field))
+    ) {
+      return false;
+    }
+    const processedPacketIds = readStringArray(
+      candidateArgs.processed_packet_ids,
+    );
+    const mailIds = readStringArray(candidateArgs.mail_ids);
+    if (processedPacketIds.length === 0 || mailIds.length === 0) return false;
+    const decisionSchema = readRecord(
+      readRecord(candidateManifest.input_schema.properties)?.decision,
+    );
+    const decisionValues = readStringArray(decisionSchema?.enum);
+    const decision = readString(candidateArgs.decision);
+    if (!decision || (decisionValues.length > 0 && !decisionValues.includes(decision))) {
+      return false;
+    }
+    return untriedContinuationLaneRequests(input.state).some((affordance) => {
+      const affordanceRequest = canonicalContinuationAliasRequest(
+        affordance.lane_request,
+      );
+      if (
+        affordanceRequest.capability !==
+        "live_env.record_live_source_mail_decision"
+      ) {
+        return false;
+      }
+      const evidenceRefs = new Set(
+        readStringArray(affordanceRequest.arguments.evidence_refs),
+      );
+      if (evidenceRefs.size === 0) return false;
+      return (
+        processedPacketIds.every((packetId) => evidenceRefs.has(packetId)) &&
+        mailIds.every((mailId) => evidenceRefs.has(mailId))
       );
     });
   };
@@ -10995,12 +11164,19 @@ export const continuationStateAdmitsPostObservationLaneRequest = (input: {
   admittedCapabilityIds: string[];
   availableCapabilities: HelixWorkstationCapabilityManifest[];
 }): boolean => {
+  const evidenceBoundLiveSourceDecision =
+    continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest({
+      state: input.state,
+      candidate: input.candidate,
+      availableCapabilities: input.availableCapabilities,
+    });
   if (
     !input.candidate ||
-    !runtimeLaneRequestCandidateUsesAdmittedCapabilities({
-      candidate: input.candidate,
-      admittedCapabilityIds: input.admittedCapabilityIds,
-    })
+    (!evidenceBoundLiveSourceDecision &&
+      !runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+        candidate: input.candidate,
+        admittedCapabilityIds: input.admittedCapabilityIds,
+      }))
   ) {
     return false;
   }
@@ -11015,6 +11191,7 @@ export const continuationStateAdmitsPostObservationLaneRequest = (input: {
       candidate: input.candidate,
       availableCapabilities: input.availableCapabilities,
     }) ||
+    evidenceBoundLiveSourceDecision ||
     continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest({
       state: input.state,
       candidate: input.candidate,
@@ -11065,12 +11242,19 @@ export const continuationStateAdmitsGenericProviderLaneRequest = (input: {
   availableCapabilities?: HelixWorkstationCapabilityManifest[];
   providerSelectedExtensionAllowed?: boolean;
 }): boolean => {
+  const evidenceBoundLiveSourceDecision =
+    continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest({
+      state: input.state,
+      candidate: input.candidate,
+      availableCapabilities: input.availableCapabilities ?? [],
+    });
   if (
     !input.candidate ||
-    !runtimeLaneRequestCandidateUsesAdmittedCapabilities({
-      candidate: input.candidate,
-      admittedCapabilityIds: input.admittedCapabilityIds,
-    })
+    (!evidenceBoundLiveSourceDecision &&
+      !runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+        candidate: input.candidate,
+        admittedCapabilityIds: input.admittedCapabilityIds,
+      }))
   ) {
     return false;
   }
@@ -11110,6 +11294,7 @@ export const continuationStateAdmitsGenericProviderLaneRequest = (input: {
       candidate: input.candidate,
       availableCapabilities: input.availableCapabilities ?? [],
     }) ||
+    evidenceBoundLiveSourceDecision ||
     continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest({
       state: input.state,
       candidate: input.candidate,
@@ -11219,8 +11404,62 @@ export const buildCodexContinuationAffordanceRetryInstruction = (
         missing_required_fields: string[];
       } => Boolean(option),
     );
+  const incompleteEvidenceBoundLiveSourceDecisionOptions = options
+    .map((option) => {
+      const manifest = continuationCapabilityManifest({
+        request: option.lane_request,
+        availableCapabilities,
+      });
+      if (
+        !manifest ||
+        manifest.capability_id !==
+          "live_env.record_live_source_mail_decision" ||
+        manifest.mutating !== true
+      ) {
+        return null;
+      }
+      const request = canonicalContinuationAliasRequest(option.lane_request);
+      const missingRequiredFields = continuationRequestMissingRequiredFields({
+        request: option.lane_request,
+        manifest,
+      });
+      const evidenceRefs = readStringArray(request.arguments.evidence_refs);
+      const processedPacketIds = evidenceRefs.filter((ref) =>
+        ref.startsWith("stage_play_processed_mail_packet:"),
+      );
+      const mailIds = evidenceRefs.filter((ref) =>
+        ref.startsWith("stage_play_live_source_mail:"),
+      );
+      return missingRequiredFields.length > 0 &&
+        processedPacketIds.length > 0 &&
+        mailIds.length > 0
+        ? {
+            capability_id: manifest.capability_id,
+            missing_required_fields: missingRequiredFields,
+            processed_packet_ids: processedPacketIds,
+            mail_ids: mailIds,
+          }
+        : null;
+    })
+    .filter(
+      (
+        option,
+      ): option is {
+        capability_id: string;
+        missing_required_fields: string[];
+        processed_packet_ids: string[];
+        mail_ids: string[];
+      } => Boolean(option),
+    );
   const argumentInstruction =
-    incompleteEvidenceBoundWalkOptions.length > 0
+    incompleteEvidenceBoundLiveSourceDecisionOptions.length > 0
+      ? [
+          "Keep the selected live-source decision capability and bind the decision only to the exact processed packet and mail identities extracted from its evidence_refs below.",
+          'Author decision, rationale, and next_loop_state from the re-entered packet facts and original user request. Use this exact outer shape: {"capability":"live_env.record_live_source_mail_decision","arguments":{"decision":"<one input-schema enum value>","processed_packet_ids":["<exact packet id>"],"mail_ids":["<exact mail id>"],"rationale":"<brief evidence-grounded reason>","next_loop_state":"<materially revised next semantic state>"}}.',
+          "Do not copy evidence_refs into the executable arguments, invent identities, or let Helix choose the semantic decision. Helix independently validates identity, freshness, permission, schema, and execution.",
+          `Evidence-bound live-source decision affordances: ${JSON.stringify(incompleteEvidenceBoundLiveSourceDecisionOptions)}`,
+        ].join("\n")
+      : incompleteEvidenceBoundWalkOptions.length > 0
       ? [
           "Keep the selected Player Embodiment walk capability and every argument already present in its lane_request unchanged.",
           "Author action_kind=walk and choose direction only from a fresh movement_safety walk_step_candidates row whose safe_candidate and evidence_complete values are true. Helix independently rejects any direction not proven by that current-turn observation.",
@@ -11512,11 +11751,28 @@ export const attachCodexMinecraftPlayerEmbodimentActionRequirement = (input: {
     return false;
   }
 
+  const residentRecoveryCapabilityIds =
+    requiredMinecraftResidentRecoveryCapabilityIds(input.promptText ?? "", {
+      trusted_environment_domain: "minecraft",
+      authorized_player_action_capability_ids: [
+        HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+      ],
+    });
   const actionRequirement = {
     group_id: MINECRAFT_PLAYER_EMBODIMENT_ACTION_REQUIREMENT_ID,
     semantic_requirement:
-      "one_successful_player_embodiment_action_selected_by_runtime",
-    capability_ids: [...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS],
+      residentRecoveryCapabilityIds.length > 0
+        ? "requested_resident_physical_recovery_effect_coverage"
+        : "one_successful_player_embodiment_action_selected_by_runtime",
+    capability_ids:
+      residentRecoveryCapabilityIds.length > 0
+        ? residentRecoveryCapabilityIds
+        : uniqueStrings([
+            ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+            ...affirmativeMinecraftPlayerControlCapabilityIds(
+              input.promptText ?? "",
+            ),
+          ]),
   };
   const existingCanonicalGoalFrame = readRecord(
     input.body.canonical_goal_frame,
@@ -11581,7 +11837,7 @@ export const attachCodexMinecraftPlayerEmbodimentActionRequirement = (input: {
     );
   }
   const playerActionCapabilities = new Set<string>(
-    HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+    actionRequirement.capability_ids,
   );
   const constrainPostActionSubgoals = (
     contract: Record<string, unknown> | null,
@@ -11840,6 +12096,7 @@ export const selectCodexRuntimeCapabilityProposalIds = (input: {
 };
 
 export const nativeProviderAdmittedCapabilityIdsForTurn = (input: {
+  question?: string;
   semanticPlayerEmbodimentActionRequired: boolean;
   runtimeProviderRequiredGroundingCapabilityIds: string[];
   runtimeProviderAdmittedCapabilityIds: string[];
@@ -11850,6 +12107,7 @@ export const nativeProviderAdmittedCapabilityIdsForTurn = (input: {
   const minecraftReasoningIds = new Set<string>([
     ...HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS,
     ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+    ...affirmativeMinecraftPlayerControlCapabilityIds(input.question ?? ""),
   ]);
   // A semantic Player Embodiment turn needs both halves of the Minecraft
   // reasoning surface: bounded observations to discover current state and the
@@ -11879,6 +12137,25 @@ export const shouldUseCodexFocusedCapabilityProjection = (input: {
 export const codexProviderCapabilityUsageNotes = (
   capabilityId: string,
 ): string[] => {
+  if (
+    capabilityId ===
+    HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY
+  ) {
+    return [
+      `${HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY} arms the trusted resident.minecraft.fabric-guardian.v1 profile across later action boundaries; it is the bounded local viability capability for protection during model delay, not a Minecraft server command or an arbitrary reactive graph.`,
+      'Use action_kind "arm_viability_guardian", profile_id "resident.minecraft.fabric-guardian.v1", a finite duration_ticks, minimum_air, dangerous_vertical_velocity, maximum_swim_ticks, maximum_observation_age_ticks, and the exact response_repertoire ["swim_up", "release_controls", "request_semantic_replan"]. Five minutes at 20 Hz is 6000 ticks.',
+      "The resident guardian may swim upward when air is low. Fire, lava, unsafe landing, blocked movement, stale evidence, manual override, and Emergency Stop cause bounded release/abstention and semantic escalation unless another separately admitted recovery exists. Do not substitute water breathing, teleportation, unrestricted commands, or invented recovery authority.",
+      `Do not select this arm capability as if it implements a requested fire, lava, unsafe-landing, or other locomotion recovery. When the user requests a bounded local response to one of those anticipated hazards, use ${HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY} for the exact admitted response, even when the trigger is not true yet; its event nodes may wait locally for a future measured trigger while Runtime Codex is absent.`,
+    ];
+  }
+  if (
+    capabilityId ===
+    HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY
+  ) {
+    return [
+      `${HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY} gracefully disarms resident.minecraft.fabric-guardian.v1 and releases its controls. Use action_kind "disarm_viability_guardian" with that exact profile_id when resident protection is no longer required; do not substitute Emergency Stop for normal successful cleanup.`,
+    ];
+  }
   if (capabilityId === HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY) {
     return [
       "Interaction targets current_focus, looked_at_block, or looked_at_entity refer to the player's current camera ray at execution time. A spatial-region, local-map, line-of-sight, or reachability observation does not move the camera and does not itself establish looked_at_block or looked_at_entity.",
@@ -11908,13 +12185,18 @@ export const codexProviderCapabilityUsageNotes = (
 
   return [
     `${HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY} executes the bounded reactive graph authored in the request; the interpreter does not invent omitted actions, goals, or recovery steps.`,
+    "Use this capability for a requested bounded local response to an anticipated future condition as well as a currently observed condition. A fresh no-hazard observation does not invalidate a user-defined future trigger: an event node can wait locally within wait_up_to_ticks, execute the authored response when the measured trigger becomes true, verify its postcondition, and settle without another model turn.",
     "Before authoring a physical graph, use an admitted read-only capability when direction, local geometry, reachability, inventory state, or another executable argument is not already supported by current-turn evidence. After a physical failure, diagnose from the typed observation instead of guessing a longer or different action.",
+    "Size hazard-recovery locomotion from current geometry and measured medium-specific displacement, not ordinary-ground timing. Sprint/jump input is strongly slowed in lava: in the accepted local reference course, 600 ms produced only 0.435 blocks and failed hazard_clear, while 1400 ms produced 3.188 blocks and reached adjacent water. Treat those measurements as calibration evidence rather than a universal duration; leave enough bounded margin to cross the observed hazard, then verify the requested clear-state postcondition before success.",
     "Represent every required physical state change with an explicit causal action node. Conditions, checkpoints, and camera aiming only observe or aim: for example, waiting for a falling-state condition cannot make a stationary actor leave a platform; a concurrent action lane must cause the intended motion.",
     "Use concurrent required lanes when one lane must cause or maintain activity while another monitors live conditions and responds. Declare every resource used by that lane, and keep manual-override, safety-interrupt, and control-release behavior explicit.",
+    "A safety condition that must cancel or redirect work whenever it becomes unsafe must be an independent interrupt evaluated throughout the program, not only an initial checkpoint. For example, a requested health floor must trigger when health_at_least becomes not_satisfied, cancel the hazardous locomotion lane, and settle through an explicit safe terminal with controls released.",
     "Keep causally ordered work that shares resources in one required lane: action, measured condition/checkpoint, dependent action, then verified terminal. Use parallel lanes only for work that is truly concurrent and can coexist under the declared resources; an interrupt-only safety watcher normally does not need to be a required completion lane.",
     "Reactive graphs must be acyclic. Do not poll by pointing a branch back to itself; use a checkpoint, event, maintain, or repeat node with an explicit bound. Give every node and interrupt a globally unique identifier across the whole program.",
     "Reactive node wait and timeout windows start when that node is entered. Coordinate them in Minecraft ticks: a bounded duration_ms action normally occupies ceil(duration_ms / 50) scheduler ticks. Leave enough time for a causal predecessor to create the observed state; under all_required, any required lane that fails, times out, or reaches a canceled terminal ends the whole program and cancels unfinished required work.",
     "A grounded vanilla client may report a small negative delta-y near -0.0784. Do not treat a near-zero vertical_velocity_at_most threshold as proof of falling: require player_grounded false or a materially lower measured descent threshold such as -0.25 before a landing-sensitive action. predicted_collision_within can otherwise match the immediate support collision while grounded.",
+    'When a reactive program is the separately admitted recovery for an armed resident guardian, declare only the exact resident_guardian_coverage it actually implements. "unsafe_landing_recovery" is admitted only for a required immediate predicted-collision water-bucket rescue with cleanup, a two-mutation water scope, and an independent health-floor interrupt. "fire_recovery" is admitted only for a required immediate lane that measures on_fire_is true, performs bounded locomotion, measures on_fire_is false, and has the same independent health-floor interrupt. The declaration lets the guardian monitor the recovery instead of canceling it; it never expands effects or mutation authority.',
+    "The reactive condition catalog exposes measured air_at_least, submerged_is, swimming_is, on_fire_is, and in_lava_is predicates. Use them only as current-state observations inside a causal program; they do not themselves perform rescue actions.",
     "Resolve live geometry bindings only after their measured preconditions exist. For predicted_collision_cell, first wait for a real trajectory-producing state transition, then wait until predicted_collision_within is true, and only then execute place; the position binding is resolved from the current trajectory when the action runs. A main-hand item_use place lane must declare camera, locomotion, hotbar, main_hand, inventory, world, and native_workflow. Entering place acquires that set while it runs, so gate it after the causal locomotion state rather than letting it starve the motion lane. A focus check is not a trajectory check.",
     "A failed or timed-out action, event, or checkpoint may enter an explicit bounded recovery node or a failed/canceled terminal, but cannot directly claim success. A succeeded terminal is justified only by the returned postcondition, mutation, inventory, safety, and controls-released observations required by the user goal.",
   ];
@@ -14311,6 +14593,193 @@ type TheoryVerifierLifecycleObservationKind =
   | "theory_independent_numerical_verifier_start_observation"
   | "theory_independent_numerical_verifier_result_observation";
 
+const LIVE_SOURCE_CANONICAL_STRING_LIMIT = 48;
+const LIVE_SOURCE_CANONICAL_FACT_LIMIT = 16;
+
+const compactLiveSourceStringList = (
+  value: unknown,
+  limit = LIVE_SOURCE_CANONICAL_STRING_LIMIT,
+): string[] =>
+  uniqueStrings(
+    readArray(value)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry))
+      .slice(0, limit),
+  );
+
+const compactProcessedLiveSourceMailPacketForHelix = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const packet = readRecord(value);
+  if (!packet) return null;
+  const salience = readRecord(packet.salience);
+  return {
+    artifactId: readString(packet.artifactId),
+    schemaVersion: readString(packet.schemaVersion),
+    packetId: readString(packet.packetId),
+    jobId: readString(packet.jobId),
+    sourceId: readString(packet.sourceId),
+    mailIds: compactLiveSourceStringList(packet.mailIds, 16),
+    visualEvidenceRefs: compactLiveSourceStringList(packet.visualEvidenceRefs),
+    observedFacts: compactLiveSourceStringList(
+      packet.observedFacts,
+      LIVE_SOURCE_CANONICAL_FACT_LIMIT,
+    ),
+    changedFacts: compactLiveSourceStringList(
+      packet.changedFacts,
+      LIVE_SOURCE_CANONICAL_FACT_LIMIT,
+    ),
+    inferredFacts: compactLiveSourceStringList(
+      packet.inferredFacts,
+      LIVE_SOURCE_CANONICAL_FACT_LIMIT,
+    ),
+    uncertainties: compactLiveSourceStringList(packet.uncertainties, 12),
+    sceneTags: compactLiveSourceStringList(packet.sceneTags, 16),
+    activityTags: compactLiveSourceStringList(packet.activityTags, 16),
+    objectTags: compactLiveSourceStringList(packet.objectTags, 16),
+    matchedCriteria: compactLiveSourceStringList(packet.matchedCriteria, 16),
+    suppressedCriteria: compactLiveSourceStringList(
+      packet.suppressedCriteria,
+      16,
+    ),
+    riskMatches: compactLiveSourceStringList(packet.riskMatches, 16),
+    opportunityMatches: compactLiveSourceStringList(
+      packet.opportunityMatches,
+      16,
+    ),
+    recommendedNext: readString(
+      packet.recommendedNext ?? packet.recommended_next,
+    ),
+    salience: salience
+      ? {
+          level: readString(salience.level),
+          reasons: compactLiveSourceStringList(salience.reasons, 12),
+          voiceCandidate: readBoolean(salience.voiceCandidate),
+          calloutDraft: readString(salience.calloutDraft),
+        }
+      : null,
+    evidenceRefs: compactLiveSourceStringList(packet.evidenceRefs),
+    createdAt: readString(packet.createdAt),
+    assistantAnswer: false,
+    terminalEligible: false,
+    rawContentIncluded: false,
+  };
+};
+
+const compactLiveSourceMailDecisionForHelix = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const decision = readRecord(value);
+  if (!decision) return null;
+  return {
+    artifactId: readString(decision.artifactId),
+    schemaVersion: readString(decision.schemaVersion),
+    decisionId: readString(decision.decisionId),
+    mailIds: compactLiveSourceStringList(decision.mailIds, 16),
+    threadId: readString(decision.threadId),
+    roomId: readString(decision.roomId),
+    environmentId: readString(decision.environmentId),
+    decision: readString(decision.decision),
+    rationalePreview: readString(decision.rationalePreview)?.slice(0, 1_000),
+    nextLoopState: readString(
+      decision.nextLoopState ?? decision.next_loop_state,
+    ),
+    nextExpectedSourceKind: readString(decision.nextExpectedSourceKind),
+    nextExpectedAfterMs: readNumber(decision.nextExpectedAfterMs),
+    mailboxCursor: readString(decision.mailboxCursor),
+    activeJobId: readString(decision.activeJobId),
+    observedFacts: compactLiveSourceStringList(
+      decision.observedFacts,
+      LIVE_SOURCE_CANONICAL_FACT_LIMIT,
+    ),
+    inferredMeaning: compactLiveSourceStringList(
+      decision.inferredMeaning,
+      LIVE_SOURCE_CANONICAL_FACT_LIMIT,
+    ),
+    evidenceRefs: compactLiveSourceStringList(decision.evidenceRefs),
+    modelReviewed: readBoolean(decision.modelReviewed),
+    createdAt: readString(decision.createdAt),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const compactLiveSourceMailboxObservationForHelix = (
+  observation: Record<string, unknown>,
+): Record<string, unknown> => {
+  const toolName = readString(observation.tool_name);
+  const result = readRecord(observation.observation);
+  let compactResult: Record<string, unknown> | null = null;
+  if (toolName === "live_env.read_processed_live_source_mail" && result) {
+    compactResult = {
+      schema: readString(result.schema),
+      packets: readArray(result.packets)
+        .slice(0, 4)
+        .map(compactProcessedLiveSourceMailPacketForHelix)
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry)),
+      processedPacketRefs: compactLiveSourceStringList(
+        result.processedPacketRefs ?? result.processed_packet_refs,
+        16,
+      ),
+      missingRawMailIds: compactLiveSourceStringList(
+        result.missingRawMailIds ?? result.missing_raw_mail_ids,
+        16,
+      ),
+      evidence_refs: compactLiveSourceStringList(result.evidence_refs),
+      producedRefs: compactLiveSourceStringList(result.producedRefs, 24),
+      created_at: readString(result.created_at),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  } else if (toolName === "live_env.record_live_source_mail_decision" && result) {
+    compactResult =
+      compactLiveSourceMailDecisionForHelix(result.decision) ??
+      compactLiveSourceMailDecisionForHelix(result);
+  } else if (result) {
+    compactResult = {
+      schema: readString(result.schema ?? result.schemaVersion),
+      artifactId: readString(result.artifactId),
+      schemaVersion: readString(result.schemaVersion),
+      readId: readString(result.readId),
+      mailIds: compactLiveSourceStringList(result.mailIds, 16),
+      processedPacketRefs: compactLiveSourceStringList(
+        result.processedPacketRefs ?? result.processed_packet_refs,
+        16,
+      ),
+      missingRawMailIds: compactLiveSourceStringList(
+        result.missingRawMailIds ?? result.missing_raw_mail_ids,
+        16,
+      ),
+      evidence_refs: compactLiveSourceStringList(result.evidence_refs),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  }
+  return {
+    schema:
+      readString(observation.schema) ??
+      "helix.live_environment_tool_observation.v1",
+    observation_id: readString(observation.observation_id),
+    thread_id: readString(observation.thread_id),
+    environment_id: readString(observation.environment_id),
+    tool_name: toolName,
+    ok: readBoolean(observation.ok),
+    summary: readString(observation.summary)?.slice(0, 2_000),
+    observation: compactResult,
+    evidence_refs: compactLiveSourceStringList(observation.evidence_refs),
+    produced_refs: compactLiveSourceStringList(
+      observation.produced_refs ?? observation.producedRefs,
+      24,
+    ),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
 const THEORY_VERIFIER_LIFECYCLE_CONTRACTS: Readonly<
   Record<
     string,
@@ -14419,6 +14888,14 @@ const isAuthenticTheoryVerifierLifecycleObservation = (input: {
 const typedObservationKindForGatewayCapability = (
   capabilityId: string,
 ): string | null => {
+  if (
+    capabilityId === "live_env.read_live_source_mail" ||
+    capabilityId === "live_env.process_live_source_mail" ||
+    capabilityId === "live_env.read_processed_live_source_mail" ||
+    capabilityId === "live_env.record_live_source_mail_decision"
+  ) {
+    return "live_environment_tool_observation";
+  }
   if (capabilityId === LIVE_PIPELINE_SET_RATE_CAPABILITY) {
     return "visual_producer_cadence_receipt";
   }
@@ -14512,6 +14989,9 @@ const typedObservationKindForGatewayCapability = (
 };
 
 const schemaForTypedObservationKind = (kind: string): string => {
+  if (kind === "live_environment_tool_observation") {
+    return "helix.live_environment_tool_observation.v1";
+  }
   if (kind === "visual_producer_cadence_receipt") {
     return "helix.visual_producer_cadence_receipt.v1";
   }
@@ -15294,6 +15774,10 @@ const normalizeGatewayObservationForHelix = (input: {
   if (!kind) return null;
   const observation = readGatewayObservationRecord(input.result);
   if (!observation) return null;
+  const normalizedObservation =
+    kind === "live_environment_tool_observation"
+      ? compactLiveSourceMailboxObservationForHelix(observation)
+      : observation;
   if (
     input.result.capability_id === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY &&
     !isAuthenticBoundRoomEvidenceObservation({
@@ -15378,9 +15862,9 @@ const normalizeGatewayObservationForHelix = (input: {
   const sourceRef = readGatewayObservationRef(input.result, input.turnId);
   const artifactId = `${input.turnId}:codex_normalized:${kind}:${input.index + 1}`;
   const status =
-    readString(observation.status) ??
+    readString(normalizedObservation.status) ??
     (input.result.ok ? "succeeded" : "failed");
-  const textPreview = compactObservationTextPreview(observation);
+  const textPreview = compactObservationTextPreview(normalizedObservation);
   const specializedExecutedArgs =
     input.result.capability_id ===
     THEORY_EXPERIMENT_PROCEDURE_READMIT_CAPABILITY
@@ -15417,8 +15901,8 @@ const normalizeGatewayObservationForHelix = (input: {
     SCIENTIFIC_EVIDENCE_CLOSURE_EVALUATE_CAPABILITY
       ? readString(scientificClosurePacket?.artifactSha256)
       : null;
-  const sourceObservationSchema = readString(observation.schema);
-  const sourceObservationStatus = readString(observation.status);
+  const sourceObservationSchema = readString(normalizedObservation.schema);
+  const sourceObservationStatus = readString(normalizedObservation.status);
   const lanyonRequest = readRecord(observation.request);
   const lanyonBindings = readRecord(observation.bindings);
   const normalizedNextAffordances =
@@ -15463,7 +15947,7 @@ const normalizeGatewayObservationForHelix = (input: {
     ...(executedArgs ? { executed_args: executedArgs } : {}),
     ...(textPreview ? { text_preview: textPreview } : {}),
     payload: {
-      ...observation,
+      ...normalizedObservation,
       schema: schemaForTypedObservationKind(kind),
       kind,
       status,
@@ -15893,6 +16377,90 @@ export const continuationStateRequiresCodexModelAuthoredCapabilityProposal = (
   state.allowed_decisions.includes("act") &&
   !state.allowed_decisions.includes("answer");
 
+export const enforceCodexLockedLiveSourceContinuation = (input: {
+  state: HelixAgentContinuationState;
+  prompt: string;
+  currentTurnArtifacts: Array<Record<string, unknown>>;
+  selectedTargetSource?: string | null;
+  selectedCapability?: string | null;
+  admittedCapabilityIds: string[];
+}): HelixAgentContinuationState => {
+  const phase = resolveLiveSourceTurnPhase({
+    prompt: input.prompt,
+    selectedTargetSource: input.selectedTargetSource,
+    selectedCapability: input.selectedCapability,
+    latestToolReceipts: input.currentTurnArtifacts,
+  });
+  const mandatoryCapability = mandatoryToolForPhase(phase);
+  if (
+    phase.phaseLock.locked !== true ||
+    !mandatoryCapability ||
+    !input.admittedCapabilityIds.includes(mandatoryCapability)
+  ) {
+    return input.state;
+  }
+  return {
+    ...input.state,
+    state_id: `${input.state.state_id}:live_source_phase:${phase.phase}`,
+    goal: {
+      ...input.state.goal,
+      status: "in_progress",
+      satisfied: false,
+      terminal_product_allowed: false,
+    },
+    capability_proposal: {
+      allowed: true,
+      admitted_capability_ids: [mandatoryCapability],
+      authority: "helix_policy_admits_runtime_proposal",
+    },
+    progress: {
+      ...input.state.progress,
+      reason_codes: uniqueStrings([
+        ...input.state.progress.reason_codes,
+        "live_source_phase_locked",
+        `live_source_phase:${phase.phase}`,
+        `live_source_mandatory_capability:${mandatoryCapability}`,
+      ]),
+    },
+    allowed_decisions: ["act"],
+  };
+};
+
+export const admitCodexLockedLiveSourceContinuationCapability = (input: {
+  prompt: string;
+  currentTurnArtifacts: Array<Record<string, unknown>>;
+  selectedTargetSource?: string | null;
+  selectedCapability?: string | null;
+  admittedCapabilityIds: string[];
+  availableCapabilityIds: string[];
+}): string[] => {
+  const admittedCapabilityIds = uniqueStrings(input.admittedCapabilityIds);
+  if (input.currentTurnArtifacts.length === 0) {
+    return admittedCapabilityIds;
+  }
+  const phase = resolveLiveSourceTurnPhase({
+    prompt: input.prompt,
+    selectedTargetSource: input.selectedTargetSource,
+    selectedCapability: input.selectedCapability,
+    latestToolReceipts: input.currentTurnArtifacts,
+  });
+  const mandatoryCapability = mandatoryToolForPhase(phase);
+  // A mailbox decision is a mutation, so it is never admitted from prompt
+  // language alone. A fresh current-turn processed packet may unlock exactly
+  // this one procedural continuation when the canonical phase resolver locks
+  // the turn to it and the gateway catalog confirms that the capability
+  // exists. Gateway policy still performs authoritative execution admission.
+  if (
+    phase.phase !== "record_decision" ||
+    phase.phaseLock.locked !== true ||
+    mandatoryCapability !== "live_env.record_live_source_mail_decision" ||
+    !input.availableCapabilityIds.includes(mandatoryCapability)
+  ) {
+    return admittedCapabilityIds;
+  }
+  return uniqueStrings([...admittedCapabilityIds, mandatoryCapability]);
+};
+
 export const codexRequiredContinuationReviewMode = (
   state: HelixAgentContinuationState,
 ): "retry" | "affordance" | "proposal" | null => {
@@ -16003,6 +16571,21 @@ export const buildCodexGenericContinuationDecisionInstruction = (
     ].join("\n");
   }
   if (continuationStateRequiresCodexModelAuthoredCapabilityProposal(state)) {
+    const admittedProposalCapabilities = uniqueStrings(
+      state.capability_proposal?.admitted_capability_ids ?? [],
+    );
+    if (
+      admittedProposalCapabilities.length === 1 &&
+      admittedProposalCapabilities[0] ===
+        "live_env.record_live_source_mail_decision"
+    ) {
+      return [
+        "The current live-source continuation is act-only: Codex must record one semantic decision for the exact processed packet that just re-entered before it may answer.",
+        `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON in this outer shape: {"capability":"live_env.record_live_source_mail_decision","arguments":{"decision":"<one schema-enumerated semantic decision>","processed_packet_ids":["<exact packetId from the re-entered packet>"],"mail_ids":["<exact mailId from that packet>"],"rationale":"<brief evidence-grounded reason>","next_loop_state":"<materially revised next semantic state>"}}.`,
+        "Copy processed_packet_ids and mail_ids exactly from the current-turn packet observation. Codex—not Helix—chooses decision, rationale, and next_loop_state from the packet facts, recommendation, original request, and exact input schema.",
+        "Do not answer, refuse, defer, repeat the mailbox read, invent identity values, or merely describe the decision capability. Helix will independently validate packet identity, subject scope, freshness, permission, and execution before the decision receipt re-enters.",
+      ].join("\n");
+    }
     return [
       "The current continuation is act-only: a different admitted capability remains required after the latest observation.",
       `Output only ${CODEX_CAPABILITY_LANE_REQUEST_MARKER} followed by compact JSON in this outer shape: {"capability":"<exact admitted capability_id>","arguments":{<schema-valid arguments>}}, with schema-valid arguments authored from the original request and re-entered observations.`,
@@ -20952,6 +21535,10 @@ const isGatewayResultCompatibleWithProviderReentry = (
       gatewayCallResults,
       index,
     ) ||
+    hasCurrentTurnResidentSemanticReplanRecovery(
+      gatewayCallResults,
+      index,
+    ) ||
     isScholarlyNumericFailClosedGatewayResult(result) ||
     isCalculatorBlockedExpressionGatewayResult(result) ||
     isGatewayRecoveryAffordanceResult(result) ||
@@ -23052,6 +23639,13 @@ type CodexNativeEventProjection = {
   transcriptEvent: Record<string, unknown>;
 };
 
+export const isCodexNativeTurnCompletionProjection = (
+  projection: { transcriptEvent?: Record<string, unknown> } | null,
+): boolean =>
+  readString(projection?.transcriptEvent?.step_id) ===
+    "codex_native_turn_complete" &&
+  readString(projection?.transcriptEvent?.status) === "completed";
+
 const unwrapCodexNativeEventEnvelope = (
   value: unknown,
 ): Record<string, unknown> | null => {
@@ -23071,6 +23665,13 @@ const readCodexNativeEventNameAndPayload = (
 ): { name: string; payload: Record<string, unknown> } | null => {
   const event = unwrapCodexNativeEventEnvelope(value);
   if (!event) return null;
+  const method = readString(event.method);
+  if (method) {
+    return {
+      name: method,
+      payload: readRecord(event.params) ?? event,
+    };
+  }
   const msg = readRecord(event.msg);
   if (msg) {
     const type =
@@ -23141,20 +23742,20 @@ const codexNativeEventSourceType = (name: string): string => {
     return "codex_native_reasoning_delta";
   }
   if (
-    /^(McpToolCallBegin|ExecCommandBegin|DynamicToolCallRequest|ItemStarted|item\/tool\/call)$/i.test(
+    /^(McpToolCallBegin|ExecCommandBegin|DynamicToolCallRequest|ItemStarted|item[\/.]started|item\/tool\/call)$/i.test(
       normalized,
     )
   ) {
     return "codex_native_tool_request";
   }
   if (
-    /^(McpToolCallEnd|ExecCommandEnd|DynamicToolCallResponse|ItemCompleted|item\/tool\/result)$/i.test(
+    /^(McpToolCallEnd|ExecCommandEnd|DynamicToolCallResponse|ItemCompleted|item[\/.]completed|item\/tool\/result)$/i.test(
       normalized,
     )
   ) {
     return "codex_native_tool_result";
   }
-  if (/^(TurnComplete|turn\/completed)$/i.test(normalized))
+  if (/^(TurnComplete|turn[\/.]completed)$/i.test(normalized))
     return "codex_native_turn_complete";
   if (/^(Error|StreamError|TurnAborted|error)$/i.test(normalized))
     return "codex_native_error";
@@ -23170,6 +23771,13 @@ const projectCodexNativeEvent = (input: {
   if (!native) return null;
   const sourceEventType = codexNativeEventSourceType(native.name);
   const payload = native.payload;
+  const nativeItem = readRecord(payload.item);
+  const nativeItemType = readString(nativeItem?.type)?.replace(/[_-]/g, "").toLowerCase();
+  const effectiveSourceEventType =
+    /^(?:item[\/.]completed|ItemCompleted)$/i.test(native.name) &&
+    nativeItemType === "agentmessage"
+      ? "codex_native_message_delta"
+      : sourceEventType;
   const text = readCodexNativeText(payload);
   const toolName = readCodexNativeToolName(payload);
   const atMs =
@@ -23181,21 +23789,21 @@ const projectCodexNativeEvent = (input: {
     readString(payload.id) ??
     readString(payload.call_id) ??
     readString(payload.item_id) ??
-    `${input.turnId}:codex_native:${input.seq}:${sourceEventType}`;
+    `${input.turnId}:codex_native:${input.seq}:${effectiveSourceEventType}`;
   const baseTranscript = {
-    id: `codex:native:${sourceEventType}:${eventId}`,
+    id: `codex:native:${effectiveSourceEventType}:${eventId}`,
     turn_id: nativeTurnId,
     seq: input.seq,
     at_ms: atMs,
     event_source: "live",
-    source_event_type: sourceEventType,
+    source_event_type: effectiveSourceEventType,
     provider_native_event_type: native.name,
     provider_native_event_schema: "codex.protocol.EventMsg",
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
   };
-  if (sourceEventType === "codex_native_tool_request") {
+  if (effectiveSourceEventType === "codex_native_tool_request") {
     return {
       runtimeEvent: {
         event: "agent_tool_request",
@@ -23219,7 +23827,7 @@ const projectCodexNativeEvent = (input: {
       },
     };
   }
-  if (sourceEventType === "codex_native_tool_result") {
+  if (effectiveSourceEventType === "codex_native_tool_result") {
     return {
       runtimeEvent: {
         event: "agent_tool_result",
@@ -23243,7 +23851,7 @@ const projectCodexNativeEvent = (input: {
       },
     };
   }
-  if (sourceEventType === "codex_native_turn_complete") {
+  if (effectiveSourceEventType === "codex_native_turn_complete") {
     return {
       runtimeEvent: {
         event: "agent_final",
@@ -23265,7 +23873,7 @@ const projectCodexNativeEvent = (input: {
       },
     };
   }
-  if (sourceEventType === "codex_native_error") {
+  if (effectiveSourceEventType === "codex_native_error") {
     return {
       runtimeEvent: {
         event: "agent_error",
@@ -23290,9 +23898,9 @@ const projectCodexNativeEvent = (input: {
   return {
     runtimeEvent: {
       event:
-        sourceEventType === "codex_native_message_delta"
+        effectiveSourceEventType === "codex_native_message_delta"
           ? "agent_message_delta"
-          : sourceEventType,
+          : effectiveSourceEventType,
       data: {
         provider_native_event_type: native.name,
         text,
@@ -23310,6 +23918,30 @@ const projectCodexNativeEvent = (input: {
       detail: native.name,
     },
   };
+};
+
+/**
+ * Compatibility stdout may contain provider protocol envelopes as well as the
+ * model's visible terminal text. Protocol envelopes can echo the complete
+ * input prompt, including the capability request example, so they must never
+ * be parsed as model-authored requests or answers.
+ */
+export const extractCodexCompatibilityModelOutput = (input: {
+  stdout: string;
+  nativeAgentMessageText?: string | null;
+}): string => {
+  const nativeAgentMessageText = input.nativeAgentMessageText?.trim();
+  if (nativeAgentMessageText) return nativeAgentMessageText;
+  return input.stdout
+    .split(/\r?\n/)
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("{")) return true;
+      const parsed = parseJsonRecord(trimmed);
+      return !parsed || !readCodexNativeEventNameAndPayload(parsed);
+    })
+    .join("\n")
+    .trim();
 };
 
 export async function runCodexProcess(input: {
@@ -23447,9 +24079,28 @@ export async function runCodexProcess(input: {
     };
   }
 
+  const compatibilityHome = resolveCodexCompatibilityHome();
+  try {
+    fs.mkdirSync(compatibilityHome, { recursive: true });
+  } catch {
+    return {
+      stdout: "",
+      stderr:
+        "Codex compatibility process could not initialize its isolated runtime home.",
+      exitCode: null,
+      timedOut: false,
+      killed: false,
+      failReason: "codex_compatibility_home_unavailable",
+      bin: binary.resolved_bin,
+      args: binary.args,
+      prompt_diagnostics: promptDiagnostics,
+    };
+  }
   const command = buildCodexSpawnCommand(
     binary.resolved_bin,
-    appendCodexModelPolicyArgs(binary.args, input),
+    appendCodexCompatibilityIsolationArgs(
+      appendCodexModelPolicyArgs(binary.args, input),
+    ),
   );
   const bin = command.bin;
   const args = command.args;
@@ -23462,14 +24113,14 @@ export async function runCodexProcess(input: {
       USERPROFILE: process.env.USERPROFILE,
       SystemRoot: process.env.SystemRoot,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      CODEX_HOME: process.env.CODEX_HOME,
+      CODEX_HOME: compatibilityHome,
     },
   });
 
   let killed = false;
-  const kill = () => {
+  const terminateChild = (markKilled: boolean) => {
     if (!child.killed) {
-      killed = true;
+      if (markKilled) killed = true;
       child.kill("SIGTERM");
     }
     if (process.platform === "win32" && child.pid) {
@@ -23483,6 +24134,7 @@ export async function runCodexProcess(input: {
       }
     }
   };
+  const kill = () => terminateChild(true);
 
   let aborted = false;
   const abort = () => {
@@ -23499,8 +24151,10 @@ export async function runCodexProcess(input: {
   const limit = maxOutputBytes();
   let nativeEventSeq = 0;
   let stdoutLineBuffer = "";
+  let nativeTurnCompletionObserved = false;
+  let nativeAgentMessageText = "";
+  let onNativeTurnCompletion: (() => void) | null = null;
   const projectNativeLine = (line: string): void => {
-    if (!input.onNativeEvent) return;
     const trimmed = line.trim();
     if (!trimmed || !trimmed.startsWith("{")) return;
     const parsed = parseJsonRecord(trimmed);
@@ -23512,18 +24166,41 @@ export async function runCodexProcess(input: {
     });
     if (!projection) return;
     nativeEventSeq += 1;
-    input.onNativeEvent(projection.runtimeEvent, projection.transcriptEvent);
+    if (
+      readString(projection.transcriptEvent.source_event_type) ===
+      "codex_native_message_delta"
+    ) {
+      const projectedText = readString(
+        readRecord(projection.runtimeEvent.data)?.text,
+      );
+      if (projectedText) {
+        const nativeEventType = readString(
+          projection.transcriptEvent.provider_native_event_type,
+        );
+        nativeAgentMessageText = /item[\/.]completed/i.test(
+          nativeEventType ?? "",
+        )
+          ? projectedText
+          : `${nativeAgentMessageText}${projectedText}`;
+      }
+    }
+    input.onNativeEvent?.(
+      projection.runtimeEvent,
+      projection.transcriptEvent,
+    );
+    if (isCodexNativeTurnCompletionProjection(projection)) {
+      nativeTurnCompletionObserved = true;
+      onNativeTurnCompletion?.();
+    }
   };
 
   child.stdout?.on("data", (chunk: Buffer) => {
     collected += chunk.length;
     const chunkText = chunk.toString("utf8");
-    if (input.onNativeEvent) {
-      stdoutLineBuffer += chunkText;
-      const lines = stdoutLineBuffer.split(/\r?\n/);
-      stdoutLineBuffer = lines.pop() ?? "";
-      for (const line of lines) projectNativeLine(line);
-    }
+    stdoutLineBuffer += chunkText;
+    const lines = stdoutLineBuffer.split(/\r?\n/);
+    stdoutLineBuffer = lines.pop() ?? "";
+    for (const line of lines) projectNativeLine(line);
     if (collected <= limit) stdout += chunkText;
     if (collected > limit) kill();
   });
@@ -23537,13 +24214,45 @@ export async function runCodexProcess(input: {
 
   return await new Promise((resolve) => {
     let settled = false;
+    let nativeCompletionGraceTimer: NodeJS.Timeout | null = null;
     const settle = (result: CodexProcessResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      if (nativeCompletionGraceTimer) {
+        clearTimeout(nativeCompletionGraceTimer);
+      }
       input.signal?.removeEventListener("abort", abort);
-      resolve(result);
+      resolve({
+        ...result,
+        stdout: extractCodexCompatibilityModelOutput({
+          stdout: result.stdout,
+          nativeAgentMessageText,
+        }),
+      });
     };
+    onNativeTurnCompletion = () => {
+      if (settled || nativeCompletionGraceTimer) return;
+      nativeCompletionGraceTimer = setTimeout(() => {
+        // Some Codex CLI builds leave background integration work alive after
+        // emitting the authoritative native turn-completed event. The model
+        // output is already complete at this boundary, so terminate the child
+        // tree without converting a successful model step into a timeout.
+        terminateChild(false);
+        settle({
+          stdout,
+          stderr,
+          exitCode: 0,
+          timedOut: false,
+          killed: false,
+          failReason: null,
+          bin,
+          args,
+          prompt_diagnostics: promptDiagnostics,
+        });
+      }, 250);
+    };
+    if (nativeTurnCompletionObserved) onNativeTurnCompletion();
     const timeout = setTimeout(() => {
       kill();
       const message = [
@@ -23578,17 +24287,19 @@ export async function runCodexProcess(input: {
       });
     });
     child.once("close", (exitCode) => {
-      if (input.onNativeEvent && stdoutLineBuffer.trim()) {
+      if (stdoutLineBuffer.trim()) {
         projectNativeLine(stdoutLineBuffer);
         stdoutLineBuffer = "";
       }
       settle({
         stdout,
         stderr,
-        exitCode,
+        exitCode: nativeTurnCompletionObserved ? 0 : exitCode,
         timedOut: false,
-        killed,
-        failReason: aborted
+        killed: nativeTurnCompletionObserved ? false : killed,
+        failReason: nativeTurnCompletionObserved
+          ? null
+          : aborted
           ? "codex_process_aborted"
           : exitCode === 0
             ? null
@@ -23662,7 +24373,9 @@ export const codexProvider: HelixAgentProvider = {
         model: compatibilityModelPolicy.model,
         reasoningEffort: compatibilityModelPolicy.reasoningEffort,
       });
-      const output = processResult.stdout.trim() || processResult.stderr.trim();
+      // stderr is transport diagnostics and may echo the complete input
+      // prompt. It is never model-authored content or capability authority.
+      const output = processResult.stdout.trim();
       const capabilityRequestMarkerDetected = output.includes(
         CODEX_CAPABILITY_LANE_REQUEST_MARKER,
       );
@@ -23904,6 +24617,7 @@ export const codexProvider: HelixAgentProvider = {
       );
     const nativeProviderAdmittedCapabilityIds =
       nativeProviderAdmittedCapabilityIdsForTurn({
+        question,
         semanticPlayerEmbodimentActionRequired,
         runtimeProviderRequiredGroundingCapabilityIds,
         runtimeProviderAdmittedCapabilityIds,
@@ -23915,7 +24629,7 @@ export const codexProvider: HelixAgentProvider = {
     // turn drift into capabilities whose required identities were never
     // produced by that turn. This narrows proposal documentation only; the
     // gateway still performs authoritative admission for every selected call.
-    const providerContinuationAdmittedCapabilityIds =
+    let providerContinuationAdmittedCapabilityIds =
       semanticPlayerEmbodimentActionRequired
         ? nativeProviderAdmittedCapabilityIds
         : runtimeProviderAdmittedCapabilityIds;
@@ -25115,6 +25829,25 @@ export const codexProvider: HelixAgentProvider = {
       } = {},
     ): HelixAgentContinuationState => {
       retainPriorEnvironmentEvidence();
+      providerContinuationAdmittedCapabilityIds =
+        admitCodexLockedLiveSourceContinuationCapability({
+          prompt: question,
+          currentTurnArtifacts: normalizedObservationArtifacts,
+          selectedTargetSource: readString(
+            runtimeSourceTargetIntent?.target_source,
+          ),
+          selectedCapability:
+            readString(runtimeToolCallAdmission?.admitted_capability) ??
+            readString(
+              readRecord(request.body.canonical_goal_frame)
+                ?.requested_capability,
+            ),
+          admittedCapabilityIds:
+            providerContinuationAdmittedCapabilityIds,
+          availableCapabilityIds: gatewayManifest.capabilities.map(
+            (capability) => capability.capability_id,
+          ),
+        });
       request.body.current_turn_artifact_ledger = currentTurnArtifactLedger;
       attachHelixCapabilityItineraryExecutionState(
         request.body,
@@ -25319,7 +26052,7 @@ export const codexProvider: HelixAgentProvider = {
           providerContinuationAdmittedCapabilityIds,
         semanticPlayerEmbodimentActionRequired,
       });
-      const builtState = settleReenteredToolContinuationForPostToolSynthesis({
+      const settledState = settleReenteredToolContinuationForPostToolSynthesis({
         state: buildHelixAgentContinuationState({
           payload: request.body,
           turnId,
@@ -25347,6 +26080,16 @@ export const codexProvider: HelixAgentProvider = {
           request.body.capability_itinerary_execution_state,
         ),
         currentCompoundCapabilityLedger: codexCompoundSubgoalLedger,
+      });
+      const builtState = enforceCodexLockedLiveSourceContinuation({
+        state: settledState,
+        prompt: question,
+        currentTurnArtifacts: normalizedObservationArtifacts,
+        selectedTargetSource: readString(sourceTargetIntent?.target_source),
+        selectedCapability:
+          readString(toolCallAdmissionDecision?.admitted_capability) ??
+          readString(canonicalGoalFrame?.requested_capability),
+        admittedCapabilityIds: providerContinuationAdmittedCapabilityIds,
       });
       const scholarlyRecoveryBoundaryReason =
         options.scholarlyRecoveryBoundaryReason ?? null;
@@ -27037,10 +27780,7 @@ export const codexProvider: HelixAgentProvider = {
     }): Promise<CodexProcessResult> => {
       if (!hasScholarlyGatewayObservation(gatewayCallResults))
         return input.currentResult;
-      const currentText =
-        input.currentResult.stdout.trim() ||
-        input.currentResult.stderr.trim() ||
-        "";
+        const currentText = input.currentResult.stdout.trim();
       // Compound turns may leave an admitted non-scholarly rail pending after
       // a scholarly observation. Preserve that Codex-authored handoff instead
       // of forcing it through the scholarly decision envelope.
@@ -27094,8 +27834,7 @@ export const codexProvider: HelixAgentProvider = {
           turnId,
           onNativeEvent: emitCodexNativeRuntimeEvent,
         });
-        rejectedText =
-          retryResult.stdout.trim() || retryResult.stderr.trim() || "";
+        rejectedText = retryResult.stdout.trim();
         validation = validateCodexScholarlyEvidenceDecision({
           text: rejectedText,
           phase: `${input.phase}_contract_retry_${contractRetry}`,
@@ -27119,8 +27858,7 @@ export const codexProvider: HelixAgentProvider = {
     });
     let initialCodexText =
       result.stdout.trim() ||
-      result.stderr.trim() ||
-      "Codex runtime did not return output before the provider adapter stopped waiting.";
+      "Codex runtime did not return model output before the provider adapter stopped waiting.";
     let runtimeSemanticRouteProposal =
       nativeProviderBridgeAttempt.result?.debug.route_proposal ??
       extractCodexSemanticRouteProposalCandidate(initialCodexText, {
@@ -27318,8 +28056,7 @@ export const codexProvider: HelixAgentProvider = {
         turnId,
         onNativeEvent: emitCodexNativeRuntimeEvent,
       });
-      const retryText =
-        retryResult.stdout.trim() || retryResult.stderr.trim() || "";
+      const retryText = retryResult.stdout.trim();
       runtimeSemanticRouteProposal =
         runtimeSemanticRouteProposal ??
         extractCodexSemanticRouteProposalCandidate(retryText, {
@@ -27675,9 +28412,7 @@ export const codexProvider: HelixAgentProvider = {
           "the runtime-requested evidence family was explicitly excluded by the user and this bounded recovery branch is closed",
       });
       const suppressedLaneRecoveryText =
-        suppressedLaneRecoveryResult.stdout.trim() ||
-        suppressedLaneRecoveryResult.stderr.trim() ||
-        "";
+        suppressedLaneRecoveryResult.stdout.trim();
       runtimeSemanticRouteProposal =
         runtimeSemanticRouteProposal ??
         extractCodexSemanticRouteProposalCandidate(suppressedLaneRecoveryText, {
@@ -27759,10 +28494,7 @@ export const codexProvider: HelixAgentProvider = {
           turnId,
           onNativeEvent: emitCodexNativeRuntimeEvent,
         });
-        const sequenceReentryText =
-          sequenceReentryResult.stdout.trim() ||
-          sequenceReentryResult.stderr.trim() ||
-          "";
+        const sequenceReentryText = sequenceReentryResult.stdout.trim();
         const correctedCandidate =
           extractCodexCapabilityLaneRequestCandidate(sequenceReentryText);
         const correctedSequenceDecision = correctedCandidate
@@ -28181,10 +28913,7 @@ export const codexProvider: HelixAgentProvider = {
         executedLaneCalls: Array<Record<string, unknown>>;
         phase: string;
       }): Promise<CodexProcessResult> => {
-        const currentCandidateText =
-          input.currentResult.stdout.trim() ||
-          input.currentResult.stderr.trim() ||
-          "";
+        const currentCandidateText = input.currentResult.stdout.trim();
         const minecraftAgencyCoverageResolutions =
           buildMinecraftAgencyCompoundCoverageResolutions({
             compoundContract: genericCompoundPromptContract,
@@ -28346,10 +29075,7 @@ export const codexProvider: HelixAgentProvider = {
         if (!requiredReviewMode) {
           return input.currentResult;
         }
-        const currentCandidateText =
-          input.currentResult.stdout.trim() ||
-          input.currentResult.stderr.trim() ||
-          "";
+        const currentCandidateText = input.currentResult.stdout.trim();
         const reviewPrompt = [
           ...buildCodexCapabilityLaneReentryPrefix(question),
           "",
@@ -28390,7 +29116,8 @@ export const codexProvider: HelixAgentProvider = {
           ...buildCodexContinuationCapabilityInputContractLines({
             continuationState: providerContinuationState,
             availableCapabilities: gatewayManifest.capabilities,
-            admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
+            admittedCapabilityIds:
+              providerContinuationAdmittedCapabilityIds,
             preferredCapabilityIds: preferredContinuationCapabilityIds,
           }),
         ].join("\n");
@@ -28533,7 +29260,7 @@ export const codexProvider: HelixAgentProvider = {
       if (
         genericCompoundTerminalReviewEnabled &&
         !extractCodexContinuationCapabilityLaneRequestCandidate({
-          text: result.stdout.trim() || result.stderr.trim() || "",
+          text: result.stdout.trim(),
           continuationState: providerContinuationState,
         })
       ) {
@@ -28569,8 +29296,7 @@ export const codexProvider: HelixAgentProvider = {
         Record<string, unknown> | Record<string, unknown>[] | null = null;
       let postObservationAffordanceRetry: Record<string, unknown> | null = null;
       if (firstLaneWasVisibleTargetCollector) {
-        const firstReentryText =
-          result.stdout.trim() || result.stderr.trim() || "";
+        const firstReentryText = result.stdout.trim();
         const candidates = extractCodexCapabilityLaneRequestCandidates(
           firstReentryText,
         ).filter(
@@ -28592,8 +29318,7 @@ export const codexProvider: HelixAgentProvider = {
               : enrichedCandidates;
         }
       } else if (firstLaneNeedsSpeechFollowup) {
-        const firstReentryText =
-          result.stdout.trim() || result.stderr.trim() || "";
+        const firstReentryText = result.stdout.trim();
         const candidate =
           extractCodexCapabilityLaneRequestCandidate(firstReentryText);
         if (
@@ -28618,7 +29343,7 @@ export const codexProvider: HelixAgentProvider = {
             turnId,
             onNativeEvent: emitCodexNativeRuntimeEvent,
           });
-          const retryText = result.stdout.trim() || result.stderr.trim() || "";
+          const retryText = result.stdout.trim();
           const retryCandidate =
             extractCodexCapabilityLaneRequestCandidate(retryText);
           if (
@@ -28629,8 +29354,7 @@ export const codexProvider: HelixAgentProvider = {
           }
         }
       } else if (firstLaneWasImageLens) {
-        const firstReentryText =
-          result.stdout.trim() || result.stderr.trim() || "";
+        const firstReentryText = result.stdout.trim();
         const requestedRecoveryCandidate =
           extractCodexCapabilityLaneRequestCandidate(firstReentryText);
         const candidateCapability = capabilityLaneCandidateCapability(
@@ -28784,8 +29508,7 @@ export const codexProvider: HelixAgentProvider = {
       } else if (
         shouldEnterCodexPostObservationContinuation(providerContinuationState)
       ) {
-        let firstReentryText =
-          result.stdout.trim() || result.stderr.trim() || "";
+        let firstReentryText = result.stdout.trim();
         let requestedContinuationCandidate =
           extractCodexContinuationCapabilityLaneRequestCandidate({
             text: firstReentryText,
@@ -28833,7 +29556,7 @@ export const codexProvider: HelixAgentProvider = {
             turnId,
             onNativeEvent: emitCodexNativeRuntimeEvent,
           });
-          firstReentryText = result.stdout.trim() || result.stderr.trim() || "";
+          firstReentryText = result.stdout.trim();
           requestedContinuationCandidate =
             extractCodexContinuationCapabilityLaneRequestCandidate({
               text: firstReentryText,
@@ -28901,8 +29624,7 @@ export const codexProvider: HelixAgentProvider = {
               turnId,
               onNativeEvent: emitCodexNativeRuntimeEvent,
             });
-            const correctionText =
-              result.stdout.trim() || result.stderr.trim() || "";
+            const correctionText = result.stdout.trim();
             const correctedCandidate =
               extractCodexContinuationCapabilityLaneRequestCandidate({
                 text: correctionText,
@@ -28953,8 +29675,7 @@ export const codexProvider: HelixAgentProvider = {
           }
         }
       } else if (!firstLaneWasTheoryReflection) {
-        const firstReentryText =
-          result.stdout.trim() || result.stderr.trim() || "";
+        const firstReentryText = result.stdout.trim();
         const requestedContinuationCandidate =
           extractCodexCapabilityLaneRequestCandidate(firstReentryText);
         if (
@@ -29622,8 +30343,7 @@ export const codexProvider: HelixAgentProvider = {
             scholarlyLaneCallHistory.length <
             CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS
           ) {
-            const latestDecisionText =
-              result.stdout.trim() || result.stderr.trim() || "";
+            const latestDecisionText = result.stdout.trim();
             const requestedNextCandidate =
               compoundCapabilityHandoffCandidateFromText({
                 text: latestDecisionText,
@@ -29937,7 +30657,7 @@ export const codexProvider: HelixAgentProvider = {
             });
             if (
               !compoundCapabilityHandoffCandidateFromText({
-                text: result.stdout.trim() || result.stderr.trim() || "",
+                text: result.stdout.trim(),
                 requiredCapabilityIds: preferredContinuationCapabilityIds,
               })
             ) {
@@ -30093,8 +30813,7 @@ export const codexProvider: HelixAgentProvider = {
           while (
             chainedLaneCalls.length < CODEX_PROVIDER_CONTINUATION_HARD_MAX_STEPS
           ) {
-            const loopReentryText =
-              result.stdout.trim() || result.stderr.trim() || "";
+            const loopReentryText = result.stdout.trim();
             if (detectProviderPromptLeakMarkers(loopReentryText).length > 0) {
               scholarlyPdfExplorationStopReason =
                 "provider_prompt_leak_requires_terminal_reentry";
@@ -30337,7 +31056,7 @@ export const codexProvider: HelixAgentProvider = {
           }
           const remainingPdfLaneRequest =
             extractCodexCapabilityLaneRequestCandidate(
-              result.stdout.trim() || result.stderr.trim() || "",
+              result.stdout.trim(),
             );
           if (
             chainedLaneCalls.length >=
@@ -30394,10 +31113,7 @@ export const codexProvider: HelixAgentProvider = {
               signal: request.signal,
               requestFromResult: (providerResult: CodexProcessResult) =>
                 extractCodexContinuationCapabilityLaneRequestCandidate({
-                  text:
-                    providerResult.stdout.trim() ||
-                    providerResult.stderr.trim() ||
-                    "",
+                  text: providerResult.stdout.trim(),
                   continuationState: providerContinuationState,
                 }),
               requestFingerprint: (candidate) =>
@@ -30405,6 +31121,10 @@ export const codexProvider: HelixAgentProvider = {
                   request: candidate,
                   mutationEpoch: genericMutationEpoch,
                   mutatingCapabilityIds: genericMutatingCapabilityIds,
+                  residentSemanticReplanRevision:
+                    residentSemanticReplanRecoveryRevision(
+                      gatewayCallResults,
+                    ),
                 }),
               priorRequestFingerprints:
                 genericMutationEpochHistory.request_fingerprints,
@@ -30412,15 +31132,22 @@ export const codexProvider: HelixAgentProvider = {
                 genericContinuationPolicyRejectionReason = null;
                 genericContinuationPolicyRecoveryLaneRequest = null;
                 const capability = capabilityLaneCandidateCapability(candidate);
+                const evidenceBoundLiveSourceDecision =
+                  continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest({
+                    state: providerContinuationState,
+                    candidate,
+                    availableCapabilities: gatewayManifest.capabilities,
+                  });
                 if (
                   !capability ||
                   capability ===
                     VISUAL_ANALYSIS_INSPECT_IMAGE_REGION_CAPABILITY ||
-                  !runtimeLaneRequestCandidateUsesAdmittedCapabilities({
-                    candidate,
-                    admittedCapabilityIds:
-                      providerContinuationAdmittedCapabilityIds,
-                  })
+                  (!evidenceBoundLiveSourceDecision &&
+                    !runtimeLaneRequestCandidateUsesAdmittedCapabilities({
+                      candidate,
+                      admittedCapabilityIds:
+                        providerContinuationAdmittedCapabilityIds,
+                    }))
                 ) {
                   return false;
                 }
@@ -30889,7 +31616,7 @@ export const codexProvider: HelixAgentProvider = {
           : null
       : null;
     const finalProviderProcessText =
-      result.stdout.trim() || result.stderr.trim() || initialCodexText;
+      result.stdout.trim() || initialCodexText;
     const finalExecutedRuntimeLaneRequests = [
       ...(Array.isArray(runtimeLaneRequestCandidate)
         ? runtimeLaneRequestCandidate
@@ -30945,15 +31672,30 @@ export const codexProvider: HelixAgentProvider = {
       terminal_eligible: false,
       raw_content_included: false,
     };
+    const compatibilityProcessFailure =
+      classifyCodexProcessFailureForUser(result);
+    const compatibilityTerminalCandidateSucceeded = Boolean(
+      !nativeTurnEligibleForTerminal &&
+      result.exitCode === 0 &&
+      result.stdout.trim() &&
+      !providerOutputHasPendingCapabilityLaneRequest &&
+      !compatibilityProcessFailure,
+    );
     const codexProcessFailure =
-      classifyCodexProcessFailureForUser(result) ??
+      compatibilityProcessFailure ??
+      classifyCodexNativeProviderFailureForUser({
+        nativeErrorCode:
+          nativeProviderBridgeAttempt.result?.debug.native_error_code ?? null,
+        fallbackReason: nativeProviderBridgeAttempt.fallbackReason,
+        compatibilityTerminalCandidateSucceeded,
+      }) ??
       scholarlyEvidenceDecisionFailure;
     const rawProviderText =
       codexProcessFailure?.text ??
       stripCodexCapabilityLaneRequestMarkers(
         stripCodexScholarlyEvidenceDecisionMarkers(
           stripCodexSemanticRouteProposalMarkers(
-            result.stdout.trim() || result.stderr.trim() || initialCodexText,
+            result.stdout.trim() || initialCodexText,
           ),
         ),
       );
@@ -31205,7 +31947,10 @@ export const codexProvider: HelixAgentProvider = {
       compoundPromptCoveragePassed:
         readBoolean(
           readRecord(request.body.compound_prompt_coverage_gate)?.passed,
-        ) === true,
+        ) === true ||
+        currentCompoundCapabilityRailsCompleteForSolver(
+          codexCompoundSubgoalLedger,
+        ),
       providerTerminalIntent,
       turnId,
     });
@@ -31954,6 +32699,23 @@ export const codexProvider: HelixAgentProvider = {
       !directTerminalAuthority &&
       !providerReentry.terminalAnswerAuthority,
     );
+    const codexProcessFailureTerminalAuthority =
+      codexProcessFailureIsTerminal && codexProcessFailure
+        ? buildHelixTurnTerminalAuthority({
+            thread_id: threadId,
+            turn_id: turnId,
+            route: request.route || "/ask/turn",
+            final_answer_source: "typed_failure",
+            terminal_artifact_kind: "typed_failure",
+            terminal_text: codexProcessFailure.text,
+            terminal_item_id: `${turnId}:typed_failure:${codexProcessFailure.error_code}`,
+            terminal_kind: "failure",
+            authority_origin: "agent_provider_failure_classifier",
+            server_authoritative: true,
+            terminal_eligible: true,
+            assistant_answer: false,
+          })
+        : null;
     const finalAnswerSource = compoundTerminalAuthorized
       ? "compound_evidence_synthesis_answer"
       : missingActiveImageLensSourceTerminalAuthority
@@ -32004,6 +32766,8 @@ export const codexProvider: HelixAgentProvider = {
         ? "authorized_missing_active_image_lens_source"
         : scientificImageBlockedReflectionTerminalAuthority
           ? "authorized_scientific_image_exact_row_promotion_blocker"
+          : codexProcessFailureTerminalAuthority
+            ? "authorized_agent_provider_failure"
           : scholarlyExploratoryTerminalAuthority
             ? "authorized_by_scholarly_response_mode"
             : livePipelineControlTerminalAuthorized
@@ -32019,6 +32783,7 @@ export const codexProvider: HelixAgentProvider = {
       (compoundTerminalAuthorized ? compoundTerminalAuthority : null) ??
       missingActiveImageLensSourceTerminalAuthority ??
       scientificImageBlockedReflectionTerminalAuthority ??
+      codexProcessFailureTerminalAuthority ??
       imageLensObservationReportTerminalAuthority ??
       scholarlyExploratoryTerminalAuthority ??
       livePipelineControlTerminalProjection?.authority ??
@@ -32133,6 +32898,22 @@ export const codexProvider: HelixAgentProvider = {
               assistant_answer: false,
               raw_content_included: false,
             }
+          : codexProcessFailureTerminalAuthority
+            ? {
+                schema: "helix.terminal_presentation.v1",
+                turn_id: turnId,
+                concise_text: projectedText,
+                terminal_artifact_kind: "typed_failure",
+                final_answer_source: "typed_failure",
+                terminal_authority_ref: readString(
+                  codexProcessFailureTerminalAuthority.terminal_item_id,
+                ),
+                selected_observation_refs: [],
+                presentation_policy: "agent_provider_failure_recovery",
+                helix_style_rewrite_applied: false,
+                assistant_answer: false,
+                raw_content_included: false,
+              }
           : directTerminalAuthority
             ? {
                 schema: "helix.terminal_presentation.v1",
@@ -32955,7 +33736,12 @@ export const codexProvider: HelixAgentProvider = {
         codex_bin: result.bin,
         codex_args: result.args,
         codex_runtime_status: resolveCodexBinary(),
-        codex_stderr_preview: result.stderr.slice(0, 2000),
+        // Codex writes its banner and echoed input at the beginning of stderr;
+        // actionable provider failures are emitted at the end. Preserve only
+        // the bounded tail so debug evidence explains the failure without
+        // treating diagnostics as model output.
+        codex_stderr_preview: result.stderr.slice(-4000),
+        codex_stderr_tail_preview: result.stderr.slice(-4000),
         workstation_tools_enabled: codexProvider.supports.workstationTools,
         code_mutation_enabled: codexProvider.supports.codeMutation,
         workstation_gateway_manifest: gatewayManifest,
@@ -33509,9 +34295,7 @@ export const codexProvider: HelixAgentProvider = {
           turnId,
           onNativeEvent: emitCodexNativeRuntimeEvent,
         });
-        let terminalRecoveryText =
-          terminalRecoveryResult.stdout.trim() ||
-          terminalRecoveryResult.stderr.trim();
+        let terminalRecoveryText = terminalRecoveryResult.stdout.trim();
         let terminalRecoveryPromptLeakMarkerIds =
           detectProviderPromptLeakMarkers(terminalRecoveryText);
         let terminalRecoveryPromptLeakRejected = Boolean(
@@ -33564,9 +34348,7 @@ export const codexProvider: HelixAgentProvider = {
             turnId,
             onNativeEvent: emitCodexNativeRuntimeEvent,
           });
-          terminalRecoveryText =
-            terminalRecoveryResult.stdout.trim() ||
-            terminalRecoveryResult.stderr.trim();
+          terminalRecoveryText = terminalRecoveryResult.stdout.trim();
           terminalRecoveryPromptLeakMarkerIds =
             detectProviderPromptLeakMarkers(terminalRecoveryText);
         }

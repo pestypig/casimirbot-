@@ -501,6 +501,28 @@ export const runCodexNativeProviderBridge = async (input: {
     signal: input.signal,
     onNativeEvent: input.onNativeEvent,
   });
+  console.info(
+    "[codex-native-bridge]",
+    JSON.stringify({
+      turn_id: input.turnId,
+      ok: result.ok,
+      fail_reason: result.failReason,
+      gateway_result_count: result.gatewayCallResults.length,
+      model_visible_tools: result.debug.model_visible_tools,
+      route_admitted_tools: result.debug.route_admitted_tools,
+      requested_tools: result.debug.requested_tools,
+      executed_tools: result.debug.executed_tools,
+      successful_tools: result.debug.successful_tools,
+      failed_tools: result.debug.failed_tools,
+      route_unobserved_tools: result.debug.route_unobserved_tools,
+      observation_reentry_ref_count:
+        result.debug.observation_reentry_refs.length,
+      terminal_candidate_present:
+        result.debug.terminal_candidate_present,
+      native_turn_status: result.debug.native_turn_status,
+      native_error_code: result.debug.native_error_code,
+    }),
+  );
   noteCodexNativeProviderFailure(result.failReason);
   return {
     attempted: true,

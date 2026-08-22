@@ -3,7 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  appendCodexCompatibilityIsolationArgs,
   appendCodexModelPolicyArgs,
+  resolveCodexCompatibilityHome,
   resolveCodexBinary,
   resolveCodexDesktopInstallCandidates,
   resolveFirstLaunchableCodexBinary,
@@ -19,7 +21,9 @@ const originalEnvironment = {
 };
 
 const makeTemporaryDirectory = (): string => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-binary-"));
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "helix-codex-binary-"),
+  );
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -36,11 +40,70 @@ afterEach(() => {
 });
 
 describe("Codex binary resolution", () => {
+  it("isolates compatibility sampling from personal Codex integrations", () => {
+    expect(
+      appendCodexCompatibilityIsolationArgs(["exec", "--sandbox", "read-only"]),
+    ).toEqual([
+      "exec",
+      "--sandbox",
+      "read-only",
+      "--ignore-user-config",
+      "-c",
+      "features.remote_plugin=false",
+      "-c",
+      "features.apps=false",
+      "-c",
+      'model_provider="helix_openai_api"',
+      "-c",
+      'model_providers.helix_openai_api={ name = "Helix OpenAI API", base_url = "https://api.openai.com/v1", env_key = "OPENAI_API_KEY", wire_api = "responses" }',
+    ]);
+    expect(
+      appendCodexCompatibilityIsolationArgs([
+        "exec",
+        "--ignore-user-config",
+        "-c",
+        "features.remote_plugin=false",
+        "-c",
+        "features.apps=false",
+        "-c",
+        'model_provider="helix_openai_api"',
+        "-c",
+        'model_providers.helix_openai_api={ name = "Helix OpenAI API", base_url = "https://api.openai.com/v1", env_key = "OPENAI_API_KEY", wire_api = "responses" }',
+      ]),
+    ).toEqual([
+      "exec",
+      "--ignore-user-config",
+      "-c",
+      "features.remote_plugin=false",
+      "-c",
+      "features.apps=false",
+      "-c",
+      'model_provider="helix_openai_api"',
+      "-c",
+      'model_providers.helix_openai_api={ name = "Helix OpenAI API", base_url = "https://api.openai.com/v1", env_key = "OPENAI_API_KEY", wire_api = "responses" }',
+    ]);
+  });
+
+  it("uses a provider-only Codex home under ignored local runtime state", () => {
+    const workingDirectory = path.join("C:\\", "workspace");
+    expect(resolveCodexCompatibilityHome({ workingDirectory })).toBe(
+      path.join(workingDirectory, ".cal", "helix-codex-compatibility-home"),
+    );
+    expect(
+      resolveCodexCompatibilityHome({
+        workingDirectory,
+        configuredHome: ".runtime-codex",
+      }),
+    ).toBe(path.join(workingDirectory, ".runtime-codex"));
+  });
+
   it("appends the pinned model and effort after compatibility defaults", () => {
-    expect(appendCodexModelPolicyArgs(
-      ["exec", "--sandbox", "read-only"],
-      { model: "gpt-4o-mini", reasoningEffort: "none" },
-    )).toEqual([
+    expect(
+      appendCodexModelPolicyArgs(["exec", "--sandbox", "read-only"], {
+        model: "gpt-4o-mini",
+        reasoningEffort: "none",
+      }),
+    ).toEqual([
       "exec",
       "--sandbox",
       "read-only",
@@ -76,14 +139,16 @@ describe("Codex binary resolution", () => {
 
   it("continues probing after an existing candidate cannot be spawned", () => {
     const directory = makeTemporaryDirectory();
-    const unspawnable = path.join(directory, process.platform === "win32" ? "codex.exe" : "codex");
+    const unspawnable = path.join(
+      directory,
+      process.platform === "win32" ? "codex.exe" : "codex",
+    );
     fs.writeFileSync(unspawnable, "not an executable image");
     if (process.platform !== "win32") fs.chmodSync(unspawnable, 0o755);
 
-    expect(resolveFirstLaunchableCodexBinary(
-      [unspawnable, process.execPath],
-      [],
-    )).toMatchObject({
+    expect(
+      resolveFirstLaunchableCodexBinary([unspawnable, process.execPath], []),
+    ).toMatchObject({
       launchable: true,
       reason: null,
       resolved_bin: process.execPath,

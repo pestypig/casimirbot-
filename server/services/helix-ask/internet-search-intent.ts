@@ -121,6 +121,12 @@ const hasLocalObservationScopeCue = (promptText: string): boolean =>
   /\b(?:(?:current|prior|earlier|previous|just[-\s]?gathered)\s+)?(?:minecraft\s+|game\s+|environment\s+)?observations?\b/i.test(
     promptText,
   ) ||
+  /\b(?:live[-\s]?source|stage\s+play|environment)\s+(?:mailbox\s+)?(?:packet|mail|finding|wake)\b/i.test(
+    promptText,
+  ) ||
+  /\b(?:processed|unread|newest|latest)\s+(?:minecraft\s+)?(?:mailbox\s+)?packets?\b/i.test(
+    promptText,
+  ) ||
   hasExplicitLocalEnvironmentCapabilityCue(promptText) ||
   hasMinecraftPlayerObservationScopeCue(promptText);
 

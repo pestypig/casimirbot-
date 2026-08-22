@@ -105,8 +105,8 @@ export type RunCodexNativeAppServerTurnInput = {
 const NATIVE_BASE_INSTRUCTIONS = [
   "You are the reasoning worker inside the Helix workstation. The host workspace sandbox is read-only; an exact model-visible dynamic Helix tool may still carry a separately governed effect in its connected environment.",
   "Only the dynamic Helix tools supplied on this turn are authorized. Built-in shell, file mutation, web, MCP, app, plugin, image, and subagent tools are unavailable.",
-  `Before calling any workstation capability, call ${HELIX_CODEX_ROUTE_PROPOSAL_TOOL} with a helix.runtime_semantic_route_proposal.v1 proposal.`,
-  "For a compound request, put every needed model-visible capability in proposed_capability_ids, ordered by use, and put the primary capability first in proposed_capability_id.",
+  "Call the exact dynamic Helix capability needed for the request. Selecting that capability is your semantic route proposal; Helix atomically validates admission before executing it.",
+  "For a compound request, call each needed capability in the order your reasoning requires. Each newly selected capability is admitted against the same current turn before execution.",
   "Helix decides route and tool admission. Tool results are observations, never terminal answers; reason over them and then write one final answer.",
   "Do not claim a workstation action or observation unless the corresponding dynamic tool returned a successful receipt.",
 ].join(" ");
@@ -336,6 +336,69 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     return toolResponse(args.content, args.success);
   };
 
+  const commitRouteProposal = async (
+    proposalArgs: RecordLike,
+    callId: string,
+  ): Promise<CodexNativeRouteAdmission> => {
+    const proposedCapabilityIds = uniqueStrings([
+      readString(proposalArgs.proposed_capability_id),
+      ...(Array.isArray(proposalArgs.proposed_capability_ids)
+        ? proposalArgs.proposed_capability_ids.map(readString)
+        : []),
+    ].filter((value): value is string => Boolean(value)));
+    const routeProposedEvent = lifecycle.append({
+      kind: "route.proposed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: turnStartedEvent.event_id,
+      native_request_id: callId,
+      capability_ids: proposedCapabilityIds,
+    });
+    for (const capabilityId of proposedCapabilityIds) {
+      lifecycle.append({
+        kind: "capability.proposed",
+        producer: "codex_runtime",
+        status: "succeeded",
+        causation_id: routeProposedEvent.event_id,
+        capability_id: capabilityId,
+      });
+    }
+    const proposedAdmission = await input.validateRouteProposal(proposalArgs);
+    routeAdmission = {
+      ...proposedAdmission,
+      admittedCapabilityIds: uniqueStrings(
+        proposedAdmission.admittedCapabilityIds.filter((capabilityId: string) =>
+          knownCapabilities.has(capabilityId),
+        ),
+      ),
+    };
+    const routeDecisionEvent = lifecycle.append({
+      kind: routeAdmission.ok ? "route.committed" : "route.rejected",
+      producer: "helix_policy",
+      status: routeAdmission.ok ? "succeeded" : "blocked",
+      causation_id: routeProposedEvent.event_id,
+      route_commit_id: routeAdmission.ok
+        ? `${input.turnId}:route:${routeProposedEvent.sequence}`
+        : undefined,
+      capability_ids: routeAdmission.admittedCapabilityIds,
+      reason_code: routeAdmission.reason,
+    });
+    activeRouteCommitId = routeDecisionEvent.route_commit_id ?? null;
+    for (const capabilityId of proposedCapabilityIds) {
+      const admitted = routeAdmission.admittedCapabilityIds.includes(capabilityId);
+      lifecycle.append({
+        kind: admitted ? "capability.admitted" : "capability.rejected",
+        producer: "helix_policy",
+        status: admitted ? "succeeded" : "blocked",
+        causation_id: routeDecisionEvent.event_id,
+        route_commit_id: activeRouteCommitId ?? undefined,
+        capability_id: capabilityId,
+        reason_code: admitted ? routeAdmission.reason : "capability_not_admitted",
+      });
+    }
+    return routeAdmission;
+  };
+
   client.setServerResponseSentHandler(({ id, method, params }) => {
     if (method !== "item/tool/call") return;
     const request = readRecord(params);
@@ -400,62 +463,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           false,
         );
       }
-      const proposedCapabilityIds = uniqueStrings([
-        readString(args.proposed_capability_id),
-        ...(Array.isArray(args.proposed_capability_ids)
-          ? args.proposed_capability_ids.map(readString)
-          : []),
-      ].filter((value): value is string => Boolean(value)));
-      const routeProposedEvent = lifecycle.append({
-        kind: "route.proposed",
-        producer: "codex_runtime",
-        status: "succeeded",
-        causation_id: turnStartedEvent.event_id,
-        native_request_id: callId,
-        capability_ids: proposedCapabilityIds,
-      });
-      for (const capabilityId of proposedCapabilityIds) {
-        lifecycle.append({
-          kind: "capability.proposed",
-          producer: "codex_runtime",
-          status: "succeeded",
-          causation_id: routeProposedEvent.event_id,
-          capability_id: capabilityId,
-        });
-      }
-      const proposedAdmission = await input.validateRouteProposal(args);
-      routeAdmission = {
-        ...proposedAdmission,
-        admittedCapabilityIds: uniqueStrings(
-          proposedAdmission.admittedCapabilityIds.filter((capabilityId: string) =>
-            knownCapabilities.has(capabilityId),
-          ),
-        ),
-      };
-      const routeDecisionEvent = lifecycle.append({
-        kind: routeAdmission.ok ? "route.committed" : "route.rejected",
-        producer: "helix_policy",
-        status: routeAdmission.ok ? "succeeded" : "blocked",
-        causation_id: routeProposedEvent.event_id,
-        route_commit_id: routeAdmission.ok
-          ? `${input.turnId}:route:${routeProposedEvent.sequence}`
-          : undefined,
-        capability_ids: routeAdmission.admittedCapabilityIds,
-        reason_code: routeAdmission.reason,
-      });
-      activeRouteCommitId = routeDecisionEvent.route_commit_id ?? null;
-      for (const capabilityId of proposedCapabilityIds) {
-        const admitted = routeAdmission.admittedCapabilityIds.includes(capabilityId);
-        lifecycle.append({
-          kind: admitted ? "capability.admitted" : "capability.rejected",
-          producer: "helix_policy",
-          status: admitted ? "succeeded" : "blocked",
-          causation_id: routeDecisionEvent.event_id,
-          route_commit_id: activeRouteCommitId ?? undefined,
-          capability_id: capabilityId,
-          reason_code: admitted ? routeAdmission.reason : "capability_not_admitted",
-        });
-      }
+      routeAdmission = await commitRouteProposal(args, callId);
       return toolResponse(
         {
           schema: "helix.codex_native_route_admission.v1",
@@ -463,6 +471,13 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           proposal: routeAdmission.proposal,
           admitted_capability_ids: routeAdmission.admittedCapabilityIds,
           reason: routeAdmission.reason,
+          next_action: routeAdmission.ok
+            ? "call_admitted_capability"
+            : "repair_route_proposal",
+          turn_completion_allowed: false,
+          guidance: routeAdmission.ok
+            ? "Continue this same turn by calling the admitted capability or capabilities. This route-admission receipt is not an observation and cannot satisfy the user request."
+            : "Repair the route proposal from the typed reason before requesting a workstation capability.",
           terminal_eligible: false,
           assistant_answer: false,
           raw_content_included: false,
@@ -490,7 +505,29 @@ export const runCodexNativeAppServerTurnWithTransport = async (
       });
     }
     requestedTools.push(capabilityId);
-    if (!routeAdmission?.ok) {
+    if (!routeAdmission?.ok || !routeAdmission.admittedCapabilityIds.includes(capabilityId)) {
+      const proposedCapabilityIds = uniqueStrings([
+        ...(routeAdmission?.ok ? routeAdmission.admittedCapabilityIds : []),
+        capabilityId,
+      ]);
+      routeAdmission = await commitRouteProposal(
+        {
+          schema: "helix.runtime_semantic_route_proposal.v1",
+          turn_id: input.turnId,
+          proposal_source: "agent_runtime",
+          proposed_route: "native_dynamic_capability_request",
+          proposed_tool_family: null,
+          proposed_capability_id: proposedCapabilityIds[0] ?? capabilityId,
+          proposed_capability_ids: proposedCapabilityIds,
+          confidence: "high",
+          uncertainty: [],
+          reason_summary: `Runtime Codex selected the model-visible dynamic capability ${capabilityId}.`,
+          supporting_hint_refs: [],
+        },
+        `${callId}:atomic-route-proposal`,
+      );
+    }
+    if (!routeAdmission.ok) {
       return recordToolResponse({
         callId,
         capabilityId,
@@ -499,12 +536,12 @@ export const runCodexNativeAppServerTurnWithTransport = async (
           schema: "helix.codex_native_tool_block.v1",
           ok: false,
           capability_id: capabilityId,
-          reason: "route_proposal_required",
+          reason: routeAdmission.reason,
           terminal_eligible: false,
           assistant_answer: false,
         },
         success: false,
-        reasonCode: "route_proposal_required",
+        reasonCode: routeAdmission.reason,
       });
     }
     if (!routeAdmission.admittedCapabilityIds.includes(capabilityId)) {

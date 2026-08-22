@@ -23,7 +23,7 @@ lane, replay, or Theory Graph surfaces, read and follow:
 
 - `docs/research/nhm2-spherical-boson-star-v2-work-program.md`
 - its linked active-gate packet, currently
-  `docs/research/nhm2-spherical-boson-star-v2-initializer-production-runtime-repair.md`
+  `docs/research/nhm2-spherical-boson-star-v2-g2b-replacement-classical-proof-attempt.md`
 - `WARP_AGENTS.md`
 
 The work program is the sole current dependency/status roadmap for this effort.

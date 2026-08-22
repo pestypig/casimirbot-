@@ -37,6 +37,10 @@ import {
   type HelixMinecraftReactiveProgramArguments,
 } from "@shared/helix-minecraft-reactive-program";
 import {
+  helixMinecraftArmViabilityGuardianArgumentsSchema,
+  helixMinecraftDisarmViabilityGuardianArgumentsSchema,
+} from "@shared/helix-minecraft-viability-guardian";
+import {
   environmentConnectorSha256,
   listEnvironmentConnectorCapabilityDescriptors,
 } from "../catalog";
@@ -2240,7 +2244,9 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
           : [],
       );
       const predictionRequired =
-        wholeNonnegative(worldMutations) && worldMutations > 0;
+        binding !== null &&
+        wholeNonnegative(worldMutations) &&
+        worldMutations > 0;
       const predictionValid = placementPredictionValid({
         candidate: measurements.placement_prediction,
         admittedPositionKeys,
@@ -2346,6 +2352,42 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
         }) &&
         wholeNonnegative(measuredDuration) &&
         measuredDuration <= parsed.data.max_total_ticks
+      );
+    }
+    case "arm_viability_guardian": {
+      const parsed =
+        helixMinecraftArmViabilityGuardianArgumentsSchema.safeParse(args);
+      if (!parsed.success) return false;
+      const measuredDuration = finiteMeasurement(
+        measurements,
+        "guardian_duration_ticks",
+      );
+      return (
+        measurements.guardian_armed === true &&
+        stringMeasurementMatches(
+          measurements,
+          "guardian_profile_id",
+          args,
+          "profile_id",
+        ) &&
+        wholeNonnegative(measuredDuration) &&
+        measuredDuration === parsed.data.duration_ticks &&
+        measurements.controls_released === true
+      );
+    }
+    case "disarm_viability_guardian": {
+      const parsed =
+        helixMinecraftDisarmViabilityGuardianArgumentsSchema.safeParse(args);
+      return (
+        parsed.success &&
+        measurements.guardian_armed === false &&
+        stringMeasurementMatches(
+          measurements,
+          "guardian_profile_id",
+          args,
+          "profile_id",
+        ) &&
+        measurements.controls_released === true
       );
     }
     default:
@@ -2758,6 +2800,30 @@ export const enqueueEnvironmentAction = async (input: {
       "action_request_invalid",
       400,
       "The concurrent Minecraft guardian program violates its trusted lanes, resource locks, graph, ruleset, interrupt, or mutation-scope contract.",
+    );
+  }
+  if (
+    request.action_kind === "arm_viability_guardian" &&
+    !helixMinecraftArmViabilityGuardianArgumentsSchema.safeParse(
+      request.arguments,
+    ).success
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_request_invalid",
+      400,
+      "The resident Minecraft guardian violates its trusted profile, lease, observation-age, or bounded-response contract.",
+    );
+  }
+  if (
+    request.action_kind === "disarm_viability_guardian" &&
+    !helixMinecraftDisarmViabilityGuardianArgumentsSchema.safeParse(
+      request.arguments,
+    ).success
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_request_invalid",
+      400,
+      "The resident Minecraft guardian disarm request does not match the trusted profile contract.",
     );
   }
   const membership = await readSharedRealtimeRoomMembership({

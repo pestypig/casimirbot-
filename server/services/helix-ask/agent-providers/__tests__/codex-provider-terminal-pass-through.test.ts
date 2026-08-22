@@ -214,6 +214,66 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("Codex provider terminal pass-through", () => {
+  it("preserves Codex synthesis after a typed resident semantic replan", () => {
+    const turnId = "ask:test:resident-semantic-replan";
+    const failed = {
+      ok: false,
+      capability_id: "com.casimirbot.minecraft.player.walk",
+      mode: "execute",
+      error: "request_canceled",
+      gateway_admission: {
+        requested_capability: "com.casimirbot.minecraft.player.walk",
+      },
+      observation_packet: {
+        turn_id: turnId,
+        status: "failed",
+        produced_artifact_refs: [`${turnId}:walk:blocked`],
+        observation_summary:
+          "The resident viability guardian interrupted the workflow: movement_blocked_requires_semantic_replan",
+      },
+      observation: {
+        outcome: "request_canceled",
+        summary:
+          "The resident viability guardian interrupted the workflow: movement_blocked_requires_semantic_replan",
+        result: {
+          manual_override_detected: false,
+          controls_released: true,
+        },
+      },
+      artifact_refs: [`${turnId}:walk:blocked`],
+      tool_followup_decision: {
+        next_action: "retry",
+        external_change_required: false,
+      },
+    };
+    const recovered = {
+      ok: true,
+      capability_id: "com.casimirbot.minecraft.hazards.scan",
+      mode: "read",
+      gateway_admission: {
+        requested_capability: "com.casimirbot.minecraft.hazards.scan",
+      },
+      observation_packet: {
+        turn_id: turnId,
+        status: "succeeded",
+        produced_artifact_refs: [`${turnId}:hazards`],
+        observation_summary: "Hazard check read-only probe completed.",
+      },
+      observation: { status: "succeeded" },
+      artifact_refs: [`${turnId}:hazards`],
+    };
+    const text =
+      "The guardian stopped at the obstruction. I checked hazards and revised the next move rather than forcing forward.";
+
+    expect(
+      applyGatewayFailureAuthorityGuard({
+        text,
+        gatewayCallResults: [failed, recovered] as never,
+        turnId,
+      }),
+    ).toBe(text);
+  });
+
   it("does not treat a completed read request repeated beside the grounded answer as unresolved", () => {
     const request = {
       capability: "com.casimirbot.minecraft.actor.status.read",

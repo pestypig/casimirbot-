@@ -31,6 +31,13 @@ import {
   buildScientificImageEvidenceSidecar,
 } from "@shared/scientific-evidence-adaptor";
 import { SHARED_INTERFACE_LANGUAGE_CODES } from "@shared/interface-language-codes";
+import { executeLiveEnvironmentTool } from "../../live-environment-tool-adapter";
+import {
+  enqueueStagePlayLiveSourceMailItem,
+  resetStagePlayLiveSourceMailboxForTest,
+} from "../../../stage-play/stage-play-live-source-mailbox-store";
+import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../../../stage-play/stage-play-live-source-mail-wake-store";
+import { resetStagePlayProcessedMailPacketStoreForTest } from "../../../stage-play/stage-play-processed-mail-packet-store";
 
 const WORKSTATION_ACTIVE_CONTEXT_CAPABILITY = "workstation.active_context";
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY =
@@ -158,6 +165,9 @@ describe("Helix workstation tool gateway", () => {
   };
 
   beforeEach(() => {
+    resetStagePlayLiveSourceMailboxForTest();
+    resetStagePlayLiveSourceMailWakeStoreForTest();
+    resetStagePlayProcessedMailPacketStoreForTest();
     restoreEnvKey("RG_BIN");
     restoreEnvKey("PATH");
     restoreEnvKey("Path");
@@ -880,6 +890,180 @@ describe("Helix workstation tool gateway", () => {
       post_tool_model_step_required: true,
       assistant_answer: false,
       raw_content_included: false,
+    });
+  });
+
+  it("uses the server-scoped conversation thread for processed live-mail reads", async () => {
+    const roomThreadId = "helix-ask:room:shared_realtime_room:gateway-mailbox";
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "read",
+      capabilityId: "live_env.read_processed_live_source_mail",
+      arguments: {
+        thread_id: "ask:model-supplied-transient-turn",
+        read_only: true,
+      },
+      conversationThreadId: roomThreadId,
+      turnId: "ask:gateway-mailbox-turn",
+      iteration: 1,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: "live_env.read_processed_live_source_mail",
+      observation: {
+        thread_id: roomThreadId,
+        observation: {
+          mailboxThreadId: roomThreadId,
+          mailboxThreadResolution: {
+            requestedThreadId: roomThreadId,
+            mailboxThreadId: roomThreadId,
+          },
+        },
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+    });
+  });
+
+  it("exposes mailbox decisions but rejects packet identities absent from current-turn evidence", async () => {
+    const manifest = listWorkstationGatewayCapabilities({
+      agentRuntime: "codex",
+      mode: "act",
+    }).capabilities.find(
+      (capability) =>
+        capability.capability_id ===
+        "live_env.record_live_source_mail_decision",
+    );
+    expect(manifest).toMatchObject({
+      mode: "act",
+      mutating: true,
+      requires_confirmation: false,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+    });
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: "live_env.record_live_source_mail_decision",
+      arguments: {
+        decision: "record_interpretation",
+        processed_packet_ids: ["stage_play_processed_mail_packet:stale"],
+        mail_ids: ["stage_play_live_source_mail:stale"],
+      },
+      conversationThreadId:
+        "helix-ask:room:shared_realtime_room:gateway-mailbox",
+      turnId: "ask:gateway-mailbox-decision-turn",
+      iteration: 2,
+      authoritativeEvidenceArtifacts: [],
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      capability_id: "live_env.record_live_source_mail_decision",
+      gateway_admission: {
+        admission_status: "blocked",
+        blocked_reason: "current_turn_processed_mail_evidence_required",
+      },
+      error: "current_turn_processed_mail_evidence_required",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+    });
+  });
+
+  it("records a mailbox decision only for the exact normalized current-turn packet", async () => {
+    const roomId = "shared_realtime_room:gateway-mailbox-current";
+    const roomThreadId = `helix-ask:room:${roomId}`;
+    const sourceId = "source:room-ingress:gateway-mailbox-current";
+    enqueueStagePlayLiveSourceMailItem({
+      threadId: roomThreadId,
+      roomId,
+      environmentId: "room_source_binding:gateway-mailbox-current",
+      sourceId,
+      sourceKind: "minecraft_world_event",
+      evidenceRef: "environment_situation_digest:gateway-mailbox-current",
+      observationRef: "environment_situation_digest:gateway-mailbox-current",
+      summaryText: JSON.stringify({
+        schema: "helix.minecraft_semantic_wake_evidence.v1",
+        changed_fields: ["hazards.on_fire"],
+        answer_authority: false,
+      }),
+      summaryPreview: "Minecraft fire state changed and requires semantic replanning.",
+      confidence: 1,
+      analysisState: "analysis_ready",
+      objectiveText: "Interpret the current Minecraft semantic change.",
+      sourceFreshness: "fresh",
+      evidenceRefs: ["environment_situation_digest:gateway-mailbox-current"],
+    });
+    const processed = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: roomThreadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "minecraft_world_event",
+      },
+    });
+    const packet = (processed.observation as { packets?: Array<{
+      packetId: string;
+      mailIds: string[];
+    }> }).packets?.[0];
+    expect(packet).toBeDefined();
+    const turnId = "ask:gateway-mailbox-decision-current-turn";
+
+    const result = await callWorkstationGatewayCapability({
+      agentRuntime: "codex",
+      mode: "act",
+      capabilityId: "live_env.record_live_source_mail_decision",
+      arguments: {
+        decision: "record_interpretation",
+        processed_packet_ids: [packet!.packetId],
+        mail_ids: packet!.mailIds,
+        rationale: "The current fire-state change invalidates the prior next step.",
+        next_loop_state: "armed_for_next_summary",
+      },
+      conversationThreadId: roomThreadId,
+      turnId,
+      iteration: 2,
+      authoritativeEvidenceArtifacts: [
+        {
+          artifact_id: `${turnId}:codex_normalized:processed-mail-read`,
+          kind: "live_environment_tool_observation",
+          payload: {
+            observation: {
+              packets: [packet],
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      capability_id: "live_env.record_live_source_mail_decision",
+      gateway_admission: {
+        admission_status: "admitted",
+        admission_reason: "current_turn_processed_mail_decision_admitted",
+      },
+      observation: {
+        ok: true,
+        observation: {
+          decision: "record_interpretation",
+          processedPacketRefs: [packet!.packetId],
+          mailIds: packet!.mailIds,
+          rationalePreview:
+            "The current fire-state change invalidates the prior next step.",
+          nextLoopState: "armed_for_next_summary",
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
     });
   });
 

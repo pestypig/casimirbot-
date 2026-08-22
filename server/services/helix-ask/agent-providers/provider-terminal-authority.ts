@@ -225,6 +225,73 @@ export const hasSuccessfulLaterRetryForFailedGatewayCapability = (
   });
 };
 
+export const hasCurrentTurnResidentSemanticReplanRecovery = (
+  gatewayCallResults: HelixWorkstationGatewayCallResult[],
+  failedIndex: number,
+): boolean => {
+  const failed = gatewayCallResults[failedIndex];
+  if (!failed || failed.ok === true) return false;
+  const observation = readRecord(failed.observation);
+  const result = readRecord(observation?.result);
+  const failureCode =
+    readString(failed.error) || readString(observation?.outcome);
+  const summary =
+    readString(observation?.summary) ||
+    readString(failed.observation_packet?.observation_summary);
+  const exactResidentEscalation = Boolean(
+    failureCode === "request_canceled" &&
+      /(?:requires?|request(?:ed|ing)?)_semantic_replan|semantic replan/i.test(
+        summary,
+      ) &&
+      readBoolean(result?.manual_override_detected) !== true &&
+      readBoolean(result?.controls_released) === true &&
+      ["repair", "retry"].includes(
+        readString(failed.tool_followup_decision?.next_action),
+      ) &&
+      readBoolean(
+        failed.tool_followup_decision?.external_change_required,
+      ) !== true,
+  );
+  if (!exactResidentEscalation) return false;
+  const failedTurnId = readString(failed.observation_packet?.turn_id);
+  return gatewayCallResults.some((candidate, index) => {
+    if (index <= failedIndex || candidate.ok !== true) return false;
+    const candidateTurnId = readString(candidate.observation_packet?.turn_id);
+    return Boolean(failedTurnId) && candidateTurnId === failedTurnId;
+  });
+};
+
+const providerTextContradictsResidentSemanticReplan = (input: {
+  providerText: string;
+  gatewayCallResults: HelixWorkstationGatewayCallResult[];
+}): boolean => {
+  const residentEscalationObserved = input.gatewayCallResults.some((result) => {
+    const observation = readRecord(result.observation);
+    const summary =
+      readString(observation?.summary) ||
+      readString(result.observation_packet?.observation_summary);
+    return Boolean(
+      result.ok !== true &&
+        (readString(result.error) || readString(observation?.outcome)) ===
+          "request_canceled" &&
+        /(?:requires?|request(?:ed|ing)?)_semantic_replan|semantic replan/i.test(
+          summary,
+        ),
+    );
+  });
+  if (!residentEscalationObserved) return false;
+  const text = input.providerText;
+  const deniesObservedInterruption =
+    /\bno\s+(?:blocked\s+movement|blockage|obstruction|interruption)\s+(?:was\s+)?(?:detected|observed|reported|encountered)\b/i.test(
+      text,
+    );
+  const acknowledgesObservedInterruption =
+    /\b(?:blocked|blockage|obstruction|interrupted|interruption|stopped|halted|semantic\s+replan)\b/i.test(
+      text,
+    );
+  return deniesObservedInterruption || !acknowledgesObservedInterruption;
+};
+
 const isScholarlyGatewayCapability = (
   result: HelixWorkstationGatewayCallResult,
 ): boolean => SCHOLARLY_GATEWAY_CAPABILITIES.has(gatewayCapability(result));
@@ -418,12 +485,57 @@ const isOptionalScholarlyFailureObservation = (
   );
 };
 
+const isHardGatewayEvidenceBoundary = (
+  result: HelixWorkstationGatewayCallResult,
+): boolean => {
+  const observation = readRecord(result.observation);
+  const detail = readRecord(observation?.result);
+  const failureCode =
+    readString(result.error) ||
+    readString(result.gateway_admission.blocked_reason) ||
+    readString(observation?.outcome);
+  if (
+    [
+      "permission_denied",
+      "permission_revoked",
+      "provenance_invalid",
+      "source_identity_mismatch",
+      "tenant_mismatch",
+      "account_mismatch",
+      "action_outcome_unknown",
+      "connector_offline",
+    ].includes(failureCode)
+  ) {
+    return true;
+  }
+  if (
+    readBoolean(observation?.provenance_valid) === false ||
+    readBoolean(observation?.eligible_for_current_turn_reentry) === false ||
+    readBoolean(result.tool_followup_decision?.external_change_required) ===
+      true ||
+    readBoolean(detail?.manual_override_detected) === true
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const isOperationalFailureSupersededBySatisfiedCommittedSubgoals = (input: {
+  result: HelixWorkstationGatewayCallResult;
+  committedSubgoalsSatisfied: boolean;
+}): boolean =>
+  input.result.ok !== true &&
+  input.committedSubgoalsSatisfied &&
+  input.result.artifact_refs.length > 0 &&
+  !isHardGatewayEvidenceBoundary(input.result);
+
 const isGatewayObservationCompatibleWithProviderReasoning = (
   result: HelixWorkstationGatewayCallResult,
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
   options: {
     selectedScholarlyResultIds?: string[];
     structuredNumericEvidenceRequired?: boolean;
+    committedSubgoalsSatisfied?: boolean;
   },
 ): boolean => {
   const resultIndex = gatewayCallResults.indexOf(result);
@@ -446,6 +558,16 @@ const isGatewayObservationCompatibleWithProviderReasoning = (
         gatewayCallResults,
         resultIndex,
       )) ||
+    (resultIndex >= 0 &&
+      hasCurrentTurnResidentSemanticReplanRecovery(
+        gatewayCallResults,
+        resultIndex,
+      )) ||
+    isOperationalFailureSupersededBySatisfiedCommittedSubgoals({
+      result,
+      committedSubgoalsSatisfied:
+        options.committedSubgoalsSatisfied === true,
+    }) ||
     isOptionalScholarlyFailureObservation(result, gatewayCallResults, options)
   );
 };
@@ -625,6 +747,14 @@ export const buildHelixProviderReasoningReentry = (input: {
   const transportObservationRefs = Array.from(
     new Set(observationRefs.filter((ref) => ref.trim().length > 0)),
   );
+  const requiredCommittedSubgoalsSatisfied = committedSubgoalsAreSatisfied(
+    input.committedSubgoalContract,
+  );
+  const committedSubgoalsRequired = committedSubgoalContractApplies(
+    input.committedSubgoalContract,
+  );
+  const committedSubgoalsCompatible =
+    !committedSubgoalsRequired || requiredCommittedSubgoalsSatisfied;
   const successfulGatewayObservationRefs = input.gatewayCallResults
     .filter((result) =>
       isGatewayObservationCompatibleWithProviderReasoning(
@@ -634,6 +764,7 @@ export const buildHelixProviderReasoningReentry = (input: {
           selectedScholarlyResultIds: input.selectedScholarlyResultIds,
           structuredNumericEvidenceRequired:
             input.structuredNumericEvidenceRequired,
+          committedSubgoalsSatisfied: requiredCommittedSubgoalsSatisfied,
         },
       ),
     )
@@ -650,14 +781,6 @@ export const buildHelixProviderReasoningReentry = (input: {
         .filter((ref) => ref.trim().length > 0),
     ),
   );
-  const requiredCommittedSubgoalsSatisfied = committedSubgoalsAreSatisfied(
-    input.committedSubgoalContract,
-  );
-  const committedSubgoalsRequired = committedSubgoalContractApplies(
-    input.committedSubgoalContract,
-  );
-  const committedSubgoalsCompatible =
-    !committedSubgoalsRequired || requiredCommittedSubgoalsSatisfied;
   const actionableBlockedCapabilityLaneObservationPackets =
     input.solverCompleted === true &&
     input.goalSatisfied === true &&
@@ -699,6 +822,7 @@ export const buildHelixProviderReasoningReentry = (input: {
           selectedScholarlyResultIds: input.selectedScholarlyResultIds,
           structuredNumericEvidenceRequired:
             input.structuredNumericEvidenceRequired,
+          committedSubgoalsSatisfied: requiredCommittedSubgoalsSatisfied,
         },
       ),
     );
@@ -772,6 +896,13 @@ export const buildHelixProviderReasoningReentry = (input: {
     ) &&
     providerTextClaimsVoicePlaybackCompleted(input.providerText),
   );
+  const residentSemanticReplanOverclaim = Boolean(
+    candidateId &&
+      providerTextContradictsResidentSemanticReplan({
+        providerText: input.providerText,
+        gatewayCallResults: input.gatewayCallResults,
+      }),
+  );
   const requestUserInputBoundaryObservationRefs =
     providerRequestUserInputBoundaryObservationRefs({
       turnId: input.turnId,
@@ -784,7 +915,8 @@ export const buildHelixProviderReasoningReentry = (input: {
     observationReentered &&
     currentTurnEvidenceSatisfied &&
     requestUserInputBoundaryObservationRefs.length > 0 &&
-    !pendingVoiceHandoffOverclaim,
+    !pendingVoiceHandoffOverclaim &&
+    !residentSemanticReplanOverclaim,
   );
   const terminalAuthorityMayUseProviderText = Boolean(
     providerRequestUserInputReady ||
@@ -792,7 +924,8 @@ export const buildHelixProviderReasoningReentry = (input: {
       evidenceReentered &&
       solverAuthoritySatisfied &&
       currentTurnEvidenceSatisfied &&
-      !pendingVoiceHandoffOverclaim),
+      !pendingVoiceHandoffOverclaim &&
+      !residentSemanticReplanOverclaim),
   );
   const terminalAuthorityStatus = terminalAuthorityMayUseProviderText
     ? providerRequestUserInputReady
@@ -802,6 +935,8 @@ export const buildHelixProviderReasoningReentry = (input: {
         : "authorized_by_helix_provider_candidate_bridge"
     : candidateId && pendingVoiceHandoffOverclaim
       ? "blocked_by_voice_playback_overclaim"
+      : candidateId && residentSemanticReplanOverclaim
+        ? "blocked_by_resident_semantic_replan_overclaim"
       : candidateId && !currentTurnEvidenceSatisfied
         ? "blocked_by_current_turn_observation_required"
         : candidateId && !allEvidenceReentryCompatible
@@ -821,6 +956,8 @@ export const buildHelixProviderReasoningReentry = (input: {
         ? ["typed_request_user_input_boundary_missing"]
         : pendingVoiceHandoffOverclaim
           ? ["voice_playback_completion_not_observed"]
+          : residentSemanticReplanOverclaim
+            ? ["provider_candidate_disagrees_with_resident_semantic_replan"]
           : !currentTurnEvidenceSatisfied
             ? ["current_turn_observation_required"]
             : !allGatewayCallsSucceeded

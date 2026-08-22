@@ -2,7 +2,7 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G3**
+Active program gate: **G5**
 
 This document answers the operational question that the product and architecture
 contracts intentionally do not:
@@ -131,9 +131,9 @@ overrule current-turn execution and re-entry facts.
 | G0 — Program vocabulary and status | closed | none | this document, canonical backlinks, required task header, and `npm run helix:environment-harness:docs-audit` | G1 |
 | G1 — Canonical lifecycle authority | closed | G0 | `docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md` | G2 |
 | G2 — A0 / A1 / B parity | closed | G1 | `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md` | G3 |
-| G3 — Viability and unexpected events | active | G2 | persistent resident control across Codex delays plus representative mid-execution hazard/event recovery and safe cancellation | G4 |
-| G4 — Live-mail wake bridge | blocked | G3 | deduplicated nonterminal resident/event escalation evidence re-enters the existing sequential Codex solver without controlling reflexes or authoring an answer | G5 |
-| G5 — Durable survival goal | blocked | G4 and converged OAuth/desktop/room identity lane | checkpointed advancement progress and recovery across disconnect, death, restart, and authorized phone continuation | G6 |
+| G3 — Viability and unexpected events | closed | G2 | `docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md` | G4 |
+| G4 — Live-mail wake bridge | closed | G3 | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md` | G5 |
+| G5 — Durable survival goal | active | G4 and converged OAuth/desktop/room identity lane | checkpointed advancement progress and recovery across disconnect, death, restart, and authorized phone continuation | G6 |
 | G6 — Concurrent reasoning roles | blocked | G5 | revision-bound perception and prospective outputs converge through one execution arbiter without stale-plan mutation | G7 |
 | G7 — Second-domain transfer | blocked | G6 | the accepted lifecycle transfers to a contrasting environment without Minecraft-specific strategy in the generic harness | release evaluation |
 
@@ -154,13 +154,13 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Fabric fluid sequence 0.3 through A0 direct, A1 Codex-through-MCP, and B keyed Helix | integrated accepted | `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md`; `docs/audits/helix-environment-harness-g2-a0-b-partial-audit-2026-08-20.md` | Preserve the exact tripath hashes as a regression while G3 tests persistent viability and unexpected events. |
 | G2 A0/A1/B differential parity observer | live accepted | `server/services/environment-connectors/actions/workflow-g2-parity-audit.ts`; `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md` | Retain observer-only semantics and fail with the first divergent lifecycle stage on future parity regressions. |
 | Pre-action unavailable-inventory cancellation | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-37-focused-source-projection/guardian_unavailable_inventory_replan`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Does not prove mid-execution unexpected-event breadth. |
-| Mid-execution health interruption contract | implemented | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-46-safe-interrupt-terminal/guardian_mid_execution_health_interrupt`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Preserve exact child measurements and pass the stronger live acceptance. |
-| Persistent viability across model-deliberation gaps | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` (Attempt 39 and viability sections) | Keep protection active between finite programs and prove recovery in G3. |
+| Mid-execution health interruption contract | implemented | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/unexpected-event/attempt-46-safe-interrupt-terminal/guardian_mid_execution_health_interrupt`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Preserve exact child measurements; the accepted keyed lava trace used an entry health gate and does not independently promote this capability. |
+| Persistent viability across model-deliberation gaps | live accepted | `docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md`; `artifacts/g3-persistent-viability/g3-keyed-fire-program-live-036.json` | Retain water, fall, fire/lava, unexpected-event, manual-override, Emergency Stop, exact-evidence, and Codex-reentry journeys as regressions. |
 | Generic resident closed-loop capability contract | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | Reserve causal fields in G1; extract the provider-neutral contract only after G3. |
-| Minecraft deterministic resident guardian baseline | specified | `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/water-bucket-rescue/attempt-34-balanced-clear-screen/guardian_water_bucket_rescue` | Prove continuous protection, abstention, control release, and Codex-delay survival in G3. |
+| Minecraft deterministic resident guardian baseline | live accepted | `docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md`; `artifacts/g3-persistent-viability/g3-keyed-fire-program-live-036.json` | Preserve the bounded accepted surface; broader hazards and continuously evaluated health interruption require their own evidence. |
 | Optional Minecraft companion-entity embodiment | projected | `docs/architecture/helix-minecraft-companion-embodiment-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; `docs/research/helix-minecraft-environment-adapter-reference-prompt.md` | Specify and implement only after the deterministic guardian passes G3 and EH-RCC1/EH-RCC2 preserve its accepted behavior. |
 | Learned resident policies and FlyWire profile | projected | `docs/helix-environment-harness-work-program-v1.md` | Shadow-evaluate only after the deterministic baseline and generic contract pass. |
-| Live-mail Minecraft wake bridge | specified | `shared/helix-live-source-mail.ts`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | Convert situation digests into deduplicated nonterminal wake evidence in G4. |
+| Live-mail Minecraft wake bridge | live accepted | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md`; `artifacts/helix-environment-g4-live-2026-08-22-deterministic/helix-minecraft-player-ask-5a72c8a7-4dc7-4546-bf88-15c41a66700f.json` | Preserve exact source identity, deterministic-only preprocessing, deduplication, re-entry, and terminal continuity as G5+ regressions. |
 | Durable all-advancements survival goal | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Prove checkpointed progress and recovery in G5. |
 | Concurrent runtime reasoning roles | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Add only after the sequential wake/solver path is reliable in G6. |
 | Second-domain harness transfer | projected | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Demonstrate the accepted lifecycle in Robinhood shadow observation or another contrasting domain in G7. |
@@ -260,7 +260,7 @@ G2 did not implement learned controllers, persistent cross-deliberation
 viability, companion embodiment, live-mail wake control, durable goals, or
 concurrent reasoning.
 
-## Active gate: G3 viability and unexpected events
+## Closed gate: G3 viability and unexpected events
 
 G3 must prove that the deterministic Fabric guardian preserves player viability
 while Codex is delayed, unavailable, or semantically replanning. The resident
@@ -278,6 +278,52 @@ evidence must materially re-enter Codex for replanning.
 G3 must not extract the provider-neutral resident-controller contract, add a
 learned controller, turn live mail into a reflex path, add concurrent Codex
 roles, or broaden companion embodiment. Those remain downstream workstreams.
+
+G3 closed on 2026-08-21. Its exact closure evidence and bounded claim are
+recorded in
+`docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md`.
+
+## Closed gate: G4 live-mail wake bridge
+
+G4 connects meaningful environment changes to the existing sequential Runtime
+Codex solver. A background wake job may coalesce and deduplicate resident or
+environment events, preserve their exact source, subject, observation revision,
+causal references, and freshness, and re-enter them as nonterminal evidence.
+
+G4 must prove that one semantic change can wake Codex, materially affect the
+next plan, and remain consistent across Ask and applicable live presentation.
+Repeated equivalent events must coalesce; stale, wrong-room, wrong-subject, or
+unbound events must fail with an exact typed reason. The wake path must preserve
+G1 canonical lifecycle authority and the G3 local-control boundary.
+
+G4 must not process Minecraft ticks, activate resident effects, become a second
+reasoning role, write or replace an answer, loosen source identity, implement a
+durable goal, or grow `server/routes/agi.plan.ts`.
+
+G4 closed on 2026-08-22. Its accepted post-repair journey used deterministic
+mail preprocessing only, re-entered the exact processed packet through the
+existing sequential Runtime Codex solver, materially revised the next plan,
+performed no Minecraft action, and retained clean single-writer terminal and
+lifecycle-projection audits. Exact evidence is recorded in
+`docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md`.
+
+## Active gate: G5 durable survival goal
+
+G5 implements one durable Minecraft survival objective whose verified progress
+survives individual Ask turns, disconnect, death, process restart, and an
+authorized continuation from another supported device or room participant.
+The durable record must bind account, host, room, participant, selected player,
+environment source, world, connector epoch, authority lease, current milestone,
+completed and incomplete postconditions, attempt history, and exact evidence
+references.
+
+Runtime Codex owns milestone strategy, retry, recovery, and replanning. Helix
+owns durable identity, checkpoint integrity, capability admission, provenance,
+and terminal eligibility. Fabric retains tick-scale viability. G5 must consume
+the accepted G4 semantic wake as evidence; it must not convert live mail into a
+reflex path, add concurrent reasoning roles, make checkpoint projections answer
+authority, or extract a generic resident-controller contract.
+
 
 ## Parallel delivery lane
 

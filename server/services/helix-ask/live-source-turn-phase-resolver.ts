@@ -436,10 +436,12 @@ const receiptHasAnyTool = (receipts: RecordLike[], toolNames: string[]): boolean
 
 const collectPacketsFromReceipt = (receipt: RecordLike): RecordLike[] => {
   const observation = receiptObservation(receipt);
+  const nestedObservation = readRecord(observation?.observation);
   return [
     ...readArray(receipt.packets),
     ...readArray(readRecord(receipt.payload)?.packets),
     ...readArray(observation?.packets),
+    ...readArray(nestedObservation?.packets),
   ].map(readRecord).filter((entry): entry is RecordLike => Boolean(entry));
 };
 

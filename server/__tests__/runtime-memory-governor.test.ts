@@ -47,6 +47,9 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     delete process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_PRESSURE_BYPASS;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_HEAP_MB;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_RSS_MB;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_HEAP_USED_MB;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_RSS_MB;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_RESUME_HEAP_USED_MB;
@@ -90,6 +93,9 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     delete process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_PRESSURE_BYPASS;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_HEAP_MB;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_RSS_MB;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_HEAP_USED_MB;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_RSS_MB;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_RESUME_HEAP_USED_MB;
@@ -564,6 +570,52 @@ describe("runtime memory governor", () => {
     expect(decision.admitted).toBe(true);
     expect(decision.pressureLevel).toBe("soft_pressure");
     decision.lease?.release("completed");
+  });
+
+  it("resumes a paused local Stage Play wake after the foreground turn releases", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL = "1";
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB = "1000";
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB = "1500";
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_HEAP_USED_MB = "600";
+      process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_RSS_MB = "900";
+      let paused = false;
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+      runtimeMemoryGovernor.registerPausableRuntimeTask({
+        id: "stage-play-wake-service",
+        taskClass: "stage_play_refresh",
+        priority: 35,
+        isPaused: () => paused,
+        pause: () => {
+          paused = true;
+        },
+        resume: () => {
+          paused = false;
+        },
+      });
+      const userTurn = runtimeMemoryGovernor.admitRuntimeTask({
+        taskClass: "active_user_turn",
+      });
+      expect(userTurn.admitted).toBe(true);
+      expect(userTurn.action).toBe("pause_existing_background");
+      expect(paused).toBe(true);
+      userTurn.lease?.release("completed");
+      await Promise.resolve();
+
+      expect(paused).toBe(false);
+      expect(runtimeMemoryGovernor.getRuntimeTaskSnapshot().pausedTasks).toHaveLength(0);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
   });
 
   it("rejects a foreground turn when Windows commit headroom is below the hard reserve", () => {

@@ -17,6 +17,8 @@ import {
   providerMentionedAdmittedCapabilityIds,
   runtimeProviderRequiredGroundingCapabilityIdsFromBody,
   runtimeProviderRequiredObservationFamiliesFromBody,
+  mutationEpochCapabilityLaneRequestFingerprint,
+  residentSemanticReplanRecoveryRevision,
   shouldAllowCodexObservationDependentCapabilityProposal,
   shouldEnterCodexPostObservationContinuation,
   shouldExtractCodexInitialCapabilityLaneRequest,
@@ -37,6 +39,59 @@ const environmentSpatialRegionMinecraftManifest =
   )!;
 
 describe("Codex required-grounding correction", () => {
+  it("permits one mutating retry after a resident semantic replan gains fresh current-turn evidence", () => {
+    const walk = {
+      capability: "com.casimirbot.minecraft.player.walk",
+      arguments: { direction: "forward", duration_ms: 10_000 },
+    };
+    const results = [
+      {
+        ok: false,
+        capability_id: walk.capability,
+        gateway_admission: { requested_capability: walk.capability },
+        observation_packet: {
+          turn_id: "turn:g3",
+          observation_summary: "Resident controller requires_semantic_replan",
+        },
+        observation: {
+          outcome: "request_canceled",
+          summary: "Resident controller requires_semantic_replan",
+          result: { controls_released: true, manual_override_detected: false },
+        },
+        tool_followup_decision: {
+          next_action: "repair",
+          external_change_required: false,
+        },
+      },
+      {
+        ok: true,
+        capability_id: "com.casimirbot.minecraft.local_map.inspect",
+        gateway_admission: {
+          requested_capability: "com.casimirbot.minecraft.local_map.inspect",
+        },
+        observation_packet: { turn_id: "turn:g3", status: "succeeded" },
+      },
+    ] as any;
+    const revision = residentSemanticReplanRecoveryRevision(results);
+    const mutatingCapabilityIds = new Set([walk.capability]);
+
+    expect(revision).toBe(1);
+    expect(
+      mutationEpochCapabilityLaneRequestFingerprint({
+        request: walk,
+        mutationEpoch: 0,
+        mutatingCapabilityIds,
+      }),
+    ).not.toBe(
+      mutationEpochCapabilityLaneRequestFingerprint({
+        request: walk,
+        mutationEpoch: 0,
+        mutatingCapabilityIds,
+        residentSemanticReplanRevision: revision,
+      }),
+    );
+  });
+
   it("allows the same read probe after a successful mutation epoch", () => {
     const spatial = {
       capability: "com.casimirbot.minecraft.spatial_region.inspect",
@@ -1127,6 +1182,39 @@ describe("Codex required-grounding correction", () => {
     expect(instruction).toContain("Do not answer, refuse, defer");
     expect(instruction).toContain(
       '{"capability":"<exact admitted capability_id>","arguments":{<schema-valid arguments>}}',
+    );
+  });
+
+  it("keeps exact live-mail packet identity model-visible while Codex authors the semantic decision", () => {
+    const instruction = buildCodexGenericContinuationDecisionInstruction({
+      goal: {
+        status: "in_progress",
+        satisfied: false,
+        terminal_product_allowed: false,
+      },
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [
+          "live_env.record_live_source_mail_decision",
+        ],
+        authority: "helix_policy_admits_runtime_proposal",
+      },
+      allowed_decisions: ["act"],
+      next_admissible_affordances: [],
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState);
+
+    expect(instruction).toContain(
+      '"capability":"live_env.record_live_source_mail_decision"',
+    );
+    expect(instruction).toContain("processed_packet_ids");
+    expect(instruction).toContain("mail_ids");
+    expect(instruction).toContain("next_loop_state");
+    expect(instruction).toContain(
+      "Codex—not Helix—chooses decision, rationale, and next_loop_state",
+    );
+    expect(instruction).toContain(
+      "Helix will independently validate packet identity",
     );
   });
 

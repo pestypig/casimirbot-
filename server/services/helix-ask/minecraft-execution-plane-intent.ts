@@ -1,3 +1,10 @@
+import {
+  HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY,
+} from "@shared/helix-minecraft-player-capabilities";
+
 export type MinecraftExecutionPlaneConstraint =
   "player_embodiment" | "world_authority" | "hybrid" | null;
 
@@ -12,7 +19,7 @@ const WORLD_AUTHORITY_PLANE_CUE_RE =
   /\b(?:world\s+authority(?:\s+plane)?|minecraft\s+(?:server\s+)?commands?|server\s+command(?:\s+tree)?|command-side\s+(?:world\s+)?control)\b/iu;
 
 const PLAYER_EMBODIMENT_ACTION_RE =
-  /\b(?:navigate|go|travel|walk|move|step|take|turn|rotate|look|face|jump|interact|use|open|select|equip|follow|collect|gather|mine|break|place|build|craft|transfer|put|deposit|withdraw|cancel|resume)\b/iu;
+  /\b(?:navigate|go|travel|walk|move|step|take|turn|rotate|look|face|jump|interact|use|open|select|equip|follow|collect|gather|mine|break|place|build|craft|transfer|put|deposit|withdraw|cancel|resume|arm|protect|keep|maintain|preserve|guard)\b/iu;
 
 const stripQuotedMinecraftPlaneExamples = (prompt: string): string =>
   prompt.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/gu, " ");
@@ -31,7 +38,11 @@ const planeCueIsOperative = (input: {
   if (
     /\b(?:do\s+not|don't|dont|never|without|not\s+using|no\s+need\s+to\s+use)\b/iu.test(
       prefix,
-    )
+    ) ||
+    // Preserve contrasts such as "use Player Embodiment, not a server
+    // command". The article sits between the negation and the plane cue, so
+    // the older generic negation check incorrectly promoted both planes.
+    /\bnot\s+(?:(?:a|an|the)\s+)?$/iu.test(prefix)
   ) {
     return false;
   }
@@ -192,6 +203,8 @@ export const minecraftPlayerEmbodimentActionPromptMatch = (
     ),
     planeThenAction,
     actionThenPlane,
+    /(?:^|[.!?;]\s*)(?:please\s+)?(arm|protect|keep|maintain|preserve|guard)\b/iu,
+    /(?:^|[.!?;]\s*)(?:please\s+)?(emergency\s+stop|e-?stop|cancel|resume)\b/iu,
   ];
   if (
     explicitPlane !== "player_embodiment" &&
@@ -201,6 +214,17 @@ export const minecraftPlayerEmbodimentActionPromptMatch = (
   ) {
     directActionPatterns.push(
       /\b(?:perform|complete)\b[\s\S]{0,180}?\b(look|sprint|jump|interact|equip|craft|release)\b/iu,
+    );
+  }
+  if (trustedPlayerPlaneAvailable) {
+    // In an authenticated room with an admitted Player Embodiment manifest,
+    // ordinary imperative gameplay language is enough to expose the player
+    // action affordance set. This carries only the semantic obligation; Codex
+    // still chooses the concrete capability and arguments. Keep this narrower
+    // than the generic command verb set so UI/document phrases such as "open"
+    // or "use" do not silently become game actions.
+    directActionPatterns.push(
+      /(?:^|[.!?;]\s*)(?:please\s+)?(navigate|go|travel|walk|move|step|turn|rotate|look|face|jump|interact|equip|follow|collect|gather|mine|break|place|build|craft|transfer|protect|keep|maintain|preserve|guard)\b/iu,
     );
   }
   for (const pattern of directActionPatterns) {
@@ -231,6 +255,96 @@ export const isAffirmativeMinecraftPlayerEmbodimentActionPrompt = (
   prompt: string,
   context?: MinecraftExecutionPlaneContext | null,
 ): boolean => minecraftPlayerEmbodimentActionPromptMatch(prompt, context) !== null;
+
+const RESIDENT_RECOVERY_HAZARD_RE =
+  /\b(?:lava|on\s+fire|catch(?:ing)?\s+fire|burn(?:ing)?|unsafe\s+landing|fall\s+damage|dangerous\s+(?:fall|descent))\b/iu;
+const RESIDENT_RECOVERY_PHYSICAL_RESPONSE_RE =
+  /\b(?:jump|sprint|walk|move|swim|place|use|land|escape|recover|rescue|save)\b/iu;
+
+/**
+ * Narrows terminal evidence for an affirmative resident-response request only
+ * when the user specified a physical recovery for a named hazard. This does
+ * not author the program or admit an effect; it prevents an unrelated
+ * successful player action (for example, the low-air-only guardian profile)
+ * from satisfying a requested fire or landing recovery.
+ */
+export const requiredMinecraftResidentRecoveryCapabilityIds = (
+  promptText: string,
+  context?: MinecraftExecutionPlaneContext | null,
+): string[] => {
+  const prompt = stripQuotedMinecraftPlaneExamples(promptText).trim();
+  if (!prompt || !minecraftPlayerEmbodimentActionPromptMatch(prompt, context)) {
+    return [];
+  }
+  const hazard = RESIDENT_RECOVERY_HAZARD_RE.exec(prompt);
+  RESIDENT_RECOVERY_HAZARD_RE.lastIndex = 0;
+  if (!hazard || typeof hazard.index !== "number") return [];
+  const nearby = prompt.slice(
+    Math.max(0, hazard.index - 240),
+    Math.min(prompt.length, hazard.index + hazard[0].length + 320),
+  );
+  const physicalResponse = RESIDENT_RECOVERY_PHYSICAL_RESPONSE_RE.exec(nearby);
+  RESIDENT_RECOVERY_PHYSICAL_RESPONSE_RE.lastIndex = 0;
+  if (!physicalResponse) return [];
+  return [HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY];
+};
+
+const PLAYER_CONTROL_CUES = [
+  {
+    capabilityId: HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
+    cue: /\b(?:emergency\s+stop|e-?stop)\b/iu,
+  },
+  {
+    capabilityId: HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
+    cue: /\bcancel\b/iu,
+  },
+  {
+    capabilityId: HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY,
+    cue: /\bresume\b/iu,
+  },
+] as const;
+
+/**
+ * Exposes only an affirmatively requested workflow control to Runtime Codex.
+ * This is provider-catalog selection, not execution admission: the gateway
+ * still validates the exact workflow, participant, player, authority, lease,
+ * and connector before any control can run.
+ */
+export const affirmativeMinecraftPlayerControlCapabilityIds = (
+  promptText: string,
+): string[] => {
+  const prompt = stripQuotedMinecraftPlaneExamples(promptText).trim();
+  if (!prompt) return [];
+  const selected = new Set<string>();
+  for (const clause of prompt.split(/[.!?;\n]+/u)) {
+    const normalized = clause.trim();
+    if (!normalized) continue;
+    for (const control of PLAYER_CONTROL_CUES) {
+      const match = control.cue.exec(normalized);
+      control.cue.lastIndex = 0;
+      if (!match || typeof match.index !== "number") continue;
+      const prefix = normalized.slice(0, match.index);
+      const affirmativeFrame =
+        /^\s*(?:please\s+)?$/iu.test(prefix) ||
+        /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?$/iu.test(prefix) ||
+        /\bi\s+(?:want|need|would\s+like)\s+you\s+to\s+$/iu.test(prefix);
+      if (
+        !affirmativeFrame ||
+        !playerEmbodimentActionClauseIsOperative({
+          prompt: normalized,
+          actionIndex: match.index,
+        }) ||
+        /\b(?:screen|page|button|label|ui|text|sentence|phrase|example|documentation|transcript|debug)\b[^.!?;\n]{0,120}\b(?:says|shows|reads|contains|mentions|describes)\b/iu.test(
+          prefix,
+        )
+      ) {
+        continue;
+      }
+      selected.add(control.capabilityId);
+    }
+  }
+  return [...selected].sort();
+};
 
 /**
  * Reads the already-admitted source contract without reclassifying the prompt.

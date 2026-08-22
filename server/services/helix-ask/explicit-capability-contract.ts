@@ -32,6 +32,8 @@ import {
 import { HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA } from "@shared/helix-environment-action";
 import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
@@ -252,6 +254,29 @@ const MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS = new Map<
         "mutation_scope",
         "nodes",
       ],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+    {
+      required: [
+        "action_kind",
+        "profile_id",
+        "duration_ticks",
+        "minimum_air",
+        "dangerous_vertical_velocity",
+        "maximum_swim_ticks",
+        "maximum_observation_age_ticks",
+        "response_repertoire",
+      ],
+      optional: ["environment_label"],
+    },
+  ],
+  [
+    HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
+    {
+      required: ["action_kind", "profile_id"],
       optional: ["environment_label"],
     },
   ],
@@ -3199,6 +3224,19 @@ const naturalMinecraftInventoryProbePromptMatch = (
   match_index: number;
   match_end_index: number;
 } | null => {
+  const explicitProcessedMailSemanticWake =
+    /\b(?:read|inspect|process)\b[\s\S]{0,140}\b(?:processed\s+)?(?:minecraft\s+)?live[-\s]?source\s+(?:mail|mailbox|packet)\b/i.test(
+      prompt,
+    ) &&
+    /\b(?:record[\s\S]{0,80}(?:interpretation|decision|checkpoint)|mail[-\s]?loop|loop\s+state|semantic\s+(?:wake|replan(?:ning)?))\b/i.test(
+      prompt,
+    );
+  const separateInventoryOperation =
+    /\bthen\s+(?:separately\s+)?(?:check|inspect|show|read|review|look\s+at)\b[\s\S]{0,120}\binventory\b/i.test(
+      prompt,
+    );
+  if (explicitProcessedMailSemanticWake && !separateInventoryOperation)
+    return null;
   if (
     /\bwhy\s+did\b[\s\S]{0,80}\b(?:previous|earlier|last)\s+turn\b/i.test(
       prompt,

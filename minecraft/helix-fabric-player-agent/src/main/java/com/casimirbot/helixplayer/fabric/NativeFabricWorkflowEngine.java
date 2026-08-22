@@ -67,6 +67,9 @@ final class NativeFabricWorkflowEngine {
     private int placementInventoryMutationCount;
     private HandObservation placementHandBefore = HandObservation.unavailable();
     private HandObservation placementHandAfter = HandObservation.unavailable();
+    private boolean landingCleanupEligible;
+    private boolean landingCleanupIssued;
+    private int landingCleanupPendingTicks;
     private final Set<Long> completedBlockTargets = new HashSet<>();
 
     NativeFabricWorkflowEngine(
@@ -338,6 +341,7 @@ final class NativeFabricWorkflowEngine {
         Map<String, Object> positionBinding = optionalObject(
             arguments.get("position_binding")
         );
+        boolean cleanupAfterLanding = bool(arguments, "cleanup_after_landing");
         List<BlockPos> positions;
         if (!positionBinding.isEmpty()) {
             if (!"predicted_collision_cell".equals(text(positionBinding, "binding_kind"))) {
@@ -398,6 +402,17 @@ final class NativeFabricWorkflowEngine {
         } else {
             positions = positions(arguments.get("positions"));
         }
+        // Cleanup is a dominant post-placement state. Once the temporary
+        // source has been observed, an empty target means cleanup succeeded;
+        // it must not fall through to the generic placement branch and place
+        // the recovered water again.
+        if (landingCleanupEligible && dynamicPlacementTarget != null) {
+            return cleanupLandingWater(
+                player,
+                dynamicPlacementTarget,
+                handName
+            );
+        }
         while (placeIndex < positions.size() && blockMatches(positions.get(placeIndex), blockId)) {
             if (blockActionStarted) {
                 placementHandAfter = bridge.observeHand(handName);
@@ -405,6 +420,16 @@ final class NativeFabricWorkflowEngine {
                     placementInventoryMutationCount++;
                 }
                 worldMutationCount++;
+                landingCleanupEligible = cleanupAfterLanding;
+            }
+            if (landingCleanupEligible && dynamicPlacementTarget != null) {
+                blockActionStarted = false;
+                pendingTicks = 0;
+                return cleanupLandingWater(
+                    player,
+                    dynamicPlacementTarget,
+                    handName
+                );
             }
             placeIndex++;
             completedCount++;
@@ -539,6 +564,123 @@ final class NativeFabricWorkflowEngine {
                 "requested_positions", positions.size(),
                 "world_mutations_performed", worldMutationCount,
                 "inventory_mutations_performed", placementInventoryMutationCount,
+                "target_position", position(target)
+            ))
+        );
+    }
+
+    private WorkflowStep cleanupLandingWater(
+        LocalPlayer player,
+        BlockPos target,
+        String handName
+    ) {
+        if (!blockMatches(target, "minecraft:water")) {
+            placementHandAfter = bridge.observeHand(handName);
+            placementInventoryMutationCount++;
+            worldMutationCount++;
+            placeIndex++;
+            completedCount++;
+            landingCleanupEligible = false;
+            return WorkflowStep.succeeded(
+                "The water-bucket rescue landed and recovered its temporary water source.",
+                withPlacementForecast(Map.of(
+                    "block_id", "minecraft:water",
+                    "verified_positions", completedCount,
+                    "requested_positions", 1,
+                    "world_mutations_performed", worldMutationCount,
+                    "cleanup_after_landing", true,
+                    "cleanup_verified", true,
+                    "controls_released", true,
+                    "target_position", position(target)
+                ))
+            );
+        }
+        boolean landingSettled =
+            player.onGround() ||
+            (player.isInWater() && player.getDeltaMovement().y >= -0.3);
+        if (!landingSettled) {
+            return WorkflowStep.running(
+                0.9,
+                "The temporary water source is active while measured landing settles.",
+                withPlacementForecast(Map.of(
+                    "block_id", "minecraft:water",
+                    "world_mutations_performed", worldMutationCount,
+                    "cleanup_after_landing", true,
+                    "cleanup_verified", false,
+                    "target_position", position(target)
+                ))
+            );
+        }
+        if (!landingCleanupIssued) {
+            if (!bridge.equip("minecraft:bucket", handName)) {
+                return WorkflowStep.failed(
+                    "The rescue landed, but the resulting empty bucket could not be equipped for cleanup.",
+                    withPlacementForecast(Map.of(
+                        "block_id", "minecraft:water",
+                        "world_mutations_performed", worldMutationCount,
+                        "cleanup_after_landing", true,
+                        "cleanup_verified", false,
+                        "target_position", position(target)
+                    ))
+                );
+            }
+            bridge.lookAt(
+                target.getX() + 0.5,
+                target.getY() + 0.5,
+                target.getZ() + 0.5,
+                180.0F
+            );
+            placementHandBefore = bridge.observeHand(handName);
+            // Give the normal client movement packet one tick to publish the
+            // measured camera orientation before the first bucket use. The
+            // server may otherwise evaluate the interaction against the prior
+            // look direction even though local rendering already moved.
+            landingCleanupIssued = true;
+            landingCleanupPendingTicks = 0;
+            return WorkflowStep.running(
+                0.92,
+                "The client aligned with the temporary water source before bounded cleanup.",
+                withPlacementForecast(Map.of(
+                    "block_id", "minecraft:water",
+                    "world_mutations_performed", worldMutationCount,
+                    "cleanup_after_landing", true,
+                    "cleanup_verified", false,
+                    "target_position", position(target)
+                ))
+            );
+        }
+        bridge.lookAt(
+            target.getX() + 0.5,
+            target.getY() + 0.5,
+            target.getZ() + 0.5,
+            180.0F
+        );
+        if (landingCleanupPendingTicks % 4 == 0) {
+            InteractionHand hand = "off_hand".equals(handName)
+                ? InteractionHand.OFF_HAND
+                : InteractionHand.MAIN_HAND;
+            minecraft.gameMode.useItem(player, hand);
+        }
+        if (++landingCleanupPendingTicks > 20) {
+            return WorkflowStep.failed(
+                "The server did not confirm removal of the temporary water source.",
+                withPlacementForecast(Map.of(
+                    "block_id", "minecraft:water",
+                    "world_mutations_performed", worldMutationCount,
+                    "cleanup_after_landing", true,
+                    "cleanup_verified", false,
+                    "target_position", position(target)
+                ))
+            );
+        }
+        return WorkflowStep.running(
+            0.95,
+            "The client submitted the admitted water cleanup and is awaiting measured world state.",
+            withPlacementForecast(Map.of(
+                "block_id", "minecraft:water",
+                "world_mutations_performed", worldMutationCount,
+                "cleanup_after_landing", true,
+                "cleanup_verified", false,
                 "target_position", position(target)
             ))
         );
@@ -995,6 +1137,9 @@ final class NativeFabricWorkflowEngine {
         placementInventoryMutationCount = 0;
         placementHandBefore = HandObservation.unavailable();
         placementHandAfter = HandObservation.unavailable();
+        landingCleanupEligible = false;
+        landingCleanupIssued = false;
+        landingCleanupPendingTicks = 0;
         completedBlockTargets.clear();
     }
 

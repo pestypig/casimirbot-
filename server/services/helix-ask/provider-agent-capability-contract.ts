@@ -382,7 +382,6 @@ export const PROVIDER_AGENT_CAPABILITY_CLASSIFICATIONS: readonly ProviderAgentCa
     "live_env.request_visual_action_replay",
     "live_env.project_live_source_narrative",
     "live_env.update_live_source_immersion_state",
-    "live_env.record_live_source_mail_decision",
   ].map((capabilityId) =>
     live(capabilityId, {
       availability: "helix_native_only",

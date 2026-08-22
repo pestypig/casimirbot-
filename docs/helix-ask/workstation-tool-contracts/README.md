@@ -314,6 +314,7 @@ Each capability contract should define:
 | `live_env.check_live_source_mail`                       | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
 | `live_env.read_live_source_mail`                        | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
 | `live_env.read_processed_live_source_mail`              | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
+| `live_env.record_live_source_mail_decision`             | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
 | `live_env.reflect_live_source_mail_loop`                | [live_env.live_source_mailbox_reads.md](live_env.live_source_mailbox_reads.md)                           | `draft`     |
 | `live_env.compare_mail_to_interpreter_profile`          | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md)                     | `draft`     |
 | `live_env.validate_live_source_prediction`              | [live_env.interpreter_prediction_reads.md](live_env.interpreter_prediction_reads.md)                     | `draft`     |

@@ -1,14 +1,14 @@
 # NHM2 Spherical Boson-Star v2 Initializer Production Runtime Repair
 
-Status: **active repair packet after BLOCKED numerical decision**.
+Status: **closed with authenticated exact `FAIL/BLOCKED` evidence after the
+frozen core terminated before projection**.
 
-Program gate: **G1-R1 — initializer production runtime repair**
+Program gate: **G1-R1F — frozen-core first-failure authentication**
 
-Workstream: source seed to frozen six-payload initializer boundary
+Workstream: frozen initializer core to content-addressed first-failure evidence
 
-Capability or component: authenticated production orchestration, fixed native
-arena ownership, shared private continuation composition, and initializer input
-publication
+Capability or component: runtime/toolchain/executable binding, source-disjoint
+failure comparison, cleanup/no-retune evidence, and fail-closed disposition
 
 Current maturity: authenticated source-manifest resource preflight, retained
 one-shot native arenas, abandonment-safe finalization, and the complete frozen
@@ -20,8 +20,10 @@ core residual/Jacobian/LU/Newton graph is present and reproducibly reaches the
 frozen Armijo first failure, so no projected core state, continuation/tail graph,
 six-payload instance, runtime closure, preseal, or evidence issuer exists
 
-Target maturity: one authority-neutral, authenticated six-payload initializer
-instance that can enter the frozen evaluator without changing its graph
+Target maturity: one authority-neutral, replayable first-failure receipt whose
+observation boundary is server-authenticated, whose source/runtime lineage is
+stated exactly, and whose evidence cannot authorize downstream numerical work
+or retune the frozen graph
 
 Required frozen inputs:
 
@@ -40,24 +42,22 @@ Required frozen inputs:
 
 Required evidence:
 
-1. A server-owned, no-caller-path/hash/provider production entry that obtains
-   one fixed arena set before any candidate numeric read.
-2. One authenticated private loader that injects the same core-quadrature
-   module instance through core orchestration, tail initialization, and the
-   combined tail operator; token rebinding and core-integral recomputation stay
-   forbidden.
-3. Exact source, dependency, toolchain, executable, loaded-runtime, command,
-   input, monotonic chronology, and scientific-preseal bindings.
-4. Successful reverse cleanup, context restoration, descriptor close, and
-   sticky poison on incomplete cleanup.
-5. One source-seed receipt and six exact payload bindings, including the
-   domain-separated supplemental `U,U1,V,V1` join-barrier trace.
-6. Independent exact-byte reread and validation against the frozen initializer
-   evaluator before any N=64 solver call.
-7. Hostile tests proving caller values are not traversed before trust/runtime
-   admission and that copied, spliced, stale, or resealed-in-isolation payloads
-   cannot cross the boundary.
-8. Focused tests, static/type checks, independent audit, math validation, and
+1. A bounded canonical receipt binding the exact frozen inputs, both observed
+   implementations, state/residual hashes, failure chronology, and no-retune
+   attestation.
+2. Exact source, dependency, toolchain, executable, loaded-runtime, and command
+   bindings for the native observation and the Python comparison.
+3. An explicit distinction between source-disjoint comparison and qualifying
+   runtime-disjoint independent replay; shared MPFR/GMP lineage must remain a
+   typed blocker.
+4. Successful reverse cleanup, binary64/MPFR context restoration, module unload,
+   and sticky poison evidence from the native observation.
+5. A server-owned authenticated observer/admission boundary that accepts only
+   the exact content-addressed receipt and cannot mint candidate, execution,
+   replay, lamp, or physical authority.
+6. Hostile tests proving mutations, splices, oversized input, wrong receipt
+   hash, and false authority promotion fail closed.
+7. Focused tests, static/type checks, independent audit, math validation, and
    applicable Casimir certificate integrity.
 
 Stop/fail criteria:
@@ -68,14 +68,16 @@ Stop/fail criteria:
 - The same authenticated private module identity cannot be retained across
   stages.
 - Fixed arenas cannot be allocated and proven within the frozen preflight.
-- Runtime/toolchain/executable identity or scientific preseal remains absent.
+- Runtime/toolchain/executable identity cannot be bound to the observation.
 - Cleanup, restoration, or post-close identity proof fails.
-- Any proposed receipt promotes candidate, proof, replay, lamp, physical,
+- Any proposed receipt treats shared runtime lineage as independent replay or
+  promotes candidate, proof, replay, lamp, physical,
   propulsion, or transport authority.
 
 Explicit non-goals:
 
-- Running the N=64 candidate before this packet closes.
+- Running the N=64 candidate or downstream projection/continuation after the
+  terminal core failure.
 - Changing the frozen initializer operation graph or synthesizing missing
   payload bytes.
 - Running N=96, N=128, or N=256.
@@ -84,9 +86,10 @@ Explicit non-goals:
   replay agreement, or a Theory Graph lamp.
 - Claiming physical viability, propulsion, or transport.
 
-Downstream gate unlocked: a fresh G1 numerical-decision attempt packet for the
-same frozen `N=64, A=2^-16` checkpoint. This repair does not itself authorize or
-constitute that attempt.
+Downstream gate unlocked: an exact authenticated `FAIL/BLOCKED` disposition. A
+fresh attempt is not unlocked unless a separately proposed, reviewed, and
+versioned numerical policy is authorized; this packet cannot authorize that
+policy.
 
 ## First implementation boundary
 
@@ -119,8 +122,8 @@ resource preflight in one Node process:
 - focused test:
   `tools/nhm2-spherical-boson-star-v2-initializer-runtime/test_native_arena_preflight.mjs`,
   SHA-256
-  `96cf01ecbca4ee87bce15f0d7db71b281b3fadf9471edbe82c621b7685827553`,
-  34,884 bytes;
+  `fd67bc48dfee10eda0ea269970eb2caf6db53070f4b8267703a198adb6391090`,
+  46,928 bytes;
 - observed MPFR library: raw SHA-256
   `95b280f52d24a1fe1e024877ee325a629c3424e12961d27f84daec73d02c4bd8`,
   version 4.2.2;
@@ -208,7 +211,7 @@ resource preflight in one Node process:
   lowest-row-tie partial pivoting, performs exactly three MPFR256 residual
   refinements through the retained native module, and follows the frozen
   48-update/25-trial Armijo schedule without fallback or retuning;
-- two independently executed implementations agree on the first failure: nine
+- two source-disjoint implementations agree on the first failure: nine
   accepted updates with alpha exponents `0,0,0,0,0,1,3,6,8`, followed by
   `armijo_schedule_exhausted_without_retry` on the tenth solve after 52 total
   trial evaluations. The preserved current equation norm is
@@ -221,6 +224,47 @@ resource preflight in one Node process:
   both match the frozen Python graph bit-for-bit. No endpoint projection,
   continuation, tail work, payload materialization, candidate read, or authority
   promotion occurs after this first failure.
+
+The diagnostic harness now emits one content-addressed canonical first-failure
+receipt only when explicitly requested:
+
+- receipt self-hash
+  `cb9c36432486b4138ad01b8c8beebaca4eecb480fdd54a9a5f57a5030c4ed0cb`;
+- receipt raw-file SHA-256
+  `34133d2c5e077b92618ea9420975f165c01134f5ab06c46f1e4eb4127bde730a`
+  / 6,837 bytes;
+- receipt path
+  [`nhm2-spherical-boson-star-v2-initializer-core-first-failure-cb9c36432486b4138ad01b8c8beebaca4eecb480fdd54a9a5f57a5030c4ed0cb.json`](./nhm2-spherical-boson-star-v2-initializer-core-first-failure-cb9c36432486b4138ad01b8c8beebaca4eecb480fdd54a9a5f57a5030c4ed0cb.json).
+
+The receipt binds the native source, built addon, Rust compiler/linker, Node and
+Python executables, Python comparison sources, MPFR/GMP bytes, commands, frozen
+semantic inputs, exact failure fields, cleanup, and no-retune locks. It
+deliberately records `serverAuthenticatedObservation:false` and
+`qualifiesAsRuntimeDisjointIndependentReplay:false`: both implementations use
+the same workstation MPFR/GMP lineage. It therefore preserves the result but
+does not close the server-observer or independent-runtime requirements.
+
+The server-observer blocker is now closed outside the plain receipt by an
+identity-only capability:
+
+- observer source
+  `server/services/theory/nhm2-spherical-boson-star-v2-initializer-core-first-failure-admission.ts`,
+  raw SHA-256
+  `5b16e6e8d6e5eb3449eae1ecede30372abce0b5cc5c7dddbc60188c3ebeb5699`
+  / 11,093 bytes;
+- focused spec raw SHA-256
+  `2a5a94d4026a15461d1113602b40f782d908d444e20f6ddb65aa47e07e521885`
+  / 5,202 bytes;
+- focused Vitest: 5/5 PASS; isolated strict TypeScript: PASS.
+
+The observer accepts zero arguments, securely rereads only the frozen
+content-addressed path, verifies file identity plus raw and self hashes, and
+mints a private WeakMap identity capability. Copies and serialized objects are
+rejected without property traversal. The outer observation can truthfully mark
+server capability identity as authenticated, while the inner plain receipt
+continues to say `serverAuthenticatedObservation:false`. Every execution,
+candidate, replay, lamp, physical, propulsion, and transport lock remains
+false.
 
 This checkpoint does **not** close G1-R1. The public diagnostic path still
 accepts a caller-selected DLL solely for negative/feasibility coverage, while
@@ -242,7 +286,7 @@ Checkpoint verification:
   active/stale/consumed lease, cleanup poison, exact binary64 caller-state
   restoration, and forced restoration-failure poison regressions;
 - math-stage validation: PASS, 318 entries;
-- Casimir `repo-convergence`: PASS / GREEN, run 2420, trace
-  `adapter:a61653bd-eea0-4f0d-87fc-84952f85de01`, certificate
+- Casimir `repo-convergence`: PASS / GREEN, run 2422, trace
+  `adapter:5995d58a-7559-4ecb-a8d3-b0bfd0a97f7c`, certificate
   `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`,
   integrity true.

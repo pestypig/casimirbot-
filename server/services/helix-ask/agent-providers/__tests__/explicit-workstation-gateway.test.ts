@@ -2331,6 +2331,28 @@ describe("explicit workstation gateway derived calls", () => {
     ]);
   });
 
+  it("does not force World Authority command grounding over an authenticated natural Player Embodiment request", () => {
+    const question =
+      "Step off this ledge, save me from the fall with my water bucket, verify I landed safely, pick the water back up, and release control.";
+
+    expect(
+      buildMinecraftMechanicsDocsWorkstationGatewayCallRequests({
+        question,
+        trusted_room_environment_intent_context: {
+          schema: "helix.trusted_room_environment_intent_context.v1",
+          trusted_environment_domain: "minecraft",
+          source: "authenticated_room_environment_subject",
+          authorized_player_action_capability_ids: [
+            "com.casimirbot.minecraft.player.guardian.execute",
+          ],
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      }),
+    ).toEqual([]);
+  });
+
   it("does not inject mechanics docs for a read-only Minecraft command-catalog query", () => {
     const question =
       'Use only com.casimirbot.minecraft.command.catalog against the paired live Fabric source. Query the current command tree with path_prefix "helixgame checkpoint" and limit 64. Report the fresh catalog entries. Do not execute any command and do not use another tool.';

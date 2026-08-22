@@ -49,15 +49,25 @@ if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
 if (-not (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)) {
   Fail-Typed "minecraft_loopback_server_not_listening"
 }
-$existingMinecraftClient = Get-CimInstance Win32_Process |
+$connectedClientIds = @(
+  Get-NetTCPConnection -State Established -RemotePort $port -ErrorAction SilentlyContinue |
+    ForEach-Object OwningProcess |
+    Sort-Object -Unique
+)
+$existingMinecraftClient = Get-Process javaw -ErrorAction SilentlyContinue |
   Where-Object {
-    $_.Name -eq "javaw.exe" -and
-    $_.CommandLine -match "net\.minecraft\.client\.main\.Main"
+    $connectedClientIds -contains $_.Id -or
+    # Minecraft marks a modded or otherwise modified client title with `*`
+    # (for example `Minecraft* 1.21.8`). Treat that as the same verified game
+    # window so a lifecycle retry reuses the client instead of clicking Play
+    # again and then waiting for a second javaw process that will never start.
+    ($_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match '^Minecraft(?:\*|\s|$)')
   } |
+  Sort-Object StartTime -Descending |
   Select-Object -First 1
 
 if ($RestartClient -and $existingMinecraftClient) {
-  $verifiedClientId = [int]$existingMinecraftClient.ProcessId
+  $verifiedClientId = [int]$existingMinecraftClient.Id
   $verifiedClient = Get-Process -Id $verifiedClientId -ErrorAction SilentlyContinue
   if (-not $verifiedClient) { Fail-Typed "minecraft_existing_client_unavailable" }
   $null = $verifiedClient.CloseMainWindow()
@@ -260,7 +270,97 @@ public static class HelixMinecraftLauncherAutomation {
         );
     }
 
-    public static string ClickRenderedPlay(IntPtr window, uint expectedProcessId) {
+    private static bool TryLocateCrashReportDoNotShare(
+        Bitmap image,
+        out Point target
+    ) {
+        // The current launcher crash-consent modal renders a narrow green
+        // "Share crash report" control in the lower-right half. Its privacy-
+        // preserving "Do not share" sibling is immediately to the left. This
+        // detector is used only after the wide Play component was absent.
+        int left = image.Width / 2;
+        int right = image.Width * 4 / 5;
+        int top = image.Height / 2;
+        // Current launcher builds place the crash-report actions below the
+        // three-quarter line on tall windows. Keep the scan bounded above the
+        // news cards while including that lower modal action row.
+        int bottom = image.Height * 9 / 10;
+        int width = right - left;
+        int height = bottom - top;
+        bool[,] green = new bool[height, width];
+        for (int y = top; y < bottom; y++) {
+            for (int x = left; x < right; x++) {
+                Color pixel = image.GetPixel(x, y);
+                bool buttonGreen = pixel.R >= 35 && pixel.R <= 100 &&
+                    pixel.G >= 95 && pixel.G <= 190 &&
+                    pixel.B >= 15 && pixel.B <= 90 &&
+                    pixel.G >= pixel.R + 40;
+                green[y - top, x - left] = buttonGreen;
+            }
+        }
+        bool[,] visited = new bool[height, width];
+        Rectangle best = Rectangle.Empty;
+        int bestCount = -1;
+        int[] dx = new int[] { -1, 1, 0, 0 };
+        int[] dy = new int[] { 0, 0, -1, 1 };
+        for (int localY = 0; localY < height; localY++) {
+            for (int localX = 0; localX < width; localX++) {
+                if (!green[localY, localX] || visited[localY, localX]) continue;
+                var queue = new System.Collections.Generic.Queue<int>();
+                queue.Enqueue(localY * width + localX);
+                visited[localY, localX] = true;
+                int minX = localX, maxX = localX, minY = localY, maxY = localY;
+                int count = 0;
+                while (queue.Count > 0) {
+                    int encoded = queue.Dequeue();
+                    int cy = encoded / width;
+                    int cx = encoded % width;
+                    count++;
+                    minX = Math.Min(minX, cx); maxX = Math.Max(maxX, cx);
+                    minY = Math.Min(minY, cy); maxY = Math.Max(maxY, cy);
+                    for (int direction = 0; direction < 4; direction++) {
+                        int nx = cx + dx[direction], ny = cy + dy[direction];
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height ||
+                            visited[ny, nx] || !green[ny, nx]) continue;
+                        visited[ny, nx] = true;
+                        queue.Enqueue(ny * width + nx);
+                    }
+                }
+                int componentWidth = maxX - minX + 1;
+                int componentHeight = maxY - minY + 1;
+                if (count >= 500 &&
+                    componentWidth >= Math.Max(100, image.Width / 12) &&
+                    componentWidth < image.Width / 5 &&
+                    componentHeight >= 20 && componentHeight <= image.Height / 8 &&
+                    count > bestCount) {
+                    bestCount = count;
+                    best = new Rectangle(
+                        left + minX,
+                        top + minY,
+                        componentWidth,
+                        componentHeight
+                    );
+                }
+            }
+        }
+        if (best.IsEmpty) {
+            target = Point.Empty;
+            return false;
+        }
+        int doNotShareX = best.Left - Math.Max(60, best.Width / 2);
+        if (doNotShareX < image.Width / 3) {
+            target = Point.Empty;
+            return false;
+        }
+        target = new Point(doNotShareX, best.Top + best.Height / 2);
+        return true;
+    }
+
+    public static string ClickRenderedPlay(
+        IntPtr window,
+        uint expectedProcessId,
+        string diagnosticImagePath
+    ) {
         IntPtr previousDpi = SetThreadDpiAwarenessContext(new IntPtr(-4));
         try {
             IntPtr oldForeground = GetForegroundWindow();
@@ -305,6 +405,7 @@ public static class HelixMinecraftLauncherAutomation {
                     }
                 }
                 Point target;
+                bool dismissCrashReport = false;
                 using (Bitmap image = new Bitmap(width, height))
                 using (Graphics graphics = Graphics.FromImage(image)) {
                     IntPtr deviceContext = graphics.GetHdc();
@@ -319,16 +420,25 @@ public static class HelixMinecraftLauncherAutomation {
                         target = LocatePlayButton(image);
                     } catch (InvalidOperationException error) {
                         if (error.Message == "minecraft_launcher_play_control_not_found") {
-                            // A forced client stop can leave the exact launcher
-                            // behind a modal crash report. Escape is a bounded,
-                            // non-mutating dismissal on this verified launcher;
-                            // the outer loop then captures a fresh frame and
-                            // still requires the real Play component.
-                            keybd_event(0x1B, 0, 0, UIntPtr.Zero);
-                            System.Threading.Thread.Sleep(100);
-                            keybd_event(0x1B, 0, 2, UIntPtr.Zero);
+                            if (!String.IsNullOrWhiteSpace(diagnosticImagePath)) {
+                                image.Save(diagnosticImagePath, System.Drawing.Imaging.ImageFormat.Png);
+                            }
+                            Point privacyTarget;
+                            if (TryLocateCrashReportDoNotShare(image, out privacyTarget)) {
+                                target = privacyTarget;
+                                dismissCrashReport = true;
+                            } else {
+                                // Older launcher versions dismissed this modal
+                                // with Escape. A later frame must still expose
+                                // and locate the real Play component.
+                                keybd_event(0x1B, 0, 0, UIntPtr.Zero);
+                                System.Threading.Thread.Sleep(100);
+                                keybd_event(0x1B, 0, 2, UIntPtr.Zero);
+                                throw;
+                            }
+                        } else {
+                            throw;
                         }
-                        throw;
                     }
                 }
                 int x = rectangle.Left + target.X;
@@ -356,7 +466,9 @@ public static class HelixMinecraftLauncherAutomation {
                     // center. Multiple physical/posted clicks can enqueue
                     // multiple Java clients before this launcher build dims
                     // the Play control.
-                    return x + "," + y;
+                    return dismissCrashReport
+                        ? "crash_report_dismissed"
+                        : x + "," + y;
                 } finally {
                     SetWindowPos(
                         window,
@@ -382,7 +494,7 @@ public static class HelixMinecraftLauncherAutomation {
 $launcherAction = "reused_client"
 $clickPoint = "not_required"
 if ($existingMinecraftClient) {
-  $client = Get-Process -Id $existingMinecraftClient.ProcessId -ErrorAction SilentlyContinue
+  $client = Get-Process -Id $existingMinecraftClient.Id -ErrorAction SilentlyContinue
   if (-not $client) { Fail-Typed "minecraft_existing_client_unavailable" }
 } else {
   $launcherAction = "launched_client"
@@ -434,6 +546,7 @@ if ($existingMinecraftClient) {
   $playDeadline = (Get-Date).AddSeconds(30)
   $clickPoint = $null
   $lastLaunchFailure = "minecraft_launcher_play_control_not_attempted"
+  $launcherDiagnosticImage = Join-Path $root "logs\helix-launcher-play-diagnostic.png"
   do {
     $currentLauncher = Get-Process MinecraftLauncher -ErrorAction SilentlyContinue |
       Where-Object {
@@ -443,10 +556,18 @@ if ($existingMinecraftClient) {
       Select-Object -First 1
     if ($currentLauncher) { $launcher = $currentLauncher }
     try {
-      $clickPoint = [HelixMinecraftLauncherAutomation]::ClickRenderedPlay(
+      $candidatePoint = [HelixMinecraftLauncherAutomation]::ClickRenderedPlay(
         $launcher.MainWindowHandle,
-        [uint32]$launcher.Id
+        [uint32]$launcher.Id,
+        $launcherDiagnosticImage
       )
+      if ($candidatePoint -eq "crash_report_dismissed") {
+        $lastLaunchFailure = "minecraft_launcher_crash_report_dismissed"
+        $clickPoint = $null
+        Start-Sleep -Seconds 1
+        continue
+      }
+      $clickPoint = $candidatePoint
     } catch {
       $launchFailure = [string]$_.Exception.InnerException.Message
       $lastLaunchFailure = $launchFailure

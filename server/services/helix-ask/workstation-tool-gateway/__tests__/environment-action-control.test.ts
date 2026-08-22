@@ -211,6 +211,63 @@ describe("Minecraft player workflow-control workstation gateway", () => {
     expect(requestControl).not.toHaveBeenCalled();
   });
 
+  it("accepts an idempotent emergency stop when authority is suspended and no workflow remains", async () => {
+    const result = await executeEnvironmentActionControlGatewayCapability({
+      capabilityId: EMERGENCY_STOP_CAPABILITY,
+      turnId: "ask:player-control:emergency-stop-idempotent",
+      arguments: { workflow_ref: WORKFLOW_ID },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        emergencyStop: vi.fn(async () => ({
+          authority: { status: "suspended" },
+          controlRequest: {
+            schema: HELIX_ENVIRONMENT_ACTION_CONTROL_REQUEST_SCHEMA,
+            control_request_id: "environment_action_control:emergency-idempotent",
+            control_kind: "emergency_stop",
+            action_authority_id: "environment_action_authority:test",
+            environment_binding_id: "environment_binding:test",
+            room_id: ROOM_ID,
+            source_id: "source:test",
+            world_id: "minecraft:local:test",
+            participant_id: PARTICIPANT_ID,
+            subject_binding_id: "subject_binding:test",
+            workflow_id: null,
+            reason: "Emergency stop the paired client.",
+            release_all_controls: true,
+            created_at: "2026-08-05T12:00:00.000Z",
+            deadline_at: "2026-08-05T12:01:00.000Z",
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => ({
+          ...observation,
+          control_kind: "emergency_stop",
+          outcome: "not_running",
+          workflow_state: null,
+          controls_released: true,
+          affected_workflow_refs: [],
+          summary: "No workflow remained running.",
+        })),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "completed",
+      observation: {
+        control_kind: "emergency_stop",
+        outcome: "completed",
+        workflow_state: "emergency_stopped",
+        controls_released: true,
+        provenance_valid: true,
+      },
+    });
+  });
+
   it("resolves the exact speaker workflow server-side and re-enters cancellation evidence", async () => {
     const requestControl = vi.fn(deps().requestControl!);
     const result = await executeEnvironmentActionControlGatewayCapability({

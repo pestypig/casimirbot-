@@ -159,6 +159,24 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         );
     }
 
+    void armDiagnosticGuardian(int durationSeconds) {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.armLocalViabilityGuardian(durationSeconds));
+    }
+
+    void disarmDiagnosticGuardian() {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.disarmLocalViabilityGuardian());
+    }
+
+    void showDiagnosticGuardianStatus() {
+        message(runtime == null
+            ? "Helix player embodiment is not initialized."
+            : runtime.localViabilityGuardianStatusText());
+    }
+
     void enableDiagnosticInbox(PlayerActionDiagnosticInbox.Scope scope) {
         if (scope == PlayerActionDiagnosticInbox.Scope.DISABLED) {
             disableDiagnosticInbox();

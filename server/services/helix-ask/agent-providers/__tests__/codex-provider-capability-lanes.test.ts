@@ -61,12 +61,16 @@ import {
   asksToBuildScientificEvidencePacketFromRetainedSidecar,
   augmentImageLensRegionCandidatesForQuestion,
   classifyCodexProcessFailureForUser,
+  classifyCodexNativeProviderFailureForUser,
   codexProviderOutputHasPendingCapabilityLaneRequest,
   codexRouteAllowsTerminalKind,
   codexProvider,
   continuationStateAdmitsPreparedLaneRequest,
   continuationStateAdmitsPostObservationLaneRequest,
   continuationStateAdmitsGenericProviderLaneRequest,
+  continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest,
+  extractCodexCompatibilityModelOutput,
+  isCodexNativeTurnCompletionProjection,
   continuationStateAdmitsSchemaCompletedReadOnlyLaneRequest,
   continuationStateAdmitsEvidenceBoundMinecraftWalkLaneRequest,
   continuationStateAdmitsPreparedRecoveryLaneRequest,
@@ -282,6 +286,63 @@ const buildIntegrityValidFormalV2Failure = async () =>
   });
 
 describe("Codex provider capability lane adapter", () => {
+  it("never parses echoed native protocol envelopes as compatibility model output", () => {
+    const echoedPrompt =
+      'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"<exact admitted capability_id>","arguments":{"example":true}}';
+    const stdout = [
+      JSON.stringify({
+        method: "turn/started",
+        params: { input: echoedPrompt },
+      }),
+      JSON.stringify({
+        method: "account/rateLimits/updated",
+        params: { remaining: 99 },
+      }),
+      JSON.stringify({
+        method: "turn/completed",
+        params: { turn: { status: "completed" } },
+      }),
+    ].join("\n");
+
+    expect(extractCodexCompatibilityModelOutput({ stdout })).toBe("");
+    expect(
+      extractCodexCompatibilityModelOutput({
+        stdout,
+        nativeAgentMessageText:
+          'HELIX_CAPABILITY_LANE_REQUEST_JSON:{"capability":"live_env.read_processed_live_source_mail","arguments":{}}',
+      }),
+    ).toContain("live_env.read_processed_live_source_mail");
+    expect(
+      extractCodexCompatibilityModelOutput({
+        stdout: "A plain Markdown answer that did not use native envelopes.",
+      }),
+    ).toBe("A plain Markdown answer that did not use native envelopes.");
+  });
+
+  it("treats only a completed native Codex turn as compatibility-step completion", () => {
+    expect(
+      isCodexNativeTurnCompletionProjection({
+        transcriptEvent: {
+          step_id: "codex_native_turn_complete",
+          status: "completed",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isCodexNativeTurnCompletionProjection({
+        transcriptEvent: {
+          step_id: "codex_native_turn_complete",
+          status: "running",
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isCodexNativeTurnCompletionProjection({
+        transcriptEvent: { step_id: "codex_native_tool_result", status: "completed" },
+      }),
+    ).toBe(false);
+  });
+
   const previousLiveTranslationExternalBackends = process.env.HELIX_LIVE_TRANSLATION_EXTERNAL_BACKENDS_ENABLED;
   const previousScholarlyWorkbenchMemoryDir = process.env.HELIX_SCHOLARLY_PDF_WORKBENCH_MEMORY_DIR;
   const providerFakeEnvKeys = [
@@ -2427,6 +2488,132 @@ describe("Codex provider capability lane adapter", () => {
     ).toBe(false);
   });
 
+  it("admits Codex-authored live-source decisions only for exact re-entered packet and mail identities", () => {
+    const capability = "live_env.record_live_source_mail_decision";
+    const packetId = "stage_play_processed_mail_packet:packet-1";
+    const mailId = "stage_play_live_source_mail:mail-1";
+    const manifest = {
+      capability_id: capability,
+      mutating: true,
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["decision", "processed_packet_ids", "mail_ids"],
+        properties: {
+          decision: {
+            type: "string",
+            enum: [
+              "wait_for_next_summary",
+              "record_interpretation",
+              "draft_text_answer",
+              "request_more_evidence",
+              "request_stage_play_checkpoint",
+              "fail_closed",
+            ],
+          },
+          processed_packet_ids: { type: "array" },
+          mail_ids: { type: "array" },
+          rationale: { type: "string" },
+          next_loop_state: { type: "string" },
+        },
+      },
+    } as any;
+    const state = {
+      next_admissible_affordances: [{
+        admissible: true,
+        tried: false,
+        affordance_id: "live-source:record-decision",
+        capability_id: capability,
+        lane_request: {
+          capability,
+          evidence_refs: [packetId, mailId, "source:room-ingress:source-1"],
+        },
+      }],
+      allowed_decisions: ["act"],
+      last_attempt: {
+        capability_id: "live_env.read_processed_live_source_mail",
+        status: "succeeded",
+      },
+      capability_proposal: {
+        allowed: true,
+        admitted_capability_ids: [capability],
+      },
+      budget: { hard: { exhausted: false } },
+    } as unknown as HelixAgentContinuationState;
+    const candidate = {
+      capability,
+      arguments: {
+        decision: "record_interpretation",
+        processed_packet_ids: [packetId],
+        mail_ids: [mailId],
+        rationale: "Inventory changed in the current Minecraft observation.",
+        next_loop_state: "Re-evaluate the next survival step with the new item available.",
+      },
+    };
+    const retryInstruction =
+      buildCodexContinuationAffordanceRetryInstruction(state, [manifest]);
+
+    expect(retryInstruction).toContain(
+      "Author decision, rationale, and next_loop_state",
+    );
+    expect(retryInstruction).toContain(
+      `\"processed_packet_ids\":[\"${packetId}\"]`,
+    );
+    expect(retryInstruction).toContain(`\"mail_ids\":[\"${mailId}\"]`);
+
+    expect(
+      continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest({
+        state,
+        candidate,
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsGenericProviderLaneRequest({
+        state,
+        candidate,
+        // The mutating decision is unlocked only after the current-turn mail
+        // read, so it need not have been prompt-admitted before that evidence
+        // existed. Exact packet/mail binding plus the available gateway
+        // manifest is the procedural admission boundary.
+        admittedCapabilityIds: [],
+        availableCapabilities: [manifest],
+        providerSelectedExtensionAllowed: false,
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsPostObservationLaneRequest({
+        state,
+        candidate,
+        admittedCapabilityIds: [],
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(true);
+    expect(
+      continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest({
+        state,
+        candidate: {
+          ...candidate,
+          arguments: {
+            ...candidate.arguments,
+            processed_packet_ids: ["stage_play_processed_mail_packet:stale"],
+          },
+        },
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(false);
+    expect(
+      continuationStateAdmitsEvidenceBoundLiveSourceMailDecisionLaneRequest({
+        state,
+        candidate: {
+          ...candidate,
+          arguments: { ...candidate.arguments, decision: "invented_decision" },
+        },
+        availableCapabilities: [manifest],
+      }),
+    ).toBe(false);
+  });
+
   it("lets Codex select only the missing direction for an evidence-bound walk affordance", () => {
     const capability = "com.casimirbot.minecraft.player.walk";
     const manifest = {
@@ -3084,6 +3271,60 @@ describe("Codex provider capability lane adapter", () => {
         "minecraft.player_embodiment.action",
       ),
     ).toEqual([]);
+
+    const controlBody: Record<string, unknown> = {
+      source_target_intent: body.source_target_intent,
+    };
+    expect(
+      attachCodexMinecraftPlayerEmbodimentActionRequirement({
+        body: controlBody,
+        turnId: "ask:test:semantic-player-emergency-stop",
+        promptText:
+          "Emergency stop my paired Minecraft player now using Player Embodiment.",
+      }),
+    ).toBe(true);
+    expect(
+      (controlBody.capability_itinerary as any).terminal_success_criteria
+        .required_capability_any_of_groups[0].capability_ids,
+    ).toContain("com.casimirbot.minecraft.player.emergency_stop");
+  });
+
+  it("requires exact reactive-program evidence for an operative resident physical recovery", () => {
+    const body: Record<string, unknown> = {
+      source_target_intent: {
+        target_source: "live_environment",
+        strength: "hard",
+        explicit_cues: ["operative_minecraft_player_embodiment_action"],
+        reasons: ["player_action_capability_selection_owned_by_runtime"],
+      },
+      canonical_goal_frame: {
+        goal_kind: "environment_action_workflow",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+    };
+
+    expect(
+      attachCodexMinecraftPlayerEmbodimentActionRequirement({
+        body,
+        turnId: "ask:test:resident-lava-recovery",
+        promptText:
+          "Protect my paired Minecraft player locally for 30 seconds. If I enter lava, jump and sprint into the adjacent water, verify that I am no longer on fire, and release controls.",
+      }),
+    ).toBe(true);
+
+    expect(
+      (body.capability_itinerary as any).terminal_success_criteria
+        .required_capability_any_of_groups,
+    ).toEqual([
+      {
+        group_id: "minecraft.player_embodiment.action",
+        semantic_requirement:
+          "requested_resident_physical_recovery_effect_coverage",
+        capability_ids: [
+          "com.casimirbot.minecraft.player.guardian.execute",
+        ],
+      },
+    ]);
   });
 
   it("marks an explicitly later Minecraft observation as a post-action requirement", () => {
@@ -3398,6 +3639,7 @@ describe("Codex provider capability lane adapter", () => {
 
     expect(
       nativeProviderAdmittedCapabilityIdsForTurn({
+        question: "Take one careful step using Player Embodiment.",
         semanticPlayerEmbodimentActionRequired: true,
         runtimeProviderRequiredGroundingCapabilityIds: [actorStatus],
         runtimeProviderAdmittedCapabilityIds: [
@@ -3411,6 +3653,24 @@ describe("Codex provider capability lane adapter", () => {
         ],
       }),
     ).toEqual([actorStatus, spatialRegion, guardian, walk, registryFact]);
+
+    expect(
+      nativeProviderAdmittedCapabilityIdsForTurn({
+        question:
+          "Emergency stop my paired Minecraft player now using Player Embodiment.",
+        semanticPlayerEmbodimentActionRequired: true,
+        runtimeProviderRequiredGroundingCapabilityIds: [],
+        runtimeProviderAdmittedCapabilityIds: [
+          actorStatus,
+          workflowStatus,
+          "com.casimirbot.minecraft.player.emergency_stop",
+          "com.casimirbot.minecraft.player.workflow.cancel",
+        ],
+      }),
+    ).toEqual([
+      actorStatus,
+      "com.casimirbot.minecraft.player.emergency_stop",
+    ]);
 
     expect(
       nativeProviderAdmittedCapabilityIdsForTurn({
@@ -5762,6 +6022,86 @@ describe("Codex provider capability lane adapter", () => {
       text:
         "Codex was called, but the pinned model `gpt-4o-mini` is not available with the active ChatGPT-account authentication. Choose a Codex-supported model such as GPT-5.4 mini, or use an isolated API-key-authenticated Codex home for API-only models.",
     });
+  });
+
+  it("projects exhausted API credits as an actionable provider failure", () => {
+    const failure = classifyCodexProcessFailureForUser({
+      stdout: "",
+      stderr:
+        "ERROR: stream disconnected before completion: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      exitCode: 1,
+    });
+
+    expect(failure).toEqual({
+      error_code: "openai_api_credits_exhausted",
+      model: null,
+      text:
+        "Runtime Codex reached OpenAI with the configured API credential, but that API account has no credits remaining. Add API credits or authorize another funded API key, then retry this turn; no connector re-pairing is required.",
+    });
+  });
+
+  it("projects exhausted API credits when app-server exits cleanly", () => {
+    const failure = classifyCodexProcessFailureForUser({
+      stdout: "",
+      stderr:
+        "ERROR: stream disconnected before completion: You have no credits remaining. Add credits to continue using the API.",
+      exitCode: 0,
+    });
+
+    expect(failure).toMatchObject({
+      error_code: "openai_api_credits_exhausted",
+      model: null,
+    });
+  });
+
+  it("projects missing API authentication without exposing credentials", () => {
+    const failure = classifyCodexProcessFailureForUser({
+      stdout: "",
+      stderr:
+        "ERROR: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header",
+      exitCode: 1,
+    });
+
+    expect(failure).toEqual({
+      error_code: "openai_api_authentication_missing",
+      model: null,
+      text:
+        "Runtime Codex could not authenticate its OpenAI API request. Confirm that the opaque keyed-server launcher supplies OPENAI_API_KEY, then restart the keyed server; do not paste the credential into chat or debug output.",
+    });
+  });
+
+  it("preserves a native quota failure when compatibility did not complete", () => {
+    expect(classifyCodexNativeProviderFailureForUser({
+      nativeErrorCode: "provider_quota_exhausted",
+      fallbackReason: "native_provider_quota_exhausted",
+      compatibilityTerminalCandidateSucceeded: false,
+    })).toMatchObject({
+      error_code: "openai_api_credits_exhausted",
+      model: null,
+    });
+  });
+
+  it("does not let an earlier native failure poison a successful compatibility candidate", () => {
+    expect(classifyCodexNativeProviderFailureForUser({
+      nativeErrorCode: "provider_quota_exhausted",
+      fallbackReason: "native_provider_quota_exhausted",
+      compatibilityTerminalCandidateSucceeded: true,
+    })).toBeNull();
+  });
+
+  it("projects native authentication failure without relaying its diagnostic", () => {
+    const secretLikeDiagnostic = "sk-test-never-project-this";
+    const failure = classifyCodexNativeProviderFailureForUser({
+      nativeErrorCode: "provider_auth_failed",
+      fallbackReason: secretLikeDiagnostic,
+      compatibilityTerminalCandidateSucceeded: false,
+    });
+
+    expect(failure).toMatchObject({
+      error_code: "openai_api_authentication_missing",
+      model: null,
+    });
+    expect(failure?.text).not.toContain(secretLikeDiagnostic);
   });
 
   it("treats explicitly excluded scientific context as dormant rather than a continuation request", () => {

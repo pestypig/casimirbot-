@@ -281,6 +281,28 @@ describe("Helix Ask prompt interpretation", () => {
     expect(interpretation.compound_contract?.requirements.every((entry) => entry.status === "pending")).toBe(true);
   });
 
+  it("keeps report-only freshness language as a constraint instead of a second required subgoal", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Check my current Minecraft player's health, air, and position. Report only fresh measured values from the paired Fabric environment.",
+    );
+
+    expect(interpretation.compound_contract?.requirements).toEqual([
+      expect.objectContaining({
+        id: "R1",
+        kind: "instruction",
+        required: true,
+      }),
+      expect.objectContaining({
+        id: "R2",
+        kind: "constraint",
+        required: false,
+      }),
+    ]);
+    expect(interpretation.compound_contract?.global_constraints).toEqual([
+      "Report only fresh measured values from the paired Fabric environment.",
+    ]);
+  });
+
   it("builds a compound contract for coordinated research, locator, and synthesis prompts", () => {
     const interpretation = interpretHelixAskPrompt(
       "Use scholarly research to find papers about photosynthesis quantum coherence and microtubule Orch-OR claims, then use the Theory Badge Graph locator / theory locator to place the relevant claims and synthesize the uncertainty with citations. Do not write files.",

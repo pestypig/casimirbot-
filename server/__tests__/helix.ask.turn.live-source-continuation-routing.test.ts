@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   RETIRED_WORKSPACE_ACTION_REGISTRY,
   RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS,
@@ -204,6 +204,14 @@ const seedBackendVisualSource = async (app: express.Express, targetThreadId = th
 };
 
 describe("live source continuation Ask routing", () => {
+  // The retired route is intentionally large and can take longer than an
+  // individual behavior budget to cold-load on constrained acceptance hosts.
+  // Pay that one-time module cost in suite setup so route assertions continue
+  // to measure request behavior rather than TypeScript transform latency.
+  beforeAll(async () => {
+    await import("../routes/agi.plan");
+  }, 120_000);
+
   beforeEach(async () => {
     await resetAccountSessionStore();
     const accountReceipt = await signInLocalAccountSession({

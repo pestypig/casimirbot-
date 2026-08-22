@@ -1,0 +1,14 @@
+{
+  "action_kind": "arm_viability_guardian",
+  "profile_id": "resident.minecraft.fabric-guardian.v1",
+  "duration_ticks": 2400,
+  "minimum_air": 80,
+  "dangerous_vertical_velocity": -0.72,
+  "maximum_swim_ticks": 200,
+  "maximum_observation_age_ticks": 1,
+  "response_repertoire": [
+    "swim_up",
+    "release_controls",
+    "request_semantic_replan"
+  ]
+}

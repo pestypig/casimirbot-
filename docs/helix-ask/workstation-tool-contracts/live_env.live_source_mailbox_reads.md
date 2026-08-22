@@ -12,6 +12,7 @@ Capabilities:
 - `live_env.check_live_source_mail`
 - `live_env.read_live_source_mail`
 - `live_env.read_processed_live_source_mail`
+- `live_env.record_live_source_mail_decision`
 - `live_env.reflect_live_source_mail_loop`
 
 `live_env.process_live_source_mail` is intentionally not included. Processing
@@ -26,14 +27,16 @@ permission, and receipt contract exists.
 
 ## Contract
 
-These capabilities read or reflect existing live-source mailbox state through
-the workstation gateway. They are observation tools only.
+The read capabilities inspect or reflect existing live-source mailbox state.
+The decision capability is a narrowly bounded evidence-ledger mutation that is
+available only after an exact processed packet has re-entered the current
+provider turn.
 
 They must not:
 
 - process new live-source mail
 - mark mail as processed through provider access
-- mutate live-source watch jobs, interpreter profiles, or mailbox decisions
+- mutate live-source watch jobs or interpreter profiles
 - speak aloud or trigger client playback
 - become final-answer authority without model/solver re-entry
 
@@ -53,6 +56,13 @@ assistant_answer=false
 raw_content_included=false
 post_tool_model_step_required=true
 ```
+
+The decision manifest instead uses `mode=act`, `mutating=true`, and permission
+profile `act`, while remaining confirmation-free and non-terminal. It requires
+`decision`, `processed_packet_ids`, and `mail_ids`. The gateway verifies every
+identity against normalized authoritative artifacts whose IDs belong to the
+same provider turn; stale, guessed, prompt-only, or missing identities fail
+closed without recording a decision.
 
 ## Inputs
 
@@ -137,5 +147,7 @@ Before treating this group as stable, keep deterministic coverage for:
 - positive prompt-named admission
 - quoted/negated/future/text-only non-admission
 - observation packet creation through `executeLiveEnvironmentTool`
+- exact current-turn packet admission and stale/missing evidence rejection for
+  `live_env.record_live_source_mail_decision`
 - `live_env.process_live_source_mail` remaining outside the provider gateway
 - terminal equivalence and API parity

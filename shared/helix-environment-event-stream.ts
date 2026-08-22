@@ -48,6 +48,7 @@ export const HELIX_MINECRAFT_EVENT_TYPES = [
   "workflow.manual_override_detected",
   "workflow.manual_override",
   "workflow.emergency_stopped",
+  "resident.decision",
 ] as const;
 
 const identifierSchema = z

@@ -1,6 +1,6 @@
 # NHM2 Spherical Boson-Star v2 August 28 Numerical Decision Record
 
-Decision: **BLOCKED, with independently reproduced frozen-core numerical FAIL evidence**
+Decision: **BLOCKED, with source-disjoint matching frozen-core numerical FAIL evidence**
 
 Decision timestamp: **2026-08-21T10:00:39-04:00**
 
@@ -30,7 +30,7 @@ The older typed blocker
 `core_level_fixed_native_arena_abi_unavailable` is therefore historical and is
 not the current first failure.
 
-Two independent implementations—the frozen Python graph and the new retained
+Two source-disjoint implementations—the frozen Python graph and the new retained
 native lease—produce the same bit-level state, residual, accepted-step
 chronology, and terminal failure:
 
@@ -77,8 +77,10 @@ unreachable under the current frozen graph.
 | Repaired vacuum ABI semantic        | `2fb589d024463ec1e656a2b180b9fdfcd61713e474666afdc217c49f1bd03251` / 29,628 canonical bytes |
 | Repaired vacuum ABI plain canonical | `4af8b689f175a418cacf252f260aa513407bcdba6161cd6497ec17932b17c732`                          |
 | Native retained-lease source        | `282271256ff58ffa08f85b46fdfdb228295aa7d0f6131b51a60a0470af4f9853` / 159,743 bytes          |
-| Native retained-lease spec          | `96cf01ecbca4ee87bce15f0d7db71b281b3fadf9471edbe82c621b7685827553` / 34,884 bytes           |
+| Native retained-lease spec          | `fd67bc48dfee10eda0ea269970eb2caf6db53070f4b8267703a198adb6391090` / 46,928 bytes           |
 | Frozen binary64 environment source  | `8d452abdfa6d9b3e0cf92aa7d8682202b588f1fe8b0fe0772c6d003d2d12f1a4` / 14,980 bytes           |
+| Server first-failure observer       | `5b16e6e8d6e5eb3449eae1ecede30372abce0b5cc5c7dddbc60188c3ebeb5699` / 11,093 bytes           |
+| Server observer focused spec        | `2a5a94d4026a15461d1113602b40f782d908d444e20f6ddb65aa47e07e521885` / 5,202 bytes            |
 
 The repaired vacuum ABI previously received an exact-byte independent `CLEAR`
 audit. Its payload preimage/domain, product-kind ordinal equation, explicit
@@ -89,8 +91,10 @@ rejection match the sealed definition.
 
 - Frozen core numerical result: **FAIL** at
   `armijo_schedule_exhausted_without_retry`.
-- Independent reproduction: **exact match** between Python and native graphs
+- Source-disjoint comparison: **exact match** between Python and native graphs
   for the failure, chronology, norms, and state/residual bytes.
+- Qualifying runtime-disjoint independent replay: **not established**; both
+  observations share the workstation MPFR/GMP binary lineage.
 - Candidate-level execution: **not reached**.
 - Candidate-level replay: **not applicable** because no authenticated
   candidate input or output was issued.
@@ -113,13 +117,19 @@ new versioned scientific policy, not a repair of this frozen checkpoint.
 - Math report generation: **PASS**.
 - Math registry validation: **PASS**, 318 entries.
 - Required WARP suite: **179/179 PASS** across 18 files.
-- Casimir adapter: **PASS / GREEN**, run `2420`.
+- Casimir adapter: **PASS / GREEN**, run `2422`.
 - Adapter trace:
-  `adapter:a61653bd-eea0-4f0d-87fc-84952f85de01`.
+  `adapter:5995d58a-7559-4ecb-a8d3-b0bfd0a97f7c`.
 - Certificate SHA-256:
   `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`.
 - Certificate integrity: **true**.
 - Training-trace export: `artifacts/training-trace.jsonl`.
+- Content-addressed first-failure receipt: self-hash
+  `cb9c36432486b4138ad01b8c8beebaca4eecb480fdd54a9a5f57a5030c4ed0cb`,
+  raw SHA-256
+  `34133d2c5e077b92618ea9420975f165c01134f5ab06c46f1e4eb4127bde730a`
+  / 6,837 bytes, at
+  [`nhm2-spherical-boson-star-v2-initializer-core-first-failure-cb9c36432486b4138ad01b8c8beebaca4eecb480fdd54a9a5f57a5030c4ed0cb.json`](./nhm2-spherical-boson-star-v2-initializer-core-first-failure-cb9c36432486b4138ad01b8c8beebaca4eecb480fdd54a9a5f57a5030c4ed0cb.json).
 
 Casimir PASS establishes current repository constraint-pack integrity. It does
 not turn the diagnostic core result into an authenticated candidate run and
@@ -128,10 +138,13 @@ does not override the numerical first failure.
 ## Self-correcting disposition
 
 The feedback loop now stops downstream work and preserves the first failure.
-The smallest honest next action is an authority-neutral failure-authentication
-closure: bind the two exact reproductions, runtime/toolchain/executable/command
-identity, frozen inputs, and no-retune attestation into one replayable decision
-receipt. It may not change the frozen numerical graph.
+The authority-neutral failure-authentication closure is implemented: the exact
+source-disjoint comparison receipt is admitted through a server-owned opaque
+identity capability while retaining the shared-runtime-lineage blocker. The
+remaining decision is scientific governance, not more downstream coding: keep
+this frozen policy at exact `FAIL/BLOCKED`, or separately authorize review of a
+versioned successor numerical policy. The current packet may not change the
+frozen numerical graph.
 
 If the August 28 objective still requires a GO after that receipt is complete,
 the only scientifically honest route is a separately proposed and reviewed

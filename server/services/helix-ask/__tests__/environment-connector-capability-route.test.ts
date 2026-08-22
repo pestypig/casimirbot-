@@ -2305,6 +2305,28 @@ describe("Minecraft environment connector capability routing", () => {
     },
   );
 
+  it("does not replace an exact processed-mail semantic wake with an inventory probe", () => {
+    const prompt =
+      "Read processed Minecraft live-source mail packet stage_play_live_source_mail:mail-1, record an evidence-grounded checkpoint for that exact packet, inspect the resulting mail-loop state, and revise the next semantic plan from the verified inventory change.";
+
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).not.toContain(CAPABILITY);
+  });
+
+  it("still admits an explicit inventory probe when it is a separate requested operation", () => {
+    const prompt =
+      "Read processed Minecraft live-source mail packet stage_play_live_source_mail:mail-1 and record its checkpoint. Then separately check my current Minecraft inventory now.";
+
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(
+        (entry) => entry.capability,
+      ),
+    ).toContain(CAPABILITY);
+  });
+
   it("keeps exact connector source arbitration and tool admission on live_environment", () => {
     const turnId = "ask:test:minecraft-environment-connector-admission";
     const prompt =

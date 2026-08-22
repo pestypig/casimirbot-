@@ -281,6 +281,32 @@ describe("Helix internet search tool admission", () => {
     expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
   });
 
+  it("keeps a newest processed Minecraft mailbox packet on the local environment route", () => {
+    const prompt = [
+      "Read the newest unread processed Minecraft packet for this room.",
+      "Record an evidence-grounded checkpoint for that exact packet and revise the next semantic plan only if its evidence warrants a change.",
+      "Do not reuse prior turns, take a reflex action, or substitute a status probe.",
+    ].join(" ");
+    const restatement = buildToolUseRestatement(prompt);
+    const internetIntent = detectInternetSearchIntent(prompt);
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:g4-natural-mailbox-prompt",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    const toolAdmission = buildToolCallAdmissionDecision({
+      turnId: "ask:g4-natural-mailbox-prompt",
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(internetIntent.searchRequested).toBe(false);
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+    expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
+  });
+
   it.each([
     [
       "scientific closure preparation",

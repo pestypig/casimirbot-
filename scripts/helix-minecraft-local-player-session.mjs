@@ -25,6 +25,8 @@ const CAPABILITY_IDS = Object.freeze([
   "com.casimirbot.minecraft.player.inventory.transfer",
   "com.casimirbot.minecraft.player.sequence.execute",
   "com.casimirbot.minecraft.player.guardian.execute",
+  "com.casimirbot.minecraft.player.viability_guardian.arm",
+  "com.casimirbot.minecraft.player.viability_guardian.disarm",
 ]);
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));

@@ -171,6 +171,7 @@
     "helix:minecraft:player-direct-capture": "tsx scripts/helix-minecraft-player-direct-diagnostic-capture.ts",
     "helix:minecraft:player-helix-capture": "tsx scripts/helix-minecraft-player-helix-debug-capture.ts",
     "helix:minecraft:player-stage-diagnostic": "tsx scripts/helix-minecraft-player-stage-diagnostic.ts",
+    "helix:minecraft:resident-capture": "tsx scripts/helix-minecraft-resident-decision-capture.ts",
     "helix:minecraft:launch-fabric-loopback": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/helix-minecraft-launch-fabric-loopback.ps1",
     "mcp:provider-conformance": "tsx scripts/casimirbot-mcp-provider-conformance.ts",
     "helix:shared-room:live-acceptance": "tsx scripts/helix-shared-live-room-live-acceptance.ts",

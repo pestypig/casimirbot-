@@ -53,6 +53,34 @@ final class PlayerActionClientCommands {
                                 return 1;
                             }))
                             .then(
+                                literal("guardian")
+                                    .then(
+                                        literal("arm")
+                                            .then(
+                                                argument(
+                                                    "duration_seconds",
+                                                    IntegerArgumentType.integer(10, 1_800)
+                                                ).executes(context -> {
+                                                    agent.armDiagnosticGuardian(
+                                                        IntegerArgumentType.getInteger(
+                                                            context,
+                                                            "duration_seconds"
+                                                        )
+                                                    );
+                                                    return 1;
+                                                })
+                                            )
+                                    )
+                                    .then(literal("disarm").executes(context -> {
+                                        agent.disarmDiagnosticGuardian();
+                                        return 1;
+                                    }))
+                                    .then(literal("status").executes(context -> {
+                                        agent.showDiagnosticGuardianStatus();
+                                        return 1;
+                                    }))
+                            )
+                            .then(
                                 literal("inbox-enable")
                                     .then(literal("movement").executes(context -> {
                                         agent.enableDiagnosticInbox(

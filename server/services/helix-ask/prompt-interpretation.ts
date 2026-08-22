@@ -357,6 +357,15 @@ const requestedOutput = (input: {
 const classifyCompoundRequirementKind = (
   text: string,
 ): HelixCompoundPromptContract["requirements"][number]["kind"] => {
+  // "Report only ..." constrains how an already-requested result may be
+  // presented or sourced. Treating it as another independently answerable
+  // operation lets the compound coverage gate discard a grounded provider
+  // answer even though the constraint was honored. Keep these clauses in the
+  // contract as global constraints, but never manufacture a second subgoal.
+  if (
+    /^(?:report|answer|respond|return|provide|use|cite)\s+only\b/i.test(text)
+  )
+    return "constraint";
   if (/\b(?:compare|contrast|versus|vs\.?)\b/i.test(text)) return "comparison";
   if (/\b(?:implementation|code|patch|repo|function|module|file)\b/i.test(text))
     return "implementation_request";
@@ -521,7 +530,7 @@ export const buildHelixCompoundPromptContract = (
   const globalConstraints = requirementTexts.filter((text) =>
     /\b(?:must|should|do not|don't|without|never|include|avoid|make sure|ensure|final answer|format)\b/i.test(
       text,
-    ),
+    ) || /^(?:report|answer|respond|return|provide|use|cite)\s+only\b/i.test(text),
   );
   return {
     schema: "helix.compound_prompt_contract.v1",

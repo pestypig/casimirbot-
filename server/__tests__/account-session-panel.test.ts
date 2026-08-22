@@ -122,6 +122,8 @@ describe("account session panel API", () => {
             ]),
             allowed_workstation_capabilities: expect.arrayContaining([
               "room.evidence.read_bound",
+              "live_env.read_processed_live_source_mail",
+              "live_env.record_live_source_mail_decision",
               "com.casimirbot.minecraft.inventory.check",
             ]),
           },
@@ -206,6 +208,8 @@ describe("account session panel API", () => {
       locked_features: expect.not.arrayContaining(["room_source_ingress"]),
       allowed_workstation_capabilities: expect.arrayContaining([
         "room.evidence.read_bound",
+        "live_env.read_processed_live_source_mail",
+        "live_env.record_live_source_mail_decision",
         "com.casimirbot.minecraft.inventory.check",
         "com.casimirbot.minecraft.command",
         "com.casimirbot.minecraft.player.walk",
@@ -251,6 +255,8 @@ describe("account session panel API", () => {
         ]),
         allowed_workstation_capabilities: expect.arrayContaining([
           "room.evidence.read_bound",
+          "live_env.read_processed_live_source_mail",
+          "live_env.record_live_source_mail_decision",
           "com.casimirbot.minecraft.inventory.check",
           "com.casimirbot.minecraft.command",
           "com.casimirbot.minecraft.player.walk",
@@ -304,6 +310,8 @@ describe("account session panel API", () => {
       locked_features: expect.not.arrayContaining(["room_source_ingress"]),
       allowed_workstation_capabilities: expect.arrayContaining([
         "room.evidence.read_bound",
+        "live_env.read_processed_live_source_mail",
+        "live_env.record_live_source_mail_decision",
         "com.casimirbot.minecraft.inventory.check",
         "com.casimirbot.minecraft.command",
         "com.casimirbot.minecraft.player.walk",

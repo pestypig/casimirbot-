@@ -88,6 +88,53 @@ describe("Codex focused initial capability retry", () => {
     expect(notes).not.toMatch(/note_block|oak_planks|g2.fluid/i);
   });
 
+  it("describes the resident guardian as a bounded local profile rather than a command", () => {
+    const notes = codexProviderCapabilityUsageNotes(
+      "com.casimirbot.minecraft.player.viability_guardian.arm",
+    ).join("\n");
+
+    expect(notes).toContain("resident.minecraft.fabric-guardian.v1");
+    expect(notes).toContain("Five minutes at 20 Hz is 6000 ticks");
+    expect(notes).toContain(
+      '["swim_up", "release_controls", "request_semantic_replan"]',
+    );
+    expect(notes).toContain(
+      "Do not select this arm capability as if it implements a requested fire, lava, unsafe-landing",
+    );
+    expect(notes).toContain(
+      "event nodes may wait locally for a future measured trigger",
+    );
+    expect(notes).toContain("Do not substitute water breathing");
+  });
+
+  it("explains that reactive programs may wait locally for future hazards", () => {
+    const notes = codexProviderCapabilityUsageNotes(
+      "com.casimirbot.minecraft.player.guardian.execute",
+    ).join("\n");
+
+    expect(notes).toContain(
+      "anticipated future condition as well as a currently observed condition",
+    );
+    expect(notes).toContain(
+      "A fresh no-hazard observation does not invalidate a user-defined future trigger",
+    );
+    expect(notes).toContain("wait locally within wait_up_to_ticks");
+    expect(notes).toContain("settle without another model turn");
+    expect(notes).toContain(
+      "Sprint/jump input is strongly slowed in lava",
+    );
+    expect(notes).toContain("600 ms produced only 0.435 blocks");
+    expect(notes).toContain("1400 ms produced 3.188 blocks");
+    expect(notes).toContain("calibration evidence rather than a universal duration");
+    expect(notes).toContain(
+      "must be an independent interrupt evaluated throughout the program",
+    );
+    expect(notes).toContain(
+      "health_at_least becomes not_satisfied",
+    );
+    expect(notes).not.toMatch(/guardian-fire-recovery-water-course|enter-water/);
+  });
+
   it("focuses hard source routes without making generic direct answers tool-shaped", () => {
     expect(
       shouldUseCodexFocusedCapabilityProjection({

@@ -1,6 +1,7 @@
 import { Router, json, type Request, type Response } from "express";
 import {
   authenticateEnvironmentActionConnector,
+  EnvironmentActionBrokerError,
   isEnvironmentActionBrokerError,
   leasePendingEnvironmentActionControls,
   leasePendingEnvironmentActions,
@@ -11,6 +12,10 @@ import {
   submitEnvironmentActionWorkflowEvent,
 } from "../services/environment-connectors/actions";
 import { recordEnvironmentActionEventBatch } from "../services/environment-connectors/events";
+import {
+  bridgeMinecraftPlayerSituationDigestToLiveMail,
+} from "../services/environment-connectors/live-mail/minecraft-situation-digest-mail-bridge";
+import { readEnvironmentAdapterProfileById } from "../services/situation-room/environment-adapter-registry";
 
 const sendError = (res: Response, error: unknown): void => {
   if (isEnvironmentActionBrokerError(error)) {
@@ -189,6 +194,28 @@ environmentActionRouter.post(
       claim,
       batch: req.body,
     });
+    const sourceAdapter = readEnvironmentAdapterProfileById(
+      claim.sourceAdapterProfileId,
+    );
+    if (!sourceAdapter) {
+      throw new EnvironmentActionBrokerError(
+        "action_connector_unavailable",
+        503,
+        "The paired source adapter profile is unavailable for semantic wake admission.",
+      );
+    }
+    const semanticWakeBridge = bridgeMinecraftPlayerSituationDigestToLiveMail({
+      digest: recorded.digest,
+      claim,
+      subjectIdentity: {
+        participantId: claim.participantId,
+        subjectBindingId: claim.subjectBindingId,
+        selectedPlayerRef: claim.subjectBindingId,
+        selectedPlayerNativeId: claim.subjectNativeId,
+      },
+      freshnessCeilingMs:
+        sourceAdapter.profile.freshness.observation_max_age_ms,
+    });
     res.json({
       schema: "helix.environment_event_batch_receipt.v1",
       ok: true,
@@ -198,6 +225,7 @@ environmentActionRouter.post(
       digest_id: recorded.digest.digest_id,
       latest_event_sequence: recorded.digest.latest_event_sequence,
       replayed: recorded.replayed,
+      semantic_wake_bridge: semanticWakeBridge,
       answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,

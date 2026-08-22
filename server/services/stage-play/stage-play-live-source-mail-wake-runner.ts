@@ -1029,6 +1029,9 @@ const buildWakeFastLayer = async (input: {
     createdAt: input.now,
   });
   const documentMarkdownPromptedMicroReasoners = input.mailBatch.some((item) => item.sourceKind === "document_markdown");
+  const minecraftSemanticWake = input.mailBatch.some(
+    (item) => item.sourceKind === "minecraft_world_event",
+  );
   const { packet: processedPacket, microReasonerRuns } = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
     jobId,
     sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? "unknown_source",
@@ -1039,7 +1042,14 @@ const buildWakeFastLayer = async (input: {
     activeProfile: input.activeInterpreterProfile ?? null,
     causalTrace: input.wake.causalTrace,
     now: input.now,
-    promptedMicroReasoners: documentMarkdownPromptedMicroReasoners ? { enabled: true } : undefined,
+    // Minecraft G4 mail is already a protected semantic digest. Its fast layer
+    // may compact deterministic evidence, but it must not create a private
+    // model-sampling lane before the sequential Runtime Codex wake.
+    promptedMicroReasoners: minecraftSemanticWake
+      ? { enabled: false }
+      : documentMarkdownPromptedMicroReasoners
+        ? { enabled: true }
+        : undefined,
   });
   const shouldRunSlowAsk =
     input.manualRun === true ||

@@ -21,6 +21,8 @@ import {
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
@@ -96,7 +98,7 @@ const capability = (
 const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.parse({
   schema: HELIX_ENVIRONMENT_ACTION_ADAPTER_PROFILE_SCHEMA,
   profile_id: HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID,
-  profile_version: 4,
+  profile_version: 5,
   domain: "minecraft",
   action_family: "minecraft_player",
   accepted_domain_adapters: ["minecraft.fabric_client.v1"],
@@ -210,6 +212,20 @@ const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.
       ["long_running"],
       ["native_fabric"],
       true,
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+      "arm_viability_guardian",
+      "continuous_control",
+      ["single_action"],
+      ["native_fabric"],
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
+      "disarm_viability_guardian",
+      "continuous_control",
+      ["single_action"],
+      ["native_fabric"],
     ),
   ],
   freshness: {

@@ -166,11 +166,19 @@ for (const row of statusRows) {
       `invalid_maturity:${row.capability}:${row.maturity || "empty"}`,
     );
   }
+  const isAcceptedMinecraftGuardian =
+    row.capability === "Minecraft deterministic resident guardian baseline" &&
+    row.maturity === "live accepted" &&
+    activeMarker !== "G3" &&
+    row.evidence.includes(
+      "docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md",
+    );
   if (
     /resident closed-loop|resident guardian|resident policies|flywire|companion-entity embodiment/i.test(
       row.capability,
     ) &&
-    !new Set(["specified", "projected"]).has(row.maturity)
+    !new Set(["specified", "projected"]).has(row.maturity) &&
+    !isAcceptedMinecraftGuardian
   ) {
     failures.push(`resident_maturity_premature:${row.capability}:${row.maturity}`);
   }

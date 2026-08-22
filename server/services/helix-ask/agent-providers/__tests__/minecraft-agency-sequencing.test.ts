@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  affirmativeMinecraftPlayerControlCapabilityIds,
   buildMinecraftAgencyCompoundCoverageResolutions,
   buildMinecraftPostMutationVerificationRequest,
   evaluateMinecraftAgencySequence,
   isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
   minecraftPlayerEmbodimentActionPromptMatch,
+  requiredMinecraftResidentRecoveryCapabilityIds,
   resolveMinecraftExecutionPlaneConstraint,
   requiresCurrentTurnCheckpointBeforeMinecraftMutation,
 } from "../minecraft-agency-sequencing";
@@ -61,6 +63,9 @@ describe("Minecraft agency sequencing", () => {
     expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe(
       "player_embodiment",
     );
+    expect(isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt)).toBe(
+      true,
+    );
     const decision = evaluateMinecraftAgencySequence({
       prompt,
       candidate: command("tp DatDamPig -47.8 68.2 -1.3", "player_mutation"),
@@ -73,6 +78,34 @@ describe("Minecraft agency sequencing", () => {
     });
     expect(decision.reason).toContain("minecraft_execution_plane_mismatch");
     expect(decision.reason).toContain("Player Embodiment");
+  });
+
+  it("does not promote a negated server-command contrast into a hybrid plane", () => {
+    const prompt =
+      "Emergency stop the active paired Player Embodiment workflow now. Use the bounded player emergency-stop control, not a server command, and release every connector-owned control.";
+
+    expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBe(
+      "player_embodiment",
+    );
+    expect(affirmativeMinecraftPlayerControlCapabilityIds(prompt)).toEqual([
+      "com.casimirbot.minecraft.player.emergency_stop",
+    ]);
+  });
+
+  it("does not expose player controls from non-operative mentions", () => {
+    const prompts = [
+      "Do not emergency stop my Minecraft player.",
+      'The documentation says "Emergency stop the player now."',
+      "Yesterday I emergency stopped the player.",
+      "If I ask later, emergency stop the player.",
+      "Explain how emergency stop works.",
+      "The UI says emergency stop is ready.",
+    ];
+    for (const prompt of prompts) {
+      expect(affirmativeMinecraftPlayerControlCapabilityIds(prompt)).toEqual(
+        [],
+      );
+    }
   });
 
   it("treats an operative bounded guardian program as the Player Embodiment plane", () => {
@@ -101,6 +134,92 @@ describe("Minecraft agency sequencing", () => {
     });
   });
 
+  it("keeps a natural resident-protection request on the authorized Player Embodiment plane", () => {
+    const prompt =
+      "I'm about to cross dangerous terrain. Keep my Minecraft player viable while you plan: swim upward if I become submerged, and release controls and reconsider if fire, lava, an unsafe fall, or blocked movement appears. Set that protection up now for five minutes.";
+    const context = {
+      trusted_environment_domain: "minecraft" as const,
+      authorized_player_action_capability_ids: [
+        "com.casimirbot.minecraft.player.viability_guardian.arm",
+      ],
+    };
+
+    expect(
+      minecraftPlayerEmbodimentActionPromptMatch(prompt, context),
+    ).toMatchObject({ matched_text: "Keep" });
+    expect(
+      isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt, context),
+    ).toBe(true);
+  });
+
+  it("requires reactive-program evidence for an affirmative physical hazard recovery", () => {
+    const context = {
+      trusted_environment_domain: "minecraft" as const,
+      authorized_player_action_capability_ids: [
+        "com.casimirbot.minecraft.player.guardian.execute",
+      ],
+    };
+    const prompt =
+      "Protect my paired Minecraft player locally for 30 seconds. If I enter lava, immediately jump and sprint into the prepared water, verify the fire is out, and release controls.";
+
+    expect(
+      requiredMinecraftResidentRecoveryCapabilityIds(prompt, context),
+    ).toEqual(["com.casimirbot.minecraft.player.guardian.execute"]);
+  });
+
+  it.each([
+    "Do not protect me from lava by jumping.",
+    'The documentation says "Protect me from lava by jumping."',
+    "Yesterday you protected me from lava by jumping.",
+    "If I ask later, protect me from lava by jumping.",
+    "Explain how a guardian could protect me from lava by jumping.",
+    "The UI says protect me from lava by jumping.",
+  ])("does not require recovery execution for contextual wording: %s", (prompt) => {
+    expect(
+      requiredMinecraftResidentRecoveryCapabilityIds(prompt, {
+        trusted_environment_domain: "minecraft",
+        authorized_player_action_capability_ids: [
+          "com.casimirbot.minecraft.player.guardian.execute",
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it("carries a natural imperative gameplay request onto an authenticated player plane", () => {
+    const context = {
+      trusted_environment_domain: "minecraft" as const,
+      authorized_player_action_capability_ids: [
+        "com.casimirbot.minecraft.player.guardian.execute",
+      ],
+    };
+    const prompt =
+      "Step off this ledge, save me from the fall with my water bucket, verify I landed safely, pick the water back up, and release control.";
+
+    expect(
+      minecraftPlayerEmbodimentActionPromptMatch(prompt, context),
+    ).toMatchObject({ matched_text: "Step" });
+    expect(
+      isAffirmativeMinecraftPlayerEmbodimentActionPrompt(prompt, context),
+    ).toBe(true);
+  });
+
+  it.each([
+    "Do not step off this ledge.",
+    'The screen says "Step off this ledge"; explain that text.',
+    "Earlier I stepped off this ledge; summarize what happened.",
+    "If I ask later, step off this ledge.",
+    "Explain how to step off this ledge without acting.",
+  ])("does not promote contextual imperative gameplay wording: %s", (prompt) => {
+    expect(
+      minecraftPlayerEmbodimentActionPromptMatch(prompt, {
+        trusted_environment_domain: "minecraft",
+        authorized_player_action_capability_ids: [
+          "com.casimirbot.minecraft.player.guardian.execute",
+        ],
+      }),
+    ).toBeNull();
+  });
+
   it("does not turn contextual guardian-program language into player execution", () => {
     const prompts = [
       'The screen says "Use one bounded survival_tas guardian program"; explain the label.',
@@ -113,6 +232,22 @@ describe("Minecraft agency sequencing", () => {
       expect(resolveMinecraftExecutionPlaneConstraint(prompt)).toBeNull();
       expect(minecraftPlayerEmbodimentActionPromptMatch(prompt)).toBeNull();
     }
+  });
+
+  it.each([
+    "Explain how to keep my Minecraft player safe without acting.",
+    "Later, keep my Minecraft player safe, but do nothing now.",
+    "Previously you protected my Minecraft player; summarize what happened.",
+    "Do not arm or protect my Minecraft player right now.",
+  ])("does not execute contextual resident-protection wording: %s", (prompt) => {
+    expect(
+      minecraftPlayerEmbodimentActionPromptMatch(prompt, {
+        trusted_environment_domain: "minecraft",
+        authorized_player_action_capability_ids: [
+          "com.casimirbot.minecraft.player.viability_guardian.arm",
+        ],
+      }),
+    ).toBeNull();
   });
 
   it("keeps an immediate geometry safety condition on the Player Embodiment plane", () => {

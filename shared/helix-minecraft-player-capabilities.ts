@@ -41,6 +41,10 @@ export const HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY =
   "com.casimirbot.minecraft.player.sequence.execute" as const;
 export const HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY =
   "com.casimirbot.minecraft.player.guardian.execute" as const;
+export const HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY =
+  "com.casimirbot.minecraft.player.viability_guardian.arm" as const;
+export const HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY =
+  "com.casimirbot.minecraft.player.viability_guardian.disarm" as const;
 
 export const HELIX_MINECRAFT_PLAYER_MVP_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
@@ -77,6 +81,8 @@ export const HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   ...HELIX_MINECRAFT_PLAYER_WORKFLOW_CAPABILITY_IDS,
 ] as const);
 
@@ -85,6 +91,8 @@ export const HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS = Object.freeze([
   ...HELIX_MINECRAFT_PLAYER_WORKFLOW_CAPABILITY_IDS,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
 ] as const);
 
 export const HELIX_MINECRAFT_PLAYER_ACTION_KINDS = [
@@ -256,6 +264,7 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
         direction: z.enum(["forward", "back", "left", "right"]),
         duration_ms: z.number().int().min(50).max(10_000),
         sprint: z.boolean(),
+        jump: z.boolean().optional(),
       })
       .strict(),
     z
@@ -352,6 +361,7 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
         placement_method: z.enum(["block_item", "item_use"]).optional(),
         source_item_id: resourceLocationSchema.optional(),
         hand: z.enum(["main_hand", "off_hand"]).optional(),
+        cleanup_after_landing: z.literal(true).optional(),
       })
       .strict(),
     z
@@ -404,12 +414,34 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
             message: "item_use placement requires the exact player hand",
           });
         }
+        if (
+          value.cleanup_after_landing === true &&
+          !(
+            value.block_id === "minecraft:water" &&
+            value.source_item_id === "minecraft:water_bucket" &&
+            value.position_binding?.binding_kind ===
+              "predicted_collision_cell"
+          )
+        ) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["cleanup_after_landing"],
+            message:
+              "Landing cleanup is limited to a predicted-collision water-bucket rescue.",
+          });
+        }
       } else if (value.source_item_id || value.hand) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["placement_method"],
           message:
             "block_item placement derives its source item and main hand from block_id",
+        });
+      } else if (value.cleanup_after_landing) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["cleanup_after_landing"],
+          message: "Landing cleanup requires item_use placement.",
         });
       }
       return;

@@ -15,6 +15,8 @@
       button { border: 1px solid #31557e; border-radius: 8px; padding: 10px 12px; color: #eaf4ff; background: #10233d; cursor: pointer; text-align: left; }
       button:hover:not(:disabled) { background: #173252; }
       button:disabled { cursor: not-allowed; opacity: .45; }
+      textarea, select { box-sizing: border-box; width: 100%; border: 1px solid #31557e; border-radius: 8px; padding: 10px 12px; color: #eaf4ff; background: #0a1526; }
+      textarea { min-height: 120px; resize: vertical; }
       dl { display: grid; grid-template-columns: 170px 1fr; gap: 7px 12px; padding: 14px; border: 1px solid #213650; border-radius: 10px; background: #0a1526; }
       dt { color: #8fa6c4; } dd { margin: 0; overflow-wrap: anywhere; }
       pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; padding: 12px; border: 1px solid #213650; border-radius: 10px; background: #050b15; }
@@ -37,6 +39,12 @@
         <button id="copy-action" disabled>8. Copy player pairing once</button>
         <button id="refresh-readiness" disabled>9. Refresh action readiness</button>
         <button id="run-ask" disabled>10. Run the natural 250 ms walk</button>
+        <select id="g4-model" aria-label="G4 Ask AI mode">
+          <option value="balanced" selected>Balanced (gpt-5.5)</option>
+          <option value="deep">Deep (gpt-5.5)</option>
+          <option value="fast">Fast (gpt-5.4-mini)</option>
+        </select>
+        <button id="run-g4" disabled>Run a room-scoped G4 semantic wake</button>
         <button id="load-debug" disabled>11. Load the exact-turn debug export</button>
         <button id="download-debug" disabled>Download redacted debug JSON</button>
       </div>
@@ -50,6 +58,9 @@
         <dt>Action connector</dt><dd id="readiness">Not paired</dd>
         <dt>Ask turn</dt><dd id="turn">Not run</dd>
       </dl>
+
+      <label for="g4-prompt">G4 semantic-wake prompt</label>
+      <textarea id="g4-prompt" placeholder="Name the exact processed live-source mail packet and request read, decision/checkpoint, loop-state inspection, and semantic replanning."></textarea>
 
       <h2>Visible answer</h2>
       <pre id="answer">No answer yet.</pre>
@@ -110,6 +121,17 @@
             },
           });
           const payload = await response.json().catch(() => null);
+          const validQueuedAdmission = payload
+            && payload.response_type === "queued"
+            && payload.final_status === "pending_input"
+            && payload.ask_turn_admission?.schema === "helix.ask_turn_admission.v1"
+            && payload.ask_turn_admission?.status === "queued";
+          if (validQueuedAdmission) return payload;
+          const validTerminalFailure = payload
+            && payload.response_type === "final_failure"
+            && payload.final_status === "final_failure"
+            && typeof payload.selected_final_answer === "string";
+          if (validTerminalFailure) return payload;
           if (!response.ok || (payload && payload.ok === false)) {
             const code = payload && (payload.error || payload.code);
             const message = payload && payload.message;
@@ -240,6 +262,7 @@
             setText("room", `${state.room.title} — active owner room`);
             setEnabled("create-source", true);
             setEnabled("refresh-environment", true);
+            setEnabled("run-g4", true);
             const environment = await refreshEnvironment();
             setStatus(
               environment
@@ -439,6 +462,49 @@
           } catch (error) { setStatus(error.message, "bad"); }
         });
 
+        byId("run-g4").addEventListener("click", async () => {
+          try {
+            if (!state.room) throw new Error("Initialize the owner room first.");
+            const prompt = byId("g4-prompt").value.trim();
+            if (!prompt) throw new Error("Enter the exact G4 packet prompt first.");
+            const languageModelProfile = byId("g4-model").value;
+            const sessionId = `helix-ask:room:${state.room.room_id}`;
+            const body = {
+              question: prompt,
+              sessionId,
+              traceId: `minecraft-g4-semantic-wake-${crypto.randomUUID()}`,
+              turnId: `ask:${crypto.randomUUID()}`,
+              agentRuntime: "codex",
+              agent_runtime: "codex",
+              languageModelProfile,
+              language_model_profile: languageModelProfile,
+              goldenPathRuntime: true,
+              golden_path_runtime: true,
+              mode: "act",
+              context_mode: "isolated",
+              debug: true,
+              max_tokens: 2200,
+            };
+            setStatus(`The exact room-scoped G4 turn is running through ${languageModelProfile}…`);
+            let payload = null;
+            for (let attempt = 1; attempt <= 90; attempt += 1) {
+              payload = await api("/api/agi/ask/turn", { method: "POST", body: JSON.stringify(body) });
+              const queued = queuedAdmission(payload);
+              if (!queued) break;
+              body.turnId = queued.turn_id;
+              setStatus(`Ask admission is queued for ${queued.reason}; preserving turn identity and retrying…`);
+              await wait(Math.min(10000, Math.max(100, Number(queued.retry_after_ms) || 1000)));
+            }
+            if (!payload || queuedAdmission(payload)) throw new Error("Ask admission did not resume within the bounded probe window.");
+            state.askPayload = payload;
+            state.turnId = readTurnId(payload) || body.turnId;
+            setText("turn", state.turnId);
+            setText("answer", readAnswer(payload));
+            setEnabled("load-debug", Boolean(state.turnId));
+            setStatus("Helix Ask returned a terminal product for the exact G4 room turn.", "ok");
+          } catch (error) { setStatus(error.message, "bad"); }
+        });
+
         byId("load-debug").addEventListener("click", async () => {
           try {
             if (!state.turnId) throw new Error("No exact Ask turn is available.");
@@ -456,9 +522,21 @@
               ?? actionCall?.delegated_gateway_call_result?.observation
               ?? null;
             const reentry = debugPayload?.provider_reasoning_reentry ?? {};
+            const evidenceReentryProof = debugPayload?.evidence_reentry_proof ?? {};
+            const evidenceReentryGate = evidenceReentryProof?.evidence_reentry_gate ?? {};
             const loopParity = debugPayload?.loop_parity_trace ?? {};
             const terminalAuthority = debugPayload?.terminal_answer_authority ?? {};
             const lifecycleProjection = debugPayload?.turn_lifecycle_projection_audit ?? {};
+            const canonicalReentryCompleted =
+              evidenceReentryProof?.passed === true
+              && evidenceReentryGate?.completed === true;
+            const postObservationSolverCompleted =
+              reentry?.solver_completed === true
+              || (
+                canonicalReentryCompleted
+                && loopParity?.followup_reasoning_ran === true
+                && loopParity?.terminal_selection_ran_after_observations === true
+              );
             const summary = {
               turn_id: state.turnId,
               selected_capability_id: actionObservation?.capability_id ?? null,
@@ -466,13 +544,17 @@
               execution_outcome: actionObservation?.outcome ?? null,
               verified_terminal_measurements: actionObservation?.result?.verified_terminal_measurements ?? null,
               controls_released: actionObservation?.result?.controls_released ?? null,
-              observation_reentered: reentry?.observation_reentered === true,
-              evidence_reentered: reentry?.evidence_reentered === true,
-              solver_completed: reentry?.solver_completed === true,
+              observation_reentered:
+                reentry?.observation_reentered === true || canonicalReentryCompleted,
+              evidence_reentered:
+                reentry?.evidence_reentered === true || canonicalReentryCompleted,
+              solver_completed: postObservationSolverCompleted,
               followup_reasoning_ran: loopParity?.followup_reasoning_ran === true,
               terminal_selection_ran_after_observations:
                 loopParity?.terminal_selection_ran_after_observations === true,
-              terminal_authority_status: debugPayload?.terminal_authority_status ?? null,
+              terminal_authority_status:
+                debugPayload?.terminal_authority_status
+                ?? (terminalAuthority?.terminal_eligible === true ? "granted" : null),
               terminal_authority_ok: loopParity?.terminal_authority_ok === true,
               terminal_eligible: terminalAuthority?.terminal_eligible === true,
               lifecycle_projection_ok: lifecycleProjection?.ok === true,

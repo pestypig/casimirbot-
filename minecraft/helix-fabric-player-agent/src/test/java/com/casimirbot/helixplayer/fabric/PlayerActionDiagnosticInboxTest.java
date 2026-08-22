@@ -50,6 +50,69 @@ final class PlayerActionDiagnosticInboxTest {
     }
 
     @Test
+    void fullScopeAcceptsTheExactResidentGuardianProfile() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-resident-guardian",
+            "action_kind", "arm_viability_guardian",
+            "arguments", Map.ofEntries(
+                Map.entry("profile_id", MinecraftViabilityGuardian.PROFILE_ID),
+                Map.entry("duration_ticks", 2_400),
+                Map.entry("minimum_air", 80),
+                Map.entry("dangerous_vertical_velocity", -0.72),
+                Map.entry("maximum_swim_ticks", 200),
+                Map.entry("maximum_observation_age_ticks", 1),
+                Map.entry(
+                    "response_repertoire",
+                    List.of("swim_up", "release_controls", "request_semantic_replan")
+                )
+            ),
+            "max_duration_ticks", 2_500,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertEquals("arm_viability_guardian", result.request().actionKind());
+        assertEquals(2_400L, result.request().arguments().get("duration_ticks"));
+        assertEquals(
+            MinecraftViabilityGuardian.PROFILE_ID,
+            result.request().arguments().get("profile_id")
+        );
+    }
+
+    @Test
+    void fullScopeAcceptsExactResidentGuardianDisarm() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-resident-disarm",
+            "action_kind", "disarm_viability_guardian",
+            "arguments", Map.of(
+                "profile_id", MinecraftViabilityGuardian.PROFILE_ID
+            ),
+            "max_duration_ticks", 100,
+            "control_engine", "native_fabric"
+        ));
+
+        var result = PlayerActionDiagnosticInbox.consume(
+            inbox,
+            System.currentTimeMillis(),
+            PlayerActionDiagnosticInbox.Scope.FULL
+        );
+
+        assertEquals("disarm_viability_guardian", result.request().actionKind());
+        assertEquals(
+            MinecraftViabilityGuardian.PROFILE_ID,
+            result.request().arguments().get("profile_id")
+        );
+    }
+
+    @Test
     void movementScopeRejectsWorldMutationAndDeletesTheRequest() throws Exception {
         Path inbox = write(Map.of(
             "schema", PlayerActionDiagnosticInbox.SCHEMA,
@@ -156,7 +219,8 @@ final class PlayerActionDiagnosticInboxTest {
                 ),
                 "placement_method", "item_use",
                 "source_item_id", "minecraft:water_bucket",
-                "hand", "main_hand"
+                "hand", "main_hand",
+                "cleanup_after_landing", true
             ),
             "max_duration_ticks", 400,
             "control_engine", "native_fabric"
@@ -172,6 +236,10 @@ final class PlayerActionDiagnosticInboxTest {
         assertEquals("place", result.request().actionKind());
         assertFalse(result.request().arguments().containsKey("positions"));
         assertEquals(
+            true,
+            result.request().arguments().get("cleanup_after_landing")
+        );
+        assertEquals(
             Map.of(
                 "binding_kind", "predicted_collision_cell",
                 "horizon_ticks", 12L,
@@ -179,6 +247,38 @@ final class PlayerActionDiagnosticInboxTest {
                 "require_replaceable", true
             ),
             result.request().arguments().get("position_binding")
+        );
+    }
+
+    @Test
+    void fullScopeRejectsLandingCleanupOutsideWaterBucketBinding() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-invalid-cleanup",
+            "action_kind", "place",
+            "arguments", Map.of(
+                "block_id", "minecraft:water",
+                "positions", List.of(Map.of("x", 1, "y", 64, "z", 2)),
+                "placement_method", "item_use",
+                "source_item_id", "minecraft:water_bucket",
+                "hand", "main_hand",
+                "cleanup_after_landing", true
+            ),
+            "max_duration_ticks", 400,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertNull(result.request());
+        assertEquals(
+            "player_diagnostic_inbox_landing_cleanup_invalid",
+            result.failureCode()
         );
     }
 

@@ -43,7 +43,8 @@ final class PlayerActionDiagnosticInbox {
         "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
         "hotbar_select", "equip", "follow", "collect", "mine", "place",
         "craft", "inventory_transfer", "execute_sequence",
-        "execute_reactive_program"
+        "execute_reactive_program", "arm_viability_guardian",
+        "disarm_viability_guardian"
     );
     private static final Pattern REQUEST_ID = Pattern.compile("^[A-Za-z0-9:._-]{1,200}$");
     private static final Pattern RESOURCE_LOCATION = Pattern.compile(
@@ -322,8 +323,65 @@ final class PlayerActionDiagnosticInbox {
             case "inventory_transfer" -> transferArguments(value);
             case "execute_sequence" -> sequenceArguments(value);
             case "execute_reactive_program" -> reactiveProgramArguments(value);
+            case "arm_viability_guardian" -> viabilityGuardianArguments(value);
+            case "disarm_viability_guardian" -> disarmViabilityGuardianArguments(value);
             default -> throw invalid("player_diagnostic_inbox_action_invalid");
         };
+    }
+
+    private static Map<String, Object> viabilityGuardianArguments(
+        Map<String, Object> value
+    ) {
+        exactKeys(
+            value,
+            Set.of(
+                "profile_id", "duration_ticks", "minimum_air",
+                "dangerous_vertical_velocity", "maximum_swim_ticks",
+                "maximum_observation_age_ticks", "response_repertoire"
+            ),
+            Set.of()
+        );
+        if (!MinecraftViabilityGuardian.PROFILE_ID.equals(text(value, "profile_id"))) {
+            throw invalid("player_diagnostic_inbox_guardian_profile_invalid");
+        }
+        List<Object> repertoire = requiredList(value.get("response_repertoire"));
+        Set<String> requiredResponses = Set.of(
+            "swim_up", "release_controls", "request_semantic_replan"
+        );
+        if (
+            repertoire.size() != requiredResponses.size() ||
+            !requiredResponses.equals(Set.copyOf(repertoire.stream().map(String::valueOf).toList()))
+        ) {
+            throw invalid("player_diagnostic_inbox_guardian_repertoire_invalid");
+        }
+        return Map.ofEntries(
+            Map.entry("profile_id", MinecraftViabilityGuardian.PROFILE_ID),
+            Map.entry("duration_ticks", integer(value, "duration_ticks", 200, 36_000)),
+            Map.entry("minimum_air", integer(value, "minimum_air", 1, 300)),
+            Map.entry(
+                "dangerous_vertical_velocity",
+                finite(value, "dangerous_vertical_velocity", -16, -0.01)
+            ),
+            Map.entry(
+                "maximum_swim_ticks",
+                integer(value, "maximum_swim_ticks", 1, 1_200)
+            ),
+            Map.entry(
+                "maximum_observation_age_ticks",
+                integer(value, "maximum_observation_age_ticks", 0, 20)
+            ),
+            Map.entry("response_repertoire", List.copyOf(repertoire))
+        );
+    }
+
+    private static Map<String, Object> disarmViabilityGuardianArguments(
+        Map<String, Object> value
+    ) {
+        exactKeys(value, Set.of("profile_id"), Set.of());
+        if (!MinecraftViabilityGuardian.PROFILE_ID.equals(text(value, "profile_id"))) {
+            throw invalid("player_diagnostic_inbox_guardian_profile_invalid");
+        }
+        return Map.of("profile_id", MinecraftViabilityGuardian.PROFILE_ID);
     }
 
     private static Map<String, Object> sequenceArguments(Map<String, Object> value) {
@@ -462,12 +520,13 @@ final class PlayerActionDiagnosticInbox {
     }
 
     private static Map<String, Object> walkArguments(Map<String, Object> value) {
-        exactKeys(value, Set.of("direction", "duration_ms", "sprint"), Set.of());
-        return Map.of(
-            "direction", enumText(value, "direction", Set.of("forward", "back", "left", "right")),
-            "duration_ms", integer(value, "duration_ms", 50, 10_000),
-            "sprint", bool(value, "sprint")
-        );
+        exactKeys(value, Set.of("direction", "duration_ms", "sprint"), Set.of("jump"));
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("direction", enumText(value, "direction", Set.of("forward", "back", "left", "right")));
+        normalized.put("duration_ms", integer(value, "duration_ms", 50, 10_000));
+        normalized.put("sprint", bool(value, "sprint"));
+        normalized.put("jump", value.containsKey("jump") && bool(value, "jump"));
+        return Map.copyOf(normalized);
     }
 
     private static Map<String, Object> trackingArguments(Map<String, Object> value) {
@@ -675,7 +734,7 @@ final class PlayerActionDiagnosticInbox {
             Set.of("block_id"),
             Set.of(
                 "positions", "position_binding", "placement_method",
-                "source_item_id", "hand"
+                "source_item_id", "hand", "cleanup_after_landing"
             )
         );
         boolean hasPositions = value.containsKey("positions");
@@ -715,8 +774,23 @@ final class PlayerActionDiagnosticInbox {
                 "hand",
                 enumText(value, "hand", Set.of("main_hand", "off_hand"))
             );
+            if (
+                value.containsKey("cleanup_after_landing") &&
+                bool(value, "cleanup_after_landing")
+            ) {
+                if (
+                    !"minecraft:water".equals(normalized.get("block_id")) ||
+                    !"minecraft:water_bucket".equals(normalized.get("source_item_id")) ||
+                    !hasBinding
+                ) {
+                    throw invalid("player_diagnostic_inbox_landing_cleanup_invalid");
+                }
+                normalized.put("cleanup_after_landing", true);
+            }
         } else if (value.containsKey("source_item_id") || value.containsKey("hand")) {
             throw invalid("player_diagnostic_inbox_block_item_source_invalid");
+        } else if (value.containsKey("cleanup_after_landing")) {
+            throw invalid("player_diagnostic_inbox_landing_cleanup_invalid");
         }
         return Map.copyOf(normalized);
     }

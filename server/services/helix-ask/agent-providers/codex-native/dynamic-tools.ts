@@ -17,50 +17,6 @@ export type CodexNativeDynamicToolCatalog = {
   toolNameByCapabilityId: Map<string, string>;
 };
 
-const routeProposalInputSchema: Record<string, unknown> = {
-  type: "object",
-  properties: {
-    schema: {
-      type: "string",
-      enum: ["helix.runtime_semantic_route_proposal.v1"],
-    },
-    turn_id: { type: "string" },
-    proposal_id: { type: "string" },
-    prompt_hash: { type: "string" },
-    proposal_source: { type: "string", enum: ["agent_runtime"] },
-    proposed_route: { type: ["string", "null"] },
-    proposed_tool_family: { type: ["string", "null"] },
-    proposed_capability_id: { type: ["string", "null"] },
-    proposed_capability_ids: {
-      type: "array",
-      items: { type: "string" },
-      maxItems: 32,
-      description:
-        "Ordered set of every model-visible Helix capability needed for this turn. Include proposed_capability_id as the first entry when it is non-null.",
-    },
-    confidence: {
-      type: "string",
-      enum: ["low", "medium", "high", "unknown"],
-    },
-    uncertainty: { type: "array", items: { type: "string" } },
-    reason_summary: { type: "string" },
-    supporting_hint_refs: { type: "array", items: { type: "string" } },
-  },
-  required: [
-    "schema",
-    "proposal_source",
-    "proposed_route",
-    "proposed_tool_family",
-    "proposed_capability_id",
-    "proposed_capability_ids",
-    "confidence",
-    "uncertainty",
-    "reason_summary",
-    "supporting_hint_refs",
-  ],
-  additionalProperties: false,
-};
-
 const dynamicToolNameForCapability = (capabilityId: string): string => {
   const slug = capabilityId
     .toLowerCase()
@@ -76,16 +32,7 @@ export const buildCodexNativeDynamicToolCatalog = (
 ): CodexNativeDynamicToolCatalog => {
   const capabilityIdByToolName = new Map<string, string>();
   const toolNameByCapabilityId = new Map<string, string>();
-  const specs: CodexNativeDynamicToolSpec[] = [
-    {
-      type: "function",
-      name: HELIX_CODEX_ROUTE_PROPOSAL_TOOL,
-      description:
-        "Propose the semantic workstation route before using any Helix capability. This is a proposal only; Helix performs route and tool admission.",
-      inputSchema: routeProposalInputSchema,
-      deferLoading: false,
-    },
-  ];
+  const specs: CodexNativeDynamicToolSpec[] = [];
 
   for (const capability of capabilities) {
     const toolName = dynamicToolNameForCapability(capability.capability_id);
@@ -100,6 +47,7 @@ export const buildCodexNativeDynamicToolCatalog = (
       description: [
         capability.description,
         `Helix capability: ${capability.capability_id}.`,
+        "Selecting this tool is the Runtime Codex route proposal; Helix atomically validates admission before execution.",
         "The result is a non-terminal observation and must be used in a later model reasoning step.",
       ].join(" "),
       inputSchema: capability.input_schema,

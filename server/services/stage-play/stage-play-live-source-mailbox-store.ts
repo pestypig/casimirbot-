@@ -308,6 +308,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   environmentId?: string | null;
   sourceId: string;
   sourceKind: StagePlayLiveSourceMailSourceKindV1;
+  environmentIdentity?: StagePlayLiveSourceMailItemV1["environmentIdentity"];
   frameRef?: string | null;
   evidenceRef?: string | null;
   observationRef?: string | null;
@@ -391,6 +392,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     environmentId: input.environmentId ?? null,
     sourceId: input.sourceId,
     sourceKind: input.sourceKind,
+    environmentIdentity: input.environmentIdentity ?? null,
     sourceRefs: {
       sourceId: input.sourceId,
       frameRef: input.frameRef ?? null,
@@ -508,6 +510,11 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       reason: "unread_mail",
       evidenceRefs,
       causalTraces: [mail.causalTrace],
+      // Minecraft semantic events may be emitted while a keyed model turn
+      // owns the foreground memory lease. Keep their wake relevant long
+      // enough for that bounded turn to release and the paused local wake
+      // service to resume; the mail's own source freshness remains enforced.
+      expiresAfterMs: input.sourceKind === "minecraft_world_event" ? 120_000 : undefined,
       now: createdAt,
     });
     wakeRequestId = wake.wakeRequestId;

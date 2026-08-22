@@ -12,6 +12,10 @@ import {
 } from "@shared/helix-minecraft-fluid-sequence";
 import { helixMinecraftReactiveProgramArgumentsSchema } from "@shared/helix-minecraft-reactive-program";
 import { helixMinecraftPlayerActionArgumentsSchema } from "@shared/helix-minecraft-player-capabilities";
+import {
+  helixMinecraftArmViabilityGuardianArgumentsSchema,
+  helixMinecraftDisarmViabilityGuardianArgumentsSchema,
+} from "@shared/helix-minecraft-viability-guardian";
 import type { ZodIssue } from "zod";
 import { listEnvironmentConnectorCapabilityDescriptors } from "../../environment-connectors/catalog";
 import { validateEnvironmentConnectorSchemaValue } from "../../environment-connectors/conformance";
@@ -221,9 +225,17 @@ const syntheticFailure = (input: {
 
 export const environmentActionFailureRepairAction = (
   outcome: HelixEnvironmentActionObservation["outcome"],
+  summary?: string,
 ): "repair" | "retry" | "ask_user" => {
   if (["connector_offline", "action_outcome_unknown"].includes(outcome))
     return "ask_user";
+  if (
+    outcome === "request_canceled" &&
+    /(?:requires?|request(?:ed|ing)?)_semantic_replan|semantic replan/i.test(
+      summary ?? "",
+    )
+  )
+    return "repair";
   if (
     [
       "failed",
@@ -260,7 +272,10 @@ const failed = (input: {
   status: input.status ?? "blocked",
   summary: input.summary,
   observation: syntheticFailure(input),
-  repairAction: environmentActionFailureRepairAction(input.outcome),
+  repairAction: environmentActionFailureRepairAction(
+    input.outcome,
+    input.summary,
+  ),
   error: input.outcome,
 });
 
@@ -390,6 +405,8 @@ const postconditionFor = (
       inventory_transfer: "minecraft.player.container_transfer_delta_matches",
       execute_sequence: "minecraft.player.sequence_checkpoints_satisfied",
       execute_reactive_program: "minecraft.player.reactive_program_completed",
+      arm_viability_guardian: "minecraft.player.viability_guardian_armed",
+      disarm_viability_guardian: "minecraft.player.viability_guardian_disarmed",
     }[actionKind] ?? "minecraft.player.action_completed";
   const parameters =
     actionKind === "execute_sequence"
@@ -406,6 +423,14 @@ const postconditionFor = (
             max_total_ticks: args.max_total_ticks,
             completion_policy: args.completion_policy,
           }
+        : actionKind === "arm_viability_guardian"
+          ? {
+              profile_id: args.profile_id,
+              duration_ticks: args.duration_ticks,
+              response_repertoire: args.response_repertoire,
+            }
+          : actionKind === "disarm_viability_guardian"
+            ? { profile_id: args.profile_id }
         : args;
   return {
     condition_id: `environment_action_condition:${crypto.randomUUID()}`,
@@ -654,6 +679,48 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
       }
       actionArguments = parsedProgram.data;
     }
+    if (context.capability.actionKind === "arm_viability_guardian") {
+      const parsedGuardian =
+        helixMinecraftArmViabilityGuardianArgumentsSchema.safeParse(
+          actionArguments,
+        );
+      if (!parsedGuardian.success) {
+        const issueSummary = trustedContractRepairDiagnostic(
+          parsedGuardian.error.issues,
+          "resident guardian",
+        );
+        return failed({
+          turnId: input.turnId,
+          capabilityId: input.capabilityId,
+          actionKind,
+          outcome: "precondition_failed",
+          summary: `The resident Minecraft guardian failed its trusted bounded profile contract${issueSummary ? `: ${issueSummary}` : "."}`,
+          repairDiagnosticEligibleForCurrentTurnReentry: true,
+        });
+      }
+      actionArguments = parsedGuardian.data;
+    }
+    if (context.capability.actionKind === "disarm_viability_guardian") {
+      const parsedDisarm =
+        helixMinecraftDisarmViabilityGuardianArgumentsSchema.safeParse(
+          actionArguments,
+        );
+      if (!parsedDisarm.success) {
+        const issueSummary = trustedContractRepairDiagnostic(
+          parsedDisarm.error.issues,
+          "resident guardian disarm",
+        );
+        return failed({
+          turnId: input.turnId,
+          capabilityId: input.capabilityId,
+          actionKind,
+          outcome: "precondition_failed",
+          summary: `The resident Minecraft guardian disarm failed its trusted profile contract${issueSummary ? `: ${issueSummary}` : "."}`,
+          repairDiagnosticEligibleForCurrentTurnReentry: true,
+        });
+      }
+      actionArguments = parsedDisarm.data;
+    }
     if (context.capability.actionKind === "track_target") {
       const parsedAction =
         helixMinecraftPlayerActionArgumentsSchema.safeParse(actionArguments);
@@ -710,6 +777,8 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
         : context.capability.actionKind === "execute_sequence" ||
             context.capability.actionKind === "execute_reactive_program"
           ? positiveIntegerArgument(actionArguments, "max_total_ticks") * 50
+          : context.capability.actionKind === "arm_viability_guardian"
+            ? 5_000
           : 0;
     const durationCeilingMs = Math.min(
       descriptor.timeout_ceiling_ms,
@@ -722,7 +791,9 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
     const deadlineAt = new Date(now.getTime() + maxDurationMs).toISOString();
     const requestedEngine =
       context.capability.actionKind === "execute_sequence" ||
-      context.capability.actionKind === "execute_reactive_program"
+      context.capability.actionKind === "execute_reactive_program" ||
+      context.capability.actionKind === "arm_viability_guardian"
+      || context.capability.actionKind === "disarm_viability_guardian"
         ? "native_fabric"
         : typeof actionArguments.engine_preference === "string"
           ? actionArguments.engine_preference
@@ -904,6 +975,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
             error: observation.outcome,
             repairAction: environmentActionFailureRepairAction(
               observation.outcome,
+              observation.summary,
             ),
           }),
     };

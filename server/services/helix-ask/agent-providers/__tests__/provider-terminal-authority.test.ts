@@ -2,8 +2,80 @@ import { describe, expect, it } from "vitest";
 import { HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA } from "@shared/helix-agent-step-observation-packet";
 import {
   buildHelixProviderReasoningReentry,
+  hasCurrentTurnResidentSemanticReplanRecovery,
   hasSuccessfulLaterRetryForFailedGatewayCapability,
 } from "../provider-terminal-authority";
+
+const buildResidentSemanticReplanResults = (manualOverride = false) => {
+  const turnId = "turn-resident-semantic-replan";
+  const failed = {
+    ok: false,
+    capability_id: "com.casimirbot.minecraft.player.walk",
+    mode: "execute",
+    error: "request_canceled",
+    gateway_admission: {
+      requested_capability: "com.casimirbot.minecraft.player.walk",
+      admission_status: "admitted",
+    },
+    observation_packet: {
+      schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+      turn_id: turnId,
+      status: "failed",
+      capability_key: "com.casimirbot.minecraft.player.walk",
+      produced_artifact_refs: [`${turnId}:walk:blocked`],
+      observation_summary: manualOverride
+        ? "Manual player input canceled the workflow."
+        : "The resident viability guardian interrupted the workflow: movement_blocked_requires_semantic_replan",
+      missing_requirements: [],
+      suggested_next_steps: [manualOverride ? "ask_user" : "repair"],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    observation: {
+      outcome: "request_canceled",
+      summary: manualOverride
+        ? "Manual player input canceled the workflow."
+        : "The resident viability guardian interrupted the workflow: movement_blocked_requires_semantic_replan",
+      result: {
+        manual_override_detected: manualOverride,
+        controls_released: true,
+      },
+    },
+    artifact_refs: [`${turnId}:walk:blocked`],
+    tool_followup_decision: {
+      next_action: manualOverride ? "ask_user" : "retry",
+      external_change_required: manualOverride,
+    },
+  };
+  const recovered = {
+    ok: true,
+    capability_id: "com.casimirbot.minecraft.hazards.scan",
+    mode: "read",
+    gateway_admission: {
+      requested_capability: "com.casimirbot.minecraft.hazards.scan",
+      admission_status: "admitted",
+    },
+    observation_packet: {
+      schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+      turn_id: turnId,
+      status: "succeeded",
+      capability_key: "com.casimirbot.minecraft.hazards.scan",
+      produced_artifact_refs: [`${turnId}:hazards`],
+      observation_summary: "Hazard check read-only probe completed.",
+      missing_requirements: [],
+      suggested_next_steps: [],
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+    observation: { status: "succeeded" },
+    artifact_refs: [`${turnId}:hazards`],
+  };
+  return { turnId, results: [failed, recovered] };
+};
 
 const buildLanePacket = () => ({
   schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
@@ -652,6 +724,175 @@ const buildCalculatorUnsupportedExpressionResult = () => ({
 });
 
 describe("provider terminal authority for capability lanes", () => {
+  it("authorizes grounded Codex synthesis after a resident semantic escalation is replanned", () => {
+    const { turnId, results } = buildResidentSemanticReplanResults();
+    expect(
+      hasCurrentTurnResidentSemanticReplanRecovery(results as never, 0),
+    ).toBe(true);
+
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-resident-semantic-replan",
+      route: "/ask/turn",
+      gatewayCallResults: results as never,
+      normalizedObservationPackets: results.map(
+        (entry) => entry.observation_packet,
+      ) as never,
+      providerText:
+        "The guardian stopped at the obstruction. I checked current hazards and revised the next move instead of forcing forward.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      all_observations_reentry_compatible: true,
+      terminal_authority_granted: true,
+    });
+    expect(result.providerReasoningReentry).toMatchObject({
+      evidence_reentered: true,
+      status: "completed",
+    });
+    expect(result.terminalAnswerAuthority).not.toBeNull();
+  });
+
+  it("does not reinterpret manual cancellation as resident semantic recovery", () => {
+    const { results } = buildResidentSemanticReplanResults(true);
+    expect(
+      hasCurrentTurnResidentSemanticReplanRecovery(results as never, 0),
+    ).toBe(false);
+  });
+
+  it("rejects a candidate that denies an observed resident semantic interruption", () => {
+    const { turnId, results } = buildResidentSemanticReplanResults();
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-resident-semantic-replan-overclaim",
+      route: "/ask/turn",
+      gatewayCallResults: results as never,
+      normalizedObservationPackets: results.map(
+        (entry) => entry.observation_packet,
+      ) as never,
+      providerText:
+        "The walk completed. No blocked movement was detected, so no revision was needed.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.terminalAuthorityCandidateReview).toMatchObject({
+      terminal_authority_status:
+        "blocked_by_resident_semantic_replan_overclaim",
+      terminal_authority_granted: false,
+      blockers: [
+        "provider_candidate_disagrees_with_resident_semantic_replan",
+      ],
+    });
+    expect(result.terminalAnswerAuthority).toBeNull();
+  });
+
+  it("keeps an intermediate operational failure in provenance without blocking satisfied current-turn rails", () => {
+    const { turnId, results } = buildResidentSemanticReplanResults();
+    const failed = results[0];
+    failed.capability_id = "com.casimirbot.minecraft.player.navigate";
+    failed.gateway_admission.requested_capability =
+      "com.casimirbot.minecraft.player.navigate";
+    failed.error = "failed";
+    failed.observation_packet.capability_key =
+      "com.casimirbot.minecraft.player.navigate";
+    failed.observation_packet.observation_summary =
+      "Native navigation stopped after measured non-progress.";
+    failed.observation.outcome = "failed";
+    failed.observation.summary =
+      "Native navigation stopped after measured non-progress.";
+    const recoveredWalk = structuredClone(results[1]);
+    recoveredWalk.capability_id = "com.casimirbot.minecraft.player.walk";
+    recoveredWalk.gateway_admission.requested_capability =
+      "com.casimirbot.minecraft.player.walk";
+    recoveredWalk.observation_packet.capability_key =
+      "com.casimirbot.minecraft.player.walk";
+    recoveredWalk.observation_packet.produced_artifact_refs = [
+      `${turnId}:walk:recovered`,
+    ];
+    recoveredWalk.artifact_refs = [`${turnId}:walk:recovered`];
+    const allResults = [...results, recoveredWalk];
+    const committedSubgoalContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      rail_status: "satisfied",
+      subgoals: [
+        {
+          subgoal_id: `${turnId}:status`,
+          requested_capability: "com.casimirbot.minecraft.hazards.scan",
+          satisfaction: "satisfied",
+          satisfied: true,
+          rail_status: "satisfied",
+          support_refs: results[1].artifact_refs,
+        },
+        {
+          subgoal_id: `${turnId}:movement`,
+          requested_capability: "com.casimirbot.minecraft.player.walk",
+          satisfaction: "satisfied",
+          satisfied: true,
+          rail_status: "satisfied",
+          support_refs: recoveredWalk.artifact_refs,
+        },
+      ],
+    };
+    const result = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-operational-recovery",
+      route: "/ask/turn",
+      gatewayCallResults: allResults as never,
+      normalizedObservationPackets: allResults.map(
+        (entry) => entry.observation_packet,
+      ) as never,
+      committedSubgoalContract,
+      providerText:
+        "Navigation stopped after non-progress. I inspected the situation and the alternate bounded walk then succeeded.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+
+    expect(result.providerTerminalAuthorityBridge).toMatchObject({
+      required_committed_subgoals_satisfied: true,
+      all_observations_reentry_compatible: true,
+      terminal_authority_granted: true,
+    });
+    expect(result.terminalAnswerAuthority).not.toBeNull();
+
+    failed.error = "permission_revoked";
+    failed.observation.provenance_valid = false;
+    const hardBoundary = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId,
+      threadId: "thread-operational-recovery",
+      route: "/ask/turn",
+      gatewayCallResults: allResults as never,
+      normalizedObservationPackets: allResults.map(
+        (entry) => entry.observation_packet,
+      ) as never,
+      committedSubgoalContract,
+      providerText: "The operation succeeded.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+    });
+    expect(hardBoundary.providerTerminalAuthorityBridge).toMatchObject({
+      all_observations_reentry_compatible: false,
+      terminal_authority_granted: false,
+    });
+  });
+
   it("authorizes a provider synthesis after a retryable gateway schema failure is superseded by a successful retry", () => {
     const turnId = "turn-minecraft-repaired-probe-authority";
     const capability = "com.casimirbot.minecraft.hazards.scan";

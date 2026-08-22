@@ -123,6 +123,8 @@ try {
       `linker=${linker}`,
       "-C",
       "opt-level=2",
+      "-C",
+      "link-arg=/Brepro",
       "-o",
       addon,
       source,
@@ -346,10 +348,10 @@ try {
 
   const nativeCoreEvidence = JSON.parse(
     execFileSync(
-    process.execPath,
-    [
-      "-e",
-      String.raw`
+      process.execPath,
+      [
+        "-e",
+        String.raw`
         const assert = require("node:assert/strict");
         const { createHash } = require("node:crypto");
         const native = require(process.argv[1]);
@@ -542,9 +544,9 @@ try {
         assert.equal(closed.executionAuthority, false);
         console.log(JSON.stringify({ core, closed }));
       `,
-      addon,
-    ],
-    { encoding: "utf8" },
+        addon,
+      ],
+      { encoding: "utf8" },
     ),
   );
   const pythonReplayCode = String.raw`
@@ -614,8 +616,7 @@ print(json.dumps({
       .map(Number),
     equationLinf: nativeCoreEvidence.core.equationLinf,
     scaledStepLinf: nativeCoreEvidence.core.scaledStepLinf,
-    currentStateF64leSha256:
-      nativeCoreEvidence.core.currentStateF64leSha256,
+    currentStateF64leSha256: nativeCoreEvidence.core.currentStateF64leSha256,
     currentResidualF64leSha256:
       nativeCoreEvidence.core.currentResidualF64leSha256,
     candidateExecuted: false,
@@ -1098,6 +1099,255 @@ print(json.dumps({
     { stdio: "inherit" },
   );
 
+  const rustcExecutable = execFileSync("where.exe", ["rustc"], {
+    encoding: "utf8",
+  })
+    .trim()
+    .split(/\r?\n/u)[0];
+  const pythonRuntime = JSON.parse(
+    execFileSync(
+      "python",
+      [
+        "-c",
+        "import json,platform,sys; print(json.dumps({'executable':sys.executable,'version':platform.python_version()},sort_keys=True,separators=(',',':')))",
+      ],
+      { encoding: "utf8" },
+    ),
+  );
+  const producerRoot = path.join(
+    repositoryRoot,
+    "tools",
+    "nhm2-spherical-boson-star-seed",
+    "producer",
+  );
+  const fileBinding = (file) => {
+    const bytes = readFileSync(file);
+    return {
+      rawSha256: sha256Bytes(bytes),
+      sizeBytes: bytes.length,
+    };
+  };
+  const rustcVersionVerbose = execFileSync("rustc", ["-Vv"], {
+    encoding: "utf8",
+  }).replaceAll("\r\n", "\n");
+  const receiptDomain =
+    "nhm2-spherical-boson-star-v2/initializer-core-first-failure-receipt/v1\n";
+  const unsignedFailureReceipt = {
+    artifactId:
+      "nhm2.spherical_boson_star_v2_initializer_core_first_failure_receipt",
+    authority: {
+      candidateAdmission: false,
+      candidateExecution: false,
+      diagnosticTheoryGraphLamp: false,
+      execution: false,
+      physicalViability: false,
+      propulsion: false,
+      replay: false,
+      transport: false,
+    },
+    blockers: [
+      "runtime_lineage_disjoint_independent_replay_absent",
+      "scientific_preseal_absent",
+      "server_authenticated_observer_absent",
+      "six_payload_initializer_unreachable_after_core_failure",
+      "candidate_numeric_read_not_performed",
+    ],
+    candidateId:
+      "nhm2.semiclassical_v2.spherical_boson_star_1s_weak_field_control/v1",
+    checkpoint: {
+      amplitude: "2^-16",
+      gridNodeCount: 64,
+      requestedCandidateCheckpointReached: false,
+      reachedBoundary: "frozen_n64_initializer_core_solve_diagnostic",
+    },
+    chronology: {
+      authenticatedMonotonicChronologyEstablished: false,
+      candidateNumericReadPerformed: false,
+      coreFailurePrecedesProjection: true,
+      coreFailurePrecedesSixPayloadMaterialization: true,
+      nativeCleanupCompletedAfterObservation: true,
+    },
+    comparison: {
+      exactFailureFieldsMatched: true,
+      independentReplayAuthority: false,
+      qualifiesAsRuntimeDisjointIndependentReplay: false,
+      runtimeLineageDisjoint: false,
+      sharedGmpRawSha256: expectedGmpSha256,
+      sharedMpfrRawSha256: expectedMpfrSha256,
+      sourceImplementationDisjoint: true,
+    },
+    contractVersion:
+      "nhm2_spherical_boson_star_v2_initializer_core_first_failure_receipt/v1",
+    frozenBindings: {
+      binary64Environment: {
+        rawSha256:
+          "8d452abdfa6d9b3e0cf92aa7d8682202b588f1fe8b0fe0772c6d003d2d12f1a4",
+        sizeBytes: 14980,
+      },
+      branchSelectionSemantic: {
+        canonicalSizeBytes: 41280,
+        sha256:
+          "221af0c6b9f858d20ca2f89c5e4eedf14a0c64ede9ff39e60077b79f08ad9aaa",
+      },
+      initializerEvaluatorSemantic: {
+        canonicalSizeBytes: 24711,
+        sha256:
+          "2253cea43e7b0abc99aaebd19ced18994eba4605b65fe674febb03d9945cdbc5",
+      },
+      primaryNumericsSemantic: livePrimaryNumerics,
+    },
+    nativeImplementation: {
+      addon: fileBinding(addon),
+      command: {
+        argv: [
+          "--edition=2021",
+          "--crate-type=cdylib",
+          "-C",
+          "linker=<bound-rust-lld>",
+          "-C",
+          "opt-level=2",
+          "-C",
+          "link-arg=/Brepro",
+          "-o",
+          "<content-observed-addon>",
+          "native_arena_preflight.rs",
+        ],
+        candidateArgumentsAccepted: false,
+        workingDirectory: "repository_root",
+      },
+      dependencies: {
+        gmp: {
+          rawSha256: expectedGmpSha256,
+          sizeBytes: readFileSync(gmp).length,
+          version: "6.3.0",
+        },
+        mpfr: {
+          rawSha256: expectedMpfrSha256,
+          sizeBytes: readFileSync(mpfr).length,
+          version: "4.2.2",
+        },
+      },
+      observed: normalizedNativeCoreEvidence,
+      runtime: {
+        nodeExecutable: fileBinding(process.execPath),
+        nodeVersion: process.version,
+      },
+      source: {
+        rawSha256: actualSourceSha256,
+        sizeBytes: readFileSync(source).length,
+      },
+      toolchain: {
+        linker: fileBinding(linker),
+        rustcExecutable: fileBinding(rustcExecutable),
+        rustcVersionVerboseSha256: sha256Bytes(
+          Buffer.from(rustcVersionVerbose, "utf8"),
+        ),
+      },
+    },
+    noRetuneAttestation: {
+      alternateGridAttempted: false,
+      alternateInitializerAttempted: false,
+      alternatePrecisionAttempted: false,
+      alternateSolverAttempted: false,
+      candidateIdentityChanged: false,
+      failureRuleChanged: false,
+      lineSearchChanged: false,
+      toleranceChanged: false,
+    },
+    observedFailure: normalizedNativeCoreEvidence,
+    pythonComparisonImplementation: {
+      command: {
+        argv: ["python", "-c", "<bound-independent-source-script>"],
+        candidateArgumentsAccepted: false,
+        scriptSha256: sha256Bytes(Buffer.from(pythonReplayCode, "utf8")),
+        workingDirectory: "repository_root",
+      },
+      observed: pythonCoreEvidence,
+      runtime: {
+        executable: fileBinding(pythonRuntime.executable),
+        version: pythonRuntime.version,
+      },
+      sources: Object.fromEntries(
+        [
+          "binary64_environment.py",
+          "core_initializer.py",
+          "core_newton.py",
+          "core_operator.py",
+          "dense_lu.py",
+          "spectral.py",
+        ].map((name) => [name, fileBinding(path.join(producerRoot, name))]),
+      ),
+    },
+    receiptHashDomain: receiptDomain,
+    serverAuthenticatedObservation: false,
+    status: "diagnostic_first_failure_observed",
+  };
+  const unsignedCanonicalBytes = Buffer.from(
+    canonicalJson(unsignedFailureReceipt),
+    "utf8",
+  );
+  const failureReceiptSha256 = sha256Bytes(
+    Buffer.concat([
+      Buffer.from(receiptDomain, "utf8"),
+      u64le(unsignedCanonicalBytes.length),
+      unsignedCanonicalBytes,
+    ]),
+  );
+  const failureReceipt = {
+    ...unsignedFailureReceipt,
+    receiptSha256: failureReceiptSha256,
+  };
+  const failureReceiptBytes = Buffer.from(
+    `${canonicalJson(failureReceipt)}\n`,
+    "utf8",
+  );
+  const artifactDirectory = path.join(repositoryRoot, "docs", "research");
+  assert.ok(existsSync(artifactDirectory));
+  const failureReceiptPath = path.join(
+    artifactDirectory,
+    `nhm2-spherical-boson-star-v2-initializer-core-first-failure-${failureReceiptSha256}.json`,
+  );
+  const failureReceiptPersistenceRequested =
+    process.env.NHM2_WRITE_FAILURE_RECEIPT === "1";
+  if (failureReceiptPersistenceRequested) {
+    if (existsSync(failureReceiptPath)) {
+      assert.deepEqual(readFileSync(failureReceiptPath), failureReceiptBytes);
+    } else {
+      writeFileSync(failureReceiptPath, failureReceiptBytes, { flag: "wx" });
+    }
+  }
+  const reparsedFailureReceipt = JSON.parse(
+    failureReceiptBytes.toString("utf8"),
+  );
+  assert.deepEqual(reparsedFailureReceipt, failureReceipt);
+  assert.equal(reparsedFailureReceipt.receiptSha256, failureReceiptSha256);
+  const { receiptSha256: reparsedSelfHash, ...reparsedUnsignedReceipt } =
+    reparsedFailureReceipt;
+  const reparsedUnsignedBytes = Buffer.from(
+    canonicalJson(reparsedUnsignedReceipt),
+    "utf8",
+  );
+  assert.equal(
+    sha256Bytes(
+      Buffer.concat([
+        Buffer.from(receiptDomain, "utf8"),
+        u64le(reparsedUnsignedBytes.length),
+        reparsedUnsignedBytes,
+      ]),
+    ),
+    reparsedSelfHash,
+  );
+  assert.equal(
+    reparsedFailureReceipt.comparison
+      .qualifiesAsRuntimeDisjointIndependentReplay,
+    false,
+  );
+  assert.ok(
+    reparsedFailureReceipt.blockers.includes(
+      "runtime_lineage_disjoint_independent_replay_absent",
+    ),
+  );
+
   console.log(
     JSON.stringify({
       status: "PASS_DIAGNOSTIC_ONLY",
@@ -1107,6 +1357,9 @@ print(json.dumps({
       mpfrElementCount: receipt.mpfrElementCount,
       binary64ElementCount: receipt.binary64ElementCount,
       permutationElementCount: receipt.permutationElementCount,
+      failureReceiptPath: path.relative(repositoryRoot, failureReceiptPath),
+      failureReceiptPersisted: failureReceiptPersistenceRequested,
+      failureReceiptSha256,
       productionRuntimeReady: false,
       executionAuthority: false,
     }),

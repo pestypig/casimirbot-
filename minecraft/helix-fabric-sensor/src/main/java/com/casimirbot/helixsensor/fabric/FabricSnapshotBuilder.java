@@ -149,6 +149,7 @@ public final class FabricSnapshotBuilder {
         snapshot.put("world_id", config.worldId());
         snapshot.put("source_id", config.sourceId());
         snapshot.put("actor_id", actorId);
+        snapshot.put("stable_actor_id", player.getUUID().toString());
         snapshot.put("actor_label", actorLabel);
         snapshot.put("ts", now);
         snapshot.put("source_tick", sourceTick);

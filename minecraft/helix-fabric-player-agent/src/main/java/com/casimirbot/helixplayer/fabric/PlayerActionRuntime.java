@@ -77,6 +77,9 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final PlayerActionDeliveryOutbox deliveryOutbox =
         new PlayerActionDeliveryOutbox(MAX_PENDING_DELIVERIES);
     private volatile Map<String, Object> latestClockSnapshot = Map.of();
+    private volatile MinecraftViabilityGuardian.Decision latestViabilityDecision;
+    private volatile String lastViabilityNotice = "";
+    private volatile String lastViabilityEventReason = "";
     private long ticks;
 
     PlayerActionRuntime(
@@ -105,6 +108,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     void tick() {
+        boolean residentOwnsTick = tickViabilityGuardian();
         if (eventStreamResyncRequired) {
             // The server can no longer admit the immutable evidence sequence
             // for this producer epoch. Never continue acting while terminal
@@ -119,7 +123,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 "The Helix action transport became unreachable; the client released every control and retained the terminal event for later delivery."
             );
             bridge.releaseAll();
-        } else {
+        } else if (!residentOwnsTick) {
             controller.tick();
         }
         ticks++;
@@ -190,6 +194,150 @@ final class PlayerActionRuntime implements AutoCloseable {
             " is running action " + diagnostic.actionKind() + ".";
     }
 
+    String armLocalViabilityGuardian(long durationSeconds) {
+        if (minecraft.player == null || minecraft.getConnection() == null) {
+            return "The resident Minecraft guardian requires an active world connection.";
+        }
+        if (emergencyStopLatched) {
+            return "The resident Minecraft guardian cannot arm while Emergency Stop is latched.";
+        }
+        long boundedSeconds = Math.max(10, Math.min(1_800, durationSeconds));
+        bridge.armViabilityGuardian(ticks, boundedSeconds * 20L);
+        lastViabilityNotice = "";
+        lastViabilityEventReason = "";
+        return "The deterministic resident Minecraft guardian is armed for " +
+            boundedSeconds + " seconds with local water/air stabilization and fail-closed hazard escalation.";
+    }
+
+    String disarmLocalViabilityGuardian() {
+        bridge.disarmViabilityGuardian();
+        lastViabilityNotice = "";
+        lastViabilityEventReason = "";
+        return "The resident Minecraft guardian is disarmed and every guardian-owned control is released.";
+    }
+
+    String localViabilityGuardianStatusText() {
+        MinecraftViabilityGuardian.Decision decision = latestViabilityDecision;
+        if (!bridge.viabilityGuardianArmed()) return "The resident Minecraft guardian is not armed.";
+        if (decision == null) return "The resident Minecraft guardian is armed and awaiting its first observation.";
+        return "The resident Minecraft guardian is armed; latest decision " +
+            decision.reasonCode() + " from observation revision " +
+            decision.observationRevision() + ".";
+    }
+
+    private boolean tickViabilityGuardian() {
+        if (!bridge.viabilityGuardianArmed()) return false;
+        ActiveEnvelope envelope = activeEnvelope;
+        if (
+            envelope != null &&
+            "arm_viability_guardian".equals(text(envelope.wire(), "action_kind"))
+        ) return false;
+        java.util.Set<String> residentCoverage = activeResidentGuardianCoverage();
+        MinecraftViabilityGuardian.Decision decision = bridge.observeViability(
+            ticks,
+            emergencyStopLatched,
+            residentCoverage.contains(
+                ConcurrentReactiveScheduler.COVERAGE_UNSAFE_LANDING
+            ),
+            residentCoverage.contains(ConcurrentReactiveScheduler.COVERAGE_FIRE)
+        );
+        latestViabilityDecision = decision;
+        boolean ownsTick = decision.proposal() ==
+            MinecraftViabilityGuardian.ProposalKind.SWIM_UP;
+        boolean delegatedRecovery = decision.proposal() ==
+            MinecraftViabilityGuardian.ProposalKind.MONITOR_ADMITTED_RECOVERY;
+        if (
+            decision.proposal() != MinecraftViabilityGuardian.ProposalKind.NONE &&
+            !delegatedRecovery
+        ) {
+            String workflowId = controller.activeWorkflowId();
+            if (workflowId != null) {
+                controller.cancel(
+                    workflowId,
+                    "The resident viability guardian interrupted the workflow: " +
+                        decision.reasonCode()
+                );
+            }
+            bridge.applyViabilityDecision(decision);
+        }
+        if (
+            !decision.reasonCode().equals(lastViabilityEventReason) &&
+            (!"viability_within_profile".equals(decision.reasonCode()) ||
+                !lastViabilityEventReason.isBlank())
+        ) {
+            lastViabilityEventReason = decision.reasonCode();
+            recordViabilityDecision(decision);
+        }
+        if (
+            decision.semanticEscalationRequired() &&
+            !decision.reasonCode().equals(lastViabilityNotice)
+        ) {
+            lastViabilityNotice = decision.reasonCode();
+            localDiagnosticMessage.accept(
+                "Resident guardian event: " + decision.reasonCode() +
+                    ". Controls released=" + decision.controlsMustRelease() + "."
+            );
+        }
+        return ownsTick;
+    }
+
+    private java.util.Set<String> activeResidentGuardianCoverage() {
+        String actionKind = "";
+        Map<String, Object> arguments = Map.of();
+        ActiveEnvelope envelope = activeEnvelope;
+        if (envelope != null) {
+            actionKind = text(envelope.wire(), "action_kind");
+            arguments = object(envelope.wire().get("arguments"));
+        } else {
+            LocalDiagnosticEnvelope diagnostic = localDiagnosticEnvelope;
+            if (diagnostic != null) {
+                actionKind = diagnostic.actionKind();
+                arguments = diagnostic.arguments();
+            }
+        }
+        if (!"execute_reactive_program".equals(actionKind)) return java.util.Set.of();
+        return ConcurrentReactiveScheduler.residentGuardianCoverage(arguments);
+    }
+
+    private void recordViabilityDecision(
+        MinecraftViabilityGuardian.Decision decision
+    ) {
+        Map<String, Object> record = baseNonAnswer();
+        record.put("schema", "helix.minecraft.resident_decision.v1");
+        record.put("profile_id", MinecraftViabilityGuardian.PROFILE_ID);
+        record.put("artifact_version", MinecraftViabilityGuardian.ARTIFACT_VERSION);
+        record.put("decision_sequence", decision.decisionSequence());
+        record.put("observation_revision", decision.observationRevision());
+        record.put("proposal", decision.proposal().name().toLowerCase(java.util.Locale.ROOT));
+        record.put("reason_code", decision.reasonCode());
+        record.put("arbiter_outcome", residentArbiterOutcome(decision));
+        record.put("bounded_effect", residentBoundedEffect(decision));
+        record.put("effect_applied", residentEffectApplied(decision));
+        record.put("postcondition_status", residentPostconditionStatus(decision));
+        record.put("controls_released", decision.controlsMustRelease());
+        record.put("semantic_escalation_required", decision.semanticEscalationRequired());
+        record.put("measurements", decision.measurements());
+        record.put("clock", clockSnapshot());
+        record.put("created_at", Instant.now().toString());
+        logger.info("HELIX_MINECRAFT_RESIDENT_DECISION {}", HelixJson.stringify(record));
+
+        if (!config.ready() || http == null || !manifestReady || !heartbeatReady) return;
+        long sequence = ++latestEventSequence;
+        Map<String, Object> batch = residentEnvironmentEventBatch(decision, sequence);
+        if (!deliveryOutbox.enqueueSequence(List.of(
+            new PlayerActionDeliveryOutbox.Delivery(
+                PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH,
+                batch
+            )
+        ), RESERVED_TERMINAL_DELIVERIES)) {
+            recordTransportError("resident_event_delivery_outbox_full");
+            bridge.disarmViabilityGuardian();
+            bridge.releaseAll();
+            return;
+        }
+        scheduleDeliveryFlush();
+    }
+
     String startLocalDiagnostic(
         String actionKind,
         Map<String, Object> arguments,
@@ -240,7 +388,8 @@ final class PlayerActionRuntime implements AutoCloseable {
             "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
             "hotbar_select", "equip", "follow", "collect", "mine", "place",
             "craft", "inventory_transfer", "execute_sequence",
-            "execute_reactive_program"
+            "execute_reactive_program", "arm_viability_guardian",
+            "disarm_viability_guardian"
         ).contains(actionKind)) {
             return "Helix direct diagnostics do not expose that action kind.";
         }
@@ -252,6 +401,13 @@ final class PlayerActionRuntime implements AutoCloseable {
         }
         String actionRequestId = id("direct_player_action_request");
         String workflowId = id("direct_player_action_workflow");
+        Map<String, Object> executionArguments = new LinkedHashMap<>(arguments);
+        if ("arm_viability_guardian".equals(actionKind)) {
+            executionArguments.put(
+                "lease_expires_tick",
+                ticks + Math.max(200, number(executionArguments, "duration_ticks").longValue())
+            );
+        }
         PlayerSnapshot initialSnapshot = bridge.snapshot();
         Map<String, Object> startingState = new LinkedHashMap<>();
         startingState.put("connected", initialSnapshot.connected());
@@ -267,7 +423,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             actionRequestId,
             workflowId,
             actionKind,
-            Map.copyOf(arguments),
+            Map.copyOf(executionArguments),
             controlEngine,
             stagingRequestRef,
             Map.copyOf(startingState),
@@ -279,7 +435,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             actionRequestId,
             workflowId,
             actionKind,
-            arguments,
+            executionArguments,
             Math.max(1, Math.min(36_000, maxDurationTicks)),
             ManualOverridePolicy.CANCEL,
             controlEngine
@@ -310,6 +466,7 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     void localEmergencyStop(String reason) {
         emergencyStopLatched = true;
+        bridge.disarmViabilityGuardian();
         controller.emergencyStop(reason);
         bridge.releaseAll();
         if (http != null) network.execute(this::publishHeartbeat);
@@ -452,11 +609,18 @@ final class PlayerActionRuntime implements AutoCloseable {
         try {
             Map<String, Object> constraints = object(wire.get("constraints"));
             long maxDurationMs = number(constraints, "max_duration_ms").longValue();
+            Map<String, Object> arguments = object(wire.get("arguments"));
+            if ("arm_viability_guardian".equals(text(wire, "action_kind"))) {
+                arguments.put(
+                    "lease_expires_tick",
+                    ticks + Math.max(200, number(arguments, "duration_ticks").longValue())
+                );
+            }
             ActionRequest request = new ActionRequest(
                 textRequired(wire, "action_request_id"),
                 textRequired(wire, "workflow_id"),
                 textRequired(wire, "action_kind"),
-                object(wire.get("arguments")),
+                arguments,
                 Math.max(1, Math.min(36_000, (maxDurationMs + 49) / 50)),
                 ManualOverridePolicy.fromWire(text(constraints, "manual_override_policy")),
                 resolvedEngine
@@ -789,6 +953,122 @@ final class PlayerActionRuntime implements AutoCloseable {
         return batch;
     }
 
+    private Map<String, Object> residentEnvironmentEventBatch(
+        MinecraftViabilityGuardian.Decision decision,
+        long sequence
+    ) {
+        String observedAt = Instant.now().toString();
+        String eventId = id("environment_event");
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("resident_decision", Map.ofEntries(
+            Map.entry("profile_id", MinecraftViabilityGuardian.PROFILE_ID),
+            Map.entry("artifact_version", MinecraftViabilityGuardian.ARTIFACT_VERSION),
+            Map.entry("decision_sequence", decision.decisionSequence()),
+            Map.entry("observation_revision", decision.observationRevision()),
+            Map.entry("proposal", decision.proposal().name().toLowerCase(java.util.Locale.ROOT)),
+            Map.entry("reason_code", decision.reasonCode()),
+            Map.entry("arbiter_outcome", residentArbiterOutcome(decision)),
+            Map.entry("bounded_effect", residentBoundedEffect(decision)),
+            Map.entry("effect_applied", residentEffectApplied(decision)),
+            Map.entry("postcondition_status", residentPostconditionStatus(decision)),
+            Map.entry("controls_released", decision.controlsMustRelease()),
+            Map.entry("semantic_escalation_required", decision.semanticEscalationRequired()),
+            Map.entry("measurements", decision.measurements())
+        ));
+        attributes.put("clock", clockSnapshot());
+
+        Map<String, Object> event = baseNonAnswer();
+        event.put("schema", "helix.environment_event.v1");
+        event.put("event_id", eventId);
+        event.put("sequence", sequence);
+        event.put("event_type", "resident.decision");
+        event.put("producer_plane", "player_embodiment");
+        event.put("domain", "minecraft");
+        event.put("domain_adapter", config.domainAdapter());
+        event.put("room_id", config.roomId());
+        event.put("source_id", config.sourceId());
+        event.put("world_id", config.worldId());
+        event.put("producer_epoch_ref", producerEpochRef);
+        event.put("subject_ref", config.subjectBindingId());
+        event.put("workflow_ref", null);
+        event.put("summary", "The deterministic resident Minecraft guardian recorded " + decision.reasonCode() + ".");
+        event.put("attributes", attributes);
+        event.put("evidence_refs", List.of());
+        event.put("occurred_at", observedAt);
+        event.put("observed_at", observedAt);
+        event.put("provenance", "measured");
+        event.put("raw_event_included", false);
+        event.put("content_role", "environment_event_not_assistant_answer");
+
+        Map<String, Object> batch = baseNonAnswer();
+        batch.put("schema", "helix.environment_event_batch.v1");
+        batch.put("batch_id", id("environment_event_batch"));
+        batch.put("room_id", config.roomId());
+        batch.put("source_id", config.sourceId());
+        batch.put("world_id", config.worldId());
+        batch.put("producer_epoch_ref", producerEpochRef);
+        batch.put("producer_plane", "player_embodiment");
+        batch.put("first_sequence", sequence);
+        batch.put("last_sequence", sequence);
+        batch.put("events", List.of(event));
+        batch.put("created_at", observedAt);
+        batch.put("content_role", "environment_event_batch_not_assistant_answer");
+        batch.put("batch_hash", SectionHasher.hashIncludingNulls(batch));
+        return batch;
+    }
+
+    private static String residentArbiterOutcome(
+        MinecraftViabilityGuardian.Decision decision
+    ) {
+        return switch (decision.proposal()) {
+            case NONE -> "not_requested";
+            case MONITOR_ADMITTED_RECOVERY -> "delegated_to_admitted_recovery";
+            default -> "admitted";
+        };
+    }
+
+    private static boolean residentEffectApplied(
+        MinecraftViabilityGuardian.Decision decision
+    ) {
+        return decision.proposal() != MinecraftViabilityGuardian.ProposalKind.NONE &&
+            decision.proposal() !=
+                MinecraftViabilityGuardian.ProposalKind.MONITOR_ADMITTED_RECOVERY;
+    }
+
+    private static String residentBoundedEffect(
+        MinecraftViabilityGuardian.Decision decision
+    ) {
+        return switch (decision.proposal()) {
+            case NONE -> "none";
+            case SWIM_UP -> "swim_up_input";
+            case MONITOR_ADMITTED_RECOVERY -> "continue_admitted_recovery";
+            case RELEASE_AND_ESCALATE, ABSTAIN_AND_ESCALATE -> "release_controls";
+        };
+    }
+
+    private static String residentPostconditionStatus(
+        MinecraftViabilityGuardian.Decision decision
+    ) {
+        return switch (decision.reasonCode()) {
+            case "breathing_restored_surface_hold" -> "breathing_restored_surface_hold_active";
+            case "water_exit_verified" -> "water_exit_verified";
+            case "unsafe_landing_recovery_active" -> "admitted_fall_recovery_active";
+            case "fire_recovery_program_active" -> "admitted_fire_recovery_active";
+            case "fire_recovery_postcondition_observed" -> "fire_recovery_postcondition_observed";
+            case "fall_recovery_verified" -> "fall_recovery_verified";
+            case "fire_recovery_verified" -> "fire_recovery_verified";
+            case "movement_blocked_requires_semantic_replan",
+                 "unsafe_landing_requires_admitted_recovery",
+                 "fire_pressure_requires_semantic_replan",
+                 "lava_pressure_requires_semantic_replan",
+                 "manual_override",
+                 "emergency_stop",
+                 "guardian_lease_expired",
+                 "guardian_lease_expired_during_water_recovery" -> "controls_released";
+            default -> "pending_or_not_applicable";
+        };
+    }
+
     private void submitWithoutExecution(Map<String, Object> wire, String outcome, String summary) {
         Map<String, Object> payload = result(
             wire,
@@ -1080,6 +1360,22 @@ final class PlayerActionRuntime implements AutoCloseable {
                 List.of("long_running"),
                 List.of("native_fabric"),
                 true
+            ),
+            capability(
+                "com.casimirbot.minecraft.player.viability_guardian.arm",
+                "arm_viability_guardian",
+                "continuous_control",
+                List.of("single_action"),
+                List.of("native_fabric"),
+                false
+            ),
+            capability(
+                "com.casimirbot.minecraft.player.viability_guardian.disarm",
+                "disarm_viability_guardian",
+                "continuous_control",
+                List.of("single_action"),
+                List.of("native_fabric"),
+                false
             )
         ));
         return List.copyOf(capabilities);

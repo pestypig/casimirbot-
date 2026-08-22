@@ -94,8 +94,13 @@ live_env.apply_visual_observer_profile
 live_env.request_visual_action_replay
 live_env.project_live_source_narrative
 live_env.update_live_source_immersion_state
-live_env.record_live_source_mail_decision
 ```
+
+`live_env.record_live_source_mail_decision` has graduated to the shared
+provider gateway for G4. It remains a bounded evidence-ledger mutation: the
+gateway requires exact packet and mail identities from normalized current-turn
+evidence, returns a non-terminal receipt, and rejects prompt-only, stale,
+guessed, or unobserved identities.
 
 Voice stream or steering procedures:
 

@@ -71331,12 +71331,12 @@ const runHelixAgentTurnRuntimeLoop = async (args: {
             .filter((entry): entry is string => Boolean(entry))
         : [];
       const liveToolThreadId =
-        readAskTurnString(runtimeToolCall.args.thread_id) ??
         readAskTurnString(liveEnvironmentRelevance?.thread_id) ??
         readAskTurnString(args.payload.thread_id) ??
         readAskTurnString(args.payload.threadId) ??
         readAskTurnString(args.payload.session_id) ??
         readAskTurnString(args.payload.sessionId) ??
+        readAskTurnString(runtimeToolCall.args.thread_id) ??
         "helix-ask:live-environment";
       const liveToolEnvironmentId =
         readAskTurnString(runtimeToolCall.args.environment_id) ??

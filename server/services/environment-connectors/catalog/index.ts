@@ -32,6 +32,8 @@ import {
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
@@ -52,6 +54,7 @@ import {
   HELIX_MINECRAFT_REACTIVE_PROGRAM_SCHEMA,
   HELIX_MINECRAFT_REACTIVE_RESOURCES,
 } from "@shared/helix-minecraft-reactive-program";
+import { HELIX_MINECRAFT_VIABILITY_GUARDIAN_PROFILE_ID } from "@shared/helix-minecraft-viability-guardian";
 import type { HelixEnvironmentProbeType } from "@shared/helix-environment-probe";
 
 const canonicalize = (value: unknown): unknown => {
@@ -1375,6 +1378,11 @@ const minecraftWalkInputSchema: HelixEnvironmentConstrainedJsonSchema = {
         "Bounded input duration. Inside the native 20 Hz reactive scheduler this normally occupies ceil(duration_ms / 50) ticks; coordinate observer wait windows with that causal duration.",
     },
     sprint: { type: "boolean" },
+    jump: {
+      type: "boolean",
+      description:
+        "When true, hold jump during the same bounded locomotion interval; useful for swimming upward through viscous hazards without creating another execution lane.",
+    },
   },
   required: ["action_kind", "direction", "duration_ms", "sprint"],
   additionalProperties: false,
@@ -1547,6 +1555,12 @@ const minecraftPlaceInputSchema: HelixEnvironmentConstrainedJsonSchema = {
       description:
         "Required with item_use; the exact hand holding the source item.",
     },
+    cleanup_after_landing: {
+      type: "boolean",
+      enum: [true],
+      description:
+        "For a predicted-collision minecraft:water placement from minecraft:water_bucket only, recover the temporary source after measured landing before completing.",
+    },
   },
   required: ["action_kind", "block_id"],
   additionalProperties: false,
@@ -1641,6 +1655,41 @@ const minecraftFluidConditionInputSchema: HelixEnvironmentConstrainedJsonSchema 
       ),
       exactObjectSchema(
         {
+          condition_kind: literalStringSchema("air_at_least"),
+          air: { type: "integer", minimum: 0, maximum: 300 },
+        },
+        ["condition_kind", "air"],
+      ),
+      exactObjectSchema(
+        {
+          condition_kind: literalStringSchema("submerged_is"),
+          expected: { type: "boolean" },
+        },
+        ["condition_kind", "expected"],
+      ),
+      exactObjectSchema(
+        {
+          condition_kind: literalStringSchema("swimming_is"),
+          expected: { type: "boolean" },
+        },
+        ["condition_kind", "expected"],
+      ),
+      exactObjectSchema(
+        {
+          condition_kind: literalStringSchema("on_fire_is"),
+          expected: { type: "boolean" },
+        },
+        ["condition_kind", "expected"],
+      ),
+      exactObjectSchema(
+        {
+          condition_kind: literalStringSchema("in_lava_is"),
+          expected: { type: "boolean" },
+        },
+        ["condition_kind", "expected"],
+      ),
+      exactObjectSchema(
+        {
           condition_kind: literalStringSchema("food_at_least"),
           food: { type: "integer", minimum: 0, maximum: 20 },
         },
@@ -1701,7 +1750,7 @@ const minecraftFluidConditionInputSchema: HelixEnvironmentConstrainedJsonSchema 
           expected: { type: "boolean" },
         },
         ["condition_kind", "max_ticks", "expected"],
-        "Tests the short-horizon collision forecast. A grounded actor can forecast its immediate support collision, so true alone does not prove airborne descent or a usable below-actor predicted_collision_cell. Gate landing-sensitive work behind measured airborne/downward state before entering an action that acquires shared resources.",
+        "Tests the short-horizon collision forecast. Ground contact is excluded from future-collision evidence, but true alone still does not prove dangerous descent. Gate landing-sensitive work behind measured airborne/downward state before entering an action that acquires shared resources.",
       ),
       exactObjectSchema(
         {
@@ -1987,6 +2036,11 @@ const minecraftFluidEmbeddedActionInputSchema: HelixEnvironmentConstrainedJsonSc
               "Bounded input duration. Inside the native 20 Hz reactive scheduler this normally occupies ceil(duration_ms / 50) ticks; coordinate observer wait windows with that causal duration.",
           },
           sprint: { type: "boolean" },
+          jump: {
+            type: "boolean",
+            description:
+              "When true, hold jump during the same bounded locomotion interval.",
+          },
         },
         ["action_kind", "direction", "duration_ms", "sprint"],
       ),
@@ -2129,6 +2183,7 @@ const minecraftFluidEmbeddedActionInputSchema: HelixEnvironmentConstrainedJsonSc
           },
           source_item_id: { type: "string", minLength: 1, maxLength: 320 },
           hand: { type: "string", enum: ["main_hand", "off_hand"] },
+          cleanup_after_landing: { type: "boolean", enum: [true] },
         },
         ["action_kind", "block_id", "position_binding"],
         "Bounded live placement. predicted_collision_cell resolves one exact replaceable landing cell from an already-applicable trajectory when this action executes; it neither moves the player nor creates a fall. Author required locomotion and measured state-transition events separately, wait for a real downward trajectory, then wait until predicted_collision_within is true before executing place. A focus check is not trajectory evidence.",
@@ -2343,7 +2398,7 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
   {
     type: "object",
     description:
-      "Concurrent graph authored by Codex. Actions cause changes; conditions only observe. Node waits/timeouts begin on entry and must outlast causal predecessors. Under all_required, a failed, timed-out, or canceled required lane terminates the program. Failures cannot jump to success; every required lane must use activation immediate. Interrupt targets use required false plus interrupt_only; reactive conditions describe Minecraft state, not manual input. Helix validates but never invents the graph.",
+      "Codex-authored concurrent graph. Read geometry/actor state first when timing or placement depends on it. Put a time-sensitive initiator and observer/reaction in separate immediate lanes; serial reaction can miss it. Node waits/timeouts begin on entry. Under all_required, a failed, timed-out, or canceled required lane terminates the program; every required lane must use activation immediate. reactive conditions describe Minecraft state, not manual input. Mutation ceilings include cleanup/retry.",
     properties: {
       action_kind: { type: "string", enum: ["execute_reactive_program"] },
       program_schema: {
@@ -2354,6 +2409,16 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
       ruleset: { type: "string", enum: ["survival_tas"] },
       execution_plane: { type: "string", enum: ["player_embodiment"] },
       scheduler_engine: { type: "string", enum: ["native_fabric_concurrent"] },
+      resident_guardian_coverage: {
+        type: "array",
+        maxItems: 2,
+        items: {
+          type: "string",
+          enum: ["unsafe_landing_recovery", "fire_recovery"],
+        },
+        description:
+          "Optional narrowly validated declaration that this already-admitted local program handles one resident-guardian invariant. unsafe_landing_recovery requires a predicted-collision water-bucket rescue with cleanup and mutation ceilings; fire_recovery requires a matched fire-or-lava onset/clearance pair, bounded locomotion, and an independent health-floor interrupt. A declaration does not expand authority.",
+      },
       max_total_ticks: { type: "integer", minimum: 1, maximum: 36_000 },
       completion_policy: {
         type: "object",
@@ -2842,6 +2907,69 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
     additionalProperties: false,
   };
 
+const minecraftArmViabilityGuardianInputSchema: HelixEnvironmentConstrainedJsonSchema =
+  {
+    type: "object",
+    description:
+      "Arm the deterministic Minecraft-specific resident guardian across action boundaries for a bounded lease. It may swim upward for low-air submersion, release controls, or request semantic replanning. It cannot invent actions, mutate the world, call a model, or expand authority.",
+    properties: {
+      action_kind: { type: "string", enum: ["arm_viability_guardian"] },
+      profile_id: {
+        type: "string",
+        enum: [HELIX_MINECRAFT_VIABILITY_GUARDIAN_PROFILE_ID],
+      },
+      duration_ticks: { type: "integer", minimum: 200, maximum: 36_000 },
+      minimum_air: { type: "integer", minimum: 1, maximum: 300 },
+      dangerous_vertical_velocity: {
+        type: "number",
+        minimum: -16,
+        maximum: -0.01,
+      },
+      maximum_swim_ticks: { type: "integer", minimum: 1, maximum: 1_200 },
+      maximum_observation_age_ticks: {
+        type: "integer",
+        minimum: 0,
+        maximum: 20,
+      },
+      response_repertoire: {
+        type: "array",
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: "string",
+          enum: ["swim_up", "release_controls", "request_semantic_replan"],
+        },
+      },
+    },
+    required: [
+      "action_kind",
+      "profile_id",
+      "duration_ticks",
+      "minimum_air",
+      "dangerous_vertical_velocity",
+      "maximum_swim_ticks",
+      "maximum_observation_age_ticks",
+      "response_repertoire",
+    ],
+    additionalProperties: false,
+  };
+
+const minecraftDisarmViabilityGuardianInputSchema: HelixEnvironmentConstrainedJsonSchema =
+  {
+    type: "object",
+    description:
+      "Disarm the exact deterministic resident guardian profile and release every guardian-owned control. This cannot arm another profile, mutate the world, or clear Emergency Stop.",
+    properties: {
+      action_kind: { type: "string", enum: ["disarm_viability_guardian"] },
+      profile_id: {
+        type: "string",
+        enum: [HELIX_MINECRAFT_VIABILITY_GUARDIAN_PROFILE_ID],
+      },
+    },
+    required: ["action_kind", "profile_id"],
+    additionalProperties: false,
+  };
+
 const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
   descriptor({
     capabilityId: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
@@ -3124,9 +3252,25 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     capabilityId: HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
     label: "Execute a concurrent Minecraft guardian program",
     description:
-      "Run one Codex-authored concurrent survival_tas program. Read exact state first when needed. Wait/timeout begins on node entry; coordinate it with causal action duration. Under all_required, any failed, timed-out, or canceled required lane ends the program. predicted_collision_cell resolves current geometry at action time but never moves or drops the player: author locomotion, measured state events, timing, and fallback. Fabric executes bounded lanes, locks, events, and interrupts and returns evidence. Keyboard, mouse, and open screens override outside the graph. Do not author manual-control or screen interrupts: manual_override_detected is not admitted, and world-state conditions cannot stand in. No arbitrary code, commands, host shell, files, credentials, or embedded model.",
+      "Run a Codex-authored concurrent survival_tas program. Read geometry/actor state first when timing or placement depends on it. Put a time-sensitive initiator and observer/reaction in separate immediate lanes; serial reaction can miss the state. Size duration from measured geometry and verify the transition. Under all_required, failed/timed-out/canceled required lanes end the program. predicted_collision_cell resolves geometry but never moves the player. Mutation ceilings cover placement, cleanup, and retry. Fabric returns bounded lane/event/interrupt evidence. Keyboard, mouse, or open screens override. Do not author manual-control or screen interrupts: manual_override_detected is not admitted, and world-state conditions cannot stand in. No code, commands, host access, or credentials.",
     inputSchema: minecraftReactiveProgramInputSchema,
     timeoutCeilingMs: 30 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+    label: "Arm persistent Minecraft viability guardian",
+    description:
+      "Arm the deterministic Fabric guardian for a bounded lease across individual action boundaries and Codex deliberation gaps. The fixed repertoire is swim upward, release controls, or request semantic replanning; every transition is measured and emitted as non-answer evidence.",
+    inputSchema: minecraftArmViabilityGuardianInputSchema,
+    timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
+    label: "Disarm persistent Minecraft viability guardian",
+    description:
+      "Disarm resident.minecraft.fabric-guardian.v1 through the trusted local arbiter and release every guardian-owned control without latching Emergency Stop.",
+    inputSchema: minecraftDisarmViabilityGuardianInputSchema,
+    timeoutCeilingMs: 15_000,
   }),
 ];
 

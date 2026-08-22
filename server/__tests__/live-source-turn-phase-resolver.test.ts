@@ -1690,6 +1690,43 @@ describe("resolveLiveSourceTurnPhase", () => {
     ]));
   });
 
+  it("requires record_decision when the processed packet is nested in a shared gateway observation", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Read the latest processed Minecraft mail, tell me what changed, and revise the next step.",
+      selectedTargetSource: "live_source_mailbox",
+      latestToolReceipts: [{
+        kind: "live_environment_tool_observation",
+        payload: {
+          tool_name: "live_env.read_processed_live_source_mail",
+          observation: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.read_processed_live_source_mail",
+            observation: {
+              schema: "stage_play_processed_live_source_mail_read_result/v1",
+              packets: [{
+                artifactId: "stage_play_processed_mail_packet",
+                packetId: "stage_play_processed_mail_packet:gateway-nested",
+                observedFacts: ["The bounded movement workflow succeeded."],
+                recommendedNext: "record_interpretation",
+                salience: { level: "medium", voiceCandidate: false },
+              }],
+            },
+          },
+        },
+      }],
+    });
+
+    expect(phase).toMatchObject({
+      phase: "record_decision",
+      canonicalGoal: "processed_mail_interpretation",
+      allowedTools: ["live_env.record_live_source_mail_decision"],
+      completionEvidence: ["stage_play_live_source_mail_decision"],
+      nextPhase: "terminal_checkpoint",
+      phaseLock: { locked: true },
+    });
+    expect(phase.evidenceRefs).toContain("stage_play_processed_mail_packet:gateway-nested");
+  });
+
   it("requires a canonical processed read after process fallback before decision", () => {
     const phase = resolveLiveSourceTurnPhase({
       prompt: "Read the visual mail and interpret what changed.",

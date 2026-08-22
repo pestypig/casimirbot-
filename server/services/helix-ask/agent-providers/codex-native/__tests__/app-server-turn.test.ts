@@ -78,47 +78,29 @@ class FakeCodexAppServer implements CodexAppServerTransport {
     }
     if (message.id === 100 && message.result) {
       queueMicrotask(() => {
-        if (this.mode === "tool_before_route") {
-          this.finish("The capability was correctly blocked before route admission.");
-        } else {
+        if (this.mode === "compound") {
           this.emit({
             id: 101,
             method: "item/tool/call",
             params: {
               threadId: "thread:fake",
               turnId: "turn:fake",
-              callId: "call:capability",
-              tool: this.capabilityToolNames[0],
-              arguments: this.mode === "docs"
-                ? { query: "NHM2", paths: ["docs"] }
-                : {},
+              callId: "call:capability:2",
+              tool: this.capabilityToolNames[1],
+              arguments: { expression: "8*9" },
             },
           });
+        } else {
+          this.finish(this.mode === "docs"
+            ? "The Docs observation was re-entered before this answer."
+            : "The workstation status observation was re-entered in this turn.");
         }
       });
       return;
     }
-    if (message.id === 101 && message.result && this.mode === "compound") {
+    if (message.id === 101 && message.result) {
       queueMicrotask(() => {
-        this.emit({
-          id: 102,
-          method: "item/tool/call",
-          params: {
-            threadId: "thread:fake",
-            turnId: "turn:fake",
-            callId: "call:capability:2",
-            tool: this.capabilityToolNames[1],
-            arguments: { expression: "8*9" },
-          },
-        });
-      });
-      return;
-    }
-    if ((message.id === 101 || message.id === 102) && message.result) {
-      queueMicrotask(() => {
-        this.finish(this.mode === "docs"
-          ? "The Docs observation was re-entered before this answer."
-          : "The workstation status observation was re-entered in this turn.");
+        this.finish("The workstation status observation was re-entered in this turn.");
       });
     }
   }
@@ -190,49 +172,17 @@ class FakeCodexAppServer implements CodexAppServerTransport {
       this.finish("This answer must be rejected because a built-in command appeared.");
       return;
     }
-    if (this.mode === "tool_before_route") {
-      this.emit({
-        id: 100,
-        method: "item/tool/call",
-        params: {
-          threadId: "thread:fake",
-          turnId: "turn:fake",
-          callId: "call:early",
-          tool: this.capabilityToolNames[0],
-          arguments: {},
-        },
-      });
-      return;
-    }
     this.emit({
       id: 100,
       method: "item/tool/call",
       params: {
         threadId: "thread:fake",
         turnId: "turn:fake",
-        callId: "call:route",
-        tool: HELIX_CODEX_ROUTE_PROPOSAL_TOOL,
-        arguments: {
-          schema: "helix.runtime_semantic_route_proposal.v1",
-          turn_id: "ask:test:native",
-          proposal_id: "ask:test:native:proposal",
-          prompt_hash: "prompt:test",
-          proposal_source: "agent_runtime",
-          proposed_route: this.mode === "docs" ? "docs_viewer" : "workspace_status",
-          proposed_tool_family: this.mode === "docs" ? "docs_viewer" : "workspace",
-          proposed_capability_id: this.mode === "docs" ? "docs.search" : "workspace_os.status",
-          proposed_capability_ids: this.mode === "compound"
-            ? ["workspace_os.status", "scientific-calculator.solve_expression"]
-            : this.mode === "docs"
-              ? ["docs.search"]
-              : ["workspace_os.status"],
-          confidence: "high",
-          uncertainty: [],
-          reason_summary: this.mode === "docs"
-            ? "The prompt explicitly requires a current Docs observation."
-            : "The prompt explicitly asks for current workstation status.",
-          supporting_hint_refs: [],
-        },
+        callId: "call:capability",
+        tool: this.capabilityToolNames[0],
+        arguments: this.mode === "docs"
+          ? { query: "NHM2", paths: ["docs"] }
+          : {},
       },
     });
   }
@@ -474,10 +424,6 @@ describe("Codex native app-server turn", () => {
     });
     expect(onNativeEvent).toHaveBeenCalledWith(
       "item/tool/call",
-      expect.objectContaining({ tool: HELIX_CODEX_ROUTE_PROPOSAL_TOOL }),
-    );
-    expect(onNativeEvent).toHaveBeenCalledWith(
-      "item/tool/call",
       expect.objectContaining({
         tool: expect.stringMatching(/^helix_workspace_os_status_/),
       }),
@@ -489,6 +435,18 @@ describe("Codex native app-server turn", () => {
         success: true,
       }),
     );
+    const capabilityResponse = transport.received.find(
+      (message) => message.id === 100,
+    )?.result as Record<string, unknown>;
+    const capabilityContent = capabilityResponse.contentItems as Array<
+      Record<string, unknown>
+    >;
+    expect(JSON.parse(String(capabilityContent[0]?.text))).toMatchObject({
+      schema: "helix.workspace_os_status_observation.v1",
+      status: "ready",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
     const instructionThreadStart = transport.received.find(
       (message) => message.method === "thread/start",
     );
@@ -499,6 +457,9 @@ describe("Codex native app-server turn", () => {
     expect(baseInstructions).toContain("host workspace sandbox is read-only");
     expect(baseInstructions).toContain(
       "separately governed effect in its connected environment",
+    );
+    expect(baseInstructions).toContain(
+      "Selecting that capability is your semantic route proposal",
     );
     expect(baseInstructions).not.toContain("read-only reasoning worker");
     const lifecycle = result.debug.turn_lifecycle;
@@ -550,12 +511,9 @@ describe("Codex native app-server turn", () => {
       ?.dynamicTools as Array<Record<string, unknown>>;
     expect(dynamicTools).not.toHaveLength(0);
     expect(dynamicTools.every((tool) => tool.type === "function")).toBe(true);
-    const routeTool = dynamicTools.find(
+    expect(dynamicTools.some(
       (tool) => tool.name === HELIX_CODEX_ROUTE_PROPOSAL_TOOL,
-    );
-    expect((routeTool?.inputSchema as Record<string, unknown>)?.required).toEqual(
-      expect.arrayContaining(["proposed_capability_id", "proposed_capability_ids"]),
-    );
+    )).toBe(false);
     const turnStart = transport.received.find((message) => message.method === "turn/start");
     expect(turnStart?.params).toMatchObject({
       model: "gpt-5.4-mini",
@@ -761,7 +719,7 @@ describe("Codex native app-server turn", () => {
     });
   });
 
-  it("does not execute a capability requested before route admission", async () => {
+  it("fails closed when atomic admission rejects a direct capability request", async () => {
     const transport = new FakeCodexAppServer("tool_before_route");
     const executeCapability = vi.fn();
 
@@ -771,7 +729,21 @@ describe("Codex native app-server turn", () => {
         turnId: "ask:test:native",
         cwd: process.cwd(),
         capabilities: [workspaceStatusManifest()],
-        validateRouteProposal: validateRoute,
+        validateRouteProposal: (value) => ({
+          ok: false,
+          proposal: normalizeHelixRuntimeSemanticRouteProposal({
+            value,
+            turnId: "ask:test:native",
+            promptHash: "prompt:test",
+            dependencies: {
+              readString: (entry) =>
+                typeof entry === "string" && entry.trim() ? entry.trim() : null,
+              hashPayloadShort: () => "test-hash",
+            },
+          }),
+          admittedCapabilityIds: [],
+          reason: "test_capability_denied",
+        }),
         executeCapability,
         timeoutMs: 2_000,
       },
@@ -789,7 +761,7 @@ describe("Codex native app-server turn", () => {
     const contentItems = (blockedResponse?.result as Record<string, unknown>)
       .contentItems as Array<Record<string, unknown>>;
     expect(JSON.parse(String(contentItems[0]?.text))).toMatchObject({
-      reason: "route_proposal_required",
+      reason: "test_capability_denied",
       capability_id: "workspace_os.status",
       terminal_eligible: false,
     });
@@ -854,12 +826,12 @@ describe("Codex native app-server turn", () => {
     const result = await runCodexNativeAppServerTurnWithTransport(
       {
         prompt: "Check the current workstation status.",
-        turnId: "ask:test:native:capability-timeout",
+        turnId: "ask:test:native",
         cwd: process.cwd(),
         capabilities: [workspaceStatusManifest()],
         validateRouteProposal: validateRoute,
         executeCapability,
-        timeoutMs: 30,
+        timeoutMs: 500,
       },
       transport,
     );

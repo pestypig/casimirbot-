@@ -559,6 +559,28 @@ const stagePlayLocalPressureBypassAllowed = (
   pressure.reason !== "host_commit_telemetry_stale" &&
   !hasActiveForegroundOrVoiceTask();
 
+const stagePlayLocalResumeBypassAllowed = (
+  taskClass: RuntimeTaskClass,
+  pressure: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] },
+  memory: RuntimeAdmissionDecision["memory"],
+): boolean =>
+  process.env.NODE_ENV !== "production" &&
+  taskClass === "stage_play_refresh" &&
+  String(process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_PRESSURE_BYPASS ?? "1").trim() !== "0" &&
+  memory.heapUsedMiB <= readPositiveNumberEnv(
+    "STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_HEAP_MB",
+    1200,
+  ) &&
+  memory.rssMiB <= readPositiveNumberEnv(
+    "STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_RSS_MB",
+    1800,
+  ) &&
+  pressure.level !== "normal" &&
+  pressure.reason !== "host_memory_limit" &&
+  pressure.reason !== "host_commit_pressure" &&
+  pressure.reason !== "host_commit_telemetry_stale" &&
+  !hasActiveForegroundOrVoiceTask();
+
 const readClassConcurrencyLimit = (taskClass: RuntimeTaskClass): number => {
   const budget = resolveDefaultTaskBudget(taskClass);
   return readPositiveIntegerEnv(
@@ -801,24 +823,32 @@ export const getRuntimeTaskSnapshot = () => {
 export const maybeResumePausedTasks = async (): Promise<number> => {
   if (pausedTaskIds.size === 0) return 0;
   const memory = toMemorySnapshot(memoryReader());
-  const limits = readLimits("voice_stt");
   const host = hostMemoryReader();
-  const pressure = classifyPressure(memory, host, limits);
-  if (
-    pressure.level === "hard_pressure" ||
-    memory.heapUsedMiB > limits.resumeHeapUsedMiB ||
-    memory.rssMiB > limits.resumeRssMiB
-  ) {
-    return 0;
-  }
+  const sharedResumeLimits = readLimits("voice_stt");
+  const sharedResumePressure = classifyPressure(memory, host, sharedResumeLimits);
+  const sharedResumeAllowed =
+    sharedResumePressure.level !== "hard_pressure" &&
+    memory.heapUsedMiB <= sharedResumeLimits.resumeHeapUsedMiB &&
+    memory.rssMiB <= sharedResumeLimits.resumeRssMiB;
   const candidates = Array.from(pausedTaskIds)
     .map((id) => pausableTasks.get(id))
     .filter((task): task is PausableRuntimeTaskRegistration => Boolean(task))
     .sort((a, b) => b.priority - a.priority);
   let resumed = 0;
   for (const task of candidates) {
+    const taskPressure = classifyPressure(memory, host, readLimits(task.taskClass));
+    const localStagePlayResumeAllowed = stagePlayLocalResumeBypassAllowed(
+      task.taskClass,
+      taskPressure,
+      memory,
+    );
+    if (!sharedResumeAllowed && !localStagePlayResumeAllowed) continue;
     try {
-      await task.resume("runtime_memory_recovered");
+      await task.resume(
+        localStagePlayResumeAllowed
+          ? "local_stage_play_refresh_bypass"
+          : "runtime_memory_recovered",
+      );
       pausedTaskIds.delete(task.id);
       resumed += 1;
     } catch {

@@ -303,15 +303,17 @@ export const executeEnvironmentActionControlGatewayCapability = async (input: {
     const reason = typeof input.arguments?.reason === "string"
       ? input.arguments.reason.trim()
       : `${spec.label} requested by the current room turn.`;
-    const control = spec.controlKind === "emergency_stop"
-      ? (await deps.emergencyStop({
+    const emergencyStopResult = spec.controlKind === "emergency_stop"
+      ? await deps.emergencyStop({
           roomId,
           profileId,
           environmentBindingId: context.environmentBindingId,
           actionAuthorityId: context.actionAuthorityId,
           reason,
-        })).controlRequest
-      : await deps.requestControl({
+        })
+      : null;
+    const control = emergencyStopResult?.controlRequest ??
+      await deps.requestControl({
           roomId,
           profileId,
           environmentBindingId: context.environmentBindingId,
@@ -320,10 +322,27 @@ export const executeEnvironmentActionControlGatewayCapability = async (input: {
           controlKind: spec.controlKind,
           reason,
         });
-    const observation = await deps.awaitObservation({
+    const rawObservation = await deps.awaitObservation({
       controlRequestId: control.control_request_id,
       deadlineAt: control.deadline_at,
     });
+    const emergencyStopPostconditionSatisfied = Boolean(
+      spec.controlKind === "emergency_stop" &&
+      emergencyStopResult?.authority.status === "suspended" &&
+      rawObservation.outcome === "not_running" &&
+      rawObservation.controls_released &&
+      rawObservation.provenance_valid &&
+      rawObservation.eligible_for_current_turn_reentry,
+    );
+    const observation = emergencyStopPostconditionSatisfied
+      ? {
+          ...rawObservation,
+          outcome: "completed" as const,
+          workflow_state: "emergency_stopped" as const,
+          summary:
+            "Emergency stop suspended the paired player authority; no workflow remained running and connector-owned controls are released.",
+        }
+      : rawObservation;
     const ok =
       observation.outcome === "completed" &&
       observation.provenance_valid &&

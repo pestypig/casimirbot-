@@ -20,6 +20,8 @@ import java.util.Set;
  * layer.</p>
  */
 final class ConcurrentReactiveScheduler {
+    static final String COVERAGE_UNSAFE_LANDING = "unsafe_landing_recovery";
+    static final String COVERAGE_FIRE = "fire_recovery";
     enum ActionStatus { RUNNING, SUCCEEDED, FAILED, TIMED_OUT }
 
     record ActionStep(
@@ -156,6 +158,10 @@ final class ConcurrentReactiveScheduler {
         scheduler.begin(program);
     }
 
+    static Set<String> residentGuardianCoverage(Map<String, Object> program) {
+        return Set.copyOf(strings(program.get("resident_guardian_coverage")));
+    }
+
     void begin(Map<String, Object> program) {
         cancelAll("program_replaced");
         lanes.clear();
@@ -200,6 +206,7 @@ final class ConcurrentReactiveScheduler {
         for (Map<String, Object> interrupt : objects(program.get("interrupts"))) {
             interrupts.add(new Interrupt(interrupt));
         }
+        validateResidentGuardianCoverage(program);
         validateReferences();
         currentTick = 0;
         resourceConflictCount = 0;
@@ -221,6 +228,122 @@ final class ConcurrentReactiveScheduler {
         begun = true;
         settled = false;
         controlsReleased = false;
+    }
+
+    private static void validateResidentGuardianCoverage(
+        Map<String, Object> program
+    ) {
+        List<String> declared = strings(program.get("resident_guardian_coverage"));
+        Set<String> coverage = Set.copyOf(declared);
+        if (coverage.size() != declared.size() || !Set.of(
+            COVERAGE_UNSAFE_LANDING,
+            COVERAGE_FIRE
+        ).containsAll(coverage)) {
+            throw new IllegalArgumentException(
+                "Resident guardian coverage must use unique supported invariants."
+            );
+        }
+        if (coverage.isEmpty()) return;
+
+        List<Map<String, Object>> qualifyingLanes = objects(program.get("lanes"))
+            .stream()
+            .filter(lane -> bool(lane, "required"))
+            .filter(lane -> "immediate".equals(text(lane, "activation")))
+            .toList();
+        if (coverage.contains(COVERAGE_UNSAFE_LANDING)) {
+            boolean validFallLane = qualifyingLanes.stream().anyMatch(lane -> {
+                List<Map<String, Object>> nodes = objects(lane.get("nodes"));
+                boolean fallingObserved = nodes.stream().anyMatch(node ->
+                    conditionKind(node, "vertical_velocity_at_most")
+                );
+                boolean landingObserved = nodes.stream().anyMatch(node ->
+                    conditionKind(node, "predicted_collision_within")
+                );
+                boolean boundedWaterClutch = nodes.stream().anyMatch(node -> {
+                    Map<String, Object> action = object(node.get("action"));
+                    Map<String, Object> binding = object(action.get("position_binding"));
+                    return "place".equals(text(action, "action_kind")) &&
+                        "minecraft:water".equals(text(action, "block_id")) &&
+                        "item_use".equals(text(action, "placement_method")) &&
+                        "minecraft:water_bucket".equals(text(action, "source_item_id")) &&
+                        "predicted_collision_cell".equals(text(binding, "binding_kind")) &&
+                        bool(binding, "require_replaceable") &&
+                        bool(action, "cleanup_after_landing");
+                });
+                return fallingObserved && landingObserved && boundedWaterClutch;
+            });
+            Map<String, Object> mutation = object(program.get("mutation_scope"));
+            boolean boundedMutation = bool(mutation, "world_mutation_allowed") &&
+                integer(mutation, "max_block_mutations") >= 2 &&
+                integer(mutation, "max_inventory_transfers") >= 2 &&
+                strings(mutation.get("allowed_block_ids")).contains("minecraft:water");
+            if (!validFallLane || !boundedMutation) {
+                throw new IllegalArgumentException(
+                    "Unsafe-landing coverage requires a required immediate predicted-collision water-bucket rescue with cleanup and a two-mutation water scope."
+                );
+            }
+        }
+        if (coverage.contains(COVERAGE_FIRE)) {
+            boolean validFireLane = qualifyingLanes.stream().anyMatch(lane -> {
+                List<Map<String, Object>> nodes = objects(lane.get("nodes"));
+                boolean fireTransitionObserved = matchedBooleanTransition(
+                    nodes,
+                    "on_fire_is"
+                );
+                boolean lavaTransitionObserved = matchedBooleanTransition(
+                    nodes,
+                    "in_lava_is"
+                );
+                boolean boundedEscape = nodes.stream().anyMatch(node -> {
+                    String actionKind = text(object(node.get("action")), "action_kind");
+                    return "walk".equals(actionKind) || "navigate_to".equals(actionKind);
+                });
+                return (fireTransitionObserved || lavaTransitionObserved) && boundedEscape;
+            });
+            if (!validFireLane) {
+                throw new IllegalArgumentException(
+                    "Fire/lava coverage requires one required immediate lane that observes a matched hazard onset and clearance and performs bounded locomotion."
+                );
+            }
+        }
+        if (!hasHealthFloorInterrupt(program)) {
+            throw new IllegalArgumentException(
+                "Resident guardian coverage requires an independent health-floor interrupt."
+            );
+        }
+    }
+
+    private static boolean conditionKind(
+        Map<String, Object> node,
+        String expectedKind
+    ) {
+        return expectedKind.equals(text(object(node.get("condition")), "condition_kind"));
+    }
+
+    private static boolean matchedBooleanTransition(
+        List<Map<String, Object>> nodes,
+        String conditionKind
+    ) {
+        boolean observed = nodes.stream().anyMatch(node ->
+            conditionKind(node, conditionKind) &&
+                bool(object(node.get("condition")), "expected")
+        );
+        boolean cleared = nodes.stream().anyMatch(node ->
+            conditionKind(node, conditionKind) &&
+                !bool(object(node.get("condition")), "expected")
+        );
+        return observed && cleared;
+    }
+
+    private static boolean hasHealthFloorInterrupt(Map<String, Object> program) {
+        return objects(program.get("interrupts")).stream().anyMatch(interrupt ->
+            "health_at_least".equals(text(
+                object(interrupt.get("condition")),
+                "condition_kind"
+            )) &&
+                "not_satisfied".equals(text(interrupt, "trigger_when")) &&
+                !strings(interrupt.get("cancel_lane_ids")).isEmpty()
+        );
     }
 
     WorkflowStep step(long tickIndex) {

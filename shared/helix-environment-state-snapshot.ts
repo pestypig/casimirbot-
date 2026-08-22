@@ -102,6 +102,7 @@ export type HelixEnvironmentStateSnapshot = {
   world_id?: string | null;
   source_id: string;
   actor_id?: string | null;
+  stable_actor_id?: string | null;
   actor_label?: string | null;
   ts: string;
   source_tick?: number | null;

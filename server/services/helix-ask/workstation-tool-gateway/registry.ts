@@ -462,6 +462,8 @@ const LIVE_SOURCE_MAILBOX_READ_CAPABILITIES = [
 const SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES = new Set<string>(
   LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.map(([capabilityId]) => capabilityId),
 );
+const LIVE_SOURCE_MAIL_DECISION_CAPABILITY =
+  "live_env.record_live_source_mail_decision" as const;
 const LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES = [
   [
     "live_env.compare_mail_to_interpreter_profile",
@@ -5278,6 +5280,72 @@ const liveSourceMailboxReadManifests: HelixWorkstationCapabilityManifest[] =
     }),
   );
 
+const liveSourceMailDecisionManifest: HelixWorkstationCapabilityManifest = {
+  schema: "helix.workstation_tool_gateway.capability.v1",
+  capability_id: LIVE_SOURCE_MAIL_DECISION_CAPABILITY,
+  label: "Record live-source mail decision",
+  description:
+    "Records one bounded semantic decision for exact processed live-source mail already observed in the current provider turn. The gateway rejects stale, guessed, or unobserved packet identities and returns a non-terminal receipt for Codex re-entry.",
+  panel_id: "live-answer-environment",
+  action_id: "record_live_source_mail_decision",
+  mode: "act",
+  mutating: true,
+  code_mutation: false,
+  shell_access: false,
+  requires_confirmation: false,
+  requires_source: false,
+  terminal_eligible: false,
+  permission_profile_required: "act",
+  post_tool_model_step_required: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["decision", "processed_packet_ids", "mail_ids"],
+    properties: {
+      decision: {
+        type: "string",
+        enum: [
+          "wait_for_next_summary",
+          "record_interpretation",
+          "draft_text_answer",
+          "request_voice_callout",
+          "request_more_evidence",
+          "request_stage_play_checkpoint",
+          "fail_closed",
+        ],
+      },
+      processed_packet_ids: {
+        type: "array",
+        minItems: 1,
+        maxItems: 8,
+        items: { type: "string" },
+      },
+      mail_ids: {
+        type: "array",
+        minItems: 1,
+        maxItems: 32,
+        items: { type: "string" },
+      },
+      rationale: { type: "string" },
+      next_loop_state: { type: "string" },
+      source_target_intent: { type: "object" },
+    },
+  },
+  output_observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  observation_schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+  safety_tags: [
+    "bounded_evidence_mutation",
+    "live_environment",
+    "live_source_mailbox",
+    "current_turn_evidence_required",
+    "non_terminal",
+    "no_shell",
+    "no_code_mutation",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+};
+
 const liveSourceInterpreterPredictionReadManifests: HelixWorkstationCapabilityManifest[] =
   LIVE_SOURCE_INTERPRETER_PREDICTION_READ_CAPABILITIES.map(
     ([capabilityId, actionId, label]) => ({
@@ -5711,6 +5779,10 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   ...liveSourceMailboxReadManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
+  [
+    liveSourceMailDecisionManifest.capability_id,
+    liveSourceMailDecisionManifest,
+  ],
   ...liveSourceInterpreterPredictionReadManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
@@ -10352,7 +10424,7 @@ export const callWorkstationGatewayCapability = async (
       reason: "read_only_gateway_capability",
       sourceTargetIntent: args.source_target_intent,
     });
-    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const threadIdForTool = cleanString(input.conversationThreadId) ?? optionalString(args.thread_id) ?? turnId;
     const suppliedSourceRef =
       optionalString(args.source_ref) ??
       optionalString(args.sourceRef) ??
@@ -10635,6 +10707,135 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
+  if (manifest.capability_id === LIVE_SOURCE_MAIL_DECISION_CAPABILITY) {
+    const args = readArguments(input.arguments);
+    const suppliedPacketIds = readStringArray(args.processed_packet_ids);
+    const suppliedMailIds = readStringArray(args.mail_ids);
+    const currentTurnPackets = readRecordArray(
+      input.authoritativeEvidenceArtifacts,
+    )
+      .filter(
+        (artifact) =>
+          cleanString(artifact.artifact_id).startsWith(
+            `${turnId}:codex_normalized:`,
+          ) &&
+          cleanString(artifact.kind) === "live_environment_tool_observation",
+      )
+      .flatMap((artifact) => {
+        const payload = readRecord(artifact.payload);
+        const observation = readRecord(payload?.observation);
+        return readRecordArray(observation?.packets);
+      });
+    const currentPacketById = new Map(
+      currentTurnPackets
+        .map((packet) => [cleanString(packet.packetId), packet] as const)
+        .filter(([packetId]) => Boolean(packetId)),
+    );
+    const selectedPackets = suppliedPacketIds
+      .map((packetId) => currentPacketById.get(packetId))
+      .filter((packet): packet is Record<string, unknown> => Boolean(packet));
+    const currentMailIds = new Set(
+      selectedPackets.flatMap((packet) => readStringArray(packet.mailIds)),
+    );
+    const exactCurrentTurnEvidence =
+      suppliedPacketIds.length > 0 &&
+      suppliedMailIds.length > 0 &&
+      selectedPackets.length === suppliedPacketIds.length &&
+      suppliedMailIds.every((mailId) => currentMailIds.has(mailId));
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: exactCurrentTurnEvidence ? "admitted" : "blocked",
+      reason: exactCurrentTurnEvidence
+        ? "current_turn_processed_mail_decision_admitted"
+        : "current_turn_processed_mail_evidence_required",
+      blockedReason: exactCurrentTurnEvidence
+        ? undefined
+        : "current_turn_processed_mail_evidence_required",
+      sourceTargetIntent: args.source_target_intent,
+    });
+    const threadIdForTool =
+      cleanString(input.conversationThreadId) || turnId;
+    const liveObservation = exactCurrentTurnEvidence
+      ? executeLiveEnvironmentTool({
+          tool_name: manifest.capability_id as HelixLiveEnvironmentToolName,
+          thread_id: threadIdForTool,
+          args: {
+            ...args,
+            rationale_preview:
+              cleanString(args.rationale_preview) ||
+              cleanString(args.rationale),
+            source_ref: `${turnId}:current_turn_processed_mail_decision`,
+          },
+        })
+      : {
+          schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+          observation_id: `${turnId}:live_source_mail_decision:blocked`,
+          thread_id: threadIdForTool,
+          environment_id: null,
+          tool_name: manifest.capability_id,
+          ok: false,
+          summary:
+            "The decision was not recorded because its exact packet and mail identities were not present in normalized current-turn evidence.",
+          observation: {
+            reason: "current_turn_processed_mail_evidence_required",
+            supplied_processed_packet_ids: suppliedPacketIds,
+            supplied_mail_ids: suppliedMailIds,
+          },
+          transcriptRows: [],
+          evidenceRefs: [],
+          assistant_answer: false as const,
+          terminal_eligible: false as const,
+          raw_content_included: false as const,
+        };
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "live-answer-environment",
+      action: manifest.action_id,
+      executedArgs: {
+        decision: args.decision,
+        processed_packet_ids: suppliedPacketIds,
+        mail_ids: suppliedMailIds,
+      },
+      status: liveObservation.ok ? "succeeded" : "blocked",
+      summary: liveObservation.summary,
+      observation: liveObservation,
+    });
+    const error = liveObservation.ok
+      ? undefined
+      : "current_turn_processed_mail_evidence_required";
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: liveObservation.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: liveObservation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(error ? { error } : {}),
+    };
+  }
+
   if (
     SHARED_LIVE_SOURCE_MAILBOX_READ_CAPABILITIES.has(manifest.capability_id)
   ) {
@@ -10647,7 +10848,7 @@ export const callWorkstationGatewayCapability = async (
       reason: "read_only_gateway_capability",
       sourceTargetIntent: args.source_target_intent,
     });
-    const threadIdForTool = optionalString(args.thread_id) ?? turnId;
+    const threadIdForTool = cleanString(input.conversationThreadId) ?? optionalString(args.thread_id) ?? turnId;
     const suppliedSourceRef =
       optionalString(args.source_ref) ??
       optionalString(args.sourceRef) ??

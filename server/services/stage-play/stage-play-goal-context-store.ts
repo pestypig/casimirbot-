@@ -32,6 +32,8 @@ const updatesById = new Map<string, WorkstationGoalContextUpdateV1>();
 const sessionsById = new Map<string, AgentGoalSessionV1>();
 const MAX_UPDATES_PER_THREAD = 240;
 const MAX_SESSIONS_PER_THREAD = 80;
+const MAX_CONTEXT_REFS_PER_KIND = 80;
+const MAX_CONTEXT_EVIDENCE_REFS = 256;
 
 type StagePlayGoalContextChange =
   | { kind: "context_update"; threadId: string | null; update: WorkstationGoalContextUpdateV1 }
@@ -371,20 +373,24 @@ const trimThreadSessions = (threadId: string): void => {
 export function recordStagePlayGoalContextUpdate(
   update: WorkstationGoalContextUpdateV1,
 ): WorkstationGoalContextUpdateV1 {
-  const sourceRefs = uniqueStrings(update.sourceRefs);
-  const loopRefs = uniqueStrings(update.loopRefs);
-  const receiptRefs = uniqueStrings(update.receiptRefs);
+  const sourceRefs = uniqueStrings(update.sourceRefs).slice(0, MAX_CONTEXT_REFS_PER_KIND);
+  const loopRefs = uniqueStrings(update.loopRefs).slice(0, MAX_CONTEXT_REFS_PER_KIND);
+  const receiptRefs = uniqueStrings(update.receiptRefs).slice(0, MAX_CONTEXT_REFS_PER_KIND);
+  const requiredEvidenceRefs = uniqueStrings([
+    update.contentRef,
+    ...sourceRefs,
+    ...loopRefs,
+    ...(update.toolIdentity?.matchedAllowedActuatorRefs ?? []),
+  ]);
   const normalizedUpdate: WorkstationGoalContextUpdateV1 = {
     ...update,
     sourceRefs,
     loopRefs,
     evidenceRefs: uniqueStrings([
-      update.contentRef,
-      ...sourceRefs,
-      ...loopRefs,
+      ...requiredEvidenceRefs,
       ...update.evidenceRefs,
       ...receiptRefs,
-    ]).slice(0, 80),
+    ]).slice(0, Math.max(MAX_CONTEXT_EVIDENCE_REFS, requiredEvidenceRefs.length)),
     receiptRefs,
     assistant_answer: false,
     terminal_eligible: false,

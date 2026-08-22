@@ -219,6 +219,8 @@ describe("environment connector capability catalog", () => {
       ?.completion_policy?.properties?.mode;
     const interruptCollection = descriptor!.input_schema.properties
       ?.interrupts;
+    const residentCoverage = descriptor!.input_schema.properties
+      ?.resident_guardian_coverage;
     const interruptSchema = interruptCollection?.items;
     expect(descriptor!.input_schema.description).toContain(
       "every required lane must use activation immediate",
@@ -228,6 +230,24 @@ describe("environment connector capability catalog", () => {
     );
     expect(descriptor!.input_schema.description).toContain(
       "a failed, timed-out, or canceled required lane terminates the program",
+    );
+    expect(descriptor!.input_schema.description).toContain(
+      "observer/reaction in separate immediate lanes",
+    );
+    expect(descriptor!.input_schema.description).toContain(
+      "Read geometry/actor state first",
+    );
+    expect(descriptor!.input_schema.description).toContain(
+      "cleanup/retry",
+    );
+    expect(descriptor!.trusted_model_description).toContain(
+      "serial reaction can miss the state",
+    );
+    expect(descriptor!.trusted_model_description).toContain(
+      "Size duration from measured geometry",
+    );
+    expect(descriptor!.trusted_model_description).toContain(
+      "placement, cleanup, and retry",
     );
     expect(descriptor!.trusted_model_description).toContain(
       "world-state conditions cannot stand in",
@@ -271,6 +291,13 @@ describe("environment connector capability catalog", () => {
     expect(interruptCollection?.description).toContain(
       "manual_override_detected is not admitted",
     );
+    expect(residentCoverage?.items?.enum).toEqual([
+      "unsafe_landing_recovery",
+      "fire_recovery",
+    ]);
+    expect(residentCoverage?.description).toContain(
+      "declaration does not expand authority",
+    );
     expect(
       descriptor!.input_schema.properties?.mutation_scope?.properties
         ?.max_inventory_transfers?.description,
@@ -295,6 +322,16 @@ describe("environment connector capability catalog", () => {
         condition.properties?.condition_kind?.enum?.[0] ===
         "predicted_collision_within",
     );
+    const conditionKinds = eventNode?.properties?.condition?.oneOf?.map(
+      (condition) => condition.properties?.condition_kind?.enum?.[0],
+    );
+    expect(conditionKinds).toEqual(expect.arrayContaining([
+      "air_at_least",
+      "submerged_is",
+      "swimming_is",
+      "on_fire_is",
+      "in_lava_is",
+    ]));
     expect(eventNode?.properties?.condition?.description).toContain(
       "do not detect keyboard, mouse, screen, or other manual input",
     );
@@ -311,7 +348,10 @@ describe("environment connector capability catalog", () => {
       "such as -0.25",
     );
     expect(predictedCollisionCondition?.description).toContain(
-      "immediate support collision",
+      "Ground contact is excluded",
+    );
+    expect(predictedCollisionCondition?.description).toContain(
+      "future-collision evidence",
     );
     expect(predictedCollisionCondition?.description).toContain(
       "Gate landing-sensitive work",

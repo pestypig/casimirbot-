@@ -13,11 +13,14 @@ import { environmentConnectorSha256 } from "../../catalog";
 import {
   buildEnvironmentSituationDigest,
   environmentEventBatchContent,
+  normalizeWorldAuthorityEventAttributes,
   recordEnvironmentActionEventBatch,
   readLatestEnvironmentSituationDigest,
+  resolveWorldAuthoritySubjectNativeId,
   type EnvironmentEventTransactionRunner,
 } from "../event-stream-store";
 import type { EnvironmentActionConnectorClaim } from "../../actions";
+import type { HelixWorldEvent } from "@shared/helix-world-event";
 
 const observedAt = "2026-08-05T18:00:00.000Z";
 
@@ -55,6 +58,59 @@ const event = (input: {
 });
 
 describe("environment event stream and digest reducer", () => {
+  it("normalizes the live Fabric snapshot sections and stable player identity into digest facts", () => {
+    const worldEvent: HelixWorldEvent = {
+      schema: "helix.world_event.v1",
+      world_id: "minecraft:local:event-test",
+      room_id: "shared_realtime_room:event-test",
+      source_id: "source:room-ingress:event-test",
+      ts: observedAt,
+      actor_id: "minecraft:player:testplayer",
+      actor_label: "TestPlayer",
+      event_type: "environment_state_snapshot",
+      evidence_refs: ["snapshot:test-1"],
+      meta: {
+        snapshot: {
+          snapshot_id: "snapshot:test-1",
+          stable_actor_id: "e6b8e983-b138-3202-9413-336c164cfec8",
+          actor_state: {
+            health: 20,
+            food_level: 20,
+            position: { x: 1, y: 64, z: 2 },
+          },
+          inventory_state: {
+            carried_items: [{ item_type: "minecraft:bread", count: 1, slot: 0 }],
+            inventory_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+          object_state: {
+            hazards: [{ hazard_type: "lava", severity: "warning" }],
+          },
+          focus: { target_kind: "empty" },
+        },
+      },
+    };
+
+    expect(resolveWorldAuthoritySubjectNativeId(worldEvent)).toBe(
+      "e6b8e983-b138-3202-9413-336c164cfec8",
+    );
+    expect(normalizeWorldAuthorityEventAttributes(worldEvent)).toMatchObject({
+      actor: {
+        label: "TestPlayer",
+        health: 20,
+        food_level: 20,
+        position: { x: 1, y: 64, z: 2 },
+      },
+      inventory: {
+        carried_items: [{ item_type: "minecraft:bread", count: 1, slot: 0 }],
+      },
+      hazards: {
+        observed: [{ hazard_type: "lava", severity: "warning" }],
+      },
+      focus: { target_kind: "empty" },
+      snapshot_refs: ["snapshot:test-1"],
+    });
+  });
+
   it("folds measured player and workflow facts while retaining every raw event reference", () => {
     const events = [
       event({

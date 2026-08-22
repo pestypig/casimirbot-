@@ -16,6 +16,11 @@ export const HELIX_MINECRAFT_FLUID_CONDITION_KINDS = [
   "tick_at_least",
   "player_grounded",
   "health_at_least",
+  "air_at_least",
+  "submerged_is",
+  "swimming_is",
+  "on_fire_is",
+  "in_lava_is",
   "food_at_least",
   "position_within",
   "inventory_count_at_least",
@@ -114,6 +119,36 @@ export const helixMinecraftFluidConditionSchema = z.discriminatedUnion(
       .object({
         condition_kind: z.literal("health_at_least"),
         health: z.number().finite().min(0).max(20),
+      })
+      .strict(),
+    z
+      .object({
+        condition_kind: z.literal("air_at_least"),
+        air: z.number().int().min(0).max(300),
+      })
+      .strict(),
+    z
+      .object({
+        condition_kind: z.literal("submerged_is"),
+        expected: z.boolean(),
+      })
+      .strict(),
+    z
+      .object({
+        condition_kind: z.literal("swimming_is"),
+        expected: z.boolean(),
+      })
+      .strict(),
+    z
+      .object({
+        condition_kind: z.literal("on_fire_is"),
+        expected: z.boolean(),
+      })
+      .strict(),
+    z
+      .object({
+        condition_kind: z.literal("in_lava_is"),
+        expected: z.boolean(),
       })
       .strict(),
     z

@@ -13,6 +13,11 @@ final class ReactivePlayerConditionEvaluator {
     record PlayerState(
         double health,
         int food,
+        int air,
+        boolean submerged,
+        boolean swimming,
+        boolean onFire,
+        boolean inLava,
         boolean onGround,
         double x,
         double y,
@@ -27,6 +32,16 @@ final class ReactivePlayerConditionEvaluator {
         return switch (kind) {
             case "health_at_least" ->
                 state.health() >= number(condition.get("health"), Double.MAX_VALUE);
+            case "air_at_least" ->
+                state.air() >= integer(condition.get("air"), Integer.MAX_VALUE);
+            case "submerged_is" ->
+                state.submerged() == bool(condition.get("expected"));
+            case "swimming_is" ->
+                state.swimming() == bool(condition.get("expected"));
+            case "on_fire_is" ->
+                state.onFire() == bool(condition.get("expected"));
+            case "in_lava_is" ->
+                state.inLava() == bool(condition.get("expected"));
             case "food_at_least" ->
                 state.food() >= integer(condition.get("food"), Integer.MAX_VALUE);
             case "player_grounded" ->

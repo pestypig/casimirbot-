@@ -79,6 +79,10 @@ import {
   listEnvironmentConnectorCapabilityDescriptors,
 } from "../services/environment-connectors/catalog";
 import { recordWorldAuthorityEventBatch } from "../services/environment-connectors/events";
+import {
+  bridgeMinecraftSituationDigestToLiveMail,
+  resolveMinecraftSemanticWakeSubjectIdentity,
+} from "../services/environment-connectors/live-mail/minecraft-situation-digest-mail-bridge";
 
 type RequestWithRawBody = Request & { rawBody?: Buffer };
 
@@ -753,6 +757,20 @@ roomSourceIngressRouter.post(
             : "Typed environment ledger rejected the world-event batch.",
         );
       });
+      const semanticWakeBridges = await Promise.all(ledger.digests.map(async (digest) =>
+        bridgeMinecraftSituationDigestToLiveMail({
+          digest,
+          roomSourceBindingId: activeClaim.binding.binding_id,
+          sourceAdmission: admission,
+          adapterAdmission,
+          subjectIdentity: await resolveMinecraftSemanticWakeSubjectIdentity({
+            roomSourceBindingId: activeClaim.binding.binding_id,
+            digest,
+          }),
+          freshnessCeilingMs:
+            adapterRecord.profile.freshness.observation_max_age_ms,
+        }),
+      ));
       const ingested = ingestProtectedRoomSourceWorldEventBatch(
         admittedEvents,
         admission,
@@ -774,6 +792,7 @@ roomSourceIngressRouter.post(
           situation_digest_refs: ledger.digests.map(
             (digest) => digest.digest_id,
           ),
+          semantic_wake_bridges: semanticWakeBridges,
           source_admission: admission,
           content_role: "observation_not_assistant_answer",
           model_invoked: false,

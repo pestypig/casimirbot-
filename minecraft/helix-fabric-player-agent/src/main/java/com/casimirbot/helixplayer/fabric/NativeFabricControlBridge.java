@@ -66,6 +66,8 @@ final class NativeFabricControlBridge implements ControlBridge {
     private final NativeFabricWorkflowEngine workflowEngine;
     private final FluidSequenceEngine fluidSequenceEngine;
     private final ConcurrentReactiveScheduler reactiveScheduler;
+    private final MinecraftViabilityGuardian viabilityGuardian =
+        new MinecraftViabilityGuardian();
     private final ReactiveRuntime reactiveRuntime = new ReactiveRuntime();
     private final String targetReferenceSalt = UUID.randomUUID().toString();
     private final Map<String, Entity> trackingTargets = new HashMap<>();
@@ -738,6 +740,16 @@ final class NativeFabricControlBridge implements ControlBridge {
             fluidSequenceEngine.begin(arguments);
         } else if ("execute_reactive_program".equals(actionKind)) {
             reactiveScheduler.begin(arguments);
+        } else if ("arm_viability_guardian".equals(actionKind)) {
+            viabilityGuardian.arm(new MinecraftViabilityGuardian.Profile(
+                (long) number(arguments.get("lease_expires_tick"), 0),
+                integer(arguments.get("minimum_air"), 80),
+                number(arguments.get("dangerous_vertical_velocity"), -0.72),
+                integer(arguments.get("maximum_swim_ticks"), 200),
+                integer(arguments.get("maximum_observation_age_ticks"), 1)
+            ));
+        } else if ("disarm_viability_guardian".equals(actionKind)) {
+            disarmViabilityGuardian();
         } else if (Set.of(
             "follow",
             "collect",
@@ -762,12 +774,107 @@ final class NativeFabricControlBridge implements ControlBridge {
             case "execute_reactive_program" -> reactiveScheduler.step(
                 reactiveTickIndex(actionTicks)
             );
+            case "arm_viability_guardian" -> WorkflowStep.succeeded(
+                "The deterministic resident Minecraft guardian is armed across action boundaries.",
+                Map.ofEntries(
+                    Map.entry("guardian_armed", true),
+                    Map.entry("guardian_profile_id", MinecraftViabilityGuardian.PROFILE_ID),
+                    Map.entry("guardian_duration_ticks", integer(arguments.get("duration_ticks"), 0)),
+                    Map.entry("controls_released", true),
+                    Map.entry("world_mutations_performed", 0),
+                    Map.entry("inventory_mutations_performed", 0)
+                )
+            );
+            case "disarm_viability_guardian" -> WorkflowStep.succeeded(
+                "The deterministic resident Minecraft guardian is disarmed and every guardian-owned control is released.",
+                Map.ofEntries(
+                    Map.entry("guardian_armed", false),
+                    Map.entry("guardian_profile_id", MinecraftViabilityGuardian.PROFILE_ID),
+                    Map.entry("controls_released", true),
+                    Map.entry("world_mutations_performed", 0),
+                    Map.entry("inventory_mutations_performed", 0)
+                )
+            );
             default -> workflowEngine.step(actionKind, actionTicks);
         };
     }
 
     static long reactiveTickIndex(long actionTicks) {
         return Math.max(0, actionTicks - 1);
+    }
+
+    void armViabilityGuardian(long currentTick, long durationTicks) {
+        long boundedDuration = Math.max(20, Math.min(36_000, durationTicks));
+        viabilityGuardian.arm(new MinecraftViabilityGuardian.Profile(
+            currentTick + boundedDuration,
+            80,
+            -0.72,
+            200,
+            1
+        ));
+    }
+
+    void disarmViabilityGuardian() {
+        viabilityGuardian.disarm();
+        releaseResources(Set.of("locomotion", "safety"));
+    }
+
+    boolean viabilityGuardianArmed() {
+        return viabilityGuardian.armed();
+    }
+
+    MinecraftViabilityGuardian.Decision observeViability(
+        long tick,
+        boolean emergencyStop,
+        boolean unsafeLandingRecoveryActive,
+        boolean fireRecoveryActive
+    ) {
+        LocalPlayer player = minecraft.player;
+        if (player == null || minecraft.level == null) {
+            return viabilityGuardian.step(new MinecraftViabilityGuardian.Observation(
+                tick, tick, tick, false, 0, 300, 300,
+                false, false, false, false, false, false, false,
+                0, true, unsafeLandingRecoveryActive, fireRecoveryActive,
+                false, emergencyStop
+            ));
+        }
+        LiveTrajectory trajectory = liveTrajectory(player, COMPACT_TRAJECTORY_HORIZON_TICKS);
+        boolean safeLanding = player.onGround() || (
+            trajectory.applicable() &&
+            trajectory.firstCollisionTick() > 0 &&
+            trajectory.firstCollisionTick() <= COMPACT_TRAJECTORY_HORIZON_TICKS
+        );
+        return viabilityGuardian.step(new MinecraftViabilityGuardian.Observation(
+            tick,
+            tick,
+            tick,
+            true,
+            player.getHealth(),
+            Math.max(0, player.getAirSupply()),
+            Math.max(1, player.getMaxAirSupply()),
+            player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER),
+            player.isSwimming(),
+            player.isInWater(),
+            player.isOnFire(),
+            player.isInLava(),
+            player.onGround(),
+            player.horizontalCollision,
+            player.getDeltaMovement().y,
+            safeLanding,
+            unsafeLandingRecoveryActive,
+            fireRecoveryActive,
+            manualInputReason(player) != null,
+            emergencyStop
+        ));
+    }
+
+    void applyViabilityDecision(MinecraftViabilityGuardian.Decision decision) {
+        if (decision.controlsMustRelease()) {
+            releaseResources(Set.of("locomotion", "camera", "main_hand", "off_hand"));
+        }
+        if (decision.proposal() == MinecraftViabilityGuardian.ProposalKind.SWIM_UP) {
+            applyMovement(new MovementInput(false, false, false, false, true, false));
+        }
     }
 
     @Override
@@ -781,6 +888,11 @@ final class NativeFabricControlBridge implements ControlBridge {
             new ReactivePlayerConditionEvaluator.PlayerState(
                 player.getHealth(),
                 player.getFoodData().getFoodLevel(),
+                player.getAirSupply(),
+                player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER),
+                player.isSwimming(),
+                player.isOnFire(),
+                player.isInLava(),
                 player.onGround(),
                 player.getX(),
                 player.getY(),
@@ -886,6 +998,16 @@ final class NativeFabricControlBridge implements ControlBridge {
         state.put("dimension", player.level().dimension().location().toString());
         state.put("food", player.getFoodData().getFoodLevel());
         state.put("saturation", player.getFoodData().getSaturationLevel());
+        state.put("air", player.getAirSupply());
+        state.put("maximum_air", player.getMaxAirSupply());
+        state.put("submerged", player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER));
+        state.put("swimming", player.isSwimming());
+        state.put("in_water", player.isInWater());
+        state.put("on_fire", player.isOnFire());
+        state.put("in_lava", player.isInLava());
+        state.put("vertical_velocity", player.getDeltaMovement().y);
+        state.put("on_ground", player.onGround());
+        state.put("horizontal_collision", player.horizontalCollision);
         state.put(
             "trajectory_forecast",
             trajectoryEvidence(
@@ -996,6 +1118,10 @@ final class NativeFabricControlBridge implements ControlBridge {
         BlockPos collisionPlacementTarget = null;
         for (ShortHorizonTrajectoryPredictor.State state : forecast.states()) {
             if (state.tick() == 0) continue;
+            // A grounded player continuously intersects the support beneath
+            // them. That contact is not a future landing and must not satisfy
+            // a predicted-collision event after the placement window closed.
+            if (player.onGround()) break;
             AABB projected = start.move(
                 state.x() - player.getX(),
                 state.y() - player.getY(),
@@ -1192,19 +1318,18 @@ final class NativeFabricControlBridge implements ControlBridge {
             Math.pow(target.getZ() + 0.5 - player.getZ(), 2)
         );
         evidence.put("resolved_distance_blocks", distance);
-        if (distance > maximumDistance) {
-            evidence.put("support_candidate_count", 0);
-            evidence.put("predicted_reachable", false);
-            evidence.put("reason", "predicted_collision_target_outside_binding_distance");
-            return Map.copyOf(evidence);
-        }
         if (requireReplaceable && !minecraft.level.getBlockState(target).canBeReplaced()) {
             evidence.put("support_candidate_count", 0);
             evidence.put("predicted_reachable", false);
             evidence.put("reason", "predicted_collision_target_not_replaceable");
             return Map.copyOf(evidence);
         }
-        evidence.putAll(placementForecast(player, target, horizonTicks));
+        Map<String, Object> placement = placementForecast(
+            player,
+            target,
+            horizonTicks
+        );
+        evidence.putAll(placement);
         evidence.put("position_binding_kind", "predicted_collision_cell");
         evidence.put("first_collision_tick", trajectory.firstCollisionTick());
         evidence.put("max_distance_blocks", maximumDistance);
@@ -1213,6 +1338,14 @@ final class NativeFabricControlBridge implements ControlBridge {
             player.getX(), player.getY(), player.getZ()
         ));
         evidence.put("resolved_distance_blocks", distance);
+        double minimumPredictedDistance = number(
+            placement.get("minimum_predicted_distance"),
+            Double.POSITIVE_INFINITY
+        );
+        if (minimumPredictedDistance > maximumDistance) {
+            evidence.put("predicted_reachable", false);
+            evidence.put("reason", "predicted_collision_target_outside_binding_distance");
+        }
         return Map.copyOf(evidence);
     }
 

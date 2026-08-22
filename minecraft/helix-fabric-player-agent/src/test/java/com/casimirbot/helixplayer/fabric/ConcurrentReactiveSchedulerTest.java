@@ -732,6 +732,200 @@ final class ConcurrentReactiveSchedulerTest {
         assertEquals(List.of("lane:conditions#0@0"), runtime.actionCalls);
     }
 
+    @Test
+    void fallCoverageRequiresTheExactBoundedWaterClutchContract() {
+        Map<String, Object> program = coveredFallProgram(true);
+
+        assertDoesNotThrow(() -> ConcurrentReactiveScheduler.validate(program));
+        assertEquals(
+            Set.of(ConcurrentReactiveScheduler.COVERAGE_UNSAFE_LANDING),
+            ConcurrentReactiveScheduler.residentGuardianCoverage(program)
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ConcurrentReactiveScheduler.validate(coveredFallProgram(false))
+        );
+    }
+
+    @Test
+    void fireCoverageRequiresMeasuredOnsetLocomotionAndExtinguishment() {
+        Map<String, Object> fireSeen = Map.of(
+            "node_id", "node:fire",
+            "node_kind", "event",
+            "earliest_tick", 0,
+            "condition", Map.of("condition_kind", "on_fire_is", "expected", true),
+            "trigger_when", "satisfied",
+            "debounce_ticks", 1,
+            "wait_up_to_ticks", 40,
+            "on_event", "node:escape",
+            "on_timeout", "node:failed"
+        );
+        Map<String, Object> escape = Map.of(
+            "node_id", "node:escape",
+            "node_kind", "action",
+            "earliest_tick", 0,
+            "timeout_ticks", 40,
+            "action", walkAction(),
+            "on_success", "node:extinguished",
+            "on_failure", "node:failed",
+            "on_timeout", "node:failed"
+        );
+        Map<String, Object> extinguished = Map.of(
+            "node_id", "node:extinguished",
+            "node_kind", "event",
+            "earliest_tick", 0,
+            "condition", Map.of("condition_kind", "on_fire_is", "expected", false),
+            "trigger_when", "satisfied",
+            "debounce_ticks", 1,
+            "wait_up_to_ticks", 40,
+            "on_event", "node:done",
+            "on_timeout", "node:failed"
+        );
+        Map<String, Object> candidate = new LinkedHashMap<>(program(
+            "all_required",
+            List.of(
+                lane(
+                    "lane:fire",
+                    "locomotion",
+                    100,
+                    true,
+                    List.of("locomotion"),
+                    fireSeen,
+                    escape,
+                    extinguished,
+                    terminal("node:done", "succeeded"),
+                    terminal("node:failed", "failed")
+                ),
+                safetyLane()
+            ),
+            List.of(),
+            List.of(healthInterrupt("lane:fire"))
+        ));
+        candidate.put("resident_guardian_coverage", List.of("fire_recovery"));
+
+        assertDoesNotThrow(
+            () -> ConcurrentReactiveScheduler.validate(Map.copyOf(candidate))
+        );
+    }
+
+    private static Map<String, Object> coveredFallProgram(boolean cleanup) {
+        Map<String, Object> falling = Map.of(
+            "node_id", "node:falling",
+            "node_kind", "event",
+            "earliest_tick", 0,
+            "condition", Map.of(
+                "condition_kind", "vertical_velocity_at_most",
+                "velocity_y", -0.25
+            ),
+            "trigger_when", "satisfied",
+            "debounce_ticks", 1,
+            "wait_up_to_ticks", 80,
+            "on_event", "node:landing",
+            "on_timeout", "node:failed"
+        );
+        Map<String, Object> landing = Map.of(
+            "node_id", "node:landing",
+            "node_kind", "event",
+            "earliest_tick", 0,
+            "condition", Map.of(
+                "condition_kind", "predicted_collision_within",
+                "max_ticks", 10,
+                "expected", true
+            ),
+            "trigger_when", "satisfied",
+            "debounce_ticks", 1,
+            "wait_up_to_ticks", 80,
+            "on_event", "node:water",
+            "on_timeout", "node:failed"
+        );
+        Map<String, Object> action = new LinkedHashMap<>(Map.ofEntries(
+            Map.entry("action_kind", "place"),
+            Map.entry("block_id", "minecraft:water"),
+            Map.entry("position_binding", Map.of(
+                "binding_kind", "predicted_collision_cell",
+                "horizon_ticks", 10,
+                "max_distance_blocks", 6,
+                "require_replaceable", true
+            )),
+            Map.entry("placement_method", "item_use"),
+            Map.entry("source_item_id", "minecraft:water_bucket"),
+            Map.entry("hand", "main_hand")
+        ));
+        if (cleanup) action.put("cleanup_after_landing", true);
+        Map<String, Object> water = Map.of(
+            "node_id", "node:water",
+            "node_kind", "action",
+            "earliest_tick", 0,
+            "timeout_ticks", 80,
+            "action", Map.copyOf(action),
+            "on_success", "node:done",
+            "on_failure", "node:failed",
+            "on_timeout", "node:failed"
+        );
+        Map<String, Object> candidate = new LinkedHashMap<>(program(
+            "all_required",
+            List.of(
+                lane(
+                    "lane:fall",
+                    "world",
+                    100,
+                    true,
+                    List.of(
+                        "camera", "locomotion", "hotbar", "main_hand",
+                        "inventory", "world", "native_workflow"
+                    ),
+                    falling,
+                    landing,
+                    water,
+                    terminal("node:done", "succeeded"),
+                    terminal("node:failed", "failed")
+                ),
+                safetyLane()
+            ),
+            List.of(),
+            List.of(healthInterrupt("lane:fall"))
+        ));
+        candidate.put(
+            "resident_guardian_coverage",
+            List.of("unsafe_landing_recovery")
+        );
+        candidate.put("mutation_scope", Map.of(
+            "world_mutation_allowed", true,
+            "max_block_mutations", 2,
+            "max_inventory_transfers", 2,
+            "allowed_block_ids", List.of("minecraft:water"),
+            "allowed_regions", List.of(),
+            "combat_allowed", false
+        ));
+        return Map.copyOf(candidate);
+    }
+
+    private static Map<String, Object> safetyLane() {
+        return dormantLane(
+            "lane:safety",
+            "safety",
+            255,
+            List.of("safety"),
+            terminal("node:safety", "canceled")
+        );
+    }
+
+    private static Map<String, Object> healthInterrupt(String laneId) {
+        return Map.of(
+            "interrupt_id", "interrupt:health",
+            "priority", 255,
+            "condition", Map.of(
+                "condition_kind", "health_at_least",
+                "health", 8
+            ),
+            "trigger_when", "not_satisfied",
+            "debounce_ticks", 1,
+            "activate_lane_id", "lane:safety",
+            "cancel_lane_ids", List.of(laneId),
+            "max_activations", 1
+        );
+    }
+
     private static Map<String, Object> program(
         String completionMode,
         List<Map<String, Object>> lanes,

@@ -125,6 +125,12 @@ const deps = (
 describe("Minecraft player-action workstation gateway", () => {
   it("treats manual cancellation as a same-turn human intervention boundary", () => {
     expect(environmentActionFailureRepairAction("request_canceled")).toBe("ask_user");
+    expect(
+      environmentActionFailureRepairAction(
+        "request_canceled",
+        "The resident viability guardian interrupted the workflow: movement_blocked_requires_semantic_replan",
+      ),
+    ).toBe("repair");
     expect(environmentActionFailureRepairAction("connector_offline")).toBe("ask_user");
     expect(environmentActionFailureRepairAction("action_outcome_unknown")).toBe("ask_user");
     expect(environmentActionFailureRepairAction("failed")).toBe("repair");
@@ -142,7 +148,7 @@ describe("Minecraft player-action workstation gateway", () => {
   });
 
   it("publishes the baseline and reusable bounded, nonterminal, host-free player tools", () => {
-    expect(environmentActionMinecraftManifests).toHaveLength(16);
+    expect(environmentActionMinecraftManifests).toHaveLength(18);
     expect(environmentActionMinecraftManifests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ capability_id: CAPABILITY_ID }),
@@ -175,6 +181,14 @@ describe("Minecraft player-action workstation gateway", () => {
         }),
         expect.objectContaining({
           capability_id: "com.casimirbot.minecraft.player.guardian.execute",
+        }),
+        expect.objectContaining({
+          capability_id:
+            "com.casimirbot.minecraft.player.viability_guardian.arm",
+        }),
+        expect.objectContaining({
+          capability_id:
+            "com.casimirbot.minecraft.player.viability_guardian.disarm",
         }),
       ]),
     );
@@ -671,6 +685,167 @@ describe("Minecraft player-action workstation gateway", () => {
     expect(enqueueAction).not.toHaveBeenCalled();
   });
 
+  it("admits the exact bounded resident guardian profile without inventing a response", async () => {
+    const capabilityId =
+      "com.casimirbot.minecraft.player.viability_guardian.arm";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const guardianObservation = {
+      ...observation,
+      capability_id: capabilityId,
+      action_kind: "arm_viability_guardian",
+    } satisfies HelixEnvironmentActionObservation;
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:resident-guardian",
+      toolCallId: "tool_call:player-action-resident-guardian",
+      providerExecutionId: "provider_execution:player-action-resident-guardian",
+      arguments: {
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+        duration_ticks: 2_400,
+        minimum_air: 80,
+        dangerous_vertical_velocity: -0.72,
+        maximum_swim_ticks: 200,
+        maximum_observation_age_ticks: 1,
+        response_repertoire: [
+          "swim_up",
+          "release_controls",
+          "request_semantic_replan",
+        ],
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "arm_viability_guardian",
+            effectClass: "continuous_control",
+            workflowModes: ["single_action"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => guardianObservation),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    const request = enqueueAction.mock.calls[0]?.[0]?.request;
+    expect(request).toMatchObject({
+      capability_id: capabilityId,
+      action_kind: "arm_viability_guardian",
+      requested_control_engine: "native_fabric",
+      arguments: {
+        action_kind: "arm_viability_guardian",
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+        duration_ticks: 2_400,
+      },
+      constraints: {
+        host_access_allowed: false,
+        automatic_replay_allowed: false,
+        world_mutation_allowed: false,
+      },
+    });
+  });
+
+  it("fails closed when the resident response repertoire is incomplete", async () => {
+    const capabilityId =
+      "com.casimirbot.minecraft.player.viability_guardian.arm";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:resident-guardian-invalid",
+      toolCallId: "tool_call:player-action-resident-guardian-invalid",
+      providerExecutionId:
+        "provider_execution:player-action-resident-guardian-invalid",
+      arguments: {
+        action_kind: "arm_viability_guardian",
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+        duration_ticks: 2_400,
+        minimum_air: 80,
+        dangerous_vertical_velocity: -0.72,
+        maximum_swim_ticks: 200,
+        maximum_observation_age_ticks: 1,
+        response_repertoire: ["swim_up", "release_controls"],
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "arm_viability_guardian",
+            effectClass: "continuous_control",
+            workflowModes: ["single_action"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "precondition_failed",
+      repairAction: "repair",
+      observation: { eligible_for_current_turn_reentry: true },
+    });
+    expect(enqueueAction).not.toHaveBeenCalled();
+  });
+
+  it("admits an exact graceful resident guardian disarm", async () => {
+    const capabilityId =
+      "com.casimirbot.minecraft.player.viability_guardian.disarm";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const disarmObservation = {
+      ...observation,
+      capability_id: capabilityId,
+      action_kind: "disarm_viability_guardian",
+    } satisfies HelixEnvironmentActionObservation;
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:resident-guardian-disarm",
+      toolCallId: "tool_call:player-action-resident-guardian-disarm",
+      providerExecutionId:
+        "provider_execution:player-action-resident-guardian-disarm",
+      arguments: {
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "disarm_viability_guardian",
+            effectClass: "continuous_control",
+            workflowModes: ["single_action"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => disarmObservation),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(enqueueAction.mock.calls[0]?.[0]?.request).toMatchObject({
+      capability_id: capabilityId,
+      action_kind: "disarm_viability_guardian",
+      requested_control_engine: "native_fabric",
+      arguments: {
+        action_kind: "disarm_viability_guardian",
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+      },
+    });
+  });
+
   it("resolves a follow target server-side without returning its native identity to Codex", async () => {
     const capabilityId = "com.casimirbot.minecraft.player.follow";
     const enqueueAction = vi.fn(async ({ request }) => request as never);
@@ -1011,6 +1186,54 @@ describe("Minecraft player-action workstation gateway", () => {
         result: {
           manual_override_detected: true,
           manual_override_reason: "screen_open",
+          controls_released: true,
+        },
+      },
+    });
+    expect(environmentActionGatewayAdmissionStatus(result.status)).toBe("admitted");
+  });
+
+  it("returns a resident semantic escalation to Codex for same-turn repair", async () => {
+    const semanticEscalationObservation = {
+      ...observation,
+      outcome: "request_canceled" as const,
+      summary:
+        "The resident viability guardian interrupted the workflow: movement_blocked_requires_semantic_replan",
+      result: {
+        manual_override_detected: false,
+        manual_override_reason: null,
+        controls_released: true,
+      },
+    } satisfies HelixEnvironmentActionObservation;
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:semantic-replan",
+      toolCallId: "tool_call:player-action-semantic-replan",
+      providerExecutionId: "provider_execution:player-action-semantic-replan",
+      arguments: {
+        destination: { x: 10, y: 64, z: 20 },
+        arrival_radius: 1,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        awaitObservation: vi.fn(async () => semanticEscalationObservation),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "request_canceled",
+      repairAction: "repair",
+      observation: {
+        outcome: "request_canceled",
+        result: {
+          manual_override_detected: false,
           controls_released: true,
         },
       },

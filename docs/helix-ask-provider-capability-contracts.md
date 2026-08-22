@@ -193,6 +193,7 @@ live_env.query_job_evidence
 live_env.check_live_source_mail
 live_env.read_live_source_mail
 live_env.read_processed_live_source_mail
+live_env.record_live_source_mail_decision
 live_env.reflect_live_source_mail_loop
 live_env.compare_mail_to_interpreter_profile
 live_env.validate_live_source_prediction
@@ -514,6 +515,7 @@ capabilities with non-empty `input_schema.required`:
 | `text_to_speech.speak_text`                             | `text`                                                                                                                                                                                                                                                                    |
 | `live_env.request_interim_voice_callout`                | `text`                                                                                                                                                                                                                                                                    |
 | `live_env.narrator_say`                                 | `text`                                                                                                                                                                                                                                                                    |
+| `live_env.record_live_source_mail_decision`             | `decision`, `processed_packet_ids`, `mail_ids`; every packet and mail identity must be present in normalized authoritative evidence from the same provider turn                                                                                                           |
 | `situation-room.live-source.set_rate`                   | `cadence_ms`, `capture_mode`                                                                                                                                                                                                                                              |
 | `com.casimirbot.minecraft.command.catalog`              | optional `query`, `path_prefix`, `limit`, `environment_label`                                                                                                                                                                                                             |
 | `com.casimirbot.minecraft.command`                      | `command`, `category`, `effect`; optional `environment_label` only disambiguates multiple active command-enabled Minecraft environments                                                                                                                                  |
@@ -765,8 +767,15 @@ live_env.reflect_live_source_mail_loop
 These observations remain non-terminal and require model re-entry before any
 final answer. They can report missing raw mail, missing processed packets,
 mailbox thread resolution, or loop reflection state. They cannot process new
-mail, record mailbox decisions, configure watch jobs, or substitute
-`live_env.process_live_source_mail` as a provider gateway fallback.
+mail, configure watch jobs, or substitute `live_env.process_live_source_mail`
+as a provider gateway fallback.
+
+After an exact processed packet re-enters the current provider turn,
+`live_env.record_live_source_mail_decision` may be admitted as the single
+locked continuation. Its schema requires exact `processed_packet_ids`,
+`mail_ids`, and a bounded decision enum. The gateway independently verifies
+those identities against normalized current-turn evidence and returns a
+non-terminal decision receipt; stale or prompt-only identities fail closed.
 
 ## Interpreter/Prediction Read Gateway Boundary
 
@@ -988,7 +997,6 @@ live_env.apply_visual_observer_profile
 live_env.request_visual_action_replay
 live_env.project_live_source_narrative
 live_env.update_live_source_immersion_state
-live_env.record_live_source_mail_decision
 ```
 
 ## Blocked Pending Contract

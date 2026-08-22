@@ -290,7 +290,7 @@ describe("environment action result canonicalization", () => {
         "interact", "mine", "place", "craft", "inventory_transfer",
       ]);
       const inventoryKinds = new Set([
-        "hotbar_select", "equip", "collect", "craft", "inventory_transfer",
+        "hotbar_select", "equip", "collect", "mine", "place", "craft", "inventory_transfer",
       ]);
       const worldMutationKinds = new Set(["mine", "place"]);
       const matrixRequest = helixEnvironmentActionRequestSchema.parse({
@@ -356,6 +356,147 @@ describe("environment action result canonicalization", () => {
     });
   }
 
+  it("requires exact measured proof that the bounded resident guardian was armed", () => {
+    const guardianArguments = {
+      action_kind: "arm_viability_guardian" as const,
+      profile_id: "resident.minecraft.fabric-guardian.v1" as const,
+      duration_ticks: 2_400,
+      minimum_air: 80,
+      dangerous_vertical_velocity: -0.72,
+      maximum_swim_ticks: 200,
+      maximum_observation_age_ticks: 1,
+      response_repertoire: [
+        "swim_up",
+        "release_controls",
+        "request_semantic_replan",
+      ] as const,
+    };
+    const guardianRequest = helixEnvironmentActionRequestSchema.parse({
+      ...request,
+      action_request_id: "environment_action_request:resident-guardian",
+      workflow_id: "environment_action_workflow:resident-guardian",
+      capability_id: "com.casimirbot.minecraft.player.viability_guardian.arm",
+      action_kind: "arm_viability_guardian",
+      effect_class: "continuous_control",
+      workflow_mode: "single_action",
+      arguments: guardianArguments,
+      postconditions: [{
+        condition_id: "postcondition:resident-guardian",
+        condition_kind: "minecraft.player.viability_guardian_armed",
+        required: true,
+        parameters: {
+          profile_id: guardianArguments.profile_id,
+          duration_ticks: guardianArguments.duration_ticks,
+        },
+      }],
+      idempotency_key: "canonicalization-resident-guardian",
+    });
+    const guardianResult = helixEnvironmentActionResultSchema.parse({
+      ...result,
+      action_request_id: guardianRequest.action_request_id,
+      workflow_id: guardianRequest.workflow_id,
+      capability_id: guardianRequest.capability_id,
+      action_kind: guardianRequest.action_kind,
+      postconditions: [{
+        condition_id: "postcondition:resident-guardian",
+        condition_kind: "minecraft.player.viability_guardian_armed",
+        required: true,
+        status: "satisfied",
+        summary: "The resident guardian profile was armed.",
+        evidence_refs: ["environment_action_event:resident-guardian"],
+        checked_at: completedAt,
+      }],
+      evidence_refs: ["environment_action_event:resident-guardian"],
+      side_effects_performed: false,
+      player_motion_performed: false,
+      player_interaction_performed: false,
+    });
+    const measurements = {
+      guardian_armed: true,
+      guardian_profile_id: guardianArguments.profile_id,
+      guardian_duration_ticks: guardianArguments.duration_ticks,
+      controls_released: true,
+    };
+
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: guardianRequest,
+      result: guardianResult,
+      measurements,
+    })).toBe(true);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: guardianRequest,
+      result: guardianResult,
+      measurements: { ...measurements, guardian_duration_ticks: 200 },
+    })).toBe(false);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: guardianRequest,
+      result: guardianResult,
+      measurements: { ...measurements, controls_released: false },
+    })).toBe(false);
+  });
+
+  it("requires exact measured proof that the resident guardian was disarmed", () => {
+    const disarmRequest = helixEnvironmentActionRequestSchema.parse({
+      ...request,
+      action_request_id: "environment_action_request:resident-disarm",
+      workflow_id: "environment_action_workflow:resident-disarm",
+      capability_id:
+        "com.casimirbot.minecraft.player.viability_guardian.disarm",
+      action_kind: "disarm_viability_guardian",
+      effect_class: "continuous_control",
+      workflow_mode: "single_action",
+      arguments: {
+        action_kind: "disarm_viability_guardian",
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+      },
+      postconditions: [{
+        condition_id: "postcondition:resident-disarm",
+        condition_kind: "minecraft.player.viability_guardian_disarmed",
+        required: true,
+        parameters: {
+          profile_id: "resident.minecraft.fabric-guardian.v1",
+        },
+      }],
+      idempotency_key: "canonicalization-resident-disarm",
+    });
+    const disarmResult = helixEnvironmentActionResultSchema.parse({
+      ...result,
+      action_request_id: disarmRequest.action_request_id,
+      workflow_id: disarmRequest.workflow_id,
+      capability_id: disarmRequest.capability_id,
+      action_kind: disarmRequest.action_kind,
+      postconditions: [{
+        condition_id: "postcondition:resident-disarm",
+        condition_kind: "minecraft.player.viability_guardian_disarmed",
+        required: true,
+        status: "satisfied",
+        summary: "The resident guardian profile was disarmed.",
+        evidence_refs: ["environment_action_event:resident-disarm"],
+        checked_at: completedAt,
+      }],
+      evidence_refs: ["environment_action_event:resident-disarm"],
+      side_effects_performed: false,
+      player_motion_performed: false,
+      player_interaction_performed: false,
+    });
+    const measurements = {
+      guardian_armed: false,
+      guardian_profile_id: "resident.minecraft.fabric-guardian.v1",
+      controls_released: true,
+    };
+
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: disarmRequest,
+      result: disarmResult,
+      measurements,
+    })).toBe(true);
+    expect(environmentActionWorkflowMeasurementsValid({
+      request: disarmRequest,
+      result: disarmResult,
+      measurements: { ...measurements, controls_released: false },
+    })).toBe(false);
+  });
+
   it("requires action-specific measured proof for a successful workflow", () => {
     expect(environmentActionWorkflowMeasurementsValid({
       request,
@@ -415,13 +556,18 @@ describe("environment action result canonicalization", () => {
             max_turn_degrees_per_tick: 10,
           },
           on_success: "node:camera:done",
-          on_failure: "node:camera:done",
-          on_timeout: "node:camera:done",
+          on_failure: "node:camera:failed",
+          on_timeout: "node:camera:failed",
         }, {
           node_id: "node:camera:done",
           node_kind: "terminal" as const,
           terminal_outcome: "succeeded" as const,
           reason_code: "camera_complete",
+        }, {
+          node_id: "node:camera:failed",
+          node_kind: "terminal" as const,
+          terminal_outcome: "canceled" as const,
+          reason_code: "camera_not_completed",
         }],
       }, {
         lane_id: "lane:safety",

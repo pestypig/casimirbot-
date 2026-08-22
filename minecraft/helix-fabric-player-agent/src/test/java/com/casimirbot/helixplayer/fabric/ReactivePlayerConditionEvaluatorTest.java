@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 
 final class ReactivePlayerConditionEvaluatorTest {
     private static final ReactivePlayerConditionEvaluator.PlayerState PLAYER =
-        new ReactivePlayerConditionEvaluator.PlayerState(20, 17, true, 10, 64, -5);
+        new ReactivePlayerConditionEvaluator.PlayerState(
+            20, 17, 250, true, true, false, false, true, 10, 64, -5
+        );
 
     @Test
     void evaluatesHealthFoodAndGroundedFromTheSameObservedPlayerState() {
@@ -26,6 +28,25 @@ final class ReactivePlayerConditionEvaluatorTest {
         assertEquals(true, ReactivePlayerConditionEvaluator.evaluate(
             Map.of("condition_kind", "player_grounded", "expected", true),
             PLAYER
+        ));
+    }
+
+    @Test
+    void evaluatesAirSubmersionSwimmingFireAndLavaFromOneObservation() {
+        assertEquals(true, ReactivePlayerConditionEvaluator.evaluate(
+            Map.of("condition_kind", "air_at_least", "air", 200), PLAYER
+        ));
+        assertEquals(true, ReactivePlayerConditionEvaluator.evaluate(
+            Map.of("condition_kind", "submerged_is", "expected", true), PLAYER
+        ));
+        assertEquals(true, ReactivePlayerConditionEvaluator.evaluate(
+            Map.of("condition_kind", "swimming_is", "expected", true), PLAYER
+        ));
+        assertEquals(true, ReactivePlayerConditionEvaluator.evaluate(
+            Map.of("condition_kind", "on_fire_is", "expected", false), PLAYER
+        ));
+        assertEquals(true, ReactivePlayerConditionEvaluator.evaluate(
+            Map.of("condition_kind", "in_lava_is", "expected", false), PLAYER
         ));
     }
 

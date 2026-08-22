@@ -38,6 +38,11 @@ export const HELIX_MINECRAFT_REACTIVE_RESOURCES = [
   "safety",
 ] as const;
 
+export const HELIX_MINECRAFT_RESIDENT_GUARDIAN_COVERAGE = [
+  "unsafe_landing_recovery",
+  "fire_recovery",
+] as const;
+
 export type HelixMinecraftReactiveResource =
   (typeof HELIX_MINECRAFT_REACTIVE_RESOURCES)[number];
 
@@ -388,6 +393,13 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
     ruleset: helixMinecraftFluidRulesetSchema,
     execution_plane: z.literal("player_embodiment"),
     scheduler_engine: z.literal("native_fabric_concurrent"),
+    resident_guardian_coverage: z
+      .array(z.enum(HELIX_MINECRAFT_RESIDENT_GUARDIAN_COVERAGE))
+      .max(2)
+      .refine((values) => new Set(values).size === values.length, {
+        message: "Resident guardian coverage entries must be unique.",
+      })
+      .optional(),
     max_total_ticks: z.number().int().positive().max(36_000),
     completion_policy: z
       .object({
@@ -425,6 +437,112 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
         path: ["lanes"],
         message: "A reactive program requires at least one immediate lane.",
       });
+    }
+
+    const residentCoverage = new Set(
+      program.resident_guardian_coverage ?? [],
+    );
+    const requiredImmediateLanes = program.lanes.filter(
+      (lane) => lane.required && lane.activation === "immediate",
+    );
+    const hasHealthFloorInterrupt = program.interrupts.some(
+      (interrupt) =>
+        interrupt.condition.condition_kind === "health_at_least" &&
+        interrupt.trigger_when === "not_satisfied" &&
+        interrupt.cancel_lane_ids.length > 0,
+    );
+    if (residentCoverage.size > 0 && !hasHealthFloorInterrupt) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["interrupts"],
+        message:
+          "Resident guardian coverage requires an independent health-floor interrupt.",
+      });
+    }
+    if (residentCoverage.has("unsafe_landing_recovery")) {
+      const validFallLane = requiredImmediateLanes.some((lane) => {
+        const conditions = lane.nodes.flatMap((node) =>
+          node.node_kind === "event" ||
+          node.node_kind === "checkpoint" ||
+          node.node_kind === "branch"
+            ? [node.condition]
+            : [],
+        );
+        const actions = lane.nodes.flatMap(nodeActions);
+        return (
+          conditions.some(
+            (condition) =>
+              condition.condition_kind === "vertical_velocity_at_most",
+          ) &&
+          conditions.some(
+            (condition) =>
+              condition.condition_kind === "predicted_collision_within",
+          ) &&
+          actions.some(
+            (action) =>
+              action.action_kind === "place" &&
+              action.block_id === "minecraft:water" &&
+              action.placement_method === "item_use" &&
+              action.source_item_id === "minecraft:water_bucket" &&
+              action.position_binding?.binding_kind ===
+                "predicted_collision_cell" &&
+              action.position_binding.require_replaceable === true &&
+              action.cleanup_after_landing === true,
+          )
+        );
+      });
+      const boundedMutation =
+        program.mutation_scope.world_mutation_allowed &&
+        program.mutation_scope.max_block_mutations >= 2 &&
+        program.mutation_scope.max_inventory_transfers >= 2 &&
+        program.mutation_scope.allowed_block_ids.includes("minecraft:water");
+      if (!validFallLane || !boundedMutation) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["resident_guardian_coverage"],
+          message:
+            "Unsafe-landing coverage requires a required immediate predicted-collision water-bucket rescue with cleanup and a two-mutation water scope.",
+        });
+      }
+    }
+    if (residentCoverage.has("fire_recovery")) {
+      const validFireLane = requiredImmediateLanes.some((lane) => {
+        const conditions = lane.nodes.flatMap((node) =>
+          node.node_kind === "event" ||
+          node.node_kind === "checkpoint" ||
+          node.node_kind === "branch"
+            ? [node.condition]
+            : [],
+        );
+        const actions = lane.nodes.flatMap(nodeActions);
+        const observesMatchedHazardTransition = ["on_fire_is", "in_lava_is"].some(
+          (conditionKind) =>
+            conditions.some(
+              (condition) =>
+                condition.condition_kind === conditionKind && condition.expected,
+            ) &&
+            conditions.some(
+              (condition) =>
+                condition.condition_kind === conditionKind && !condition.expected,
+            ),
+        );
+        return (
+          observesMatchedHazardTransition &&
+          actions.some(
+            (action) =>
+              action.action_kind === "walk" ||
+              action.action_kind === "navigate_to",
+          )
+        );
+      });
+      if (!validFireLane) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["resident_guardian_coverage"],
+          message:
+            "Fire/lava coverage requires a required immediate lane that measures a matched hazard onset and clearance, performs bounded locomotion, and verifies stabilization.",
+        });
+      }
     }
 
     const observationIds = [
@@ -556,8 +674,11 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
             }
           } else if (action.action_kind === "place") {
             const placementCount = action.positions?.length ?? 1;
-            declaredBlockMutations += placementCount * multiplier;
-            declaredInventoryTransfers += placementCount * multiplier;
+            const mutationFactor = action.cleanup_after_landing === true ? 2 : 1;
+            declaredBlockMutations +=
+              placementCount * multiplier * mutationFactor;
+            declaredInventoryTransfers +=
+              placementCount * multiplier * mutationFactor;
             if (!allowedBlocks.has(action.block_id)) {
               context.addIssue({
                 code: z.ZodIssueCode.custom,

@@ -733,6 +733,16 @@ describe("Shared Realtime room source ingress", () => {
         situation_digest_refs: [
           expect.stringMatching(/^environment_situation_digest:/u),
         ],
+        semantic_wake_bridges: [
+          expect.objectContaining({
+            schema: "helix.minecraft_situation_digest_mail_bridge.v1",
+            status: "blocked",
+            reason: "environment_wake_subject_unbound",
+            wake_expected: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          }),
+        ],
         model_invoked: false,
         assistant_answer: false,
         terminal_eligible: false,

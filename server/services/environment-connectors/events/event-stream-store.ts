@@ -529,21 +529,57 @@ export const recordEnvironmentActionEventBatch = async (input: {
   });
 };
 
-const worldEventAttributes = (event: HelixWorldEvent): Record<string, unknown> => {
+const worldEventSnapshot = (
+  event: HelixWorldEvent,
+): Record<string, unknown> | null => {
+  const snapshot = event.meta?.snapshot ?? event.meta?.environment_state_snapshot;
+  return isRecord(snapshot) ? snapshot : null;
+};
+
+export const resolveWorldAuthoritySubjectNativeId = (
+  event: HelixWorldEvent,
+): string | null =>
+  boundedIdentifier(worldEventSnapshot(event)?.stable_actor_id) ??
+  boundedIdentifier(event.actor_id);
+
+export const normalizeWorldAuthorityEventAttributes = (
+  event: HelixWorldEvent,
+): Record<string, unknown> => {
   const attributes: Record<string, unknown> = {};
-  const actor: Record<string, unknown> = {};
+  const snapshot = worldEventSnapshot(event);
+  const snapshotActor = isRecord(snapshot?.actor_state)
+    ? snapshot.actor_state
+    : {};
+  const actor: Record<string, unknown> = { ...snapshotActor };
   if (event.actor_label?.trim()) actor.label = event.actor_label.trim();
   if (isRecord(event.location)) actor.position = event.location;
   if (isRecord(event.health_delta)) actor.health_delta = event.health_delta;
   if (Object.keys(actor).length > 0) attributes.actor = actor;
+  const snapshotInventory = isRecord(snapshot?.inventory_state)
+    ? snapshot.inventory_state
+    : null;
+  if (snapshotInventory) attributes.inventory = { ...snapshotInventory };
   if (isRecord(event.inventory_delta)) {
-    attributes.inventory = { delta: event.inventory_delta };
+    attributes.inventory = {
+      ...(isRecord(attributes.inventory) ? attributes.inventory : {}),
+      delta: event.inventory_delta,
+    };
   }
-  if (isRecord(event.meta?.hazards)) attributes.hazards = event.meta.hazards;
-  if (isRecord(event.meta?.focus)) attributes.focus = event.meta.focus;
+  const snapshotObjectState = isRecord(snapshot?.object_state)
+    ? snapshot.object_state
+    : null;
+  if (Array.isArray(snapshotObjectState?.hazards)) {
+    attributes.hazards = { observed: snapshotObjectState.hazards };
+  } else if (isRecord(event.meta?.hazards)) {
+    attributes.hazards = event.meta.hazards;
+  }
+  if (isRecord(snapshot?.focus)) attributes.focus = snapshot.focus;
+  else if (isRecord(event.meta?.focus)) attributes.focus = event.meta.focus;
   if (isRecord(event.meta?.active_workflow)) {
     attributes.active_workflow = event.meta.active_workflow;
   }
+  const snapshotId = boundedIdentifier(snapshot?.snapshot_id);
+  if (snapshotId) attributes.snapshot_refs = [snapshotId];
   if (isRecord(event.objective_delta)) {
     attributes.objective_delta = event.objective_delta;
   }
@@ -712,8 +748,9 @@ export const recordWorldAuthorityEventBatch = async (input: {
         )
         .digest("hex")
         .slice(0, 48);
-      const subjectRef = event.actor_id?.trim()
-        ? subjectByNativeId.get(event.actor_id.trim().toLowerCase()) ?? null
+      const subjectNativeId = resolveWorldAuthoritySubjectNativeId(event);
+      const subjectRef = subjectNativeId
+        ? subjectByNativeId.get(subjectNativeId.toLowerCase()) ?? null
         : null;
       const workflowRef = boundedIdentifier(event.meta?.workflow_ref);
       return helixEnvironmentEventSchema.parse({
@@ -733,7 +770,7 @@ export const recordWorldAuthorityEventBatch = async (input: {
         summary: (
           event.text?.trim() || `Minecraft world event: ${event.event_type}`
         ).slice(0, 2_000),
-        attributes: worldEventAttributes(event),
+        attributes: normalizeWorldAuthorityEventAttributes(event),
         evidence_refs: [
           ...new Set(
             [

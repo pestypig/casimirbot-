@@ -743,7 +743,7 @@ public final class PlayerActionController {
             "back".equals(direction),
             "left".equals(direction),
             "right".equals(direction),
-            false,
+            Boolean.TRUE.equals(active.arguments().get("jump")),
             bool(active.arguments(), "sprint")
         ));
     }

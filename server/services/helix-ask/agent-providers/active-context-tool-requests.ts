@@ -66,6 +66,8 @@ import {
   isSchemaCompleteExplicitMinecraftCommandCapabilityIntent,
   readTrustedRoomEnvironmentCapabilityExtractionContext,
 } from "../explicit-capability-contract";
+import { isAffirmativeMinecraftPlayerEmbodimentActionPrompt } from
+  "../minecraft-execution-plane-intent";
 
 const HELIX_ASK_CAPABILITY_CATALOG_CAPABILITY = "helix_ask.inspect_capability_catalog" as const;
 const SCIENTIFIC_CALCULATOR_THEORY_RUN_CONTEXT_CAPABILITY =
@@ -789,6 +791,10 @@ export const buildMinecraftMechanicsDocsWorkstationGatewayCallRequests = (
     );
   const naturalCommandNeedsGrounding =
     isAffirmativeNaturalMinecraftCommandCapabilityIntent(
+      prompt,
+      trustedEnvironmentContext,
+    ) &&
+    !isAffirmativeMinecraftPlayerEmbodimentActionPrompt(
       prompt,
       trustedEnvironmentContext,
     ) &&

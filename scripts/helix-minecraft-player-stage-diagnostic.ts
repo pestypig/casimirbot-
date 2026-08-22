@@ -15,6 +15,12 @@ import {
   helixMinecraftReactiveProgramArgumentsSchema,
   type HelixMinecraftReactiveProgramArguments,
 } from "../shared/helix-minecraft-reactive-program";
+import {
+  helixMinecraftArmViabilityGuardianArgumentsSchema,
+  helixMinecraftDisarmViabilityGuardianArgumentsSchema,
+  type HelixMinecraftArmViabilityGuardianArguments,
+  type HelixMinecraftDisarmViabilityGuardianArguments,
+} from "../shared/helix-minecraft-viability-guardian";
 
 const INBOX_FILE = "helix-fabric-player-agent.diagnostic-inbox.json";
 const INBOX_SCHEMA = "helix.minecraft.player.direct_diagnostic_request.v1";
@@ -24,7 +30,9 @@ type JsonRecord = Record<string, unknown>;
 type DirectDiagnosticAction =
   | HelixMinecraftPlayerActionArguments
   | HelixMinecraftFluidSequenceArguments
-  | HelixMinecraftReactiveProgramArguments;
+  | HelixMinecraftReactiveProgramArguments
+  | HelixMinecraftArmViabilityGuardianArguments
+  | HelixMinecraftDisarmViabilityGuardianArguments;
 
 export type DirectDiagnosticEnvelope = {
   schema: typeof INBOX_SCHEMA;
@@ -78,6 +86,10 @@ const ceilingMsFor = (
       return Math.min(action.max_total_ticks * 50 + 5_000, 30 * 60_000);
     case "execute_reactive_program":
       return Math.min(action.max_total_ticks * 50 + 5_000, 30 * 60_000);
+    case "arm_viability_guardian":
+      return Math.min(action.duration_ticks * 50 + 5_000, 30 * 60_000);
+    case "disarm_viability_guardian":
+      return 5_000;
   }
 };
 
@@ -121,6 +133,10 @@ export const buildDirectDiagnosticEnvelope = (input: {
     ? helixMinecraftFluidSequenceArgumentsSchema.safeParse(schemaInput)
     : actionKind === "execute_reactive_program"
     ? helixMinecraftReactiveProgramArgumentsSchema.safeParse(schemaInput)
+    : actionKind === "arm_viability_guardian"
+    ? helixMinecraftArmViabilityGuardianArgumentsSchema.safeParse(schemaInput)
+    : actionKind === "disarm_viability_guardian"
+    ? helixMinecraftDisarmViabilityGuardianArgumentsSchema.safeParse(schemaInput)
     : helixMinecraftPlayerActionArgumentsSchema.safeParse(schemaInput);
   if (!parsed.success) {
     throw new Error(

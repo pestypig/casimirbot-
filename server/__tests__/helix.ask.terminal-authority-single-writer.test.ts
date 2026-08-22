@@ -402,6 +402,8 @@ describe("Helix terminal authority single writer", () => {
         terminal_artifact_kind: "request_user_input",
       }),
     });
+    expect(payload.selected_terminal_support_refs).toEqual([observationRef]);
+    expect(payload.terminal_synthesis_support_refs).toEqual([observationRef]);
     expect(payload.typed_failure).toBeUndefined();
   });
 

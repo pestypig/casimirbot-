@@ -63,6 +63,7 @@ describe("Codex native compatibility fallback", () => {
 
   afterEach(() => {
     delete process.env.CODEX_AGENT_FAKE_STDOUT;
+    delete process.env.CODEX_AGENT_FAKE_STDERR;
     delete process.env.CODEX_AGENT_FAKE_EXIT_CODE;
     delete process.env.HELIX_CODEX_COMPATIBILITY_PROCESS_TEST_ENABLED;
   });
@@ -446,6 +447,75 @@ describe("Codex native compatibility fallback", () => {
     expect(
       (result as Record<string, any>).provider_prompt_diagnostics.char_count,
     ).toBeLessThan(50_000);
+  });
+
+  it("gives an unrecovered provider-credit failure exact typed-failure authority", async () => {
+    nativeBridgeMock.run.mockResolvedValueOnce({
+      attempted: true,
+      eligible: true,
+      fallbackRequired: true,
+      fallbackReason: "native_provider_quota_exhausted",
+      result: {
+        ok: false,
+        answer: "",
+        failReason: "native_provider_quota_exhausted",
+        native: null,
+        gatewayCallResults: [],
+        debug: {
+          route_proposal: null,
+          route_unobserved_tools: [],
+          native_error_code: "provider_quota_exhausted",
+        },
+      },
+      gatewayCallResults: [],
+      debug: {
+        schema: "helix.codex_native_provider_bridge.v1",
+        enabled: true,
+        eligible: true,
+        attempted: true,
+        status: "fallback_required",
+        native_transport: "codex_app_server",
+        compatibility_transport: "codex_exec",
+        fallback_required: true,
+        fallback_reason: "native_provider_quota_exhausted",
+        terminal_eligible: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    process.env.CODEX_AGENT_FAKE_STDOUT = "";
+    process.env.CODEX_AGENT_FAKE_STDERR =
+      "You have no credits remaining. Add credits to continue using the API.";
+    process.env.CODEX_AGENT_FAKE_EXIT_CODE = "1";
+
+    const result = await codexProvider.runTurn({
+      runtime: "codex",
+      route: "/ask/turn",
+      body: {
+        turn_id: "ask:test:native-credit-failure-authority",
+        agent_runtime: "codex",
+        question: "Give me a brief greeting.",
+      },
+      headers: {},
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "openai_api_credits_exhausted",
+      terminal_answer_authority: {
+        final_answer_source: "typed_failure",
+        terminal_kind: "failure",
+        authority_origin: "typed_failure",
+        server_authoritative: true,
+        terminal_eligible: true,
+      },
+      terminal_presentation: {
+        final_answer_source: "typed_failure",
+        presentation_policy: "agent_provider_failure_recovery",
+      },
+    });
   });
 
   it("recovers admitted observations missing from a partially completed native compound route", async () => {

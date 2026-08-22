@@ -1,21 +1,28 @@
 # NHM2 Spherical Boson-Star v2 August 28 Numerical Decision Sprint
 
-Status: closed with an authenticated `BLOCKED` decision.
+Status: closed with a `BLOCKED` decision, now strengthened by matching
+source-disjoint frozen-core failure evidence.
 
 Parent program:
 [`nhm2-spherical-boson-star-v2-work-program.md`](./nhm2-spherical-boson-star-v2-work-program.md)
 
 Decision deadline: **August 28, 2026, end of day America/New_York**
 
-Decision outcome: **BLOCKED**
+Decision outcome: **BLOCKED**; the frozen core fails diagnostically before
+projection, while authenticated candidate execution and runtime-disjoint replay
+remain absent.
 
 Final decision record:
 [`nhm2-spherical-boson-star-v2-august-28-numerical-decision-record.md`](./nhm2-spherical-boson-star-v2-august-28-numerical-decision-record.md)
 
 The decision was issued early on August 21, 2026 because the first ordered
 initializer blocker and its upstream production-runtime cause were already
-reproducible. The deadline was not used to justify waiting after the evidence
-became decisive.
+reproducible. Subsequent in-scope runtime work reached the frozen core graph:
+both the Python and native implementations terminate with the same Armijo
+failure and state/residual bytes before projection. Because they share MPFR/GMP
+runtime lineage and no server-authenticated candidate preseal exists, this
+strengthens the decision without converting it to candidate-level `FAIL` or
+qualifying independent replay.
 
 ## Purpose
 

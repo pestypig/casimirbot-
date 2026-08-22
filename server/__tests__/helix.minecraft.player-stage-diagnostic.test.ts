@@ -30,6 +30,61 @@ describe("Minecraft direct diagnostic inbox staging", () => {
     expect(envelope.arguments).not.toHaveProperty("action_kind");
   });
 
+  it("stages the exact resident guardian profile for direct viability proof", () => {
+    const envelope = buildDirectDiagnosticEnvelope({
+      action: {
+        action_kind: "arm_viability_guardian",
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+        duration_ticks: 2_400,
+        minimum_air: 80,
+        dangerous_vertical_velocity: -0.72,
+        maximum_swim_ticks: 200,
+        maximum_observation_age_ticks: 1,
+        response_repertoire: [
+          "swim_up",
+          "release_controls",
+          "request_semantic_replan",
+        ],
+      },
+      requestId: "direct_diagnostic_request:resident-guardian",
+    });
+
+    expect(envelope).toMatchObject({
+      action_kind: "arm_viability_guardian",
+      control_engine: "native_fabric",
+      max_duration_ticks: 2_500,
+      arguments: {
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+        duration_ticks: 2_400,
+        response_repertoire: [
+          "swim_up",
+          "release_controls",
+          "request_semantic_replan",
+        ],
+      },
+    });
+    expect(envelope.arguments).not.toHaveProperty("action_kind");
+  });
+
+  it("stages a symmetric resident guardian disarm", () => {
+    const envelope = buildDirectDiagnosticEnvelope({
+      action: {
+        action_kind: "disarm_viability_guardian",
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+      },
+      requestId: "direct_diagnostic_request:resident-guardian-disarm",
+    });
+
+    expect(envelope).toMatchObject({
+      action_kind: "disarm_viability_guardian",
+      control_engine: "native_fabric",
+      max_duration_ticks: 100,
+      arguments: {
+        profile_id: "resident.minecraft.fabric-guardian.v1",
+      },
+    });
+  });
+
   it("preserves a separately resolved follow identity for the direct lane", () => {
     const envelope = buildDirectDiagnosticEnvelope({
       action: {

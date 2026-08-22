@@ -135,8 +135,10 @@ Do not admit these tools from:
 Do not substitute held-back controls such as
 `live_env.project_live_source_narrative`,
 `live_env.configure_route_watch`,
-`live_env.configure_interpreter_profile`, or
-`live_env.record_live_source_mail_decision` as provider gateway calls.
+or `live_env.configure_interpreter_profile` as provider gateway calls.
+`live_env.record_live_source_mail_decision` is available only as the locked
+post-read continuation for exact normalized current-turn packet evidence; it
+must not be inferred from these prediction reads or from prompt text alone.
 
 ## Tests
 

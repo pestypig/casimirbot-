@@ -4404,7 +4404,6 @@ const terminalKindCanMirrorSupport = (kind: string | null): kind is string =>
   Boolean(
     kind &&
     kind !== "typed_failure" &&
-    kind !== "request_user_input" &&
     kind !== "pending_server_request" &&
     kind !== "direct_answer_text" &&
     kind !== "tool_receipt",

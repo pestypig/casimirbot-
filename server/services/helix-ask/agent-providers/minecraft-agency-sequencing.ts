@@ -19,8 +19,10 @@ import {
 } from "../minecraft-execution-plane-intent";
 
 export {
+  affirmativeMinecraftPlayerControlCapabilityIds,
   isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
   minecraftPlayerEmbodimentActionPromptMatch,
+  requiredMinecraftResidentRecoveryCapabilityIds,
   resolveMinecraftExecutionPlaneConstraint,
 } from "../minecraft-execution-plane-intent";
 

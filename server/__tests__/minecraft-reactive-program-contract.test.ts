@@ -282,6 +282,27 @@ describe("Minecraft concurrent reactive program contract", () => {
         },
       }).success,
     ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...dynamicPlacement,
+        cleanup_after_landing: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...dynamicPlacement,
+        block_id: "minecraft:cobblestone",
+        cleanup_after_landing: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...dynamicPlacement,
+        positions: [{ x: 1, y: 64, z: 2 }],
+        position_binding: undefined,
+        cleanup_after_landing: true,
+      }).success,
+    ).toBe(false);
   });
 
   it("counts a dynamic landing cell as one admitted mutation", () => {
