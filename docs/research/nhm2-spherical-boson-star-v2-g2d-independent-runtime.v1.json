@@ -1,0 +1,17 @@
+{
+  "admission": "ADMITTED_PREEXECUTION_ONLY",
+  "architecture": "amd64",
+  "baseImageDigest": "sha256:715f6ea4674ace8cd1758954b09fda66e7f4ca9373a28af7a796fe1f9926dfd1",
+  "binaryPath": "/usr/local/bin/g2d-fluid-star-independent",
+  "binarySha256": "ff56a59d33e2e450986aadb81769c1a141677fb830d75c0f960bf163a96a6713",
+  "candidateExecutionObserved": false,
+  "compiler": "GCC 12.2.0, C17, -O2 -fno-fast-math -ffp-contract=off",
+  "gmpVersion": "6.3.0",
+  "imageId": "sha256:c4c437edf2ae480445f2ec9c1a551e6d88d264947d6238e023d5368b4a7c158a",
+  "mpfrPrecisionBits": 768,
+  "mpfrVersion": "4.2.1",
+  "networkAtExecution": "none",
+  "operatingSystem": "Debian GNU/Linux 12 (bookworm)",
+  "pythonAbiLinked": false,
+  "schema": "nhm2.g2d.fluid-star.independent-runtime.v1"
+}

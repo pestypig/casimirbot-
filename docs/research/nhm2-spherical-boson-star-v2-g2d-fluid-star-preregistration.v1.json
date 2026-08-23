@@ -1,0 +1,279 @@
+{
+  "authority": {
+    "candidateAdmitted": false,
+    "classicalProofEstablished": false,
+    "diagnosticLampAuthorized": false,
+    "executionAuthorized": false,
+    "jointGeometryStateAccepted": false,
+    "laneAuthorized": false,
+    "pairAgreementEstablished": false,
+    "physicalViabilityAuthorized": false,
+    "propulsionAuthorized": false,
+    "quantumStateAccepted": false,
+    "replayAuthorized": false,
+    "transportAuthorized": false
+  },
+  "candidate": {
+    "candidateId": "nhm2-fluid-star-constant-density-chi-1-over-4-v1",
+    "coordinates": {
+      "exterior": "x=r/R in [1,infinity)",
+      "exteriorCompactified": "y=1-1/x in [0,1]",
+      "interior": "x=r/R in [0,1]",
+      "surface": "x=1"
+    },
+    "equations": {
+      "commonMetric": "ds^2=-alpha(x)^2 dt^2+f(x)^-1 dx^2+x^2 dOmega^2",
+      "exterior": {
+        "alpha": "sqrt(1-1/(4*x))",
+        "f": "1-1/(4*x)",
+        "m": "1/8",
+        "pHat": "0",
+        "rhoHat": "0"
+      },
+      "interior": {
+        "A": "sqrt(1-x^2/4)",
+        "alpha": "(3*sqrt(3)/2-A)/2",
+        "f": "1-x^2/4",
+        "m": "x^3/8",
+        "pHat": "(3/4)*(A-sqrt(3)/2)/(3*sqrt(3)/2-A)",
+        "rhoHat": "3/4"
+      },
+      "normalizations": {
+        "pHat": "8*pi*G*R^2*p/c^4",
+        "rhoHat": "8*pi*G*R^2*rho/c^2"
+      }
+    },
+    "familyId": "SUB_BUCHDAHL_CONSTANT_DENSITY_FLUID_STAR_SCALAR_QFT_CONTROL",
+    "parameters": {
+      "M": "1/8",
+      "R": "1",
+      "chi": "2*M/R=1/4",
+      "rhoHat": "3/4",
+      "surfaceLapse": "sqrt(3)/2"
+    },
+    "scaleConvention": {
+      "G": "1",
+      "R": "1",
+      "c": "1",
+      "dimensionlessOnly": true,
+      "physicalScaleAssigned": false
+    }
+  },
+  "chronology": {
+    "firstFailureTerminal": true,
+    "noAlternateOutputRoot": true,
+    "noRetry": true,
+    "noRetune": true,
+    "orderedReceiptPrefix": [
+      "preexecution-binding.json",
+      "duty-00-parameter-domain.json",
+      "duty-01-origin.json",
+      "duty-02-interior.json",
+      "duty-03-matter-rails.json",
+      "duty-04-surface.json",
+      "duty-05-exterior.json",
+      "duty-06-infinity.json",
+      "duty-07-interval-replay.json",
+      "duty-08-independent-agreement.json",
+      "terminal-receipt.json"
+    ],
+    "preregistrationMayCreateFutureRoot": false
+  },
+  "evaluatorContracts": {
+    "independent": {
+      "arithmetic": "GMP 6.3.0 plus MPFR 4.2.1 at 768 bits with directed rounding",
+      "implementationLanguage": "C17",
+      "network": "none",
+      "operatingSystem": "offline Linux x86_64 container",
+      "runtimeAdmissionRequiredBeforeExecution": true,
+      "sourcePath": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2d_fluid_star_independent.c"
+    },
+    "independenceRequirements": [
+      "no shared candidate evaluator source",
+      "no shared language runtime",
+      "no shared interval arithmetic library",
+      "no shared operating-system runtime lineage",
+      "independent parsing and receipt rehash"
+    ],
+    "primary": {
+      "arithmetic": "Python integer and Fraction exact arithmetic plus 220-digit Decimal directed enclosures",
+      "implementationLanguage": "CPython standard library only",
+      "network": "none",
+      "operatingSystem": "Windows x86_64",
+      "runtimeAdmissionRequiredBeforeExecution": true,
+      "sourcePath": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2d_fluid_star_primary.py"
+    }
+  },
+  "executionCheckpoint": {
+    "exactCommand": null,
+    "implementationComplete": false,
+    "runtimeManifestsAdmitted": false,
+    "token": null,
+    "whyNull": "A later implementation checkpoint must bind both evaluator source hashes and admitted runtime manifests before any one-shot token or command can exist."
+  },
+  "falsifiers": [
+    "any parameter or equation differs from this manifest",
+    "any duty runs out of order",
+    "any exact identity is replaced by sampled agreement",
+    "any interior and exterior derivative stencil crosses x=1",
+    "any hard interval excludes zero or exceeds its width rail",
+    "any matter, horizon, Buchdahl, origin, surface or infinity rail fails",
+    "any runtime or source independence requirement fails",
+    "any output-root collision, chronology mismatch or persistence mismatch occurs",
+    "any retry, retune, alternate root or post-result threshold change occurs"
+  ],
+  "futureOutputRoot": "artifacts/nhm2-spherical-boson-star-v2-g2d/fluid-star-chi-1-over-4-v1",
+  "hardRails": {
+    "buchdahl": "chi=1/4 < 8/9 with exact margin 23/36",
+    "compactness": "0 <= 2*m(x)/x <= 1/4",
+    "intervalContainsZero": true,
+    "intervalMaximumWidth": "2^-180",
+    "lapse": "alpha(x) >= 3/4",
+    "matter": "0 <= pHat(x) <= rhoHat/8=3/32 and rhoHat=3/4 on 0<=x<1",
+    "noHorizon": "f(x) >= 3/4",
+    "surface": "pHat(1)=0 and Darmois induced-metric/extrinsic-curvature data agree with no thin shell"
+  },
+  "proofDutyOrder": [
+    {
+      "id": "parameter-domain",
+      "ordinal": 0,
+      "requirements": [
+        "exact manifest and runtime-input binding",
+        "chi=1/4",
+        "chi<8/9",
+        "f>=3/4",
+        "future output root initially absent"
+      ]
+    },
+    {
+      "id": "origin",
+      "ordinal": 1,
+      "requirements": [
+        "m=x^3/8",
+        "alpha and pHat are even and finite",
+        "alpha'(0)=pHat'(0)=0",
+        "no conical or curvature singularity"
+      ]
+    },
+    {
+      "id": "interior",
+      "ordinal": 2,
+      "requirements": [
+        "G^t_t=-rhoHat",
+        "G^x_x=G^theta_theta=G^phi_phi=pHat",
+        "2*m'-x^2*rhoHat=0",
+        "2*x*(x-2*m)*alpha'/alpha-2*m-x^3*pHat=0",
+        "pHat'+(rhoHat+pHat)*alpha'/alpha=0"
+      ]
+    },
+    {
+      "id": "matter-rails",
+      "ordinal": 3,
+      "requirements": [
+        "rhoHat=3/4",
+        "0<=pHat<=3/32",
+        "pHat'<=0",
+        "rhoHat+pHat>=0"
+      ]
+    },
+    {
+      "id": "surface",
+      "ordinal": 4,
+      "requirements": [
+        "alpha_in=alpha_out=sqrt(3)/2",
+        "f_in=f_out=3/4",
+        "m_in=m_out=1/8",
+        "pHat_in=0",
+        "alpha'_in=alpha'_out=1/(4*sqrt(3))",
+        "induced metric and extrinsic curvature agree",
+        "finite curvature jump is permitted but a distributional thin shell is not"
+      ]
+    },
+    {
+      "id": "exterior",
+      "ordinal": 5,
+      "requirements": [
+        "rhoHat=pHat=0",
+        "m'=0",
+        "all vacuum Einstein residuals vanish",
+        "f>=3/4"
+      ]
+    },
+    {
+      "id": "infinity",
+      "ordinal": 6,
+      "requirements": [
+        "at y=1 alpha->1 and f->1",
+        "m->1/8",
+        "x*(1-alpha)->1/8",
+        "asymptotic flatness"
+      ]
+    },
+    {
+      "id": "interval-replay",
+      "ordinal": 7,
+      "requirements": [
+        "all exact identities have already passed",
+        "every directed residual interval contains zero",
+        "every directed residual interval width is at most 2^-180",
+        "grids are replay evidence only"
+      ]
+    },
+    {
+      "id": "independent-agreement",
+      "ordinal": 8,
+      "requirements": [
+        "both evaluators independently pass duties 0 through 7",
+        "candidate and manifest hashes agree",
+        "duty order, statuses and first-failure code agree",
+        "corresponding interval enclosures overlap"
+      ]
+    }
+  ],
+  "receiptSchema": {
+    "canonicalJson": "ASCII-only UTF-8, LF, lexicographically sorted object keys, separators comma and colon, no insignificant whitespace, no floating JSON numbers, reject duplicate keys and all surrogate code points",
+    "hashAlgorithm": "sha256",
+    "requiredFields": [
+      "schema",
+      "candidateId",
+      "manifestSha256",
+      "sourceSha256",
+      "runtimeManifestSha256",
+      "dutyOrdinal",
+      "dutyId",
+      "status",
+      "firstFail",
+      "artifactInventory",
+      "authority",
+      "selfSha256"
+    ],
+    "selfHashPreimage": "canonical receipt object with selfSha256 set to null",
+    "statusEnum": [
+      "PASS",
+      "FAIL",
+      "BLOCKED"
+    ]
+  },
+  "replayGrids": {
+    "endpointPolicy": "origin, surface and infinity are analytic duties; pointwise replay uses only open-domain nodes",
+    "exteriorCompactifiedOpenNodes": "y_j=j/N for j=1,...,N-1",
+    "interiorOpenNodes": "x_j=j/N for j=1,...,N-1",
+    "resolutionOrder": [
+      64,
+      96,
+      128,
+      256
+    ],
+    "stencils": "none; analytic derivative formulas are enclosed pointwise and no stencil crosses the surface"
+  },
+  "resourceCeilings": {
+    "futureEvaluatorMaximumResidentMemoryMiB": 2048,
+    "futureEvaluatorWallSecondsEach": 600,
+    "network": "none",
+    "preexecutionAuditMaximumResidentMemoryMiB": 512,
+    "preexecutionAuditWallSecondsEach": 60,
+    "processesPerEvaluator": 1
+  },
+  "schema": "nhm2.g2d.fluid-star.preregistration.v1",
+  "status": "SEALED_DEFINITION_NO_EXECUTION_IMPLEMENTATION_CHECKPOINT_PENDING"
+}

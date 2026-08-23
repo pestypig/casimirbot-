@@ -232,6 +232,10 @@ Each capability contract should define:
 | `com.casimirbot.environment.durable_goal.create`         | [environment-durable-goal.md](environment-durable-goal.md)                                               | `draft`     |
 | `com.casimirbot.environment.durable_goal.inspect`        | [environment-durable-goal.md](environment-durable-goal.md)                                               | `draft`     |
 | `com.casimirbot.environment.durable_goal.append`         | [environment-durable-goal.md](environment-durable-goal.md)                                               | `draft`     |
+| `com.casimirbot.environment.reasoning_role.record`       | [environment-reasoning-role.md](environment-reasoning-role.md)                                           | `draft`     |
+| `com.casimirbot.environment.reasoning_role.inspect`      | [environment-reasoning-role.md](environment-reasoning-role.md)                                           | `draft`     |
+| `com.casimirbot.environment.reasoning_role.disposition`  | [environment-reasoning-role.md](environment-reasoning-role.md)                                           | `draft`     |
+| `com.casimirbot.environment.reasoning_role.arbitrate`    | [environment-reasoning-role.md](environment-reasoning-role.md)                                           | `draft`     |
 | `workspace_os.status`                                   | [workspace_os.status.md](workspace_os.status.md)                                                         | `draft`     |
 | `helix_ask.inspect_capability_catalog`                  | [helix_ask.inspect_capability_catalog.md](helix_ask.inspect_capability_catalog.md)                       | `draft`     |
 | `workstation.active_context`                            | [workstation.active_context.md](workstation.active_context.md)                                           | `draft`     |

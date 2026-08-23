@@ -176,6 +176,11 @@ import {
   executeEnvironmentDurableGoalGatewayCapability,
 } from "./environment-durable-goal";
 import {
+  environmentReasoningRoleManifests,
+  executeEnvironmentReasoningRoleGatewayCapability,
+  linkCompletedEnvironmentReasoningRoleAction,
+} from "./environment-reasoning-role";
+import {
   executeMinecraftLocalLifecycleGatewayCapability,
   minecraftLocalLifecycleManifest,
 } from "./minecraft-local-lifecycle";
@@ -5825,6 +5830,9 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   ...environmentDurableGoalManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
+  ...environmentReasoningRoleManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   [
     minecraftLocalLifecycleManifest.capability_id,
     minecraftLocalLifecycleManifest,
@@ -6635,6 +6643,84 @@ export const callWorkstationGatewayCapability = async (
   }
 
   if (
+    environmentReasoningRoleManifests.some(
+      (entry) => entry.capability_id === manifest.capability_id,
+    )
+  ) {
+    const gatewayResult = await executeEnvironmentReasoningRoleGatewayCapability({
+      capabilityId: manifest.capability_id,
+      turnId,
+      agentRuntime,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_reasoning_role_admitted"
+        : "authenticated_environment_reasoning_role_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [{
+              code: gatewayResult.error,
+              message: gatewayResult.summary,
+              repair_action: gatewayResult.repairAction ?? "repair",
+            }],
+          }
+        : {}),
+    });
+    const trace = buildWorkstationToolLifecycleTrace({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      providerToolCallId,
+      requestedArgs: readArguments(input.arguments),
+      normalizedArgs: readArguments(input.arguments),
+      source: null,
+      admission,
+      observationPacket,
+      terminalCandidate: null,
+      providerContinuationEnabled,
+      forceFollowupModelStep: true,
+    });
+    return {
+      ok: gatewayResult.ok,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (
     manifest.capability_id ===
     environmentSituationDigestMinecraftManifest.capability_id
   ) {
@@ -6771,6 +6857,58 @@ export const callWorkstationGatewayCapability = async (
           }
         : {}),
     });
+    if (gatewayResult.ok && gatewayResult.status === "completed") {
+      try {
+        const resultRef = observationPacket.produced_artifact_refs[0] ??
+          `${turnId}:environment_action:measured_result`;
+        const actionRequestId = input.toolCallId?.trim() ||
+          input.providerExecutionId?.trim() ||
+          `${turnId}:environment_action:${manifest.capability_id}`;
+        const linkedProjection =
+          await linkCompletedEnvironmentReasoningRoleAction({
+            turnId,
+            capabilityId: manifest.capability_id,
+            capabilityArguments: readArguments(input.arguments),
+            environmentActionRequestId: actionRequestId,
+            environmentActionResultRef: resultRef,
+            reentryObservationRef: resultRef,
+            accountContext: input.accountContext,
+            conversationThreadId: input.conversationThreadId,
+          });
+        if (linkedProjection) {
+          observationPacket.state_delta = {
+            ...observationPacket.state_delta,
+            environment_reasoning_role_execution_link: {
+              goal_id: linkedProjection.goal_id,
+              ledger_revision: linkedProjection.revision,
+              latest_event_hash: linkedProjection.latest_event_hash,
+              execution_linked: true,
+              measured_result_reentry_linked: true,
+              terminal_eligible: false,
+            },
+          };
+        }
+      } catch (error) {
+        observationPacket.state_delta = {
+          ...observationPacket.state_delta,
+          environment_reasoning_role_execution_link: {
+            execution_linked: false,
+            measured_result_reentry_linked: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "G6 execution/result linkage failed.",
+            terminal_eligible: false,
+          },
+        };
+        observationPacket.missing_requirements.push({
+          code: "reasoning_role_execution_link_failed",
+          message:
+            "The environment action completed, but its selected G6 proposal and measured-result re-entry could not be linked canonically.",
+          repair_action: "inspect_reasoning_role_ledger_before_claiming_success",
+        });
+      }
+    }
     const trace = buildGatewayTrace({
       turnId,
       capabilityId: manifest.capability_id,

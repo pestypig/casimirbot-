@@ -78,6 +78,18 @@ import {
   type HelixEnvironmentDurableGoalProjection,
 } from "@shared/helix-environment-durable-goal";
 import {
+  HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
+  HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY,
+  HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+  HELIX_ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY,
+  helixEnvironmentReasoningRoleArbitrateRequestSchema,
+  helixEnvironmentReasoningRoleDispositionRequestSchema,
+  helixEnvironmentReasoningRoleRecordRequestSchema,
+  helixEnvironmentReasoningRoleSha256,
+  type HelixEnvironmentReasoningRolePayload,
+  type HelixEnvironmentReasoningRoleProjection,
+} from "@shared/helix-environment-reasoning-role";
+import {
   HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
   helixEnvironmentProbeObservationSchema,
 } from "@shared/helix-environment-connector";
@@ -155,6 +167,11 @@ import {
   isEnvironmentDurableGoalError,
   type EnvironmentDurableGoalStore,
 } from "../services/environment-connectors/goals";
+import {
+  environmentReasoningRoleStore,
+  isEnvironmentReasoningRoleError,
+  type EnvironmentReasoningRoleStore,
+} from "../services/environment-connectors/reasoning-roles/environment-reasoning-role-store";
 import { extendEnvironmentActionAuthorityLease } from
   "../services/environment-connectors/actions/authority-store";
 import { listStagePlayLiveSourceMailItems } from
@@ -284,6 +301,53 @@ type HelixEnvironmentGoalCheckpointHashToolArguments = {
   incomplete_postcondition_ids: string[];
 };
 
+type HelixEnvironmentReasoningRoleRecordToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  action_authority_id: string;
+  subject_native_id: string;
+  turn_id: string;
+  goal_id: string;
+  expected_goal_revision: number;
+  expected_ledger_revision: number;
+  observation_revision: number;
+  input_evidence_refs: string[];
+  payload: HelixEnvironmentReasoningRolePayload;
+  expires_in_seconds: number;
+};
+
+type HelixEnvironmentReasoningRoleInspectToolArguments = {
+  room_id: string;
+  goal_id: string;
+};
+
+type HelixEnvironmentReasoningRoleDispositionToolArguments = {
+  room_id: string;
+  turn_id: string;
+  goal_id: string;
+  expected_ledger_revision: number;
+  role_output_id: string;
+  disposition: "adopted" | "revised" | "ignored" | "rejected";
+  adopted_capability_id: string | null;
+  adopted_capability_arguments: RecordLike | null;
+  rationale_summary: string;
+};
+
+type HelixEnvironmentReasoningRoleArbitrateToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  action_authority_id: string;
+  subject_native_id: string;
+  turn_id: string;
+  goal_id: string;
+  expected_goal_revision: number;
+  expected_ledger_revision: number;
+  observation_revision: number;
+  considered_role_output_ids: string[];
+  selected_role_output_id: string | null;
+  reason: string;
+};
+
 type HelixEnvironmentActionAuthorityExtendToolArguments = {
   room_id: string;
   environment_binding_id: string;
@@ -300,6 +364,10 @@ export type HelixEnvironmentProbeMcpExecutor =
 export type HelixEnvironmentDurableGoalMcpStore = Pick<
   EnvironmentDurableGoalStore,
   "create" | "inspect" | "append"
+>;
+export type HelixEnvironmentReasoningRoleMcpStore = Pick<
+  EnvironmentReasoningRoleStore,
+  "recordOutput" | "inspect" | "recordPrincipalDisposition" | "arbitrate"
 >;
 export type HelixEnvironmentActionAuthorityLeaseExtender =
   typeof extendEnvironmentActionAuthorityLease;
@@ -680,6 +748,27 @@ const environmentGoalCheckpointHashOutputSchema = z
   })
   .strict();
 
+const environmentReasoningRoleOutputSchema = z
+  .object({
+    operation: z.enum([
+      HELIX_ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY,
+      HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+      HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY,
+      HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
+    ]),
+    room_id: helixSharedLiveRoomIdSchema,
+    ok: z.literal(true),
+    projection: jsonObjectSchema.nullable(),
+    content_role: z.literal(
+      "environment_reasoning_role_observation_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
 const environmentActionAuthorityExtendOutputSchema = z
   .object({
     operation: z.literal("environment.action_authority.extend"),
@@ -706,6 +795,26 @@ const durableGoalMcpObservation = (
   ok: true,
   goal,
   content_role: "environment_durable_goal_observation_not_assistant_answer",
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+});
+
+const reasoningRoleMcpObservation = (
+  operation:
+    | typeof HELIX_ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY
+    | typeof HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY
+    | typeof HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY
+    | typeof HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
+  roomId: string,
+  projection: HelixEnvironmentReasoningRoleProjection | null,
+): RecordLike => ({
+  operation,
+  room_id: roomId,
+  ok: true,
+  projection,
+  content_role: "environment_reasoning_role_observation_not_assistant_answer",
   reentry_required: true,
   answer_authority: false,
   assistant_answer: false,
@@ -937,6 +1046,26 @@ const toolError = (
 };
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+  if (isEnvironmentReasoningRoleError(error)) {
+    const value = {
+      schema: "helix.environment_reasoning_role_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable: error.statusCode >= 500,
+      details: error.details,
+      content_role:
+        "environment_reasoning_role_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
   if (isEnvironmentDurableGoalError(error)) {
     const value = {
       schema: "helix.environment_durable_goal_error.v1",
@@ -1152,6 +1281,7 @@ export const createHelixMcpServer = (input: {
   environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
   environmentProbeExecutor?: HelixEnvironmentProbeMcpExecutor;
   environmentDurableGoalService?: HelixEnvironmentDurableGoalMcpStore;
+  environmentReasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
   environmentActionAuthorityLeaseExtender?: HelixEnvironmentActionAuthorityLeaseExtender;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
@@ -1173,6 +1303,8 @@ export const createHelixMcpServer = (input: {
     input.environmentProbeExecutor ?? executeEnvironmentProbeGatewayCapability;
   const durableGoalService =
     input.environmentDurableGoalService ?? environmentDurableGoalStore;
+  const reasoningRoleService =
+    input.environmentReasoningRoleService ?? environmentReasoningRoleStore;
   const actionAuthorityLeaseExtender =
     input.environmentActionAuthorityLeaseExtender ??
       extendEnvironmentActionAuthorityLease;
@@ -1615,6 +1747,240 @@ export const createHelixMcpServer = (input: {
             assistant_answer: false,
             terminal_eligible: false,
           },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_reasoning_role_record",
+    {
+      title: "Record revision-bound environment reasoning support",
+      description:
+        "Records one nonterminal perception, prospective-planning, or verification artifact for the exact current durable goal, observation, room participant, and principal turn. It cannot execute or answer.",
+      inputSchema: helixEnvironmentReasoningRoleRecordRequestSchema.extend({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        subject_native_id: z.string().trim().min(1).max(320),
+        turn_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentReasoningRoleOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentReasoningRoleRecordToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const projection = await reasoningRoleService.recordOutput({
+          ownerProfileId: input.principal.accountProfileId,
+          roomId: argumentsValue.room_id,
+          participantId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          subjectNativeId: argumentsValue.subject_native_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          runId: null,
+          turnId: argumentsValue.turn_id,
+          goalId: argumentsValue.goal_id,
+          expectedGoalRevision: argumentsValue.expected_goal_revision,
+          expectedLedgerRevision: argumentsValue.expected_ledger_revision,
+          observationRevision: argumentsValue.observation_revision,
+          principalTurnId: argumentsValue.turn_id,
+          producer: {
+            selected_runtime_provider_id: "external_mcp_runtime",
+            supporting_provider_id: "external_mcp_runtime",
+            role_profile_id:
+              `environment.${argumentsValue.payload.role_kind}.external_mcp_shadow.v1`,
+            role_artifact_version: "v1",
+          },
+          inputEvidenceRefs: argumentsValue.input_evidence_refs,
+          payload: argumentsValue.payload,
+          expiresAt: new Date(
+            Date.now() + argumentsValue.expires_in_seconds * 1_000,
+          ).toISOString(),
+        });
+        return {
+          ok: true,
+          value: reasoningRoleMcpObservation(
+            HELIX_ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY,
+            argumentsValue.room_id,
+            projection,
+          ),
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_reasoning_role_inspect",
+    {
+      title: "Inspect revision-bound environment reasoning support",
+      description:
+        "Reconstructs the authorized append-only G6 role ledger as nonterminal evidence for the principal Runtime Codex.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        goal_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentReasoningRoleOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async (argumentsValue: HelixEnvironmentReasoningRoleInspectToolArguments) =>
+      callRoomObservationTool(HELIX_SHARED_LIVE_ROOM_READ_SCOPE, async () => {
+        requireHelixAgentApiScope(
+          input.principal,
+          HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        );
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const projection = await reasoningRoleService.inspect({
+          goalId: argumentsValue.goal_id,
+          profileId: input.principal.accountProfileId,
+          participantId,
+        });
+        return {
+          ok: true,
+          value: reasoningRoleMcpObservation(
+            HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+            argumentsValue.room_id,
+            projection,
+          ),
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_reasoning_role_disposition",
+    {
+      title: "Record principal disposition of environment reasoning support",
+      description:
+        "Records the exact principal turn's adoption, revision, rejection, or ignore decision. Helix hashes exact adopted arguments; no action executes.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        turn_id: z.string().trim().min(1).max(320),
+        goal_id: z.string().trim().min(1).max(320),
+        expected_ledger_revision: z.number().int().positive(),
+        role_output_id: z.string().trim().min(1).max(320),
+        disposition: z.enum(["adopted", "revised", "ignored", "rejected"]),
+        adopted_capability_id: z.string().trim().min(1).max(320).nullable(),
+        adopted_capability_arguments: z.record(z.string(), z.unknown()).nullable(),
+        rationale_summary: z.string().trim().min(1).max(4_000),
+      }).strict(),
+      outputSchema: environmentReasoningRoleOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentReasoningRoleDispositionToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const disposition =
+          helixEnvironmentReasoningRoleDispositionRequestSchema.parse({
+            goal_id: argumentsValue.goal_id,
+            expected_ledger_revision: argumentsValue.expected_ledger_revision,
+            role_output_id: argumentsValue.role_output_id,
+            disposition: argumentsValue.disposition,
+            adopted_capability_id: argumentsValue.adopted_capability_id,
+            adopted_capability_arguments:
+              argumentsValue.adopted_capability_arguments,
+            rationale_summary: argumentsValue.rationale_summary,
+          });
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const projection = await reasoningRoleService.recordPrincipalDisposition({
+          goalId: disposition.goal_id,
+          profileId: input.principal.accountProfileId,
+          participantId,
+          expectedLedgerRevision: disposition.expected_ledger_revision,
+          roleOutputId: disposition.role_output_id,
+          principalTurnId: argumentsValue.turn_id,
+          disposition: disposition.disposition,
+          adoptedCapabilityId: disposition.adopted_capability_id,
+          adoptedCapabilityArgumentsHash:
+            disposition.adopted_capability_arguments === null
+              ? null
+              : helixEnvironmentReasoningRoleSha256(
+                  disposition.adopted_capability_arguments,
+                ),
+          rationaleSummary: disposition.rationale_summary,
+        });
+        return {
+          ok: true,
+          value: reasoningRoleMcpObservation(
+            HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY,
+            argumentsValue.room_id,
+            projection,
+          ),
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_reasoning_role_arbitrate",
+    {
+      title: "Arbitrate current environment reasoning support",
+      description:
+        "Invalidates stale outputs and selects at most one current, principal-adopted proposal for the existing action-admission path. It never executes that action.",
+      inputSchema: helixEnvironmentReasoningRoleArbitrateRequestSchema.extend({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        subject_native_id: z.string().trim().min(1).max(320),
+        turn_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentReasoningRoleOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentReasoningRoleArbitrateToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const projection = await reasoningRoleService.arbitrate({
+          ownerProfileId: input.principal.accountProfileId,
+          roomId: argumentsValue.room_id,
+          participantId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          subjectNativeId: argumentsValue.subject_native_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          runId: null,
+          turnId: argumentsValue.turn_id,
+          goalId: argumentsValue.goal_id,
+          expectedGoalRevision: argumentsValue.expected_goal_revision,
+          expectedLedgerRevision: argumentsValue.expected_ledger_revision,
+          observationRevision: argumentsValue.observation_revision,
+          principalTurnId: argumentsValue.turn_id,
+          consideredRoleOutputIds: argumentsValue.considered_role_output_ids,
+          selectedRoleOutputId: argumentsValue.selected_role_output_id,
+          reason: argumentsValue.reason,
+        });
+        return {
+          ok: true,
+          value: reasoningRoleMcpObservation(
+            HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
+            argumentsValue.room_id,
+            projection,
+          ),
         };
       }),
   );

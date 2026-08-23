@@ -239,6 +239,41 @@ const readStructuredLaneCalls = (body: RecordLike): RecordLike[] => {
   return record ? [record] : [];
 };
 
+const ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY =
+  "com.casimirbot.environment.reasoning_role.record" as const;
+
+const invalidConcurrentEnvironmentRoleBatch = (
+  calls: RecordLike[],
+): boolean => {
+  const roleCalls = calls.filter(
+    (call) =>
+      readHelixCapabilityLaneCallCapability(call) ===
+      ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY,
+  );
+  if (roleCalls.length === 0) return false;
+  if (roleCalls.length !== calls.length) return true;
+  if (roleCalls.length === 1) return false;
+  const first = roleCalls[0];
+  const goalId = readString(first.goal_id);
+  const goalRevision = readNumber(first.expected_goal_revision);
+  const observationRevision = readNumber(first.observation_revision);
+  const firstLedgerRevision = readNumber(first.expected_ledger_revision);
+  if (
+    !goalId ||
+    goalRevision === null ||
+    observationRevision === null ||
+    firstLedgerRevision === null
+  ) {
+    return true;
+  }
+  return roleCalls.some((call, index) =>
+    readString(call.goal_id) !== goalId ||
+    readNumber(call.expected_goal_revision) !== goalRevision ||
+    readNumber(call.observation_revision) !== observationRevision ||
+    readNumber(call.expected_ledger_revision) !== firstLedgerRevision + index
+  );
+};
+
 const readTurnInputItems = (body: RecordLike): RecordLike[] =>
   readRecordArray(
     body.turn_input_items ??
@@ -642,7 +677,24 @@ export const runHelixCapabilityLaneOneShotRequests = async (input: {
     }
   }
   const results: HelixCapabilityLaneOneShotCallResult[] = [];
+  const g6RoleBatchInvalid = invalidConcurrentEnvironmentRoleBatch(calls);
   for (const call of calls) {
+    if (g6RoleBatchInvalid) {
+      results.push(
+        buildUnknownHelixCapabilityLaneOneShotResult({
+          provider: input.provider,
+          call: {
+            ...call,
+            requested_lane: "unknown",
+            requested_backend_provider: null,
+          },
+          turnId,
+          iteration: input.iteration,
+          env: input.env,
+        }),
+      );
+      continue;
+    }
     const capability = readHelixCapabilityLaneCallCapability(call);
     const dispatch = capability
       ? resolveHelixCapabilityLaneOneShotDispatch({

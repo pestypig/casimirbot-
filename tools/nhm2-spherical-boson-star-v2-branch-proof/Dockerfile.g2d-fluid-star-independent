@@ -1,0 +1,21 @@
+# G2D-R1 independent C17/GMP/MPFR runtime. Building may use the network;
+# candidate execution is always offline and remains separately unauthorized.
+FROM nhm2-g2b-runtime:python3.12.11-gmpy2.2.1 AS build
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+COPY g2d_fluid_star_independent.c /tmp/g2d_fluid_star_independent.c
+RUN gcc -std=c17 -O2 -fno-fast-math -ffp-contract=off \
+    -Wall -Wextra -Werror \
+    -I/usr/local/lib/python3.12/site-packages/gmpy2 \
+    /tmp/g2d_fluid_star_independent.c \
+    -L/usr/local/lib/python3.12/site-packages/gmpy2.libs \
+    -Wl,-rpath,/usr/local/lib/python3.12/site-packages/gmpy2.libs \
+    -Wl,-z,relro,-z,now \
+    -l:libmpfr-6963dfaf.so.6.2.1 -l:libgmp-c9be030b.so.10.5.0 \
+    -o /tmp/g2d-fluid-star-independent
+
+FROM nhm2-g2b-runtime:python3.12.11-gmpy2.2.1
+COPY --from=build /tmp/g2d-fluid-star-independent /usr/local/bin/g2d-fluid-star-independent
+ENTRYPOINT ["/usr/local/bin/g2d-fluid-star-independent"]

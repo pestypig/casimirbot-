@@ -249,6 +249,10 @@ com.casimirbot.minecraft.situation_digest.read
 com.casimirbot.environment.durable_goal.create
 com.casimirbot.environment.durable_goal.inspect
 com.casimirbot.environment.durable_goal.append
+com.casimirbot.environment.reasoning_role.record
+com.casimirbot.environment.reasoning_role.inspect
+com.casimirbot.environment.reasoning_role.disposition
+com.casimirbot.environment.reasoning_role.arbitrate
 environment.minecraft.fabric_loopback.launch_and_join
 situation-room.describe_visual_capture
 room.list
@@ -307,6 +311,10 @@ capability.
 | `com.casimirbot.environment.durable_goal.create` | required `objective`; optional `environment_label` | `helix.environment_durable_goal_observation.v1` | Creates an append-only survival goal under exact server-resolved room, player, source, epoch, and action authority. The projection is nonterminal context. |
 | `com.casimirbot.environment.durable_goal.inspect` | required `goal_id` | `helix.environment_durable_goal_observation.v1` | Reconstructs bounded milestone, attempt, checkpoint, recovery, and evidence-reference context for authorized Codex continuation. |
 | `com.casimirbot.environment.durable_goal.append` | required `goal_id`, `expected_revision`, `payload`, `evidence_refs`; optional `environment_label` | `helix.environment_durable_goal_observation.v1` | Records one verified Runtime Codex decision or lifecycle fact. It cannot choose strategy or become terminal authority. |
+| `com.casimirbot.environment.reasoning_role.record` | `goal_id`, `expected_goal_revision`, `expected_ledger_revision`, `observation_revision`, `input_evidence_refs`, `payload`, `expires_in_seconds` | `helix.environment_reasoning_role_observation.v1` | Records one bounded perception, prospective-planning, or verification output against the exact principal turn and current revisions. The output is nonterminal evidence with no execution or answer authority. |
+| `com.casimirbot.environment.reasoning_role.inspect` | `goal_id` | `helix.environment_reasoning_role_observation.v1` | Reconstructs the append-only supporting-role ledger for the authorized durable goal. It does not select a proposal or answer. |
+| `com.casimirbot.environment.reasoning_role.disposition` | `goal_id`, `expected_ledger_revision`, `role_output_id`, `disposition`, `adopted_capability_id`, `adopted_capability_arguments`, `rationale_summary` | `helix.environment_reasoning_role_observation.v1` | Records the exact principal Runtime Codex turn's adopted, revised, ignored, or rejected disposition. Helix hashes the exact adopted arguments; adoption remains non-executing. |
+| `com.casimirbot.environment.reasoning_role.arbitrate` | `goal_id`, `expected_goal_revision`, `expected_ledger_revision`, `observation_revision`, `considered_role_output_ids`, `selected_role_output_id`, `reason` | `helix.environment_reasoning_role_observation.v1` | Invalidates stale outputs and selects at most one current, principal-adopted proposal for the existing action-admission path. It never executes that action. |
 | `environment.minecraft.fabric_loopback.launch_and_join` | optional `address` (loopback only) | `helix.minecraft.local_lifecycle_observation.v1` | Developer-only, confirmation-gated lifecycle action shared by browser and packaged EXE. It invokes one fixed launcher and one fixed loopback join inbox, exposes no generic shell or credentials, and remains nonterminal. |
 | `situation-room.describe_visual_capture` | `thread_id`, `prompt` | `helix.visual_situation_observation.v1` | Read-only bounded SituationRun evidence; execution failure remains an admitted observation, and successful evidence must re-enter the runtime before synthesis. |
 | `room.list`                | none                         | `helix.shared_live_room.list_receipt.v1`                    | Server-authenticated account policy filters the list.                                                                                                        |

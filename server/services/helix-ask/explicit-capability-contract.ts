@@ -36,6 +36,12 @@ import {
   HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
 } from "@shared/helix-environment-durable-goal";
 import {
+  HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
+  HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY,
+  HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+  HELIX_ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY,
+} from "@shared/helix-environment-reasoning-role";
+import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
   HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
@@ -2220,6 +2226,70 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       ],
       requiredArgs: ["goal_id", "expected_revision", "payload", "evidence_refs"],
       optionalArgs: ["environment_label"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_REASONING_ROLE_RECORD_CAPABILITY,
+      aliases: ["record revision-bound environment reasoning support"],
+      requiredObservationKinds: [
+        "helix.environment_reasoning_role_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: [
+        "goal_id",
+        "expected_goal_revision",
+        "expected_ledger_revision",
+        "observation_revision",
+        "input_evidence_refs",
+        "payload",
+        "expires_in_seconds",
+      ],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+      aliases: ["inspect revision-bound environment reasoning support"],
+      requiredObservationKinds: [
+        "helix.environment_reasoning_role_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: ["goal_id"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY,
+      aliases: ["record principal disposition of environment reasoning support"],
+      requiredObservationKinds: [
+        "helix.environment_reasoning_role_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: [
+        "goal_id",
+        "expected_ledger_revision",
+        "role_output_id",
+        "disposition",
+        "adopted_capability_id",
+        "adopted_capability_arguments",
+        "rationale_summary",
+      ],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
+      aliases: ["arbitrate current environment reasoning proposal"],
+      requiredObservationKinds: [
+        "helix.environment_reasoning_role_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: [
+        "goal_id",
+        "expected_goal_revision",
+        "expected_ledger_revision",
+        "observation_revision",
+        "considered_role_output_ids",
+        "selected_role_output_id",
+        "reason",
+      ],
     }),
     liveEnvironmentEvidenceContract({
       capability: HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,

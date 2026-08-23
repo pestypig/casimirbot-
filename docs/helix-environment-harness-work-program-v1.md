@@ -163,7 +163,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Live-mail Minecraft wake bridge | live accepted | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md`; `artifacts/helix-environment-g4-live-2026-08-22-deterministic/helix-minecraft-player-ask-5a72c8a7-4dc7-4546-bf88-15c41a66700f.json` | Preserve exact source identity, deterministic-only preprocessing, deduplication, re-entry, and terminal continuity as G5+ regressions. |
 | Durable Minecraft goal lifecycle | integrated accepted | `docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md`; `artifacts/g5-durable-survival-goal/owner-natural-progress-report-final.json`; `artifacts/g5-durable-survival-goal/second-participant-natural-progress-report-authorized.json` | Preserve hash-linked recovery, semantic-wake consumption, exact evidence re-entry, read-only participant continuation, and no-action reporting as G6+ regressions. |
 | Durable all-advancements survival goal | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Prove checkpointed progress and recovery in G5. |
-| Concurrent runtime reasoning roles | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Add only after the sequential wake/solver path is reliable in G6. |
+| Concurrent runtime reasoning roles | implemented | `docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md`; `shared/helix-environment-reasoning-role.ts`; `server/services/environment-connectors/reasoning-roles/environment-reasoning-role-store.ts`; `server/services/environment-connectors/reasoning-roles/environment-reasoning-role-audit.ts` | Deterministic schemas, append-only persistence, native role batches, stale invalidation, principal disposition/arbitration, MCP/workstation facades, and execution/result linkage exist. Live keyed Minecraft acceptance and G1–G5 regressions remain required before G6 closes. |
 | Second-domain harness transfer | projected | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Demonstrate the accepted lifecycle in Robinhood shadow observation or another contrasting domain in G7. |
 
 ## Closed gate: G1 canonical lifecycle authority
@@ -347,6 +347,16 @@ goal revisions, stale proposals are invalidated before execution, one admitted
 proposal reaches the existing execution path, and its measured result re-enters
 the principal Runtime Codex turn without lifecycle or presentation divergence.
 The accepted G1–G5 journeys remain mandatory regressions.
+
+The active implementation packet is
+`docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md`.
+The deterministic implementation checkpoint is complete: exact shared schemas,
+hash-linked storage, provider-native revision-identical role batches,
+principal disposition, stale-aware one-proposal arbitration, automatic
+execution/measured-result linkage, observer-only first-divergence audit, and
+provider-neutral MCP/workstation facades are present. This is an
+`implemented` checkpoint only. G6 remains active until a natural keyed
+Minecraft journey and retained regressions supply acceptance evidence.
 
 
 ## Parallel delivery lane
