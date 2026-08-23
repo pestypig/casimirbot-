@@ -307,6 +307,32 @@ describe("Helix internet search tool admission", () => {
     expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
   });
 
+  it("keeps a current durable Minecraft room-goal report on bound room evidence", () => {
+    const prompt = [
+      "Using the canonical durable Minecraft goal in this room, report whether it completed.",
+      "Summarize the verified wake-driven replanning, connector-epoch recovery, restored viable control, and terminal milestone state.",
+      "Use current room evidence; do not execute a new game action or invent progress.",
+    ].join(" ");
+    const restatement = buildToolUseRestatement(prompt);
+    const internetIntent = detectInternetSearchIntent(prompt);
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:g5-natural-room-goal-report",
+      threadId: "helix-ask:room:test",
+      promptText: prompt,
+    });
+    const toolAdmission = buildToolCallAdmissionDecision({
+      turnId: "ask:g5-natural-room-goal-report",
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(internetIntent.searchRequested).toBe(false);
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+    expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
+  });
+
   it.each([
     [
       "scientific closure preparation",

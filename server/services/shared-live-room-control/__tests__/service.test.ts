@@ -224,6 +224,20 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
         }),
       ],
   );
+  const updatePresence = vi.fn(
+    async (input: { roomId: string; profileId: string; presence: "present" | "away" }) =>
+      room({
+        room_id: input.roomId,
+        self_participant_id: `participant:${input.profileId}`,
+        participants: [
+          {
+            ...room().participants[0]!,
+            participant_id: `participant:${input.profileId}`,
+            presence: input.presence,
+          },
+        ],
+      }),
+  );
   const deferredSourceBindingStore = overrides.deferredSourceBindingStore ?? {
     createSourceBindingWithoutCredential: vi.fn(async () =>
       sourceBinding({
@@ -255,6 +269,7 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
       readRoom,
       readMembership,
       listSourceBindings,
+      updatePresence,
     },
     deferredSourceBindingStore,
     credentialDelivery,
@@ -271,6 +286,7 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
     readRoom,
     readMembership,
     listSourceBindings,
+    updatePresence,
     deferredSourceBindingStore,
     credentialDelivery,
   };
@@ -287,6 +303,33 @@ const expectControlError = async (
 };
 
 describe("SharedLiveRoomControlService", () => {
+  it("sets only the authenticated actor's own room presence", async () => {
+    const harness = await createHarness();
+    const receipt = await harness.service.setOwnPresence({
+      actor: actor(),
+      request: { room_id: ROOM_ID, presence: "present" },
+    });
+
+    expect(harness.updatePresence).toHaveBeenCalledWith({
+      roomId: ROOM_ID,
+      profileId: "profile-a",
+      presence: "present",
+    });
+    expect(receipt).toMatchObject({
+      schema: "helix.shared_live_room.presence_set_receipt.v1",
+      operation: "room.presence.set",
+      content_role: "room_control_receipt_not_assistant_answer",
+      room: {
+        room_id: ROOM_ID,
+        self_participant_id: "participant:profile-a",
+      },
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  });
+
   it("lists and inspects only the authenticated actor's rooms as observations", async () => {
     const harness = await createHarness();
     const externalActor = actor();

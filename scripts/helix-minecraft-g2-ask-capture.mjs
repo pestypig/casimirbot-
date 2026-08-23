@@ -213,6 +213,12 @@ const run = async ({ statePath, outputPath, baseUrl, prompt }) => {
   const roomId = string(state.room_id, "room_id_missing");
   const profileId = string(state.profile_id, "profile_id_missing");
   const cookie = await signIn(baseUrl, profileId);
+  if (state.enable_experimental_rooms === true) {
+    await request(baseUrl, cookie, "/api/account/session/experimental-rooms", {
+      method: "POST",
+      body: { enabled: true },
+    });
+  }
   // API parity must reproduce the UI's explicit room-presence lifecycle. The
   // signed-in account alone is not authority to observe or mutate a room.
   await request(

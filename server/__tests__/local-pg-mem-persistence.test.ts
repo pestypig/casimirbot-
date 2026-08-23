@@ -413,6 +413,106 @@ describe("local pg-mem persistence", () => {
           'command_request:persistence', 'command_result_recorded',
           '{"outcome":"succeeded"}'::jsonb
         );
+        INSERT INTO helix_room_environment_subject_bindings (
+          subject_binding_id, room_id, participant_id, profile_id,
+          environment_binding_id, room_source_binding_id, source_id, world_id,
+          subject_kind, subject_ref, subject_native_id, subject_label,
+          verification_method, confidence, producer_epoch_ref
+        ) VALUES (
+          'subject_binding:durable-goal-persistence',
+          'shared_realtime_room:command-persistence',
+          'participant:command-persistence', $1,
+          'environment_binding:command-persistence',
+          'room_source_binding:command-persistence',
+          'source:room-ingress:command-persistence',
+          'minecraft:local:command-persistence', 'player',
+          'minecraft-player:persistence', 'player:persistence',
+          'Persistence Player', 'server_auth', 1, 'epoch:persistence'
+        );
+        INSERT INTO helix_environment_action_authorities (
+          action_authority_id, environment_binding_id,
+          room_source_binding_id, owner_profile_id, room_id, source_id,
+          world_id, adapter_profile_id, domain_adapter, participant_id,
+          subject_binding_id, subject_native_id, allowed_capability_ids,
+          autonomy_mode, manual_override_policy, policy_version, status,
+          expires_at
+        ) VALUES (
+          'environment_action_authority:persistence',
+          'environment_binding:command-persistence',
+          'room_source_binding:command-persistence', $1,
+          'shared_realtime_room:command-persistence',
+          'source:room-ingress:command-persistence',
+          'minecraft:local:command-persistence',
+          'game.minecraft.player.fabric.v1', 'minecraft.fabric_client.v1',
+          'participant:command-persistence',
+          'subject_binding:durable-goal-persistence', 'player:persistence',
+          '["com.casimirbot.minecraft.player.navigate"]'::jsonb,
+          'approved_capabilities', 'cancel', 1, 'active',
+          now() + interval '1 day'
+        );
+        INSERT INTO helix_environment_durable_goals (
+          goal_id, owner_profile_id, connector_installation_id, device_id,
+          environment_binding_id, room_source_binding_id, room_id,
+          participant_id, subject_binding_id, subject_native_id, source_id,
+          world_id, objective_hash, objective_payload, current_sequence,
+          latest_event_hash
+        ) VALUES (
+          'environment_durable_goal:persistence', $1,
+          'installation:command-persistence', 'device:command-persistence',
+          'environment_binding:command-persistence',
+          'room_source_binding:command-persistence',
+          'shared_realtime_room:command-persistence',
+          'participant:command-persistence',
+          'subject_binding:durable-goal-persistence', 'player:persistence',
+          'source:room-ingress:command-persistence',
+          'minecraft:local:command-persistence', 'sha256:${"2".repeat(64)}',
+          '{"objective_text":"Survive restart"}'::jsonb, 1,
+          'sha256:${"3".repeat(64)}'
+        );
+        INSERT INTO helix_environment_durable_goal_participants (
+          goal_id, participant_id, profile_id, granted_by_profile_id, scopes
+        ) VALUES (
+          'environment_durable_goal:persistence',
+          'participant:command-persistence', $1, $1,
+          '["read","steer"]'::jsonb
+        );
+        INSERT INTO helix_environment_durable_goal_participant_events (
+          grant_event_id, goal_id, sequence, event_hash, event_kind,
+          participant_id, profile_id, actor_profile_id, scopes
+        ) VALUES (
+          'durable_goal_grant_event:persistence',
+          'environment_durable_goal:persistence', 1,
+          'sha256:${"4".repeat(64)}', 'granted',
+          'participant:command-persistence', $1, $1,
+          '["read","steer"]'::jsonb
+        );
+        INSERT INTO helix_environment_durable_goal_events (
+          event_id, goal_id, sequence, event_kind, event_hash,
+          owner_profile_id, connector_installation_id, device_id,
+          environment_binding_id, room_source_binding_id, room_id,
+          goal_owner_participant_id, participant_id,
+          authority_participant_id, subject_binding_id, subject_native_id,
+          source_id, world_id, producer_epoch_ref, action_authority_id,
+          authority_policy_version, authority_expires_at, turn_id,
+          event_payload, payload, evidence_refs, occurred_at
+        ) VALUES (
+          'environment_durable_goal_event:persistence',
+          'environment_durable_goal:persistence', 1, 'goal_created',
+          'sha256:${"3".repeat(64)}', $1,
+          'installation:command-persistence', 'device:command-persistence',
+          'environment_binding:command-persistence',
+          'room_source_binding:command-persistence',
+          'shared_realtime_room:command-persistence',
+          'participant:command-persistence', 'participant:command-persistence',
+          'participant:command-persistence',
+          'subject_binding:durable-goal-persistence', 'player:persistence',
+          'source:room-ingress:command-persistence',
+          'minecraft:local:command-persistence', 'epoch:persistence',
+          'environment_action_authority:persistence', 1,
+          now() + interval '1 day', 'turn:persistence',
+          '{"kind":"goal_created"}'::jsonb,
+          '{"kind":"goal_created"}'::jsonb, '[]'::jsonb, now()
+        );
       `,
       [profileId],
     );
@@ -428,7 +528,12 @@ describe("local pg-mem persistence", () => {
         (SELECT count(*)::text FROM helix_environment_command_catalog_snapshots) AS catalogs,
         (SELECT count(*)::text FROM helix_environment_command_requests) AS requests,
         (SELECT count(*)::text FROM helix_environment_command_results) AS results,
-        (SELECT count(*)::text FROM helix_environment_command_events) AS events;
+        (SELECT count(*)::text FROM helix_environment_command_events) AS events,
+        (SELECT count(*)::text FROM helix_environment_action_authorities) AS action_authorities,
+        (SELECT count(*)::text FROM helix_environment_durable_goals) AS durable_goals,
+        (SELECT count(*)::text FROM helix_environment_durable_goal_participants) AS durable_participants,
+        (SELECT count(*)::text FROM helix_environment_durable_goal_participant_events) AS durable_participant_events,
+        (SELECT count(*)::text FROM helix_environment_durable_goal_events) AS durable_events;
     `);
     const restoredCounts = Object.fromEntries(
       Object.entries(restored.rows[0]).map(([key, value]) => [
@@ -444,6 +549,11 @@ describe("local pg-mem persistence", () => {
       requests: 1,
       results: 1,
       events: 1,
+      action_authorities: 1,
+      durable_goals: 1,
+      durable_participants: 1,
+      durable_participant_events: 1,
+      durable_events: 1,
     });
     const jsonRestored = await getPool().query<{
       approved_categories: unknown;
@@ -471,6 +581,29 @@ describe("local pg-mem persistence", () => {
       catalog_summary: { root_commands: ["time"] },
       result_payload: { summary: "The time is 1000." },
       payload: { outcome: "succeeded" },
+    });
+    const durableJsonRestored = await getPool().query<{
+      objective_payload: unknown;
+      scopes: unknown;
+      event_payload: unknown;
+      payload: unknown;
+      evidence_refs: unknown;
+    }>(`
+      SELECT g.objective_payload, p.scopes, e.event_payload, e.payload,
+             e.evidence_refs
+      FROM helix_environment_durable_goals g
+      JOIN helix_environment_durable_goal_participants p
+        ON p.goal_id = g.goal_id
+      JOIN helix_environment_durable_goal_events e
+        ON e.goal_id = g.goal_id
+      WHERE g.goal_id = 'environment_durable_goal:persistence';
+    `);
+    expect(durableJsonRestored.rows[0]).toMatchObject({
+      objective_payload: { objective_text: "Survive restart" },
+      scopes: ["read", "steer"],
+      event_payload: { kind: "goal_created" },
+      payload: { kind: "goal_created" },
+      evidence_refs: [],
     });
   }, 30_000);
 

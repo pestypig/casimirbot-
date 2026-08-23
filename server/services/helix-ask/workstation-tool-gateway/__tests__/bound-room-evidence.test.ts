@@ -24,6 +24,7 @@ import {
   type HelixSharedRealtimeRoom,
 } from "@shared/helix-shared-realtime-room";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import type { HelixEnvironmentDurableGoalProjection } from "@shared/helix-environment-durable-goal";
 import type { SharedLiveRoomRunRoomBinding } from "../../../shared-live-room-control/binding-store";
 import {
   clearEventJournalForTest,
@@ -294,6 +295,7 @@ const dependencies = (
   readSourceCandidate: async () => sourceCandidate,
   queryEvents: () => eventResult([event()]),
   readLatestSnapshot: () => null,
+  readDurableGoals: async () => [],
   now: () => NOW,
   freshnessMs: () => 120_000,
   ...overrides,
@@ -375,6 +377,144 @@ describe("authenticated bound-room evidence gateway", () => {
     expect(serialized).not.toContain("subject-a");
     expect(serialized).not.toContain("https://issuer.example");
     expect(serialized).not.toContain("bearer_token");
+  });
+
+  it("includes bounded participant-authorized durable goal evidence without granting answer authority", async () => {
+    const durableGoal: HelixEnvironmentDurableGoalProjection = {
+      schema: "helix.environment_durable_goal_projection.v1",
+      goal_id: "environment_durable_goal:one",
+      revision: 19,
+      latest_event_hash: `sha256:${"a".repeat(64)}`,
+      status: "completed",
+      objective: {
+        objective_text: "Preserve viable control through one connector recovery.",
+        goal_kind: "custom_survival",
+        domain: "minecraft",
+        game_version: "1.21.8",
+        mechanics_collection_ref: null,
+        milestones: [{
+          milestone_id: "restored_viable_control",
+          description: "Restore viable control after a connector epoch change.",
+          dependency_milestone_ids: [],
+          required_postcondition_ids: ["health_restored", "controls_released"],
+        }],
+      },
+      identity: {
+        owner_profile_id: "profile-a",
+        host_ref: "environment_device:one",
+        connector_installation_id: "installation:one",
+        device_id: "device:one",
+        environment_binding_id: "environment:one",
+        room_source_binding_id: SOURCE_BINDING_ID,
+        room_id: ROOM_ID,
+        goal_owner_participant_id: "participant-a",
+        participant_id: "participant-a",
+        authority_participant_id: "participant-a",
+        subject_binding_id: "subject:one",
+        subject_native_id: "player:one",
+        source_id: SOURCE_ID,
+        world_id: WORLD_ID,
+        producer_epoch_ref: "producer-epoch:two",
+        action_authority_id: "authority:one",
+        authority_policy_version: 2,
+        authority_expires_at: "2026-07-27T00:00:00.000Z",
+        run_id: RUN_ID,
+        turn_id: TURN_ID,
+      },
+      active_milestone_id: null,
+      milestones: [{
+        milestone_id: "restored_viable_control",
+        description: "Restore viable control after a connector epoch change.",
+        status: "completed",
+        required_postcondition_ids: ["health_restored", "controls_released"],
+        completed_postcondition_ids: ["health_restored", "controls_released"],
+      }],
+      recent_attempts: [],
+      attempt_count: 1,
+      latest_checkpoint: {
+        checkpoint_id: "checkpoint:restored",
+        event_id: "environment_durable_goal_event:checkpoint",
+        observation_revision: 8,
+        verified_facts: { health: 20, controls_released: true },
+        evidence_refs: ["environment_action_evidence:restored"],
+      },
+      recovery: {
+        required: false,
+        reason: null,
+        rebound_event_id: "environment_durable_goal_event:rebound",
+      },
+      consumed_semantic_wake_refs: ["environment_mail:wake"],
+      event_refs: [
+        "environment_durable_goal_event:created",
+        "environment_durable_goal_event:rebound",
+        "environment_durable_goal_event:completed",
+      ],
+      content_role: "environment_durable_goal_projection_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const result = await executeBoundRoomEvidenceCapability({
+      turnId: TURN_ID,
+      policy: policy(),
+      dependencies: dependencies({
+        readDurableGoals: async () => [durableGoal],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        durable_goal_observations: {
+          goal_count: 1,
+          goals: [{
+            goal_id: durableGoal.goal_id,
+            revision: 19,
+            status: "completed",
+            milestones: [{ status: "completed" }],
+            latest_checkpoint: {
+              checkpoint_id: "checkpoint:restored",
+              verified_facts: { health: 20, controls_released: true },
+            },
+            recovery: { required: false },
+            answer_authority: false,
+            terminal_eligible: false,
+          }],
+        },
+        provenance: {
+          evidence_refs: expect.arrayContaining([
+            "environment_durable_goal_event:completed",
+            "environment_action_evidence:restored",
+            "environment_mail:wake",
+          ]),
+        },
+      },
+    });
+
+    const mismatched = await executeBoundRoomEvidenceCapability({
+      turnId: TURN_ID,
+      policy: policy(),
+      dependencies: dependencies({
+        readDurableGoals: async () => [{
+          ...durableGoal,
+          identity: {
+            ...durableGoal.identity,
+            world_id: "minecraft:wrong-world",
+          },
+        }],
+      }),
+    });
+    expect(mismatched).toMatchObject({
+      ok: false,
+      status: "blocked",
+      error: "bound_room_evidence_identity_mismatch",
+      observation: {
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+    });
   });
 
   it("projects a second game adapter through generic environment evidence without a Minecraft alias", async () => {

@@ -296,6 +296,55 @@ const collectMissingRequirementIds = (payload: RecordLike): string[] => {
   return uniqueStrings(values);
 };
 
+const requirementIdsResolvedBySuccessfulAttempt = (args: {
+  payload: RecordLike;
+  lastAttempt: HelixAgentContinuationAttempt | null;
+  newObservationRefs: string[];
+  projectedMissingRequirementIds: string[];
+}): string[] => {
+  const capabilityId = args.lastAttempt?.capability_id;
+  if (
+    args.lastAttempt?.status !== "succeeded" ||
+    !capabilityId ||
+    uniqueStrings([
+      args.lastAttempt.observation_refs,
+      args.newObservationRefs,
+    ]).length === 0
+  ) {
+    return [];
+  }
+
+  const itinerary =
+    readRecord(args.payload.capability_itinerary_execution_state) ??
+    readRecord(readRecord(args.payload.capability_itinerary)?.execution_state);
+  const matchingPendingSubgoals = readArray(itinerary?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter(
+      (entry: RecordLike | null): entry is RecordLike =>
+        Boolean(entry) &&
+        readString(entry?.satisfaction) !== "satisfied" &&
+        [
+          readString(entry?.requested_capability),
+          readString(entry?.runtime_capability),
+          readString(entry?.selected_capability),
+          readString(entry?.executed_capability),
+        ].includes(capabilityId),
+    )
+    .sort(
+      (left: RecordLike, right: RecordLike) =>
+        (Number(left.order) || 0) - (Number(right.order) || 0),
+    );
+
+  // A backend-success observation proves the exact capability requirement.
+  // If an occurrence ledger is stale, it also proves only the first pending
+  // matching occurrence; later occurrences of the same capability remain open.
+  const projectedMissing = new Set(args.projectedMissingRequirementIds);
+  return uniqueStrings([
+    projectedMissing.has(capabilityId) ? capabilityId : null,
+    readString(matchingPendingSubgoals[0]?.subgoal_id),
+  ]).filter((requirementId) => projectedMissing.has(requirementId));
+};
+
 const normalizeGoalStatus = (
   payload: RecordLike,
 ): {
@@ -1137,17 +1186,44 @@ export const buildHelixAgentContinuationState = (
     args.turnId,
     args.lastAttempt,
   );
-  const missingRequirementIds = uniqueStrings([
+  const projectedMissingRequirementIds = uniqueStrings([
     collectMissingRequirementIds(args.payload),
     lastAttempt?.failure_class === "missing_evidence"
       ? lastAttempt.failure_code
       : null,
   ]);
   const previousMissing = new Set(previousState?.missing_requirement_ids ?? []);
-  const currentMissing = new Set(missingRequirementIds);
-  const resolvedRequirements = [...previousMissing].filter(
-    (id: string) => !currentMissing.has(id),
+  const previouslyResolvedRequirements = uniqueStrings(
+    previousState?.progress?.resolved_requirement_ids ?? [],
   );
+  const evidenceResolvedRequirements =
+    requirementIdsResolvedBySuccessfulAttempt({
+      payload: args.payload,
+      lastAttempt,
+      newObservationRefs: newObservations,
+      projectedMissingRequirementIds,
+    });
+  const projectedMissing = new Set(projectedMissingRequirementIds);
+  const projectionResolvedRequirements = [...previousMissing].filter(
+    (id: string) => !projectedMissing.has(id),
+  );
+  // Resolution is monotonic within one turn. A later stale projection or
+  // unrelated failed probe cannot resurrect a requirement already proven by
+  // current-turn execution evidence.
+  const resolvedRequirements = uniqueStrings([
+    previouslyResolvedRequirements,
+    projectionResolvedRequirements,
+    evidenceResolvedRequirements,
+  ]);
+  const previouslyResolved = new Set(previouslyResolvedRequirements);
+  const newlyResolvedRequirements = resolvedRequirements.filter(
+    (id: string) => !previouslyResolved.has(id),
+  );
+  const durablyResolved = new Set(resolvedRequirements);
+  const missingRequirementIds = projectedMissingRequirementIds.filter(
+    (id: string) => !durablyResolved.has(id),
+  );
+  const currentMissing = new Set(missingRequirementIds);
   const addedRequirements = missingRequirementIds.filter(
     (id: string) => !previousMissing.has(id),
   );
@@ -1167,7 +1243,11 @@ export const buildHelixAgentContinuationState = (
   );
   const affordances = authoritativeTypedFailureSettled
     ? []
-    : collectedAffordances;
+    : collectedAffordances.map((affordance) =>
+        affordance.source_ref && durablyResolved.has(affordance.source_ref)
+          ? { ...affordance, tried: true }
+          : affordance,
+      );
   // A successful schema repair may carry a runtime-normalized attempt
   // fingerprint that differs from the affordance fingerprint Helix issued.
   // Persist every retired affordance fingerprint in the canonical tried set so
@@ -1190,13 +1270,13 @@ export const buildHelixAgentContinuationState = (
   const failedAttemptHasOnlyBookkeepingObservations = Boolean(
     lastAttempt &&
     (lastAttempt.status === "failed" || lastAttempt.status === "blocked") &&
-    resolvedRequirements.length === 0 &&
+    newlyResolvedRequirements.length === 0 &&
     newAffordanceCount === 0,
   );
   const madeProgress =
     (newObservations.length > 0 &&
       !failedAttemptHasOnlyBookkeepingObservations) ||
-    resolvedRequirements.length > 0 ||
+    newlyResolvedRequirements.length > 0 ||
     newAffordanceCount > 0;
   const repeatedFingerprint = Boolean(
     previousState?.last_attempt?.action_fingerprint &&
@@ -1249,7 +1329,7 @@ export const buildHelixAgentContinuationState = (
   };
   const reasonCodes = uniqueStrings([
     newObservations.length > 0 ? "new_observation" : null,
-    resolvedRequirements.length > 0 ? "requirements_resolved" : null,
+    newlyResolvedRequirements.length > 0 ? "requirements_resolved" : null,
     addedRequirements.length > 0 ? "requirements_added" : null,
     newAffordanceCount > 0 ? "new_affordance" : null,
     repeatedFingerprint && newAttemptObserved && !madeProgress

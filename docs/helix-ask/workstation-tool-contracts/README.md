@@ -229,6 +229,9 @@ Each capability contract should define:
 
 | Capability                                              | Contract                                                                                                 | Maturity    |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------- |
+| `com.casimirbot.environment.durable_goal.create`         | [environment-durable-goal.md](environment-durable-goal.md)                                               | `draft`     |
+| `com.casimirbot.environment.durable_goal.inspect`        | [environment-durable-goal.md](environment-durable-goal.md)                                               | `draft`     |
+| `com.casimirbot.environment.durable_goal.append`         | [environment-durable-goal.md](environment-durable-goal.md)                                               | `draft`     |
 | `workspace_os.status`                                   | [workspace_os.status.md](workspace_os.status.md)                                                         | `draft`     |
 | `helix_ask.inspect_capability_catalog`                  | [helix_ask.inspect_capability_catalog.md](helix_ask.inspect_capability_catalog.md)                       | `draft`     |
 | `workstation.active_context`                            | [workstation.active_context.md](workstation.active_context.md)                                           | `draft`     |
@@ -360,6 +363,8 @@ Each capability contract should define:
 | `com.casimirbot.minecraft.player.inventory.transfer`    | [environment-connector.player-action.md](environment-connector.player-action.md)                         | `draft`     |
 | `com.casimirbot.minecraft.player.sequence.execute`      | [environment-connector.player-action.md](environment-connector.player-action.md)                         | `draft`     |
 | `com.casimirbot.minecraft.player.guardian.execute`      | [environment-connector.player-action.md](environment-connector.player-action.md)                         | `draft`     |
+| `com.casimirbot.minecraft.player.viability_guardian.arm` | [environment-connector.player-action.md](environment-connector.player-action.md)                        | `draft`     |
+| `com.casimirbot.minecraft.player.viability_guardian.disarm` | [environment-connector.player-action.md](environment-connector.player-action.md)                     | `draft`     |
 | `com.casimirbot.minecraft.player.workflow.status`       | [environment-connector.player-action.md](environment-connector.player-action.md)                         | `draft`     |
 | `com.casimirbot.minecraft.player.workflow.resume`       | [environment-connector.player-action.md](environment-connector.player-action.md)                         | `draft`     |
 | `com.casimirbot.minecraft.player.workflow.cancel`       | [environment-connector.player-action.md](environment-connector.player-action.md)                         | `draft`     |

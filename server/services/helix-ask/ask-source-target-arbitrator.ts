@@ -76,6 +76,8 @@ import {
 } from "./theory-badge-graph-current-context-intent";
 import {
   isAffirmativeImmediateMinecraftSituationPrompt,
+  isAffirmativeMinecraftDurableGoalCreatePrompt,
+  isAffirmativeMinecraftDurableGoalInspectPrompt,
   isMinecraftCommandNonExecutionDiscussionPrompt,
   isMinecraftSituationSessionSetupPrompt,
 } from "./minecraft-situation-intent";
@@ -803,6 +805,57 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["model_only_concept", "no_tool_direct"],
       precedenceReason: "registered_formal_artifact_inspection_source_target",
       confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isAffirmativeMinecraftDurableGoalCreatePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["affirmative_minecraft_durable_goal_create"],
+      reasons: [
+        "minecraft_durable_goal_requires_authenticated_environment_gateway",
+        "durable_goal_strategy_and_arguments_owned_by_runtime_codex",
+      ],
+      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "workspace_panel",
+        "world_event_current_state",
+        "model_only_answer",
+        "no_tool_direct",
+      ],
+      precedenceReason: "affirmative_minecraft_durable_goal_create",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isAffirmativeMinecraftDurableGoalInspectPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["affirmative_minecraft_durable_goal_inspect"],
+      reasons: [
+        "minecraft_durable_goal_requires_authenticated_environment_gateway",
+        "durable_goal_resume_requires_canonical_identity_bound_projection",
+      ],
+      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "workspace_panel",
+        "workspace_diagnostic",
+        "world_event_current_state",
+        "model_only_answer",
+        "no_tool_direct",
+      ],
+      precedenceReason: "affirmative_minecraft_durable_goal_inspect",
+      confidence: 0.99,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

@@ -547,6 +547,12 @@ export const authenticateEnvironmentActionConnector = async (input: {
   };
 };
 
+export const buildEnvironmentActionConnectorEndpoint = (
+  publicBaseUrl: string,
+  actionAuthorityId: string,
+): string =>
+  `${publicBaseUrl.replace(/\/$/u, "")}/api/environment-action/v1/authorities/${actionAuthorityId}`;
+
 const connectorConfig = (input: {
   authority: AuthorityConnectorRow;
   connectorInstallationId: string;
@@ -556,7 +562,10 @@ const connectorConfig = (input: {
 }): HelixEnvironmentActionConnectorConfig =>
   helixEnvironmentActionConnectorConfigSchema.parse({
     schema: HELIX_ENVIRONMENT_ACTION_CONNECTOR_CONFIG_SCHEMA,
-    endpoint: `${input.publicBaseUrl.replace(/\/$/u, "")}/api/environment-action/v1/authorities/${encodeURIComponent(input.authority.action_authority_id)}`,
+    endpoint: buildEnvironmentActionConnectorEndpoint(
+      input.publicBaseUrl,
+      input.authority.action_authority_id,
+    ),
     bearer_token: input.secret,
     action_authority_id: input.authority.action_authority_id,
     connector_installation_id: input.connectorInstallationId,
@@ -2568,6 +2577,127 @@ export type EnvironmentActionExecutionContext = {
   };
 };
 
+export type EnvironmentActionAuthorityContext = Omit<
+  EnvironmentActionExecutionContext,
+  "capability"
+>;
+
+type EnvironmentActionManifestCapability = {
+  capability_id: string;
+  capability_version: number;
+  action_kind: string;
+  effect_class: EnvironmentActionExecutionContext["capability"]["effectClass"];
+  workflow_modes: Array<"single_action" | "long_running">;
+  control_engines: Array<"native_fabric" | "baritone">;
+};
+
+const resolveEnvironmentActionAuthorityBase = async (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+  participantId: string;
+}): Promise<{
+  context: EnvironmentActionAuthorityContext;
+  allowedCapabilityIds: string[];
+  manifestCapabilities: EnvironmentActionManifestCapability[];
+}> => {
+  const membership = await readSharedRealtimeRoomMembership({
+    roomId: input.roomId,
+    profileId: input.profileId,
+  });
+  if (
+    !membership ||
+    (membership.role !== "owner" &&
+      membership.participantId !== input.participantId)
+  ) {
+    throw new EnvironmentActionBrokerError(
+      "action_policy_denied",
+      403,
+      "The current room turn cannot control this paired player identity.",
+    );
+  }
+  const db = await readSharedRealtimeRoomDatabase();
+  const selected = await db.query<{ action_authority_id: string }>(
+    `SELECT action_authority_id
+     FROM helix_environment_action_authorities
+     WHERE room_id = $1 AND environment_binding_id = $2
+       AND participant_id = $3 AND status = 'active'
+       AND (expires_at IS NULL OR expires_at > now())
+     ORDER BY policy_version DESC, created_at DESC
+     LIMIT 1;`,
+    [input.roomId, input.environmentBindingId, input.participantId],
+  );
+  const authority = assertAuthorityUsable(
+    selected.rows[0]
+      ? await readAuthorityConnectorRow(
+          db,
+          selected.rows[0].action_authority_id,
+        )
+      : null,
+  );
+  const manifest = await assertFreshConnector(db, {
+    authorityId: authority.action_authority_id,
+    credentialId: authority.credential_id!,
+    connectorInstallationId: authority.connector_installation_id!,
+    environmentBindingId: authority.environment_binding_id,
+    roomSourceBindingId: authority.room_source_binding_id,
+    roomId: authority.room_id,
+    sourceId: authority.source_id,
+    worldId: authority.world_id,
+    actionAdapterProfileId: authority.adapter_profile_id,
+    actionDomainAdapter: authority.domain_adapter,
+    sourceAdapterProfileId: authority.source_adapter_profile_id,
+    participantId: authority.participant_id,
+    subjectBindingId: authority.subject_binding_id,
+    subjectNativeId: authority.subject_native_id,
+    policyVersion: Number(authority.policy_version),
+  });
+  const catalogSnapshotId = await assertEnvironmentActionCatalogAvailable({
+    db,
+    environmentBindingId: authority.environment_binding_id,
+    adapterProfileId: authority.adapter_profile_id,
+    manifestHash: manifest.manifest_hash,
+  });
+  return {
+    context: {
+      actionAuthorityId: authority.action_authority_id,
+      environmentBindingId: authority.environment_binding_id,
+      roomId: authority.room_id,
+      sourceId: authority.source_id,
+      worldId: authority.world_id,
+      participantId: authority.participant_id,
+      subjectBindingId: authority.subject_binding_id,
+      subjectNativeId: authority.subject_native_id,
+      actionAdapterProfileId: authority.adapter_profile_id,
+      actionDomainAdapter: authority.domain_adapter,
+      policyVersion: Number(authority.policy_version),
+      autonomyMode:
+        authority.autonomy_mode as EnvironmentActionAuthorityContext["autonomyMode"],
+      manualOverridePolicy:
+        authority.manual_override_policy as EnvironmentActionAuthorityContext["manualOverridePolicy"],
+      catalogSnapshotId,
+      manifestId: manifest.manifest_id,
+    },
+    allowedCapabilityIds: parseStringArray(authority.allowed_capability_ids),
+    manifestCapabilities: parseJson<EnvironmentActionManifestCapability[]>(
+      manifest.capabilities,
+      [],
+    ),
+  };
+};
+
+/**
+ * Resolves the exact, fresh Player Embodiment identity and authority without
+ * pretending that persistence itself executes a Fabric capability.
+ */
+export const resolveEnvironmentActionAuthorityContext = async (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+  participantId: string;
+}): Promise<EnvironmentActionAuthorityContext> =>
+  (await resolveEnvironmentActionAuthorityBase(input)).context;
+
 export type EnvironmentActionWorkflowControlContext = {
   actionAuthorityId: string;
   environmentBindingId: string;
@@ -2650,44 +2780,9 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
   participantId: string;
   capabilityId: string;
 }): Promise<EnvironmentActionExecutionContext> => {
-  const membership = await readSharedRealtimeRoomMembership({
-    roomId: input.roomId,
-    profileId: input.profileId,
-  });
+  const authority = await resolveEnvironmentActionAuthorityBase(input);
   if (
-    !membership ||
-    (membership.role !== "owner" &&
-      membership.participantId !== input.participantId)
-  ) {
-    throw new EnvironmentActionBrokerError(
-      "action_policy_denied",
-      403,
-      "The current room turn cannot control this paired player identity.",
-    );
-  }
-  const db = await readSharedRealtimeRoomDatabase();
-  const selected = await db.query<{ action_authority_id: string }>(
-    `SELECT action_authority_id
-     FROM helix_environment_action_authorities
-     WHERE room_id = $1 AND environment_binding_id = $2
-       AND participant_id = $3 AND status = 'active'
-       AND (expires_at IS NULL OR expires_at > now())
-     ORDER BY policy_version DESC, created_at DESC
-     LIMIT 1;`,
-    [input.roomId, input.environmentBindingId, input.participantId],
-  );
-  const authority = assertAuthorityUsable(
-    selected.rows[0]
-      ? await readAuthorityConnectorRow(
-          db,
-          selected.rows[0].action_authority_id,
-        )
-      : null,
-  );
-  if (
-    !parseStringArray(authority.allowed_capability_ids).includes(
-      input.capabilityId,
-    )
+    !authority.allowedCapabilityIds.includes(input.capabilityId)
   ) {
     throw new EnvironmentActionBrokerError(
       "action_policy_denied",
@@ -2695,33 +2790,7 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
       "The player-action authority does not admit this capability.",
     );
   }
-  const manifest = await assertFreshConnector(db, {
-    authorityId: authority.action_authority_id,
-    credentialId: authority.credential_id!,
-    connectorInstallationId: authority.connector_installation_id!,
-    environmentBindingId: authority.environment_binding_id,
-    roomSourceBindingId: authority.room_source_binding_id,
-    roomId: authority.room_id,
-    sourceId: authority.source_id,
-    worldId: authority.world_id,
-    actionAdapterProfileId: authority.adapter_profile_id,
-    actionDomainAdapter: authority.domain_adapter,
-    sourceAdapterProfileId: authority.source_adapter_profile_id,
-    participantId: authority.participant_id,
-    subjectBindingId: authority.subject_binding_id,
-    subjectNativeId: authority.subject_native_id,
-    policyVersion: Number(authority.policy_version),
-  });
-  const manifestCapability = parseJson<
-    Array<{
-      capability_id: string;
-      capability_version: number;
-      action_kind: string;
-      effect_class: EnvironmentActionExecutionContext["capability"]["effectClass"];
-      workflow_modes: Array<"single_action" | "long_running">;
-      control_engines: Array<"native_fabric" | "baritone">;
-    }>
-  >(manifest.capabilities, []).find(
+  const manifestCapability = authority.manifestCapabilities.find(
     (capability) => capability.capability_id === input.capabilityId,
   );
   if (!manifestCapability) {
@@ -2731,30 +2800,8 @@ export const resolveEnvironmentActionExecutionContext = async (input: {
       "The live player connector does not advertise this capability.",
     );
   }
-  const catalogSnapshotId = await assertEnvironmentActionCatalogAvailable({
-    db,
-    environmentBindingId: authority.environment_binding_id,
-    adapterProfileId: authority.adapter_profile_id,
-    manifestHash: manifest.manifest_hash,
-  });
   return {
-    actionAuthorityId: authority.action_authority_id,
-    environmentBindingId: authority.environment_binding_id,
-    roomId: authority.room_id,
-    sourceId: authority.source_id,
-    worldId: authority.world_id,
-    participantId: authority.participant_id,
-    subjectBindingId: authority.subject_binding_id,
-    subjectNativeId: authority.subject_native_id,
-    actionAdapterProfileId: authority.adapter_profile_id,
-    actionDomainAdapter: authority.domain_adapter,
-    policyVersion: Number(authority.policy_version),
-    autonomyMode:
-      authority.autonomy_mode as EnvironmentActionExecutionContext["autonomyMode"],
-    manualOverridePolicy:
-      authority.manual_override_policy as EnvironmentActionExecutionContext["manualOverridePolicy"],
-    catalogSnapshotId,
-    manifestId: manifest.manifest_id,
+    ...authority.context,
     capability: {
       capabilityId: manifestCapability.capability_id,
       capabilityVersion: manifestCapability.capability_version,

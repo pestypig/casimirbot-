@@ -31,12 +31,21 @@ import {
 } from "@shared/helix-environment-command";
 import { HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA } from "@shared/helix-environment-action";
 import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-durable-goal";
+import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
   HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
 import {
@@ -63,6 +72,9 @@ import {
 import { isAffirmativeReadAloudPrompt } from "./referent-resolution";
 import {
   isAffirmativeImmediateMinecraftSituationPrompt,
+  isAffirmativeMinecraftDurableGoalAppendPrompt,
+  isAffirmativeMinecraftDurableGoalCreatePrompt,
+  isAffirmativeMinecraftDurableGoalInspectPrompt,
   isMinecraftSituationSessionSetupPrompt,
 } from "./minecraft-situation-intent";
 import { minecraftMechanicsDocsPromptMatch } from "./minecraft-mechanics-docs-intent";
@@ -280,7 +292,26 @@ const MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS = new Map<
       optional: ["environment_label"],
     },
   ],
+  ...[
+    HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
+    HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY,
+    HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
+    HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
+  ].map(
+    (capability) =>
+      [
+        capability,
+        { required: ["workflow_ref"], optional: ["reason"] },
+      ] as const,
+  ),
 ]);
+const MINECRAFT_PLAYER_EXPLICIT_CAPABILITY_IDS = [
+  ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_RESUME_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
+] as const;
 export type ExplicitCapabilityContract = {
   schema: "helix.explicit_capability_contract.v1";
   capability: string;
@@ -2139,7 +2170,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
             : ["freshness_requirement_ms"],
       }),
     ),
-    ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.map((capability) => {
+    ...MINECRAFT_PLAYER_EXPLICIT_CAPABILITY_IDS.map((capability) => {
       const args = MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS.get(capability) ?? {
         required: [],
         optional: ["environment_label"],
@@ -2157,6 +2188,38 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
         requiredArgs: args.required,
         optionalArgs: args.optional,
       });
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+      aliases: ["create durable Minecraft goal", "start durable Minecraft goal"],
+      requiredObservationKinds: [
+        "helix.environment_durable_goal_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: ["objective"],
+      optionalArgs: ["environment_label"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+      aliases: ["inspect durable Minecraft goal", "read durable Minecraft goal"],
+      requiredObservationKinds: [
+        "helix.environment_durable_goal_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: ["goal_id"],
+    }),
+    liveEnvironmentEvidenceContract({
+      capability: HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+      aliases: ["record durable Minecraft goal progress", "append durable Minecraft goal event"],
+      requiredObservationKinds: [
+        "helix.environment_durable_goal_observation.v1",
+        "helix.agent_step_observation_packet.v1",
+        "provider_gateway_observation_packet",
+      ],
+      requiredArgs: ["goal_id", "expected_revision", "payload", "evidence_refs"],
+      optionalArgs: ["environment_label"],
     }),
     liveEnvironmentEvidenceContract({
       capability: HELIX_MINECRAFT_CONTAINER_CONTENTS_READ_CAPABILITY,
@@ -3609,6 +3672,8 @@ const naturalMinecraftSituationProbePromptMatches = (
         /\b(?:check|read|show|inspect|tell\s+me)\b[\s\S]{0,120}\b(?:my\s+)?(?:selected|bound|current)\s+(?:minecraft\s+)?player\b[\s\S]{0,100}\b(?:yaw|pitch|facing(?:\s+direction)?|view(?:\s+(?:direction|rotation))?|rotation)\b/i,
         /\b(?:check|read|show|inspect|tell\s+me|what(?:'s|\s+is))\b[\s\S]{0,70}\b(?:crimson\s+curse|infection)\b[\s\S]{0,40}\b(?:phase|mass|points?|state|status)\b/i,
         /\b(?:make|perform|run|take)\b[\s\S]{0,80}\b(?:fresh|current|post[-\s]?action)?\s*player[-\s]?status\s+check\b/i,
+        /\b(?:verify|check|confirm|establish)\b[\s\S]{0,120}\b(?:my|the|current)\s+(?:minecraft\s+)?player\b[\s\S]{0,80}\b(?:alive|viable|surviving|safe)\b/i,
+        /\b(?:fresh|current)(?:[-\s]game|\s+minecraft)?\s+evidence\b[\s\S]{0,120}\b(?:my|the|current)\s+(?:minecraft\s+)?player\b[\s\S]{0,80}\b(?:alive|viable|surviving|safe)\b/i,
       ],
     },
     {
@@ -3996,6 +4061,69 @@ export const extractExplicitCapabilityContracts = (
       matched_name: minecraftMechanicsDocsMatch.matched_text,
       match_index: minecraftMechanicsDocsMatch.match_index,
       match_end_index: minecraftMechanicsDocsMatch.match_end_index,
+      source: "natural_capability_intent",
+    });
+  }
+  const durableGoalCreateContract = explicitCapabilityContractForCapability(
+    HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  );
+  if (
+    durableGoalCreateContract &&
+    isAffirmativeMinecraftDurableGoalCreatePrompt(prompt) &&
+    !familySuppressed(prompt, durableGoalCreateContract)
+  ) {
+    const match = prompt.match(
+      /\b(?:start|create|begin|launch|establish|set\s+up)\b/i,
+    );
+    const matchIndex = match?.index ?? 0;
+    matches.push({
+      contract: durableGoalCreateContract,
+      capability: durableGoalCreateContract.capability,
+      matched_name: match?.[0] ?? "durable_minecraft_goal_create",
+      match_index: matchIndex,
+      match_end_index: matchIndex + (match?.[0]?.length ?? 0),
+      source: "natural_capability_intent",
+    });
+  }
+  const durableGoalInspectContract = explicitCapabilityContractForCapability(
+    HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+  );
+  if (
+    durableGoalInspectContract &&
+    isAffirmativeMinecraftDurableGoalInspectPrompt(prompt) &&
+    !familySuppressed(prompt, durableGoalInspectContract)
+  ) {
+    const match = prompt.match(
+      /\b(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i,
+    );
+    const matchIndex = match?.index ?? 0;
+    matches.push({
+      contract: durableGoalInspectContract,
+      capability: durableGoalInspectContract.capability,
+      matched_name: match?.[0] ?? "durable_minecraft_goal_inspect",
+      match_index: matchIndex,
+      match_end_index: matchIndex + (match?.[0]?.length ?? 0),
+      source: "natural_capability_intent",
+    });
+  }
+  const durableGoalAppendContract = explicitCapabilityContractForCapability(
+    HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  );
+  if (
+    durableGoalAppendContract &&
+    isAffirmativeMinecraftDurableGoalAppendPrompt(prompt) &&
+    !familySuppressed(prompt, durableGoalAppendContract)
+  ) {
+    const match = prompt.match(
+      /\b(?:record|append|save|persist|write|mark|complete|advance|update)\b/i,
+    );
+    const matchIndex = match?.index ?? 0;
+    matches.push({
+      contract: durableGoalAppendContract,
+      capability: durableGoalAppendContract.capability,
+      matched_name: match?.[0] ?? "durable_minecraft_goal_append",
+      match_index: matchIndex,
+      match_end_index: matchIndex + (match?.[0]?.length ?? 0),
       source: "natural_capability_intent",
     });
   }

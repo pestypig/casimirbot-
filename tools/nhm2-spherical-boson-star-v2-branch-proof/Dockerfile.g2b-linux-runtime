@@ -1,0 +1,31 @@
+# Program gate: G2B — replacement classical proof attempt
+# Workstream: frozen four-grid classical branch
+# Capability or component: authenticated Linux x86_64/glibc full-fenv runtime
+# Current maturity: pinned runtime build definition before candidate execution
+# Target maturity: content-addressed admitted execution runtime
+# Required frozen inputs: CPython base digest and gmpy2 wheel hash
+# Required evidence: image digest, loader closure, fenv observation, and runtime manifest
+# Stop/fail criteria: first build, architecture, libc, loader, or fenv mismatch
+# Explicit non-goals: candidate solve, retune, replay authority, or physical authority
+# Downstream gate unlocked: integrated four-grid preexecution sealing
+
+FROM python@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PYTHONHASHSEED=0 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONNOUSERSITE=1
+
+COPY requirements-g2b-linux-runtime.txt /opt/nhm2/requirements-g2b-linux-runtime.txt
+
+RUN python -m pip install \
+      --disable-pip-version-check \
+      --no-cache-dir \
+      --only-binary=:all: \
+      --require-hashes \
+      --requirement /opt/nhm2/requirements-g2b-linux-runtime.txt
+
+WORKDIR /workspace
+
+ENTRYPOINT ["python", "-B", "-W", "error"]

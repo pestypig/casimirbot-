@@ -32,6 +32,11 @@ import {
 } from "@shared/contracts/casimir-independent-numerical-verification.v1";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-durable-goal";
+import {
   bindScholarlyRecoveryLaneRequestToSelectedPaper,
   buildCodexContinuationAffordanceRetryInstruction,
   buildCodexChainedLaneCallPlan,
@@ -47,7 +52,9 @@ import {
   buildCodexRuntimeLaneCapabilityAdmissionCorrection,
   attachCodexMinecraftPlayerEmbodimentActionRequirement,
   codexObservationDependentCapabilityProposalIds,
+  explicitlyAdmittedMutatingCapabilityIdsForQuestion,
   runtimeProviderAdmittedCapabilityIdsForQuestion,
+  typedObservationKindForGatewayCapability,
   nativeProviderAdmittedCapabilityIdsForTurn,
   runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody,
   selectCodexRuntimeCapabilityProposalIds,
@@ -3105,6 +3112,45 @@ describe("Codex provider capability lane adapter", () => {
     ]);
   });
 
+  it("preserves an exact hard-route durable-goal admission over unrelated diagnostic affordances", () => {
+    const inspectGoal =
+      "com.casimirbot.environment.durable_goal.inspect";
+    const actorStatus = "com.casimirbot.minecraft.actor.status.read";
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question:
+          "Resume durable Minecraft survival goal environment_durable_goal:example-12345678 and inspect its canonical state.",
+        admittedCapabilityIds: [
+          inspectGoal,
+          actorStatus,
+          "workspace_os.status",
+          "workstation.open_panel",
+        ],
+        admittedToolFamilies: ["live_environment", "workspace_diagnostic"],
+        committedRouteAllowedToolFamilies: ["live_environment"],
+        requiredExactCapabilityIds: [inspectGoal],
+        restrictAllCapabilitiesToAdmittedToolFamilies: true,
+      }),
+    ).toEqual([inspectGoal]);
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question:
+          "Inspect the exact durable goal after grounding the current player state.",
+        admittedCapabilityIds: [
+          inspectGoal,
+          actorStatus,
+          "workspace_os.status",
+        ],
+        admittedToolFamilies: ["live_environment", "workspace_diagnostic"],
+        committedRouteAllowedToolFamilies: ["live_environment"],
+        requiredExactCapabilityIds: [inspectGoal, actorStatus],
+        restrictAllCapabilitiesToAdmittedToolFamilies: true,
+      }),
+    ).toEqual([inspectGoal, actorStatus].sort());
+  });
+
   it("keeps account-wide mutations out of historical and contextual runtime turns", () => {
     const admittedCapabilityIds = [
       "debug.inspect_current_turn",
@@ -3158,6 +3204,55 @@ describe("Codex provider capability lane adapter", () => {
     ).toEqual([
       "com.casimirbot.minecraft.command",
       "debug.inspect_current_turn",
+    ]);
+  });
+
+  it("preserves an affirmative durable-goal append admitted inside an explicit compound route", () => {
+    const question =
+      "Continue my durable Minecraft survival patrol goal environment_durable_goal:8d46e04c-746c-4fde-9bad-0a3c689a1c87. Inspect its canonical state, use fresh current-game evidence to verify that my player is alive and viable, record the baseline checkpoint and complete only the baseline milestone if its required postcondition is actually supported, then tell me the next unverified milestone. Do not move the player or infer progress from chat history.";
+    const admission = {
+      admitted_capability: null,
+      exclusive_tool_capabilities: [],
+      compound_requested_capabilities: [
+        HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+        "com.casimirbot.minecraft.actor.status.read",
+        HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+        "situation-room.live-source.set_rate",
+      ],
+    };
+
+    expect(
+      explicitlyAdmittedMutatingCapabilityIdsForQuestion({
+        question,
+        toolCallAdmission: admission,
+      }),
+    ).toEqual([
+      HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+      "com.casimirbot.minecraft.actor.status.read",
+      HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+    ]);
+    expect(
+      explicitlyAdmittedMutatingCapabilityIdsForQuestion({
+        question:
+          "Do not record a baseline checkpoint; just explain how durable goal appends work.",
+        toolCallAdmission: admission,
+      }),
+    ).toEqual([]);
+  });
+
+  it("normalizes every durable-goal gateway receipt as live environment evidence", () => {
+    expect(
+      [
+        HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+        HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+        HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+      ].map((capabilityId) =>
+        typedObservationKindForGatewayCapability(capabilityId),
+      ),
+    ).toEqual([
+      "live_environment_observation",
+      "live_environment_observation",
+      "live_environment_observation",
     ]);
   });
 

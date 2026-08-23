@@ -65,6 +65,15 @@ import {
   FirstPartyCookieBoundary,
   FirstPartyCookieBoundaryError,
 } from "../../middleware/first-party-cookie-boundary";
+import {
+  helixEnvironmentDurableGoalAppendRequestSchema,
+  helixEnvironmentDurableGoalCreateRequestSchema,
+  helixEnvironmentDurableGoalParticipantGrantSchema,
+} from "@shared/helix-environment-durable-goal";
+import {
+  environmentDurableGoalStore,
+  isEnvironmentDurableGoalError,
+} from "../../services/environment-connectors/goals";
 
 const environmentCookieBoundary = new FirstPartyCookieBoundary({
   codePrefix: "room_environment_cookie",
@@ -133,6 +142,23 @@ const actionReceipt = (
 });
 
 const sendError = (res: Response, error: unknown): void => {
+  if (isEnvironmentDurableGoalError(error)) {
+    res.status(error.statusCode).json({
+      schema: "helix.environment_durable_goal_receipt.v1",
+      ok: false,
+      error: error.code,
+      message: error.message,
+      evidence_refs: error.evidenceRefs,
+      goal: null,
+      content_role: "environment_durable_goal_receipt_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    return;
+  }
   if (error instanceof FirstPartyCookieBoundaryError) {
     res.status(error.statusCode).json(receipt({
       ok: false,
@@ -480,6 +506,148 @@ sharedRealtimeRoomEnvironmentRouter.get(
       authorities,
       connector_readiness: connectorReadiness,
     }));
+  }),
+);
+
+const durableGoalReceipt = (goal: unknown) => ({
+  schema: "helix.environment_durable_goal_receipt.v1",
+  ok: true,
+  error: null,
+  message: "Durable environment goal state loaded as nonterminal evidence.",
+  goal,
+  content_role: "environment_durable_goal_receipt_not_assistant_answer",
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
+sharedRealtimeRoomEnvironmentRouter.post(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/durable-goals",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    const parsed = helixEnvironmentDurableGoalCreateRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        ...durableGoalReceipt(null),
+        ok: false,
+        error: "durable_goal_event_invalid",
+        message: "A valid authority, player, turn, objective, and milestone contract are required.",
+      });
+      return;
+    }
+    const goal = await environmentDurableGoalStore.create({
+      ownerProfileId: account.profileId,
+      roomId: req.params.roomId,
+      participantId: membership.participantId,
+      environmentBindingId: req.params.environmentBindingId,
+      subjectNativeId: parsed.data.subject_native_id,
+      actionAuthorityId: parsed.data.action_authority_id,
+      runId: parsed.data.run_id ?? null,
+      turnId: parsed.data.turn_id,
+      objective: parsed.data.objective,
+    });
+    res.status(201).json(durableGoalReceipt(goal));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.get(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/durable-goals/:goalId",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    const goal = await environmentDurableGoalStore.inspect({
+      goalId: req.params.goalId,
+      profileId: account.profileId,
+      participantId: membership.participantId,
+    });
+    if (
+      goal.identity.room_id !== req.params.roomId ||
+      goal.identity.environment_binding_id !== req.params.environmentBindingId
+    ) {
+      res.status(404).json({
+        ...durableGoalReceipt(null),
+        ok: false,
+        error: "durable_goal_not_found",
+        message: "The durable environment goal was not found in this room environment.",
+      });
+      return;
+    }
+    res.json(durableGoalReceipt(goal));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.post(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/durable-goals/:goalId/events",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    const parsed = helixEnvironmentDurableGoalAppendRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        ...durableGoalReceipt(null),
+        ok: false,
+        error: "durable_goal_event_invalid",
+        message: "A valid expected revision, typed event, evidence set, and turn identity are required.",
+      });
+      return;
+    }
+    const goal = await environmentDurableGoalStore.append({
+      ownerProfileId: account.profileId,
+      roomId: req.params.roomId,
+      participantId: membership.participantId,
+      environmentBindingId: req.params.environmentBindingId,
+      subjectNativeId: parsed.data.subject_native_id,
+      actionAuthorityId: parsed.data.action_authority_id,
+      runId: parsed.data.run_id ?? null,
+      turnId: parsed.data.turn_id,
+      goalId: req.params.goalId,
+      expectedRevision: parsed.data.expected_revision,
+      payload: parsed.data.payload,
+      evidenceRefs: parsed.data.evidence_refs,
+    });
+    res.json(durableGoalReceipt(goal));
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.put(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/durable-goals/:goalId/participants/:participantId",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    await readMembership(req.params.roomId, account);
+    const parsed = helixEnvironmentDurableGoalParticipantGrantSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ ...durableGoalReceipt(null), ok: false, error: "durable_goal_event_invalid", message: "A read and/or steer continuation scope is required." });
+      return;
+    }
+    const grant = await environmentDurableGoalStore.grantParticipant({
+      goalId: req.params.goalId,
+      ownerProfileId: account.profileId,
+      participantId: req.params.participantId,
+      scopes: parsed.data.scopes,
+    });
+    res.json({ ...durableGoalReceipt(null), message: "Durable goal continuation grant updated.", continuation_grant: grant });
+  }),
+);
+
+sharedRealtimeRoomEnvironmentRouter.delete(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/durable-goals/:goalId/participants/:participantId",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    await readMembership(req.params.roomId, account);
+    const grant = await environmentDurableGoalStore.revokeParticipant({
+      goalId: req.params.goalId,
+      ownerProfileId: account.profileId,
+      participantId: req.params.participantId,
+    });
+    res.json({ ...durableGoalReceipt(null), message: "Durable goal continuation grant revoked.", continuation_grant: grant });
   }),
 );
 

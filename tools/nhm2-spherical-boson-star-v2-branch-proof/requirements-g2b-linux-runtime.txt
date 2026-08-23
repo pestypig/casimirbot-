@@ -1,0 +1,3 @@
+# CPython 3.12 x86_64 manylinux wheel selected before any G2B candidate execution.
+gmpy2==2.2.1 \
+    --hash=sha256:30fba6f7cf43fb7f8474216701b5aaddfa5e6a06d560e88a67f814062934e863

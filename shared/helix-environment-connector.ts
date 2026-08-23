@@ -380,6 +380,7 @@ export const helixEnvironmentProbeObservationSchema = z
     summary: z.string().trim().min(1).max(2_000),
     result: z.record(z.string(), z.unknown()),
     evidence_ref: identifierSchema,
+    observation_revision: z.number().int().nonnegative().optional(),
     observed_at: timestampSchema,
     freshness_age_ms: z.number().int().nonnegative().nullable(),
     provenance_valid: z.boolean(),

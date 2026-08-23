@@ -423,6 +423,71 @@ describe("Codex provider outer turn lifecycle", () => {
     expect(lifecycle.integrity).toMatchObject({ ok: true, violations: [] });
   });
 
+  it("merges compatibility continuation facts after an earlier native provider cycle completed", () => {
+    const turnId = "ask:test:native-cycle-then-gateway-continuation";
+    const native = createHelixTurnLifecycleRecorder({
+      turnId,
+      scope: "codex_native_provider_cycle",
+      now: () => 100,
+    });
+    const started = native.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const earlyMessage = native.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: started.event_id,
+      message_sha256: "early-tool-request-marker",
+    });
+    native.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: earlyMessage.event_id,
+    });
+
+    const lifecycle = buildCodexProviderTurnLifecycle({
+      turnId,
+      routeCommitId: "route:bound-room-report",
+      gatewayCallResults: [gatewayResult("room.evidence.read_bound", 1)],
+      providerReasoningReentry: {
+        observation_reentered: true,
+        reentered_observation_refs: ["observation:1", "artifact:1"],
+      },
+      providerText: "The canonical durable goal completed.",
+      terminalArtifactKind: "model_synthesized_answer",
+      terminalEligible: true,
+      ok: true,
+      nativeProviderLifecycle: native.snapshot(),
+    });
+
+    expect(lifecycle.events.map((event) => event.kind)).toEqual([
+      "turn.started",
+      "route.committed",
+      "capability.admitted",
+      "tool.call.started",
+      "tool.call.completed",
+      "observation.reentered",
+      "agent.message.completed",
+      "runtime.turn.completed",
+      "terminal.eligibility.checked",
+      "turn.completed",
+    ]);
+    expect(lifecycle.reduction).toMatchObject({
+      observation_reentry_refs: expect.arrayContaining([
+        "observation:1",
+        "artifact:1",
+      ]),
+      post_observation_reasoning_completed: true,
+      terminal_outcome: "completed",
+      complete: true,
+    });
+    expect(lifecycle.integrity).toMatchObject({ ok: true, violations: [] });
+  });
+
   it("preserves a failed native attempt and records a strictly later compatibility recovery", () => {
     const turnId = "ask:test:native-failure-compatibility-recovery";
     const native = createHelixTurnLifecycleRecorder({

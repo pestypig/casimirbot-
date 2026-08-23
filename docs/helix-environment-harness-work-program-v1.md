@@ -2,7 +2,7 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G5**
+Active program gate: **G6**
 
 This document answers the operational question that the product and architecture
 contracts intentionally do not:
@@ -133,8 +133,8 @@ overrule current-turn execution and re-entry facts.
 | G2 — A0 / A1 / B parity | closed | G1 | `docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md` | G3 |
 | G3 — Viability and unexpected events | closed | G2 | `docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md` | G4 |
 | G4 — Live-mail wake bridge | closed | G3 | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md` | G5 |
-| G5 — Durable survival goal | active | G4 and converged OAuth/desktop/room identity lane | checkpointed advancement progress and recovery across disconnect, death, restart, and authorized phone continuation | G6 |
-| G6 — Concurrent reasoning roles | blocked | G5 | revision-bound perception and prospective outputs converge through one execution arbiter without stale-plan mutation | G7 |
+| G5 — Durable survival goal | closed | G4 and converged OAuth/desktop/room identity lane | `docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md` | G6 |
+| G6 — Concurrent reasoning roles | active | G5 | revision-bound perception and prospective outputs converge through one execution arbiter without stale-plan mutation | G7 |
 | G7 — Second-domain transfer | blocked | G6 | the accepted lifecycle transfers to a contrasting environment without Minecraft-specific strategy in the generic harness | release evaluation |
 
 Exactly one gate is active. A blocked gate may receive design clarification but
@@ -161,6 +161,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Optional Minecraft companion-entity embodiment | projected | `docs/architecture/helix-minecraft-companion-embodiment-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md`; `docs/research/helix-minecraft-environment-adapter-reference-prompt.md` | Specify and implement only after the deterministic guardian passes G3 and EH-RCC1/EH-RCC2 preserve its accepted behavior. |
 | Learned resident policies and FlyWire profile | projected | `docs/helix-environment-harness-work-program-v1.md` | Shadow-evaluate only after the deterministic baseline and generic contract pass. |
 | Live-mail Minecraft wake bridge | live accepted | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md`; `artifacts/helix-environment-g4-live-2026-08-22-deterministic/helix-minecraft-player-ask-5a72c8a7-4dc7-4546-bf88-15c41a66700f.json` | Preserve exact source identity, deterministic-only preprocessing, deduplication, re-entry, and terminal continuity as G5+ regressions. |
+| Durable Minecraft goal lifecycle | integrated accepted | `docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md`; `artifacts/g5-durable-survival-goal/owner-natural-progress-report-final.json`; `artifacts/g5-durable-survival-goal/second-participant-natural-progress-report-authorized.json` | Preserve hash-linked recovery, semantic-wake consumption, exact evidence re-entry, read-only participant continuation, and no-action reporting as G6+ regressions. |
 | Durable all-advancements survival goal | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Prove checkpointed progress and recovery in G5. |
 | Concurrent runtime reasoning roles | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Add only after the sequential wake/solver path is reliable in G6. |
 | Second-domain harness transfer | projected | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Demonstrate the accepted lifecycle in Robinhood shadow observation or another contrasting domain in G7. |
@@ -307,7 +308,7 @@ performed no Minecraft action, and retained clean single-writer terminal and
 lifecycle-projection audits. Exact evidence is recorded in
 `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md`.
 
-## Active gate: G5 durable survival goal
+## Closed gate: G5 durable survival goal
 
 G5 implements one durable Minecraft survival objective whose verified progress
 survives individual Ask turns, disconnect, death, process restart, and an
@@ -323,6 +324,29 @@ and terminal eligibility. Fabric retains tick-scale viability. G5 must consume
 the accepted G4 semantic wake as evidence; it must not convert live mail into a
 reflex path, add concurrent reasoning roles, make checkpoint projections answer
 authority, or extract a generic resident-controller contract.
+
+G5 closed on 2026-08-23. The accepted keyed journey retained one revision-19
+goal across semantic-wake replanning and successor-epoch recovery, verified
+restored viable control, and projected the completed ledger through Runtime
+Codex without executing a new game action. An owner turn and an explicitly
+read-authorized second room participant both reconstructed the same canonical
+goal with clean lifecycle, poison, and presentation audits. Exact evidence is
+recorded in
+`docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md`.
+
+## Active gate: G6 concurrent reasoning roles
+
+G6 may add revision-bound perception and prospective-planning roles around the
+accepted sequential Runtime Codex path. These roles may prepare observations,
+candidate plans, and invalidation signals, but they are not independent
+Minecraft controllers and cannot execute effects, expand permissions, or write
+terminal answers. One execution arbiter and one mutation authority remain.
+
+G6 closes only when concurrently prepared outputs carry exact observation and
+goal revisions, stale proposals are invalidated before execution, one admitted
+proposal reaches the existing execution path, and its measured result re-enters
+the principal Runtime Codex turn without lifecycle or presentation divergence.
+The accepted G1–G5 journeys remain mandatory regressions.
 
 
 ## Parallel delivery lane

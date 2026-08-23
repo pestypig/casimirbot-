@@ -107,6 +107,13 @@ const localPersistenceTables = [
   "helix_environment_event_batches",
   "helix_environment_events",
   "helix_environment_situation_digests",
+  // Durable goals depend on the complete connector, room, and subject roots
+  // above. Restore the goal projection before either append-only event ledger
+  // so a keyed local-server restart preserves the exact goal and hash chain.
+  "helix_environment_durable_goals",
+  "helix_environment_durable_goal_participants",
+  "helix_environment_durable_goal_participant_events",
+  "helix_environment_durable_goal_events",
   "helix_environment_probe_requests",
   "helix_environment_probe_attempts",
   "helix_environment_probe_results",
@@ -163,6 +170,12 @@ const localPersistenceJsonColumns = new Set([
   "helix_environment_action_control_results.result_payload",
   "helix_environment_events.event_payload",
   "helix_environment_situation_digests.digest_payload",
+  "helix_environment_durable_goals.objective_payload",
+  "helix_environment_durable_goal_participants.scopes",
+  "helix_environment_durable_goal_participant_events.scopes",
+  "helix_environment_durable_goal_events.event_payload",
+  "helix_environment_durable_goal_events.payload",
+  "helix_environment_durable_goal_events.evidence_refs",
   "helix_environment_probe_requests.arguments",
   "helix_environment_probe_results.result_payload",
   "helix_environment_probe_observations.normalized_observation",

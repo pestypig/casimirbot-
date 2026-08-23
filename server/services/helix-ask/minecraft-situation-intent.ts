@@ -101,6 +101,133 @@ export const isMinecraftSituationSessionSetupPrompt = (
 };
 
 /**
+ * Recognizes a present-tense operator request to create a durable Minecraft
+ * objective. This must be distinguished from configuring a monitoring panel:
+ * the durable-goal gateway binds the objective to the already authenticated
+ * room, environment, player, connector epoch, and action authority.
+ */
+export const isAffirmativeMinecraftDurableGoalCreatePrompt = (
+  promptText: string | null | undefined,
+): boolean => {
+  const prompt = String(promptText ?? "").trim();
+  if (!prompt) return false;
+  const durableGoal =
+    /\b(?:durable|persistent|checkpointed|long[-\s]?running)\b[\s\S]{0,80}\b(?:goal|objective)\b|\b(?:goal|objective)\b[\s\S]{0,80}\b(?:durable|persistent|checkpointed|long[-\s]?running)\b/i.test(
+      prompt,
+    );
+  const minecraftScope =
+    /\b(?:minecraft|fabric|minehut|mine\s*hut)\b/i.test(prompt);
+  const affirmativeCreate =
+    /^(?:please\s+)?(?:start|create|begin|launch|establish|set\s+up)\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:start|create|begin|launch|establish|set\s+up)\b/i.test(
+      prompt,
+    ) ||
+    /\bi\s+(?:want|need|would\s+like)\s+you\s+to\s+(?:start|create|begin|launch|establish|set\s+up)\b/i.test(
+      prompt,
+    );
+  if (!durableGoal || !minecraftScope || !affirmativeCreate) return false;
+  return !(
+    /^(?:do\s+not|don't|dont|never|avoid|without)\b/i.test(prompt) ||
+    /^(?:later|eventually|tomorrow|after(?:ward|wards)?|in\s+the\s+future|if|when)\b/i.test(
+      prompt,
+    ) ||
+    /^(?:previously|earlier|historically|last\s+turn)\b/i.test(prompt) ||
+    /^(?:the\s+(?:screen|docs?|guide|transcript|message)\s+(?:says?|said|shows?|showed)|quoted?|someone\s+said)\b/i.test(
+      prompt,
+    ) ||
+    /^(?:explain|describe|show\s+me|tell\s+me)\b[\s\S]{0,80}\bhow\s+to\b/i.test(
+      prompt,
+    )
+  );
+};
+
+/**
+ * Recognizes an operative request to inspect or resume one existing durable
+ * Minecraft goal. Resumption begins with the read-only inspect capability so
+ * the runtime must recover the canonical identity-bound projection before it
+ * can propose any later append or environment mutation.
+ */
+export const isAffirmativeMinecraftDurableGoalInspectPrompt = (
+  promptText: string | null | undefined,
+): boolean => {
+  const prompt = String(promptText ?? "").trim();
+  if (!prompt) return false;
+  const goalReference =
+    /\benvironment_durable_goal:[a-z0-9][a-z0-9-]{7,}\b/i.test(prompt) ||
+    /\b(?:durable|persistent|checkpointed|long[-\s]?running)\b[\s\S]{0,80}\b(?:minecraft\s+)?(?:goal|objective)\b|\b(?:minecraft\s+)?(?:goal|objective)\b[\s\S]{0,80}\b(?:durable|persistent|checkpointed|long[-\s]?running)\b/i.test(
+      prompt,
+    );
+  const operativeInspect =
+    /^(?:please\s+)?(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i.test(
+      prompt,
+    ) ||
+    /\bi\s+(?:want|need|would\s+like)\s+you\s+to\s+(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i.test(
+      prompt,
+    );
+  if (!goalReference || !operativeInspect) return false;
+  return !(
+    /^(?:do\s+not|don't|dont|never|avoid|without)\b/i.test(prompt) ||
+    /^(?:later|eventually|tomorrow|after(?:ward|wards)?|in\s+the\s+future|if|when)\b/i.test(
+      prompt,
+    ) ||
+    /^(?:previously|earlier|historically|last\s+turn)\b/i.test(prompt) ||
+    /^(?:the\s+(?:screen|docs?|guide|transcript|message)\s+(?:says?|said|shows?|showed)|quoted?|someone\s+said)\b/i.test(
+      prompt,
+    ) ||
+    /^(?:explain|describe|show\s+me|tell\s+me)\b[\s\S]{0,80}\bhow\s+to\b/i.test(
+      prompt,
+    )
+  );
+};
+
+/**
+ * Recognizes an affirmative request to record verified progress on an
+ * existing durable Minecraft goal. This admits only the append capability;
+ * the gateway still requires the exact current revision, identity, authority,
+ * typed event payload, and evidence references before any ledger mutation.
+ */
+export const isAffirmativeMinecraftDurableGoalAppendPrompt = (
+  promptText: string | null | undefined,
+): boolean => {
+  const prompt = String(promptText ?? "").trim();
+  if (!prompt) return false;
+  const existingGoalContext =
+    /\benvironment_durable_goal:[a-z0-9][a-z0-9-]{7,}\b/i.test(prompt) ||
+    isAffirmativeMinecraftDurableGoalInspectPrompt(prompt);
+  if (!existingGoalContext) return false;
+
+  const progressMutation =
+    /\b(?:record|append|save|persist|write)\b[\s\S]{0,100}\b(?:progress|checkpoint|event|attempt|recovery|postcondition)\b|\b(?:mark|complete|advance|update)\b[\s\S]{0,100}\b(?:milestone|checkpoint|goal|postcondition)\b/giu;
+  const candidates = [...prompt.matchAll(progressMutation)];
+  return candidates.some((candidate) => {
+    const index = candidate.index ?? 0;
+    const prefix = prompt.slice(Math.max(0, index - 100), index);
+    return !(
+      /\b(?:do\s+not|don't|dont|never|avoid|without)\b[\s\S]{0,80}$/iu.test(
+        prefix,
+      ) ||
+      /\b(?:later|eventually|tomorrow|after(?:ward|wards)?|in\s+the\s+future|if|when|unless|once)\b[\s\S]{0,80}$/iu.test(
+        prefix,
+      ) ||
+      /\b(?:previously|earlier|historically|last\s+turn)\b[\s\S]{0,100}$/iu.test(
+        prefix,
+      ) ||
+      /\b(?:screen|docs?|guide|transcript|message|example|quoted?|someone\s+said)\b[\s\S]{0,100}$/iu.test(
+        prefix,
+      ) ||
+      /\b(?:explain|describe|show\s+me|tell\s+me)\b[\s\S]{0,80}\bhow\s+to\b[\s\S]{0,80}$/iu.test(
+        prefix,
+      )
+    );
+  });
+};
+
+/**
  * Admits an immediate game-world observation request without requiring the
  * user to repeat "Minecraft" on every turn. This is intentionally narrower
  * than generic tool-word matching and rejects contextual/non-executable text.

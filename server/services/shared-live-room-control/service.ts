@@ -14,6 +14,8 @@ import {
   HELIX_SHARED_LIVE_ROOM_INSPECT_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_LIST_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_LIST_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_CAPABILITY,
@@ -22,6 +24,7 @@ import {
   HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
   helixSharedLiveRoomCreateRequestSchema,
+  helixSharedLiveRoomPresenceSetRequestSchema,
   helixSharedLiveRoomCredentialDeliverySchema,
   helixSharedLiveRoomIdSchema,
   helixSharedLiveRoomSourceCreateRequestSchema,
@@ -31,6 +34,7 @@ import {
   type HelixSharedLiveRoomCredentialDelivery,
   type HelixSharedLiveRoomInspectReceipt,
   type HelixSharedLiveRoomListReceipt,
+  type HelixSharedLiveRoomPresenceSetReceipt,
   type HelixSharedLiveRoomSourceBindingProjection,
   type HelixSharedLiveRoomSourceCreateReceipt,
   type HelixSharedLiveRoomSourceListReceipt,
@@ -53,6 +57,7 @@ import {
   listSharedRealtimeRooms,
   readSharedRealtimeRoom,
   readSharedRealtimeRoomMembership,
+  updateSharedRealtimeRoomPresence,
   type SharedRealtimeRoomMembership,
 } from "../helix-ask/realtime-room/room-store";
 import {
@@ -171,6 +176,7 @@ type SharedLiveRoomDomainStore = {
   readRoom: typeof readSharedRealtimeRoom;
   readMembership: typeof readSharedRealtimeRoomMembership;
   listSourceBindings: typeof listSharedRealtimeRoomSourceBindings;
+  updatePresence: typeof updateSharedRealtimeRoomPresence;
 };
 
 export type SharedLiveRoomControlDependencies = {
@@ -519,6 +525,9 @@ export class SharedLiveRoomControlService {
       listSourceBindings:
         dependencies.domainStore?.listSourceBindings ??
         listSharedRealtimeRoomSourceBindings,
+      updatePresence:
+        dependencies.domainStore?.updatePresence ??
+        updateSharedRealtimeRoomPresence,
     };
     this.deferredSourceBindingStore = dependencies.deferredSourceBindingStore;
     this.credentialDelivery = dependencies.credentialDelivery;
@@ -908,6 +917,32 @@ export class SharedLiveRoomControlService {
         schema: HELIX_SHARED_LIVE_ROOM_INSPECT_RECEIPT_SCHEMA,
         operation: HELIX_SHARED_LIVE_ROOM_INSPECT_CAPABILITY,
         content_role: "room_control_observation_not_assistant_answer",
+        room: await this.projectSafeRoom(room),
+      };
+    } catch (error) {
+      throw normalizeControlError(error);
+    }
+  }
+
+  async setOwnPresence(input: {
+    actor: SharedLiveRoomControlActor;
+    request: unknown;
+  }): Promise<HelixSharedLiveRoomPresenceSetReceipt> {
+    try {
+      this.requireRead(input.actor);
+      const request = helixSharedLiveRoomPresenceSetRequestSchema.parse(
+        input.request,
+      );
+      const room = await this.domainStore.updatePresence({
+        roomId: request.room_id,
+        profileId: input.actor.profileId,
+        presence: request.presence,
+      });
+      return {
+        ...receiptBase,
+        schema: HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA,
+        operation: HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY,
+        content_role: "room_control_receipt_not_assistant_answer",
         room: await this.projectSafeRoom(room),
       };
     } catch (error) {

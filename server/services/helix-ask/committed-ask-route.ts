@@ -176,6 +176,7 @@ const sourceBackedTargets = new Set([
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   if (/^com\.casimirbot\.minecraft\./i.test(capabilityId)) return "live_environment";
+  if (/^com\.casimirbot\.environment\.durable_goal\./i.test(capabilityId)) return "live_environment";
   if (/^situation-room\.describe_visual_capture$/i.test(capabilityId)) return "situation_run";
   if (/^docs\.|docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
   if (/research[-_.]?library|scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";

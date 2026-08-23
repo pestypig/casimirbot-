@@ -19,11 +19,11 @@ describe("Codex native model policy", () => {
     expect(resolveCodexNativeModelPolicy({
       language_model_policy: {
         schema: "helix.language_model_policy.v1",
-        resolved_model: "gpt-5.5",
+        resolved_model: "gpt-5.6-terra",
         reasoning_effort: "high",
       },
     })).toMatchObject({
-      model: "gpt-5.5",
+      model: "gpt-5.6-terra",
       reasoningEffort: "high",
       source: "language_model_policy",
     });

@@ -3,7 +3,7 @@ import type { HelixAccountCapabilityPolicy, HelixAccountType } from "./helix-acc
 export const HELIX_LANGUAGE_MODEL_POLICY_SCHEMA = "helix.language_model_policy.v1" as const;
 
 export type HelixLanguageModelProfileId = "auto" | "fast" | "balanced" | "deep";
-export const HELIX_PINNED_LANGUAGE_MODEL_IDS = ["gpt-5.4-mini"] as const;
+export const HELIX_PINNED_LANGUAGE_MODEL_IDS = ["gpt-5.6-terra"] as const;
 export type HelixPinnedLanguageModelId = (typeof HELIX_PINNED_LANGUAGE_MODEL_IDS)[number];
 export type HelixLanguageModelSelectionMode = "auto" | "profile" | "pinned" | "developer_override";
 export type HelixLanguageModelSelectionRequest =
@@ -97,7 +97,7 @@ type PinnedModelSpec = ProfileSpec & {
 const DEFAULT_PROFILE_SPECS: Record<Exclude<HelixLanguageModelProfileId, "auto">, ProfileSpec> = {
   fast: {
     profile: "fast",
-    model: "gpt-5.4-mini",
+    model: "gpt-5.6-terra",
     reasoning: "low",
     verbosity: "low",
     toolTier: "minimal",
@@ -105,7 +105,7 @@ const DEFAULT_PROFILE_SPECS: Record<Exclude<HelixLanguageModelProfileId, "auto">
   },
   balanced: {
     profile: "balanced",
-    model: "gpt-5.5",
+    model: "gpt-5.6-terra",
     reasoning: "medium",
     verbosity: "medium",
     toolTier: "standard",
@@ -113,7 +113,7 @@ const DEFAULT_PROFILE_SPECS: Record<Exclude<HelixLanguageModelProfileId, "auto">
   },
   deep: {
     profile: "deep",
-    model: "gpt-5.5",
+    model: "gpt-5.6-terra",
     reasoning: "high",
     verbosity: "medium",
     toolTier: "expanded",
@@ -122,9 +122,9 @@ const DEFAULT_PROFILE_SPECS: Record<Exclude<HelixLanguageModelProfileId, "auto">
 };
 
 const PINNED_MODEL_SPECS: Record<HelixPinnedLanguageModelId, PinnedModelSpec> = {
-  "gpt-5.4-mini": {
+  "gpt-5.6-terra": {
     profile: "fast",
-    model: "gpt-5.4-mini",
+    model: "gpt-5.6-terra",
     reasoning: "low",
     verbosity: "low",
     toolTier: "standard",
@@ -369,7 +369,7 @@ export const resolveHelixLanguageModelPolicy = (
   const pinnedModeRequested = explicitSelectionMode === "pinned" || (!explicitSelectionMode && Boolean(pinnedModelText));
   const normalizedPinnedModel = normalizePinnedModel(pinnedModelText);
   const pinnedModel = pinnedModeRequested
-    ? normalizedPinnedModel ?? "gpt-5.4-mini"
+    ? normalizedPinnedModel ?? "gpt-5.6-terra"
     : null;
   const pinnedModelRejectedReason =
     pinnedModeRequested && !normalizedPinnedModel
@@ -423,7 +423,7 @@ export const resolveHelixLanguageModelPolicy = (
       ? "Developer exact model override accepted by account policy."
       : pinnedModel
         ? pinnedModelRejectedReason
-          ? "Pinned model request was invalid, so policy selected the allowlisted Codex-compatible fallback gpt-5.4-mini."
+          ? "Pinned model request was invalid, so policy selected the allowlisted Codex-compatible fallback gpt-5.6-terra."
           : `Operator pinned ${pinnedModel}; adaptive model and reasoning selection are disabled for this session.`
       : autoSelection?.reason ??
         (downgradeReason

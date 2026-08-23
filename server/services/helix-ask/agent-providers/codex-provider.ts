@@ -21,6 +21,11 @@ import type { HelixAgentStepObservationPacket } from "@shared/helix-agent-step-o
 import type { HelixConversationMemoryPacket } from "@shared/helix-conversation-memory-packet";
 import { HELIX_MINECRAFT_COMMAND_CAPABILITY } from "@shared/helix-environment-command";
 import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-durable-goal";
+import {
   HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
   HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS,
@@ -11607,6 +11612,8 @@ export const runtimeProviderAdmittedCapabilityIdsForQuestion = (input: {
   question: string;
   admittedCapabilityIds: string[];
   admittedToolFamilies?: string[];
+  committedRouteAllowedToolFamilies?: string[];
+  requiredExactCapabilityIds?: string[];
   mutatingCapabilityIds?: string[];
   explicitlyAdmittedMutatingCapabilityIds?: string[];
   operatorCommandAdmitted?: boolean;
@@ -11628,6 +11635,15 @@ export const runtimeProviderAdmittedCapabilityIdsForQuestion = (input: {
         inferCommittedRouteToolFamilyFromSourceTarget(family) || family,
     ),
   );
+  const committedRouteAllowedToolFamilies = new Set(
+    uniqueStrings(input.committedRouteAllowedToolFamilies ?? []).map(
+      (family) =>
+        inferCommittedRouteToolFamilyFromSourceTarget(family) || family,
+    ),
+  );
+  const requiredExactCapabilityIds = new Set(
+    uniqueStrings(input.requiredExactCapabilityIds ?? []),
+  );
   const mutatingCapabilityIds = new Set(
     uniqueStrings(input.mutatingCapabilityIds ?? []),
   );
@@ -11646,9 +11662,21 @@ export const runtimeProviderAdmittedCapabilityIdsForQuestion = (input: {
         capabilityId !== "workstation.open_panel",
     )
     .filter((capabilityId) => {
+      if (
+        requiredExactCapabilityIds.size > 0 &&
+        !requiredExactCapabilityIds.has(capabilityId)
+      ) {
+        return false;
+      }
       const familyAllowed =
         admittedToolFamilies.size === 0 ||
         admittedToolFamilies.has(inferCommittedRouteToolFamily(capabilityId));
+      const committedRouteAllowsFamily =
+        committedRouteAllowedToolFamilies.size === 0 ||
+        committedRouteAllowedToolFamilies.has(
+          inferCommittedRouteToolFamily(capabilityId),
+        );
+      if (!committedRouteAllowsFamily) return false;
       if (restrictAllCapabilitiesToAdmittedToolFamilies && !familyAllowed) {
         return false;
       }
@@ -11664,6 +11692,27 @@ export const runtimeProviderAdmittedCapabilityIdsForQuestion = (input: {
       return input.operatorCommandAdmitted === true && familyAllowed;
     })
     .sort();
+};
+
+export const explicitlyAdmittedMutatingCapabilityIdsForQuestion = (input: {
+  question: string;
+  toolCallAdmission: Record<string, unknown> | null | undefined;
+  trustedEnvironmentContext?: TrustedRoomEnvironmentIntentContext | null;
+}): string[] => {
+  const explicitPromptCapabilityIds = new Set(
+    extractPlannerBindingCapabilityContracts(
+      input.question,
+      input.trustedEnvironmentContext,
+    ).map((match) => match.capability),
+  );
+  const explicitlyRequestedCompoundCapabilityIds = readStringArray(
+    input.toolCallAdmission?.compound_requested_capabilities,
+  ).filter((capabilityId) => explicitPromptCapabilityIds.has(capabilityId));
+  return uniqueStrings([
+    readString(input.toolCallAdmission?.admitted_capability),
+    ...readStringArray(input.toolCallAdmission?.exclusive_tool_capabilities),
+    ...explicitlyRequestedCompoundCapabilityIds,
+  ]);
 };
 
 export const runtimeProviderRequiredGroundingCapabilityIdsFromBody = (
@@ -14885,7 +14934,7 @@ const isAuthenticTheoryVerifierLifecycleObservation = (input: {
   );
 };
 
-const typedObservationKindForGatewayCapability = (
+export const typedObservationKindForGatewayCapability = (
   capabilityId: string,
 ): string | null => {
   if (
@@ -14982,7 +15031,12 @@ const typedObservationKindForGatewayCapability = (
     return "workstation_active_context_observation";
   if (capabilityId === CALCULATOR_ACTIVE_CONTEXT_CAPABILITY)
     return "calculator_active_context_observation";
-  if (capabilityId.startsWith("com.casimirbot.minecraft.")) {
+  if (
+    capabilityId.startsWith("com.casimirbot.minecraft.") ||
+    capabilityId === HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY ||
+    capabilityId === HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY ||
+    capabilityId === HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY
+  ) {
     return "live_environment_observation";
   }
   return null;
@@ -18959,9 +19013,20 @@ const hasDocsContentObservation = (
   gatewayCallResults: HelixWorkstationGatewayCallResult[],
 ): boolean =>
   gatewayCallResults.some((result) => {
-    if (result.ok !== true || result.capability_id !== "docs.search")
-      return false;
+    if (result.ok !== true) return false;
     const observation = readGatewayObservationRecord(result);
+    if (
+      result.capability_id === "docs-viewer.read_visible_surface" ||
+      result.capability_id === "docs-viewer.read_active_translation"
+    ) {
+      return (
+        /^(?:succeeded|completed|success|ok)$/i.test(
+          readString(observation?.status) ?? "",
+        ) &&
+        Boolean(readString(observation?.text))
+      );
+    }
+    if (result.capability_id !== "docs.search") return false;
     const activeDocumentObservation = readGatewayObservationRecord(
       observation?.active_document_observation,
     );
@@ -24587,10 +24652,29 @@ export const codexProvider: HelixAgentProvider = {
         readArray(runtimePromptInterpretation?.executable_operator_commands)
           .length > 0) ||
       semanticPlayerEmbodimentActionRequired;
-    const explicitlyAdmittedMutatingCapabilityIds = uniqueStrings([
-      readString(runtimeToolCallAdmission?.admitted_capability),
-      ...readStringArray(runtimeToolCallAdmission?.exclusive_tool_capabilities),
-    ]);
+    const explicitlyAdmittedMutatingCapabilityIds =
+      explicitlyAdmittedMutatingCapabilityIdsForQuestion({
+        question,
+        toolCallAdmission: runtimeToolCallAdmission,
+        trustedEnvironmentContext: trustedRoomEnvironmentIntentContext,
+      });
+    const boundaryCommittedRoute = readCommittedAskRoute(request.body);
+    const hardCommittedRoute =
+      boundaryCommittedRoute?.route.strength === "hard";
+    const exactCommittedCapability = readString(
+      boundaryCommittedRoute?.canonical_goal.requested_capability,
+    );
+    const runtimeProviderRequiredGroundingCapabilityIdsUnfiltered =
+      runtimeProviderRequiredGroundingCapabilityIdsFromBody(request.body);
+    const exactCommittedDurableGoalInspect =
+      exactCommittedCapability ===
+      HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY;
+    const exactCommittedCapabilityIds = exactCommittedDurableGoalInspect
+      ? uniqueStrings([
+          exactCommittedCapability,
+          ...runtimeProviderRequiredGroundingCapabilityIdsUnfiltered,
+        ])
+      : [];
     const runtimeProviderAdmittedCapabilityIds =
       runtimeProviderAdmittedCapabilityIdsForQuestion({
         question,
@@ -24602,6 +24686,14 @@ export const codexProvider: HelixAgentProvider = {
           ),
         ],
         admittedToolFamilies: runtimeAdmittedToolFamilies,
+        committedRouteAllowedToolFamilies:
+          hardCommittedRoute && exactCommittedDurableGoalInspect
+          ? boundaryCommittedRoute?.capability_policy.allowed_tool_families
+          : undefined,
+        requiredExactCapabilityIds:
+          exactCommittedCapabilityIds.length > 0
+            ? exactCommittedCapabilityIds
+            : undefined,
         restrictAllCapabilitiesToAdmittedToolFamilies: hardRuntimeSourceRoute,
         mutatingCapabilityIds: gatewayManifest.capabilities
           .filter((capability) => capability.mutating)
@@ -24610,9 +24702,7 @@ export const codexProvider: HelixAgentProvider = {
         operatorCommandAdmitted: currentTurnOperatorCommandAdmitted,
       });
     const runtimeProviderRequiredGroundingCapabilityIds =
-      runtimeProviderRequiredGroundingCapabilityIdsFromBody(
-        request.body,
-      ).filter((capabilityId) =>
+      runtimeProviderRequiredGroundingCapabilityIdsUnfiltered.filter((capabilityId) =>
         runtimeProviderAdmittedCapabilityIds.includes(capabilityId),
       );
     const nativeProviderAdmittedCapabilityIds =
@@ -24632,7 +24722,9 @@ export const codexProvider: HelixAgentProvider = {
     let providerContinuationAdmittedCapabilityIds =
       semanticPlayerEmbodimentActionRequired
         ? nativeProviderAdmittedCapabilityIds
-        : runtimeProviderAdmittedCapabilityIds;
+        : exactCommittedDurableGoalInspect
+          ? nativeProviderAdmittedCapabilityIds
+          : runtimeProviderAdmittedCapabilityIds;
     const admittedRequiredContinuationCapabilityIds = uniqueStrings([
       ...runtimeProviderRequiredGroundingCapabilityIds,
       readString(
@@ -24882,15 +24974,20 @@ export const codexProvider: HelixAgentProvider = {
       packets: capabilityLaneContext.observation_packets,
     });
     let capabilityLaneDebugProjection = capabilityLaneContext.debug_projection;
-    let evidenceGatewayCallResults = nativeProviderDecisionLoopPreferred
-      ? []
-      : await runExplicitCodexWorkstationGatewayCalls({
-          body: request.body,
-          turnId,
-          conversationThreadId: gatewayConversationThreadId,
-          accountContext: workstationAccountContext,
-          authoritativeEvidenceArtifacts: capabilityLaneContext.artifact_ledger,
-        });
+    const trustedReenteredGatewayCallResults =
+      request.reenteredWorkstationGatewayCallResults ?? [];
+    let evidenceGatewayCallResults = mergeUniqueGatewayCallResults(
+      trustedReenteredGatewayCallResults,
+      nativeProviderDecisionLoopPreferred
+        ? []
+        : await runExplicitCodexWorkstationGatewayCalls({
+            body: request.body,
+            turnId,
+            conversationThreadId: gatewayConversationThreadId,
+            accountContext: workstationAccountContext,
+            authoritativeEvidenceArtifacts: capabilityLaneContext.artifact_ledger,
+          }),
+    );
     let scholarlyFollowupEvidenceLookup: ScholarlyFollowupEvidenceLookup | null =
       null;
     let priorScholarlyEvidenceMemoryRecord: ScholarlyFollowupEvidenceMemoryRecord | null =
@@ -27475,7 +27572,7 @@ export const codexProvider: HelixAgentProvider = {
           gatewayResult.capability_id ===
             "situation-room.describe_visual_capture",
       );
-    const compatibilityGatewayRecoveryRequests =
+    const unboundedCompatibilityGatewayRecoveryRequests =
       readWorkstationGatewayCallRequestsForTurn({
         body: request.body,
         includePlannerDerived: true,
@@ -27487,7 +27584,34 @@ export const codexProvider: HelixAgentProvider = {
           hardVisualCaptureAlreadyObserved &&
           capabilityId === "situation-room.describe_visual_capture"
         );
-    });
+      });
+    const compatibilityBoundaryCommittedRoute =
+      readCommittedAskRoute(request.body);
+    const nativeProviderAdmittedCapabilityIdSet = new Set(
+      nativeProviderAdmittedCapabilityIds,
+    );
+    const compatibilityGatewayRecoveryRequests =
+      unboundedCompatibilityGatewayRecoveryRequests.filter(
+        (gatewayRequest) => {
+          const capabilityId =
+            readString(gatewayRequest.capability_id) ??
+            readString(gatewayRequest.capabilityId);
+          if (!capabilityId) return false;
+          if (
+            exactCommittedDurableGoalInspect &&
+            !nativeProviderAdmittedCapabilityIdSet.has(capabilityId)
+          ) {
+            return false;
+          }
+          return exactCommittedDurableGoalInspect &&
+            compatibilityBoundaryCommittedRoute
+            ? assertCapabilityAllowedByCommittedRoute({
+                committedRoute: compatibilityBoundaryCommittedRoute,
+                capabilityId,
+              }).allowed
+            : true;
+        },
+      );
     let nativeAppServerEventSeq = 0;
     appendCodexProviderStageEvent({
       turnId,

@@ -12,6 +12,7 @@ import {
   submitEnvironmentActionWorkflowEvent,
 } from "../services/environment-connectors/actions";
 import { recordEnvironmentActionEventBatch } from "../services/environment-connectors/events";
+import { environmentDurableGoalStore } from "../services/environment-connectors/goals";
 import {
   bridgeMinecraftPlayerSituationDigestToLiveMail,
 } from "../services/environment-connectors/live-mail/minecraft-situation-digest-mail-bridge";
@@ -216,6 +217,36 @@ environmentActionRouter.post(
       freshnessCeilingMs:
         sourceAdapter.profile.freshness.observation_max_age_ms,
     });
+    const recoveryEvent = recorded.batch.events.find((event) =>
+      [
+        "actor.died",
+        "actor.left",
+        "workflow.manual_override_detected",
+        "workflow.manual_override",
+        "workflow.emergency_stopped",
+      ].includes(event.event_type),
+    );
+    const recoveryReason = recoveryEvent?.event_type === "actor.died"
+      ? "death"
+      : recoveryEvent?.event_type === "actor.left"
+        ? "disconnect"
+        : recoveryEvent?.event_type === "workflow.emergency_stopped"
+          ? "emergency_stop"
+          : recoveryEvent
+            ? "manual_override"
+            : null;
+    const durableGoalRecoveries = recoveryEvent && recoveryReason
+      ? await environmentDurableGoalStore.recordRecoveryFromEnvironmentEvent({
+          roomId: recorded.batch.room_id,
+          sourceId: recorded.batch.source_id,
+          worldId: recorded.batch.world_id,
+          producerEpochRef: recorded.batch.producer_epoch_ref,
+          subjectBindingId: claim.subjectBindingId,
+          eventRef: recoveryEvent.event_id,
+          reason: recoveryReason,
+          occurredAt: recoveryEvent.occurred_at,
+        })
+      : [];
     res.json({
       schema: "helix.environment_event_batch_receipt.v1",
       ok: true,
@@ -226,6 +257,9 @@ environmentActionRouter.post(
       latest_event_sequence: recorded.digest.latest_event_sequence,
       replayed: recorded.replayed,
       semantic_wake_bridge: semanticWakeBridge,
+      durable_goal_recovery_refs: durableGoalRecoveries.map(
+        (goal) => goal.event_refs.at(-1),
+      ).filter(Boolean),
       answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,

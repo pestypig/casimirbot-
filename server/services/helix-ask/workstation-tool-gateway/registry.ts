@@ -172,6 +172,10 @@ import {
   executeEnvironmentSituationDigestGatewayCapability,
 } from "./environment-situation-digest";
 import {
+  environmentDurableGoalManifests,
+  executeEnvironmentDurableGoalGatewayCapability,
+} from "./environment-durable-goal";
+import {
   executeMinecraftLocalLifecycleGatewayCapability,
   minecraftLocalLifecycleManifest,
 } from "./minecraft-local-lifecycle";
@@ -5818,6 +5822,9 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
     environmentSituationDigestMinecraftManifest.capability_id,
     environmentSituationDigestMinecraftManifest,
   ],
+  ...environmentDurableGoalManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   [
     minecraftLocalLifecycleManifest.capability_id,
     minecraftLocalLifecycleManifest,
@@ -6519,6 +6526,81 @@ export const callWorkstationGatewayCapability = async (
                 repair_action: gatewayResult.repairAction ?? "ask_user",
               },
             ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (
+    environmentDurableGoalManifests.some(
+      (entry) => entry.capability_id === manifest.capability_id,
+    )
+  ) {
+    const gatewayResult = await executeEnvironmentDurableGoalGatewayCapability({
+      capabilityId: manifest.capability_id,
+      turnId,
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_environment_durable_goal_admitted"
+        : "authenticated_environment_durable_goal_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: "workstation-gateway",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [{
+              code: gatewayResult.error,
+              message: gatewayResult.summary,
+              repair_action: gatewayResult.repairAction ?? "ask_user",
+            }],
           }
         : {}),
     });

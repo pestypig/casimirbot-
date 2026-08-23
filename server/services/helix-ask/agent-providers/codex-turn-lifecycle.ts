@@ -36,6 +36,9 @@ export const buildCodexProviderTurnLifecycle = (input: {
   settleTerminal?: boolean;
   nativeProviderLifecycle?: HelixTurnLifecycle | null;
 }): HelixTurnLifecycle => {
+  const hasCompatibilityContinuationFacts =
+    input.gatewayCallResults.length > 0 ||
+    (input.capabilityLaneObservationPackets?.length ?? 0) > 0;
   const nativeRuntimeEvents =
     input.nativeProviderLifecycle?.turn_id === input.turnId &&
     input.nativeProviderLifecycle.scope === "codex_native_provider_cycle" &&
@@ -45,7 +48,10 @@ export const buildCodexProviderTurnLifecycle = (input: {
             event.kind !== "terminal.eligibility.checked" &&
             event.kind !== "turn.completed" &&
             event.kind !== "turn.failed" &&
-            event.kind !== "turn.needs_input",
+            event.kind !== "turn.needs_input" &&
+            (!hasCompatibilityContinuationFacts ||
+              (event.kind !== "agent.message.completed" &&
+                event.kind !== "runtime.turn.completed")),
         )
       : [];
   const recorder = createHelixTurnLifecycleRecorder({
@@ -54,7 +60,8 @@ export const buildCodexProviderTurnLifecycle = (input: {
     initialEvents: nativeRuntimeEvents,
   });
   const nativeRuntimeCompleted = Boolean(
-    input.nativeProviderLifecycle?.reduction.runtime_turn_completed &&
+    !hasCompatibilityContinuationFacts &&
+      input.nativeProviderLifecycle?.reduction.runtime_turn_completed &&
       input.nativeProviderLifecycle.reduction.final_agent_message_event_id,
   );
   let prior = recorder.latest();

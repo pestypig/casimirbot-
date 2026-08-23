@@ -17,6 +17,8 @@ export const HELIX_SHARED_LIVE_ROOM_LIST_CAPABILITY = "room.list" as const;
 export const HELIX_SHARED_LIVE_ROOM_INSPECT_CAPABILITY =
   "room.inspect" as const;
 export const HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY = "room.create" as const;
+export const HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY =
+  "room.presence.set" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_CAPABILITY =
   "room.source.list" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_CAPABILITY =
@@ -38,6 +40,8 @@ export const HELIX_SHARED_LIVE_ROOM_INSPECT_RECEIPT_SCHEMA =
   "helix.shared_live_room.inspect_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_CREATE_RECEIPT_SCHEMA =
   "helix.shared_live_room.create_receipt.v1" as const;
+export const HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA =
+  "helix.shared_live_room.presence_set_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_RECEIPT_SCHEMA =
   "helix.shared_live_room.source_list_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_RECEIPT_SCHEMA =
@@ -72,6 +76,13 @@ export const helixSharedLiveRoomIdSchema = z
 export const helixSharedLiveRoomCreateRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(120).optional(),
+  })
+  .strict();
+
+export const helixSharedLiveRoomPresenceSetRequestSchema = z
+  .object({
+    room_id: helixSharedLiveRoomIdSchema,
+    presence: z.enum(["present", "away"]),
   })
   .strict();
 
@@ -152,6 +163,9 @@ export const helixSharedLiveRoomCredentialDeliverySchema = z
 
 export type HelixSharedLiveRoomCreateRequest = z.infer<
   typeof helixSharedLiveRoomCreateRequestSchema
+>;
+export type HelixSharedLiveRoomPresenceSetRequest = z.infer<
+  typeof helixSharedLiveRoomPresenceSetRequestSchema
 >;
 export type HelixSharedLiveRoomSourceCreateRequest = z.infer<
   typeof helixSharedLiveRoomSourceCreateRequestSchema
@@ -238,6 +252,13 @@ export type HelixSharedLiveRoomCreateReceipt = NonAuthoritativeReceipt & {
   room: HelixSharedRealtimeRoom;
 };
 
+export type HelixSharedLiveRoomPresenceSetReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY;
+  content_role: "room_control_receipt_not_assistant_answer";
+  room: HelixSharedRealtimeRoom;
+};
+
 export type HelixSharedLiveRoomSourceListReceipt = NonAuthoritativeReceipt & {
   schema: typeof HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_RECEIPT_SCHEMA;
   operation: typeof HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_CAPABILITY;
@@ -302,6 +323,7 @@ export type HelixSharedLiveRoomAgentReceipt =
   | HelixSharedLiveRoomListReceipt
   | HelixSharedLiveRoomInspectReceipt
   | HelixSharedLiveRoomCreateReceipt
+  | HelixSharedLiveRoomPresenceSetReceipt
   | HelixSharedLiveRoomSourceListReceipt
   | HelixSharedLiveRoomSourceCreateReceipt
   | HelixSharedLiveRoomRunBindReceipt

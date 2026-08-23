@@ -1,14 +1,32 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { helixRuntimeGoalSessionStore } from "../services/helix-ask/agent-providers/goal-runtime-session";
+import {
+  resetAccountSessionStore,
+  signInLocalAccountSession,
+} from "../services/helix-account/account-session-store";
 import {
   buildRuntimeGoalReadableSurfaceGatewayCall,
   readRuntimeGoalVisibleDocContext,
-  routeHelixRuntimeGoalCommand,
+  routeHelixRuntimeGoalCommand as routeHelixRuntimeGoalCommandImpl,
 } from "../services/helix-ask/runtime-goal-command-router";
 
 const originalEnableCodexAgent = process.env.ENABLE_CODEX_AGENT;
 const originalCodexFakeStdout = process.env.CODEX_AGENT_FAKE_STDOUT;
 const originalCodexFakeExitCode = process.env.CODEX_AGENT_FAKE_EXIT_CODE;
+let requestHeaders: { cookie: string };
+
+const routeHelixRuntimeGoalCommand: typeof routeHelixRuntimeGoalCommandImpl = (input) =>
+  routeHelixRuntimeGoalCommandImpl({ ...input, headers: input.headers ?? requestHeaders });
+
+beforeEach(async () => {
+  await resetAccountSessionStore();
+  const receipt = await signInLocalAccountSession({
+    profile_id: "profile:runtime-goal-command-route-test",
+    account_type: "developer",
+  });
+  const sessionId = receipt.session?.session_id ?? "";
+  requestHeaders = { cookie: `helix_session=${encodeURIComponent(sessionId)}` };
+});
 
 afterEach(() => {
   helixRuntimeGoalSessionStore.clear();

@@ -159,7 +159,13 @@ describe("Minecraft player workflow-control workstation gateway", () => {
       expect(manifest.safety_tags).toEqual(
         expect.arrayContaining(["no_shell", "no_code_mutation", "non_terminal"]),
       );
+      expect(manifest.input_schema).toMatchObject({
+        required: ["workflow_ref"],
+      });
     }
+    expect(environmentActionControlMinecraftManifests[0]?.description).toContain(
+      "not a general player health, location, hazard, inventory, or safe-baseline read",
+    );
   });
 
   it("resolves an exact workflow to its authority before applying global emergency stop", async () => {

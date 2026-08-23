@@ -432,6 +432,8 @@ const stripToolRequestsForProviderResume = (body: RecordLike): RecordLike => {
     workstationGatewayCall: _workstationGatewayCallCamel,
     workstation_gateway_calls: _workstationGatewayCalls,
     workstationGatewayCalls: _workstationGatewayCallsCamel,
+    workspace_context_snapshot: _workspaceContextSnapshot,
+    workspaceContextSnapshot: _workspaceContextSnapshotCamel,
     ...rest
   } = body;
   return rest;
@@ -966,6 +968,7 @@ export class HelixRuntimeGoalSessionStore {
               },
             },
             workstationAccountContext: input.accountContext,
+            reenteredWorkstationGatewayCallResults: gatewayResults,
           });
       const providerText = providerTextFromResult(providerResult);
       const providerTextAvailable = providerText.length > 0;

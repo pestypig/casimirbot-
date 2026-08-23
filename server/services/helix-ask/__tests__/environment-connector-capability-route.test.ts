@@ -130,6 +130,20 @@ describe("Minecraft environment connector capability routing", () => {
     });
   });
 
+  it("requires an existing workflow reference for every workflow-control contract", () => {
+    for (const capability of [
+      "com.casimirbot.minecraft.player.workflow.status",
+      "com.casimirbot.minecraft.player.workflow.resume",
+      "com.casimirbot.minecraft.player.workflow.cancel",
+      "com.casimirbot.minecraft.player.emergency_stop",
+    ]) {
+      expect(explicitCapabilityContractForCapability(capability)).toMatchObject({
+        required_args: ["workflow_ref"],
+        optional_args: ["reason"],
+      });
+    }
+  });
+
   it("binds conditional movement evidence without preselecting the player action", () => {
     const prompt =
       "Help me take one safe step as a player in the active Minecraft Fabric world. First inspect a small region immediately around and below DatDamPig. If a cardinal direction has solid walkable support, safe headroom, and no nearby fire, drop, or other immediate hazard, use the paired Player Embodiment client to walk no more than one block in that direction, then make a fresh player-status check. If no safe direction is evidenced, do not move and explain the missing or unsafe evidence.";
@@ -630,6 +644,110 @@ describe("Minecraft environment connector capability routing", () => {
         "minecraft_situation_session_setup_is_action_not_evidence",
     });
     expect(extractExplicitCapabilityContracts(prompt)).toEqual([]);
+  });
+
+  it("routes an affirmative durable Minecraft objective to its live environment capability", () => {
+    const prompt =
+      "Start a durable Minecraft survival goal for my selected player, checkpoint verified progress, and recover from interruption.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "turn:minecraft-durable-goal-create",
+      threadId: "thread:minecraft-durable-goal-create",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      precedence_reason: "affirmative_minecraft_durable_goal_create",
+    });
+    expect(extractExplicitCapabilityContracts(prompt).map(({ capability }) => capability)).toContain(
+      "com.casimirbot.environment.durable_goal.create",
+    );
+    expect(
+      inferCommittedRouteToolFamily(
+        "com.casimirbot.environment.durable_goal.create",
+      ),
+    ).toBe("live_environment");
+  });
+
+  it("routes an existing durable-goal continuation through canonical goal inspection", () => {
+    const prompt =
+      "Resume durable Minecraft survival goal environment_durable_goal:4ab6b139-7088-40a3-8085-ec7524dbad80. Inspect its canonical state and continue only if this exact account, room, participant, selected player, environment, world, connector epoch, source binding, and authority are authorized. Do not create a replacement goal and do not infer progress from chat history.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "turn:minecraft-durable-goal-inspect",
+      threadId: "thread:minecraft-durable-goal-inspect",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      allow_no_tool_direct: false,
+      precedence_reason: "affirmative_minecraft_durable_goal_inspect",
+    });
+    expect(extractExplicitCapabilityContracts(prompt).map(({ capability }) => capability)).toContain(
+      "com.casimirbot.environment.durable_goal.inspect",
+    );
+    expect(sourceTargetIntent.suppressed_routes).toContain("workspace_diagnostic");
+  });
+
+  it("admits inspect, fresh player evidence, and verified progress recording for a compound durable-goal continuation", () => {
+    const prompt =
+      "Continue my durable Minecraft survival patrol goal environment_durable_goal:8d46e04c-746c-4fde-9bad-0a3c689a1c87. Inspect its canonical state, use fresh current-game evidence to verify that my player is alive and viable, record the baseline checkpoint and complete only the baseline milestone if its required postcondition is actually supported, then tell me the next unverified milestone. Do not move the player or infer progress from chat history.";
+    expect(
+      extractExplicitCapabilityContracts(prompt).map(({ capability }) => capability),
+    ).toEqual(
+      expect.arrayContaining([
+        "com.casimirbot.environment.durable_goal.inspect",
+        "com.casimirbot.minecraft.actor.status.read",
+        "com.casimirbot.environment.durable_goal.append",
+      ]),
+    );
+  });
+
+  it.each([
+    "Do not record progress for durable Minecraft goal environment_durable_goal:example-12345678.",
+    "Later, append a checkpoint to durable Minecraft goal environment_durable_goal:example-12345678.",
+    "Previously I completed a milestone for durable Minecraft goal environment_durable_goal:example-12345678.",
+    'The screen says "record durable Minecraft goal progress for environment_durable_goal:example-12345678".',
+    "Explain how to update a milestone for durable Minecraft goal environment_durable_goal:example-12345678.",
+  ])("does not append a contextual durable-goal progress phrase: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).some(
+        ({ capability }) =>
+          capability === "com.casimirbot.environment.durable_goal.append",
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    "Do not resume durable Minecraft goal environment_durable_goal:example-12345678.",
+    "Later, inspect durable Minecraft goal environment_durable_goal:example-12345678.",
+    "Previously I resumed durable Minecraft goal environment_durable_goal:example-12345678.",
+    'The screen says "resume durable Minecraft goal environment_durable_goal:example-12345678".',
+    "Explain how to inspect durable Minecraft goal environment_durable_goal:example-12345678.",
+  ])("does not inspect a contextual durable-goal reference: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).some(
+        ({ capability }) =>
+          capability === "com.casimirbot.environment.durable_goal.inspect",
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    "Do not start a durable Minecraft survival goal.",
+    "Later, start a durable Minecraft survival goal.",
+    "Previously I started a durable Minecraft survival goal.",
+    'The screen says "start a durable Minecraft survival goal".',
+    "Explain how to start a durable Minecraft survival goal.",
+  ])("does not execute a contextual durable-goal phrase: %s", (prompt) => {
+    expect(
+      extractExplicitCapabilityContracts(prompt).some(
+        ({ capability }) =>
+          capability === "com.casimirbot.environment.durable_goal.create",
+      ),
+    ).toBe(false);
   });
 
   it("classifies the exact capability as live environment evidence", () => {

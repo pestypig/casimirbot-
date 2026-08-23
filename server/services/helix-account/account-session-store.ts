@@ -23,6 +23,11 @@ import {
 import {
   HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS,
 } from "@shared/helix-minecraft-player-capabilities";
+import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-durable-goal";
 import { ensureDatabase, getPool, resetDbClient } from "../../db/client";
 import { getHelixThreadLedgerEvents } from "../helix-thread/ledger";
 import { listDiscordVoiceSessions } from "../situation-room/discord-session-store";
@@ -184,6 +189,13 @@ const PUBLIC_ROOM_SOURCE_CAPABILITY_IDS = [
   HELIX_MINECRAFT_COMMAND_CATALOG_CAPABILITY,
   HELIX_MINECRAFT_COMMAND_CAPABILITY,
   ...HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS,
+  // G5 durable goals are room-scoped persistence operations. Their gateway
+  // still requires an exact signed-in room participant, selected Minecraft
+  // subject, fresh connector manifest, and active action authority; exposing
+  // them here only makes those governed operations visible to Runtime Codex.
+  HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
 ] as const;
 
 const buildSharedRealtimeRoomsSessionPolicy = (

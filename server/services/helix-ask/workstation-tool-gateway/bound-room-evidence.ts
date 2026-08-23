@@ -17,6 +17,7 @@ import type {
   HelixEnvironmentStateSnapshot,
 } from "@shared/helix-environment-state-snapshot";
 import type { HelixEventJournalRecord } from "@shared/helix-event-journal-query";
+import type { HelixEnvironmentDurableGoalProjection } from "@shared/helix-environment-durable-goal";
 import {
   HELIX_ROOM_SOURCE_ADMISSION_SCHEMA,
   HELIX_ROOM_SOURCE_INGRESS_RECEIPT_SCHEMA,
@@ -53,6 +54,7 @@ import {
   type SharedRealtimeRoomMembership,
 } from "../realtime-room/room-store";
 import { readSharedRealtimeRoomDatabase } from "../realtime-room/room-store/database";
+import { environmentDurableGoalStore } from "../../environment-connectors/goals/durable-goal-store";
 import {
   currentHelixExternalCapabilityPolicy,
   type HelixExternalCapabilityPolicy,
@@ -73,6 +75,7 @@ const DEFAULT_FRESHNESS_MS = 2 * 60 * 1_000;
 const MIN_FRESHNESS_MS = 5_000;
 const MAX_FRESHNESS_MS = 10 * 60 * 1_000;
 const MAX_EVENTS = 8;
+const MAX_DURABLE_GOALS = 4;
 const MAX_EVIDENCE_REFS = 32;
 
 export type BoundRoomEvidenceErrorCode =
@@ -147,6 +150,15 @@ export type BoundRoomEvidenceDependencies = {
   ) => Promise<BoundRoomEvidenceSourceCandidate | null>;
   queryEvents: typeof queryEventJournal;
   readLatestSnapshot: typeof getLatestEnvironmentStateSnapshot;
+  readDurableGoals: (input: {
+    roomId: string;
+    profileId: string;
+    participantId: string;
+    sourceId: string;
+    worldId: string;
+    roomSourceBindingId: string;
+    limit: number;
+  }) => Promise<HelixEnvironmentDurableGoalProjection[]>;
   now: () => Date;
   freshnessMs: () => number;
 };
@@ -486,6 +498,8 @@ const dependencies = (
   queryEvents: overrides.queryEvents ?? queryEventJournal,
   readLatestSnapshot:
     overrides.readLatestSnapshot ?? getLatestEnvironmentStateSnapshot,
+  readDurableGoals:
+    overrides.readDurableGoals ?? ((input) => environmentDurableGoalStore.listForRoom(input)),
   now: overrides.now ?? (() => new Date()),
   freshnessMs: overrides.freshnessMs ?? configuredFreshnessMs,
 });
@@ -1142,12 +1156,39 @@ export const executeBoundRoomEvidenceCapability = async (input: {
       });
     }
 
+    const durableGoals = await deps.readDurableGoals({
+      roomId: binding.roomId,
+      profileId: policy.accountProfileId,
+      participantId: finalMembership.participantId,
+      sourceId: source.sourceId,
+      worldId: source.worldId,
+      roomSourceBindingId: source.bindingId,
+      limit: MAX_DURABLE_GOALS,
+    });
+    if (durableGoals.some((goal) =>
+      goal.identity.room_id !== binding.roomId ||
+      goal.identity.source_id !== source.sourceId ||
+      goal.identity.world_id !== source.worldId ||
+      goal.identity.room_source_binding_id !== source.bindingId)) {
+      return errorResult({
+        turnId,
+        code: "bound_room_evidence_identity_mismatch",
+        status: "blocked",
+        message: "A durable goal projection did not match the current bound room.",
+      });
+    }
+
     const evidenceRefs = uniqueStrings([
       ...source.admission.evidence_refs,
       ...events.flatMap(
         (event: HelixEventJournalRecord) => event.evidence_refs,
       ),
       ...(snapshot?.evidence_refs ?? []),
+      ...durableGoals.flatMap((goal) => [
+        ...goal.event_refs.slice(-16),
+        ...(goal.latest_checkpoint?.evidence_refs ?? []),
+        ...goal.consumed_semantic_wake_refs.slice(-8),
+      ]),
       binding.bindingId,
     ]);
     const environmentObservations = {
@@ -1155,6 +1196,48 @@ export const executeBoundRoomEvidenceCapability = async (input: {
       events: compactEvents(events),
       latest_environment_state: snapshot ? compactSnapshot(snapshot) : null,
     };
+    const durableGoalObservations = durableGoals.map((goal) => ({
+      schema: goal.schema,
+      goal_id: goal.goal_id,
+      revision: goal.revision,
+      latest_event_hash: goal.latest_event_hash,
+      status: goal.status,
+      objective: {
+        objective_text: goal.objective.objective_text,
+        goal_kind: goal.objective.goal_kind,
+        domain: goal.objective.domain,
+        game_version: goal.objective.game_version,
+        mechanics_collection_ref: goal.objective.mechanics_collection_ref,
+      },
+      identity: {
+        room_id: goal.identity.room_id,
+        source_id: goal.identity.source_id,
+        world_id: goal.identity.world_id,
+        subject_native_id: goal.identity.subject_native_id,
+        producer_epoch_ref: goal.identity.producer_epoch_ref,
+        action_authority_id: goal.identity.action_authority_id,
+        goal_owner_participant_id: goal.identity.goal_owner_participant_id,
+      },
+      active_milestone_id: goal.active_milestone_id,
+      milestones: goal.milestones.map((milestone) => ({
+        milestone_id: milestone.milestone_id,
+        description: milestone.description,
+        status: milestone.status,
+        required_postcondition_ids: milestone.required_postcondition_ids,
+        completed_postcondition_ids: milestone.completed_postcondition_ids,
+      })),
+      attempt_count: goal.attempt_count,
+      latest_checkpoint: goal.latest_checkpoint,
+      recovery: goal.recovery,
+      consumed_semantic_wake_refs: goal.consumed_semantic_wake_refs.slice(-8),
+      recent_event_refs: goal.event_refs.slice(-16),
+      content_role: goal.content_role,
+      reentry_required: goal.reentry_required,
+      answer_authority: goal.answer_authority,
+      assistant_answer: goal.assistant_answer,
+      terminal_eligible: goal.terminal_eligible,
+      raw_content_included: goal.raw_content_included,
+    }));
     const observation = {
       schema: HELIX_BOUND_ROOM_EVIDENCE_OBSERVATION_SCHEMA,
       capability_key: HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
@@ -1219,6 +1302,10 @@ export const executeBoundRoomEvidenceCapability = async (input: {
       },
       room: compactRoom(room),
       environment_observations: environmentObservations,
+      durable_goal_observations: {
+        goal_count: durableGoalObservations.length,
+        goals: durableGoalObservations,
+      },
       ...(source.domain === "minecraft"
         ? { minecraft_observations: environmentObservations }
         : {}),
@@ -1253,7 +1340,9 @@ export const executeBoundRoomEvidenceCapability = async (input: {
       status: "completed",
       summary:
         `Read ${events.length} fresh exact-provenance ${source.sourceFamily} event(s)` +
-        `${snapshot ? " and one bounded environment snapshot" : ""} from the current run's bound room.`,
+        `${snapshot ? " and one bounded environment snapshot" : ""}` +
+        `${durableGoalObservations.length > 0 ? ` plus ${durableGoalObservations.length} authorized durable goal projection(s)` : ""}` +
+        ` from the current run's bound room.`,
       observation: redactProtectedRoomSourceSecrets(observation),
     };
   } catch {

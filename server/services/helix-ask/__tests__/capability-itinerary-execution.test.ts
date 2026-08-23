@@ -6,6 +6,21 @@ import {
 } from "../capability-itinerary-execution";
 
 describe("Helix capability itinerary execution", () => {
+  it("accepts a successful visible-surface gateway observation as docs-viewer evidence", () => {
+    const artifact = {
+      artifact_id: "ask:test:docs-visible:observation",
+      kind: "provider_gateway_observation_packet",
+      capability_key: "docs-viewer.read_visible_surface",
+      status: "succeeded",
+      payload: {
+        status: "succeeded",
+        capability_id: "docs-viewer.read_visible_surface",
+      },
+    };
+
+    expect(isHelixCapabilityItineraryFamilyObserved("docs_viewer", [artifact])).toBe(true);
+  });
+
   it("requires a successful runtime-selected Player Embodiment action instead of accepting a read-only probe", () => {
     const playerLook = "com.casimirbot.minecraft.player.look";
     const playerWalk = "com.casimirbot.minecraft.player.walk";

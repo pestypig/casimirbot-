@@ -125,6 +125,9 @@ describe("account session panel API", () => {
               "live_env.read_processed_live_source_mail",
               "live_env.record_live_source_mail_decision",
               "com.casimirbot.minecraft.inventory.check",
+              "com.casimirbot.environment.durable_goal.create",
+              "com.casimirbot.environment.durable_goal.inspect",
+              "com.casimirbot.environment.durable_goal.append",
             ]),
           },
         },
@@ -215,6 +218,9 @@ describe("account session panel API", () => {
         "com.casimirbot.minecraft.player.walk",
         "com.casimirbot.minecraft.player.jump",
         "com.casimirbot.minecraft.player.emergency_stop",
+        "com.casimirbot.environment.durable_goal.create",
+        "com.casimirbot.environment.durable_goal.inspect",
+        "com.casimirbot.environment.durable_goal.append",
       ]),
     });
   });
@@ -262,6 +268,9 @@ describe("account session panel API", () => {
           "com.casimirbot.minecraft.player.walk",
           "com.casimirbot.minecraft.player.jump",
           "com.casimirbot.minecraft.player.emergency_stop",
+          "com.casimirbot.environment.durable_goal.create",
+          "com.casimirbot.environment.durable_goal.inspect",
+          "com.casimirbot.environment.durable_goal.append",
         ]),
       },
     });
@@ -317,6 +326,9 @@ describe("account session panel API", () => {
         "com.casimirbot.minecraft.player.walk",
         "com.casimirbot.minecraft.player.jump",
         "com.casimirbot.minecraft.player.emergency_stop",
+        "com.casimirbot.environment.durable_goal.create",
+        "com.casimirbot.environment.durable_goal.inspect",
+        "com.casimirbot.environment.durable_goal.append",
       ]),
     });
   });

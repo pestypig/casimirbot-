@@ -115,6 +115,15 @@ const hasLocalObservationScopeCue = (promptText: string): boolean =>
     promptText,
   ) ||
   /\b(?:minecraft|game)\s+(?:room|world)\b/i.test(promptText) ||
+  /\b(?:this|current|bound|shared\s+live)\s+room\s+(?:evidence|goal|environment|source|state)\b/i.test(
+    promptText,
+  ) ||
+  /\b(?:canonical|durable)\s+(?:minecraft\s+)?(?:environment\s+)?goal\b[\s\S]{0,120}\b(?:this|current|bound)\s+room\b/i.test(
+    promptText,
+  ) ||
+  /\b(?:use|read|inspect|summari[sz]e|report)\b[\s\S]{0,100}\b(?:this|current|bound)\s+room\s+evidence\b/i.test(
+    promptText,
+  ) ||
   /\b(?:player\s+embodiment(?:\s+plane)?|paired(?:\s+minecraft)?(?:\s+player)?\s+client|minecraft\s+player\s+client)\b/i.test(
     promptText,
   ) ||

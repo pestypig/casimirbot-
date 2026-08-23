@@ -798,6 +798,66 @@ export const configureEnvironmentActionAuthority = async (input: {
   });
 };
 
+export const extendEnvironmentActionAuthorityLease = async (input: {
+  roomId: string;
+  ownerProfileId: string;
+  environmentBindingId: string;
+  actionAuthorityId: string;
+  expiresAt: string;
+}): Promise<HelixEnvironmentActionAuthority> => {
+  await requireMembership({
+    roomId: input.roomId,
+    profileId: input.ownerProfileId,
+    owner: true,
+  });
+  if (Date.parse(input.expiresAt) <= Date.now()) {
+    throw new EnvironmentActionAuthorityError(
+      "action_authority_expiry_invalid",
+      400,
+      "Player-action authority expiry must be in the future.",
+    );
+  }
+  return withSharedRealtimeRoomTransaction(async (db) => {
+    const selected = await db.query<AuthorityRow>(
+      `SELECT * FROM helix_environment_action_authorities
+        WHERE action_authority_id = $1 AND environment_binding_id = $2
+          AND room_id = $3 AND owner_profile_id = $4 AND status = 'active'
+        LIMIT 1 FOR UPDATE;`,
+      [
+        input.actionAuthorityId,
+        input.environmentBindingId,
+        input.roomId,
+        input.ownerProfileId,
+      ],
+    );
+    const authority = selected.rows[0];
+    if (!authority) {
+      throw new EnvironmentActionAuthorityError(
+        "action_authority_not_found",
+        404,
+        "The exact active player-action authority was not found for this owner and environment.",
+      );
+    }
+    const extended = await db.query<AuthorityRow>(
+      `UPDATE helix_environment_action_authorities
+          SET expires_at = $2, updated_at = now()
+        WHERE action_authority_id = $1 AND status = 'active'
+        RETURNING *;`,
+      [input.actionAuthorityId, input.expiresAt],
+    );
+    await db.query(
+      `UPDATE helix_environment_action_connector_credentials
+          SET expires_at = $2
+        WHERE action_authority_id = $1 AND status = 'active';`,
+      [input.actionAuthorityId, input.expiresAt],
+    );
+    if (!extended.rows[0]) {
+      throw new Error("Player-action authority lease extension failed.");
+    }
+    return projectAuthority(extended.rows[0]);
+  });
+};
+
 export const requestEnvironmentActionWorkflowControl = async (input: {
   roomId: string;
   profileId: string;

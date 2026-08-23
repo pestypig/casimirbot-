@@ -1336,6 +1336,100 @@ describe("agent continuation state", () => {
     );
   });
 
+  it("keeps a successful capability and its exact pending occurrence resolved after a later failed probe", () => {
+    const createCapability =
+      "com.casimirbot.environment.durable_goal.create";
+    const createSubgoal =
+      "ask:g5:create:compound_capability_subgoal:1:durable_goal_create";
+    const payload: Record<string, unknown> = {
+      goal_satisfaction_evaluation: {
+        satisfaction: "unsatisfied",
+        missing_requirement_ids: [createCapability, createSubgoal],
+      },
+      capability_itinerary_execution_state: {
+        complete: false,
+        missing_required_capabilities: [createCapability],
+        missing_compound_subgoal_ids: [createSubgoal],
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: createSubgoal,
+            order: 1,
+            requested_capability: createCapability,
+            runtime_capability: createCapability,
+            satisfaction: "failed",
+            rail_failure_code: "missing_required_arg:objective",
+          },
+        ],
+      },
+      agent_loop_budget: budget(),
+      current_turn_artifact_ledger: [
+        artifact({
+          id: "ask:g5:create:durable-goal-observation",
+          kind: "provider_gateway_observation_packet",
+        }),
+      ],
+    };
+    const afterCreate = buildHelixAgentContinuationState({
+      payload,
+      turnId: "ask:g5:create",
+      trigger: "post_attempt",
+      capabilityProposal: {
+        allowed: true,
+        admittedCapabilityIds: [createCapability],
+      },
+      lastAttempt: {
+        attempt_id: "call:durable-goal:create",
+        capability_id: createCapability,
+        status: "succeeded",
+        observation_refs: ["ask:g5:create:durable-goal-observation"],
+      },
+    });
+
+    expect(afterCreate.missing_requirement_ids).toEqual([]);
+    expect(afterCreate.progress.resolved_requirement_ids).toEqual(
+      expect.arrayContaining([createCapability, createSubgoal]),
+    );
+    expect(
+      afterCreate.next_admissible_affordances.some(
+        (affordance) =>
+          affordance.source_ref === createSubgoal && !affordance.tried,
+      ),
+    ).toBe(false);
+
+    const afterFailedProbe = buildHelixAgentContinuationState({
+      payload: {
+        ...payload,
+        current_turn_artifact_ledger: [
+          ...(payload.current_turn_artifact_ledger as unknown[]),
+          artifact({
+            id: "ask:g5:create:workflow-status-failure",
+            kind: "provider_gateway_observation_packet",
+          }),
+        ],
+      },
+      turnId: "ask:g5:create",
+      trigger: "post_attempt",
+      previousState: afterCreate,
+      lastAttempt: {
+        attempt_id: "call:workflow:status",
+        capability_id: "com.casimirbot.minecraft.player.workflow.status",
+        status: "failed",
+        failure_class: "invalid_args",
+        failure_code: "action_policy_denied",
+        retryability: "retryable",
+      },
+    });
+
+    expect(afterFailedProbe.missing_requirement_ids).toEqual([]);
+    expect(afterFailedProbe.progress.resolved_requirement_ids).toEqual(
+      expect.arrayContaining([createCapability, createSubgoal]),
+    );
+    expect(afterFailedProbe.progress.added_requirement_ids).toEqual([]);
+    expect(afterFailedProbe.progress.reason_codes).not.toContain(
+      "requirements_resolved",
+    );
+  });
+
   it("treats tool-policy rejection as non-retryable bookkeeping rather than progress", () => {
     const payload: Record<string, unknown> = {
       goal_satisfaction_evaluation: {

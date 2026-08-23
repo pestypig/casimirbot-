@@ -193,8 +193,8 @@ live_env.query_job_evidence
 live_env.check_live_source_mail
 live_env.read_live_source_mail
 live_env.read_processed_live_source_mail
-live_env.record_live_source_mail_decision
 live_env.reflect_live_source_mail_loop
+live_env.record_live_source_mail_decision
 live_env.compare_mail_to_interpreter_profile
 live_env.validate_live_source_prediction
 live_env.predict_live_source_immediate
@@ -239,11 +239,16 @@ com.casimirbot.minecraft.player.craft
 com.casimirbot.minecraft.player.inventory.transfer
 com.casimirbot.minecraft.player.sequence.execute
 com.casimirbot.minecraft.player.guardian.execute
+com.casimirbot.minecraft.player.viability_guardian.arm
+com.casimirbot.minecraft.player.viability_guardian.disarm
 com.casimirbot.minecraft.player.workflow.status
 com.casimirbot.minecraft.player.workflow.resume
 com.casimirbot.minecraft.player.workflow.cancel
 com.casimirbot.minecraft.player.emergency_stop
 com.casimirbot.minecraft.situation_digest.read
+com.casimirbot.environment.durable_goal.create
+com.casimirbot.environment.durable_goal.inspect
+com.casimirbot.environment.durable_goal.append
 environment.minecraft.fabric_loopback.launch_and_join
 situation-room.describe_visual_capture
 room.list
@@ -292,11 +297,16 @@ capability.
 | `com.casimirbot.minecraft.player.inventory.transfer` | `direction`, `item_id`, `count`, `container_target`; optional `environment_label` | `helix.environment_action.observation.v1` | Performs a bounded current/open-container transfer and verifies the exact player-side item delta. |
 | `com.casimirbot.minecraft.player.sequence.execute` | `sequence_schema`, `sequence_id`, `ruleset`, `execution_plane`, `scheduler_engine`, `max_total_ticks`, `start_node_id`, `nodes`, `required_checkpoint_ids`, `mutation_scope`, `optimization` | `helix.environment_action.observation.v1` | Executes a bounded tick-scheduled player sequence through the paired Fabric client. Codex supplies the plan; the adapter owns only timing, cancellation, ceilings, checkpoints, and receipts. |
 | `com.casimirbot.minecraft.player.guardian.execute` | `program_schema`, `program_id`, `ruleset`, `execution_plane`, `scheduler_engine`, `max_total_ticks`, `completion_policy`, `mutation_scope`, `lanes`, `races`, `interrupts` | `helix.environment_action.observation.v1` | Executes a bounded concurrent reactive program with deterministic arbitration and emergency stop. A Codex-authored placement step may use an exact position or the bounded `predicted_collision_cell` geometry binding; the adapter resolves geometry but never chooses the strategy. It is a thin runtime, not a strategy or answer authority. |
+| `com.casimirbot.minecraft.player.viability_guardian.arm` | `profile_id`, `duration_ticks`, `minimum_air`, `dangerous_vertical_velocity`, `maximum_swim_ticks`, `maximum_observation_age_ticks`, `response_repertoire` | `helix.environment_action.observation.v1` | Arms the exact accepted deterministic resident guardian profile for a bounded interval. The local controller may select only its declared viability responses; Helix still admits the lease and Fabric remains the effect arbiter. |
+| `com.casimirbot.minecraft.player.viability_guardian.disarm` | `profile_id` | `helix.environment_action.observation.v1` | Disarms the exact resident guardian profile and verifies that connector-owned controls are released. It does not cancel unrelated workflows or broaden authority. |
 | `com.casimirbot.minecraft.player.workflow.status` | `workflow_ref`; optional `reason` | `helix.environment_action.control_observation.v1` | Reads one exact workflow through the separately paired client and re-enters the typed status observation. |
 | `com.casimirbot.minecraft.player.workflow.resume` | `workflow_ref`; optional `reason` | `helix.environment_action.control_observation.v1` | Resumes only an exact workflow paused by the admitted manual-override pause policy. |
 | `com.casimirbot.minecraft.player.workflow.cancel` | `workflow_ref`; optional `reason` | `helix.environment_action.control_observation.v1` | Cancels one exact active or paused workflow and requires all client controls to be released. |
 | `com.casimirbot.minecraft.player.emergency_stop` | `workflow_ref`; optional `reason` | `helix.environment_action.control_observation.v1` | Resolves the exact prior workflow to its player authority, suspends that authority, stops all active client workflows and requires all controls to be released. |
 | `com.casimirbot.minecraft.situation_digest.read` | optional `environment_label`, `freshness_requirement_ms`, `producer_plane` | `helix.environment_situation_digest_observation.v1` | Reads a fresh server-owned compact World Authority or Player Embodiment digest for the current room speaker's paired player. Every digest retains raw event references and remains nonterminal evidence for Codex re-entry. |
+| `com.casimirbot.environment.durable_goal.create` | required `objective`; optional `environment_label` | `helix.environment_durable_goal_observation.v1` | Creates an append-only survival goal under exact server-resolved room, player, source, epoch, and action authority. The projection is nonterminal context. |
+| `com.casimirbot.environment.durable_goal.inspect` | required `goal_id` | `helix.environment_durable_goal_observation.v1` | Reconstructs bounded milestone, attempt, checkpoint, recovery, and evidence-reference context for authorized Codex continuation. |
+| `com.casimirbot.environment.durable_goal.append` | required `goal_id`, `expected_revision`, `payload`, `evidence_refs`; optional `environment_label` | `helix.environment_durable_goal_observation.v1` | Records one verified Runtime Codex decision or lifecycle fact. It cannot choose strategy or become terminal authority. |
 | `environment.minecraft.fabric_loopback.launch_and_join` | optional `address` (loopback only) | `helix.minecraft.local_lifecycle_observation.v1` | Developer-only, confirmation-gated lifecycle action shared by browser and packaged EXE. It invokes one fixed launcher and one fixed loopback join inbox, exposes no generic shell or credentials, and remains nonterminal. |
 | `situation-room.describe_visual_capture` | `thread_id`, `prompt` | `helix.visual_situation_observation.v1` | Read-only bounded SituationRun evidence; execution failure remains an admitted observation, and successful evidence must re-enter the runtime before synthesis. |
 | `room.list`                | none                         | `helix.shared_live_room.list_receipt.v1`                    | Server-authenticated account policy filters the list.                                                                                                        |
@@ -532,6 +542,8 @@ capabilities with non-empty `input_schema.required`:
 | `com.casimirbot.minecraft.player.place`                 | `block_id`, exactly one of `positions` or `position_binding` (`predicted_collision_cell`)                                                                                                                                                                                  |
 | `com.casimirbot.minecraft.player.craft`                 | `output_item_id`, `count`; optional `recipe_id`                                                                                                                                                                                                                            |
 | `com.casimirbot.minecraft.player.inventory.transfer`    | `direction`, `item_id`, `count`, `container_target`                                                                                                                                                                                                                        |
+| `com.casimirbot.minecraft.player.viability_guardian.arm` | `profile_id`, `duration_ticks`, `minimum_air`, `dangerous_vertical_velocity`, `maximum_swim_ticks`, `maximum_observation_age_ticks`, `response_repertoire`                                                                                                                |
+| `com.casimirbot.minecraft.player.viability_guardian.disarm` | `profile_id`                                                                                                                                                                                                                                                            |
 | `com.casimirbot.minecraft.player.workflow.status`       | `workflow_ref`                                                                                                                                                                                                                                                            |
 | `com.casimirbot.minecraft.player.workflow.resume`       | `workflow_ref`                                                                                                                                                                                                                                                            |
 | `com.casimirbot.minecraft.player.workflow.cancel`       | `workflow_ref`                                                                                                                                                                                                                                                            |

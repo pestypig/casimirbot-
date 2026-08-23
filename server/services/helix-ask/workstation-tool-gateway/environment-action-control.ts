@@ -30,7 +30,7 @@ const controlSpecs = [
     capabilityId: HELIX_MINECRAFT_PLAYER_STATUS_CAPABILITY,
     label: "Read Minecraft player workflow status",
     description:
-      "Ask the separately paired Fabric client for the current state of one exact player workflow.",
+      "Inspect one already-created Minecraft player-action workflow by its exact workflow_ref. This is not a general player health, location, hazard, inventory, or safe-baseline read; use the corresponding Minecraft observation capability for those questions.",
     controlKind: "status" as const,
     mode: "read" as const,
     mutating: false,
@@ -94,7 +94,7 @@ HelixWorkstationCapabilityManifest[] = controlSpecs.map((spec) => ({
         minLength: 1,
         maxLength: 320,
         description:
-          "Exact workflow_ref returned by the current or prior admitted player-action observation.",
+          "Required exact workflow_ref returned by a current or prior admitted player-action observation. Never invent or omit this identifier, and do not use workflow controls before a workflow exists.",
       },
       reason: {
         type: "string",

@@ -1266,10 +1266,13 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   if (family === "docs_viewer") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) => {
       const status = readString(artifactPayload(artifact)?.status);
+      const successfulDocsGatewayObservation =
+        /^(?:docs[-_]viewer|docs)\./i.test(artifactCapability(artifact) ?? "") &&
+        /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
       const successfulDocsSearch =
         artifactCapability(artifact) === "docs.search" &&
         /^(?:succeeded|completed|success|ok)$/i.test(status ?? "");
-      return successfulDocsSearch ||
+      return successfulDocsGatewayObservation || successfulDocsSearch ||
         /doc_|docs_viewer/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
     });
   }

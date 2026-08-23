@@ -20,6 +20,8 @@ Capabilities:
 - `com.casimirbot.minecraft.player.inventory.transfer`
 - `com.casimirbot.minecraft.player.sequence.execute`
 - `com.casimirbot.minecraft.player.guardian.execute`
+- `com.casimirbot.minecraft.player.viability_guardian.arm`
+- `com.casimirbot.minecraft.player.viability_guardian.disarm`
 - `com.casimirbot.minecraft.player.workflow.status`
 - `com.casimirbot.minecraft.player.workflow.resume`
 - `com.casimirbot.minecraft.player.workflow.cancel`
@@ -88,6 +90,12 @@ The model supplies only semantic action fields plus an optional
   substitute for movement, interaction, or mutation. A failed or timed-out
   action/event/checkpoint cannot transition directly to a successful terminal;
   it must fail/cancel or enter explicit bounded recovery work;
+- viability guardian arm: the exact accepted `profile_id`, a bounded
+  `duration_ticks`, `minimum_air`, `dangerous_vertical_velocity`,
+  `maximum_swim_ticks`, `maximum_observation_age_ticks`, and the complete
+  admitted `response_repertoire`;
+- viability guardian disarm: the exact accepted `profile_id`; disarm verifies
+  control release and does not imply cancellation of unrelated workflows;
 - workflow status/resume/cancel: the exact prior `workflow_ref` and an optional
   semantic `reason`;
 - emergency stop: an exact prior `workflow_ref` used only to resolve the

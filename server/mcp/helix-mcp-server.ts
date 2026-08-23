@@ -28,6 +28,8 @@ import {
   HELIX_SHARED_LIVE_ROOM_LIST_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_LIST_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_SHARED_LIVE_ROOM_RUN_BIND_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_RUN_BIND_RECEIPT_SCHEMA,
@@ -43,6 +45,7 @@ import {
   helixSharedLiveRoomCreateRequestSchema,
   helixSharedLiveRoomErrorSchema,
   helixSharedLiveRoomIdSchema,
+  helixSharedLiveRoomPresenceSetRequestSchema,
   helixSharedLiveRoomRunBindingRequestSchema,
   helixSharedLiveRoomRunBindingRevokeRequestSchema,
   helixSharedLiveRoomSourceCreateRequestSchema,
@@ -63,6 +66,21 @@ import {
   helixEnvironmentActionControlObservationSchema,
   helixEnvironmentActionObservationSchema,
 } from "@shared/helix-environment-action";
+import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+  helixEnvironmentDurableGoalAppendRequestSchema,
+  helixEnvironmentDurableGoalObjectiveSchema,
+  helixEnvironmentDurableGoalSha256,
+  type HelixEnvironmentDurableGoalEventPayload,
+  type HelixEnvironmentDurableGoalObjective,
+  type HelixEnvironmentDurableGoalProjection,
+} from "@shared/helix-environment-durable-goal";
+import {
+  HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+  helixEnvironmentProbeObservationSchema,
+} from "@shared/helix-environment-connector";
 import {
   helixMinecraftFluidSequenceArgumentsSchema,
 } from "@shared/helix-minecraft-fluid-sequence";
@@ -128,6 +146,19 @@ import {
   executeEnvironmentActionControlGatewayCapability,
   type EnvironmentActionControlGatewayExecution,
 } from "../services/helix-ask/workstation-tool-gateway/environment-action-control";
+import {
+  executeEnvironmentProbeGatewayCapability,
+  type EnvironmentProbeGatewayExecution,
+} from "../services/helix-ask/workstation-tool-gateway/environment-probe";
+import {
+  environmentDurableGoalStore,
+  isEnvironmentDurableGoalError,
+  type EnvironmentDurableGoalStore,
+} from "../services/environment-connectors/goals";
+import { extendEnvironmentActionAuthorityLease } from
+  "../services/environment-connectors/actions/authority-store";
+import { listStagePlayLiveSourceMailItems } from
+  "../services/stage-play/stage-play-live-source-mailbox-store";
 
 type RecordLike = Record<string, unknown>;
 
@@ -179,6 +210,10 @@ type HelixRoomIdToolArguments = {
   room_id: string;
 };
 
+type HelixRoomPresenceSetToolArguments = {
+  request: z.infer<typeof helixSharedLiveRoomPresenceSetRequestSchema>;
+};
+
 type HelixEnvironmentDeviceCheckToolArguments = {
   room_id?: string;
 };
@@ -188,6 +223,18 @@ type HelixMinecraftPlayerActionToolArguments = {
   idempotency_key: string;
   environment_label?: string;
   action: RecordLike & { action_kind: string };
+};
+
+type HelixMinecraftActorStatusToolArguments = {
+  room_id: string;
+  environment_label?: string;
+};
+
+type HelixEnvironmentSemanticWakeReadToolArguments = {
+  room_id: string;
+  source_id?: string;
+  after_observation_revision?: number;
+  limit: number;
 };
 
 type HelixMinecraftWorkflowStatusToolArguments = {
@@ -201,10 +248,61 @@ type HelixMinecraftWorkflowControlToolArguments =
     reason?: string;
   };
 
+type HelixEnvironmentDurableGoalCreateToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  action_authority_id: string;
+  subject_native_id: string;
+  run_id?: string | null;
+  turn_id: string;
+  objective: HelixEnvironmentDurableGoalObjective;
+};
+
+type HelixEnvironmentDurableGoalInspectToolArguments = {
+  room_id: string;
+  goal_id: string;
+};
+
+type HelixEnvironmentDurableGoalAppendToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  goal_id: string;
+  action_authority_id: string;
+  subject_native_id: string;
+  run_id?: string | null;
+  turn_id: string;
+  expected_revision: number;
+  payload: HelixEnvironmentDurableGoalEventPayload;
+  evidence_refs: string[];
+};
+
+type HelixEnvironmentGoalCheckpointHashToolArguments = {
+  evidence_refs: string[];
+  observation_revision: number;
+  verified_facts: RecordLike;
+  completed_postcondition_ids: string[];
+  incomplete_postcondition_ids: string[];
+};
+
+type HelixEnvironmentActionAuthorityExtendToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  action_authority_id: string;
+  expires_at: string;
+};
+
 export type HelixEnvironmentActionMcpExecutor =
   typeof executeEnvironmentActionGatewayCapability;
 export type HelixEnvironmentActionControlMcpExecutor =
   typeof executeEnvironmentActionControlGatewayCapability;
+export type HelixEnvironmentProbeMcpExecutor =
+  typeof executeEnvironmentProbeGatewayCapability;
+export type HelixEnvironmentDurableGoalMcpStore = Pick<
+  EnvironmentDurableGoalStore,
+  "create" | "inspect" | "append"
+>;
+export type HelixEnvironmentActionAuthorityLeaseExtender =
+  typeof extendEnvironmentActionAuthorityLease;
 
 export type HelixEnvironmentDeviceCheckServicePort = (input: {
   ownerProfileId: string;
@@ -336,6 +434,16 @@ const roomInspectOutputSchema = z
   })
   .passthrough();
 
+const roomPresenceSetOutputSchema = z
+  .object({
+    ...roomReceiptAuthorityFields,
+    schema: z.literal(HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA),
+    operation: z.literal(HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY),
+    content_role: z.literal("room_control_receipt_not_assistant_answer"),
+    room: jsonObjectSchema,
+  })
+  .passthrough();
+
 const roomCreateReceiptOutputSchema = z
   .object({
     ...roomReceiptAuthorityFields,
@@ -448,6 +556,22 @@ const minecraftPlayerActionInputSchema = z.union([
   helixMinecraftReactiveProgramArgumentsSchema,
 ]);
 
+const normalizeMinecraftMcpActionArguments = (
+  action: RecordLike & { action_kind: string },
+): RecordLike => {
+  const { action_kind: _actionKind, ...argumentsValue } = action;
+  if (
+    (action.action_kind === "look_at" || action.action_kind === "track_target") &&
+    argumentsValue.target &&
+    typeof argumentsValue.target === "object" &&
+    !Array.isArray(argumentsValue.target)
+  ) {
+    const { target, ...remaining } = argumentsValue;
+    return { ...remaining, ...(target as RecordLike) };
+  }
+  return argumentsValue;
+};
+
 const minecraftPlayerActionOutputSchema = z
   .object({
     operation: z.literal("minecraft.player.action"),
@@ -457,6 +581,53 @@ const minecraftPlayerActionOutputSchema = z
     summary: z.string(),
     idempotency_replayed: z.boolean(),
     observation: helixEnvironmentActionObservationSchema,
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const minecraftActorStatusOutputSchema = z
+  .object({
+    operation: z.literal("minecraft.actor.status.read"),
+    room_id: helixSharedLiveRoomIdSchema,
+    ok: z.boolean(),
+    status: z.enum(["completed", "blocked", "failed"]),
+    summary: z.string(),
+    observation: helixEnvironmentProbeObservationSchema,
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentSemanticWakeReadOutputSchema = z
+  .object({
+    operation: z.literal("environment.semantic_wake.read"),
+    room_id: helixSharedLiveRoomIdSchema,
+    items: z.array(
+      z.object({
+        mail_id: z.string(),
+        source_id: z.string(),
+        room_source_binding_id: z.string(),
+        world_id: z.string(),
+        producer_plane: z.enum(["world_authority", "player_embodiment"]),
+        producer_epoch_ref: z.string(),
+        subject_ref: z.string().nullable(),
+        participant_id: z.string(),
+        selected_player_native_id: z.string().nullable(),
+        observation_revision: z.number().int().min(0),
+        digest_id: z.string(),
+        digest_hash: z.string(),
+        semantic_evidence: jsonObjectSchema,
+        summary_preview: z.string(),
+        evidence_refs: z.array(z.string()),
+        created_at: z.string(),
+        freshness: z.enum(["fresh", "stale"]),
+      }).strict(),
+    ),
+    content_role: z.literal("environment_semantic_wake_observation_not_assistant_answer"),
+    reentry_required: z.literal(true),
     answer_authority: z.literal(false),
     assistant_answer: z.literal(false),
     terminal_eligible: z.literal(false),
@@ -479,6 +650,67 @@ const minecraftWorkflowControlOutputSchema = z
     terminal_eligible: z.literal(false),
   })
   .strict();
+
+const environmentDurableGoalOutputSchema = z
+  .object({
+    operation: z.enum([
+      HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
+      HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+      HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+    ]),
+    room_id: helixSharedLiveRoomIdSchema,
+    ok: z.literal(true),
+    goal: jsonObjectSchema,
+    content_role: z.literal("environment_durable_goal_observation_not_assistant_answer"),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentGoalCheckpointHashOutputSchema = z
+  .object({
+    operation: z.literal("environment.durable_goal.checkpoint_hash"),
+    checkpoint_evidence_hash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    content_role: z.literal("environment_checkpoint_hash_observation_not_assistant_answer"),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentActionAuthorityExtendOutputSchema = z
+  .object({
+    operation: z.literal("environment.action_authority.extend"),
+    room_id: helixSharedLiveRoomIdSchema,
+    authority: jsonObjectSchema,
+    content_role: z.literal("environment_action_authority_receipt_not_assistant_answer"),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const durableGoalMcpObservation = (
+  operation:
+    | typeof HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY
+    | typeof HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY
+    | typeof HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  roomId: string,
+  goal: HelixEnvironmentDurableGoalProjection,
+): RecordLike => ({
+  operation,
+  room_id: roomId,
+  ok: true,
+  goal,
+  content_role: "environment_durable_goal_observation_not_assistant_answer",
+  reentry_required: true,
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+});
 
 const minecraftCapabilityIdForActionKind = (
   actionKind: string,
@@ -705,6 +937,35 @@ const toolError = (
 };
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+  if (isEnvironmentDurableGoalError(error)) {
+    const value = {
+      schema: "helix.environment_durable_goal_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable: error.statusCode >= 500,
+      evidence_refs: error.evidenceRefs,
+      mismatch_reasons: error.mismatchReasons,
+      content_role: "environment_durable_goal_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
+  if (
+    !(error instanceof SharedLiveRoomControlError) &&
+    !(error instanceof HelixAgentApiServiceError)
+  ) {
+    console.error("[helix-mcp] unexpected room tool error", {
+      name: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : "non_error_value",
+    });
+  }
   const value = buildSharedLiveRoomExternalError({
     error,
     requestId: null,
@@ -889,6 +1150,9 @@ export const createHelixMcpServer = (input: {
   deviceCheckService?: HelixEnvironmentDeviceCheckServicePort;
   environmentActionExecutor?: HelixEnvironmentActionMcpExecutor;
   environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
+  environmentProbeExecutor?: HelixEnvironmentProbeMcpExecutor;
+  environmentDurableGoalService?: HelixEnvironmentDurableGoalMcpStore;
+  environmentActionAuthorityLeaseExtender?: HelixEnvironmentActionAuthorityLeaseExtender;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const roomControlService =
@@ -905,6 +1169,13 @@ export const createHelixMcpServer = (input: {
   const environmentActionControlExecutor =
     input.environmentActionControlExecutor ??
       executeEnvironmentActionControlGatewayCapability;
+  const environmentProbeExecutor =
+    input.environmentProbeExecutor ?? executeEnvironmentProbeGatewayCapability;
+  const durableGoalService =
+    input.environmentDurableGoalService ?? environmentDurableGoalStore;
+  const actionAuthorityLeaseExtender =
+    input.environmentActionAuthorityLeaseExtender ??
+      extendEnvironmentActionAuthorityLease;
   const roomOwner = {
     tenantId: input.principal.tenantId,
     issuer: input.principal.issuer,
@@ -935,6 +1206,13 @@ export const createHelixMcpServer = (input: {
       },
     );
   };
+  const resolveSelfParticipantId = async (roomId: string): Promise<string> => {
+    const inspected = await roomControlService.inspectRoom({
+      actor: roomActor,
+      roomId,
+    });
+    return inspected.room.self_participant_id;
+  };
   const server = new McpServer(
     {
       name: "casimirbot-helix-agent",
@@ -948,6 +1226,7 @@ export const createHelixMcpServer = (input: {
         "Room and source receipts are non-authoritative; source creation returns only an opaque secure-delivery handle, never a source bearer.",
         "Raw Shared Live Room server-command execution is disabled. Typed Minecraft player actions use a separately paired action authority; sensor credentials are never action credentials.",
         "Minecraft action and workflow-control results are observations for Codex re-entry, never assistant answers or terminal authority.",
+        "Durable environment-goal projections are checkpoint context for Codex re-entry; they never choose strategy, write an answer, or grant terminal authority.",
         "Continue only while progress is possible and within the declared run budget.",
       ].join(" "),
     },
@@ -1174,6 +1453,393 @@ export const createHelixMcpServer = (input: {
   });
 
   server.registerTool(
+    "helix_environment_goal_create",
+    {
+      title: "Create a durable environment goal",
+      description:
+        "Creates an append-only Minecraft survival goal bound to the current room participant, selected player, source, world, connector epoch, and action authority. The projection is context for Codex re-entry, never an answer or strategy writer.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        subject_native_id: z.string().trim().min(1).max(320),
+        run_id: z.string().trim().min(1).max(320).nullable().optional(),
+        turn_id: z.string().trim().min(1).max(320),
+        objective: helixEnvironmentDurableGoalObjectiveSchema,
+      }).strict(),
+      outputSchema: environmentDurableGoalOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentDurableGoalCreateToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const goal = await durableGoalService.create({
+          ownerProfileId: input.principal.accountProfileId,
+          roomId: argumentsValue.room_id,
+          participantId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          subjectNativeId: argumentsValue.subject_native_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          runId: argumentsValue.run_id ?? null,
+          turnId: argumentsValue.turn_id,
+          objective: argumentsValue.objective,
+        });
+        return { ok: true, value: durableGoalMcpObservation(HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY, argumentsValue.room_id, goal) };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_goal_inspect",
+    {
+      title: "Inspect a durable environment goal",
+      description:
+        "Reconstructs bounded milestone, attempt, checkpoint, recovery, and evidence-reference context from the canonical goal ledger for the current authorized room participant.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        goal_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentDurableGoalOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async ({ room_id, goal_id }: HelixEnvironmentDurableGoalInspectToolArguments) =>
+      callRoomObservationTool(HELIX_SHARED_LIVE_ROOM_READ_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_SHARED_LIVE_ROOM_READ_SCOPE);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(room_id);
+        const goal = await durableGoalService.inspect({
+          goalId: goal_id,
+          profileId: input.principal.accountProfileId,
+          participantId,
+        });
+        return { ok: true, value: durableGoalMcpObservation(HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY, room_id, goal) };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_goal_append",
+    {
+      title: "Append a durable environment-goal event",
+      description:
+        "Appends one revision-checked event after exact identity and evidence admission. Runtime Codex owns strategy and retry choices; this tool only records verified lifecycle facts and returns nonterminal context for re-entry.",
+      inputSchema: helixEnvironmentDurableGoalAppendRequestSchema.extend({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        goal_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentDurableGoalOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentDurableGoalAppendToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const goal = await durableGoalService.append({
+          ownerProfileId: input.principal.accountProfileId,
+          roomId: argumentsValue.room_id,
+          participantId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          subjectNativeId: argumentsValue.subject_native_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          runId: argumentsValue.run_id ?? null,
+          turnId: argumentsValue.turn_id,
+          goalId: argumentsValue.goal_id,
+          expectedRevision: argumentsValue.expected_revision,
+          payload: argumentsValue.payload,
+          evidenceRefs: argumentsValue.evidence_refs,
+        });
+        return { ok: true, value: durableGoalMcpObservation(HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY, argumentsValue.room_id, goal) };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_goal_checkpoint_hash",
+    {
+      title: "Calculate a durable-goal checkpoint evidence hash",
+      description:
+        "Calculates the canonical deterministic hash for an exact proposed checkpoint payload. It does not admit evidence, append progress, or decide milestone or terminal eligibility; helix_environment_goal_append independently verifies the result.",
+      inputSchema: z.object({
+        evidence_refs: z.array(z.string().trim().min(1).max(320)).max(256),
+        observation_revision: z.number().int().min(0),
+        verified_facts: z.record(z.string(), z.unknown()),
+        completed_postcondition_ids: z.array(z.string().trim().min(1).max(320)).max(128),
+        incomplete_postcondition_ids: z.array(z.string().trim().min(1).max(320)).max(128),
+      }).strict(),
+      outputSchema: environmentGoalCheckpointHashOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async (argumentsValue: HelixEnvironmentGoalCheckpointHashToolArguments) =>
+      callRoomObservationTool(HELIX_SHARED_LIVE_ROOM_READ_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_SHARED_LIVE_ROOM_READ_SCOPE);
+        requireCurrentRoomFeature();
+        return {
+          ok: true,
+          value: {
+            operation: "environment.durable_goal.checkpoint_hash",
+            checkpoint_evidence_hash: helixEnvironmentDurableGoalSha256({
+              evidence_refs: argumentsValue.evidence_refs,
+              observation_revision: argumentsValue.observation_revision,
+              verified_facts: argumentsValue.verified_facts,
+              completed_postcondition_ids: argumentsValue.completed_postcondition_ids,
+              incomplete_postcondition_ids: argumentsValue.incomplete_postcondition_ids,
+            }),
+            content_role:
+              "environment_checkpoint_hash_observation_not_assistant_answer",
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_action_authority_extend",
+    {
+      title: "Extend an exact player-action authority lease",
+      description:
+        "Lets the authenticated room owner extend only the expiry of one exact active Player Embodiment authority and its existing connector credential. Capability policy, subject, participant, world, adapter, autonomy mode, and policy version remain unchanged; no credential is returned.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        expires_at: z.string().datetime({ offset: true }).refine(
+          (value) => {
+            const delta = Date.parse(value) - Date.now();
+            return delta >= 60_000 && delta <= 7 * 24 * 60 * 60_000;
+          },
+          "Lease expiry must be between one minute and seven days in the future.",
+        ),
+      }).strict(),
+      outputSchema: environmentActionAuthorityExtendOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentActionAuthorityExtendToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const authority = await actionAuthorityLeaseExtender({
+          roomId: argumentsValue.room_id,
+          ownerProfileId: input.principal.accountProfileId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          expiresAt: argumentsValue.expires_at,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.action_authority.extend",
+            room_id: argumentsValue.room_id,
+            authority,
+            content_role:
+              "environment_action_authority_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_minecraft_actor_status",
+    {
+      title: "Read the selected Minecraft actor status",
+      description:
+        "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The observation is evidence for Codex re-entry, never an assistant answer or terminal authority.",
+      inputSchema: z
+        .object({
+          room_id: helixSharedLiveRoomIdSchema,
+          environment_label: z.string().trim().min(1).max(240).optional(),
+        })
+        .strict(),
+      outputSchema: minecraftActorStatusOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async ({
+      room_id,
+      environment_label,
+    }: HelixMinecraftActorStatusToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const digest = crypto.randomUUID();
+        const execution: EnvironmentProbeGatewayExecution =
+          await environmentProbeExecutor({
+            capabilityId: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+            turnId: `mcp_environment_probe_turn:${digest}`,
+            toolCallId: `mcp_environment_probe_tool_call:${digest}`,
+            providerExecutionId: `mcp_environment_probe_execution:${digest}`,
+            arguments: environment_label ? { environment_label } : {},
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
+        return {
+          ok: execution.ok,
+          value: {
+            operation: "minecraft.actor.status.read",
+            room_id,
+            ok: execution.ok,
+            status: execution.status,
+            summary: execution.summary,
+            observation: execution.observation,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_semantic_wake_read",
+    {
+      title: "Read Minecraft semantic wake evidence",
+      description:
+        "Returns compact G4 Minecraft semantic-change evidence for the authenticated participant's selected player in one exact room. It is nonterminal evidence for Codex replanning; it never performs a reflex, mutates the world, or supplies answer authority.",
+      inputSchema: z
+        .object({
+          room_id: helixSharedLiveRoomIdSchema,
+          source_id: z.string().trim().min(1).max(320).optional(),
+          after_observation_revision: z.number().int().min(0).optional(),
+          limit: z.number().int().min(1).max(20).default(10),
+        })
+        .strict(),
+      outputSchema: environmentSemanticWakeReadOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async ({
+      room_id,
+      source_id,
+      after_observation_revision,
+      limit,
+    }: HelixEnvironmentSemanticWakeReadToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(room_id);
+        const nowMs = Date.now();
+        const items = listStagePlayLiveSourceMailItems({
+          threadId: `helix-ask:room:${room_id}`,
+          roomId: room_id,
+          sourceId: source_id ?? null,
+          sourceKind: "minecraft_world_event",
+          limit: 250,
+        })
+          .filter((item) => {
+            const identity = item.environmentIdentity;
+            return Boolean(
+              identity &&
+              identity.provenanceValid &&
+              identity.participantId === participantId &&
+              (after_observation_revision === undefined ||
+                identity.observationRevision > after_observation_revision),
+            );
+          })
+          .slice(-limit)
+          .map((item) => {
+            const identity = item.environmentIdentity!;
+            let semanticEvidence: RecordLike = {};
+            try {
+              const parsed = JSON.parse(item.summary.text) as unknown;
+              if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                semanticEvidence = parsed as RecordLike;
+              }
+            } catch {
+              semanticEvidence = { summary: item.summary.preview };
+            }
+            const observedMs = Date.parse(item.createdAt);
+            return {
+              mail_id: item.mailId,
+              source_id: item.sourceId,
+              room_source_binding_id: identity.roomSourceBindingId,
+              world_id: identity.worldId,
+              producer_plane: identity.producerPlane,
+              producer_epoch_ref: identity.producerEpochRef,
+              subject_ref: identity.subjectRef,
+              participant_id: participantId,
+              selected_player_native_id: identity.selectedPlayerNativeId,
+              observation_revision: identity.observationRevision,
+              digest_id: identity.digestId,
+              digest_hash: identity.digestHash,
+              semantic_evidence: semanticEvidence,
+              summary_preview: item.summary.preview,
+              evidence_refs: Array.from(new Set([
+                item.mailId,
+                identity.digestId,
+                identity.digestHash,
+                ...item.evidenceRefs,
+              ])),
+              created_at: item.createdAt,
+              freshness:
+                Number.isFinite(observedMs) && nowMs - observedMs <= 120_000
+                  ? "fresh"
+                  : "stale",
+            } as const;
+          });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.semantic_wake.read",
+            room_id,
+            items,
+            content_role:
+              "environment_semantic_wake_observation_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
     "helix_minecraft_player_action",
     {
       title: "Execute a typed Minecraft player action",
@@ -1219,7 +1885,7 @@ export const createHelixMcpServer = (input: {
           principal: input.principal,
           idempotencyKey: idempotency_key,
         });
-        const { action_kind: _actionKind, ...actionArguments } = action;
+        const actionArguments = normalizeMinecraftMcpActionArguments(action);
         const execution: EnvironmentActionGatewayExecution =
           await environmentActionExecutor({
             capabilityId,
@@ -1459,6 +2125,34 @@ export const createHelixMcpServer = (input: {
           idempotency_replayed: result.idempotencyReplayed,
           receipt: result.body,
         };
+      }),
+  );
+
+  server.registerTool(
+    "helix_room_presence_set",
+    {
+      title: "Set own Shared Live Room presence",
+      description:
+        "Marks only the verified linked account participant present or away in an existing room. It cannot change another participant, consent, environment authority, or terminal authority.",
+      inputSchema: z
+        .object({ request: helixSharedLiveRoomPresenceSetRequestSchema })
+        .strict(),
+      outputSchema: roomPresenceSetOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async ({ request }: HelixRoomPresenceSetToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        return (await roomControlService.setOwnPresence({
+          actor: roomActor,
+          request,
+        })) as unknown as RecordLike;
       }),
   );
 
@@ -1724,6 +2418,13 @@ export const createHelixMcpServer = (input: {
       ["helix_run_fetch_evidence", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_run_list_events", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_goal_create", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_goal_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_goal_append", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_action_authority_extend", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_minecraft_actor_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_semantic_wake_read", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_minecraft_player_action", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_minecraft_workflow_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_minecraft_workflow_control", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
