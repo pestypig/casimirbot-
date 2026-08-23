@@ -128,7 +128,7 @@ evaluation was not.
 The derived token is:
 
 ```text
-34b66572934d051e68c1466c8f0066fe2e43c49b634213037c2af34d93a671b5
+359cdf5d87e865dc3721b99bd79c3453046f5e489d51f67676dbc1c48167d034
 ```
 
 It is SHA-256 over a domain separator and canonical bindings for the base
@@ -138,7 +138,7 @@ and exclusive output root. It remains unauthorized.
 The sole eligible future command from the canonical repository root is:
 
 ```powershell
-$env:NHM2_G2D_EXECUTION_TOKEN='34b66572934d051e68c1466c8f0066fe2e43c49b634213037c2af34d93a671b5'; python -I -B tools/nhm2-spherical-boson-star-v2-branch-proof/g2d_fluid_star_orchestrator.py --execute --implementation-manifest docs/research/nhm2-spherical-boson-star-v2-g2d-implementation.v1.json
+$env:NHM2_G2D_EXECUTION_TOKEN='359cdf5d87e865dc3721b99bd79c3453046f5e489d51f67676dbc1c48167d034'; python -I -B tools/nhm2-spherical-boson-star-v2-branch-proof/g2d_fluid_star_orchestrator.py --execute --implementation-manifest docs/research/nhm2-spherical-boson-star-v2-g2d-implementation.v1.json
 ```
 
 This packet does not authorize that command. A later user authorization must

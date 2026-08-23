@@ -430,6 +430,16 @@ describe("Helix MCP Minecraft action boundary", () => {
         providerExecutionId: expect.stringMatching(/^mcp_environment_probe_execution:/),
       }));
 
+      const actorStatusWithUnsupportedSelector = await connection.client.callTool({
+        name: "helix_minecraft_actor_status",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_label: "a label that the frozen actor-status schema cannot admit",
+        },
+      });
+      expect(actorStatusWithUnsupportedSelector.isError).toBe(true);
+      expect(executeProbe).toHaveBeenCalledTimes(1);
+
       const result = await connection.client.callTool({
         name: "helix_minecraft_player_action",
         arguments: {

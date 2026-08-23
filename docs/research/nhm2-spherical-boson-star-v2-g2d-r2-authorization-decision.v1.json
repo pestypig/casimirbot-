@@ -1,0 +1,37 @@
+{
+  "authority": {
+    "candidateAdmitted": false,
+    "classicalProofEstablished": false,
+    "diagnosticLampAuthorized": false,
+    "executionAuthorized": false,
+    "jointGeometryStateAccepted": false,
+    "laneAuthorized": false,
+    "pairAgreementEstablished": false,
+    "physicalViabilityAuthorized": false,
+    "propulsionAuthorized": false,
+    "quantumStateAccepted": false,
+    "replayAuthorized": false,
+    "transportAuthorized": false
+  },
+  "authorizationEvidence": null,
+  "candidateExecutionObserved": false,
+  "checkpointPath": "docs/research/nhm2-spherical-boson-star-v2-g2d-r1-execution-checkpoint.md",
+  "checkpointSha256": "5480ec2ad381ae9f3fc685f1d29f9a2096f5cee8146021f7f1f94b63700d23c1",
+  "decision": "PENDING_EXPLICIT_USER_AUTHORIZATION",
+  "exactFutureCommand": "$env:NHM2_G2D_EXECUTION_TOKEN='359cdf5d87e865dc3721b99bd79c3453046f5e489d51f67676dbc1c48167d034'; python -I -B tools/nhm2-spherical-boson-star-v2-branch-proof/g2d_fluid_star_orchestrator.py --execute --implementation-manifest docs/research/nhm2-spherical-boson-star-v2-g2d-implementation.v1.json",
+  "executionToken": "359cdf5d87e865dc3721b99bd79c3453046f5e489d51f67676dbc1c48167d034",
+  "futureOutputRoot": "artifacts/nhm2-spherical-boson-star-v2-g2d/fluid-star-chi-1-over-4-v1",
+  "implementationManifestPath": "docs/research/nhm2-spherical-boson-star-v2-g2d-implementation.v1.json",
+  "implementationManifestSha256": "21e20f53f33f7517322a1a9d3c2e4290e8cf000617efe445cbebf349bacf81e5",
+  "independentBinarySha256": "ff56a59d33e2e450986aadb81769c1a141677fb830d75c0f960bf163a96a6713",
+  "independentImageId": "sha256:c4c437edf2ae480445f2ec9c1a551e6d88d264947d6238e023d5368b4a7c158a",
+  "requiredExactUserAcknowledgement": "I authorize exactly one G2D fluid-star execution under token 359cdf5d87e865dc3721b99bd79c3453046f5e489d51f67676dbc1c48167d034 using the checkpointed command. I understand that PASS, FAIL, or partial output becomes immutable evidence and there will be no retry, retune, deletion, or alternate output root.",
+  "resourceCeilings": {
+    "independentContainerCpus": 1,
+    "independentContainerMemoryMiB": 2048,
+    "independentContainerNetwork": "none",
+    "wallSecondsEach": 600
+  },
+  "schema": "nhm2.g2d.fluid-star.authorization-decision.v1",
+  "status": "READY_FOR_SEPARATE_USER_DECISION_EXECUTION_UNAUTHORIZED"
+}

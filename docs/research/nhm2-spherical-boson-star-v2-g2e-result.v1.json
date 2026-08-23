@@ -1,0 +1,33 @@
+{
+  "authority": {
+    "candidateAdmitted": false,
+    "classicalProofEstablished": false,
+    "diagnosticLampAuthorized": false,
+    "executionAuthorized": false,
+    "jointGeometryStateAccepted": false,
+    "laneAuthorized": false,
+    "pairAgreementEstablished": false,
+    "physicalViabilityAuthorized": false,
+    "propulsionAuthorized": false,
+    "quantumStateAccepted": false,
+    "replayAuthorized": false,
+    "transportAuthorized": false
+  },
+  "candidateEvaluated": false,
+  "candidateNeutral": true,
+  "contractSha256": "4c55056c9adaa6d88ed6c199d5918479f920913bc784546441df06c8ef380a65",
+  "dockerfileSha256": "894d615de51e29098c772675d5593a564e3465e27636d806e44b4b1a8cfedac4",
+  "focusedTests": {
+    "passed": 7,
+    "sourceSha256": "d996a310abe124a987c1568109259ba20b2963d51d39f695bcbb427a2a4d048b",
+    "total": 7
+  },
+  "independentBinarySha256": "09e1b6d0e27ac3bce81efcdada44fc78a58ef02c47f21c79b48d9706ae314198",
+  "independentImageId": "sha256:b927cf05736373c71f03acc8f53f88f3d2fe0f17cc4d2f68edc31622ba3797f0",
+  "independentSourceSha256": "3a3766809468131fb93e756d36d54968937e119d50d7353cf1931eb24a71c498",
+  "primarySourceSha256": "8d0a3826c26295e578da92f941c62df763fe1bd391bb98d9118a25e9d7f7b751",
+  "provenanceSourceSha256": "5446a96624b1e64ca3343d3832b3d91f511ca1d835944382bf37800b3c6b1487",
+  "schema": "nhm2.g2e.interval-provenance-result.v1",
+  "status": "PASS_CANDIDATE_NEUTRAL_INFRASTRUCTURE_ONLY",
+  "syntheticFixtureSha256": "a1c6dc8c824cdf12b3ee0a2eea2142cb6e832391a1777c84a3d6062f71962b44"
+}

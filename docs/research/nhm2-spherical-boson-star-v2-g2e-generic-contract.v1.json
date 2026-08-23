@@ -1,0 +1,96 @@
+{
+  "authority": {
+    "candidateAdmitted": false,
+    "classicalProofEstablished": false,
+    "diagnosticLampAuthorized": false,
+    "executionAuthorized": false,
+    "jointGeometryStateAccepted": false,
+    "laneAuthorized": false,
+    "pairAgreementEstablished": false,
+    "physicalViabilityAuthorized": false,
+    "propulsionAuthorized": false,
+    "quantumStateAccepted": false,
+    "replayAuthorized": false,
+    "transportAuthorized": false
+  },
+  "candidateNeutral": true,
+  "directedSqrtContract": {
+    "lowerPostcondition": "lower^2 <= input",
+    "precisionDigits": 80,
+    "tightness": "next_plus(lower)^2 > input unless lower is exact",
+    "upperPostcondition": "upper^2 >= input",
+    "upperTightness": "next_minus(upper)^2 < input unless upper is exact"
+  },
+  "forbiddenInputs": [
+    "fluid-star formulas",
+    "G2D replay grids",
+    "G2D candidate evaluator entrypoints",
+    "G2D occupied output root"
+  ],
+  "independentContract": {
+    "language": "C17",
+    "precisionBits": 512,
+    "runtime": "offline Linux GMP/MPFR",
+    "sqrtRounding": [
+      "MPFR_RNDD",
+      "MPFR_RNDU"
+    ]
+  },
+  "provenanceContract": {
+    "capturePrefixBytesPerStream": 64,
+    "firstFailureTerminal": true,
+    "persist": [
+      "byteCount",
+      "capturedPrefixBase64",
+      "sha256",
+      "truncated"
+    ],
+    "receiptOrder": [
+      "preexecution-binding.json",
+      "terminal-receipt.json"
+    ],
+    "rootCreation": "exclusive",
+    "syntheticOnly": true
+  },
+  "schema": "nhm2.g2e.generic-interval-provenance-contract.v1",
+  "status": "FROZEN_CANDIDATE_NEUTRAL_NO_SCIENTIFIC_EXECUTION",
+  "vectors": [
+    {
+      "id": "zero",
+      "input": "0"
+    },
+    {
+      "id": "unit",
+      "input": "1"
+    },
+    {
+      "id": "quarter-square",
+      "input": "0.25"
+    },
+    {
+      "id": "sqrt-two",
+      "input": "2"
+    },
+    {
+      "id": "sqrt-ten",
+      "input": "10"
+    },
+    {
+      "id": "tiny-square",
+      "input": "1e-1000"
+    },
+    {
+      "id": "tiny-irrational",
+      "input": "2e-1000"
+    },
+    {
+      "id": "huge-square",
+      "input": "1e1000"
+    },
+    {
+      "id": "interval-endpoints",
+      "inputLower": "2",
+      "inputUpper": "3"
+    }
+  ]
+}

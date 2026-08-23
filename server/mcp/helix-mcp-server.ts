@@ -94,6 +94,12 @@ import {
   helixEnvironmentProbeObservationSchema,
 } from "@shared/helix-environment-connector";
 import {
+  helixRoomEnvironmentSelfBindingRequestSchema,
+  helixRoomEnvironmentsReceiptSchema,
+  type HelixRoomEnvironmentProjection,
+  type HelixRoomEnvironmentSubjectBinding,
+} from "@shared/helix-environment-subject";
+import {
   helixMinecraftFluidSequenceArgumentsSchema,
 } from "@shared/helix-minecraft-fluid-sequence";
 import {
@@ -174,6 +180,11 @@ import {
 } from "../services/environment-connectors/reasoning-roles/environment-reasoning-role-store";
 import { extendEnvironmentActionAuthorityLease } from
   "../services/environment-connectors/actions/authority-store";
+import {
+  bindOwnRoomEnvironmentSubject,
+  isRoomEnvironmentSubjectError,
+  listRoomEnvironmentProjections,
+} from "../services/environment-connectors/subjects";
 import { listStagePlayLiveSourceMailItems } from
   "../services/stage-play/stage-play-live-source-mailbox-store";
 
@@ -235,6 +246,16 @@ type HelixEnvironmentDeviceCheckToolArguments = {
   room_id?: string;
 };
 
+type HelixEnvironmentSubjectListToolArguments = {
+  room_id: string;
+};
+
+type HelixEnvironmentSubjectSelectToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  subject_ref: string;
+};
+
 type HelixMinecraftPlayerActionToolArguments = {
   room_id: string;
   idempotency_key: string;
@@ -244,7 +265,6 @@ type HelixMinecraftPlayerActionToolArguments = {
 
 type HelixMinecraftActorStatusToolArguments = {
   room_id: string;
-  environment_label?: string;
 };
 
 type HelixEnvironmentSemanticWakeReadToolArguments = {
@@ -1046,6 +1066,24 @@ const toolError = (
 };
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+  if (isRoomEnvironmentSubjectError(error)) {
+    const value = {
+      schema: "helix.environment_subject_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable: error.statusCode >= 500,
+      content_role: "environment_subject_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
   if (isEnvironmentReasoningRoleError(error)) {
     const value = {
       schema: "helix.environment_reasoning_role_error.v1",
@@ -1265,6 +1303,19 @@ const runIdSchema = z
   .regex(/^run_[A-Za-z0-9._:-]{8,200}$/)
   .describe("Opaque durable run ID returned by helix_run_start.");
 
+export type HelixEnvironmentSubjectMcpService = {
+  list(input: {
+    roomId: string;
+    profileId: string;
+  }): Promise<HelixRoomEnvironmentProjection[]>;
+  select(input: {
+    roomId: string;
+    profileId: string;
+    environmentBindingId: string;
+    subjectRef: string;
+  }): Promise<HelixRoomEnvironmentSubjectBinding>;
+};
+
 export const createHelixMcpServer = (input: {
   principal: HelixAgentApiPrincipal;
   service?: HelixAgentApiService;
@@ -1277,6 +1328,7 @@ export const createHelixMcpServer = (input: {
     | "revokeClaimedRunChatBindingForOwner"
   >;
   deviceCheckService?: HelixEnvironmentDeviceCheckServicePort;
+  environmentSubjectService?: HelixEnvironmentSubjectMcpService;
   environmentActionExecutor?: HelixEnvironmentActionMcpExecutor;
   environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
   environmentProbeExecutor?: HelixEnvironmentProbeMcpExecutor;
@@ -1294,6 +1346,10 @@ export const createHelixMcpServer = (input: {
   );
   const deviceCheckService =
     input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList;
+  const environmentSubjectService = input.environmentSubjectService ?? {
+    list: listRoomEnvironmentProjections,
+    select: bindOwnRoomEnvironmentSubject,
+  };
   const environmentActionExecutor =
     input.environmentActionExecutor ?? executeEnvironmentActionGatewayCapability;
   const environmentActionControlExecutor =
@@ -1583,6 +1639,101 @@ export const createHelixMcpServer = (input: {
     principal: input.principal,
     deviceCheckService,
   });
+
+  server.registerTool(
+    "helix_environment_subject_list",
+    {
+      title: "List my live environment subjects",
+      description:
+        "Lists sanitized subject directories and this authenticated room member's current environment identity. It never exposes native player IDs, connector credentials, or answer authority.",
+      inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+      outputSchema: helixRoomEnvironmentsReceiptSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async ({ room_id }: HelixEnvironmentSubjectListToolArguments) =>
+      callRoomObservationTool(HELIX_SHARED_LIVE_ROOM_READ_SCOPE, async () => {
+        requireHelixAgentApiScope(
+          input.principal,
+          HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        );
+        requireCurrentRoomFeature();
+        const environments = await environmentSubjectService.list({
+          roomId: room_id,
+          profileId: input.principal.accountProfileId,
+        });
+        return {
+          ok: true,
+          value: {
+            schema: "helix.room_environments.receipt.v1",
+            ok: true,
+            error: null,
+            message: "Environment subjects listed for the authenticated room member.",
+            environments,
+            binding: null,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_subject_select",
+    {
+      title: "Select my live environment subject",
+      description:
+        "Re-verifies only the authenticated room member's own exact subject from a fresh connector directory. It cannot assign another participant, expand permissions, or bypass subject conflicts and connector-epoch checks.",
+      inputSchema: helixRoomEnvironmentSelfBindingRequestSchema.extend({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: helixRoomEnvironmentsReceiptSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async ({
+      room_id,
+      environment_binding_id,
+      subject_ref,
+    }: HelixEnvironmentSubjectSelectToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const binding = await environmentSubjectService.select({
+          roomId: room_id,
+          profileId: input.principal.accountProfileId,
+          environmentBindingId: environment_binding_id,
+          subjectRef: subject_ref,
+        });
+        return {
+          ok: true,
+          value: {
+            schema: "helix.room_environments.receipt.v1",
+            ok: true,
+            error: null,
+            message: `Authenticated room identity re-verified as ${binding.subject_label}.`,
+            binding,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        };
+      }),
+  );
 
   server.registerTool(
     "helix_environment_goal_create",
@@ -2049,7 +2200,6 @@ export const createHelixMcpServer = (input: {
       inputSchema: z
         .object({
           room_id: helixSharedLiveRoomIdSchema,
-          environment_label: z.string().trim().min(1).max(240).optional(),
         })
         .strict(),
       outputSchema: minecraftActorStatusOutputSchema,
@@ -2061,10 +2211,7 @@ export const createHelixMcpServer = (input: {
       },
       _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
     },
-    async ({
-      room_id,
-      environment_label,
-    }: HelixMinecraftActorStatusToolArguments) =>
+    async ({ room_id }: HelixMinecraftActorStatusToolArguments) =>
       callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
         requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
         requireCurrentRoomFeature();
@@ -2075,7 +2222,7 @@ export const createHelixMcpServer = (input: {
             turnId: `mcp_environment_probe_turn:${digest}`,
             toolCallId: `mcp_environment_probe_tool_call:${digest}`,
             providerExecutionId: `mcp_environment_probe_execution:${digest}`,
-            arguments: environment_label ? { environment_label } : {},
+            arguments: {},
             accountContext: input.principal.accountContext,
             conversationThreadId: `helix-ask:room:${room_id}`,
           });
@@ -2784,6 +2931,8 @@ export const createHelixMcpServer = (input: {
       ["helix_run_fetch_evidence", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_run_list_events", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_subject_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_subject_select", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_create", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_goal_append", HELIX_MINECRAFT_ACTION_MCP_SCOPES],

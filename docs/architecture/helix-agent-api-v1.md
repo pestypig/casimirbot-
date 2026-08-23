@@ -427,6 +427,8 @@ The Minecraft Player Embodiment extension tools are:
 
 | MCP tool                           | OAuth scopes                                          | Input |
 | ---------------------------------- | ----------------------------------------------------- | ----- |
+| `helix_environment_subject_list`   | `helix.rooms.read`                                    | `room_id` |
+| `helix_environment_subject_select` | `helix.rooms.read`, `helix.environment_actions.write` | `room_id`, `environment_binding_id`, exact sanitized `subject_ref` |
 | `helix_minecraft_player_action`    | `helix.rooms.read`, `helix.environment_actions.write` | `room_id`, `idempotency_key`, optional environment label, typed `action` |
 | `helix_minecraft_workflow_status`  | `helix.rooms.read`, `helix.environment_actions.read`  | `room_id`, exact `workflow_ref` |
 | `helix_minecraft_workflow_control` | `helix.rooms.read`, `helix.environment_actions.write` | `room_id`, exact `workflow_ref`, resume/cancel/emergency-stop control |
@@ -438,6 +440,15 @@ participant/player binding, action authority, lease, live manifest, and
 connector. The Fabric mod continues to poll the narrower southbound connector
 protocol. Its credentials, private endpoint, and pairing material never enter
 MCP arguments or results.
+
+The subject tools are the provider-neutral equivalent of **Your identity in
+this environment**. Listing returns only the sanitized, room-scoped subject
+directory and the authenticated member's own binding. Selection re-verifies
+only that same member against a fresh exact `subject_ref`; it cannot name a
+different participant, reveal an environment-native player ID, expand action
+authority, or bypass connector-epoch and subject-conflict checks. This keeps
+remote MCP operation available without turning an owner UI session into a
+prerequisite or adding a developer-only identity bypass.
 
 `helix_room_command_request` remains disabled. Typed player actions are not an
 escape hatch to arbitrary Minecraft commands, host shell, files, RCON, launcher

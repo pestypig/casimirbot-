@@ -742,6 +742,8 @@ scopes = [
 ]
 enabled_tools = [
   "helix_environment_device_check",
+  "helix_environment_subject_list",
+  "helix_environment_subject_select",
   "helix_minecraft_player_action",
   "helix_minecraft_workflow_status",
   "helix_minecraft_workflow_control",
@@ -756,6 +758,93 @@ Do not add `auth = "oauth"`; current Codex initiates OAuth when the remote MCP
 server has no bearer-token or static authentication configuration. Never paste
 an access token, room-source bearer, action pairing code, or Minecraft account
 credential into `config.toml`, a prompt, or debug output.
+
+### Repeatable local Codex MCP OAuth recovery
+
+Use this recovery when Codex reports `Authentication expired`, the MCP catalog
+does not load, or Auth0 rejects a CLI login with `Callback URL mismatch`. The
+successful Windows loopback method uses one fixed native/public-client callback
+instead of accepting the ephemeral port and nonce path that `codex mcp login`
+chooses by default.
+
+Prerequisites:
+
+1. Start keyed CasimirBot only through the opaque
+   `start-myapp-for-codex` launcher and wait for `[express] app ready`.
+2. Confirm that `/api/account/session`, `/api/helix/pipeline`, and
+   `/api/agi/agent-providers` return HTTP 200 at `http://127.0.0.1:1522`.
+3. Use an Auth0 Native/public client with authorization code plus PKCE S256,
+   no client secret, and the exact allowed callback
+   `http://127.0.0.1:8766/callback`.
+4. Ensure an official user-space Codex CLI is available. On this Windows
+   workstation the known fallback is
+   `C:\Users\dan\AppData\Roaming\npm\codex.cmd`; prefer `Get-Command codex`
+   when it resolves normally.
+
+Persist these top-level Codex settings in `~/.codex/config.toml` so later app
+and CLI reconnects request the already registered callback:
+
+```toml
+mcp_oauth_callback_port = 8766
+mcp_oauth_callback_url = "http://127.0.0.1:8766/callback"
+```
+
+Then run the login with the same values explicitly. Replace the server alias
+only when the configured MCP entry has a different name:
+
+```powershell
+$codexCommand = (Get-Command codex -ErrorAction SilentlyContinue).Source
+if (-not $codexCommand) {
+  $codexCommand = 'C:\Users\dan\AppData\Roaming\npm\codex.cmd'
+}
+
+& $codexCommand mcp login casimirbot_g2_a1_local `
+  -c 'mcp_oauth_callback_port=8766' `
+  -c 'mcp_oauth_callback_url="http://127.0.0.1:8766/callback"' 2>&1 |
+  ForEach-Object {
+    [string]$_ -replace 'https?://\S+', '<authorization_url_redacted>'
+  }
+```
+
+The CLI opens the authorization page and listens on the fixed loopback
+callback. The operator completes the Auth0 approval; a successful terminal
+result is `Successfully logged in to MCP server '<alias>'`. Do not enumerate
+the authorization tab URL, copy its query string, print credential stores, or
+inspect credential-bearing environment variables. The authorization URL may
+contain transient state and PKCE material even though it is not an access
+token.
+
+Interpret failures in this order:
+
+- Connection refusal or OAuth-metadata discovery failure: port 1522 is absent
+  or the keyed server is not ready. Restore it only through the opaque launcher
+  and recheck the three health endpoints.
+- `Callback URL mismatch` with a random loopback port or `/callback/<nonce>`:
+  the fixed callback overrides were not applied. Correct the Codex settings and
+  rerun; do not add each ephemeral callback to Auth0.
+- Browser approval succeeds but the current task still shows the old MCP
+  startup error or old catalog: the already-loaded Codex host has stale client
+  state. Restart/reload the Codex MCP host once, then confirm the task catalog
+  contains the expected Helix tools. Do not repeat account authorization first.
+
+OAuth success proves account authentication only. It does not prove room
+membership, selected environment subject, Minecraft action authority, fresh
+connector identity, tool execution, observation re-entry, or terminal parity;
+verify those separately in the A1/B acceptance sequence.
+
+When the authenticated member is away from the owner browser, use
+`helix_environment_subject_list` to read the fresh sanitized subject directory,
+then pass the chosen exact room-scoped `subject_ref` and
+`environment_binding_id` to `helix_environment_subject_select`. This performs
+the same self-identity re-verification as the owner/member UI; it does not
+assign another participant and does not expose or accept a player UUID. If the
+MCP connection predates these tools, reload the MCP host before continuing.
+In Codex desktop, save the server in MCP settings and select **Restart**; a
+supported Codex app-server client may instead invoke
+`config/mcpServer/reload`, which reloads configuration and queues a refresh for
+loaded tasks. Editing `config.toml` alone is not evidence that an already-loaded
+task received the new catalog. Confirm `/mcp` or the task tool catalog contains
+both subject tools before attempting remote re-verification.
 
 The localhost transport intentionally retains the deployed resource identity
 `https://casimirbot.com/mcp`; it must match the `resource` advertised by the
@@ -1059,6 +1148,7 @@ architectural failure by hard-coding one prompt.
 | A player-state prompt containing `check ... online` requires web search                                           | Source-route projection contradiction                         | Once `live_environment` is committed, internet evidence guards must validate only an explicitly committed `internet_search` route. Retain lexical web detection only for legacy/provider-only turns without route authority. Do not add a Minecraft prompt exception.                                                                                                                                                                                       |
 | A Player Embodiment safety prompt requests docs/search or Minecraft command authority                             | Prompt interpretation / capability itinerary contradiction    | Treat the paired player client as a local live-observation scope. Preserve safety conditions such as solid support, headroom, fire and drop checks as operative action guards. A negative constraint such as `do not issue a server command` must forbid command admission; bare `no` inside `no nearby fire` must not negate a later walk. The expected itinerary is the matching read/action/read capability sequence, not a prompt-specific fallback.    |
 | Active Fabric source returns `subject_binding_required`                                                           | Participant-to-subject binding                                | Confirm the player is online, refresh the sanitized subject directory, then select that player under **Your identity in this environment**. Do not bypass identity selection or expose a raw player UUID.                                                                                                                                                                                                                                                   |
+| Actor status returns `producer_epoch_mismatch` after a connector or keyed-server restart                          | Participant-to-subject re-verification                        | Preserve the fail-closed result. In the owner/member UI, refresh **Your identity in this environment** and select the same online player again; for a remotely authenticated MCP member, call `helix_environment_subject_list` followed by `helix_environment_subject_select` with the exact sanitized environment and subject refs. Never copy a native UUID, select for another participant, or reuse a stale projection.                                                                                          |
 | The first probe after a keyed restart says every matching connector admission is stale                            | Connector freshness recovery                                  | Preserve the fail-closed result. Wait for the Fabric manifest/heartbeat to be freshly admitted after pg-mem restore and connector backoff, confirm the sanitized source is active, then start a new turn. Re-pair only if freshness does not recover.                                                                                                                                                                                                       |
 | Probe waits indefinitely                                                                                          | Connector poll/result lane                                    | Confirm Fabric is running, manifest-admitted, and polling after heartbeat startup.                                                                                                                                                                                                                                                                                                                                                                          |
 | Player action says no paired client                                                                               | Player Embodiment pairing                                     | Confirm the action authority is active, redeem a fresh action-only code with `/helix-player pair`, then check the sanitized client manifest/heartbeat. Do not reuse source or command pairing.                                                                                                                                                                                                                                                              |

@@ -241,7 +241,32 @@ def main() -> int:
     args = _args()
     manifest = args.implementation_manifest.resolve()
     if args.execute:
-        return execute_once(manifest)
+        try:
+            return execute_once(manifest)
+        except Exception as exc:
+            # Once the exclusive root exists, preserve the reached prefix and
+            # append exactly one terminal failure receipt. Never remove, reuse,
+            # or retry the root under this candidate identity.
+            try:
+                binding = _load(manifest)
+                output = ROOT / binding["outputRoot"]
+                terminal = output / "terminal-receipt.json"
+                if output.is_dir() and not os.path.lexists(terminal):
+                    _write_exclusive(terminal, _receipt({
+                        "artifactInventory": [], "authority": binding["authority"],
+                        "candidateAdmitted": False, "candidateId": binding["candidateId"],
+                        "classicalProofEstablished": False, "dutyId": "terminal",
+                        "dutyOrdinal": 9, "firstFail": str(exc),
+                        "manifestSha256": binding["baseManifestSha256"],
+                        "runtimeManifestSha256": None,
+                        "schema": "nhm2.g2d.fluid-star.terminal-receipt.v1",
+                        "sourceSha256": binding["orchestratorSourceSha256"],
+                        "status": "FAIL",
+                    }))
+            except Exception:
+                pass
+            print(canonical({"firstFail": str(exc), "status": "FAIL"}).decode("ascii"), file=sys.stderr)
+            return 1
     print(canonical(verify_preexecution(manifest)).decode("ascii"))
     return 0
 
