@@ -14,7 +14,10 @@ import {
 } from
   "./helix-minecraft-guardian-evidence.mjs";
 
-const CAPABILITY_PREFIX = "com.casimirbot.minecraft.";
+const CAPABILITY_PREFIXES = [
+  "com.casimirbot.minecraft.",
+  "com.casimirbot.environment.durable_goal.",
+];
 const DEFAULT_TIMEOUT_MS = 300_000;
 
 const scenarios = {
@@ -44,6 +47,71 @@ const scenarios = {
   actor_status_short: {
     prompt: "What is my Minecraft status right now?",
     expected: ["com.casimirbot.minecraft.actor.status.read"],
+  },
+  nether_preflight_goal_create: {
+    prompt:
+      "Create a durable Minecraft custom-survival goal for preparing the exact bound player and world for a later full Nether journey. Its only milestone for now is a preflight binding check requiring fresh actor status evidence. Do not begin gameplay progression, move, interact, change inventory, mutate blocks, craft, mine, use a Minecraft command, complete the milestone, or mark the goal complete. Leave the new goal active and report its exact goal identity from current-turn evidence.",
+    expected: ["com.casimirbot.environment.durable_goal.create"],
+    forbiddenCapabilities: [
+      "com.casimirbot.minecraft.command",
+      "com.casimirbot.minecraft.player.navigate",
+      "com.casimirbot.minecraft.player.walk",
+      "com.casimirbot.minecraft.player.interact",
+      "com.casimirbot.minecraft.player.mine",
+      "com.casimirbot.minecraft.player.place",
+      "com.casimirbot.minecraft.player.craft",
+    ],
+  },
+  nether_preflight_goal_checkpoint: {
+    prompt:
+      "Inspect environment_durable_goal:4ecee784-d431-4b76-853f-af5bbf046940 in the current Minecraft room, read fresh current actor status, and append one verified preflight checkpoint satisfying fresh_actor_status_bound. Leave the goal active and report the goal and checkpoint identities from current-turn evidence.",
+    expected: [
+      "com.casimirbot.environment.durable_goal.inspect",
+      "com.casimirbot.minecraft.actor.status.read",
+      "com.casimirbot.environment.durable_goal.append",
+    ],
+    forbiddenCapabilities: [
+      "com.casimirbot.minecraft.command",
+      "com.casimirbot.minecraft.player.navigate",
+      "com.casimirbot.minecraft.player.walk",
+      "com.casimirbot.minecraft.player.interact",
+      "com.casimirbot.minecraft.player.mine",
+      "com.casimirbot.minecraft.player.place",
+      "com.casimirbot.minecraft.player.craft",
+    ],
+  },
+  nether_preflight_goal_verify: {
+    prompt:
+      "Inspect environment_durable_goal:4ecee784-d431-4b76-853f-af5bbf046940 and report its current revision, status, latest checkpoint identity, and exact checkpoint evidence refs from the canonical ledger.",
+    expected: ["com.casimirbot.environment.durable_goal.inspect"],
+    forbiddenCapabilities: [
+      "com.casimirbot.minecraft.command",
+      "com.casimirbot.minecraft.player.navigate",
+      "com.casimirbot.minecraft.player.walk",
+      "com.casimirbot.minecraft.player.interact",
+      "com.casimirbot.minecraft.player.mine",
+      "com.casimirbot.minecraft.player.place",
+      "com.casimirbot.minecraft.player.craft",
+      "com.casimirbot.environment.durable_goal.append",
+    ],
+  },
+  nether_preflight_checkpoint: {
+    prompt:
+      "Prepare the exact Minecraft room for a later full Nether journey, but do not begin that journey or perform any gameplay action. Read my current actor status, create a custom-survival durable goal whose only milestone is a preflight binding check, and append one verified checkpoint from the fresh status evidence. The checkpoint must state that no movement, interaction, inventory change, block mutation, crafting, mining, or Nether progress occurred. Leave the goal active and report its goal and checkpoint identities from current-turn evidence.",
+    expected: [
+      "com.casimirbot.minecraft.actor.status.read",
+      "com.casimirbot.environment.durable_goal.create",
+      "com.casimirbot.environment.durable_goal.append",
+    ],
+    forbiddenCapabilities: [
+      "com.casimirbot.minecraft.player.navigate",
+      "com.casimirbot.minecraft.player.walk",
+      "com.casimirbot.minecraft.player.interact",
+      "com.casimirbot.minecraft.player.mine",
+      "com.casimirbot.minecraft.player.place",
+      "com.casimirbot.minecraft.player.craft",
+      "com.casimirbot.minecraft.command",
+    ],
   },
   inventory_status: {
     prompt:
@@ -416,7 +484,9 @@ const listCapabilities = (observations, ask, debug) => {
     const selected =
       string(decision?.chosen_capability) ||
       string(decision?.capability_id);
-    if (selected?.startsWith(CAPABILITY_PREFIX)) capabilities.push(selected);
+    if (CAPABILITY_PREFIXES.some((prefix) => selected?.startsWith(prefix))) {
+      capabilities.push(selected);
+    }
   }
   return [...new Set(capabilities)];
 };

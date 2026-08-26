@@ -1,0 +1,38 @@
+{
+  "authority": {
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 0,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "base_primary_v2_image_id": "sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "dockerfile": {
+    "path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.primary.proof.v3",
+    "sha256": "10af96a8063e14c623de785085ef0b650863c17f080c86db26b5c91ec875a469"
+  },
+  "executable_path": "/usr/local/bin/tolman-vii-primary-proof-v3",
+  "executable_sha256": "1764b6bec075061eea815a2a9c44cba3ff459fb8cc0709c813762863225246e1",
+  "fixture": {
+    "candidate_entrypoint_invocations": 0,
+    "cases_passed": 10,
+    "image_id": "sha256:cd30827cd5760ae45aff0846650e1e204bd50f1187035b205cb8c18ea6c31f23",
+    "source_sha256": "fae14d7fc3308ed2633723406f2e6b023aa9f4f9e5a53b5e35f47b0cdec96506"
+  },
+  "image": "nhm2-g2h-primary-proof:v3",
+  "image_id": "sha256:5a790295492d607fc9c3ede7a527a86922e09608cce1eaa9af464d33a1617ada",
+  "repair_scope": [
+    "authorization_schema_v1_to_v2",
+    "new_primary_v3_root_token_runtime_and_ledger_identity",
+    "explicit_absence_checks_for_exhausted_v1_and_v2_roots"
+  ],
+  "schema": "nhm2.g2h_e_s_r1.primary_v3_build_binding.v1",
+  "scientific_duties_changed": false,
+  "source": {
+    "path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_primary_proof_v3.c",
+    "sha256": "37ffaba2c36f8094c14aea57a5eafbbf0cd3f5353638dd5d9213d2534ffc2e68"
+  },
+  "token_sha256": "39ee95896fbd9d39d13c2762c42cefcf5284a2cb66e78dddadcf0006530dd3c3"
+}

@@ -333,7 +333,7 @@ function sessionFromRow(row: SessionRow): HelixAccountSession {
       auth_mode:
         row.provider === "guest"
           ? "guest"
-          : row.provider === "google"
+          : row.provider === "google" || row.provider === "auth0"
           ? "web_auth"
           : row.provider === "password"
             ? "password_account"
@@ -346,6 +346,8 @@ function sessionFromRow(row: SessionRow): HelixAccountSession {
           ? "guest"
           : row.provider === "google"
             ? "google"
+            : row.provider === "auth0"
+              ? "external_oauth"
             : "local",
       provider_subject: row.provider_subject,
       picture_url: row.picture_url,
@@ -385,6 +387,8 @@ function buildLinkedAccounts(session: HelixAccountSession | null): HelixAccountL
             ? "guest"
             : session.profile.provider === "google"
               ? "google"
+              : session.profile.provider === "external_oauth"
+                ? "auth0"
               : "local",
         external_id: session.profile.provider_subject ?? session.profile.profile_id,
         display_name: session.profile.display_name,
@@ -438,7 +442,7 @@ async function upsertAccount(input: {
   display_name: string;
   email?: string | null;
   account_type: HelixAccountType;
-  provider: "local" | "google" | "password" | "guest";
+  provider: "local" | "google" | "auth0" | "password" | "guest";
   provider_subject?: string | null;
   picture_url?: string | null;
 }): Promise<AccountRow> {
@@ -1446,7 +1450,7 @@ export async function signInPasswordAccountSession(input: {
 }
 
 export async function signInWebAccountSession(input: {
-  provider: "google";
+  provider: "google" | "auth0";
   provider_subject?: string | null;
   display_name?: string | null;
   email?: string | null;
@@ -1464,7 +1468,25 @@ export async function signInWebAccountSession(input: {
       credential_collection_allowed_in_agents: false,
     };
   }
-  const profileId = `${input.provider}:${providerSubject}`;
+  await ensureDatabase();
+  const linked = await getPool().query<{ profile_id: string }>(
+    `
+      SELECT p.profile_id
+      FROM helix_account_linked_providers p
+      JOIN helix_accounts a ON a.profile_id = p.profile_id
+      WHERE p.provider = $1
+        AND p.provider_subject = $2
+        AND a.deleted_at IS NULL
+      LIMIT 1;
+    `,
+    [input.provider, providerSubject],
+  );
+  // A verified provider subject is an identity lookup key, never permission to
+  // move that identity to a newly derived profile. Reuse the explicitly linked
+  // profile when one exists so browser and MCP sessions converge on the same
+  // account and room ownership.
+  const profileId = linked.rows[0]?.profile_id ?? `${input.provider}:${providerSubject}`;
+  const existing = await findAccountByProfileId(profileId);
   const accountType = await resolveStoredAccountType({
     profileId,
     email: normalize(input.email) || null,
@@ -1473,12 +1495,16 @@ export async function signInWebAccountSession(input: {
   });
   const account = await upsertAccount({
     profile_id: profileId,
-    display_name: normalize(input.display_name) || normalize(input.email) || "Google user",
-    email: normalize(input.email) || null,
+    display_name:
+      normalize(input.display_name) ||
+      normalize(input.email) ||
+      existing?.display_name ||
+      (input.provider === "google" ? "Google user" : "Auth0 user"),
+    email: normalize(input.email) || existing?.email || null,
     account_type: accountType,
     provider: input.provider,
     provider_subject: providerSubject,
-    picture_url: normalize(input.picture_url) || null,
+    picture_url: normalize(input.picture_url) || existing?.picture_url || null,
   });
   const session = await insertSession({
     account,
@@ -1488,7 +1514,7 @@ export async function signInWebAccountSession(input: {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
     ok: true,
     session,
-    message: "Signed in with Google.",
+    message: input.provider === "google" ? "Signed in with Google." : "Signed in with Auth0.",
     error: null,
     raw_password_stored: false,
     credential_collection_allowed_in_agents: false,

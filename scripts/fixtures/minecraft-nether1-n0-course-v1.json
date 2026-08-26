@@ -1,0 +1,60 @@
+{
+  "schema": "helix.minecraft.nether1_n0_course_fixture.v1",
+  "fixture_id": "EH-MC-NETHER1-N0-controlled-course-v1",
+  "objective_id": "EH-MC-NETHER1",
+  "program_gate": "G8",
+  "ruleset": "survival_tas",
+  "authority_contract": {
+    "setup_plane": "world_authority_setup_only",
+    "execution_plane": "player_embodiment_only",
+    "setup_receipts_acceptance_eligible": false,
+    "setup_authority_released_before_course": true,
+    "restore_before_n1": true,
+    "forbidden_acceptance_stages": ["N1", "N2", "N3", "N4"]
+  },
+  "world_contract": {
+    "dedicated_disposable_course_region_required": true,
+    "pre_course_world_snapshot_required": true,
+    "restore_mode": "server_world_snapshot",
+    "region_min_offset": {"x": -8, "y": -1, "z": -8},
+    "region_max_offset": {"x": 8, "y": 6, "z": 8}
+  },
+  "composition_template": {
+    "path": "scripts/fixtures/minecraft-nether1-n0-compositions-v1.json",
+    "origin": {"x": 0, "y": 64, "z": 0}
+  },
+  "stations": {
+    "player_start_offset": {"x": -6, "y": 0, "z": 0},
+    "collection_item_offset": {"x": -5, "y": 0, "z": 2},
+    "furnace_offset": {"x": -3, "y": 0, "z": 0},
+    "crafting_table_offset": {"x": -3, "y": 0, "z": 2},
+    "portal": {
+      "plane": "z",
+      "interior_min_offset": {"x": 0, "y": 1, "z": 0},
+      "interior_max_offset": {"x": 1, "y": 3, "z": 0},
+      "frame_block_id": "minecraft:obsidian"
+    }
+  },
+  "setup_inventory": [
+    {"item_id": "minecraft:raw_iron", "count": 1},
+    {"item_id": "minecraft:coal", "count": 1},
+    {"item_id": "minecraft:flint_and_steel", "count": 1},
+    {"item_id": "minecraft:bread", "count": 8}
+  ],
+  "verification": {
+    "required_block_checks": [
+      {"station": "furnace", "block_id": "minecraft:furnace"},
+      {"station": "crafting_table", "block_id": "minecraft:crafting_table"},
+      {"station": "portal_frame", "block_id": "minecraft:obsidian"}
+    ],
+    "required_player_state": ["survival", "not_spectator"],
+    "required_pre_course_portal_state": "unlit"
+  },
+  "forbidden_setup_outputs": [
+    "active_nether_portal",
+    "nether_dimension_checkpoint",
+    "survival_resource_acquisition_checkpoint",
+    "durable_goal_completion",
+    "terminal_answer"
+  ]
+}

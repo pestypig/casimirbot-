@@ -1,0 +1,70 @@
+{
+  "schema": "nhm2.g2h_e_s4.continuation_runtime_verification_receipt.v6",
+  "status": "PASS_P04_P05_R04_R05_CONTINUATION_KERNELS_REMAINING_SCIENTIFIC_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source/runtime-disjoint continuation tubes and coefficient majorants",
+    "current_maturity": "P01-P05 and R01-R05 complete on exact/manufactured pass/fail/range/chronology fixtures",
+    "target_maturity": "input evidence for P06/P07 and R06/R07 stability builders",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "builder algorithms 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "continuation definition 7a0cdc0e45a09e0291b79a1ef3892e221d6ed71395e3e4cf5e767c0adb1cb16c",
+      "fixture binding e57766fe330922f8ffc915937eb7688c11be6b48f71274ae2aa22f208ecd31e3"
+    ],
+    "required_evidence": [
+      "second-order predictor and complete manufactured 1024-cell chronology",
+      "all 73 radii evaluated in frozen order with least strict pass",
+      "strict containment and touching rejection",
+      "primary Arb polynomial convolution and exact weighted-l1 accumulation",
+      "independent Bernstein recurrence, degree-512 exact binomial convolution and directed remainder",
+      "bound offline images/executables, independent audit and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "cell, predictor, radius, containment, convolution, weight or chronology mismatch",
+      "subdivision, alternate predictor, candidate ingress, root creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "scientific cell execution or vacuum connection",
+      "stability or quantum constructor completion",
+      "candidate execution, Rust scientific execution, authorization, G3, lane, lamp or physical authority"
+    ],
+    "downstream_gate_unlocked": "P06/P07 then R06/R07 manufactured stability-builder implementation"
+  },
+  "change_classification": {"mathematical_semantics_changed": false, "runtime_authority_changed": false, "receipt_semantics_changed": false, "proof_implementation_maturity_changed": true},
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "manifest": {"bytes": 17615, "raw_sha256": "e57766fe330922f8ffc915937eb7688c11be6b48f71274ae2aa22f208ecd31e3"},
+    "completion_matrix": {"bytes": 14179, "raw_sha256": "55a2b0c9be4ed77fe9bee16919e93dcdaec15fd077a117fb84323deda9ea5e69"},
+    "runtime_audit": {"bytes": 25669, "raw_sha256": "7c4d3481bc6e028229f2ed24d1211870a736baca79a2f8fd7eb35126091416c5"},
+    "completion_audit": {"bytes": 5005, "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"},
+    "continuation_audit": {"bytes": 8374, "raw_sha256": "96bfd06fc37e8bf97efa4a283ccedf40ac02abe2d88297e103e5b0795b6eb19e"},
+    "canonical_work_program": {"bytes": 60158, "raw_sha256": "00701cfbe0e63b1048e4574d310c63ebff862c6feba2c1e22cca0b4dc39f536b"},
+    "active_packet": {"bytes": 9342, "raw_sha256": "72cb66278d2e440731c01a823976c9b53a44d85ca0bfae153561ea2d8b095c50"}
+  },
+  "primary_P04_P05": {
+    "source_sha256": "fa68db917586132d855c919527e71894d24758d172e8888113e18ab307e33485",
+    "header_sha256": "3a411e2a6a6dbd82b0b7ee30be68fda98cb2d2b78d85523cf548c591e48237f5",
+    "runtime_image_id": "sha256:0b598089425863e05d690d8ec27d809dba41fd4f6db70b4f592ab2f147faf8cc",
+    "executable_sha256": "00546b147975001890f0d3d6bf3c1f160e1a3464605c0f9db45d1f8162772913",
+    "fixture": {"status": "PASS", "continuation_checks_passed": 10, "continuation_checks_total": 10, "checks_passed": 30, "checks_total": 30}
+  },
+  "independent_R04_R05": {
+    "source_sha256": "c4f123d0f94ebdc8cad866d5134c86950312ab64ae9f41191a7eadc38a311656",
+    "runtime_image_id": "sha256:d6501a9178e9d274911e71b31df0e2762aa2c3b96bfabd917b319cd775955bec",
+    "executable_sha256": "1e5cb1fc54b87dab14e22b708dbb85bc9742d94f6f130d1603abd046b0544e13",
+    "runtime_dependencies": [],
+    "fixture": {"status": "PASS", "continuation_check_mask": "111111111", "continuation_checks_passed": 9, "continuation_checks_total": 9, "checks_passed": 30, "checks_total": 30}
+  },
+  "audits": {
+    "runtime": {"status": "PASS", "checks_passed": 75, "checks_total": 75},
+    "continuation": {"status": "PASS", "checks_passed": 22, "checks_total": 22},
+    "completion": {"status": "PASS_FAIL_CLOSED_MATRIX", "checks_passed": 8, "checks_total": 8, "common_roles_complete": 4, "primary_roles_complete": 5, "independent_roles_complete": 5, "S4_implementation_closure": false}
+  },
+  "manufactured_execution": {"cells_exercised_per_lane": 1024, "radii_evaluated_per_cell": 73, "candidate_data_used": false, "scientific_cells_executed": 0, "vacuum_connection_established": false},
+  "host_candidate_roots": {"primary": "absent", "independent": "absent"},
+  "execution": {"candidate_evaluations": 0, "positive_parameter_samples": 0, "scientific_builder_executed": false, "execution_authorized": false},
+  "authority": {"receipt_is_scientific_proof": false, "candidate_evaluated": false, "classical_proof_established": false, "quantum_state_established": false, "geometry_state_authority": false, "lane_authority": false, "diagnostic_lamp_authority": false, "physical_authority": false, "propulsion_authority": false, "transport_authority": false}
+}

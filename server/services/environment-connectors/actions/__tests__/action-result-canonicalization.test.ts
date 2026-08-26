@@ -224,6 +224,33 @@ describe("environment action result canonicalization", () => {
       },
     },
     {
+      actionKind: "attack",
+      arguments: {
+        action_kind: "attack",
+        target_ref: "target:1234567890abcdef1234567890abcdef12345678",
+        target_entity_type_id: "minecraft:zombie",
+        target_classification: "hostile",
+        max_acquisition_distance: 4.5,
+        require_line_of_sight: true,
+        minimum_attack_cooldown: 0.9,
+        max_attack_pulses: 16,
+        max_duration_ms: 20_000,
+        stop_below_health: 6,
+        friendly_fire: false,
+      },
+      measurements: {
+        target_ref: "target:1234567890abcdef1234567890abcdef12345678",
+        target_entity_type_id: "minecraft:zombie",
+        target_classification: "hostile",
+        friendly_fire: false,
+        attack_pulses: 4,
+        confirmed_hurt_or_health_transitions: 4,
+        rejected_attack_pulses: 0,
+        target_defeated: true,
+        safety_interrupted: false,
+      },
+    },
+    {
       actionKind: "hotbar_select",
       arguments: { action_kind: "hotbar_select", slot: 2 },
       measurements: { selection_matches: true, selected_slot: 2 },
@@ -287,7 +314,7 @@ describe("environment action result canonicalization", () => {
         "navigate_to", "look_at", "walk", "jump", "follow", "collect", "mine", "place",
       ]);
       const interactionKinds = new Set([
-        "interact", "mine", "place", "craft", "inventory_transfer",
+        "interact", "attack", "mine", "place", "craft", "inventory_transfer",
       ]);
       const inventoryKinds = new Set([
         "hotbar_select", "equip", "collect", "mine", "place", "craft", "inventory_transfer",
@@ -820,6 +847,8 @@ describe("environment action result canonicalization", () => {
       workflowEvidenceValid: true,
     })).toMatchObject({
       outcome: "postcondition_failed",
+      summary:
+        "The connector reported success, but its terminal measurements did not prove every required action postcondition.",
       controls_released: true,
       automatic_replay_performed: false,
     });
@@ -855,7 +884,11 @@ describe("environment action result canonicalization", () => {
       envelopeValid: true,
       currentTurn: true,
       workflowEvidenceValid: false,
-    }).outcome).toBe("postcondition_failed");
+    })).toMatchObject({
+      outcome: "postcondition_failed",
+      summary:
+        "The connector reported success, but the matching terminal workflow event and its current execution-window measurements were not recorded consistently.",
+    });
   });
 
   it("rejects measured world mutation that exceeds the admitted request scope", () => {

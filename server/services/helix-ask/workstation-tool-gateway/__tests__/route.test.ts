@@ -213,6 +213,38 @@ describe("AGI workstation tool gateway route", () => {
     );
   });
 
+  it("returns a typed G6 reasoning-role failure instead of hanging outside a room turn", async () => {
+    const agent = await createDeveloperAgent();
+    const response = await agent
+      .post("/api/agi/workstation-tool-gateway/call")
+      .send({
+        agent_runtime: "codex",
+        mode: "read",
+        capability_id: "com.casimirbot.environment.reasoning_role.inspect",
+        arguments: { goal_id: "environment_durable_goal:g6-route-test" },
+        turn_id: "ask:g6-route-test",
+        conversation_thread_id: "ordinary-thread",
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: "read-observe-act.v1",
+      ok: false,
+      agent_runtime: "codex",
+      capability_id: "com.casimirbot.environment.reasoning_role.inspect",
+      error: "reasoning_role_forbidden",
+      observation: {
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+      tool_lifecycle_trace: {
+        lifecycle_stage: "failed",
+        status: "failed",
+      },
+    });
+  });
+
   it("keeps preview interface languages available to developer accounts", async () => {
     const agent = await createDeveloperAgent();
     const response = await agent

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "helix_fabric_player_agent_gametest",
+  "version": "1.0.0",
+  "name": "Helix Fabric Player Agent GameTests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "com.casimirbot.helixplayer.fabric.gametest.CombatArenaGameTests"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

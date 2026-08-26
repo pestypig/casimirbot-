@@ -1,0 +1,57 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_evaluations": 0,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "authorization": {
+    "bytes": 380,
+    "path": "artifacts/research/nhm2/g2h-authorizations/g2h-e-primary-v2.txt",
+    "sha256": "452537efaf5ae64260122fac63cc8817b3babb4eb15668dfe8dc92bcbb16cc10"
+  },
+  "candidate_entrypoint_invocations": 1,
+  "container": {
+    "exit_code": 66,
+    "id": "6ffbd649062affbfdc231cd3ae4fb5965d4f87b56bf06eb9596270ce07a9644b",
+    "name": "nhm2-g2h-e-primary-v2",
+    "oom_killed": false,
+    "retained": true,
+    "state": "exited"
+  },
+  "decision": "PARTIAL_EXECUTION_PRE_MATH_AUTHORIZATION_SCHEMA_VERSION_SKEW",
+  "exhausted_v1_preserved": true,
+  "fixture": {
+    "candidate_entrypoint_invocations": 0,
+    "executable_sha256": "248b1e804397597478b675d713d2c9706fd80aa2ab59ca9586cb155e8b45acbc",
+    "image_id": "sha256:4d87dc36a34227f0614ccf3b6132455d003d5af33ab8cf9d357adee898ea1c3d",
+    "source_sha256": "7c186d5e1efe9d4f88eb9eaaeb13fc3545d354ee068eb493db96f1e427516c6b",
+    "v1_admitted": true,
+    "v2_rejected": true
+  },
+  "independent_lane_executed": false,
+  "ledger": {
+    "invocation_sha256": "2b6e57dc5a9586f16737f6dc2d190d2d8f22f92ac09328e989112e035aaccdd2",
+    "process_result_sha256": "0d3987694b1b47d5eb92cee644bff9458ec80185a819f8764f6de94b7bcb79c9",
+    "stderr_sha256": "8a51fa06ab6ee3ab86f7d081f8dc62c95d81c17c86ce12b8ae05cf8519be2643",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "mathematical_decision": null,
+  "output_root_exists": false,
+  "primary_manifest_sha256": null,
+  "proposal_exhausted": true,
+  "proposal_sha256": "65093d0084a513b101172e339123ecb2839cd76ef4350c6a351acdf054dbcfdd",
+  "retry_allowed": false,
+  "schema": "nhm2.g2h_e_s.primary_result.v1",
+  "static_attribution": {
+    "binary_expected_schema": "nhm2.g2h_execution_authorization.v1",
+    "checkpoint_expected_schema": "nhm2.g2h_execution_authorization.v2",
+    "persisted_schema": "nhm2.g2h_execution_authorization.v2",
+    "typed_failure": "AUTHORIZATION_SCHEMA_VERSION_SKEW_V2_CHECKPOINT_V1_BINARY"
+  }
+}

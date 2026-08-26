@@ -1,0 +1,74 @@
+{
+  "schema": "nhm2.g2h_e_s4_r2.definition_closure_receipt.v1",
+  "status": "PASS_SEALED_FIXTURE_IMPLEMENTATION_ELIGIBLE_NO_SCIENTIFIC_EXECUTION_AUTHORITY",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R2",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "implementation-total deterministic P08-P13/R08-R13 quantum-builder definitions",
+    "current_maturity": "additive total definition sealed and source-language-disjoint exact/manufactured replay passed",
+    "target_maturity": "resume bounded fixture-only quantum producer implementation in parent S4",
+    "required_frozen_inputs": ["R2 041c406c...ed12a", "R1 seal 728d8c9a...025ca", "quantum cf0a49ad...e3cc", "builder v1 5bd4c470...f0abf", "gap inventory 3da161ec...b4c52", "stability receipt 36d46c2d...e5af4"],
+    "required_evidence": ["exact definition audit", "source-language-disjoint selector replay", "all twelve gaps closed", "unchanged predecessor hashes", "absent roots and all locks false"],
+    "stop_fail_criteria": ["candidate ingress", "scientific execution", "retune", "root creation", "authorization", "authority promotion"],
+    "explicit_non_goals": ["quantum proof", "accepted geometry/state", "G3", "lanes", "lamp", "physical viability", "propulsion", "transport"],
+    "downstream_gate_unlocked": "G2H-E-S4 fixture-only P08-P13/R08-R13 source implementation"
+  },
+  "semantic_change_class": "additive_pre_ingress_numerical_definition_repair_only",
+  "sealed_contract": {
+    "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r2-total-quantum-builder-algorithms.v2.json",
+    "raw_sha256": "2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc"
+  },
+  "audits": [
+    {
+      "path": "scripts/nhm2_g2h_e_s4_r2_total_quantum_builder_definition_audit.py",
+      "raw_sha256": "3ee1cd1dd4e49c07ce38dcf188998a850feef2e40289e6ee7d4e328d9ff806cd",
+      "result": "PASS_49_OF_49"
+    },
+    {
+      "path": "scripts/nhm2_g2h_e_s4_r2_total_quantum_builder_independent_replay.mjs",
+      "raw_sha256": "9ecc38effb39f0fd761aa4730b992d6978dff4735df41e481666c3c900425cb7",
+      "result": "PASS_29_OF_29"
+    }
+  ],
+  "replayed_facts": {
+    "predecessor_hashes_match": true,
+    "hard_gap_classes_closed": 12,
+    "quantum_roles_total": 12,
+    "GL32_exact_mesh_root_isolations": 32,
+    "Richardson_moments_exact_per_lane": 9,
+    "jet_multiindices": 70,
+    "noise_vectors": 256,
+    "noise_matrix_entries": 65536,
+    "noise_lower_entries": 32896,
+    "component_error_bound": "strictly_below_2^-132",
+    "total_error_bound": "strictly_below_2^-120",
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false
+  },
+  "theory_corrections_before_seal": [
+    "the Poisson/Richardson remainder contains the exact sum_j |w_j| epsilon_j^9 factor",
+    "W_DF state jets derive from the static-ground spectral product minus U/V rather than local geometric transport",
+    "the D=4 U/V transport equations and sign convention are displayed explicitly",
+    "quantum role payloads extend the frozen wire-v1 proof-record envelope"
+  ],
+  "disposition": "CLOSE_G2H_E_S4_R2_AND_RESUME_PARENT_S4_QUANTUM_FIXTURE_IMPLEMENTATION",
+  "readiness": {
+    "definition_sealed": true,
+    "fixture_implementation_eligible": true,
+    "scientific_execution_eligible": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_quantum_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

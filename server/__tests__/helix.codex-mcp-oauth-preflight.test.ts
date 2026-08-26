@@ -5,6 +5,7 @@ const metadata = (scopes = [
   "helix.rooms.read",
   "helix.environment_actions.read",
   "helix.environment_actions.write",
+  "helix.agent_runs.write",
 ]) => ({
   resource: "http://127.0.0.1:1522/mcp",
   authorization_servers: ["https://tenant.example.auth0.com/"],
@@ -106,6 +107,30 @@ describe("Codex MCP OAuth preflight", () => {
     })).rejects.toThrow(
       /codex_mcp_required_scopes_missing:helix\.environment_actions\.read,helix\.environment_actions\.write/,
     );
+  });
+
+  it("requires run-write admission for the G8 monitor profile", async () => {
+    await expect(inspectCodexMcpOAuthReadiness({
+      oauthClientId: "public-client-id",
+      capabilityProfile: "g8-monitor",
+      fetcher: fetcherFor(metadata([
+        "helix.rooms.read",
+        "helix.environment_actions.read",
+        "helix.environment_actions.write",
+      ])),
+    })).rejects.toThrow(
+      /codex_mcp_required_scopes_missing:helix\.agent_runs\.write/,
+    );
+
+    const result = await inspectCodexMcpOAuthReadiness({
+      oauthClientId: "public-client-id",
+      capabilityProfile: "g8-monitor",
+      callbackPort: 9876,
+      derivedCallbackUrl: "http://127.0.0.1:9876/callback/server-id_123",
+      fetcher: fetcherFor(),
+    });
+    expect(result.capability_profile).toBe("g8-monitor");
+    expect(result.required_scopes).toContain("helix.agent_runs.write");
   });
 
   it("fails before login when PKCE S256 is unavailable", async () => {

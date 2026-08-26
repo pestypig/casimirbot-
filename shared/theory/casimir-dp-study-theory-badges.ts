@@ -5520,6 +5520,111 @@ export const CASIMIR_DP_STUDY_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   studyBadge({
+    id: "study.casimir_dp.composition_internal_energy_successor",
+    title: "Positive-Result Composition and Internal-Energy Successor",
+    plainMeaning:
+      "Registers a future material, isotope, and internal-energy universality comparison that remains blocked until a powered independent replication of the parent coherence residual exists.",
+    whyItMatters:
+      "It defines how a genuine residual could be tested for total-mass-energy universality without mislabeling coarse-grained mass sensitivity as direct evidence about quarks, gluons, or a covariant collapse source.",
+    subjects: [
+      "casimir_dp_study",
+      "positive_result_successor",
+      "composition_universality",
+      "internal_energy_equivalence",
+      "isotope_comparison",
+      "qcd_constituent_nonbridge",
+    ],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["casimir_dp_study", "curvature_collapse"],
+    equationFamilies: [
+      "composition_conditioned_residual_exposure",
+      "internal_energy_universality",
+      "qcd_constituent_nonbridge",
+    ],
+    tags: [
+      "future_successor_protocol",
+      "parent_positive_replication_absent",
+      "physical_acquisition_not_authorized",
+      "nine_authority_packets_not_ready",
+      "total_measured_mass_authoritative",
+      "qcd_scheme_and_scale_required",
+      "constituent_double_counting_forbidden",
+      "direct_gluon_detection_not_claimed",
+      "covariant_internal_energy_source_not_registered",
+      "maximum_claim:blocked_composition_universality_successor_definition_only",
+    ],
+    equations: [
+      {
+        id: "cdp-composition-universality-successor",
+        role: "gate",
+        displayLatex:
+          "\\Lambda_k=\\int_0^{T_k}E_{G,k}(t)\\,dt/\\hbar,\\quad \\chi_k^{\\rm res}=-\\ln|C_k^{\\rm meas}|+\\ln|C_k^{H_0}|,\\quad \\eta_k=\\chi_k^{\\rm res}/\\Lambda_k,\\quad \\Delta\\eta_{k\\ell}=\\eta_k-\\eta_\\ell",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "parent_positive_replication_receipt",
+          "C_meas_k",
+          "C_H0_k",
+          "E_G_k",
+          "cohort_mass_density_receipt",
+          "joint_covariance",
+        ],
+        outputSymbols: ["eta_k", "Delta_eta_kl", "successor_admission_status"],
+      },
+    ],
+    units: [
+      { symbol: "Lambda_k", unit: "1", quantity: "registered_diosi_exposure", dimensionSignature: "1" },
+      { symbol: "chi_res_k", unit: "1", quantity: "signed_ordinary_null_log_coherence_residual", dimensionSignature: "1" },
+      { symbol: "eta_k", unit: "1", quantity: "composition_normalized_residual_strength", dimensionSignature: "1" },
+      { symbol: "Delta_eta_kl", unit: "1", quantity: "between_cohort_universality_contrast", dimensionSignature: "1" },
+    ],
+    assumptions: [
+      "The successor is admitted only after a powered independent replication of the parent mass-separation-hold-time residual and all signed-phase and ordinary-null controls.",
+      "Every cohort uses measured total neutral-object mass and a three-dimensional density map; electron, nuclear-binding, and selected QCD components are not added again.",
+      "The frozen 100 nm regularization is about eight orders of magnitude coarser than hadronic structure and cannot spatially resolve quarks or gluons.",
+      "Material and isotope comparisons first test portability of the coarse-grained mass-density law and cohort-specific ordinary-null closure.",
+      "Internal-energy weighting beyond measured mass differences requires a new conserved-source dynamics and is absent from the registered nonrelativistic Diósi model.",
+      "Any quark/gluon interpretation must specify the renormalization scheme and scale and provide a distinct held-out prediction.",
+      "Agreement across cohorts is consistent with total-mass-energy universality but does not prove that QCD fields cause collapse.",
+      "Disagreement first establishes an ordinary-response, cohort-equivalence, or source-representation anomaly, not constituent-specific collapse.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      sourceRef("doc", "docs/research/casimir-dp-quantum-foam-study.md", "section-11.4", "Canonical successor rationale, comparison coordinate, staged experiment, and claim boundary."),
+      sourceRef("doc", "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md", "appendix-B.20", "Nine-packet admission gate and explicit not-authorized standing."),
+      sourceRef("literature_ref", "https://doi.org/10.1080/14786440508637080", "Rutherford-1911", "Methodological precedent for inference from a controlled residual, not a collapse mechanism analogy."),
+      sourceRef("literature_ref", "https://pdg.lbl.gov/2024/reviews/rpp2024-rev-qcd.pdf", "PDG-QCD-2024", "Confined quark/gluon and renormalized QCD context."),
+      sourceRef("literature_ref", "https://doi.org/10.1103/PhysRevLett.121.212001", "Yang-et-al-2018", "Scheme- and scale-specified lattice-QCD proton energy-momentum decomposition."),
+      sourceRef("literature_ref", "https://doi.org/10.1103/PhysRevA.104.022822", "Zhou-et-al-2021", "Operational mass/internal-energy equivalence comparison; not collapse evidence."),
+    ],
+    observables: [
+      {
+        id: "study.casimir_dp.composition_internal_energy_successor.universality_contrast",
+        canonicalObservableId: "observable.study.composition_normalized_residual_contrast",
+        symbol: "Delta_eta_kl",
+        quantity: "between_cohort_universality_contrast",
+        mathematicalType: "scalar",
+        unit: "1",
+        dimensionSignature: "1",
+        coordinateFrame: "cohort_conditioned_complex_coherence_space",
+        operationalDefinitionRef: "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
+        responseModelRef: "docs/research/casimir-dp-quantum-foam-study.md",
+      },
+    ],
+    hintKeys: {
+      subjects: ["composition universality", "internal energy equivalence", "isotope collapse test", "QCD nonbridge", "positive result successor"],
+      symbols: ["Lambda_k", "chi_res_k", "eta_k", "Delta_eta_kl"],
+      unitSignatures: ["1"],
+      repoPaths: [
+        "docs/research/casimir-dp-quantum-foam-study.md",
+        "docs/research/casimir-dp-quantum-foam-study-reproducibility-supplement.md",
+      ],
+      equationFamilies: ["composition_conditioned_residual_exposure", "internal_energy_universality", "qcd_constituent_nonbridge"],
+      simulationOwners: ["casimir_dp_study", "curvature_collapse"],
+    },
+  }),
+  studyBadge({
     id: "study.casimir_dp.claim_boundary",
     title: "Casimir / DP Quantum-Foam Study Claim Boundary",
     plainMeaning:
@@ -6893,6 +6998,46 @@ export const CASIMIR_DP_STUDY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "The Stage-3 outcome map carries each lane's least-mature maximum claim.",
     claimBoundaryNote: "The graph-wide maximum remains diagnostic.",
+  },
+  {
+    id: "casimir_dp_parent_replication_requires_composition_successor",
+    from: "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+    to: "study.casimir_dp.composition_internal_energy_successor",
+    relation: "requires",
+    label:
+      "The composition successor requires an admitted parent pilot followed by a powered independent positive replication; the present 0/8 readiness state supplies neither.",
+    claimBoundaryNote:
+      "A conditional Diósi forecast or software PASS cannot trigger constituent or internal-energy acquisition.",
+  },
+  {
+    id: "casimir_dp_mass_density_documents_composition_successor",
+    from: "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+    to: "study.casimir_dp.composition_internal_energy_successor",
+    relation: "documents",
+    label:
+      "The measured-total-mass and branch-density accounting lane supplies the cohort source convention for the future universality comparison.",
+    claimBoundaryNote:
+      "The 100 nm effective mass-density source does not spatially resolve quarks, gluons, nuclei, or electrons.",
+  },
+  {
+    id: "casimir_dp_blinded_comparison_requires_composition_successor",
+    from: "study.casimir_dp.blinded_model_comparison",
+    to: "study.casimir_dp.composition_internal_energy_successor",
+    relation: "requires",
+    label:
+      "Cohort-conditioned response, covariance, denominator uncertainty, held-out likelihood, and independent replication must be frozen before the universality contrast is evaluated.",
+    claimBoundaryNote:
+      "A post-selected material or isotope difference is not evidence for composition-sensitive collapse.",
+  },
+  {
+    id: "casimir_dp_composition_successor_blocks_constituent_claims",
+    from: "study.casimir_dp.composition_internal_energy_successor",
+    to: "study.casimir_dp.claim_boundary",
+    relation: "blocks",
+    label:
+      "The absent parent replication, nine missing authority packets, and unregistered covariant internal-energy source block QCD-, nuclear-, electron-, or binding-specific collapse claims.",
+    claimBoundaryNote:
+      "Agreement would support only a tested universality pattern; disagreement would first be an ordinary-response or source-representation anomaly.",
   },
   {
     id: "casimir_dp_protocol_documents_claim_boundary",

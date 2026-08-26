@@ -356,6 +356,11 @@ pairing, not Player Embodiment readiness.
    under an earlier player-binding epoch. After saving, the selected room/API
    projection and action broker must name the same newest policy. If they do
    not, stop before creating a pairing code.
+   An authenticated owner-controlled same-host MCP client may perform the same
+   operation with `helix_environment_action_authority_configure`. It remains
+   subject to the identical owner, participant, selected-subject, adapter
+   registry, capability, autonomy, manual-override and expiry checks; it does
+   not grant a connector credential or return pairing material.
 3. Create an action-only connector pairing for that authority through
    **Pair player client in game**. It calls
    `POST /api/agi/realtime/rooms/:roomId/connector-pairings` with
@@ -381,10 +386,12 @@ pairing succeeded. The client companion is publishing its capabilities.` If
 ### Opaque local pairing handoff for agent-run acceptance
 
 During a local keyed acceptance run, the test agent may streamline pairing so
-the player can remain in the game. The authenticated owner UI remains the only
-place that creates a one-time pairing. The agent clicks the UI copy control and
-transports the copied value opaquely; the pairing command must never be read
-into a model prompt, printed in a terminal transcript, persisted in an
+the player can remain in the game. The authenticated owner UI may create the
+one-time pairing and expose only its copy control. An authenticated same-host
+owner MCP client may instead call `helix_environment_player_pair_local`, which
+creates the exact action-only pairing and stages it directly into the bounded
+default Fabric client inbox. In both paths, the pairing command must never be
+read into a model prompt, printed in a terminal transcript, persisted in an
 artifact, or included in a debug export.
 
 Send each command to its exact execution plane:
@@ -411,6 +418,23 @@ fallback when Windows can focus Minecraft but the game rejects injected
 keystrokes. The repository helper
 `scripts/helix-minecraft-player-pairing-inbox.ps1` implements that exact
 stdin-only atomic handoff and emits only `player_pairing_inbox_staged`.
+The MCP handoff returns only sanitized pairing status with
+`credential_included=false` and `pairing_code_included=false`. A remote server
+or non-default Minecraft instance must use the explicit owner UI copy boundary
+instead of weakening the fixed same-host path.
+
+The repository-standard dedicated Fabric server has the parallel
+`helix_environment_server_pair_local` owner tool. It creates only a
+command-credential rotation for the exact existing source binding and stages
+the generated `/helix pair ...` command into
+`minecraft/helix-fabric-sensor/run/config/helix-fabric-sensor.pairing-inbox`.
+The server claims and deletes the file before redemption and accepts only a
+regular, at-most-512-byte, at-most-two-minute-old exact pairing command. MCP
+returns only `server_pairing_inbox_staged` plus sanitized pairing metadata; the
+code and delivered command credential remain excluded. This fixed-path tool is
+for the same-host repository acceptance profile only. Remote or alternate
+server profiles must use the authenticated owner UI or a future installed-node
+profile handle, never a model-authored filesystem path.
 
 For a Codex-controlled in-app-browser acceptance run, use the tab's browser
 session clipboard API as the opaque boundary. Create the player pairing from
@@ -723,7 +747,7 @@ answer.
 
 For a local keyed A1 run, start CasimirBot only through the opaque
 `start-myapp-for-codex` launcher, then add a Codex MCP server whose URL is
-`http://localhost:1522/mcp`. Request only the scopes required by the test:
+`http://127.0.0.1:1522/mcp`. Request only the scopes required by the test:
 `helix.rooms.read`, `helix.environment_actions.read`, and
 `helix.environment_actions.write`. Enable only the three Minecraft tools plus
 `helix_environment_device_check`, use write-sensitive approval mode at the
@@ -733,8 +757,7 @@ trusted-project configuration is:
 
 ```toml
 [mcp_servers.casimirbot_local]
-url = "http://localhost:1522/mcp"
-oauth_resource = "https://casimirbot.com/mcp"
+url = "http://127.0.0.1:1522/mcp"
 scopes = [
   "helix.rooms.read",
   "helix.environment_actions.read",
@@ -846,9 +869,21 @@ loaded tasks. Editing `config.toml` alone is not evidence that an already-loaded
 task received the new catalog. Confirm `/mcp` or the task tool catalog contains
 both subject tools before attempting remote re-verification.
 
-The localhost transport intentionally retains the deployed resource identity
-`https://casimirbot.com/mcp`; it must match the `resource` advertised by the
-keyed server's protected-resource metadata and the configured OAuth audience.
+Current Codex hosts may keep external MCP tools in the deferred catalog rather
+than placing every definition in the initial model prompt. A direct request can
+therefore report that a named tool is unavailable even when OAuth and MCP
+initialization succeeded. For a fresh acceptance probe, explicitly search the
+tool catalog for the exact Helix capability before invoking it; distinguish a
+discovery miss from an OAuth, scope, or execution failure.
+
+The local transport uses the separately registered development resource
+identity `http://127.0.0.1:1522/mcp`. Use that exact host spelling for both the
+Codex transport URL and Auth0 API identifier, and omit `oauth_resource` from
+the local Codex entry. Current Codex/rmcp versions already add the transport
+resource to the OAuth request; an explicit override can add a second resource
+parameter that strict providers reject. The production resource remains
+`https://casimirbot.com/mcp`; do not reuse the loopback identifier in a public
+deployment.
 
 MCP does not make the Fabric mod start `codex.exe`, and the mod cannot launch
 Minecraft before it is loaded. Launcher start is a separate explicit

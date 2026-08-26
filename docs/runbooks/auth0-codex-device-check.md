@@ -116,6 +116,35 @@ The login and subsequent A1 call remain explicit user/Codex actions. The
 preflight never registers a client, opens a browser, obtains a token, modifies
 Codex configuration, or performs an environment action.
 
+### G8 semantic-monitor client scope
+
+The G8 M3 installed-client course extends the G2 action profile with exactly
+`helix.agent_runs.write`. The monitor is bound to a server-validated durable
+run, so advertising monitor tools while issuing only the three G2 scopes makes
+interactive login appear successful but causes `helix_run_start` to fail with
+`insufficient_scope`.
+
+Before asking an operator to consent, define `helix.agent_runs.write` on the
+Auth0 API whose identifier is exactly `http://127.0.0.1:1522/mcp`, grant that
+permission to the same local Native/public client and test user, and run:
+
+```powershell
+npx tsx scripts/helix-codex-mcp-oauth-preflight.ts `
+  --base-url http://127.0.0.1:1522 `
+  --callback-port 8766 `
+  --capability-profile g8-monitor `
+  --oauth-client-id <public-client-id> `
+  --derived-callback-url <full-derived-uri>
+```
+
+The resulting `required_scopes` must contain the three G2 scopes plus
+`helix.agent_runs.write`. The authorization request and the issued bearer token
+must both contain that same four-scope bundle. A successful callback alone is
+not sufficient evidence: make one sanitized `helix_run_start` scope probe and
+stop on `insufficient_scope` instead of sending the user through another
+identical login or restart sequence. Do not substitute a developer session,
+reuse an unrelated run, or weaken the monitor's run-binding requirement.
+
 ## CasimirBot deployment configuration
 
 Configure these values only in the deployment secret/configuration store:

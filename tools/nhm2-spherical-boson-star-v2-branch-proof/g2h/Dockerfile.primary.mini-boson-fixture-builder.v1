@@ -1,0 +1,10 @@
+FROM nhm2-g2h-primary-proof:v2@sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       g++=4:12.2.0-3 \
+       g++-12=12.2.0-14+deb12u1 \
+       libstdc++-12-dev=12.2.0-14+deb12u1 \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
+
+ENTRYPOINT ["/bin/false"]

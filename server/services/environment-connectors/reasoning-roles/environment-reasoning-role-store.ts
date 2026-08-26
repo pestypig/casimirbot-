@@ -40,6 +40,7 @@ export type EnvironmentReasoningRoleErrorCode =
   | "reasoning_role_output_not_found"
   | "reasoning_role_output_stale"
   | "reasoning_role_principal_turn_mismatch"
+  | "reasoning_role_capability_identity_mismatch"
   | "reasoning_role_event_invalid";
 
 export class EnvironmentReasoningRoleError extends Error {

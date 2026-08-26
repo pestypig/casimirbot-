@@ -1,0 +1,279 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.sp_endpoint_proof_contract.v1",
+  "status": "draft_unsealed_exact_operator_and_proof_record_definition_no_endpoint_or_candidate_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "lambda-zero normalized Schrodinger-Poisson endpoint existence, uniqueness and simple-kernel proof definition",
+    "current_maturity": "exact continuous operator and fail-closed proof-product draft",
+    "target_maturity": "independently audited endpoint validation definition suitable for two disjoint fixture-only implementations",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "analytic seed payload scalars da88f738edbcc722b83a1c780fff4c32316f7e6145445b883ef28e31d2793fc1",
+      "delta=nu0-Vc as an exact positive dyadic",
+      "vacuum blow-up chart d6cbff356b6bfc8db39f65f28407b2064f0ff024f611472342f73c8687d816de",
+      "corrected state/grid v2 cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c"
+    ],
+    "required_evidence": [
+      "exact operator and Frechet derivative replay",
+      "scale-zero-mode removal by the member row",
+      "73 preregistered candidate radii and strict radii-polynomial predicates",
+      "synthetic pass, fail, corruption and undecidable fixture behavior",
+      "independent mathematical audit before implementation",
+      "zero endpoint or positive-parameter scientific evaluations"
+    ],
+    "stop_fail_criteria": [
+      "nonpositive delta or N",
+      "a validation ball that permits N>=0 or loses the fixed exponential weight",
+      "missing bound or interval touching a strict predicate",
+      "selecting a radius outside the preregistered list",
+      "using the inherited predictor as proof of an exact root",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "executing the endpoint proof",
+      "evaluating a positive continuation parameter or the selected member",
+      "defining the full finite coefficient discretization",
+      "proving first-cell overlap",
+      "implementing either scientific producer",
+      "G3, quantum products or physical claims"
+    ],
+    "downstream_gate_unlocked": "endpoint component of the additive validation-map definition after independent audit; implementation remains blocked on the other R1 gaps"
+  },
+  "semantic_change_class": "additive_numerical_proof_semantics_only_R2_unchanged",
+  "immutable_predecessors": {
+    "r2": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+      "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "mutated": false
+    },
+    "analytic_seed": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-analytic-seed-contract.v1.json",
+      "role": "authenticated approximate center only; not an exact endpoint root"
+    },
+    "vacuum_chart": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-vacuum-blow-up-chart.v1.json",
+      "raw_sha256_at_binding": "d6cbff356b6bfc8db39f65f28407b2064f0ff024f611472342f73c8687d816de",
+      "role": "the eta=0 differential operator and member row reconstructed by this endpoint contract"
+    },
+    "corrected_state_grid": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json",
+      "raw_sha256_at_binding": "cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c",
+      "role": "node cardinality, parity realization, canonical coefficient codec, exact component weights and vacuum square packing"
+    }
+  },
+  "exact_ingress": {
+    "scalar_payload_path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/scalars.f64le",
+    "scalar_payload_sha256": "da88f738edbcc722b83a1c780fff4c32316f7e6145445b883ef28e31d2793fc1",
+    "nu0": "word ordinal 0 decoded once as an exact dyadic",
+    "Vc": "word ordinal 1 decoded once as an exact dyadic",
+    "delta": "nu0-Vc",
+    "required_order": "Vc<nu0<0, hence delta>0",
+    "positive_parameter_samples": 0,
+    "selected_member_evaluations": 0
+  },
+  "endpoint_boundary_value_problem": {
+    "coordinate": "xi in [0,infinity)",
+    "unknowns": ["U(xi)", "V(xi)", "N"],
+    "equations": [
+      "-1/2*(U_xixi+2*U_xi/xi)+V*U-N*U=0",
+      "V_xixi+2*V_xi/xi-U^2=0"
+    ],
+    "origin_extensions": [
+      "U_xi(0)=0",
+      "V_xi(0)=0",
+      "U_xixi(0)=2*(V(0)-N)*U(0)/3",
+      "V_xixi(0)=U(0)^2/3"
+    ],
+    "infinity": ["U(infinity)=0", "V(infinity)=0", "N<0"],
+    "member_row": "N-V(0)-delta=0",
+    "branch_component": "the unique root inside the future validated ball around the authenticated positive nodeless predictor; global uniqueness outside that ball is not claimed"
+  },
+  "equivalent_integral_operator": {
+    "kappa": "sqrt(-2*N), positive branch only",
+    "newton_operator": {
+      "definition": "P[f](xi)=xi^-1*integral_0^xi t^2*f(t)dt+integral_xi^infinity t*f(t)dt",
+      "origin_extension": "P[f](0)=integral_0^infinity t*f(t)dt",
+      "identity": "Delta(-P[f])=f with regular origin and zero infinity boundary"
+    },
+    "yukawa_green_kernel": {
+      "definition": "G_kappa(xi,t)=sinh(kappa*min(xi,t))*exp(-kappa*max(xi,t))/(kappa*xi*t)",
+      "xi_zero_extension": "G_kappa(0,t)=exp(-kappa*t)/t",
+      "t_zero_extension": "G_kappa(xi,0)=exp(-kappa*xi)/xi",
+      "double_zero_extension": "there is no finite pointwise value at (0,0); the kernel is used only under the radial t^2 dt measure, whose unique integrable action has the displayed one-sided endpoint extensions",
+      "action": "G_kappa[f](xi)=integral_0^infinity G_kappa(xi,t)*f(t)*t^2 dt",
+      "identity": "(-Delta+kappa^2)G_kappa[f]=f with regular origin and exponential decay"
+    },
+    "ordered_residual": [
+      "F_U=U+2*G_kappa[V*U]",
+      "F_V=V+P[U^2]",
+      "F_member=N-V(0)-delta"
+    ],
+    "equivalence_rule": "a zero in the declared function space is a C2 radial solution of the differential boundary-value problem and conversely"
+  },
+  "banach_space": {
+    "fixed_weight": "kappa_star=sqrt(-2*nu0)/2; it is fixed from ingress and never varied with the unknown N",
+    "U_norm": "sup_(xi>=0) exp(kappa_star*xi)*(1+xi)*abs(U(xi))",
+    "V_norm": "sup_(xi>=0) (1+xi)*abs(V(xi))",
+    "N_norm": "abs(N)/delta",
+    "product_norm": "max(U_norm/w_U,V_norm/w_V,N_norm/w_N) with positive exact dyadic component weights frozen by the corrected state/grid contract",
+    "admissible_ball_conditions": [
+      "sup_ball(N)<-kappa_star^2/2<0",
+      "the U and V norms are finite",
+      "U(0)>0 and the ball excludes the sign-reflected component",
+      "all evaluation and integral maps used below have directed outward enclosures"
+    ],
+    "coefficient_realization_binding": "corrected state/grid v2 canonical Chebyshev codec with polynomial weight (1+k)^8",
+    "component_weights_binding": "every component and scalar has exact dyadic weight 1 under corrected state/grid v2",
+    "unbound_dependency": "flat-carrier remainder bounds and the approximate-inverse block realization remain open"
+  },
+  "frechet_derivative": {
+    "direction": ["dU", "dV", "dN"],
+    "dkappa": "-dN/kappa",
+    "ordered_rows": [
+      "DF_U=dU+2*G_kappa[V*dU+U*dV]+2*dkappa*(partial_kappa G_kappa)[V*U]",
+      "DF_V=dV+2*P[U*dU]",
+      "DF_member=dN-dV(0)"
+    ],
+    "partial_kappa_rule": "differentiate the displayed Green kernel before endpoint extension; use its unique dominated continuous extension under the fixed kappa_star weight",
+    "higher_derivative_rule": "all second-derivative bounds are obtained by directed differentiation of these exact integral kernels; finite differencing is forbidden"
+  },
+  "scale_mode_and_member_transversality": {
+    "exact_scaling": [
+      "U_a(xi)=a^2*U(a*xi)",
+      "V_a(xi)=a^2*V(a*xi)",
+      "N_a=a^2*N"
+    ],
+    "differential_equation_scaling": "both differential residuals scale by a^4",
+    "infinitesimal_scale_mode": [
+      "dU_scale=2*U+xi*U_xi",
+      "dV_scale=2*V+xi*V_xi",
+      "dN_scale=2*N"
+    ],
+    "unbordered_kernel_fact": "the scale mode is a formal kernel vector of the two differential rows",
+    "member_row_on_scale_mode": "dN_scale-dV_scale(0)=2*(N-V(0))=2*delta>0",
+    "consequence_to_be_proved": "invertibility of the bordered derivative proves the endpoint simple-kernel duty in the normalized member space; this definition alone is not that proof",
+    "lambda_orientation": "because eta=lambda/(5*delta) and the desingularized member gives shat_0-1=eta*delta, d(shat_0)/d(lambda)=1/5 exactly"
+  },
+  "validation_map": {
+    "center": "x_bar=(U_bar,V_bar,N_bar) produced in the future by the frozen corrected-grid Newton chronology from the authenticated analytic seed",
+    "approximate_derivative": "A_dagger, a future interval-free finite operator plus analytically bounded tail action encoded under the corrected state/grid ABI",
+    "approximate_inverse": "A, a future bounded linear bijection from residual space to state space, represented by a directed-ball finite operator plus analytically bounded tail action under the corrected state/grid ABI",
+    "newton_like_map": "T(x)=x-A*F(x)",
+    "bounds": {
+      "Y": "an outward upper bound on norm(A*F(x_bar))",
+      "Z0": "an outward upper bound on norm(I-A*A_dagger)",
+      "Z1": "an outward upper bound on norm(A*(DF(x_bar)-A_dagger))",
+      "Z2": "an outward upper bound satisfying norm(A*(DF(x)-DF(x_bar)))<=Z2*norm(x-x_bar) for every x in the largest preregistered ball"
+    },
+    "radii_polynomial": "p(r)=Z2*r^2-(1-Z0-Z1)*r+Y",
+    "candidate_radii": {
+      "ordered_exact_set": "r_j=2^(-192+j) for j=0..72",
+      "count": 73,
+      "minimum": "2^-192",
+      "maximum": "2^-120",
+      "selection": "the least-index r_j satisfying every strict predicate; if none passes, endpoint validation FAILS"
+    },
+    "strict_pass_predicates": [
+      "Y>=0, Z0>=0, Z1>=0, Z2>=0 are finite outward enclosures",
+      "sup(p(r_j))<0",
+      "sup(Z0+Z1+Z2*r_j)<1",
+      "the entire ball satisfies every admissible_ball_condition",
+      "the selected radius is <=2^-120"
+    ],
+    "touching_or_unknown_rule": "an interval touching a strict boundary, a missing bound, invalid arithmetic or an undecidable comparison is FAIL",
+    "result_if_passed": "one and only one zero of F exists in the selected closed ball; the bordered derivative is invertible throughout that ball"
+  },
+  "proof_record_abi": {
+    "record_role": "sp_endpoint_validation",
+    "required_inputs": [
+      "R2 raw SHA-256",
+      "this contract raw SHA-256",
+      "analytic-seed contract raw SHA-256",
+      "corrected state/grid contract raw SHA-256",
+      "source/toolchain/dependency/runtime/executable/command/environment manifest hashes"
+    ],
+    "required_interval_fields": [
+      "delta",
+      "kappa_star",
+      "N_ball",
+      "Y",
+      "Z0",
+      "Z1",
+      "Z2",
+      "p_at_each_of_73_radii",
+      "contraction_at_each_of_73_radii",
+      "selected_radius_or_null",
+      "scale_member_derivative_ball"
+    ],
+    "required_boolean_fields": [
+      "ingress_valid",
+      "ball_admissible",
+      "radii_polynomial_pass",
+      "bordered_derivative_invertible",
+      "unique_root_in_ball",
+      "positive_component_isolated",
+      "endpoint_proved"
+    ],
+    "failure_precedence": [
+      "ingress_or_hash",
+      "arithmetic_or_runtime_identity",
+      "chronology",
+      "center_or_operator_shape",
+      "N_negative_and_weight_margin",
+      "bound_completeness",
+      "radii_polynomial",
+      "ball_admissibility",
+      "record_hash_or_persistence"
+    ],
+    "wire_codec": "the separately versioned S4-R1 wire/record contract; no native float, NaN or infinity permitted",
+    "definition_is_execution": false,
+    "definition_is_proof": false
+  },
+  "fixture_boundary": {
+    "allowed": [
+      "symbolic scaling identities",
+      "manufactured finite-dimensional operators with known Y/Z bounds",
+      "synthetic pass/fail/touching/undecidable radii records",
+      "kernel-bordering algebra",
+      "hash, corruption, chronology and absent-root checks"
+    ],
+    "forbidden": [
+      "loading the selected member",
+      "solving the admitted endpoint profile",
+      "evaluating any positive eta or lambda",
+      "creating either candidate output root",
+      "using fixture success as endpoint or candidate authority"
+    ]
+  },
+  "readiness": {
+    "continuous_endpoint_operator_complete": true,
+    "frechet_derivative_complete": true,
+    "scale_mode_border_definition_complete": true,
+    "radii_predicates_complete": true,
+    "coefficient_realization_complete": true,
+    "component_weights_complete": true,
+    "approximate_inverse_realization_complete": false,
+    "endpoint_fixture_audit_complete": false,
+    "independent_definition_audit_complete": false,
+    "endpoint_scientifically_executed": false,
+    "endpoint_proved": false,
+    "first_cell_validated": false,
+    "positive_tail_overlap_proved": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "definition_is_proof": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

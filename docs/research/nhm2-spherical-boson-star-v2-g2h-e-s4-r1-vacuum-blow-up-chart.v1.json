@@ -1,0 +1,209 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.vacuum_blow_up_chart.v1",
+  "status": "draft_unsealed_exact_vacuum_chart_operator_defined_validation_and_overlap_proofs_unbound_no_implementation_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "desingularized lambda-zero continuation chart and exact Schroedinger-Poisson endpoint map",
+    "current_maturity": "exact change of variables and endpoint operator definition",
+    "target_maturity": "validated first-cell existence, simple-kernel, transversality, remainder and positive-tail overlap definition",
+    "required_frozen_inputs": [
+      "R2 EKG equations and shat_0(lambda)=1+lambda/5",
+      "R2 continuation cells 1024 and 73 candidate radii per cell",
+      "admitted exact-dyadic Newtonian seed payload",
+      "delta=nu0-Vc>0",
+      "lambda=0 exact Minkowski endpoint"
+    ],
+    "required_evidence": [
+      "exact scaled EKG derivation",
+      "analytic member quotient",
+      "Schroedinger-Poisson endpoint identity",
+      "seed-to-endpoint normalization map",
+      "origin and infinity limits",
+      "separate validation and overlap obligations"
+    ],
+    "stop_fail_criteria": [
+      "delta is not strictly positive",
+      "eta or epsilon is retuned after any result",
+      "scaled operator fails to extend at eta=0",
+      "endpoint differs from the admitted seed problem",
+      "member quotient fails to remove scaling degeneracy",
+      "positive-tail overlap is assumed rather than proved",
+      "candidate evaluation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "candidate evaluation",
+      "first-cell radii proof",
+      "positive-lambda numerical sample",
+      "positive-tail overlap receipt",
+      "grid-cardinality choice",
+      "quantum products",
+      "physical claims"
+    ],
+    "downstream_gate_unlocked": "a defined lambda-zero operator for later validated first-cell proof; state/grid replacement remains blocked"
+  },
+  "immutable_predecessor": {
+    "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+    "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+    "mutated": false
+  },
+  "seed_binding": {
+    "contract_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-analytic-seed-contract.v1.json",
+    "scalar_payload_path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/scalars.f64le",
+    "scalar_payload_raw_sha256": "da88f738edbcc722b83a1c780fff4c32316f7e6145445b883ef28e31d2793fc1",
+    "nu0": "scalar word ordinal 0 interpreted as an exact dyadic",
+    "Vc": "scalar word ordinal 1 interpreted as an exact dyadic",
+    "delta": "nu0-Vc",
+    "required": "delta>0"
+  },
+  "parameters_and_coordinates": {
+    "r2_parameter": "lambda in [0,1]",
+    "eta": "lambda/(5*delta)",
+    "epsilon": "sqrt(eta)>=0",
+    "scaled_radius": "xi=epsilon*r",
+    "physical_infinity": "xi=infinity for every epsilon>0",
+    "blown_up_vacuum_fiber": "at eta=0 retain xi and the nonzero normalized SP profile while the reconstructed physical spacetime is exact Minkowski with zero scalar",
+    "retuning_allowed": false
+  },
+  "scaled_unknowns": {
+    "function_order": ["Mbar(xi)", "L(xi)", "U(xi)", "W(xi)"],
+    "scalar_order": ["Nbar"],
+    "W_definition": "dU/dxi",
+    "physical_reconstruction": {
+      "m": "epsilon*Mbar",
+      "f": "1-2*eta*Mbar/xi with Mbar/xi=0 at xi=0",
+      "b": "positive_sqrt(1/f)",
+      "s": "exp(eta*L)",
+      "sigma": "sqrt(2)*eta*U",
+      "p": "sqrt(2)*eta*epsilon*W",
+      "omega": "positive_sqrt(1+2*eta*Nbar)",
+      "alpha": "1/(b*s)"
+    }
+  },
+  "exact_scaled_operator": {
+    "R": "exp(2*eta*L)*(1+2*eta*Nbar)*U^2/f+eta*f*W^2+U^2",
+    "Mbar_xi": "xi^2*R/2",
+    "L_xi": "-xi*(exp(2*eta*L)*(1+2*eta*Nbar)*U^2/f^2+eta*W^2)",
+    "U_xi": "W",
+    "Q": "(exp(2*eta*L)*(1+2*eta*Nbar)-f)/(eta*f^2)",
+    "Q_eta_zero_extension": "2*(L+Nbar+Mbar/xi)",
+    "b_log_derivative_xi": "eta*(Mbar_xi/xi-Mbar/xi^2)/f with analytic origin extension",
+    "W_xi": "-(2/xi-2*b_log_derivative_xi-eta*L_xi)*W-Q*U",
+    "origin_W_xi": "-Q(0)*U(0)/3 from the even regular limit",
+    "evaluation_rule": "at eta=0 use the displayed analytic extensions; never evaluate a zero-over-zero quotient"
+  },
+  "boundary_and_member_map": {
+    "origin": [
+      "Mbar(0)=0",
+      "W(0)=0",
+      "Mbar,L,U are even analytic functions of xi and W is odd analytic"
+    ],
+    "infinity": [
+      "L(infinity)=0",
+      "U(infinity)=0",
+      "Mbar(infinity) is finite and strictly positive on a positive member"
+    ],
+    "desingularized_member": "B_member=(exp(eta*L(0))*sqrt(1+2*eta*Nbar)-1)/eta-delta=0",
+    "member_eta_zero_extension": "L(0)+Nbar-delta=0",
+    "purpose": "the eta-zero member equation fixes the SP scaling symmetry; U(0) is not separately fixed on the relativistic chart"
+  },
+  "eta_zero_endpoint": {
+    "operator": {
+      "Mbar_xi": "xi^2*U^2",
+      "L_xi": "-xi*U^2",
+      "U_xi": "W",
+      "W_xi": "-2*W/xi-2*(L+Nbar+Mbar/xi)*U with the even origin limit",
+      "member": "L(0)+Nbar=delta"
+    },
+    "newtonian_potential": "V=-(L+Mbar/xi)",
+    "poisson_identity": "V_xi=Mbar/xi^2 and V(infinity)=0",
+    "schroedinger_identity": "-0.5*(U_xixi+2*U_xi/xi)+V*U=Nbar*U",
+    "seed_identification": [
+      "U=u0",
+      "Nbar=nu0",
+      "Mbar=xi^2*V0_xi",
+      "L=-V0-Mbar/xi",
+      "L(0)=-Vc",
+      "L(0)+Nbar=nu0-Vc=delta"
+    ],
+    "physical_reconstruction": [
+      "m=0",
+      "b=1",
+      "s=1",
+      "sigma=0",
+      "p=0",
+      "omega=1",
+      "Minkowski spacetime"
+    ],
+    "endpoint_profile_is_candidate": false,
+    "endpoint_profile_authority": "normalization fiber and predictor input only until an independent SP proof ball and first-cell validation are established"
+  },
+  "continuation_chart_assignment": {
+    "vacuum_cell": "cell ordinal 0, lambda in [0,1/1024]",
+    "positive_cells": "cell ordinals 1 through 1023 remain governed by the positive-kappa representation after an exact overlap proof",
+    "candidate_radii": "the frozen 73 candidates apply to the vacuum cell without change",
+    "assignment_is_execution": false,
+    "positive_parameter_sampled_now": false
+  },
+  "positive_tail_overlap": {
+    "boundary": "lambda=1/1024",
+    "positive_branch_parameters": [
+      "kappa=epsilon*sqrt(-2*Nbar)",
+      "M=epsilon*Mbar(infinity)",
+      "beta=Mbar(infinity)*(1+4*eta*Nbar)/sqrt(-2*Nbar)-1"
+    ],
+    "coordinate_relation": "q=epsilon/xi",
+    "required_joint_match": ["m", "b", "s", "sigma", "p", "omega", "alpha", "first radial jets"],
+    "proof_status": "unbound",
+    "pointwise_formula_equality_is_overlap_proof": false
+  },
+  "validation_obligations": {
+    "sp_endpoint_ball": "bind the admitted binary64 predictor inside a directed ball containing one exact normalized nodeless SP solution",
+    "simple_kernel": "prove the linearized eta-zero operator with the desingularized member row has trivial kernel",
+    "transversality": "prove the eta direction is not in the range obstruction and orient the branch toward increasing shat_0",
+    "first_cell": "bind Y,Z0,Z1,Z2 and one of the frozen 73 radii over the entire lambda interval [0,1/1024]",
+    "remainder": "control the eta-dependent nonlinear remainder uniformly in the blown-up radial norm",
+    "overlap": "prove the terminal vacuum-cell ball and first positive-cell ball contain the same physical solution with consistent orientation",
+    "none_established_by_this_definition": true
+  },
+  "readiness": {
+    "exact_change_of_variables_complete": true,
+    "eta_zero_operator_complete": true,
+    "member_desingularization_complete": true,
+    "sp_endpoint_proved": false,
+    "simple_kernel_proved": false,
+    "transversality_proved": false,
+    "first_cell_validated": false,
+    "positive_tail_overlap_proved": false,
+    "state_grid_unblocked": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  },
+  "sources": [
+    {
+      "url": "https://arxiv.org/abs/gr-qc/0002034",
+      "use": "existence context for globally regular spherical mini-boson stars; not a substitute for the selected validated branch proof"
+    },
+    {
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5684349/",
+      "use": "published EKG-to-Schroedinger-Poisson weak-field scaling context"
+    },
+    {
+      "path": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "use": "repository-frozen SP normalization and scale family"
+    }
+  ]
+}

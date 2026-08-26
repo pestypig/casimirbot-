@@ -3,7 +3,11 @@ import type {
   HelixEnvironmentSourceHeartbeat,
   HelixEnvironmentSourceManifest,
 } from "@shared/helix-environment-source-manifest";
-import { HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA, HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA } from "@shared/helix-environment-source-manifest";
+import {
+  HELIX_ENVIRONMENT_SOURCE_HEARTBEAT_SCHEMA,
+  HELIX_ENVIRONMENT_SOURCE_MANIFEST_SCHEMA,
+  helixEnvironmentSourceManifestSchema,
+} from "@shared/helix-environment-source-manifest";
 import { projectManifestAvailability } from "../services/situation-room/environment-source-availability-projector";
 import { recordEnvironmentSourceHeartbeat, resetEnvironmentSourceHeartbeatStoreForTest } from "../services/situation-room/environment-source-heartbeat-store";
 import { resetEnvironmentSourceRegistryForTest } from "../services/situation-room/environment-source-registry";
@@ -76,6 +80,17 @@ describe("environment source runtime status", () => {
   beforeEach(() => {
     resetEnvironmentSourceHeartbeatStoreForTest();
     resetEnvironmentSourceRegistryForTest();
+  });
+
+  it("admits the bounded tactical perception snapshot probe vocabulary", () => {
+    expect(helixEnvironmentSourceManifestSchema.safeParse({
+      ...manifest(),
+      supported_probe_types: [
+        "actor_status",
+        "inventory_check",
+        "perception_snapshot",
+      ],
+    }).success).toBe(true);
   });
 
   it("projects auth and oversized payload failures distinctly", () => {

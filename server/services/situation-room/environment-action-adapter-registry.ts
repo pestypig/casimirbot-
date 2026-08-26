@@ -27,6 +27,7 @@ import {
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
@@ -148,6 +149,12 @@ const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.
       "interact",
       "player_interaction",
       ["single_action"],
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+      "attack",
+      "player_interaction",
+      ["long_running"],
     ),
     capability(
       HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,

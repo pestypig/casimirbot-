@@ -235,6 +235,38 @@ describe("Shared Live Room environment panel", () => {
     expect(screen.queryByRole("button", { name: "Generate link" })).toBeNull();
   });
 
+  it("fails visibly closed when a live connector reports no player in its exact world", async () => {
+    const emptyEnvironment = {
+      ...environment,
+      subject_directory: {
+        ...environment.subject_directory,
+        subjects: [],
+      },
+    } as const;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      jsonResponse(environmentReceipt([emptyEnvironment])),
+    ));
+
+    render(
+      <SharedLiveRoomSourceBindingsPanel
+        roomId={environment.room_id}
+        roomClosed={false}
+        isOwner
+        selfParticipantId="participant:self"
+      />,
+    );
+
+    expect(
+      await screen.findByText(`Bound world: ${environment.world_id}`),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("status").textContent,
+    ).toMatch(/do not pair Player Embodiment or run player actions/i);
+    expect(
+      screen.queryByText(/Minecraft player embodiment/i),
+    ).toBeNull();
+  });
+
   it("shows every member a safe environment selector while keeping setup controls owner-only", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "PUT") {
@@ -470,6 +502,25 @@ describe("Shared Live Room environment panel", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/environments")) return jsonResponse(environmentReceipt());
+      if (
+        url.endsWith("/connector-pairings/local-server-handoff") &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse({
+          schema: "helix.connector_pairing_receipt.v1",
+          ok: true,
+          error: null,
+          message:
+            "Local server command access was staged without exposing the one-time code.",
+          pairing: null,
+          pairing_code_shown_once: false,
+          credential_included: false,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        });
+      }
       if (url.endsWith("/connector-pairings") && init?.method === "POST") {
         return jsonResponse({
           schema: "helix.connector_pairing_receipt.v1",
@@ -654,6 +705,26 @@ describe("Shared Live Room environment panel", () => {
     expect(screen.queryByText(/helix_env_cmd_/)).toBeNull();
     expect(screen.getByText(/never placed in chat, agent context, MCP output/i))
       .toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pair local server privately" }),
+    );
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/connector-pairings/local-server-handoff"),
+        expect.objectContaining({
+          method: "POST",
+          credentials: "include",
+          body: expect.stringContaining('"command_credential_requested":true'),
+        }),
+      ),
+    );
+    expect(
+      await screen.findByText(
+        "Local server command access was staged without exposing the one-time code.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("/helix pair WXYZ-6789")).toBeNull();
     expect(confirm).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,270 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.quantum_ground_rset_noise_contract.v1",
+  "status": "draft_unsealed_exact_static_ground_hadamard_rset_and_smeared_noise_definition_no_scientific_state_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "positive Klein-Gordon operator, static ground state, Hadamard RSET, connected smeared noise and finite comparison products",
+    "current_maturity": "R2 theorem-level quantum duties frozen but the mode, observable, smearing, tail and record products were unbound",
+    "target_maturity": "independently audited exact quantum proof-product ABI suitable for source/runtime-disjoint fixture producers",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "the same accepted terminal classical continuum ball satisfying R2-C01 through R2-C15",
+      "one distinct free real scalar with m_phi=1, xi_R=0 and no self-interaction",
+      "alpha=1/(b*s), h=b^2 dr^2+r^2 dOmega^2 and y=r/(1+r)",
+      "ell_H=1, zero finite ambiguity vector and zero Minkowski RSET",
+      "512-bit ball arithmetic, frozen strict-sign/identity rules and no finite wall"
+    ],
+    "required_evidence": [
+      "global-hyperbolicity and positive-Friedrichs-operator certificate",
+      "complete half-line spectral-measure construction without a finite wall or finite-pole assumption",
+      "one static ground-state two-point function and Hadamard theorem hypotheses",
+      "candidate-specialized Hadamard coefficients and conserved RSET remainder",
+      "64 by 4 declared mean smearings and 256 by 256 connected-noise Gram products",
+      "certified angular, spectral, radial and coincidence-subtraction remainders",
+      "same-state cross-product and source/runtime-disjoint comparison records",
+      "manufactured pass/fail/corruption/chronology fixtures and zero candidate evaluation during R1"
+    ],
+    "stop_fail_criteria": [
+      "finite-radius wall, Pauli-Villars import, smoothing, eigenvalue clipping or modal extrapolation",
+      "assuming the bound spectrum is finite or omitting threshold accumulation from the spectral measure",
+      "mixing different states, Hadamard lengths or ambiguity vectors between mean and noise",
+      "an uncertified discarded angular, spectral, radial or derivative sector",
+      "post-observation alteration of selectors, work budgets, smearings or comparison tolerances",
+      "candidate evaluation, candidate-root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "evaluating the selected-member spectrum, RSET or noise during definition review",
+      "self-consistent semiclassical backreaction or acceptance of a joint geometry/state",
+      "implementing or executing either scientific lane",
+      "SI or metric lanes, the 68-file outputs, a lamp, physical viability, propulsion or transport"
+    ],
+    "downstream_gate_unlocked": "quantum portion of R1 definition completeness after independent theory audit"
+  },
+  "semantic_change_class": "additive_quantum_scientific_and_numerical_proof_semantics_R2_unchanged",
+  "immutable_predecessors": {
+    "r2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "raw_sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a", "mutated": false},
+    "state_grid_v2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json", "raw_sha256": "cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c"},
+    "positive_tail": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-positive-branch-tail-factorization.v1.json", "raw_sha256": "363818f51349f844105bdb1ddb26fdd06cfdc62da4f2450ca2ab36fb22ec68bf"},
+    "flat_carrier": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-flat-carrier-remainder-contract.v1.json", "raw_sha256": "09ca71e9ea3d93ca31468ceb1a953cd0930b86f1f117211b3e4a5925cf865103"},
+    "wire_record": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-wire-record-contract.v1.json", "raw_sha256": "c225865343ccf3c2874b59e305c70891cdd944fa3f3a88179bc55eccbf59c160"}
+  },
+  "spacetime_and_field": {
+    "metric": "ds^2=-alpha(r)^2 dt^2+b(r)^2 dr^2+r^2 dOmega^2 with alpha=1/(b*s)",
+    "cauchy_surface": "Sigma={t=constant} is diffeomorphic to R^3 with h=b^2 dr^2+r^2 dOmega^2",
+    "global_hyperbolicity_certificate": "R2-C05, R2-C06, smooth compactified continuity and the normalized end certify 0<alpha_min<=alpha<=alpha_max<infinity and complete h; therefore the optical metric alpha^(-2)*h is uniformly equivalent to h and complete, so the standard static spacetime (R times Sigma,-alpha^2 dt^2+h) is globally hyperbolic and every Sigma_t is a Cauchy surface",
+    "field": "one real Phi distinct from both real components of the classical complex source",
+    "equation": "(Box-1)Phi=0",
+    "curvature_coupling": "xi_R=0",
+    "finite_box_forbidden": true
+  },
+  "positive_spatial_operator": {
+    "hilbert_space": "H=L2(Sigma,alpha^(-1)*dvol_h) with dvol_h=b*r^2*sin(theta)*dr*dtheta*dphi",
+    "core": "C_c^infinity(Sigma)",
+    "operator": "K=-alpha*D_i(alpha*D^i)+alpha^2",
+    "quadratic_form": "q_K[f]=integral_Sigma alpha*(h^ij*(D_i f)^star*(D_j f)+|f|^2)*dvol_h",
+    "strict_bound": "q_K[f]>=alpha_min^2*||f||_H^2 because alpha>=alpha_min and integral alpha*|f|^2 dvol_h>=alpha_min^2*integral alpha^(-1)*|f|^2 dvol_h",
+    "realization": "the unique positive Friedrichs extension generated by the closure of q_K on the stated core",
+    "functional_calculus": "the projection-valued spectral measure E_K defines K^(plus_or_minus_1/2), exp(-i sqrt(K) tau) and every later multiplier; no mode truncation defines the state",
+    "spherical_reduction": {
+      "decomposition": "f=sum_(ell,m) u_ellm(r)Y_ellm(theta,phi), with integral_S2 Y_ellm^star Y_ell_prime_m_prime dOmega=delta_ell_ell_prime delta_m_m_prime",
+      "radial_measure": "dmu_r=b^2*s*r^2 dr=alpha^(-1)*b*r^2 dr",
+      "radial_operator": "K_ell u=-alpha/(b*r^2)*d_dr[(alpha*r^2/b)*u']+alpha^2*(1+ell*(ell+1)/r^2)*u",
+      "origin_domain": "u_ell(r)=r^ell*(u0+O(r^2)); the singular Frobenius branch is excluded",
+      "infinity_domain": "the half-line Weyl solution is selected by L2(dmu_r) for nonreal spectral parameter and by limiting absorption for continuous spectrum; no boundary is imposed at finite r",
+      "essential_threshold": "sigma_essential(K_ell)=[1,infinity) for every ell after proving relative compactness of the certified asymptotically-flat coefficient remainder",
+      "bound_spectrum_rule": "all spectral mass in [alpha_min^2,1), including a finite or countably infinite set of eigenvalues accumulating only at 1, is retained by the spectral measure; a finite bound-pole inventory is not assumed"
+    }
+  },
+  "complete_spectral_measure": {
+    "primary_definition": "for each ell, rho_ell is the unique Weyl-Titchmarsh spectral measure of the Friedrichs radial operator K_ell in L2(dmu_r)",
+    "green_kernel": "for z in C\\[alpha_min^2,infinity), G_ell(z;r,r')=u_reg(z,r_<)*u_W(z,r_>)/W_ell(z), with the measure-weighted Wronskian fixed by the unit origin coefficient of u_reg and the unique Weyl solution u_W",
+    "stieltjes_identity": "<f,(K_ell-z)^(-1)g>=integral_[alpha_min^2,infinity) (lambda-z)^(-1) d<f,E_ell(lambda)g>",
+    "recovery": "rho_ell is recovered by Stieltjes inversion of the directed boundary values; atoms, absolutely continuous density and any threshold accumulation are parts of one measure",
+    "negative_axis_route": "the finite proof program evaluates (K_ell+kappa^2)^(-1) for kappa>=0 using the regular origin and decaying infinity solutions plus certified Wronskians; this route has no physical-axis pole crossing because K>=alpha_min^2",
+    "mode_normalization_meaning": "agreement on mode normalization means equality of the radial resolvent/spectral-measure pairing under dmu_r and the frozen unitary spherical-harmonic convention, not equality of arbitrary eigenfunction phases",
+    "threshold_duty": "each lane certifies the absence or exact contribution of a lambda=1 resonance and encloses the complete spectral-measure remainder in a punctured threshold neighborhood; failure to decide is terminal"
+  },
+  "static_ground_state": {
+    "state": "the pure quasifree time-translation-invariant static ground state determined by the positive-frequency spectral calculus of K",
+    "two_point_function": "G_plus(t,f;t_prime,g)=<f,exp(-i*sqrt(K)*(t-t_prime))*(2*sqrt(K))^(-1)g>_H",
+    "equal_time_covariance": "C_00=(2*sqrt(K))^(-1)=(1/pi)*integral_0^infinity (K+kappa^2)^(-1) d kappa",
+    "equal_time_momentum_covariance": "C_11=sqrt(K)/2 in the distributional quadratic-form sense, with mixed covariance fixed by the canonical commutator",
+    "uniqueness_scope": "unique regular pure quasifree state for this frozen positive-frequency prescription; no claim of uniqueness among all invariant mixed or non-ground states",
+    "Hadamard_theorem_duty": "the complete smooth standard-static geometry, strict positive K, elliptic coefficients and normalized asymptotically flat end satisfy the hypotheses of the frozen static-ground-state Hadamard theorem; the producer records every hypothesis and its predecessor evidence",
+    "asymptotic_condition": "the resolvent difference from the massive Minkowski operator and its required derivatives vanish in the q=1/r end with a certified factored remainder, which fixes the normalized Minkowski ground-state limit",
+    "same_state_rule": "this exact G_plus supplies every mean, noise and comparison product"
+  },
+  "hadamard_and_rset": {
+    "world_function": "sigma_synge(x,x_prime) is one half the signed squared geodesic distance in a convex normal neighborhood",
+    "parametrix_convention": "G_F=i/(8*pi^2)*[U/(sigma_synge+i0)+V*log((sigma_synge+i0)/ell_H^2)+W_DF]",
+    "hadamard_length": "ell_H=1",
+    "U": "Delta^(1/2), with Delta the Van Vleck-Morette determinant",
+    "V": "the unique smooth geometric coefficient solving the four-dimensional massive minimally-coupled Hadamard transport recursion with m=1 and xi=0",
+    "smooth_state_remainder": "W_DF=(8*pi^2/i)*G_F-U/(sigma_synge+i0)-V*log((sigma_synge+i0)) in the displayed common bracket convention",
+    "point_split_operator_general": "T_ab^(xi)= (1-2*xi)*g_b^(b_prime)*nabla_a*nabla_(b_prime)+(2*xi-1/2)*g_ab*g^(c d_prime)*nabla_c*nabla_(d_prime)-2*xi*g_a^(a_prime)*g_b^(b_prime)*nabla_(a_prime)*nabla_(b_prime)+2*xi*g_ab*Box+xi*(R_ab-g_ab*R/2)-g_ab*m^2/2",
+    "specialization": "xi=0 and m=1 are substituted before coefficient generation",
+    "v1_coincidence": "[v1]=1/8-R/24+Box(R)/120+R^2/288-R_ab*R^ab/720+R_abcd*R^abcd/720",
+    "renormalized_tensor": "<T_ab>_ren=(1/(8*pi^2))*([T_ab^(0) W_DF]+2*g_ab*[v1])+Theta_ab",
+    "ambiguity": "Theta_ab=0 exactly: cosmological=0, Einstein=0, R_squared=0, Ricci_squared=0",
+    "minkowski_normalization": "the massive Minkowski ground-state RSET is exactly zero and the candidate RSET tends to zero at the normalized end",
+    "local_output_basis": "<T_ab>_ren=rho*u_a*u_b+p_r*n_a*n_b+p_t*q_ab with u=alpha^(-1)*partial_t, n=b^(-1)*partial_r, q_ab=g_ab+u_a*u_b-n_a*n_b; static spherical symmetry requires flux and all omitted components to contain exact zero",
+    "local_conservation": "p_r'+(rho+p_r)*alpha'/alpha+2*(p_r-p_t)/r=0 on the full origin/bulk/infinity cover under the R2 identity rule",
+    "derivative_duty": "the common G_plus-minus-parametrix remainder is enclosed through two covariant derivatives at coincidence, while geometric coefficients and remainder derivatives consumed by conservation are enclosed through their exact required order",
+    "forbidden": ["Pauli-Villars subtraction", "finite-wall mode average", "post-hoc conservation repair", "changing ell_H or Theta after observing a result"]
+  },
+  "declared_smearings": {
+    "bump": "chi(z)=exp(-1/(1-z^2)) for |z|<1 and chi(z)=0 otherwise",
+    "radial_centers": "y_p=(2*p+1)/128 for p=0,...,63",
+    "supports": "chi(64*t)*chi(256*(y-y_p))/(4*pi), so |t|<1/64 and |y-y_p|<1/256; every support is separated from r=0 and y=1",
+    "normalization": "Z_p=integral_M sqrt(-g)*chi(64*t)*chi(256*(y-y_p))/(4*pi) d^4x and f_p=the displayed numerator/Z_p, with a directed proof Z_p>0 and integral sqrt(-g)f_p=1",
+    "tensor_channels": [
+      {"ordinal": 0, "id": "energy", "E_I_ab_contravariant": "u^a*u^b"},
+      {"ordinal": 1, "id": "radial", "E_I_ab_contravariant": "n^a*n^b"},
+      {"ordinal": 2, "id": "tangential_average", "E_I_ab_contravariant": "q^ab/2"},
+      {"ordinal": 3, "id": "radial_flux", "E_I_ab_contravariant": "(u^a*n^b+n^a*u^b)/2"}
+    ],
+    "test_tensor": "F_pI^ab=f_p*E_I^ab",
+    "mean_product": "M_pI=integral_M sqrt(-g)*F_pI^ab*<T_ab>_ren d^4x",
+    "mean_shape": [64, 4],
+    "flattening": "mean_index=4*p+I; noise_index=4*(64*p+q)+I is not used: the canonical noise matrix index is a=4*p+I, b=4*q+J",
+    "noise_shape": [256, 256],
+    "completeness": "the three diagonal spherical channels reconstruct the complete static spherical mean tensor; the flux channel is an exact-zero symmetry check for the mean and a nontrivial allowed fluctuation channel for noise"
+  },
+  "connected_noise": {
+    "local_definition": "t_ab=T_ab-<T_ab> and N_abcd(x,x_prime)=1/2*<{t_ab(x),t_cd(x_prime)}>",
+    "smeared_operator": "B_pI=integral_M sqrt(-g)*F_pI^ab*t_ab d^4x as a distributionally smeared Wick polynomial in the same ground-state representation",
+    "two_particle_vector": "Psi_pI=P_2*B_pI*Omega; for a zero-mean free-field ground state the centered quadratic stress has no vacuum, one-particle or higher-than-two-particle component",
+    "gram_identity": "N_(pI)(qJ)=Re<Psi_pI,Psi_qJ>=1/2*<Omega,{B_pI,B_qJ}Omega>",
+    "positivity": "for every real vector c, sum_a,b c_a*N_ab*c_b=||sum_a c_a*Psi_a||^2>=0",
+    "exchange_symmetry": "N_(pI)(qJ)=N_(qJ)(pI) exactly",
+    "conservation": "replacing either test tensor by a compactly supported symmetrized gradient nabla^(a v^(b)) gives an interval containing exact zero under the R2 identity rule",
+    "diagonal_rule": "diagonal entries are defined by the same smooth spacetime smearing and Fock Gram construction, never by unsmeared point coincidence, interpolation or zero fill",
+    "verification": "PSD is proved by an outward interval enclosure of the two-particle Gram factor and its residual, not by clipping negative eigenvalues or altering the reported matrix",
+    "state_and_scheme_binding": "the same G_plus, ell_H=1 and zero ambiguity vector as the mean are mandatory; local c-number renormalization terms cancel from t_ab but their common convention remains hash-bound"
+  },
+  "finite_validated_products": {
+    "exact_required_products": [
+      "positive K quadratic-form certificate and alpha_min ball",
+      "per-ell regular/Weyl resolvent certificates and complete spectral-measure pairing",
+      "threshold resonance/accumulation enclosure",
+      "Hadamard U,V and W_DF coincidence jets",
+      "rho,p_r,p_t and conservation residual coefficient balls on all 256 cells",
+      "64 by 4 mean-smearing interval matrix",
+      "256 by 256 symmetric connected-noise interval Gram matrix",
+      "angular, negative-axis spectral, radial, time-smearing and coincidence-subtraction tail balls",
+      "Minkowski and manufactured-state subtraction residuals"
+    ],
+    "resolvent_realization": "equal-time covariance and ultraviolet subtraction use convergent integrals of certified negative-axis radial resolvents; general compact-time products apply the bump Fourier multipliers to the complete Weyl--Titchmarsh measure recovered by directed Stieltjes inversion and limiting absorption, with certified contour and threshold remainders. No physical-axis pole enumeration is required",
+    "angular_tail": "a covariant large-ell Hadamard/WKB parametrix is subtracted through the derivative order consumed by mean and noise; the summed analytic tail plus a norm bound on its remainder encloses every discarded ell",
+    "spectral_tail": "the kappa integral is split only at prebound exact dyadic nodes; heat-kernel/resolvent asymptotics and positivity give directed bounds on [kappa_max,infinity), including every bound-state contribution through the full resolvent",
+    "radial_validation": "origin Taylor, 254 bulk cells and the q=1/r infinity cell use the frozen coefficient/remainder cover; all ODE defects, Wronskians, Green identities and quadratures are interval enclosed without adaptive scientific subdivision",
+    "selector_rule": "each lane's angular order, kappa quadrature, radial polynomial degrees, Hadamard order, rational projections, iteration counts and total work budget are immutable source/build-manifest inputs before selected-background ingress; failure to meet a bound terminates rather than changing a selector",
+    "comparison_rule": "corresponding primary and independent interval products must overlap entrywise, every exact-zero residual must satisfy the R2 identity rule, every strict predicate must pass independently and both complete error decompositions must close; central-value proximity without overlap is insufficient",
+    "no_confidence_semantics": "all products are deterministic enclosures; statistical confidence levels and marginal error bars are not used"
+  },
+  "chronology_and_record_abi": {
+    "construction_freeze": "all producer algorithms, finite selectors, exact projections, work budgets, source/runtime/executable/command/environment identities and future absent-root assertions are persisted and self-hashed before selected-background ingress",
+    "observation_order": [
+      "ingress identities and chronology",
+      "accepted classical background",
+      "global-hyperbolicity and K positivity",
+      "radial operator and resolvent measures",
+      "threshold classification",
+      "ground-state and Hadamard hypotheses",
+      "Hadamard coefficients and smooth remainder",
+      "local RSET and conservation",
+      "declared mean smearings",
+      "two-particle noise Gram factor",
+      "tail enclosures",
+      "cross-product consistency",
+      "record persistence"
+    ],
+    "required_record_fields": [
+      "all predecessor/source/runtime/toolchain/dependency/image/executable/command/environment hashes",
+      "alpha_min and K-form margins",
+      "radial coefficient, endpoint, Wronskian, resolvent and spectral-measure records",
+      "threshold classification and complete tail decomposition",
+      "Hadamard theorem hypothesis ledger, U/V/W_DF jets and subtraction residuals",
+      "local rho/pr/pt/flux and conservation products",
+      "every Z_p, M_pI, Gram factor, N_ab and PSD residual",
+      "all selector values and proof-work exhaustion state",
+      "first failure, previous-record hash and self hash"
+    ],
+    "failure_precedence": [
+      "identity_or_chronology",
+      "classical_background_prerequisite",
+      "global_hyperbolicity",
+      "K_domain_or_strict_bound",
+      "radial_resolvent_or_spectral_measure",
+      "threshold_classification",
+      "ground_state_or_Hadamard_hypothesis",
+      "Hadamard_coefficients_or_remainder",
+      "RSET_or_conservation",
+      "smearing_normalization",
+      "noise_symmetry_conservation_or_positivity",
+      "tail_or_work_budget",
+      "cross_product_consistency",
+      "persistence"
+    ],
+    "post_observation_retune": false,
+    "first_failure": "the earliest failing role terminates the lane; retry, selector extension, retune, smoothing, deletion and alternate output roots are forbidden"
+  },
+  "fixture_boundary": {
+    "allowed": [
+      "exact massive Minkowski ground state with zero RSET",
+      "positive constant and manufactured radial Sturm-Liouville operators",
+      "spectral measures with zero, finite and countably accumulating bound atoms",
+      "origin, infinity, Wronskian and threshold-resonance pass/touch/fail fixtures",
+      "analytic Hadamard-coefficient and conserved-tensor fixtures",
+      "finite-rank Fock Gram matrices with positive, zero and deliberately indefinite corruption cases",
+      "bump normalization, exchange symmetry, conservation and tail-exhaustion fixtures",
+      "hash, mutation, missing-field, chronology and record-chain fixtures"
+    ],
+    "forbidden": [
+      "selected-member spectrum, RSET or noise evaluation",
+      "positive continuation sample",
+      "candidate-root creation",
+      "scientific Rust execution",
+      "geometry/state or any downstream authority promotion"
+    ]
+  },
+  "readiness": {
+    "spacetime_and_operator_definition_complete": true,
+    "spectral_measure_definition_complete": true,
+    "ground_state_definition_complete": true,
+    "Hadamard_RSET_definition_complete": true,
+    "smearing_inventory_complete": true,
+    "connected_noise_definition_complete": true,
+    "finite_product_and_tail_definition_complete": true,
+    "record_and_failure_definition_complete": true,
+    "fixture_audit_complete": false,
+    "independent_theory_audit_complete": false,
+    "scientific_spectrum_evaluated": false,
+    "scientific_RSET_evaluated": false,
+    "scientific_noise_evaluated": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_quantum_state_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "KG_positivity_established": false,
+    "Hadamard_state_established": false,
+    "RSET_established": false,
+    "connected_noise_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  },
+  "sources": [
+    {"url": "https://arxiv.org/abs/hep-th/9507097", "use": "static positive-frequency ground-state construction and Hadamard theorem hypotheses"},
+    {"url": "https://arxiv.org/abs/gr-qc/0512118", "use": "four-dimensional Hadamard parametrix, point-split stress operator, v1 term, conservation and finite ambiguity structure"},
+    {"url": "https://arxiv.org/abs/gr-qc/0010019", "use": "connected stress-noise bidistribution and Wick reduction; this contract uses R2's direct one-half anticommutator normalization"}
+  ]
+}

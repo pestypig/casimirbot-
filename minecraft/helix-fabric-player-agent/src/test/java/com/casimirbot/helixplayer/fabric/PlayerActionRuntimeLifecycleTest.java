@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 final class PlayerActionRuntimeLifecycleTest {
@@ -12,6 +13,12 @@ final class PlayerActionRuntimeLifecycleTest {
         assertFalse(PlayerActionRuntime.actionPollingReady(false, false));
         assertFalse(PlayerActionRuntime.actionPollingReady(true, false));
         assertTrue(PlayerActionRuntime.actionPollingReady(true, true));
+    }
+
+    @Test
+    void directDiagnosticAdmissionIncludesTheExactHostileAttackAction() {
+        assertTrue(PlayerActionRuntime.directDiagnosticActionAllowed("attack"));
+        assertFalse(PlayerActionRuntime.directDiagnosticActionAllowed("attack_nearest"));
     }
 
     @Test
@@ -99,5 +106,18 @@ final class PlayerActionRuntimeLifecycleTest {
         assertFalse(PlayerActionRuntime.heartbeatFailureRequiresManifestRepublish(
             "action_event_stream_resync_required"
         ));
+    }
+
+    @Test
+    void preControlSafetyRefusalDoesNotClaimAnEnvironmentEffect() {
+        assertFalse(PlayerActionRuntime.effectExecutionPerformed(
+            true,
+            true,
+            Map.of(
+                "effect_prevented", true,
+                "reason_code", "locomotion_health_floor_crossed"
+            )
+        ));
+        assertTrue(PlayerActionRuntime.effectExecutionPerformed(true, true, Map.of()));
     }
 }

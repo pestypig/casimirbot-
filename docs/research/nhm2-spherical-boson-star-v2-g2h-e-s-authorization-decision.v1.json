@@ -1,0 +1,42 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 0,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "authorization_audit": {
+    "passed": 22,
+    "script_bytes": 6556,
+    "script_sha256": "7aefaa23aa15422b3ddc55e882eeba3c5836bb89a21eea1d3f03226cdf1541e6",
+    "total": 22
+  },
+  "authorization_record_absent": true,
+  "build_binding_sha256": "e7865e334dc35f795120ac1d1d0d29c7c7d965bc006eae028fa6952e5c008388",
+  "candidate_entrypoint_invoked": false,
+  "checkpoint_command": "python scripts/nhm2_g2h_e_r1_successor_checkpoint.py --lane primary --token ec667713a193b0b70e79d851f279e53ab945ccdfc749135fbe5ee1b098f3dd09 --execute",
+  "checkpoint_sha256": "8de58e8a36236168eab39eb43e090a7aafe5ed7c29c983e4d5cbe1bdaffc20f5",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "decision": "READY_FOR_SEPARATE_EXACT_USER_AUTHORIZATION",
+  "exact_user_authorization_statement": "I authorize exactly one G2H-E-S primary-v2 Tolman-VII execution under proposal SHA-256 65093d0084a513b101172e339123ecb2839cd76ef4350c6a351acdf054dbcfdd using token ec667713a193b0b70e79d851f279e53ab945ccdfc749135fbe5ee1b098f3dd09 and the frozen checkpoint command. I understand that PASS, FAIL, or partial output becomes immutable evidence and there will be no retry, retune, deletion, or alternate output root. I do not authorize the independent Rust execution at this time.",
+  "exhausted_v1_container_id": "ed7ed5fd641507c5457d83943489e0cc2c521a723509a76bcc1fd4668b00270c",
+  "exhausted_v1_preserved": true,
+  "first_output_exhausts_proposal": true,
+  "future_authorization_path": "artifacts/research/nhm2/g2h-authorizations/g2h-e-primary-v2.txt",
+  "future_container": "nhm2-g2h-e-primary-v2",
+  "future_evidence_absent": true,
+  "future_output_root": "artifacts/research/nhm2/g2h/tolman-vii-primary-v2",
+  "independent_lane_ineligible": true,
+  "primary_executable_sha256": "666ba126413e63318275bf0861b860707ce7046bcd278c3ee73b1f65f9369028",
+  "primary_image_id": "sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab",
+  "proposal_sha256": "65093d0084a513b101172e339123ecb2839cd76ef4350c6a351acdf054dbcfdd",
+  "schema": "nhm2.g2h_e_s.authorization_decision.v1",
+  "separate_user_authorization_required": true,
+  "token_sha256": "d54ee55da5967062bfbc080bcfb3d962b07ed69b08e4316b3973aa5b24d2ff4b"
+}

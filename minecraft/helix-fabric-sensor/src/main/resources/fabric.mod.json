@@ -8,6 +8,9 @@
   "entrypoints": {
     "main": [
       "com.casimirbot.helixsensor.fabric.HelixFabricSensorMod"
+    ],
+    "client": [
+      "com.casimirbot.helixsensor.fabric.HelixFabricClientPerceptionMod"
     ]
   },
   "depends": {

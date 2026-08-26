@@ -2,7 +2,7 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G6**
+Active program gate: **G8**
 
 This document answers the operational question that the product and architecture
 contracts intentionally do not:
@@ -116,6 +116,7 @@ flowchart TD
     G4 --> G5["G5 Durable survival goal"]
     G5 --> G6["G6 Concurrent reasoning roles"]
     G6 --> G7["G7 Second-domain transfer"]
+    G7 --> G8["G8 Release evaluation"]
     G1 --> D["Parallel: OAuth, desktop, rooms"]
     D --> G5
 ```
@@ -134,8 +135,9 @@ overrule current-turn execution and re-entry facts.
 | G3 — Viability and unexpected events | closed | G2 | `docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md` | G4 |
 | G4 — Live-mail wake bridge | closed | G3 | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md` | G5 |
 | G5 — Durable survival goal | closed | G4 and converged OAuth/desktop/room identity lane | `docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md` | G6 |
-| G6 — Concurrent reasoning roles | active | G5 | revision-bound perception and prospective outputs converge through one execution arbiter without stale-plan mutation | G7 |
-| G7 — Second-domain transfer | blocked | G6 | the accepted lifecycle transfers to a contrasting environment without Minecraft-specific strategy in the generic harness | release evaluation |
+| G6 — Concurrent reasoning roles | closed | G5 | `docs/audits/helix-environment-harness-g6-closure-audit-2026-08-23.md` | G7 |
+| G7 — Second-domain transfer | closed | G6 | `docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md` | G8 |
+| G8 — Environment-harness release evaluation | active | G7 | one installed-node release packet demonstrates cross-surface lifecycle convergence, credential separation, recovery, and representative post-G7 integration without weakening G1–G7 | release-ready evaluation |
 
 Exactly one gate is active. A blocked gate may receive design clarification but
 must not receive runtime implementation that assumes its prerequisites passed.
@@ -163,8 +165,18 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Live-mail Minecraft wake bridge | live accepted | `docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md`; `artifacts/helix-environment-g4-live-2026-08-22-deterministic/helix-minecraft-player-ask-5a72c8a7-4dc7-4546-bf88-15c41a66700f.json` | Preserve exact source identity, deterministic-only preprocessing, deduplication, re-entry, and terminal continuity as G5+ regressions. |
 | Durable Minecraft goal lifecycle | integrated accepted | `docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md`; `artifacts/g5-durable-survival-goal/owner-natural-progress-report-final.json`; `artifacts/g5-durable-survival-goal/second-participant-natural-progress-report-authorized.json` | Preserve hash-linked recovery, semantic-wake consumption, exact evidence re-entry, read-only participant continuation, and no-action reporting as G6+ regressions. |
 | Durable all-advancements survival goal | specified | `docs/architecture/helix-environment-agent-reasoning-v1.md` | Prove checkpointed progress and recovery in G5. |
-| Concurrent runtime reasoning roles | implemented | `docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md`; `shared/helix-environment-reasoning-role.ts`; `server/services/environment-connectors/reasoning-roles/environment-reasoning-role-store.ts`; `server/services/environment-connectors/reasoning-roles/environment-reasoning-role-audit.ts` | Deterministic schemas, append-only persistence, native role batches, stale invalidation, principal disposition/arbitration, MCP/workstation facades, and execution/result linkage exist. Live keyed Minecraft acceptance and G1–G5 regressions remain required before G6 closes. |
-| Second-domain harness transfer | projected | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Demonstrate the accepted lifecycle in Robinhood shadow observation or another contrasting domain in G7. |
+| Concurrent runtime reasoning roles | integrated accepted | `docs/audits/helix-environment-harness-g6-closure-audit-2026-08-23.md`; `artifacts/g6-concurrent-environment-reasoning/a1-live-latest.json`; `artifacts/g6-concurrent-environment-reasoning/keyed-natural-ask-ask_g6-keyed-natural-1787531751670.json` | Preserve exact revision identity, stale rejection, one-arbiter execution/result linkage, evidence re-entry, provider-neutral itinerary completion, and single-writer parity as G7+ regressions. |
+| Second-domain harness transfer | integrated accepted | `docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md`; `docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md`; `artifacts/g7-second-domain-transfer/live-tripath-acceptance-2026-08-24.json` | Preserve the owner-private read-only Robinhood tripath, exact Ask evidence re-entry, terminal continuity, zero mutation authority, and secret exclusion as G8 regressions. |
+| User profile connection broker — Robinhood read slice | deterministically verified | `docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md`; `server/routes/__tests__/brokerage-connections.test.ts`; `client/src/components/workstation/__tests__/BrokerageConnectionsCard.spec.tsx`; `client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomBrokerageBindingsPanel.spec.tsx`; `apps/desktop/scripts/smoke-service-boundary.mjs` | Extend through trusted native model-provider enrollment, generic opaque handles, authorized multi-member room grants, and live installed-node acceptance without exposing raw secrets or enabling brokerage mutation for users. |
+| Installed multi-surface harness convergence | specified | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `apps/desktop/README.md` | G8 must package one self-starting CasimirBot node whose desktop UI and authenticated MCP clients project the same durable runs and evidence while provider, MCP-client, and connector credentials remain separate and outside model context. |
+| Profile-native MCP authorization and managed recovery | specified | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md`; `docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/helix-environment-harness-work-program-v1.md` | The deterministic Auth0 browser-session slice now resolves the already-linked MCP profile and sets only an HttpOnly Casimir session cookie; focused tests and the compiled client pass. The 2026-08-25 perception-parity run reproduced that an admitted new MCP capability remained absent from one active Codex task after both server reconnect and a later task turn. A bounded actor-status compatibility projection now returns the typed perception snapshot to that unrestarted task while explicitly preserving `catalog_refresh_required=true`; this is continuity mitigation, not catalog convergence or dedicated-tool discovery. Live exact-callback/profile/room convergence, branded consent, OS-protected renewal, managed MCP reconnect/catalog resynchronization, durable one-instance supervision, revocation and recovery remain required. This is a G8 release blocker. |
+| Profile-scoped semantic MCP monitoring and Codex task wake | deterministically verified | `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json`; `shared/helix-client-authorization-readiness.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `server/services/environment-connectors/monitoring/__tests__/environment-monitor-store.test.ts`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/architecture/helix-environment-agent-reasoning-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | The 2026-08-25 bounded installed-node trace repaired the exact Auth0 permission, proved the four-scope readiness projection, semantic delivery, a 264 ms fresh actor snapshot, cursor acknowledgement, bounded typed recovery, fresh-process reconnect without duplicate wake/effect, revocation and post-revocation `lease_inactive`. Complete the remaining M3 release evidence inside the unknown-world Nether course: operator-visible material replanning through the accepted arbiter, portal entry, safe-return-point evidence and cross-surface agreement. Native closed-task wake remains unsupported until the client supplies a continuation transport. |
+| Operator-visible Codex steering and action-reaction fidelity | specified | `docs/helix-environment-harness-work-program-v1.md`; `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Prove a bounded, evidence-linked sense-decide-act-observe loop in which an authenticated Codex task receives every admitted material change and action receipt needed for the next decision, the operator can inspect the same ordered trace, latency and gap states are explicit, and neither surface receives raw tick spam, credentials, hidden reasoning, or a second mutation authority. This is required before the full Nether journey is used as G8 release evidence. |
+| Minecraft tactical perception parity | specified | `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `server/mcp/__tests__/helix-mcp-minecraft-action.test.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `shared/__tests__/helix-minecraft-perception-benchmark.spec.ts`; `minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricManifestContractTest.java` | The typed MCP reads, bounded snapshot, actor-status catalog-compatibility projection, consecutive-change monitor projection, semantic action idempotency and deterministic critical-hazard benchmark are implementation prerequisites only. The unrestarted-task compatibility call is live-proven, but the Minecraft client was rejected by the dedicated server with `Invalid session`, so no P3/P4 gameplay evidence was produced. Keep this capability `specified` until the screenshot/human ground-truth record and authenticated `keepInventory=false` Survival course prove the packet thresholds, explicit unknowns, latency, zero duplicate effects and safe control release. |
+| Responsive Player Embodiment sensing and consecutive native mining | deterministically verified | `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/PlayerSensorFrameTest.java`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/MiningTargetAffordanceTest.java`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/ConcurrentReactiveSchedulerTest.java` | Preserve the 4 ms p95 tick budget, exact frame identity, typed bounded failures, same-tick handoff, postcondition verification, and control release while completing the remaining N0 compositions and keyed A1/B parity. |
+| Optional Baritone v1.15.0 movement-only navigation | deterministically verified | `docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md`; `reports/helix-minecraft/nether1-baritone-movement-only-a0.json`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/BaritoneFacadeTest.java` | Preserve the public-API-only settings lease, pre-existing-task rejection, policy-drift cancellation, safe restoration, exact artifact pin, zero mutation effects, and native fallback independence. This does not promote the Nether objective or admit Baritone mining/building/inventory behavior. |
+| N0 controlled-course fixture planner | implemented | `docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md`; `scripts/fixtures/minecraft-nether1-n0-course-v1.json`; `scripts/helix-minecraft-nether1-n0-course-plan.ts`; `server/__tests__/minecraft-nether1-n0-course-plan.test.ts` | Preserve exact server/dimension/player/origin/snapshot binding, credential-free non-execution, origin-relative compositions, setup-receipt ineligibility, World Authority release before the course, and snapshot restoration before N1–N4. The account mismatch is now repaired deterministically by the Auth0 profile-session convergence slice; require its live exact-callback proof to project room `1ac9...` before snapshot or authority creation. Live setup, verification, release and restoration receipts remain required for promotion. |
+| Legitimate durable Nether entry | specified | `docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md`; `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md` | After G7, progress from a controlled survival capability course through responsive sensing/consecutive-action verification, direct-Codex/keyed-Helix parity, and one unknown-world recorded portal-entry and safe-return-point demonstration. |
 
 ## Closed gate: G1 canonical lifecycle authority
 
@@ -334,7 +346,7 @@ goal with clean lifecycle, poison, and presentation audits. Exact evidence is
 recorded in
 `docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md`.
 
-## Active gate: G6 concurrent reasoning roles
+## Closed gate: G6 concurrent reasoning roles
 
 G6 may add revision-bound perception and prospective-planning roles around the
 accepted sequential Runtime Codex path. These roles may prepare observations,
@@ -354,18 +366,365 @@ The deterministic implementation checkpoint is complete: exact shared schemas,
 hash-linked storage, provider-native revision-identical role batches,
 principal disposition, stale-aware one-proposal arbitration, automatic
 execution/measured-result linkage, observer-only first-divergence audit, and
-provider-neutral MCP/workstation facades are present. This is an
-`implemented` checkpoint only. G6 remains active until a natural keyed
-Minecraft journey and retained regressions supply acceptance evidence.
+provider-neutral MCP/workstation facades are present. The implementation and
+natural keyed acceptance are recorded in
+`docs/audits/helix-environment-harness-g6-closure-audit-2026-08-23.md`. The
+accepted turn preserves one principal solver, one execution arbiter, one
+mutation authority, exact observation re-entry, and single-writer terminal
+presentation.
+
+## Closed gate: G7 second-domain transfer
+
+G7 must transfer the accepted environment-harness lifecycle into one
+deliberately contrasting environment without moving Minecraft-specific
+mechanics, player strategy, Fabric assumptions, or game command semantics into
+provider-neutral contracts.
+
+The first G7 work packet must select the contrasting domain, declare its exact
+identity, evidence, capability, authority, reaction-timescale, and acceptance
+surface, and identify which G1–G6 contracts are reused unchanged. Design
+clarification may compare Robinhood shadow observation or another non-mutating
+environment, but runtime implementation must remain bounded to that declared
+packet and must not weaken the accepted Minecraft regressions.
+
+The selected packet is
+`docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md`. It uses
+the existing developer-only Robinhood private-room read plane and explicitly
+excludes provider UI automation, credentials, paper or live order mutation,
+reviews, approvals, control arming, unattended observation, and financial
+recommendation authority. The first implementation slice adds the same
+nonterminal workstation/MCP observation path used by Runtime Codex while
+retaining the existing brokerage adapter's owner, room, capability, producer
+epoch, freshness, and redaction boundary. Deterministic verification is recorded
+in `docs/audits/helix-environment-harness-g7-progress-audit-2026-08-23.md`.
+The post-restart callable-MCP preflight is recorded in
+`docs/audits/helix-environment-harness-g7-progress-audit-2026-08-24.md`.
+G7 closed through
+`docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md`.
+The authenticated principal used one clean owner-private room and the same
+server-derived read binding across the reference, MCP, and keyed-Ask routes.
+The Ask observation re-entered Runtime Codex and supported the selected terminal
+candidate; all three routes retained zero order authority and secret exclusion.
+
+## Active gate: G8 environment-harness release evaluation
+
+G8 converges the accepted G1–G7 contracts into a release-evaluation surface. It
+must preserve one canonical lifecycle and one effect authority across the
+installed desktop, authenticated MCP clients, Helix Ask, Shared Live Rooms, and
+representative environment journeys. Credential enrollment, storage, renewal,
+and revocation must remain outside model context and separated by credential
+class.
+
+The first G8 packet must declare the exact installed-node acceptance surface,
+recovery and one-instance supervision evidence, cross-surface run identity,
+credential-boundary checks, and representative post-G7 integration journey.
+The selected first packet is
+`docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md`. Its first
+slice promotes the already encrypted, owner-private Robinhood read connection
+to ordinary signed-in user profiles while retaining developer-only paper and
+live mutation authority. It reserves, but does not yet claim, installed MCP
+catalog convergence, multi-member sharing, signed-installer acceptance, or G8
+closure. No broad mutation-authority expansion or release-ready claim is
+permitted from this slice.
+
+### G8 release blocker: profile-native authorization and managed recovery
+
+The developer acceptance flow currently permits an operator to configure a
+callback, run `codex mcp login`, approve scopes in Auth0, restart a client or
+server when its cached catalog is stale, and use the opaque repository launcher.
+That remains useful diagnostic infrastructure, but it is not an acceptable
+ordinary-user onboarding or recovery design. G8 cannot become `release-ready`
+while a user must understand CLI commands, callback ports, OAuth resource
+parameters, process identifiers, keyed launchers, or application restart order.
+
+The release experience must make one signed-in CasimirBot profile the owner of
+its northbound client authorizations and environment/provider connections. The
+Account panel must provide one guided, credential-free state machine:
+
+```text
+signed out
+  -> profile signed in
+  -> client connection offered
+  -> least-scope consent requested
+  -> authorization active
+  -> MCP catalog synchronized
+  -> environment connection enrolled
+  -> optional room grant approved
+  -> ready / degraded / action required / revoked
+```
+
+The implementation must satisfy all of the following before release:
+
+1. **Profile ownership.** Every MCP client authorization, provider connection,
+   environment connector, and room grant binds to the exact CasimirBot profile.
+   Auth0 or another identity provider remains infrastructure; users encounter a
+   branded CasimirBot sign-in rather than a developer-owned Auth0 workflow.
+2. **Native consent.** The Account panel initiates OAuth Authorization Code with
+   PKCE or an approved device flow, displays the exact requested capability
+   families, and returns to a sanitized connection state. Normal users never run
+   `codex mcp login`, edit `config.toml`, choose a callback port, or copy a token,
+   pairing code, provider key, or authorization URL.
+3. **Stable least-scope bundles.** Initial consent requests only the scopes for
+   the selected product surface. A later capability expansion uses explicit
+   incremental consent and explains the new authority without revoking unrelated
+   profile connections or silently broadening a room member's grant.
+4. **Protected renewal.** Refresh material and provider credentials remain under
+   OS-protected native custody. Access-token renewal is automatic until expiry,
+   revocation, account-policy change, or provider denial requires the user.
+   Raw credentials remain absent from renderer state, chat, model context, MCP
+   output, logs, debug exports, repository files, environment projections, and
+   process arguments.
+5. **Managed reconnect and catalog refresh.** A successful consent upgrade,
+   server recovery, connector rotation, or token renewal causes a bounded MCP
+   reconnect and authoritative tool-catalog re-enumeration. Existing tasks either
+   adopt the refreshed client safely or receive one actionable reconnect state;
+   the user is not asked to discover a client/server restart sequence.
+6. **Durable one-instance supervision.** The installed node retains an
+   authenticated instance identity and ownership receipt across desktop, service,
+   and operating-system restarts. A healthy owned service is reused, a stale
+   owned service is replaced safely, and an unknown listener fails closed with a
+   user-facing recovery action. PID reuse, port occupancy, or model-visible
+   command-line inspection never establishes ownership.
+7. **Connector enrollment without secret relay.** Same-host Minecraft and other
+   supported connectors use bounded opaque handoffs owned by the profile. The
+   user may approve, revoke, or retry them from the Account panel without
+   relaying pairing material to the agent. Remote connectors use an equivalent
+   owner-mediated flow rather than a caller-selected filesystem path.
+8. **Room grants remain references.** A Shared Live Room receives a revocable,
+   capability-narrowed reference to a profile connection, never its credential.
+   Members authenticate as themselves, and observation, Player Embodiment, World
+   Authority, and higher-consequence mutations remain separately authorized.
+9. **Actionable recovery.** Expired consent, missing scope, revoked connector,
+   stale catalog, service crash, unknown port owner, wrong profile, and offline
+   environment each map to one stable sanitized state, one owner-safe recovery
+   action, and no retry loop that repeatedly asks for the same completed step.
+10. **Revocation and cleanup.** Disconnecting the client, provider, environment,
+    profile, or room grant invalidates only the corresponding authorization,
+    releases active controls, removes derived grants, and proves that future
+    reads and mutations fail closed.
+
+Release evidence must include a clean external-user journey on a signed install:
+
+```text
+install
+-> create or link profile
+-> connect one supported Codex client from the Account panel
+-> approve initial least scopes
+-> enroll one environment connector without secret relay
+-> use a fresh observation
+-> add one explicitly explained scope
+-> observe automatic reconnect and catalog refresh without app/server restart
+-> grant and revoke one room-scoped capability
+-> survive token renewal plus one service crash/restart
+-> disconnect and prove subsequent access fails closed
+```
+
+The journey must retain exact profile, client, room, connector, environment,
+source/world, credential-class, lifecycle, evidence, and revocation identities.
+It must also prove secret exclusion, one mutation authority, control release,
+bounded recovery time, and consistent status across the Account panel, MCP,
+API, and Shared Live Room. Deterministic unit/UI/service tests are necessary but
+do not replace this installed-node acceptance artifact.
+
+Until this evidence exists, the profile-native authorization capability remains
+`specified`, the opaque launcher remains developer-only, and G8 release closure
+is prohibited.
+
+### G8 release requirement: profile-scoped semantic MCP monitoring
+
+G4 proved that deterministic live-mail preprocessing can coalesce one meaningful
+Minecraft change, wake the sequential Runtime Codex solver, re-enter the exact
+packet and preserve terminal continuity. G5 proved semantic-wake consumption by
+a durable goal. Those accepted server-side paths do not by themselves prove that
+an authenticated external Codex client can passively follow the same canonical
+run. The current development MCP surface can request observations and inspect
+durable state, but it does not yet establish a profile-owned subscription that
+wakes the exact linked Codex task when the harness receives a meaningful change.
+
+G8 must add that missing northbound monitoring contract without turning MCP into
+the Minecraft credential, the raw 20 Hz sensor stream, a second planner or a
+competing execution loop. The release surface must satisfy all of the following:
+
+1. **Exact monitor identity.** A finite monitor lease binds the CasimirBot
+   profile, authenticated MCP client, supported Codex task or continuation
+   handle, durable `run_id`, room/member grant when applicable, environment,
+   source/world, subject, connector epoch and policy revision. Proximity, the
+   newest open task, a generic room, or a model-supplied identifier cannot infer
+   the binding.
+2. **Read-only event scope.** The lease declares admitted event families,
+   maximum age, wake budget, expiry and revocation state. Monitoring grants no
+   World Authority, Player Embodiment, workstation or terminal authority, and a
+   room receives only a revocable narrowed reference to the profile connection.
+3. **Resumable ordered cursor.** Codex consumes server-owned semantic event
+   batches through a monotonic cursor with exact source event/snapshot refs,
+   producer plane and epoch. Acknowledgement advances only that monitor; replay,
+   reconnect and multi-surface observers cannot duplicate a physical effect or
+   erase immutable evidence.
+4. **Bounded semantic projection.** Raw tick frames remain in the connector and
+   authoritative evidence ledger. Deterministic change detection, coalescing,
+   deduplication and situation digests emit only meaningful hazards, deviations,
+   workflow results, authority changes and durable-goal checkpoints. Load
+   shedding or backpressure must retain an explicit gap marker and force a fresh
+   snapshot instead of silently claiming continuity.
+5. **One wake, no hidden reasoning.** One admitted event batch may request at
+   most one wake of the exact linked task. A wake is only notice that evidence is
+   available; it does not choose a strategy, execute a tool, write an answer,
+   mirror hidden reasoning or create a second Runtime Codex solver.
+6. **Fresh re-entry before action.** After waking, Codex must materialize the
+   referenced event or digest, obtain a fresh subject snapshot when required,
+   compare it with the durable goal revision and submit any new action through
+   the existing single execution arbiter. Stale, wrong-task, wrong-room,
+   wrong-world, superseded-epoch and revoked-lease events fail with stable typed
+   reasons.
+7. **Reconnect and recovery.** Client, service, connector and operating-system
+   restarts resume from the last acknowledged cursor within a bounded window,
+   report any retention gap, synchronize the MCP catalog when needed and never
+   ask the user to discover a restart sequence. Expiry or revocation prevents
+   later reads and wakes and releases any monitor-owned resources.
+8. **Consistent projection.** Account, Device Check, MCP, API, Shared Live Room
+   and applicable desktop presentation must agree on monitor state, freshness,
+   blockers and the canonical `run_id`. A successful probe cannot coexist with
+   an unexplained contradictory readiness state.
+
+Release evidence must include one signed-install external-Codex journey:
+
+```text
+connect an authenticated Codex client from the profile
+-> create a finite read-only monitor lease for one durable environment run
+-> admit one bounded local guardian or workflow
+-> receive one meaningful semantic event without raw tick projection
+-> wake the exact linked task once
+-> materialize the event and obtain the required fresh snapshot
+-> let Codex materially replan through the existing execution arbiter
+-> disconnect while a later event is retained
+-> reconnect from the acknowledged cursor without duplicate wake or mutation
+-> revoke the monitor and prove subsequent reads and wakes fail closed
+```
+
+The N0 controlled-course mechanics may continue with explicit MCP observation
+calls while this contract is `specified`. The N1–N4 unknown-world Nether
+journey may not serve as integrated G8 evidence until the minimal monitor lease,
+semantic wake, fresh re-entry and reconnect path above are accepted on the exact
+Codex surface used for the run.
+
+### G8 release requirement: operator-visible Codex steering fidelity
+
+The semantic monitor makes a live task wakeable, but wake capability alone does
+not prove that the harness is responsive enough for an unscripted journey. G8
+must also prove one continuous, inspectable action-reaction loop. Codex may make
+the next decision from fresh evidence as conditions change, and the operator may
+watch the same canonical facts arrive, without projecting the connector's raw
+tick stream or model-private reasoning into either surface.
+
+This requirement is a tiered observability contract rather than unrestricted
+screen streaming or direct credentialed remote control:
+
+1. **Local reflex tier.** Tick-rate sensing, collision avoidance, control
+   release, cancellation and admitted guardians remain inside the connector.
+   They react at game timescales without waiting for a model turn and emit typed
+   evidence when they intervene.
+2. **Semantic decision tier.** The monitor projects every admitted material
+   state change, hazard, affordance loss, action receipt, postcondition failure,
+   authority change and durable-goal checkpoint required to choose the next
+   action. Coalescing may suppress redundant frames, but it may not suppress a
+   decision-relevant transition.
+3. **Operator trace tier.** The Account/Device Check or environment-run surface
+   presents the same ordered event, snapshot, action, receipt, cancellation and
+   goal-checkpoint references seen through MCP. It shows freshness, elapsed
+   latency, cursor, connector epoch, active authority and any retention gap; it
+   does not expose credentials, raw private prompts or hidden chain of thought.
+4. **Bounded cadence.** Each course declares sensor-to-semantic, wake/re-entry,
+   decision-to-dispatch and dispatch-to-receipt budgets. A missed budget is a
+   typed degraded result, not silently presented as smooth live control.
+5. **Consecutive causality.** Every dispatched action binds the snapshot and
+   goal revision that justified it. Its receipt or cancellation becomes input
+   to the next decision before another incompatible effect is admitted. Local
+   guardians may pre-empt through the existing arbiter, never through a second
+   control path.
+6. **Coverage and gaps.** Controlled perturbations must demonstrate that each
+   admitted material event family is observed exactly once across steady state,
+   disconnect/reconnect and connector restart. Backpressure, dropped retention
+   or an epoch discontinuity emits an explicit gap and requires a fresh
+   authoritative snapshot before further mutation.
+7. **Shared-room projection.** A room member sees only the narrowed evidence and
+   controls granted to that member. Combining a profile connection with a room
+   never transfers the profile credential or silently widens World Authority or
+   Player Embodiment.
+
+G8 acceptance evidence must include one recorded N0 course and one unknown-world
+journey segment with at least three consecutive sense-decide-act-observe cycles,
+one local-guardian intervention, one changed-affordance replan, and one
+disconnect/reconnect. The artifact must correlate the operator trace, MCP
+cursor, authoritative snapshots, action plan hashes, receipts and durable goal
+revision; report measured latency percentiles and event-family coverage; prove
+zero duplicate physical effects; and show control release at the end.
+
+This capability remains `specified` until that cross-surface live artifact
+exists. Deterministic sensor and monitor tests establish prerequisites but do
+not by themselves make the harness ready for the full Nether journey or G8
+release closure.
 
 
 ## Parallel delivery lane
 
 OAuth, packaged desktop, Device Check, Shared Live Room identity, provider
 deployment, and multi-device continuation may proceed in parallel after G1's
-contracts are respected. Their work packets must not claim G2–G6 closure. They
-must converge before G5 because a durable room goal depends on stable account,
-host, room, participant, subject, source, and device identity.
+contracts are respected. Their work packets must not claim G7 closure or
+substitute deployment readiness for second-domain lifecycle evidence. Remaining
+delivery work converges during release evaluation after G7 closes.
+
+### Installed-node convergence reservation
+
+The release target is one installed CasimirBot node with multiple northbound
+clients, not independent reasoning or execution stacks. The packaged desktop
+renderer, Codex through authenticated MCP, Helix Ask, Shared Live Rooms, and
+voice may initiate, observe, steer, or present an authorized run, but they must
+share the same durable `run_id`, canonical lifecycle facts, evidence references,
+execution arbiter, cancellation state, and terminal product. They must not race
+through separate mutation authorities or manufacture surface-specific answers.
+
+The present developer and packaged launch paths remain deliberately distinct:
+
+- `start-myapp-for-codex` is the opaque keyed repository launcher for live
+  provider and parity testing. It is not a user credential-onboarding design.
+- the packaged desktop host owns a private loopback service, per-launch session
+  boundary, desktop-local state, and the current narrow Device Check tunnel. It
+  does not yet inherit repository provider credentials or expose the complete
+  Helix Ask/environment catalog through MCP.
+
+A post-G7 delivery packet may converge those surfaces only through a signed
+native bootstrap and credential broker. It must keep three credential classes
+separate: model-provider authorization used behind the Runtime Codex boundary,
+scoped OAuth/PKCE or device authorization used by an MCP client to reach
+CasimirBot, and connector/provider credentials used only by the corresponding
+environment adapter. Raw credentials must not enter command-line arguments,
+renderer state, chat, MCP results, debug exports, repository configuration, or
+model context.
+
+That packet must require OS-protected enrollment and revocation, one-instance
+service supervision, health and crash recovery, managed MCP reconnect/catalog
+refresh, least-scope authorization, cross-surface run projection, serialized
+effects, and clean secret exclusion. It must not be treated as G7 evidence:
+G7 still closes only through the selected second-domain tripath acceptance.
+
+### Reserved first post-G7 Minecraft integration objective
+
+`docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md` specifies the
+first return-to-Minecraft integration objective after G7: prepare for the
+Nether, construct and ignite a portal through legitimate survival Player
+Embodiment, enter it, stabilize the arrival state, and verify a usable return
+point. The packet uses the accepted durable-goal, resident viability, live-mail,
+concurrent-role, MCP, and terminal-lifecycle contracts together.
+
+The objective remains `specified`. With G7 closed, G8 permits its N0
+deterministic capability-readiness course and subsequent staged acceptance work,
+but no stage inherits acceptance from G7. Runtime Codex reconstructs the larger
+objective from the latest verified checkpoint after a gameplay failure;
+Development Codex repairs a general Fabric capability when the direct route
+fails; and a direct-success/keyed-failure split triggers an adapter
+first-divergence repair. No layer may replace the objective with a
+portal-specific deterministic walkthrough or use server commands to satisfy
+authentic survival postconditions.
 
 ## G2 and G3 resident-control acceptance
 

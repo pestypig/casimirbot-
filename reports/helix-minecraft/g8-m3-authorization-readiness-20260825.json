@@ -1,0 +1,60 @@
+{
+  "schema": "helix.minecraft.g8_m3_authorization_readiness_checkpoint.v1",
+  "recorded_at": "2026-08-25T05:01:49.629Z",
+  "claim_boundary": {
+    "proves": "One fresh external Codex client can inspect its signed G8 monitor authorization readiness without attempting run, monitor, environment, or game mutation.",
+    "does_not_prove": [
+      "helix.agent_runs.write grant",
+      "M3 durable run creation",
+      "semantic monitor delivery",
+      "fresh-snapshot re-entry",
+      "cursor acknowledgement",
+      "disconnect or reconnect continuity",
+      "monitor revocation",
+      "N0 or unknown-world Nether acceptance"
+    ]
+  },
+  "keyed_node": {
+    "account_session_status": 200,
+    "helix_pipeline_status": 200,
+    "agent_providers_status": 200
+  },
+  "authorization_readiness": {
+    "schema": "helix.client_authorization_readiness.v1",
+    "capability_profile": "g8-monitor",
+    "ready": false,
+    "required_scopes": [
+      "helix.rooms.read",
+      "helix.environment_actions.read",
+      "helix.environment_actions.write",
+      "helix.agent_runs.write"
+    ],
+    "granted_required_scopes": [
+      "helix.rooms.read",
+      "helix.environment_actions.read",
+      "helix.environment_actions.write"
+    ],
+    "missing_scopes": [
+      "helix.agent_runs.write"
+    ],
+    "authorization_expires_at": "2026-08-26T04:44:31.000Z",
+    "recovery_action": "authorize_missing_scopes",
+    "credential_included": false,
+    "bearer_included": false,
+    "subject_included": false,
+    "client_identity_included": false,
+    "raw_claims_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "calls": {
+    "authorization_status_calls": 1,
+    "run_start_calls": 0,
+    "goal_calls": 0,
+    "monitor_calls": 0,
+    "environment_calls": 0,
+    "game_action_calls": 0
+  }
+}

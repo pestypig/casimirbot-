@@ -181,6 +181,10 @@ import {
   linkCompletedEnvironmentReasoningRoleAction,
 } from "./environment-reasoning-role";
 import {
+  brokerageReadManifest,
+  executeBrokerageReadGatewayCapability,
+} from "./brokerage-read";
+import {
   executeMinecraftLocalLifecycleGatewayCapability,
   minecraftLocalLifecycleManifest,
 } from "./minecraft-local-lifecycle";
@@ -5833,6 +5837,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   ...environmentReasoningRoleManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
+  [brokerageReadManifest.capability_id, brokerageReadManifest],
   [
     minecraftLocalLifecycleManifest.capability_id,
     minecraftLocalLifecycleManifest,
@@ -6688,22 +6693,20 @@ export const callWorkstationGatewayCapability = async (
           }
         : {}),
     });
-    const trace = buildWorkstationToolLifecycleTrace({
+    const trace = buildGatewayTrace({
       turnId,
-      iteration,
       capabilityId: manifest.capability_id,
-      providerToolCallId,
-      requestedArgs: readArguments(input.arguments),
-      normalizedArgs: readArguments(input.arguments),
-      source: null,
+      agentRuntime,
       admission,
       observationPacket,
-      terminalCandidate: null,
-      providerContinuationEnabled,
-      forceFollowupModelStep: true,
+      error: gatewayResult.error,
+      terminalEligible: false,
     });
     return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
       ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
       capability_id: manifest.capability_id,
       mode,
       gateway_admission: admission,
@@ -6766,6 +6769,75 @@ export const callWorkstationGatewayCapability = async (
                   ),
               },
             ],
+          }
+        : {}),
+    });
+    const trace = buildGatewayTrace({
+      turnId,
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      admission,
+      observationPacket,
+      error: gatewayResult.error,
+      terminalEligible: false,
+    });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...(gatewayResult.error ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (manifest.capability_id === brokerageReadManifest.capability_id) {
+    const gatewayResult = await executeBrokerageReadGatewayCapability({
+      arguments: readArguments(input.arguments),
+      accountContext: input.accountContext,
+      conversationThreadId: input.conversationThreadId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok
+        ? "authenticated_private_room_brokerage_read_admitted"
+        : "authenticated_private_room_brokerage_read_blocked",
+      blockedReason: gatewayResult.error,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "account-session",
+      action: manifest.action_id,
+      executedArgs: gatewayResult.executedArgs,
+      status:
+        gatewayResult.status === "completed"
+          ? "succeeded"
+          : gatewayResult.status,
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(gatewayResult.error
+        ? {
+            missingRequirements: [{
+              code: gatewayResult.error,
+              message: gatewayResult.summary,
+              repair_action: gatewayResult.repairAction ?? "ask_user",
+            }],
           }
         : {}),
     });

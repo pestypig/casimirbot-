@@ -1,0 +1,24 @@
+{
+  "schema": "nhm2.g2h_r1.prebuild.v1",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "immutable_failure_root": "artifacts/research/nhm2/g2h-fixtures-v1",
+  "repair_scope": "primary exact_rational_positive fixture only",
+  "primary_v1_source_sha256": "beb200b2396d78960cd53d3fb56ca81691fa6cb484a846aac058a3950d9c2132",
+  "primary_v2_source": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_primary_v2.c",
+  "primary_v2_source_bytes": 1302,
+  "primary_v2_source_sha256": "b0ed004c5cae55af02fa9d820f7907e8ff1a5af76242f983d0fb761397238166",
+  "primary_v2_dockerfile": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.primary.v2",
+  "primary_v2_dockerfile_sha256": "7d423fa2598bb78214d17b1c3346445c4ab863f9f0d1c617433ea048eb4c900c",
+  "offline_deb_index_composite_sha256": "0318757b2cdf7c1a8e3899632cfd1daebcb547002f8fc697f689968887ae3dba",
+  "independent_reuse": {
+    "image": "nhm2-g2h-independent-fixture:v1",
+    "image_id": "sha256:f2161397cc75b1362026107a8483f5ad21989a2871e815e09c42d6ba2bfa99be",
+    "executable_sha256": "cd40bd4f70b8f49acba8578d0821a101bc07afff30d97c283d12d5fc74cf49ed",
+    "prior_executions": 0
+  },
+  "fresh_output_root": "artifacts/research/nhm2/g2h-fixtures-v2",
+  "candidate_evaluations": 0,
+  "candidate_execution_authorized": false,
+  "proof_implementation_complete": false,
+  "all_downstream_authority": false
+}

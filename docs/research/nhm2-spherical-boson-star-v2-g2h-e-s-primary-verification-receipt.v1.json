@@ -1,0 +1,59 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_evaluations": 0,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "casimir": {
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_status": "GREEN",
+    "deltas": [],
+    "fail_reason": "NONE",
+    "first_fail": null,
+    "integrity_ok": true,
+    "run_id": "2468",
+    "trace_id": "adapter:26b96a1c-60cd-4a42-9456-437b14b85234",
+    "verdict": "PASS"
+  },
+  "closure_audit": {
+    "passed": 10,
+    "script_bytes": 2910,
+    "script_sha256": "f9dbecd735aabd04f2a329c74c8bd08a34aa5d65c023609abc537ba1c99bbaeb",
+    "total": 10
+  },
+  "math": {
+    "registry_entries": 318,
+    "report_bytes": 25037,
+    "report_sha256": "2d307b182d49c64cb8964975d4ad117c14a407c6fbd8895eccee3aa6119425f1",
+    "validation": "PASS"
+  },
+  "partial_audit": {
+    "passed": 16,
+    "script_bytes": 7199,
+    "script_sha256": "a72f8b22c1b80a9a5d3cec05f9aee73f983ea65ac45e5c8845f0d97248340624",
+    "total": 16
+  },
+  "primary_result_sha256": "36509fd0eda9f6ac6df80326942b12afbae81c287f3d728a9a94abe1adc08ec4",
+  "schema": "nhm2.g2h_e_s.primary_verification_receipt.v1",
+  "status": "PASS_PARTIAL_RESULT_INTEGRITY_ONLY",
+  "training_trace": {
+    "bytes_at_receipt": 4736000,
+    "path": "artifacts/training-trace.jsonl",
+    "sha256_at_receipt": "f4f49cde7a51654b2784c62100617efe9061309e7443e904bece160e64ed809d"
+  },
+  "warp": {
+    "failed_files": 0,
+    "failed_tests": 0,
+    "passed_files": 18,
+    "passed_tests": 179,
+    "required_files": 18,
+    "tests": 179
+  }
+}

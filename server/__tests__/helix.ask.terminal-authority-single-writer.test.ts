@@ -6797,6 +6797,101 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
+  it("preserves an exact account-policy gateway failure instead of relabeling it capability unavailable", () => {
+    const turnId = "ask:test:brokerage-account-policy-continuity";
+    const capability = "environment.brokerage.robinhood.read";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "helix-ask:desktop:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: [
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        goal_kind: "live_environment",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        source_target: "live_environment",
+        required: true,
+        admitted_tool_families: ["live_environment"],
+      },
+      codex_native_provider_bridge: {
+        schema: "helix.codex_native_provider_bridge.v1",
+        status: "fallback_required",
+        fallback_reason: "native_admitted_capability_set_empty",
+        native_workstation_turn: {
+          model_visible_tools: [capability],
+          executed_tools: [capability],
+          account_locked_tools: [],
+          compatibility_fallback_reason:
+            "native_admitted_capability_set_empty",
+        },
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "source_backed",
+        relevant_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+          requires_post_observation_synthesis: true,
+        },
+      },
+      workstation_gateway_call_results: [
+        {
+          capability_id: capability,
+          ok: false,
+          error: "capability_outside_account_policy",
+          gateway_admission: {
+            admission_status: "blocked",
+            blocked_reason: "capability_outside_account_policy",
+          },
+          observation: {
+            schema:
+              "helix.workstation_tool_gateway.account_policy_observation.v1",
+            status: "blocked",
+            blocked_reason: "capability_outside_account_policy",
+            terminal_eligible: false,
+            assistant_answer: false,
+          },
+          tool_followup_decision: {
+            next_action: "ask_user",
+            reason: "capability_outside_account_policy",
+            observation_summary:
+              "Workstation gateway blocked environment.brokerage.robinhood.read: capability_outside_account_policy.",
+          },
+        },
+      ],
+      current_turn_artifact_ledger: [],
+    };
+
+    applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "helix-ask:desktop:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(payload.terminal_error_code).toBe(
+      "capability_outside_account_policy",
+    );
+    expect(payload.terminal_error_code).not.toBe("capability_unavailable");
+    expect(payload.selected_final_answer).toContain(
+      "capability_outside_account_policy",
+    );
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "capability_outside_account_policy",
+      first_broken_rail: "tool_admission",
+      repair_target: "account_session",
+      selected_capability: capability,
+    });
+  });
+
   it("turns a required capability family with no governed model tool into an actionable typed limitation", () => {
     const turnId = "ask:test:capability-family-unavailable";
     const payload: Record<string, unknown> = {
@@ -7691,6 +7786,166 @@ describe("Helix terminal authority single writer", () => {
       next_missing_subgoal_id: missingCalculatorSubgoalId,
     });
     expect(payload.selected_final_answer).not.toBe(draftText);
+  });
+
+  it("does not terminalize a provider answer from a nearby capability while one exact G6 subgoal is incomplete", () => {
+    const turnId = "ask:test:g6-single-exact-capability-terminal-gate";
+    const goalId =
+      "environment_durable_goal:ef49540b-0bab-4857-837f-c2f449b08585";
+    const subgoalId =
+      `${turnId}:compound_capability_subgoal:1:com_casimirbot_environment_reasoning_role_inspect`;
+    const wrongObservationRef =
+      `${turnId}:workstation_gateway:com.casimirbot.environment.durable_goal.inspect:wrong`;
+    const candidateRef =
+      `${turnId}:agent_provider_terminal_candidate:codex:wrong-capability`;
+    const wrongAnswer =
+      "The durable goal has no attempts, so no G6 proposal was selected.";
+    const artifacts = [
+      {
+        artifact_id: wrongObservationRef,
+        kind: "provider_gateway_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          capability_key:
+            "com.casimirbot.environment.durable_goal.inspect",
+          status: "succeeded",
+          observation: {
+            schema: "helix.environment_durable_goal_observation.v1",
+            goal_id: goalId,
+          },
+          post_tool_model_step_required: true,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: wrongAnswer,
+      answer: wrongAnswer,
+      text: wrongAnswer,
+      final_answer_source: "agent_provider_terminal_candidate",
+      terminal_artifact_kind: "agent_provider_terminal_candidate",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: [
+          "agent_provider_terminal_candidate",
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "agent_provider_gateway_turn",
+        requested_capability:
+          "com.casimirbot.environment.reasoning_role.inspect",
+        required_terminal_kind: "agent_provider_terminal_candidate",
+        allowed_terminal_artifact_kinds: [
+          "agent_provider_terminal_candidate",
+          "typed_failure",
+        ],
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "single_tool",
+        relevant_tool_families: ["live_environment"],
+        terminal_success_criteria: {
+          required_observation_families: ["live_environment"],
+          required_capabilities: [
+            "com.casimirbot.environment.reasoning_role.inspect",
+          ],
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "single_capability",
+          requires_all_subgoals: false,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: subgoalId,
+              order: 1,
+              mandatory: true,
+              requested_capability:
+                "com.casimirbot.environment.reasoning_role.inspect",
+              runtime_capability:
+                "com.casimirbot.environment.reasoning_role.inspect",
+              required_args: ["goal_id"],
+              optional_args: [],
+              args_hint: { goal_id: goalId },
+              required_observation_kinds: [
+                "helix.environment_reasoning_role_observation.v1",
+                "provider_gateway_observation_packet",
+              ],
+              allowed_substitutions: [],
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      provider_terminal_candidate: {
+        schema: "helix.agent_provider_terminal_candidate.v1",
+        candidate_id: candidateRef,
+        turn_id: turnId,
+        candidate_text: wrongAnswer,
+        grounded_in_observation_refs: [wrongObservationRef],
+        normalized_observation_refs: [wrongObservationRef],
+        evidence_reentry_required: true,
+        provider_reasoning_completed: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        terminal_kind: "answer",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        terminal_item_id: candidateRef,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        concise_text: wrongAnswer,
+        terminal_artifact_kind: "agent_provider_terminal_candidate",
+        final_answer_source: "agent_provider_terminal_candidate",
+        terminal_authority_ref: candidateRef,
+        selected_observation_refs: [wrongObservationRef],
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("subgoal_observation_missing");
+    expect(payload.selected_final_answer).not.toBe(wrongAnswer);
+    expect(payload.compound_subgoal_terminal_failure).toMatchObject({
+      subgoal_id: subgoalId,
+      requested_capability:
+        "com.casimirbot.environment.reasoning_role.inspect",
+      first_broken_rail: "observation_artifact",
+    });
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      applies: true,
+      complete: false,
+      missing_required_capabilities: [
+        "com.casimirbot.environment.reasoning_role.inspect",
+      ],
+    });
   });
 
   it("blocks compound final drafts that omit a satisfied subgoal observation ref", () => {

@@ -1,0 +1,16 @@
+FROM python@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+
+COPY primary-debs/ /packages/
+
+RUN dpkg --unpack /packages/*.deb \
+ && dpkg --configure -a \
+ && rm -rf /packages
+
+COPY tolman_vii_primary.c /src/tolman_vii_primary.c
+COPY tolman_vii_primary_v2.c /src/tolman_vii_primary_v2.c
+
+RUN gcc -std=c17 -O2 -fno-fast-math -fno-common -Wall -Wextra -Werror \
+      -o /usr/local/bin/tolman-vii-primary /src/tolman_vii_primary_v2.c \
+      -lflint-arb -lflint -lgmp -lmpfr
+
+ENTRYPOINT ["/usr/local/bin/tolman-vii-primary"]

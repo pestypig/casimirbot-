@@ -2,9 +2,9 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G2F — fresh classical-control candidate selection**
+Active program gate: **G2H-E-S5 — inert primary execution-preflight decision**
 
-Status date: **August 23, 2026**
+Status date: **August 24, 2026**
 
 This document preserves the complete scientific objective while identifying the
 single gate that repository agents are permitted to treat as the current
@@ -16,6 +16,27 @@ deadline. It answers:
 The August 28 decision packet now records `BLOCKED` with source-disjoint,
 exactly matching frozen-core numerical failure evidence and is preserved at
 [`nhm2-spherical-boson-star-v2-august-28-numerical-decision-record.md`](./nhm2-spherical-boson-star-v2-august-28-numerical-decision-record.md).
+The completed smooth-family selection is
+[`nhm2-spherical-boson-star-v2-g2h-e-s3-r2-selection-result.md`](./nhm2-spherical-boson-star-v2-g2h-e-s3-r2-selection-result.md),
+and the umbrella implementation/preexecution packet is
+[`nhm2-spherical-boson-star-v2-g2h-e-s4-mini-boson-star-proof-implementation-preexecution.md`](./nhm2-spherical-boson-star-v2-g2h-e-s4-mini-boson-star-proof-implementation-preexecution.md).
+The active primary execution-preflight packet is
+[`nhm2-spherical-boson-star-v2-g2h-e-s5-primary-execution-preflight.md`](./nhm2-spherical-boson-star-v2-g2h-e-s5-primary-execution-preflight.md).
+Its subordinate staged delivery checklist is
+[`nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md`](./nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md);
+the checklist does not replace this canonical roadmap and its post-S5 rows are
+downstream forecasts only.
+Its active S5-A
+[`formal-germ subtraction definition review`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a-formal-germ-subtraction-definition-review.md)
+records an unbound truncation/formal-tail issue and selects nothing.
+The expanded Borel pre-acknowledgement review repaired 23 total-definition bindings;
+A3 subsequently bound the repaired exact bytes by independent
+acknowledgement, while A4 remains the sole active implementation row.
+The active A3 decision surface is the
+[`replacement Borel-definition acknowledgement request`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a-borel-definition-replacement-acknowledgement-request.md);
+the earlier request remains withdrawn and cannot satisfy it.
+Its completed fail-closed quantum-definition repair is
+[`nhm2-spherical-boson-star-v2-g2h-e-s4-r2-quantum-builder-definition-repair.md`](./nhm2-spherical-boson-star-v2-g2h-e-s4-r2-quantum-builder-definition-repair.md).
 The completed first-failure packet is
 [`nhm2-spherical-boson-star-v2-initializer-production-runtime-repair.md`](./nhm2-spherical-boson-star-v2-initializer-production-runtime-repair.md).
 The completed numerical-policy review is
@@ -94,8 +115,44 @@ The completed G2D-R1 diagnosis is
 [`nhm2-spherical-boson-star-v2-g2d-r1-static-failure-diagnosis.md`](./nhm2-spherical-boson-star-v2-g2d-r1-static-failure-diagnosis.md).
 The completed G2E result is
 [`nhm2-spherical-boson-star-v2-g2e-result.md`](./nhm2-spherical-boson-star-v2-g2e-result.md).
-The sole active packet is now
-[`nhm2-spherical-boson-star-v2-g2f-fresh-candidate-selection.md`](./nhm2-spherical-boson-star-v2-g2f-fresh-candidate-selection.md).
+The completed G2F selection result is
+[`nhm2-spherical-boson-star-v2-g2f-selection-result.md`](./nhm2-spherical-boson-star-v2-g2f-selection-result.md).
+Its closure audit is
+[`nhm2-spherical-boson-star-v2-g2f-closure-audit.md`](./nhm2-spherical-boson-star-v2-g2f-closure-audit.md).
+The completed G2G definition result is
+[`nhm2-spherical-boson-star-v2-g2g-result.md`](./nhm2-spherical-boson-star-v2-g2g-result.md).
+The completed parent G2H packet is
+[`nhm2-spherical-boson-star-v2-g2h-proof-implementation-preexecution.md`](./nhm2-spherical-boson-star-v2-g2h-proof-implementation-preexecution.md).
+Its immutable v1 fixture failure is
+[`nhm2-spherical-boson-star-v2-g2h-fixture-v1-failure.md`](./nhm2-spherical-boson-star-v2-g2h-fixture-v1-failure.md).
+The completed R1/R2 fixture-repair result is
+[`nhm2-spherical-boson-star-v2-g2h-r2-result.md`](./nhm2-spherical-boson-star-v2-g2h-r2-result.md).
+The independently audited G2H closure result is
+[`nhm2-spherical-boson-star-v2-g2h-result.md`](./nhm2-spherical-boson-star-v2-g2h-result.md).
+The exhausted G2H-E authorization proposal is
+[`nhm2-spherical-boson-star-v2-g2h-e-execution-proposal.md`](./nhm2-spherical-boson-star-v2-g2h-e-execution-proposal.md).
+The sole active disposition packet and immutable partial result is
+[`nhm2-spherical-boson-star-v2-g2h-e-primary-result.md`](./nhm2-spherical-boson-star-v2-g2h-e-primary-result.md).
+The completed candidate-neutral identity repair is
+[`nhm2-spherical-boson-star-v2-g2h-e-r1-result.md`](./nhm2-spherical-boson-star-v2-g2h-e-r1-result.md).
+Its inert versioned successor proposal is
+[`nhm2-spherical-boson-star-v2-g2h-e-r1-successor-proposal.v1.json`](./nhm2-spherical-boson-star-v2-g2h-e-r1-successor-proposal.v1.json).
+The active exact authorization decision packet is
+[`nhm2-spherical-boson-star-v2-g2h-e-s-authorization-decision.md`](./nhm2-spherical-boson-star-v2-g2h-e-s-authorization-decision.md).
+The immutable primary-v2 partial result is
+[`nhm2-spherical-boson-star-v2-g2h-e-s-primary-result.md`](./nhm2-spherical-boson-star-v2-g2h-e-s-primary-result.md).
+The completed schema-alignment/preexecution result is
+[`nhm2-spherical-boson-star-v2-g2h-e-s-r1-result.md`](./nhm2-spherical-boson-star-v2-g2h-e-s-r1-result.md).
+Its current-head verification receipt is
+[`nhm2-spherical-boson-star-v2-g2h-e-s-r1-verification-receipt.v1.json`](./nhm2-spherical-boson-star-v2-g2h-e-s-r1-verification-receipt.v1.json).
+The exhausted exact authorization decision is
+[`nhm2-spherical-boson-star-v2-g2h-e-s3-authorization-decision.md`](./nhm2-spherical-boson-star-v2-g2h-e-s3-authorization-decision.md).
+Its immutable primary result is
+[`nhm2-spherical-boson-star-v2-g2h-e-s3-primary-result.md`](./nhm2-spherical-boson-star-v2-g2h-e-s3-primary-result.md).
+Its current-head integrity receipt is
+[`nhm2-spherical-boson-star-v2-g2h-e-s3-primary-verification-receipt.v1.json`](./nhm2-spherical-boson-star-v2-g2h-e-s3-primary-verification-receipt.v1.json).
+The completed surface-regularity disposition is
+[`nhm2-spherical-boson-star-v2-g2h-e-s3-r1-regularity-disposition.md`](./nhm2-spherical-boson-star-v2-g2h-e-s3-r1-regularity-disposition.md).
 
 ## Permanent program objective
 
@@ -147,7 +204,7 @@ The program remains **Stage 2: diagnostic/preexecution**.
 | Classical branch diagnostics | The frozen G2B branch is closed without a terminal candidate. G2D preexecution passed, then its exact one-shot command persisted a terminal `FAIL` with `primary_evaluator_failed:1`. Result audit passes 5/5. Static diagnosis passes 8/8: both analytic residual systems reduce identically to zero, while the primary's `Decimal.sqrt()` floor/ceiling calls collapse to one half-even value and violate upper enclosure. The run's exact exception remains unobserved because stderr was not persisted. |
 | Boundary mathematics         | The origin/tail recurrence kernel exists as an authority-neutral diagnostic; authenticated proof receipts remain absent.                                                                                                                                                            |
 | Vacuum continuation          | The ABI record/input hashing and Unicode-totality defects are repaired, sealed, and independently audited; no verifier or proof execution exists.                                                                                                                                   |
-| Numerical decision           | G2D remains an immutable execution `FAIL`, not a falsification of the analytic geometry. G2E closes candidate-neutral infrastructure repair: primary exact-postcondition square roots, offline MPFR replay and durable bounded failure provenance pass 11/11 combined focused/closure tests. G2F may now select one genuinely fresh classical-control identity; G2D reuse remains forbidden. |
+| Numerical decision           | G2D remains an immutable execution `FAIL`, not a falsification of its analytic geometry. G2F/G2G froze Tolman-VII `mu=1`, `C=1/5` under `30de966d...343d`. After two preserved pre-math partials and bounded repairs, primary-v3 reached mathematics once: preflight passed, then the surface gate found `B''_in=-350/27` and `B''_out=100/27`. The authenticated result is `FAIL_GLOBAL_STATIC_STATE_SURFACE_GERMS_DISJOINT_ORDER_2`; candidate evaluations are 1, all 18 later duties are ineligible, the proposal is exhausted and Rust remains unauthorized. R1 independently upholds that failure for the standard semiclassical route: the surface produces an unregistered `Box R` delta, the cited Hadamard/RSET/noise route assumes a globally `C∞` background, and analyticity is narrowed to a sufficient special proof method rather than a requirement. |
 | Geometry/state               | The accepted-geometry/state handoff is definition-only; every solver, state, witness, and acceptance binding is null.                                                                                                                                                               |
 | Scientific output            | Only `smearing_weights` is materializable, in memory, for 1 of 68 roles.                                                                                                                                                                                                            |
 | Runtime lanes                | Complete primary lanes: 0; complete independent lanes: 0; pair agreements: 0.                                                                                                                                                                                                       |
@@ -193,7 +250,23 @@ flowchart TD
     G2BB4R11R1 --> G2B["G2B frozen branch: closed without candidate"]
     G2B --> G2C["G2C replacement-candidate research and preregistration"]
     G2C --> G2D["G2D fresh replacement-candidate proof attempt"]
-    G2D --> G3["G3 Accepted joint geometry and quantum state"]
+    G2D --> G2E["G2E interval/provenance repair"]
+    G2E --> G2F["G2F fresh candidate selection: Tolman VII"]
+    G2F --> G2G["G2G Tolman-VII candidate preregistration"]
+    G2G --> G2H["G2H proof implementation/preexecution"]
+    G2H -. "separate one-shot authorization" .-> G2HE["G2H-E primary: immutable pre-math partial"]
+    G2HE --> G2HER1["G2H-E-R1 self-identity repair: PASS"]
+    G2HER1 --> G2HESA["G2H-E-S successor authorization decision"]
+    G2HESA -. "exact separate user authorization" .-> G2HES["primary-v2: immutable pre-math partial"]
+    G2HES --> G2HESR1["G2H-E-S-R1 schema-skew disposition"]
+    G2HESR1 -. "new versioned proposal and authorization required" .-> G2HESS["primary-v3: surface-germ FAIL"]
+    G2HESS --> G2HESSR1["G2H-E-S3-R1 regularity disposition: PASS"]
+    G2HESSR1 --> G2HESSR2["G2H-E-S3-R2 mini-boson selection: PASS"]
+    G2HESSR2 --> G2HES4R1["G2H-E-S4-R1 exact-definition review: PASS"]
+    G2HES4R1 --> G2HES4["G2H-E-S4 implementation/preexecution: PASS"]
+    G2HES4 --> G2HES5["G2H-E-S5 inert primary execution-preflight decision: active"]
+    G2HES5 -. "only after audited preflight and separate authorization" .-> G2HNEW["future mini-boson candidate proof and replay"]
+    G2HNEW -. "only after a supported new candidate passes both lanes" .-> G3["G3 Accepted joint geometry and quantum state"]
     G3 --> G4["G4 SI-v2 and metric-input successor closure"]
     G4 --> G5["G5 Two complete disjoint 68-file lanes"]
     G5 --> G6["G6 Replay, agreement, diagnostic lamp"]
@@ -247,8 +320,22 @@ close.
 | G2D — Fresh replacement-candidate proof attempt      | closed: immutable execution `FAIL` | The exact authorized command ran once. Preexecution persisted `PASS`, then the primary evaluator returned code 1 and the terminal receipt recorded `primary_evaluator_failed:1`; no duty or independent lane ran. The two-file prefix is immutable, candidate admission/proof remain false, and no retry, retune, deletion or alternate root is eligible. | G2D-R1 |
 | G2D-R1 — Terminal primary-evaluator failure review  | closed: unique static hard defect; runtime exception unobserved | Eight source-only tests prove exact interior/exterior residual identities and source parity, exclude the strongest pre-evaluation causes, and demonstrate that CPython `Decimal.sqrt()` ignores the requested floor/ceiling modes. The alleged interval for `sqrt(3/4)` collapses and its upper endpoint lies below the exact root. Decision: `CLOSE_G2D_NO_PROOF_PRIMARY_DIRECTED_SQRT_CONTRACT_INVALID`; no retry or authority promotion. | G2E |
 | G2E — Candidate-neutral interval/provenance repair  | closed: independently audited infrastructure `PASS` | Nine generic primary roles and ten offline MPFR endpoint checks satisfy exact outward/tightness postconditions. Synthetic exit-7 receipts persist full-stream digests/counts, bounded prefixes, truncation and exclusive chronology. Focused/closure audits pass 11/11; G2D receipts remain byte-identical and all authority false. | G2F |
-| G2F — Fresh classical-control candidate selection  | active: no eligible member selected | Evidence-rank new known-physics families under preregistered criteria, preserve exclusions, and freeze at most one genuinely new scientific identity before implementation. The G2D member/root are ineligible and no candidate execution is authorized. | new candidate preregistration |
-| G3 — Accepted joint geometry and quantum state       | blocked by G2F and fresh classical proof | A converged joint fixed-point witness binding the same geometry, Hadamard state, renormalization/effective-action definitions, spectral evidence, and authenticated bytes                                                                                                                                                                                                               | G4                            |
+| G2F — Fresh classical-control candidate selection  | closed: independently audited selection `PASS`; no execution | Protocol SHA-256 `785d9843...d18272` freezes five identities, hard minima, rank and no-selection rules before search. Primary-source scoring selects `TOLMAN_VII_ISOTROPIC_FLUID_SCALAR_QFT_CONTROL` at exact `mu=1`, `beta=1/5` as the unique rank `(1,15,1,2,2,2,2,2,2)` maximum. Primary 10/10 and independent replay 9/9 pass; math 318, WARP 179/179 and Casimir run 2459 are green with certificate integrity true. Zero candidate evaluations and all authority false. | G2G |
+| G2G — Tolman-VII candidate preregistration | closed: independently audited definition `PASS`; no execution | Contract SHA-256 `30de966d...343d` freezes the exact interior/exterior solution, endpoints, 12 classical and 6 quantum duties, scalar ground-state/RSET/noise definitions, two disjoint future implementations, fixed arithmetic/partitions, complete primary arithmetic lineage and constructible build-before-executable-digest chronology. Exact audits pass 24/24 and 19/19; math 318, WARP 179/179 and Casimir run 2460 were green before the feasibility corrections and must be refreshed at G2H closure. Zero candidate evaluations and all authority false. | G2H |
+| G2H — Tolman-VII proof implementation/preexecution | closed: independently audited implementation `PASS`; no candidate execution | R1 preserves the immutable v1 fixture failure. R2's FLINT API repair and v3 fixtures are byte-bound; both source/runtime-disjoint lanes pass 7/7 synthetic checks and receipt replay passes 13/13. Final C17 and pure-Rust images/executables are bound by manifest `37738d32...362a`; implementation/runtime/guard audit passes 26/26. Inert G2H-E proposal `bab85c21...b46e` passes 14/14. Verification receipt `b71d32ca...aef42` binds math 318, WARP 179/179 and Casimir run 2461 `PASS` with certificate integrity true. At G2H closure, candidate evaluations were zero, both candidate roots and both authorization records were absent, and all authority was false. | G2H-E explicit authorization decision |
+| G2H-R1/R2 — Exact-layer fixture repair | closed: independently audited fixture `PASS`; no candidate execution | V2 stops at compile time on a FLINT 2.9 API mismatch and remains immutable. V3 checks canonical `fmpq` numerator/denominator identity and Arb positivity/containment. Binding `8f968fad...31dc2`; manifest self-hash `979cad4d...7c13`; all authority false. | G2H |
+| G2H-E — Tolman-VII proof execution | closed: immutable pre-math partial execution; no candidate evaluation | The exact authorized primary checkpoint ran once. Invocation `06406232...b5c8`, result `44ab716d...3b0f` and retained container `ed7ed5fd...0270c` bind exit 66 before root creation. Audit 16/16 proves `primary_hash_file("/proc/self/exe")` is the first condition and its `O_NOFOLLOW` open returns Linux `ELOOP`; short-circuiting prevents contract, sources, authorization values, surface gate and every duty from being read. Result `89084492...0df36`; verification receipt `65aa480a...f508d` binds math 318, WARP 179/179 and Casimir run 2462 green. No retry, no primary manifest, no independent authority and no star decision. | G2H-E-R1 candidate-neutral self-identity disposition |
+| G2H-E-R1 — Primary pre-math self-identity failure disposition | closed: independently audited infrastructure `PASS`; no candidate execution | Dedicated fixed-path helper follows only `/proc/self/exe`, requires a regular opened descriptor and hashes that descriptor; generic paths retain `O_NOFOLLOW`. Actual Linux fixtures reproduce v1 `ELOOP`, establish internal/external executable-hash agreement, reject arbitrary symlinks and detect mutation. Audit 21/21 preserves the old proposal/auth/ledger/container and proves all candidate/future roots absent. Proposal `65093d00...cfdd`; math 318, WARP 179/179 and Casimir run 2464 are green. | G2H-E-S separate authorization decision |
+| G2H-E-S — Versioned primary successor authorization/execution | closed: immutable pre-math partial; no candidate evaluation | The exact authorized checkpoint persisted invocation `2b6e57dc...cdd2`, result `0d398769...79c9`, empty stdout and exact 60-byte stderr, then retained container `6ffbd649...a9644b` exited 66 before root creation. Actual-runtime C fixture proves the binary admits authorization schema v1 and rejects the checkpoint's/persisted v2 schema. Partial audit 16/16 and closure 10/10; result `36509fd0...08ec4`; math 318, WARP 179/179 and Casimir run 2468 are green. Proposal exhausted, no retry, no star decision and Rust remains unauthorized. | G2H-E-S-R1 candidate-neutral schema disposition |
+| G2H-E-S-R1 — Primary-v2 authorization-schema version-skew disposition | closed: independently audited preexecution `PASS`; no candidate execution | Primary-v3 changes only the schema expectation, fresh v3 identities and exhausted-root guards. Actual Linux C fixtures pass 10/10, combined audit 31/31, both exhausted evidence sets remain immutable and every candidate root is absent. Proposal `af0a0394...67384`; math 318, WARP 179/179 and Casimir run 2469 are green; all authority false. | G2H-E-S3 exact authorization decision |
+| G2H-E-S3 — Primary-v3 exact authorization/execution | closed: immutable mathematical `FAIL` | The sole run passed preflight and evaluated the candidate once. Exact surface germs for `B` first separate at order 2: interior `-350/27`, exterior `100/27`. The 21-file root terminates in manifest `b4eec02b...edd98`; audit 77/77, math 318, WARP 179/179 and Casimir run 2470 are green. All 18 later duties are ineligible, proposal exhausted, Rust untouched and all authority false. | G2H-E-S3-R1 bounded theoretical disposition |
+| G2H-E-S3-R1 — Surface-regularity first-failure theoretical disposition | closed: independently audited theoretical `PASS` | Disposition `e86dcd10...ec0a` and audit 27/27 preserve the exact order-2 failure and ordinary junction pass, independently replay the `Box R` surface-delta coefficient `18/5` and minimal-coupling `v1` coefficient `3/100`, require the standard globally `C∞` route for the frozen Hadamard/RSET/noise duties, and narrow analytic germ equality to a sufficient special method. Math 318, WARP 179/179 and Casimir run 2471 are green with certificate integrity true. No sharp finite-regularity alternative is invented; all authority remains false. | G2H-E-S3-R2 |
+| G2H-E-S3-R2 — Smooth replacement-family research and preregistration | closed: independently replayed selection `PASS`; no candidate execution | Protocol `f2fec60d...a6cb2` freezes six families, hard minima, rank and no-selection rules before scoring. Primary-source matrix `7f7b7ac8...10d03` selects the ordinary nodeless quadratic mini-boson star at source coordinate `shat(0)=1.2`, ingressed as `6/5`, as the unique rank `(1,1,19,2,2,2,2,2,2,2,2,2)` maximum. Contract `041c406c...ed12a` freezes the global surface-free EKG problem, 15 classical and six quantum duties, arithmetic, grids, continuation, two future disjoint runtimes and absent-root rules. Selection/replay and closure audit pass 33/33; R1 remains 27/27; math 318, WARP 179/179 and Casimir run 2472 are green with certificate integrity true. New evaluations are zero; no implementation, execution, admission or scientific/physical authority. | G2H-E-S4 |
+| G2H-E-S4 — Mini-boson-star proof implementation and preexecution closure | closed: independently audited implementation/preexecution `PASS`; no candidate execution or proof | R1 seal `728d8c9a...025ca` and quantum builder `29893736...62fc` remain unchanged. Both disjoint lanes complete 4/4 common and 13/13 scientific fixture roles; final audit passes 23/23. Closure receipt `539a4ac5...a191`, current-head receipt `b5ab2249...c816`, math 318, WARP 179/179, and Casimir `PASS/GREEN` with certificate `6e84f965...4e45` and integrity true close S4. Both candidate roots remain absent; evaluations, samples, authorization, proof and every authority remain zero/false. | G2H-E-S5 inert primary execution-preflight decision |
+| G2H-E-S5 — Inert primary execution-preflight decision | active: ABI and outer guard PASS; scientific handlers 0/19 | Checkpoint ABI `6fbf6cdb...911ca`, outer guard, scheduler, record, ingress and existing candidate-neutral foundations remain green. A2 is complete-unsealed and A3 has exact-byte independent acknowledgement. A4 remains active. The generic C08-010 kernel passes 23/23 fixtures plus an 87/87 audit. C08-011a passes 26/26 plus 81/81; C08-011b passes 23/23 plus 92/92. Partial C08-011c1 verifies prefix/onset/history under 25/25 plus 86/86; C08-011c2 arbitrary-left panels pass 17/17 plus 57/57; C08-011c3 origin models pass 13/13 plus 48/48; and C08-011c4 owns stable scalar ledgers, commits four-state panels atomically and persists the first finite failure under 17/17 fixtures plus a 51/51 recursive audit. Exact internal `kappa`, `mu`, `beta+1` analytic 13-jets now pass 10/10 fixtures plus a 37/37 audit; the exact analytic degree-one model product passes 9/9 plus a 38/38 audit; paired `P/Pprime` persistence passes 14/14 fixtures plus a 52/52 recursive audit; per-panel analytic `F/E1/E2` models pass 11/11 plus a 43/43 audit and their persistent ledgers pass 13/13 plus a 45/45 recursive audit. Exact per-panel `Fprime/E1prime/E2prime` models pass 11/11 plus a 36/36 recursive audit and their persistent ledgers pass 15/15 plus a 45/45 recursive audit. H2 is under candidate-neutral fixture evaluation. A separately named P2 adapter passes an 11/11 exact manufactured fixture but remains provisional pending its H2 parent result and independent audit. Remaining derivative-convolution origin/target-panel ledgers are absent, so the history callback remains unbound and C08-011c incomplete. C08-011d through C08-015, C08-021 and the handler remain absent. No selected-member panel, instantiated selected-box witness or candidate summability proof exists. Candidate roots, authorization, token, candidate ledgers, selected-member sampling/execution, G3 and every authority remain absent/false. | finish and audit H2/P2, then remaining derivative-convolution ledgers; do not load or evaluate the frozen member |
+| G2H-E-S4-R2 — Quantum-builder definition repair | closed: additive total definition seal `PASS`; no quantum source or scientific execution | Gap inventory `3da161ec...b4c52` remains the immutable reproduced defect. Successor `29893736...62fc` fixes panel endpoints, node/weight construction, radial corrections, atom-safe weighted Richardson/Poisson remainders, explicit D=4 Hadamard transport, state-dependent W_DF subtraction, noise projection/factors, error allocation, wire-v1 payloads and every finite inner budget without changing an inherited selector. Exact audit passes 49/49, independent Node replay 29/29 and receipt audit 13/13 under closure `9928c20b...5bf1`. Candidate ingress and roots remain absent; all authority remains false. | G2H-E-S4 fixture-only quantum producer implementation |
+| G2H-E-S4-R1 — Mini-boson-star proof-definition completeness review | closed: exact additive definition seal `PASS` | R2 remains byte-identical. Classical definitions cover wire/record, seed, corrected grids, endpoint/tails, inverse/radii, 1,024-cell continuation, common-unit masses and the exact ell=0 Friedrichs stability certificate. Quantum definitions cover optical-metric global hyperbolicity, positive `K`, complete threshold-aware spectral measure, one static ground `G_plus`, Hadamard RSET, 64x4 mean and 256x256 Fock-Gram noise products. Two finite producer-specific builder algorithms fix every selector and exhaustion rule. Combined closure passes 42/42, cross-language replay 100/100, math 318, WARP 179/179 and Casimir run 2473 `PASS/GREEN`, integrity true. Zero scientific ingress; both roots absent; all authority false. | G2H-E-S4 fixture-only implementation |
+| G3 — Accepted joint geometry and quantum state       | blocked by a versioned authenticated primary proof and independent replay | A converged joint fixed-point witness binding the same geometry, Hadamard state, renormalization/effective-action definitions, spectral evidence, and authenticated bytes                                                                                                                                                                                                               | G4                            |
 | G4 — SI-v2 and metric-input successor closure        | blocked by G3                          | Two genuinely disjoint SI executions and agreement; accepted four-radius derivative enclosures; metric-demand-v2 and required successor bindings                                                                                                                                                                                                                                        | G5                            |
 | G5 — Two complete disjoint 68-file lanes             | blocked by G4                          | Four mean/noise files and 63 constraint files per lane, complete manifests, exclusive output-root chronology, and two source/runtime-disjoint executions                                                                                                                                                                                                                                | G6                            |
 | G6 — Replay, agreement, diagnostic lamp              | blocked by G5                          | Server reread/replay of both lanes, exact pair agreement, all diagnostic gates, and no-retune evidence                                                                                                                                                                                                                                                                                  | G7                            |
@@ -256,10 +343,18 @@ close.
 
 ## Active-gate rule
 
-Exactly one gate is active. Until G2F closes, work must contribute directly to
-evidence-ranked selection and preregistration of one genuinely fresh classical
-control, or be explicitly marked as an independent parallel lane that cannot
-perturb the immutable G2D evidence or the closed G2E infrastructure result.
+Exactly one gate is active. G2H-E-S4, S4-R1, and S4-R2 are closed. S4 preserves
+all exhausted Tolman-VII evidence, the frozen R2 mini-boson-star definition,
+common 4/4 plus scientific 13/13 fixture roles per disjoint lane, final closure
+receipt `539a4ac5...a191`, and current-head verification receipt
+`b5ab2249...c816`. The active G2H-E-S5 gate is implementation/preexecution only.
+It may define and candidate-neutrally fixture-audit a separately versioned
+candidate-capable primary preflight packet, but
+it may not evaluate the selected member, consume a positive parameter sample,
+create either future root, issue an authorization token, execute either
+scientific lane, change an equation/member/grid/integer/threshold/chronology,
+begin G3, or promote any authority. Any semantic gap returns fail-closed to a
+versioned additive definition review while R2 remains unchanged.
 
 The following do not close G2D:
 
@@ -287,8 +382,8 @@ The following do not close G2D:
   a result;
 - substituting a historical certificate or overview for current-tree evidence;
 - retrying, retuning, extending, or reinterpreting the closed B4-R10 branch;
-- running the selected replacement candidate before G2D preregisters it and a
-  separate one-shot authority is issued.
+- rerunning, restarting, deleting, retuning or redirecting the exhausted G2H-E
+  primary invocation, or treating exit 66 as a Tolman-VII mathematical result.
 
 ## Agent work-packet contract
 

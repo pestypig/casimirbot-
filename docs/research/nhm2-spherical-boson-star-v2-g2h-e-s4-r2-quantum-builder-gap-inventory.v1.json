@@ -1,0 +1,149 @@
+{
+  "schema": "nhm2.g2h_e_s4_r2.quantum_builder_gap_inventory.v1",
+  "status": "active_fail_closed_quantum_builder_definition_repair_no_candidate_ingress",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R2",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "total deterministic quantum constructor definitions required before P08-P13/R08-R13 source implementation",
+    "current_maturity": "quantum mathematical products and coarse work counts are sealed, but implementation-critical selectors remain absent",
+    "target_maturity": "additive independently audited total builder contract with every node, panel, correction, extrapolation, projection, tail and exhaustion choice fixed before scientific ingress",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 definition seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "quantum contract cf0a49ad816af742f0d1f86acbe6afd33538f126ebf5eb7487dbb154359fe3cc",
+      "builder v1 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "stability receipt 36d46c2d7474ff41d7a318ed1f4aaf540071aa854eecb57dc201d1ffa99e5af4"
+    ],
+    "required_evidence": [
+      "mechanical reproduction of every missing implementation selector",
+      "one additive successor definition preserving every already-frozen integer, threshold, equation and authority lock",
+      "independent exact/manufactured replay of all new selectors and exhaustion paths",
+      "zero candidate evaluation, zero positive parameter samples and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "implementing a quantum producer while any listed hard gap remains",
+      "changing an existing degree, order, panel count, node count, epsilon level, width target, smearing, state or equation",
+      "using candidate observations to choose a selector",
+      "candidate-root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "selected-member spectral, RSET or noise evaluation",
+      "primary or Rust scientific execution",
+      "retuning the selected member or completed P01-P07/R01-R07 fixtures",
+      "G3, geometry/state acceptance, lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "resume G2H-E-S4 P08-P13/R08-R13 fixture implementation only after the successor definition seal and independent audit pass"
+  },
+  "semantic_change_class": "additive_pre_ingress_numerical_definition_repair_R2_and_existing_selectors_unchanged",
+  "preserved_evidence": {
+    "fixture_binding": "215078e444fd4ff30c393b03daa2c70ef093fcc5719cf802d387f56d6c123515",
+    "runtime_audit": "PASS_78_OF_78",
+    "stability_audit": "PASS_26_OF_26",
+    "completion_matrix": "common_4_of_4_primary_7_of_13_independent_7_of_13_S4_false",
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false
+  },
+  "hard_gaps": [
+    {
+      "id": "QG01_primary_radial_collocation_totality",
+      "affected_roles": ["P08"],
+      "missing": ["canonical degree-24 node formula and wire order", "cell-interface and endpoint row replacement", "linear factorization/pivot/tie rule", "fixed defect-correction iteration and contraction budget", "projection ordinal and failure precedence"],
+      "evidence": "builder v1 names Chebyshev collocation and interval defect correction but binds none of these selectors"
+    },
+    {
+      "id": "QG02_independent_radial_picard_totality",
+      "affected_roles": ["R08"],
+      "missing": ["48-step subinterval layout on each frozen cell", "degree-28 Taylor coefficient recurrence and rounding order", "Picard enclosure seed radius", "fixed Picard iteration/contraction budget", "projection ordinal and failure precedence"],
+      "evidence": "builder v1 names Taylor propagation and Picard defects but fixes only degree and step count"
+    },
+    {
+      "id": "QG03_primary_negative_axis_panel_totality",
+      "affected_roles": ["P10"],
+      "missing": ["exact x-domain endpoint or truncation endpoint", "canonical 1,024 panel endpoint formula", "32-point Gauss-Legendre node/weight construction and certification", "last-panel to kappa-tail split", "order-20 tail coefficient and remainder selector"],
+      "evidence": "kappa=tan(pi*x/2) plus panel/node counts does not determine a finite quadrature or kappa_max"
+    },
+    {
+      "id": "QG04_independent_negative_axis_panel_totality",
+      "affected_roles": ["R10"],
+      "missing": ["exact t-domain endpoint", "canonical 1,536 dyadic panel endpoint formula", "24-node tanh-sinh step, abscissa and weight schedule", "native directed sinh/cosh enclosure algorithm and budget", "last-panel kappa_max and order-22 tail selector"],
+      "evidence": "kappa=sinh(t) and fixed panel/node counts leave infinitely many incompatible quadratures"
+    },
+    {
+      "id": "QG05_physical_measure_and_limiting_absorption_totality",
+      "affected_roles": ["P11", "R11"],
+      "missing": ["energy coordinate, lower/upper endpoints and compactification", "canonical panel endpoint formulas", "threshold-neighborhood split", "epsilon extrapolation stencil/order", "zero-epsilon remainder theorem hypotheses, bound formula and failure budget"],
+      "evidence": "2,048/2,304 energy panel counts and nine epsilon levels do not define the integral or extrapolant"
+    },
+    {
+      "id": "QG06_angular_subtraction_and_tail_totality",
+      "affected_roles": ["P09", "R09"],
+      "missing": ["canonical coefficient packing for every derivative channel", "large-ell subtraction recurrence", "closed analytic tail formula", "unsummed remainder norm and constant", "threshold resonance/accumulation decision algorithm"],
+      "evidence": "ell maxima and WKB/DeWitt-Schwinger orders alone do not determine certified discarded sectors"
+    },
+    {
+      "id": "QG07_hadamard_transport_and_jet_totality",
+      "affected_roles": ["P12", "R12"],
+      "missing": ["coefficient basis and canonical multiindex packing", "transport row/solve order and endpoint data", "fixed solve/correction/projection budget", "complete total-order-four jet enumeration", "remainder allocation consumed by RSET conservation"],
+      "evidence": "transport order and coincidence derivative order do not select reproducible certificate bytes"
+    },
+    {
+      "id": "QG08_noise_vector_gram_totality",
+      "affected_roles": ["P13", "R13"],
+      "missing": ["finite two-particle vector coefficient packing", "normalization and canonical phase/sign rule", "primary lower-triangular factor construction selector", "Rust MGS pivot, reorthogonalization and projection rules", "direct Gram residual norm/order and exhaustion budget"],
+      "evidence": "the 256-vector inventory and Gram identity do not determine either finite factor constructor"
+    },
+    {
+      "id": "QG09_smearing_and_fourier_multiplier_quadrature_totality",
+      "affected_roles": ["P11", "P13", "R11", "R13"],
+      "missing": ["time and radial bump quadrature maps", "node/weight schedules", "normalization Z_p correction budget", "compact-time Fourier multiplier enclosure and tail", "channel-wise persistence order"],
+      "evidence": "the exact bump functions and supports define observables but not finite validated construction"
+    },
+    {
+      "id": "QG10_error_allocation_totality",
+      "affected_roles": ["P08", "P09", "P10", "P11", "P12", "P13", "R08", "R09", "R10", "R11", "R12", "R13"],
+      "missing": ["allocation of 2^-120 total width across radial/angular/spectral/time/coincidence/noise sectors", "per-entry versus global 2^-132 tail rule", "canonical accumulation order", "touching-threshold failure semantics"],
+      "evidence": "two aggregate width targets do not determine component acceptance"
+    },
+    {
+      "id": "QG11_role_record_and_first_failure_totality",
+      "affected_roles": ["P08", "P09", "P10", "P11", "P12", "P13", "R08", "R09", "R10", "R11", "R12", "R13"],
+      "missing": ["role-specific payload keys and array flattening", "partial-output inventory at each failure ordinal", "counter exhaustion payloads", "within-role first-failure precedence", "cross-product consistency record order"],
+      "evidence": "the common record envelope and high-level chronology do not define quantum role payload bytes"
+    },
+    {
+      "id": "QG12_complete_finite_work_budget",
+      "affected_roles": ["P08", "P09", "P10", "P11", "P12", "P13", "R08", "R09", "R10", "R11", "R12", "R13"],
+      "missing": ["radial solve/correction iterations", "node-generation iterations", "tail-bound terms", "Hadamard solve/correction counts", "smearing normalization work", "Gram factor/reorthogonalization counts"],
+      "evidence": "the existing 29/32 counter tables cover coarse selector counts but omit the named inner algorithms"
+    }
+  ],
+  "repair_rules": {
+    "existing_numbers_immutable": true,
+    "candidate_neutral_selection_only": true,
+    "one_total_algorithm_per_lane_per_role": true,
+    "all_new_loops_finitely_budgeted": true,
+    "touch_is_failure_unless_existing_contract_says_nonstrict": true,
+    "no_fallback_or_precision_escalation": true,
+    "independent_source_and_runtime_lineage_required": true
+  },
+  "readiness": {
+    "gap_inventory_complete": true,
+    "successor_quantum_builder_contract_complete": false,
+    "independent_definition_audit_complete": false,
+    "quantum_source_implementation_eligible": false,
+    "candidate_evaluated": false,
+    "execution_authorized": false
+  },
+  "authority": {
+    "inventory_is_quantum_proof": false,
+    "candidate_evaluated": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

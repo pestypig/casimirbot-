@@ -1,0 +1,155 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.validated_inverse_radii_contract.v1",
+  "status": "draft_unsealed_exact_preconditioner_radii_and_chronology_definition_no_scientific_inverse_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "producer-specific bounded approximate inverse, derivative surrogate and Y/Z radii-polynomial proof ABI",
+    "current_maturity": "continuous operators, coefficient spaces and flat-carrier bounds defined; no scientific inverse constructed",
+    "target_maturity": "independently audited fail-closed inverse/radii definition suitable for disjoint fixture producers",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "wire contract c225865343ccf3c2874b59e305c70891cdd944fa3f3a88179bc55eccbf59c160",
+      "state/grid v2 cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c",
+      "SP endpoint db6a53f2d0ab2447b98cbd4f86e22e48d5aa90fa5ef8fe3a10cb4219aafc5006",
+      "flat-carrier contract 09ca71e9ea3d93ca31468ceb1a953cd0930b86f1f117211b3e4a5925cf865103",
+      "73 radii 2^-192 through 2^-120"
+    ],
+    "required_evidence": [
+      "exact finite/tail operator encoding",
+      "bounded-bijection certificate",
+      "pre-bound chronology and immutable hash",
+      "Y,Z0,Z1,Z2 assembly",
+      "strict least-radius selection",
+      "synthetic pass, every first-failure class, corruption and chronology fixtures",
+      "source/runtime-disjoint producer constructions"
+    ],
+    "stop_fail_criteria": [
+      "a singular finite block or zero tail multiplier",
+      "an unencoded infinite-tail action",
+      "constructing or changing A after any Y/Z or radius observation",
+      "missing flat-remainder contribution",
+      "a strict interval predicate touching its boundary",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "constructing a scientific inverse now",
+      "requiring primary and independent producers to share a solver algorithm",
+      "executing endpoint, continuation or selected-member bounds",
+      "candidate execution, G3, quantum outputs or physical claims"
+    ],
+    "downstream_gate_unlocked": "fixture implementations of the common inverse/radii record semantics after independent definition audit"
+  },
+  "semantic_change_class": "additive_numerical_proof_and_receipt_semantics_R2_unchanged",
+  "immutable_predecessors": {
+    "r2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a", "mutated": false},
+    "wire": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-wire-record-contract.v1.json", "raw_sha256": "c225865343ccf3c2874b59e305c70891cdd944fa3f3a88179bc55eccbf59c160"},
+    "state_grid_v2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json", "raw_sha256": "cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c"},
+    "sp_endpoint": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-sp-endpoint-proof-contract.v1.json", "raw_sha256": "db6a53f2d0ab2447b98cbd4f86e22e48d5aa90fa5ef8fe3a10cb4219aafc5006"},
+    "flat_carrier": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-flat-carrier-remainder-contract.v1.json", "raw_sha256": "09ca71e9ea3d93ca31468ceb1a953cd0930b86f1f117211b3e4a5925cf865103"}
+  },
+  "mathematical_spaces": {
+    "state_functions": "canonical Chebyshev l1_8 sequences in the v2 component order plus the chart scalars",
+    "first_order_residual_functions": "canonical Chebyshev l1_6 sequences in the v2 row order",
+    "second_derivative_auxiliary_residuals": "canonical Chebyshev l1_4 sequences only where an explicitly named proof product requires two derivatives",
+    "finite_rows": "interface, origin, member and recurrence rows use the exact dyadic component norm 1",
+    "product_norm": "the maximum of all weighted function and scalar/finite-row component norms"
+  },
+  "encoded_operator_class": {
+    "finite_cutoff": "the frozen grid node count N for the applicable chart; the finite state and row sizes are exactly those in state/grid v2",
+    "A_finite": "an exact dyadic row-major square matrix mapping finite residual rows to finite state coefficients",
+    "A_dagger_finite": "an exact dyadic row-major square matrix mapping finite state coefficients to finite residual rows",
+    "finite_bijection": "A_finite must have a nonzero exact determinant certified by a fraction-free elimination transcript; row swaps and pivots are recorded",
+    "tail_components": "the eight function components only, coefficient ordinals k>=N",
+    "A_tail": "A maps residual basis e_(c,k) to gamma_c*(k+1)^(-ell_c)*state basis e_(c,k)",
+    "A_dagger_tail": "A_dagger maps state basis e_(c,k) to delta_c*(k+1)^(ell_c)*residual basis e_(c,k)",
+    "tail_loss": "ell_c=2 for every first-order ODE component; any future second-derivative auxiliary product must declare ell_c=4 in a separate role",
+    "tail_multipliers": "gamma_c and delta_c are nonzero exact dyadics, encoded in component order",
+    "finite_tail_cross_blocks": "zero in A and A_dagger; all actual finite/tail coupling is bounded in Z0 and Z1 rather than hidden in an unencoded action",
+    "bounded_bijection": "nonzero gamma_c plus finite invertibility make A a bounded bijection from the declared residual product space to the state product space"
+  },
+  "producer_specific_construction": {
+    "shared_mathematics": "only the encoded operator class, proof predicates and record ABI are common",
+    "primary": "future C++ producer constructs its dyadic finite matrices and tail multipliers using its separately hash-bound Arb/FLINT/GMP/MPFR-lineage algorithm",
+    "independent": "future pure-Rust producer constructs its own dyadic matrices and tail multipliers using separately hash-bound Rust source with no C arithmetic lineage",
+    "same_matrix_required": false,
+    "same_proof_result_required": "both must prove the same frozen mathematical cell/member duties and their accepted solution/observable balls must overlap under the later agreement ABI",
+    "construction_definition_binding": "each producer manifest must freeze its deterministic matrix-construction algorithm and work budget before any scientific execution"
+  },
+  "chronology": {
+    "ordered_events": [
+      "center_and_parameter_tube_persisted",
+      "finite_midpoint_Jacobian_persisted",
+      "A_and_A_dagger_constructed",
+      "determinant_and_tail_bijection_certificate_persisted",
+      "inverse_record_self_hash_frozen",
+      "Y_computed",
+      "Z0_computed",
+      "Z1_computed",
+      "Z2_computed",
+      "73_radii_evaluated_in_order",
+      "least_passing_radius_or_failure_persisted"
+    ],
+    "strict_rule": "no byte of A, A_dagger, their certificates, algorithms or work budgets may change at or after Y_computed",
+    "retry_rule": "a failed bound or absent passing radius is immutable evidence; no alternate inverse, tail multiplier, radius order, center, precision, output root or work budget is permitted within that execution",
+    "timestamp_rule": "monotone integer event ordinals are authoritative; wall-clock strings are metadata only"
+  },
+  "bounds": {
+    "Y": "sup over the frozen parameter tube of norm(A*F(parameter,x_bar(parameter))), including every flat-carrier remainder contribution",
+    "Z0": "norm(I-A*A_dagger), including finite, tail and declared cross-block majorants",
+    "Z1": "sup over the parameter tube of norm(A*(A_dagger-D_xF(parameter,x_bar(parameter))))",
+    "Z2": "an outward bound such that norm(A*(D_xF(parameter,x)-D_xF(parameter,x_bar)))<=Z2*norm(x-x_bar) throughout the largest preregistered ball",
+    "parameter_defect": "all derivative and residual effects of an affine or higher-order center tube are included in Y or Z1 under the exact tube contract; omitted parameter terms fail",
+    "flat_remainder": "the complete flat-carrier record is mandatory input to Y,Z1,Z2",
+    "nonnegative_finite": "Y,Z0,Z1,Z2 must be finite outward balls with lower endpoint >=0"
+  },
+  "radii_decision": {
+    "ordered_candidates": "r_j=2^(-192+j), j=0..72",
+    "polynomial": "p(r)=Z2*r^2-(1-Z0-Z1)*r+Y",
+    "contraction": "c(r)=Z0+Z1+Z2*r",
+    "strict_pass": ["sup(p(r_j))<0", "sup(c(r_j))<1", "the complete ball remains inside every chart/domain/sign denominator margin"],
+    "selection": "the least j satisfying every predicate",
+    "failure": "if no j passes, or any required interval is missing, invalid or undecidable, the proof role FAILS",
+    "touching": "an upper endpoint equal to zero for p or equal to one for c does not pass",
+    "theorem": "when A is a bounded bijection and all predicates pass, T=I-AF is a strict self-map contraction on the selected closed ball, giving one unique zero of F in that ball"
+  },
+  "record_abi": {
+    "roles": ["sp_endpoint_inverse", "vacuum_cell_inverse", "positive_cell_inverse"],
+    "required_bindings": ["R2", "wire", "state/grid", "chart/operator", "flat carrier", "producer source", "toolchain", "dependency", "runtime image", "executable", "command", "environment", "center/tube", "previous record"],
+    "required_payloads": ["A_finite dyadics", "A_dagger_finite dyadics", "fraction-free determinant transcript", "gamma and delta dyadics", "tail losses", "cross-block majorants", "Y,Z0,Z1,Z2", "73 polynomial and contraction balls", "selected index or null", "first failure"],
+    "self_hash": "canonical wire self-hash with the self-hash field omitted under the wire contract",
+    "first_failure_precedence": ["ingress_or_binding", "chronology", "finite_shape", "finite_singularity", "tail_zero_or_loss", "invalid_bound", "Y", "Z0", "Z1", "Z2", "radii", "ball_domain", "persistence_or_hash"],
+    "authority_rule": "a fixture PASS cannot set scientific proof, candidate or physical authority"
+  },
+  "fixture_boundary": {
+    "allowed": ["exact 1x1 and 2x2 dyadic matrices", "manufactured tail diagonals", "synthetic Y/Z pass and each strict-boundary fail", "singularity", "zero tail", "shape", "mutation", "chronology and previous-hash fixtures"],
+    "forbidden": ["constructing a matrix from a candidate Jacobian", "endpoint or positive-lambda evaluation", "creating candidate roots", "scientific Rust execution", "authority promotion"]
+  },
+  "readiness": {
+    "operator_class_complete": true,
+    "chronology_complete": true,
+    "Y_Z_definitions_complete": true,
+    "radii_decision_complete": true,
+    "record_ABI_complete": true,
+    "fixture_audit_complete": false,
+    "independent_definition_audit_complete": false,
+    "scientific_inverse_constructed": false,
+    "scientific_bounds_computed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_inverse": false,
+    "definition_is_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

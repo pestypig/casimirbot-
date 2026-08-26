@@ -1,0 +1,177 @@
+{
+  "schema": "nhm2.g2h_e_s5_a4.c08_canonical_ingress_resource_contract.v1",
+  "status": "proposal_unsealed_pending_independent_parent_acknowledgement_no_implementation_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5 / A4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "C08-002 bounded canonical JSON and hash ingress for the acknowledged Borel contract",
+    "current_maturity": "candidate-neutral additive definition proposal only",
+    "target_maturity": "independently acknowledged total definition eligible for candidate-neutral implementation",
+    "required_frozen_inputs": [
+      "S4-R1 wire-record contract c225865343ccf3c2874b59e305c70891cdd944fa3f3a88179bc55eccbf59c160",
+      "Borel growth/quadrature contract 7dd4d30a64d9c7eae8637a79e40f16b19d564b0081aeec21d0cdf886c3094737",
+      "Borel state-jet definition 75eff0131c357480c938e466fe6338793fbdb980dc41cf7f3218a6f5acb6cffc",
+      "state-grid v2 contract cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c",
+      "checkpoint ABI 6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca"
+    ],
+    "required_evidence": [
+      "exact raw and RFC8785-compatible canonical Borel-contract hashes",
+      "measured frozen-contract footprint below every fixed ceiling",
+      "exact audit and cross-language replay",
+      "independent parent acknowledgement before implementation",
+      "zero candidate evaluations, positive samples, roots, token or authority"
+    ],
+    "stop_fail_criteria": [
+      "bound below the measured frozen-contract footprint",
+      "unbounded allocation or recursion",
+      "duplicate-key or surrogate acceptance",
+      "raw or canonical hash ambiguity",
+      "candidate ingress or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "C08 scientific payload or C08-021 record-size policy",
+      "selected-member evaluation",
+      "scientific equation or selector change",
+      "authorization, execution, Rust, G3, SI, metric or lane work",
+      "candidate, proof, geometry/state, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "only independent acknowledgement may make candidate-neutral C08-002 implementation eligible"
+  },
+  "semantic_change_class": "additive_representational_resource_definition_no_scientific_or_numerical_semantic_change",
+  "scope": {
+    "admitted_value": "the exact acknowledged Borel growth/quadrature contract file only",
+    "admitted_raw_bytes": 54972,
+    "admitted_raw_sha256": "7dd4d30a64d9c7eae8637a79e40f16b19d564b0081aeec21d0cdf886c3094737",
+    "expected_root_type": "object",
+    "excluded": [
+      "selected state coefficients or balls",
+      "positive-chart samples",
+      "C08 scientific output payload",
+      "C08-021 record envelope or ledger stream",
+      "authorization and execution records"
+    ],
+    "c08_failure_code": "C08-002_CANONICAL_JSON_OR_HASH"
+  },
+  "measured_frozen_contract_footprint": {
+    "raw_input_bytes": 54972,
+    "canonical_output_bytes": 49780,
+    "root_depth_convention": "root value has depth 0; each contained value increments depth by 1; object member names are not values",
+    "maximum_depth": 4,
+    "total_value_nodes": 746,
+    "maximum_members_in_one_object": 25,
+    "maximum_elements_in_one_array": 23,
+    "maximum_decoded_string_utf8_bytes": 436,
+    "maximum_decoded_object_key_utf8_bytes": 51,
+    "numeric_value_count": 98,
+    "numeric_inventory": "nonnegative integers only; maximum 65536",
+    "measurement_rule": "parse only after strict UTF-8 validation and duplicate-preserving object-pair construction; count the root and every object, array, string, number, boolean or null as one value node"
+  },
+  "fixed_ingress_resource_bounds": {
+    "maximum_raw_input_bytes": 65536,
+    "maximum_canonical_output_bytes": 65536,
+    "maximum_depth": 8,
+    "maximum_total_value_nodes": 1024,
+    "maximum_members_per_object": 64,
+    "maximum_elements_per_array": 64,
+    "maximum_decoded_string_utf8_bytes": 1024,
+    "maximum_decoded_object_key_utf8_bytes": 128,
+    "maximum_cumulative_decoded_string_utf8_bytes": 65536,
+    "maximum_number_lexeme_bytes": 64,
+    "allocation_rule": "every input, token, decoded string, object-pair vector, array vector and canonical-output allocation is checked against its fixed ceiling before growth; no unchecked size addition or multiplication",
+    "recursion_rule": "recursive descent may enter at most depth 8 and must fail before constructing a depth-9 value",
+    "exhaustion_rule": "first exhausted counter is terminal C08-002 failure; no retry, larger buffer, alternate parser, alternate root, retune or deletion"
+  },
+  "wire_and_canonicalization": {
+    "encoding": "UTF-8 without BOM",
+    "raw_whitespace_rule": "RFC8259 JSON whitespace is syntactically permitted before or after the single value, including the exact frozen file's terminal LF; the exact raw byte count and SHA-256 still reject every whitespace mutation",
+    "single_value_rule": "exactly one JSON value; every non-whitespace trailing byte is rejected",
+    "duplicate_rule": "decode object member names to Unicode scalar sequences, reject duplicates before object construction, including direct-versus-escaped aliases",
+    "surrogate_rule": "reject every unpaired high or low UTF-16 surrogate; a paired escape decodes to one Unicode scalar value; no Unicode normalization",
+    "contract_key_rule": "every object member name is nonempty printable ASCII bytes 0x20 through 0x7e after decoding",
+    "number_rule": "valid JSON number grammar, finite IEEE-754 binary64 value, negative zero canonicalizes to 0, and every integer-valued resource field lies in [-(2^53-1),2^53-1]",
+    "canonicalization": "RFC8785-compatible JCS with object names ordered by UTF-16 code units, minimal JSON string escaping, lowercase literals and ECMAScript shortest finite-number serialization",
+    "canonicalization_order": "parse into duplicate-preserving pairs, validate duplicates and all semantic/resource rules, construct the value, then serialize canonically",
+    "bom": "reject",
+    "invalid_utf8": "reject",
+    "nonfinite_number": "reject"
+  },
+  "hash_bindings": {
+    "raw_algorithm": "SHA-256 of exact file bytes with no domain prefix",
+    "expected_raw_sha256": "7dd4d30a64d9c7eae8637a79e40f16b19d564b0081aeec21d0cdf886c3094737",
+    "canonical_domain_utf8": "nhm2-g2h-e-s5-a/borel-contract/v1\n",
+    "canonical_rule": "SHA-256(UTF8(canonical_domain_utf8)||RFC8785(parsed exact file))",
+    "expected_canonical_bytes": 49780,
+    "expected_canonical_sha256": "665b6d9ddd9d2108274652414ec9d6a0a2fb43f86f28ab3ab64db70003c7f520",
+    "inherited_payload_domain_utf8": "nhm2-g2h-e-s4/payload/v1\n",
+    "inherited_record_domain_utf8": "nhm2-g2h-e-s4/record/v1\n",
+    "inherited_manifest_self_domain_utf8": "nhm2-g2h-e-s4/manifest-self/v1\n",
+    "inherited_stream_domain_utf8": "nhm2-g2h-e-s4/stream/v1\n",
+    "self_member_rule": "C08-021, not C08-002, hashes UTF-8(domain)||RFC8785(value with only the relevant self-hash member omitted); this proposal does not change that inherited rule"
+  },
+  "ordered_validation_and_failure_precedence": [
+    "001 reject raw byte count above 65536 before allocation or decode",
+    "002 reject BOM, then reject invalid UTF-8 at the least raw byte offset",
+    "003 lex exactly one JSON value and reject invalid escapes, unpaired surrogates, invalid number grammar or non-whitespace trailing bytes",
+    "004 parse into pair-preserving objects while enforcing depth, node, member, element, string, key, cumulative-string and number-lexeme counters before growth",
+    "005 reject the least canonical-path duplicate decoded object key before constructing any object map",
+    "006 reject the least canonical-path empty or non-printable-ASCII contract key",
+    "007 reject the least canonical-path nonfinite binary64 number or unsafe integer-valued resource field",
+    "008 require root object, exact raw byte count 54972 and exact raw SHA-256",
+    "009 RFC8785-canonicalize within the 65536-byte output ceiling",
+    "010 require exact canonical byte count 49780 and exact domain-separated canonical SHA-256"
+  ],
+  "within_step_tie_rule": "choose the least raw byte offset when defined, then the lexicographically least RFC8785 canonical JSON Pointer path encoded with RFC6901 escapes, then the listed predicate order",
+  "candidate_neutral_fixture_matrix": [
+    "exact acknowledged contract PASS with both expected hashes",
+    "65536 raw bytes admitted to bounded parsing and 65537 rejected before decode",
+    "depth 8 admitted and depth 9 rejected before constructing the depth-9 value",
+    "1024 total nodes admitted and node 1025 rejected",
+    "64 object members admitted and member 65 rejected",
+    "64 array elements admitted and element 65 rejected",
+    "1024-byte decoded string admitted and byte 1025 rejected",
+    "128-byte printable-ASCII key admitted and byte 129 rejected",
+    "65536 cumulative decoded string bytes admitted and byte 65537 rejected",
+    "64-byte valid number lexeme reaches number semantics and byte 65 is rejected by resource policy",
+    "BOM, invalid UTF-8, malformed escape and every unpaired-surrogate class rejected",
+    "direct-versus-escaped duplicate key rejected before map construction",
+    "empty and non-printable-ASCII contract keys rejected",
+    "nonfinite binary64 and unsafe integer-valued resource rejected",
+    "raw whitespace mutation rejected by raw identity",
+    "canonical key order, minimal escaping, negative zero, fixed/scientific number thresholds and canonical hash replay",
+    "corrupt raw hash and corrupt canonical hash rejected",
+    "zero candidate coefficients read, zero positive samples and every protected root absent before and after"
+  ],
+  "acknowledgement_boundary": {
+    "required_before_implementation": true,
+    "acknowledgement_subject": "the exact raw bytes and SHA-256 of this additive definition after exact and cross-language audits",
+    "acknowledgement_is_not": [
+      "candidate evaluation or execution authorization",
+      "positive sampling authorization",
+      "token, authorization or output-root authorization",
+      "Rust, G3, SI, metric or lane authorization",
+      "candidate, proof, geometry/state, lamp, physical, propulsion or transport authority"
+    ]
+  },
+  "readiness": {
+    "measured_footprint_defined": true,
+    "fixed_resource_bounds_defined": true,
+    "validation_precedence_defined": true,
+    "hash_domains_defined": true,
+    "exact_audit_complete": false,
+    "cross_language_replay_complete": false,
+    "independent_parent_acknowledgement_complete": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

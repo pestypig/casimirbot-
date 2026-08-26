@@ -198,9 +198,37 @@ final class FluidSequenceEngine {
             transition(text(node, "on_complete"), "succeeded");
             return running(actionTicks, "The tick-addressed input segment completed.");
         }
-        PlayerSnapshot lookSnapshot = controls.get("look_delta") instanceof Map<?, ?>
+        boolean locomotionRequested = forward != 0 || strafe != 0 || sprint ||
+            !"idle".equals(jump);
+        PlayerSnapshot lookSnapshot = locomotionRequested ||
+            controls.get("look_delta") instanceof Map<?, ?>
             ? bridge.snapshot()
             : null;
+        if (locomotionRequested) {
+            double heading = Math.toRadians(lookSnapshot.yaw());
+            double forwardX = -Math.sin(heading);
+            double forwardZ = Math.cos(heading);
+            double rightX = -Math.sin(heading + Math.PI / 2.0);
+            double rightZ = Math.cos(heading + Math.PI / 2.0);
+            double targetX = lookSnapshot.x() + forwardX * forward + rightX * strafe;
+            double targetZ = lookSnapshot.z() + forwardZ * forward + rightZ * strafe;
+            LocomotionSafetyEnvelope.Check safety = bridge.checkLocomotionSafety(
+                targetX,
+                targetZ,
+                6.0
+            );
+            if (!safety.decision().admitted()) {
+                bridge.releaseAll();
+                deviations++;
+                recordFirstFailure(
+                    node,
+                    "The sequence input segment stopped before movement because the local safety envelope refused the next step.",
+                    safety.measurements()
+                );
+                transition(text(node, "on_failure"), "failed");
+                return running(actionTicks, "The sequence input segment was refused before movement.");
+            }
+        }
         MovementInput movement = new MovementInput(
             forward > 0,
             forward < 0,
@@ -246,7 +274,7 @@ final class FluidSequenceEngine {
             }
         }
         if (
-            forward != 0 || strafe != 0 || sprint || !"idle".equals(jump) ||
+            locomotionRequested ||
             controls.get("look_delta") instanceof Map<?, ?>
         ) motionPerformed = true;
         if (controls.get("look_delta") instanceof Map<?, ?>) {

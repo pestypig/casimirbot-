@@ -1001,6 +1001,96 @@
       "from": "server/services/theory/nhm2-semiclassical-v2-scientific-root-observer.ts",
       "to": "server/services/theory/nhm2-secure-run-output-reader.ts",
       "reason": "The observer reuses the authority-neutral secure reader for exact two-pass file identity and byte observation."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-redesign-stage4-2c.ts",
+      "to": "shared/casimir-dp-apparatus-identifiability-stage4-2b.ts",
+      "reason": "Stage 4.2C redesign consumes the frozen Stage-4.2B residual, covariance, and identifiability geometry."
+    },
+    {
+      "from": "shared/casimir-dp-cross-scale-metrology-stage4-2d.ts",
+      "to": "shared/casimir-dp-apparatus-redesign-stage4-2c.ts",
+      "reason": "Stage 4.2D preserves the redesigned candidate and adds source-bounded metrology controls."
+    },
+    {
+      "from": "shared/casimir-dp-causal-cone-clock-stage4-2e.ts",
+      "to": "shared/casimir-dp-cross-scale-metrology-stage4-2d.ts",
+      "reason": "Stage 4.2E consumes the frozen cross-scale controls while adding ordinary causal and clock recoveries."
+    },
+    {
+      "from": "shared/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts",
+      "to": "shared/casimir-dp-causal-cone-clock-stage4-2e.ts",
+      "reason": "Stage 4.2F inherits the causal nonbridge and supplies the Maxwell, Green/FDT, and named-Diósi closure."
+    },
+    {
+      "from": "shared/casimir-dp-empirical-feasibility-pilot-stage4-2g.ts",
+      "to": "shared/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts",
+      "reason": "Stage 4.2G binds the Stage-4.2F model identities to one empirical handoff contract."
+    },
+    {
+      "from": "shared/casimir-dp-commissioning-intake-stage4-2h.ts",
+      "to": "shared/casimir-dp-empirical-feasibility-pilot-stage4-2g.ts",
+      "reason": "Stage 4.2H turns the unacquired pilot requirements into strict commissioning packet semantics."
+    },
+    {
+      "from": "shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts",
+      "to": "shared/casimir-dp-commissioning-intake-stage4-2h.ts",
+      "reason": "Stage 4.2I consumes the custody contract for its four-cell complex-coherence interaction estimator."
+    },
+    {
+      "from": "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts",
+      "to": "shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts",
+      "reason": "Stage 4.2J keeps Hamiltonian phase, ordinary loss, Diósi loss, and the boundary interaction as distinct lanes."
+    },
+    {
+      "from": "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
+      "to": "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts",
+      "reason": "Stage 4.2K supplies microscopic ordinary-EM controls without changing the mass-density Diósi generator."
+    },
+    {
+      "from": "shared/casimir-dp-empirical-authority-stage4-2l.ts",
+      "to": "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
+      "reason": "Stage 4.2L audits the apparatus authority required to replace Stage-4.2K screens."
+    },
+    {
+      "from": "shared/casimir-dp-apparatus-search-stage4-2m.ts",
+      "to": "shared/casimir-dp-empirical-authority-stage4-2l.ts",
+      "reason": "Stage 4.2M searches only within the fail-closed bounds inherited from Stage 4.2L."
+    },
+    {
+      "from": "shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts",
+      "to": "shared/casimir-dp-apparatus-search-stage4-2m.ts",
+      "reason": "Stage 4.2N evaluates the ordinary material/thermal null for the selected Stage-4.2M candidate."
+    },
+    {
+      "from": "shared/casimir-dp-public-data-component-validation-stage4-2o.ts",
+      "to": "shared/casimir-dp-material-thermal-ordinary-null-stage4-2n.ts",
+      "reason": "Stage 4.2O exercises bounded components on public data without promoting the Stage-4.2N synthetic apparatus null."
+    },
+    {
+      "from": "shared/casimir-dp-proper-time-worldline-closure-stage4-2p.ts",
+      "to": "shared/casimir-dp-public-data-component-validation-stage4-2o.ts",
+      "reason": "Stage 4.2P preserves public component evidence tiers while adding the apparatus-specific ordinary worldline phase budget."
+    },
+    {
+      "from": "shared/casimir-dp-superconducting-boundary-control-stage4-2q.ts",
+      "to": "shared/casimir-dp-proper-time-worldline-closure-stage4-2p.ts",
+      "reason": "Stage 4.2Q consumes the signed-phase control budget when comparing normal and superconducting boundary states."
+    },
+    {
+      "from": "shared/casimir-dp-integrated-feasibility-pilot-stage4-2r.ts",
+      "to": "shared/casimir-dp-superconducting-boundary-control-stage4-2q.ts",
+      "reason": "Stage 4.2R integrates the boundary control with seven other same-apparatus authority packets."
+    },
+    {
+      "from": "shared/casimir-dp-retarded-source-propagation-stage4-2s.ts",
+      "to": "shared/casimir-dp-integrated-feasibility-pilot-stage4-2r.ts",
+      "reason": "Stage 4.2S inherits the integrated no-go and adds the missing causal source-response authority lane."
+    },
+    {
+      "from": "shared/casimir-dp-retarded-source-propagation-stage4-2s.ts",
+      "to": "shared/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts",
+      "reason": "Stage 4.2S reuses the Maxwell/Green response contract for conserved retarded sources and ordinary complex coherence."
     }
   ]
 }

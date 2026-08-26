@@ -175,6 +175,11 @@ const artifactKindMatchesCapability = (
   const topSchema = readString(artifact?.schema);
   const topToolName =
     readString(artifact?.tool_name) ?? readString(artifact?.toolName);
+  const artifactCapability =
+    readString(artifact?.capability_key) ??
+    readString(artifact?.capability_id) ??
+    readString(payload?.capability_key) ??
+    readString(payload?.capability_id);
   const topObservation = readRecord(artifact?.observation);
   const payloadKind = readString(payload?.kind);
   const schema = readString(payload?.schema);
@@ -203,6 +208,7 @@ const artifactKindMatchesCapability = (
     payloadKind,
     schema,
     payloadToolName,
+    artifactCapability,
     observationSchema,
     actionId,
     panelId,
@@ -220,6 +226,19 @@ const artifactKindMatchesCapability = (
   const microDeckPresetDraftObservation =
     observationSchema === MICRODECK_DRAFT_OBSERVATION_SCHEMA ||
     /stage_play_micro_reasoner_prompt_preset_draft\/v1/i.test(joined);
+
+  // A current-turn governed observation packet may intentionally expose only
+  // its exact capability identity plus observation schema. Preserve that
+  // identity instead of requiring a family-specific lexical marker in the
+  // packet body (for example, `tool_observation`).
+  if (
+    artifactCapability === capability &&
+    /observation|helix\.agent_step_observation_packet\.v1|helix\.environment_connector\.probe_observation\.v1|helix\.environment_action\.observation\.v1/i.test(
+      joined,
+    )
+  ) {
+    return true;
+  }
 
   if (capability === MICRODECK_QUERY_CAPABILITY) {
     return (
@@ -2615,11 +2634,15 @@ const verifiedRuntimeLifecycleAuthority = (
   if (!lifecycle) return empty;
 
   const reduction = lifecycle.reduction;
+  // Runtime completion is the prerequisite for terminal arbitration, not a
+  // consequence of it. Requiring turn.completed here makes the pre-terminal
+  // authority check circular: the terminal writer cannot authorize the
+  // candidate until this report passes, while this report would not pass
+  // until the writer had already emitted the terminal event.
   const providerCycleCompleted = Boolean(
-    reduction.complete &&
     reduction.runtime_turn_completed &&
-    reduction.terminal_outcome === "completed" &&
     reduction.final_agent_message_event_id &&
+    reduction.post_observation_reasoning_completed &&
     reduction.pending_call_ids.length === 0,
   );
   const admittedCapabilities = new Set(reduction.admitted_capability_ids);

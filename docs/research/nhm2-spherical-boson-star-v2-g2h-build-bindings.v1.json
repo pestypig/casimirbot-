@@ -1,0 +1,26 @@
+{
+  "schema": "nhm2.g2h.fixture_build_bindings.v1",
+  "scope": "no-candidate fixture harnesses only",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "prebuild_manifest": "docs/research/nhm2-spherical-boson-star-v2-g2h-prebuild-manifest.v1.json",
+  "primary": {
+    "image": "nhm2-g2h-primary-fixture:v1",
+    "image_id": "sha256:ea6e417f94a6829e04e1217e4942139cfcc1695e858b7cfc620ea5e4364d58bb",
+    "executable_bytes": 16560,
+    "executable_sha256": "435e8cae6ed83a0d341ad53ba0573f1d850d2443a3e0347ef0ce928492150dfc",
+    "build_network": "none",
+    "executions_before_binding": 0
+  },
+  "independent": {
+    "uncontainerized_executable": ".cal/nhm2-g2h/independent-v1/tolman-vii-independent",
+    "executable_bytes": 4158336,
+    "executable_sha256": "cd40bd4f70b8f49acba8578d0821a101bc07afff30d97c283d12d5fc74cf49ed",
+    "runtime_base": "scratch",
+    "image": "nhm2-g2h-independent-fixture:v1",
+    "image_id": "sha256:f2161397cc75b1362026107a8483f5ad21989a2871e815e09c42d6ba2bfa99be",
+    "executions_before_binding": 0
+  },
+  "candidate_evaluations": 0,
+  "candidate_execution_authorized": false,
+  "candidate_roots_absent": true
+}

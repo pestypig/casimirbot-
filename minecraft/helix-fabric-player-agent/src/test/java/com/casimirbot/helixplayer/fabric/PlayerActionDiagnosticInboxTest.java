@@ -140,6 +140,66 @@ final class PlayerActionDiagnosticInboxTest {
     }
 
     @Test
+    void fullScopeAcceptsOneExactMiningTarget() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-exact-mine",
+            "action_kind", "mine",
+            "arguments", Map.of(
+                "block_id", "minecraft:iron_ore",
+                "count", 1,
+                "search_radius", 32,
+                "target_position", Map.of("x", -11, "y", 40, "z", -2)
+            ),
+            "max_duration_ticks", 200,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertEquals("mine", result.request().actionKind());
+        assertEquals(
+            Map.of("x", -11L, "y", 40L, "z", -2L),
+            result.request().arguments().get("target_position")
+        );
+    }
+
+    @Test
+    void fullScopeRejectsExactMiningWithMultipleRequestedBlocks() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-invalid-exact-mine",
+            "action_kind", "mine",
+            "arguments", Map.of(
+                "block_id", "minecraft:iron_ore",
+                "count", 2,
+                "search_radius", 32,
+                "target_position", Map.of("x", -11, "y", 40, "z", -2)
+            ),
+            "max_duration_ticks", 200,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertNull(result.request());
+        assertEquals(
+            "player_diagnostic_inbox_exact_mine_count_invalid",
+            result.failureCode()
+        );
+    }
+
+    @Test
     void fullScopeAcceptsExactPlacementPositions() throws Exception {
         Path inbox = write(Map.of(
             "schema", PlayerActionDiagnosticInbox.SCHEMA,
@@ -357,6 +417,44 @@ final class PlayerActionDiagnosticInboxTest {
         assertEquals(
             "minecraft:bat",
             ((Map<?, ?>) result.request().arguments().get("target")).get("entity_type_id")
+        );
+    }
+
+    @Test
+    void fullScopeAcceptsAnExactHostileAttackAtExtendedAcquisitionRange() throws Exception {
+        Map<String, Object> arguments = Map.ofEntries(
+            Map.entry("target_ref", "target:00dd51226cf33aa465b609dc08fa100b0ae2c3bc"),
+            Map.entry("target_entity_type_id", "minecraft:zombie"),
+            Map.entry("target_classification", "hostile"),
+            Map.entry("max_acquisition_distance", 16),
+            Map.entry("require_line_of_sight", true),
+            Map.entry("minimum_attack_cooldown", 0.9),
+            Map.entry("max_attack_pulses", 8),
+            Map.entry("max_duration_ms", 15_000),
+            Map.entry("stop_below_health", 6),
+            Map.entry("friendly_fire", false)
+        );
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-attack",
+            "action_kind", "attack",
+            "arguments", arguments,
+            "max_duration_ticks", 300,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertEquals("attack", result.request().actionKind());
+        assertEquals(16.0, result.request().arguments().get("max_acquisition_distance"));
+        assertEquals(
+            "target:00dd51226cf33aa465b609dc08fa100b0ae2c3bc",
+            result.request().arguments().get("target_ref")
         );
     }
 

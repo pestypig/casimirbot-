@@ -60,13 +60,54 @@ describe("Casimir / DP quantum-foam study badges", () => {
         "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
         "study.casimir_dp.penrose_relational_candidate_stage0",
         "study.casimir_dp.penrose_relational_correspondence_stage0_1",
+        "study.casimir_dp.composition_internal_energy_successor",
         "study.casimir_dp.claim_boundary",
       ]),
     );
-    expect(branch.badges).toHaveLength(50);
-    expect(branch.edges).toHaveLength(146);
+    expect(branch.badges).toHaveLength(51);
+    expect(branch.edges).toHaveLength(150);
     expect(branch.badges.every((badge) => badge.claimBoundary.diagnosticOnly)).toBe(true);
     expect(branch.badges.every((badge) => badge.claimBoundary.promotionAllowed === false)).toBe(true);
+  });
+
+  it("keeps the composition and internal-energy successor blocked behind a replicated positive result", () => {
+    const branch = buildCasimirDpStudyTheoryBadgesV1();
+    const successor = branch.badges.find(
+      (badge) =>
+        badge.id === "study.casimir_dp.composition_internal_energy_successor",
+    );
+    const edges = branch.edges.filter(
+      (edge) => edge.from === successor?.id || edge.to === successor?.id,
+    );
+
+    expect(successor).toEqual(expect.objectContaining({
+      level: "diagnostic_gate",
+      status: "blocked",
+      calculatorPayloads: [],
+    }));
+    expect(successor?.tags).toEqual(expect.arrayContaining([
+      "parent_positive_replication_absent",
+      "physical_acquisition_not_authorized",
+      "qcd_scheme_and_scale_required",
+      "direct_gluon_detection_not_claimed",
+      "covariant_internal_energy_source_not_registered",
+    ]));
+    expect(successor?.equations[0]?.displayLatex).toContain("\\Delta\\eta");
+    expect(successor?.assumptions.join(" ")).toContain(
+      "measured total neutral-object mass",
+    );
+    expect(successor?.assumptions.join(" ")).toContain(
+      "does not prove that QCD fields cause collapse",
+    );
+    expect(edges).toHaveLength(4);
+    expect(edges.some((edge) => edge.observableBridge != null)).toBe(false);
+    expect(edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "study.casimir_dp.composition_internal_energy_successor",
+        to: "study.casimir_dp.claim_boundary",
+        relation: "blocks",
+      }),
+    ]));
   });
 
   it("registers the Penrose candidate as a blocked Stage-0 definition with no observable bridge", () => {
@@ -1347,7 +1388,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
       "casimir_dp_stage4_2j_no_go_blocks_claim_boundary",
       "casimir_dp_stage4_2j_requires_stage4_2k_microscopic_em_closure",
     ]));
-    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges).toHaveLength(4);
     expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
     expect(incidentEdges.some((edge) => edge.relation === "derives")).toBe(false);
   });
@@ -1585,7 +1626,7 @@ describe("Casimir / DP quantum-foam study badges", () => {
       "casimir_dp_stage4_2r_empirical_authority_gap_blocks_claim_boundary",
       "casimir_dp_stage4_2r_requires_stage4_2s_retarded_source_closure",
     ]));
-    expect(incidentEdges).toHaveLength(3);
+    expect(incidentEdges).toHaveLength(4);
     expect(incidentEdges.some((edge) => edge.observableBridge != null)).toBe(false);
   });
 

@@ -1,0 +1,88 @@
+{
+  "schema": "nhm2.g2h.fixture_build_bindings.v3",
+  "scope": "no-candidate fixture harnesses only",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "repair_packet": "docs/research/nhm2-spherical-boson-star-v2-g2h-r2-flint-api-repair.md",
+  "fixture_runner": {
+    "base_path": "scripts/nhm2_g2h_run_fixtures.py",
+    "base_bytes": 6448,
+    "base_sha256": "f400d5650b9d191fa2f50ef538e696c0fe4e6796056524e9e322d632afa511b4",
+    "wrapper_path": "scripts/nhm2_g2h_run_fixtures_v3.py",
+    "wrapper_bytes": 866,
+    "wrapper_sha256": "595faed2bbd459251e46e8387245c96ee1dffeb414fe69b036c760ee58534746",
+    "exclusive_output_root": "artifacts/research/nhm2/g2h-fixtures-v3"
+  },
+  "primary": {
+    "source": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_primary_v3.c",
+    "source_bytes": 1427,
+    "source_sha256": "0443079b4edce832a7b48fd2f509905a6b83cac19b91893b9c3cae9bc79b32c5",
+    "dockerfile": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.primary.v3",
+    "dockerfile_bytes": 380,
+    "dockerfile_sha256": "10c4dbd288f805724289882fb16b0f481453c90f9752ba11867a6c99314bc6e6",
+    "base_image": "nhm2-g2h-primary-fixture:v1",
+    "base_image_id": "sha256:ea6e417f94a6829e04e1217e4942139cfcc1695e858b7cfc620ea5e4364d58bb",
+    "build_command": "docker build --network=none --no-cache -f Dockerfile.primary.v3 -t nhm2-g2h-primary-fixture:v3 .",
+    "compiler_path": "/usr/bin/x86_64-linux-gnu-gcc-12",
+    "compiler_sha256": "75e997ec62297a6484f491bae28ab0ccb489daba23e398fd10fe68e9e6f0def8",
+    "compiler_version": "gcc (Debian 12.2.0-14+deb12u1) 12.2.0",
+    "dependency_packages": {
+      "gcc": "4:12.2.0-3",
+      "libc6-dev:amd64": "2.36-9+deb12u14",
+      "libflint-arb-dev:amd64": "1:2.23.0-1+b1",
+      "libflint-dev": "2.9.0-5",
+      "libgmp-dev:amd64": "2:6.2.1+dfsg1-1.1",
+      "libmpfr-dev:amd64": "4.2.0-1"
+    },
+    "loaded_library_sha256": {
+      "libflint-arb.so.2": "186bbd5bb0a46d620b474fbe573269c8145f65706e67b1130164e77205ab0531",
+      "libflint.so.17": "bfc6a9ac22fcda76f7ad37b50f514c908b8757d984dad91b5ab2a224892c31d0",
+      "libgmp.so.10": "7376c9af0afd6e7698a64ee19de3c8a0199418664974384c70435a51c7ff7f3f",
+      "libmpfr.so.6": "699a9c255a6509956ce5c642b6fb4a6dc70a670f8eba8a0925cfdc26fc9069fa",
+      "libm.so.6": "7f2ca87f652f56b094462474b076749e90e689d0ecb9cb63c7679820b271b4e7",
+      "libc.so.6": "6b4a45352fd0c540a9c7c718f35ce8c8e46a4e482f9d3885a910c32d1a0e1421"
+    },
+    "image": "nhm2-g2h-primary-fixture:v3",
+    "image_id": "sha256:1f1453fd28eaa9a2bf65d3d501a4324d6365bbc4cd3b4dab2a64f12ca4bc2142",
+    "executable_bytes": 16920,
+    "executable_sha256": "52d5fd20fef077ce5f9866e433f7159f2fab3296b08db177d68492b975819514",
+    "build_network": "none",
+    "executions_before_binding": 0
+  },
+  "independent": {
+    "source": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_independent.rs",
+    "source_bytes": 4184,
+    "source_sha256": "5172f12298954a204c1df526e21c2ac1ddb67219aaf8896cbebc8971e82c09a0",
+    "compiler_version": "rustc 1.82.0 (f6e511eec 2024-10-15)",
+    "compiler_sha256": "193d6c727e18734edbf7303180657e96e9d5a08432002b4e6c5bbe77c60cb3e8",
+    "linker_sha256": "53d1431f141aa2f591623778152efd461806af07f4f986902861551d351cdb45",
+    "target": "x86_64-unknown-linux-musl",
+    "dependencies": [],
+    "runtime_base": "scratch",
+    "runtime_base_layers": [],
+    "image_payload_layers": [
+      "sha256:6dc2c8ef7303af949fecf49236ceb30f68c07df96e6eb3f3b42ac47b31d73f1f"
+    ],
+    "uncontainerized_executable": ".cal/nhm2-g2h/independent-v1/tolman-vii-independent",
+    "executable_bytes": 4158336,
+    "executable_sha256": "cd40bd4f70b8f49acba8578d0821a101bc07afff30d97c283d12d5fc74cf49ed",
+    "image": "nhm2-g2h-independent-fixture:v1",
+    "image_id": "sha256:f2161397cc75b1362026107a8483f5ad21989a2871e815e09c42d6ba2bfa99be",
+    "executions_before_binding": 0
+  },
+  "candidate_roots": [
+    "artifacts/research/nhm2/g2h/tolman-vii-primary-v1",
+    "artifacts/research/nhm2/g2h/tolman-vii-independent-v1"
+  ],
+  "candidate_evaluations": 0,
+  "candidate_execution_authorized": false,
+  "candidate_admitted": false,
+  "proof_implementation_complete": false,
+  "classical_proof_established": false,
+  "geometry_state_accepted": false,
+  "lanes_complete": 0,
+  "diagnostic_lamp": false,
+  "physical_viability": false,
+  "propulsion_authority": false,
+  "transport_authority": false,
+  "candidate_roots_absent": true
+}

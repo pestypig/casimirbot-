@@ -14,7 +14,8 @@ public final class EnvironmentSourceManifestFactory {
         "crop_state",
         "hazard_check",
         "inventory_check",
-        "local_map_summary"
+        "local_map_summary",
+        "perception_snapshot"
     );
 
     public static final List<String> FORBIDDEN_PROBE_TYPES = List.of(

@@ -1,0 +1,63 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v7",
+  "status": "PASS_CANDIDATE_NEUTRAL_PRIMARY_FOUNDATIONS_WITH_POSITIVE_TAIL_SCIENTIFIC_HANDLERS_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "8a0810c007f1aa8cad7145fcccb507d38c746cc454d5f6d73b5477c3dfc12bce",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v9",
+    "image_id": "sha256:3565f2af96a0c352142fe3fd3f2d9060c3ec1014e4c3a729ee7bb2301fedccc4",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 121408,
+    "executable_sha256": "6706e0b6e4fa2bf0f99e3bc2889de89b4782b756b33862d2f0a0a2bb331f8e91",
+    "positive_tail_header_sha256": "d22350f0c1b4d0bfadcca401f903b0387ff61a404286ec47669bf714b8c72158",
+    "positive_tail_cpp_sha256": "3c2d5de4d81453d319367660209e6c90d30f8ab102a4402696f906aa2204c94f"
+  },
+  "candidate_neutral_fixture_groups": {
+    "record": "PASS_2_OF_2",
+    "manifest_ingress": "PASS_5_OF_5",
+    "origin_recurrence": "PASS_3_OF_3",
+    "state_grid_codec": "PASS_8_OF_8",
+    "duty_scheduler": "PASS_5_OF_5",
+    "bulk_EKG_operator": "PASS_3_OF_3",
+    "positive_tail": "PASS_4_OF_4_MASK_15_ZERO_FIELD_MASK_63"
+  },
+  "positive_tail_scope": {
+    "positive_q_domain": "0<q<=1/255",
+    "parameter_identities": ["kappa=sqrt(1-omega^2)>0", "beta=M*(2*omega^2-1)/kappa-1"],
+    "reconstruction": ["A", "W", "Z", "m", "f", "b", "s", "sigma", "p_over_A", "p", "rho_hat", "p_r_hat"],
+    "transformed_residuals": ["mass", "lapse_ratio", "H_definition", "KG"],
+    "endpoint": "q=0_D0_and_S0_inserted_without_dividing_by_q",
+    "non_dyadic_interface_rule": "narrow_ball_containing_exact_1_over_255_accepted_only_at_width_at_most_2^-400",
+    "flat_remainder_proof_complete": false,
+    "selected_member_used": false
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "28c3e7b643ea7e1232721850360fc22960677f3d11e689fdba48a33a7e694e97",
+    "status": "PASS",
+    "checks_passed": 26,
+    "checks_total": 26
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_handlers_installed": 0,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

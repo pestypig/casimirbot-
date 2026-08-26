@@ -1,0 +1,100 @@
+{
+  "schema": "helix.minecraft.nether1.keyed_a1_action_reaction_checkpoint.v1",
+  "recorded_at": "2026-08-24T23:31:02.176Z",
+  "claim_boundary": {
+    "proves": "One authenticated keyed A1 action/evidence/re-entry cycle with exact room, player, authority, manifest, heartbeat, and presence admission.",
+    "does_not_prove": [
+      "N0 furnace composition",
+      "N0 portal ignition",
+      "N0 dimension transition or return viability",
+      "post-transition guardian behavior",
+      "durable recovery",
+      "B natural-objective terminal parity",
+      "N1-N4 Nether acceptance"
+    ]
+  },
+  "environment": {
+    "room_id": "shared_realtime_room:1ac9e158-c650-4644-8485-29974d406ef7",
+    "environment_binding_id": "environment_binding:legacy:897791b2c62787c63c0c051157f3d86ffb1fd91d",
+    "source_label": "G2 A1 Local Fabric",
+    "world_id": "minecraft:local-fabric:g2-a1",
+    "connection_status": "active",
+    "subject_ref": "environment_subject:be34276942a16281a8f2cf4084c94b5a6f4682eac9568aa9",
+    "subject_presence": "online",
+    "subject_binding_status": "active",
+    "producer_epoch_ref": "adapter_epoch:575eceef9d29379c152d19db070e29d633b67cbe"
+  },
+  "connector_readiness": {
+    "state": "ready",
+    "ready_for_actions": true,
+    "manifest_admitted": true,
+    "available_control_engines": [
+      "native_fabric",
+      "baritone"
+    ],
+    "heartbeat_status": "active",
+    "heartbeat_fresh": true,
+    "active_workflow_count": 0,
+    "controls_asserted": false,
+    "manual_input_detected": false,
+    "emergency_stop_latched": false
+  },
+  "action": {
+    "action_kind": "look_at",
+    "target_kind": "current_focus",
+    "outcome": "succeeded",
+    "summary": "The current player focus was retained.",
+    "action_request_ref": "environment_action_request:95063fd0-9946-445b-91cc-2a333508dbb8",
+    "action_execution_ref": "environment_action_execution:6bae173c-d1f9-4b86-80f2-c37aa0ee9f11",
+    "workflow_ref": "environment_action_workflow:18542117-e63f-4fd0-88cd-a4c869c5443a",
+    "evidence_ref": "environment_action_evidence:2ad90704f8e53b7cdeff555374928340f0310e503",
+    "observed_at": "2026-08-24T23:30:41.445Z",
+    "duration_ticks": 0,
+    "control_engine": "native_fabric",
+    "postconditions_satisfied": true,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "manual_override_detected": false,
+    "controls_released": true,
+    "inventory_mutation_performed": false,
+    "world_mutation_performed": false,
+    "host_access_performed": false,
+    "automatic_replay_performed": false,
+    "model_invoked": false
+  },
+  "observation": {
+    "capability": "minecraft.actor.status.read",
+    "outcome": "succeeded",
+    "summary": "Actor status read-only probe completed.",
+    "probe_request_ref": "environment_probe_request:b03d28df-da9c-47e5-a6f5-2889f63869b8",
+    "probe_attempt_ref": "environment_probe_attempt:af9bba49-24c5-4eb2-9897-25143640f475",
+    "evidence_ref": "environment_probe_evidence:f438b25ff7800090ce955d635adce1d2b2d15cc0",
+    "observed_at": "2026-08-24T23:31:02.176Z",
+    "freshness_age_ms": 160,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "game_mode": "survival",
+    "dimension": "minecraft:overworld",
+    "health": 20,
+    "food_level": 20
+  },
+  "fail_closed_presence_check": {
+    "initial_outcome": "permission_revoked",
+    "reason": "participant_not_present",
+    "repair": "Typed room presence was set to present for the authenticated owner.",
+    "retry_outcome": "succeeded"
+  },
+  "casimir_verification": {
+    "trace_id": "adapter:23021e80-8fe9-4141-b506-36c64064eaec",
+    "run_id": "2501",
+    "verdict": "PASS",
+    "first_fail": null,
+    "certificate_status": "GREEN",
+    "certificate_integrity_ok": true,
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45"
+  },
+  "credential_included": false,
+  "raw_content_included": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

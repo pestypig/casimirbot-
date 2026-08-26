@@ -5,6 +5,7 @@ import {
   HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
   helixEnvironmentDurableGoalAppendRequestSchema,
   helixEnvironmentDurableGoalObjectiveSchema,
+  helixEnvironmentDurableGoalSha256,
   type HelixEnvironmentDurableGoalProjection,
 } from "@shared/helix-environment-durable-goal";
 import { resolveEnvironmentActionAuthorityContext } from "../../environment-connectors/actions";
@@ -60,6 +61,92 @@ const objectiveJsonSchema = {
   ],
   additionalProperties: false,
 } as const;
+
+const durableGoalEventPayloadJsonSchema = {
+  type: "object",
+  description:
+    "One canonical durable-goal event payload. Use kind (not schema or event_type). For checkpoint_verified, copy observation_revision and exact evidence_refs from the fresh observation; Helix derives checkpoint_evidence_hash when omitted.",
+  properties: {
+    kind: {
+      type: "string",
+      enum: [
+        "strategy_revised", "milestone_activated", "attempt_started",
+        "attempt_settled", "semantic_wake_consumed", "checkpoint_verified",
+        "milestone_completed", "recovery_required", "authority_rebound",
+        "goal_paused", "goal_resumed", "goal_completed", "goal_canceled",
+      ],
+    },
+    strategy_summary: { type: "string" },
+    candidate_milestone_ids: { type: "array", items: { type: "string" }, maxItems: 64 },
+    supersedes_strategy_event_id: { type: ["string", "null"] },
+    milestone_id: { type: ["string", "null"] },
+    rationale: { type: "string" },
+    attempt_id: { type: "string" },
+    plan_summary: { type: "string" },
+    capability_ids: { type: "array", items: { type: "string" }, maxItems: 64 },
+    outcome: { type: "string", enum: ["succeeded", "failed", "canceled", "interrupted"] },
+    postconditions: { type: "array", maxItems: 128 },
+    failure_code: { type: ["string", "null"] },
+    mail_refs: { type: "array", items: { type: "string" }, maxItems: 64 },
+    digest_refs: { type: "array", items: { type: "string" }, maxItems: 64 },
+    observation_revision: {
+      type: "integer",
+      minimum: 0,
+      description: "Exact observation_revision copied from admitted current evidence.",
+    },
+    material_change_summary: { type: "string" },
+    checkpoint_id: { type: "string" },
+    verified_facts: { type: "object" },
+    completed_postcondition_ids: { type: "array", items: { type: "string" }, maxItems: 128 },
+    incomplete_postcondition_ids: { type: "array", items: { type: "string" }, maxItems: 128 },
+    checkpoint_evidence_hash: {
+      type: "string",
+      pattern: "^sha256:[a-f0-9]{64}$",
+      description: "Optional for checkpoint_verified; Helix deterministically derives it from the exact event facts and evidence refs when omitted.",
+    },
+    reason: { type: "string" },
+    last_recoverable_checkpoint_id: { type: ["string", "null"] },
+    superseded_producer_epoch_ref: { type: "string" },
+    fresh_observation_revision: { type: "integer", minimum: 0 },
+    recovery_checkpoint_id: { type: "string" },
+    completed_milestone_ids: { type: "array", items: { type: "string" }, maxItems: 256 },
+  },
+  required: ["kind"],
+  additionalProperties: false,
+} as const;
+
+const durableGoalEventFieldsByKind: Record<string, readonly string[]> = {
+  strategy_revised: ["strategy_summary", "candidate_milestone_ids", "supersedes_strategy_event_id"],
+  milestone_activated: ["milestone_id", "rationale"],
+  attempt_started: ["attempt_id", "milestone_id", "plan_summary", "capability_ids"],
+  attempt_settled: ["attempt_id", "milestone_id", "outcome", "postconditions", "failure_code"],
+  semantic_wake_consumed: ["mail_refs", "digest_refs", "observation_revision", "material_change_summary"],
+  checkpoint_verified: [
+    "checkpoint_id", "milestone_id", "observation_revision", "verified_facts",
+    "completed_postcondition_ids", "incomplete_postcondition_ids", "checkpoint_evidence_hash",
+  ],
+  milestone_completed: ["milestone_id", "completed_postcondition_ids"],
+  recovery_required: ["reason", "last_recoverable_checkpoint_id"],
+  authority_rebound: ["superseded_producer_epoch_ref", "fresh_observation_revision"],
+  goal_paused: ["reason"],
+  goal_resumed: ["recovery_checkpoint_id"],
+  goal_completed: ["completed_milestone_ids"],
+  goal_canceled: ["reason"],
+};
+
+const normalizeDurableGoalEventPayload = (value: unknown): unknown => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const input = value as Record<string, unknown>;
+  const kind = typeof input.kind === "string" ? input.kind : "";
+  const allowedFields = durableGoalEventFieldsByKind[kind];
+  if (!allowedFields) return value;
+  return Object.fromEntries([
+    ["kind", kind],
+    ...allowedFields
+      .filter((field) => field in input)
+      .map((field) => [field, input[field]] as const),
+  ]);
+};
 
 const commonSafetyTags = [
   "exact_room_player_world_authority",
@@ -169,7 +256,7 @@ export const environmentDurableGoalManifests: HelixWorkstationCapabilityManifest
         environment_label: { type: "string", minLength: 1, maxLength: 240 },
         goal_id: { type: "string", minLength: 1, maxLength: 320 },
         expected_revision: { type: "integer", minimum: 1 },
-        payload: { type: "object", description: "One typed helix.environment_durable_goal_event payload." },
+        payload: durableGoalEventPayloadJsonSchema,
         evidence_refs: { type: "array", items: { type: "string" }, maxItems: 256 },
       },
       required: ["goal_id", "expected_revision", "payload", "evidence_refs"],
@@ -448,14 +535,39 @@ export const executeEnvironmentDurableGoalGatewayCapability = async (input: {
         objective: parsedObjective.data,
       });
     } else if (operation === HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY) {
+      const evidenceRefs = Array.isArray(args.evidence_refs)
+        ? args.evidence_refs
+        : [];
+      const normalizedPayload = normalizeDurableGoalEventPayload(args.payload);
+      const rawPayload =
+        normalizedPayload &&
+        typeof normalizedPayload === "object" &&
+        !Array.isArray(normalizedPayload)
+          ? { ...(normalizedPayload as Record<string, unknown>) }
+          : normalizedPayload;
+      if (
+        rawPayload &&
+        typeof rawPayload === "object" &&
+        !Array.isArray(rawPayload) &&
+        rawPayload.kind === "checkpoint_verified" &&
+        !("checkpoint_evidence_hash" in rawPayload)
+      ) {
+        rawPayload.checkpoint_evidence_hash = helixEnvironmentDurableGoalSha256({
+          evidence_refs: evidenceRefs,
+          observation_revision: rawPayload.observation_revision,
+          verified_facts: rawPayload.verified_facts,
+          completed_postcondition_ids: rawPayload.completed_postcondition_ids,
+          incomplete_postcondition_ids: rawPayload.incomplete_postcondition_ids,
+        });
+      }
       const parsed = helixEnvironmentDurableGoalAppendRequestSchema.safeParse({
         action_authority_id: context.actionAuthorityId,
         subject_native_id: context.subjectNativeId,
         run_id: null,
         turn_id: input.turnId,
         expected_revision: args.expected_revision,
-        payload: args.payload,
-        evidence_refs: args.evidence_refs,
+        payload: rawPayload,
+        evidence_refs: evidenceRefs,
       });
       const goalId = typeof args.goal_id === "string" ? args.goal_id.trim() : "";
       if (!goalId || !parsed.success) return failed(input.turnId, operation, "durable_goal_event_invalid", "A goal_id, current expected revision, typed event, and exact evidence refs are required.");

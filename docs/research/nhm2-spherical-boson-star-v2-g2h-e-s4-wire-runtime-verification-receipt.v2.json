@@ -1,0 +1,111 @@
+{
+  "schema": "nhm2.g2h_e_s4.wire_runtime_verification_receipt.v2",
+  "status": "PASS_COMMON_C02_WIRE_SCALAR_RECORD_ROLE_SCIENTIFIC_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source-disjoint wire ingress, exact scalar normalization, canonical record encoding and runtime replay",
+    "current_maturity": "common role C02 complete on manufactured/adversarial fixtures",
+    "target_maturity": "input evidence for C04 fixed-budget terminal wiring",
+    "required_frozen_inputs": [
+      "wire contract c225865343ccf3c2874b59e305c70891cdd944fa3f3a88179bc55eccbf59c160",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "fixture binding 6c294a5939764a035f78aaadad61b4668407d8edbc62180eb67ea2be9a008589"
+    ],
+    "required_evidence": [
+      "two source-disjoint parser and scalar implementations",
+      "BOM, invalid UTF-8, surrogate, decoded duplicate-key, ABI-key, trailing, unsafe-integer and float rejection",
+      "arbitrary-width reduced-rational and dyadic normalization",
+      "canonical record hashing and exclusive first-failure replay",
+      "bound images/executables and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "any admitted malformed input or rejected exact fixture",
+      "shared parser/scalar source or C arithmetic in Rust",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "claiming wire closure is scientific producer closure",
+      "candidate or positive-parameter evaluation",
+      "scientific Rust execution, G3 or downstream authority"
+    ],
+    "downstream_gate_unlocked": "C04 fixed-budget counter and terminal-exhaustion wiring"
+  },
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "manifest": {"bytes": 13532, "raw_sha256": "6c294a5939764a035f78aaadad61b4668407d8edbc62180eb67ea2be9a008589"},
+    "completion_matrix": {"bytes": 10715, "raw_sha256": "b13059bde54045d46347d8a1530ae8fe5b653d0bab08b5ff629227014c3d70e3"},
+    "runtime_audit": {"bytes": 21434, "raw_sha256": "f4b6ceae94e1968715cf3766eff82271c70aca0fbeed315461ff2176a6ba241a"},
+    "completion_audit": {"bytes": 5005, "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"}
+  },
+  "primary": {
+    "main_source_sha256": "f4d6965de12969384908432d192a8a354202542f618cec881682a7defccaf77f",
+    "wire_source_sha256": "1d813b474edc69170cd98ccf1f3bd4249c541884f3f0cca41d422f9a05e72fb0",
+    "wire_header_sha256": "f3c50feb61bfa6dd8865598a6d97ca8e51a0ece0c50c0dabfc0cb93b42b1600f",
+    "image_id": "sha256:07d6e0b7ffc6231791ca6b971c75237583a6730b64270ea57f677075b3cb2b47",
+    "executable_sha256": "54f965b05c17d02239fe6a90b9fb3a696f4f636597f06d35ecd4bd1370f2fd7d",
+    "fixture": {"status": "PASS", "checks_passed": 26, "checks_total": 26},
+    "scalar_arithmetic": "GMP arbitrary-width gcd with independent grammar and dyadic normalization"
+  },
+  "independent": {
+    "main_source_sha256": "04cf542203ecdf2524069688d040de7b5d5c6de11289914c0f4a3d8d9b06aa4e",
+    "wire_source_sha256": "f3a8d7cc68f7bdada49fdf494b91388d6ccb8c27611923876743ccc9aba2556f",
+    "image_id": "sha256:ab7d8b3dbec4049cb65a823d73ac0af9f49c1c8a65c20a25ce9d55f3d091dbc4",
+    "executable_sha256": "32e2394ce97f9dec79967227a5d8fc97e0b18545917b02b96cda223becc19c25",
+    "fixture": {"status": "PASS", "checks_passed": 25, "checks_total": 25},
+    "scalar_arithmetic": "native arbitrary-width base-2^32 words and binary gcd; no FFI or C arithmetic"
+  },
+  "adversarial_classes": {
+    "valid_ascii_object": "ACCEPT",
+    "valid_raw_and_escaped_non_BMP_scalar_value": "ACCEPT",
+    "BOM": "REJECT",
+    "invalid_UTF8": "REJECT",
+    "unpaired_high_or_low_surrogate": "REJECT",
+    "direct_or_escape_alias_duplicate_key": "REJECT",
+    "nonempty_printable_ASCII_ABI_key_violation": "REJECT",
+    "trailing_JSON_value": "REJECT",
+    "unsafe_integer": "REJECT",
+    "JSON_float_or_exponent": "REJECT",
+    "integer_negative_zero_or_leading_zero_scalar": "REJECT",
+    "unreduced_rational_or_noncanonical_zero": "REJECT",
+    "even_nonzero_dyadic_or_nonzero_zero_exponent": "REJECT"
+  },
+  "runtime_audit": {
+    "status": "PASS",
+    "checks_passed": 57,
+    "checks_total": 57,
+    "source_sets_disjoint": true,
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "scientific_builder_executed": false,
+    "execution_authorized": false,
+    "authority_promoted": false
+  },
+  "completion_audit": {
+    "status": "PASS_FAIL_CLOSED_MATRIX",
+    "checks_passed": 8,
+    "checks_total": 8,
+    "common_roles_complete": 3,
+    "common_roles_required": 4,
+    "primary_scientific_roles_complete": 0,
+    "primary_scientific_roles_required": 13,
+    "independent_scientific_roles_complete": 0,
+    "independent_scientific_roles_required": 13,
+    "S4_implementation_closure": false,
+    "next_role": "C04_fixed_budget_counter_and_terminal_exhaustion"
+  },
+  "host_candidate_roots": {"primary": "absent", "independent": "absent"},
+  "authority": {
+    "receipt_is_scientific_proof": false,
+    "candidate_evaluated": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

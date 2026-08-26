@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildCasimirDpStudyTheoryBadgesV1 } from "../shared/theory/casimir-dp-study-theory-badges";
+import { buildHelixTheoryBadgeGraphV1 } from "../shared/theory/helix-theory-badge-graph";
 
 const root = process.cwd();
 const mainPath = path.resolve(root, "docs/research/casimir-dp-quantum-foam-study.md");
@@ -43,7 +44,10 @@ const coherenceFigure = readFileSync(coherenceFigurePath, "utf8");
 
 type Sidecar = {
   docPath: string;
-  entries: Array<{ equationId: string }>;
+  entries: Array<{
+    equationId: string;
+    actions?: Array<{ preferredBadgeId?: string; badgeIds?: string[] }>;
+  }>;
 };
 
 const loadSidecar = (pathname: string): Sidecar =>
@@ -245,7 +249,7 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
   });
 
   it("integrates Stage-4.2S as a causal ordinary-EM propagation closure", () => {
-    expect(main).toContain("### 5.10 Retarded-source propagation closes a missing ordinary-physics lane");
+    expect(main).toContain("### 5.10 Retarded-source propagation adds an executable ordinary-physics lane");
     expect(main).toContain("cdp-stage4-2s-retarded-radiation-field");
     expect(main).toContain("cdp-stage4-2s-propagation-scale");
     expect(main).toContain("cdp-stage4-2s-green-to-coherence");
@@ -277,7 +281,7 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     expect(main).toContain("0.007320 of the");
     expect(supplement).toContain("0.149851%");
     expect(supplement).toContain("declared-equilibrium gas gate");
-    expect(main).toContain("not a calorimetric measurement of gravitational energy");
+    expect(main).toMatch(/not a calorimetric\s+measurement of gravitational energy/);
     expect(main).toMatch(/The full\s+whitened complex estimator/);
     expect(supplement).toContain(
       "### B.12 Stage-4.2J Schrödinger, mass-density, and environment recovery",
@@ -360,6 +364,23 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
     }
   });
 
+  it("resolves every equation-action badge reference against the global graph", () => {
+    const badgeIds = new Set(buildHelixTheoryBadgeGraphV1().badges.map((badge) => badge.id));
+    for (const sourcePath of [mainSourcePath, supplementSourcePath]) {
+      const source = loadSidecar(sourcePath);
+      for (const entry of source.entries) {
+        for (const action of entry.actions ?? []) {
+          if (action.preferredBadgeId) {
+            expect(badgeIds.has(action.preferredBadgeId), `${entry.equationId}:preferredBadgeId`).toBe(true);
+          }
+          for (const badgeId of action.badgeIds ?? []) {
+            expect(badgeIds.has(badgeId), `${entry.equationId}:${badgeId}`).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
   it("preserves the long-form audit as a noncanonical supplement", () => {
     expect(supplement).toMatch(
       /^# Reproducibility Supplement: Casimir–Diósi Coherence Feasibility Program/,
@@ -387,16 +408,19 @@ describe("Casimir-Diósi article and reproducibility supplement", () => {
 
   it("keeps the canonical article connected to the live Theory Badge graph", () => {
     const graph = buildCasimirDpStudyTheoryBadgesV1();
-    expect(graph.badges).toHaveLength(50);
-    expect(graph.edges).toHaveLength(146);
+    expect(graph.badges).toHaveLength(51);
+    expect(graph.edges).toHaveLength(150);
     expect(main).toContain("QED-vacuum precedent and the gated bridge");
     expect(main).toContain("cdp-branch-conditioned-total-stress-energy");
     expect(main).toContain("cdp-boundary-metric-response-slot");
     expect(main).toContain("cdp-boundary-conditioned-coherence-extension");
     expect(main).toContain("Conditional evolutionary coherence control");
     expect(main).toContain("cdp-evolutionary-coherence-control-conditional-gate");
+    expect(main).toContain("From residual inference to an internal-energy universality successor");
+    expect(main).toContain("cdp-composition-universality-successor");
     expect(supplement).toContain("Branch-conditioned stress--metric--coherence chain");
     expect(supplement).toContain("cdp-supplement-evolutionary-coherence-control-conditional-gate");
+    expect(supplement).toContain("cdp-supplement-composition-universality-successor");
     expect(
       graph.badges.some((badge) =>
         badge.sourceRefs.some((source) =>

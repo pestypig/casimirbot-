@@ -1,0 +1,60 @@
+{
+  "authorization_record_absent": true,
+  "authorization_template_lines": [
+    "schema=nhm2.g2h_execution_authorization.v2",
+    "decision=AUTHORIZED",
+    "lane=primary",
+    "token_sha256=d54ee55da5967062bfbc080bcfb3d962b07ed69b08e4316b3973aa5b24d2ff4b",
+    "contract_sha256=30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+    "executable_sha256=666ba126413e63318275bf0861b860707ce7046bcd278c3ee73b1f65f9369028",
+    "output_root=artifacts/research/nhm2/g2h/tolman-vii-primary-v2"
+  ],
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 0,
+    "diagnostic_lamp": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "build_binding_sha256": "e7865e334dc35f795120ac1d1d0d29c7c7d965bc006eae028fa6952e5c008388",
+  "candidate_definition_changed": false,
+  "checkpoint": {
+    "bytes": 11955,
+    "command": "python scripts/nhm2_g2h_e_r1_successor_checkpoint.py --lane primary --token ec667713a193b0b70e79d851f279e53ab945ccdfc749135fbe5ee1b098f3dd09 --execute",
+    "sha256": "8de58e8a36236168eab39eb43e090a7aafe5ed7c29c983e4d5cbe1bdaffc20f5"
+  },
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "exhausted_v1": {
+    "authorization_sha256": "348dc0f0f7bedf1e825b83218f55f3a20cdf3507b1b04189a8db8618778e87f3",
+    "container_id": "ed7ed5fd641507c5457d83943489e0cc2c521a723509a76bcc1fd4668b00270c",
+    "container_required_stopped_exit": 66,
+    "invocation_sha256": "0640623244279e787b74b85980fa7d52a038f4312f006eb7100116849aaeb5c8",
+    "proposal_sha256": "bab85c219be9245b77b6a353b9aa47cebe13153107f7d46e0d0e699071feb46e",
+    "result_sha256": "44ab716de6b2657d549cc6589241fab7a728af3c5baf2e25c184911348913b0f",
+    "root_required_absent": "artifacts/research/nhm2/g2h/tolman-vii-primary-v1",
+    "stderr_sha256": "8a51fa06ab6ee3ab86f7d081f8dc62c95d81c17c86ce12b8ae05cf8519be2643",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "future_authorization_path": "artifacts/research/nhm2/g2h-authorizations/g2h-e-primary-v2.txt",
+  "future_container": "nhm2-g2h-e-primary-v2",
+  "future_execution_ledger_prefix": "artifacts/research/nhm2/g2h-executions/g2h-e-primary-v2",
+  "future_output_root": "artifacts/research/nhm2/g2h/tolman-vii-primary-v2",
+  "independent_lane": {
+    "authorization_absent": true,
+    "execution_authorized": false,
+    "output_root_absent": true
+  },
+  "no_retune": true,
+  "primary_executable_sha256": "666ba126413e63318275bf0861b860707ce7046bcd278c3ee73b1f65f9369028",
+  "primary_image_id": "sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab",
+  "repair_scope": "fixed_procfs_self_executable_descriptor_only",
+  "retry_allowed": false,
+  "schema": "nhm2.g2h_e_r1.primary_successor_proposal.v1",
+  "scientific_duties_changed": false,
+  "separate_user_authorization_required": true,
+  "stop_rule": "first persisted invocation, partial output, PASS or FAIL is immutable and exhausts this proposal",
+  "token_sha256": "d54ee55da5967062bfbc080bcfb3d962b07ed69b08e4316b3973aa5b24d2ff4b"
+}

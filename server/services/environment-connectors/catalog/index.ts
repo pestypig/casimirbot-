@@ -8,6 +8,7 @@ import {
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
   HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS,
   HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
@@ -38,6 +39,7 @@ import {
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
@@ -201,6 +203,323 @@ const minecraftPositionTargetSchema: HelixEnvironmentConstrainedJsonSchema = {
     },
   },
   required: ["target", "position"],
+  additionalProperties: false,
+};
+
+const minecraftPerceptionSnapshotOutputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    result_summary: { type: "string", maxLength: 2_000 },
+    snapshot_schema: {
+      type: "string",
+      enum: ["helix.minecraft_perception_snapshot.v1"],
+    },
+    observation_revision: { type: "integer", minimum: 0 },
+    game_tick: { type: "integer", minimum: 0 },
+    capture_duration_ms: { type: "number", minimum: 0, maximum: 2_000 },
+    dimension: { type: "string", minLength: 1, maxLength: 160 },
+    actor: {
+      type: "object",
+      properties: {
+        position: minecraftPositionSchema,
+        velocity: minecraftPositionSchema,
+        yaw: { type: "number", minimum: -360, maximum: 360 },
+        pitch: { type: "number", minimum: -90, maximum: 90 },
+        health: { type: "number", minimum: 0, maximum: 2_048 },
+        max_health: { type: "number", minimum: 0, maximum: 2_048 },
+        food_level: { type: "integer", minimum: 0, maximum: 20 },
+        air: { type: "integer", minimum: -20, maximum: 100_000 },
+        on_ground: { type: "boolean" },
+        on_fire: { type: "boolean" },
+        freezing: { type: "boolean" },
+      },
+      required: [
+        "position", "velocity", "yaw", "pitch", "health", "max_health",
+        "food_level", "air", "on_ground", "on_fire", "freezing",
+      ],
+      additionalProperties: false,
+    },
+    focus: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["miss", "block", "entity"] },
+        distance_blocks: { type: "number", minimum: 0, maximum: 6 },
+        line_of_sight: { type: "boolean" },
+        occlusion: { type: "string", enum: ["none", "block", "unknown"] },
+        block_id: { type: "string", minLength: 1, maxLength: 160 },
+        position: minecraftBlockPositionSchema,
+        aim_position: minecraftPositionSchema,
+      },
+      required: ["kind", "distance_blocks", "line_of_sight", "occlusion"],
+      additionalProperties: false,
+    },
+    entities: {
+      type: "array",
+      maxItems: 128,
+      items: {
+        type: "object",
+        properties: {
+          entity_type: { type: "string", minLength: 1, maxLength: 160 },
+          classification: {
+            type: "string",
+            enum: ["hostile", "player", "passive", "projectile", "item", "other"],
+          },
+          distance_blocks: { type: "number", minimum: 0, maximum: 512 },
+          bearing_degrees: { type: "number", minimum: -180, maximum: 180 },
+          relative_elevation_blocks: { type: "number", minimum: -512, maximum: 512 },
+          closing_speed_blocks_per_second: { type: "number", minimum: -1_000, maximum: 1_000 },
+          targeting_actor: { type: "boolean" },
+          line_of_sight: { type: "boolean" },
+          occlusion: { type: "string", enum: ["none", "block", "unknown"] },
+        },
+        required: [
+          "entity_type", "classification", "distance_blocks",
+          "bearing_degrees", "relative_elevation_blocks",
+          "closing_speed_blocks_per_second", "targeting_actor",
+          "line_of_sight", "occlusion",
+        ],
+        additionalProperties: false,
+      },
+    },
+    hazards: {
+      type: "array",
+      maxItems: 128,
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", minLength: 1, maxLength: 80 },
+          position: minecraftBlockPositionSchema,
+          distance_blocks: { type: "number", minimum: 0, maximum: 64 },
+          bearing_degrees: { type: "number", minimum: -180, maximum: 180 },
+          critical: { type: "boolean" },
+        },
+        required: ["kind", "position", "distance_blocks", "bearing_degrees", "critical"],
+        additionalProperties: false,
+      },
+    },
+    movement_candidates: {
+      type: "array",
+      minItems: 4,
+      maxItems: 4,
+      items: {
+        type: "object",
+        properties: {
+          cardinal_direction: { type: "string", enum: ["north", "south", "east", "west"] },
+          relative_direction: { type: "string", enum: ["forward", "back", "left", "right"] },
+          target_feet_position: minecraftBlockPositionSchema,
+          support_position: minecraftBlockPositionSchema,
+          support_block: { type: "string", minLength: 1, maxLength: 160 },
+          evidence_complete: { type: "boolean" },
+          feet_clear: { type: "boolean" },
+          head_clear: { type: "boolean" },
+          drop_depth_blocks: { type: "integer", minimum: 0, maximum: 7 },
+          drop_scan_complete: { type: "boolean" },
+          nearby_hazard_count: { type: "integer", minimum: 0, maximum: 1_000 },
+          nearby_fluid_count: { type: "integer", minimum: 0, maximum: 1_000 },
+          safe_candidate: { type: "boolean" },
+        },
+        required: [
+          "cardinal_direction", "relative_direction", "target_feet_position",
+          "support_position", "support_block", "evidence_complete",
+          "feet_clear", "head_clear", "drop_depth_blocks",
+          "drop_scan_complete", "nearby_hazard_count", "nearby_fluid_count",
+          "safe_candidate",
+        ],
+        additionalProperties: false,
+      },
+    },
+    navigation_frontier: {
+      type: "object",
+      properties: {
+        frontier_schema: {
+          type: "string",
+          enum: ["helix.minecraft_navigation_frontier.v1"],
+        },
+        planner: {
+          type: "string",
+          enum: ["casimirbot_native_bounded_dijkstra"],
+        },
+        movement_model: {
+          type: "array",
+          minItems: 4,
+          maxItems: 4,
+          items: {
+            type: "string",
+            enum: ["walk", "diagonal", "ascend", "descend"],
+          },
+        },
+        origin: minecraftBlockPositionSchema,
+        horizontal_radius: { type: "integer", minimum: 1, maximum: 16 },
+        vertical_radius: { type: "integer", minimum: 1, maximum: 16 },
+        reachable_foothold_count: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10_000,
+        },
+        evidence_complete: { type: "boolean" },
+        coverage_boundary_reached: { type: "boolean" },
+        route_step_limit_reached: { type: "boolean" },
+        ranked_frontiers: {
+          type: "array",
+          maxItems: 8,
+          items: {
+            type: "object",
+            properties: {
+              destination: minecraftBlockPositionSchema,
+              steps: {
+                type: "array",
+                minItems: 1,
+                maxItems: 32,
+                items: {
+                  type: "object",
+                  properties: {
+                    from: minecraftBlockPositionSchema,
+                    to: minecraftBlockPositionSchema,
+                    movement: {
+                      type: "string",
+                      enum: ["walk", "diagonal", "ascend", "descend"],
+                    },
+                    cost: { type: "integer", minimum: 1, maximum: 100 },
+                  },
+                  required: ["from", "to", "movement", "cost"],
+                  additionalProperties: false,
+                },
+              },
+              cost: { type: "integer", minimum: 1, maximum: 100_000 },
+              displacement_blocks: { type: "number", minimum: 0, maximum: 64 },
+              vertical_gain_blocks: { type: "integer", minimum: -16, maximum: 16 },
+              coverage_boundary: { type: "boolean" },
+            },
+            required: [
+              "destination", "steps", "cost", "displacement_blocks",
+              "vertical_gain_blocks", "coverage_boundary",
+            ],
+            additionalProperties: false,
+          },
+        },
+        selection_authority: {
+          type: "string",
+          enum: ["runtime_codex"],
+        },
+      },
+      required: [
+        "frontier_schema", "planner", "movement_model", "origin",
+        "horizontal_radius", "vertical_radius", "reachable_foothold_count",
+        "evidence_complete", "coverage_boundary_reached",
+        "route_step_limit_reached", "ranked_frontiers", "selection_authority",
+      ],
+      additionalProperties: false,
+    },
+    inventory: {
+      type: "object",
+      properties: {
+        item_count: { type: "integer", minimum: 0, maximum: 512 },
+        slots: {
+          type: "array",
+          maxItems: 256,
+          items: {
+            type: "object",
+            properties: {
+              slot: { type: "integer", minimum: 0, maximum: 512 },
+              item: { type: "string", minLength: 1, maxLength: 160 },
+              count: { type: "integer", minimum: 0, maximum: 100_000 },
+            },
+            required: ["slot", "item", "count"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["item_count", "slots"],
+      additionalProperties: false,
+    },
+    coverage: {
+      type: "object",
+      properties: {
+        horizontal_radius: { type: "integer", minimum: 1, maximum: 7 },
+        vertical_radius: { type: "integer", minimum: 1, maximum: 16 },
+        loaded_region_complete: { type: "boolean" },
+        unknown_cell_count: { type: "integer", minimum: 0, maximum: 10_000 },
+        entities_complete: { type: "boolean" },
+        hazards_complete: { type: "boolean" },
+        omitted_categories: {
+          type: "array",
+          maxItems: 16,
+          items: { type: "string", minLength: 1, maxLength: 80 },
+        },
+      },
+      required: [
+        "horizontal_radius", "vertical_radius", "loaded_region_complete",
+        "unknown_cell_count", "entities_complete", "hazards_complete",
+        "omitted_categories",
+      ],
+      additionalProperties: false,
+    },
+    ui_state: {
+      type: "object",
+      properties: {
+        server_container_open: { type: "boolean" },
+        same_revision: { type: "boolean" },
+        client_screen_state: { type: "string", enum: ["open", "closed", "unobserved"] },
+        input_capture_known: { type: "boolean" },
+        input_activity: { type: "boolean" },
+        client_game_tick: { type: "integer", minimum: 0 },
+        server_received_tick: { type: "integer", minimum: 0 },
+        age_ticks: { type: "integer", minimum: 0, maximum: 10 },
+        freshness: { type: "string", enum: ["fresh", "unobserved"] },
+        screen_kind: { type: "string", minLength: 1, maxLength: 160 },
+      },
+      required: [
+        "server_container_open", "same_revision", "client_screen_state",
+        "input_capture_known", "input_activity", "freshness",
+      ],
+      additionalProperties: false,
+    },
+    world_rules: {
+      type: "object",
+      properties: {
+        keep_inventory: { type: "boolean" },
+      },
+      required: ["keep_inventory"],
+      additionalProperties: false,
+    },
+    semantic_fingerprint: { type: "string", minLength: 71, maxLength: 71 },
+  },
+  required: [
+    "result_summary", "snapshot_schema", "observation_revision", "game_tick",
+    "capture_duration_ms", "dimension", "actor", "focus", "entities",
+    "hazards", "movement_candidates", "inventory", "coverage", "ui_state",
+    "world_rules", "semantic_fingerprint",
+  ],
+  additionalProperties: false,
+};
+
+const minecraftPerceptionSnapshotInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    target: {
+      type: "string",
+      enum: ["current_actor"],
+      description: "Capture the authenticated actor already selected in the room.",
+    },
+    horizontal_radius: {
+      type: "integer",
+      minimum: 1,
+      maximum: 7,
+      description: "Bounded horizontal terrain and hazard radius; defaults to 4.",
+    },
+    vertical_radius: {
+      type: "integer",
+      minimum: 2,
+      maximum: 16,
+      description: "Bounded vertical coverage and drop scan context; defaults to 8.",
+    },
+    freshness_requirement_ms: {
+      type: "integer",
+      minimum: 1_000,
+      maximum: 30_000,
+    },
+  },
+  required: ["target"],
   additionalProperties: false,
 };
 
@@ -371,6 +690,7 @@ const minecraftNearbyEntitiesOutputSchema: HelixEnvironmentConstrainedJsonSchema
           type: "object",
           properties: {
             entity_type: { type: "string", maxLength: 160 },
+            entity_label: { type: "string", maxLength: 160 },
             classification: {
               type: "string",
               enum: ["hostile", "player", "passive", "projectile", "other"],
@@ -381,6 +701,12 @@ const minecraftNearbyEntitiesOutputSchema: HelixEnvironmentConstrainedJsonSchema
               maximum: 1_024,
             },
             targeting_actor: { type: "boolean" },
+            health: { type: "number", minimum: 0, maximum: 2_147_483_647 },
+            max_health: {
+              type: "number",
+              minimum: 0,
+              maximum: 2_147_483_647,
+            },
           },
           required: [
             "entity_type",
@@ -1413,6 +1739,43 @@ const minecraftInteractInputSchema: HelixEnvironmentConstrainedJsonSchema = {
   additionalProperties: false,
 };
 
+const minecraftCombatAttackInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["attack"] },
+    target_ref: {
+      type: "string",
+      minLength: 1,
+      maxLength: 320,
+      description:
+        "Opaque exact entity-incarnation reference from a prior target-lock receipt. The connector may not replace it with the nearest or crosshair entity.",
+    },
+    target_entity_type_id: { type: "string", minLength: 3, maxLength: 320 },
+    target_classification: { type: "string", enum: ["hostile"] },
+    max_acquisition_distance: { type: "number", minimum: 1, maximum: 16 },
+    require_line_of_sight: { type: "boolean", enum: [true] },
+    minimum_attack_cooldown: { type: "number", minimum: 0.1, maximum: 1 },
+    max_attack_pulses: { type: "integer", minimum: 1, maximum: 64 },
+    max_duration_ms: { type: "integer", minimum: 1_000, maximum: 60_000 },
+    stop_below_health: { type: "number", minimum: 1, maximum: 20 },
+    friendly_fire: { type: "boolean", enum: [false] },
+  },
+  required: [
+    "action_kind",
+    "target_ref",
+    "target_entity_type_id",
+    "target_classification",
+    "max_acquisition_distance",
+    "require_line_of_sight",
+    "minimum_attack_cooldown",
+    "max_attack_pulses",
+    "max_duration_ms",
+    "stop_below_health",
+    "friendly_fire",
+  ],
+  additionalProperties: false,
+};
+
 const minecraftHotbarInputSchema: HelixEnvironmentConstrainedJsonSchema = {
   type: "object",
   properties: {
@@ -1496,6 +1859,11 @@ const minecraftMineInputSchema: HelixEnvironmentConstrainedJsonSchema = {
       maximum: 32,
       description:
         "Bounded loaded-client search radius for the native Fabric engine.",
+    },
+    target_position: {
+      ...minecraftBlockPositionSchema,
+      description:
+        "Optional exact loaded block to mine. Requires count 1 and a current block_id match inside search_radius.",
     },
   },
   required: ["action_kind", "block_id", "count", "search_radius"],
@@ -2117,6 +2485,7 @@ const minecraftFluidEmbeddedActionInputSchema: HelixEnvironmentConstrainedJsonSc
           block_id: { type: "string", minLength: 1, maxLength: 320 },
           count: { type: "integer", minimum: 1, maximum: 4_096 },
           search_radius: { type: "integer", minimum: 1, maximum: 32 },
+          target_position: minecraftBlockPositionSchema,
         },
         ["action_kind", "block_id", "count", "search_radius"],
       ),
@@ -3081,6 +3450,19 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     timeoutCeilingMs: 30_000,
   }),
   descriptor({
+    capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+    capabilityVersion: 1,
+    domain: "minecraft",
+    adapterProfileIds: [HELIX_MINECRAFT_ADAPTER_PROFILE_ID],
+    label: "Read one bounded Minecraft perception snapshot",
+    description:
+      "Capture actor, focus, inventory, directional terrain, drop/fluid hazards, nearby-entity bearings and motion, coverage gaps, and known UI state from one server-thread game revision. Client-only UI state remains explicitly unobserved until companion evidence is joined; unknown coverage never means safe.",
+    inputSchema: minecraftPerceptionSnapshotInputSchema,
+    outputSchema: minecraftPerceptionSnapshotOutputSchema,
+    freshnessCeilingMs: 30_000,
+    timeoutCeilingMs: 30_000,
+  }),
+  descriptor({
     capabilityId: HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
     domain: "minecraft",
     adapterProfileIds: [HELIX_MINECRAFT_ADAPTER_PROFILE_ID],
@@ -3175,6 +3557,14 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
       "Use or interact with the block or entity currently under the paired player's crosshair using the selected hand.",
     inputSchema: minecraftInteractInputSchema,
     timeoutCeilingMs: 15_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+    label: "Attack one exact hostile Minecraft entity",
+    description:
+      "Use the normal vanilla client attack path against one previously locked hostile entity incarnation. Requires current line of sight, reach and cooldown; refuses substitutions and friendly fire; reports hurt, health and death transitions.",
+    inputSchema: minecraftCombatAttackInputSchema,
+    timeoutCeilingMs: 60_000,
   }),
   actionDescriptor({
     capabilityId: HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
@@ -3303,7 +3693,9 @@ const builtinPackages: BuiltinEnvironmentConnectorPackage[] = [
           HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS as readonly string[]
         ).includes(entry.capability_id) &&
         entry.capability_id !==
-          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY &&
+        entry.capability_id !==
+          HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
     ),
   },
   {
@@ -3425,6 +3817,8 @@ export const legacyProbeTypeForEnvironmentCapability = (
     case HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY:
     case HELIX_SYNTHETIC_REACHABILITY_CAPABILITY:
       return "reachability";
+    case HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY:
+      return "perception_snapshot";
     case HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY:
       return "registry_fact";
     case HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY:

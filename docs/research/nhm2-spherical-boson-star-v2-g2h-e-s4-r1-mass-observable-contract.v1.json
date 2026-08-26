@@ -1,0 +1,126 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.mass_observable_contract.v1",
+  "status": "draft_unsealed_exact_ADM_Komar_and_integrated_mass_maps_no_scientific_mass_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "geometrized ADM, Komar and integrated-energy mass observable definitions and equality residuals",
+    "current_maturity": "source convention recovered, exact executable maps previously unbound",
+    "target_maturity": "independently audited common-unit mass ABI suitable for disjoint fixture producers",
+    "required_frozen_inputs": [
+      "R2 metric, rho,p_r,p_t and mbar_P=1 conventions",
+      "G=1/(8*pi)",
+      "b^-2=1-2*m/r",
+      "alpha=1/(b*s)",
+      "normalized asymptotic alpha and s"
+    ],
+    "required_evidence": [
+      "exact m-prime derivation",
+      "ADM boundary map",
+      "Komar boundary and volume maps",
+      "integrated coordinate-energy map",
+      "common interval and identity-residual predicates",
+      "manufactured Schwarzschild and compact-source fixtures",
+      "zero candidate evaluation"
+    ],
+    "stop_fail_criteria": [
+      "mixing physical mass with geometrized length",
+      "using proper-volume matter energy as the frozen integrated mass",
+      "omitting the normalized lapse factor from Komar mass",
+      "a boundary/tail remainder or equality residual missing",
+      "candidate evaluation, root creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "claiming material or apparatus source closure",
+      "computing the selected-member mass",
+      "radial stability",
+      "quantum products",
+      "physical viability, propulsion or transport"
+    ],
+    "downstream_gate_unlocked": "mass-observable portion of classical definition completeness after independent audit"
+  },
+  "semantic_change_class": "additive_scientific_convention_and_observable_semantics_R2_unchanged",
+  "immutable_predecessor": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a", "mutated": false},
+  "units_and_mass_symbol": {
+    "newton_constant": "G=1/(8*pi) from mbar_P=1",
+    "physical_to_geometrized": "m=G*M_phys",
+    "metric_definition": "b(r)^(-2)=1-2*m(r)/r",
+    "all_reported_mass_intervals": "geometrized length units",
+    "physical_mass_export": "forbidden in this control ABI unless a later SI contract explicitly applies M_phys=m/G"
+  },
+  "misner_sharp_and_ADM": {
+    "finite_radius": "m(r)=r*(1-b(r)^(-2))/2, with m(0)=0 by regular extension",
+    "field_equation_identity": "m'(r)=r^2*rho(r)/2",
+    "ADM_boundary": "M_ADM=lim_(r->infinity) m(r)=lim r*(1-b^-2)/2",
+    "positive_tail": "M_ADM is the exact positive-chart scalar M after the full tail remainder is included",
+    "vacuum_chart": "M_ADM=epsilon*Mbar_infinity, where Mbar_infinity=integral xi^2*R/2 dxi",
+    "tail_requirement": "the boundary limit and omitted infinite-coefficient remainder are outward enclosed"
+  },
+  "integrated_energy_mass": {
+    "definition": "M_energy=(1/2)*integral_0^infinity r^2*rho(r) dr",
+    "meaning": "the geometrized mass-source integral selected by the exact Misner-Sharp equation; it is not the proper-volume matter energy",
+    "proper_volume_comparator": "(1/2)*integral b*r^2*rho dr is logged only as a binding-energy diagnostic and is not one of the three R2-C09 equality masses",
+    "identity": "M_energy=M_ADM follows from m(0)=0, the mass equation and the certified infinity limit"
+  },
+  "Komar_mass": {
+    "killing_field": "xi^a=(partial_t)^a normalized by alpha(infinity)=1",
+    "unit_normal": "n^a=alpha^-1*xi^a",
+    "boundary": "M_Komar=lim_(r->infinity) r^2*alpha'(r)/b(r)",
+    "volume": "M_Komar=integral_0^infinity alpha*b*r^2*(rho+p_r+2*p_t) dr=integral r^2*(rho+p_r+2*p_t)/s dr",
+    "stress_combination": "rho+p_r+2*p_t=2*b^2*s^2*omega^2*sigma^2-sigma^2",
+    "identity": "the boundary and volume maps agree by the static Einstein lapse equation, regular origin and normalized infinity",
+    "sign_and_normalization": "no absolute value, factor-of-two substitution or unnormalized time coordinate is permitted"
+  },
+  "validated_evaluation": {
+    "core": "directed coefficient integration after exact r/y or xi/Y coordinate conversion and origin parity reconstruction",
+    "tail": "directed integration of the factored carrier, formal germ and flat remainder through the frozen infinity endpoint",
+    "quadrature_rule": "each producer's independently hash-bound validated integration algorithm may differ, but must enclose the same exact improper integrals",
+    "boundary_rule": "boundary and volume forms are both required; one cannot be substituted for a missing other form",
+    "nonfinite": "any invalid denominator, nonintegrable remainder, missing tail bound or nonfinite ball is FAIL"
+  },
+  "agreement_predicates": {
+    "ordered_mass_balls": ["M_ADM", "M_Komar_boundary", "M_Komar_volume", "M_energy"],
+    "common_interval": "the closed intersection of all four outward balls is nonempty",
+    "identity_residuals": ["M_ADM-M_energy", "M_Komar_boundary-M_Komar_volume", "M_ADM-M_Komar_boundary"],
+    "identity_rule": "each residual ball contains exact zero and has width <=2^-400 under the frozen R2 identity rule",
+    "positivity": "the common mass interval has a strictly positive lower endpoint for a nonvacuum member; the exact vacuum mass is zero",
+    "failure": "empty intersection, a residual excluding zero or excessive width is terminal at R2-C09"
+  },
+  "record_abi": {
+    "role": "classical_mass_observables",
+    "required_fields": ["all source/runtime/operator bindings", "four mass balls", "three equality residuals", "common intersection", "proper-volume diagnostic ball", "core and tail contribution balls", "boundary remainder balls", "first failure"],
+    "wire": "S4-R1 canonical wire/record contract",
+    "cross_lane": "primary and independent common mass intersections must overlap; intermediate quadrature partitions need not be identical"
+  },
+  "fixture_boundary": {
+    "allowed": ["Schwarzschild exterior boundary identity", "manufactured compact smooth rho and pressures", "vacuum zero", "factor-of-two, lapse-normalization, empty-intersection and tail-omission failures"],
+    "forbidden": ["selected-member evaluation", "positive continuation sample", "candidate-root creation", "apparatus interpretation", "authority promotion"]
+  },
+  "readiness": {
+    "mass_unit_complete": true,
+    "ADM_map_complete": true,
+    "Komar_maps_complete": true,
+    "integrated_map_complete": true,
+    "agreement_predicates_complete": true,
+    "fixture_audit_complete": false,
+    "independent_definition_audit_complete": false,
+    "scientific_mass_computed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_mass_evaluation": false,
+    "definition_is_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  },
+  "source": {"url": "https://arxiv.org/abs/2601.05129", "use": "areal-gauge mass definition and static stress conventions; all normalization factors are rederived in repository conventions"}
+}

@@ -60,6 +60,44 @@ final class FluidSequenceEngineTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void inputSegmentRefusesUnsafeLandingWithoutClaimingMotion() {
+        FakeBridge bridge = new FakeBridge();
+        bridge.locomotionSafety = new LocomotionSafetyEnvelope.Check(
+            LocomotionSafetyEnvelope.Decision.refuse("locomotion_predicted_drop_exceeded"),
+            Map.of(
+                "reason_code", "locomotion_predicted_drop_exceeded",
+                "effect_prevented", true,
+                "predicted_drop_blocks", 3.0,
+                "controls_released", true
+            )
+        );
+        FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+        engine.begin(sequence(
+            "node:input",
+            List.of(),
+            List.of(
+                inputNode("node:input", "node:succeeded", "node:failed", 2),
+                terminal("node:succeeded", "succeeded"),
+                terminal("node:failed", "failed")
+            )
+        ));
+
+        assertEquals(WorkflowStepStatus.RUNNING, engine.step(1).status());
+        WorkflowStep terminal = engine.step(2);
+
+        assertEquals(WorkflowStepStatus.FAILED, terminal.status());
+        assertFalse(bridge.movement.forward());
+        assertTrue(bridge.released);
+        assertEquals(false, terminal.measurements().get("player_motion_performed"));
+        Map<String, Object> failure = (Map<String, Object>) terminal
+            .measurements()
+            .get("first_failure_measurements");
+        assertEquals("locomotion_predicted_drop_exceeded", failure.get("reason_code"));
+        assertEquals(true, failure.get("effect_prevented"));
+    }
+
+    @Test
     void reusesTheProductionControllerForEmbeddedActions() {
         SequenceBridge bridge = new SequenceBridge();
         FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
@@ -532,6 +570,11 @@ final class FluidSequenceEngineTest {
         protected int selectedSlot = -1;
         protected boolean worldCondition;
         protected Map<String, Object> startedArguments = Map.of();
+        protected LocomotionSafetyEnvelope.Check locomotionSafety =
+            new LocomotionSafetyEnvelope.Check(
+                LocomotionSafetyEnvelope.Decision.admit(),
+                Map.of("reason_code", "locomotion_safety_admitted")
+            );
 
         @Override
         public PlayerSnapshot snapshot() {
@@ -542,6 +585,15 @@ final class FluidSequenceEngineTest {
         public void applyMovement(MovementInput movement) {
             this.movement = movement;
             released = false;
+        }
+
+        @Override
+        public LocomotionSafetyEnvelope.Check checkLocomotionSafety(
+            double targetX,
+            double targetZ,
+            double minimumHealth
+        ) {
+            return locomotionSafety;
         }
 
         @Override

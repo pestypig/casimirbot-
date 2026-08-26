@@ -35,13 +35,14 @@ final class FabricManifestContractTest {
                 "hazard_check",
                 "inventory_check",
                 "local_map_summary",
+                "perception_snapshot",
                 "spatial_region",
                 "registry_fact",
                 "recipe_fact"
             ),
             manifest.get("supported_probe_types")
         );
-        assertEquals(11, ((List<?>) manifest.get("supported_probe_types")).size());
+        assertEquals(12, ((List<?>) manifest.get("supported_probe_types")).size());
         Map<String, Object> execution = HelixJson.asObject(
             manifest.get("execution_policy")
         );
@@ -50,7 +51,7 @@ final class FabricManifestContractTest {
     }
 
     @Test
-    void loadsOnIntegratedAndDedicatedFabricWithoutAClientEntrypoint()
+    void loadsACommonServerEntrypointAndAnOptionalClientPerceptionEntrypoint()
         throws Exception {
         try (
             InputStream input = getClass()
@@ -68,7 +69,7 @@ final class FabricManifestContractTest {
                 metadata.get("entrypoints")
             );
             assertTrue(entrypoints.containsKey("main"));
-            assertFalse(entrypoints.containsKey("client"));
+            assertTrue(entrypoints.containsKey("client"));
         }
     }
 }

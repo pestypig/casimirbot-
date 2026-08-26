@@ -23,6 +23,7 @@ public final class ProbeContractGuard {
         "hazard_check",
         "local_map_summary",
         "spatial_region",
+        "perception_snapshot",
         "registry_fact",
         "recipe_fact"
     );

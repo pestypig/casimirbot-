@@ -1,0 +1,148 @@
+{
+  "schema": "nhm2.g2h_e_s5_a.metric_borel_system.v1",
+  "status": "draft_unsealed_exact_derived_metric_system_no_global_bounds_or_implementation_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "positive/vacuum D,S,K Borel-plane companion systems and exact nonlinear source transform",
+    "current_maturity": "candidate-neutral exact symbolic definition derived from the frozen triangular recurrences",
+    "target_maturity": "independently audited additive input for directed Gevrey/Borel norm bounds through state order two",
+    "required_frozen_inputs": [
+      "universal scalar Borel proposal nhm2.g2h_e_s5_a.universal_scalar_borel_system.v1",
+      "positive-tail contract 363818f51349f844105bdb1ddb26fdd06cfdc62da4f2450ca2ab36fb22ec68bf",
+      "state/grid v2 cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c",
+      "strict kappa and formal-metric margins"
+    ],
+    "required_evidence": [
+      "exact recurrence-to-Borel transformation",
+      "exact derivative-convolution product identity",
+      "positive-ray denominator exclusion",
+      "global type and state-derivative bounds",
+      "zero candidate ingress"
+    ],
+    "stop_fail_criteria": [
+      "ordinary products are substituted for Borel derivative-convolution",
+      "a source factor or chart normalization is omitted",
+      "2*kappa+t touches zero on the integration ray",
+      "polynomial prefactors are hidden from tail bounds",
+      "candidate evaluation, selector creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "sealing a Borel or Laplace prescription",
+      "selecting a truncation order",
+      "loading the selected member",
+      "implementing or executing C08",
+      "changing frozen equations or authority"
+    ],
+    "downstream_gate_unlocked": "none until independent acknowledgement and quantitative bounds close"
+  },
+  "semantic_class": {
+    "derived_from_frozen_equations": true,
+    "frozen_equations_changed": false,
+    "normalization_changed": false,
+    "summation_prescription_selected": false,
+    "implementation_authorized": false
+  },
+  "borel_product": {
+    "name": "derivative_convolution",
+    "notation": "F diamond G",
+    "definition": "(F diamond G)(t)=d/dt integral_0^t F(s)*G(t-s) ds",
+    "identity": "Borel[f*g]=Borel[f] diamond Borel[g] for ordinary formal-series multiplication",
+    "commutative": true,
+    "unit": "1",
+    "pointwise_product_substitution_allowed": false
+  },
+  "common_scalar_inputs": {
+    "BH": "Borel[H] from the universal scalar system",
+    "JH": "integral_0^t BH(s) ds",
+    "BK": "BH'+t*BH''",
+    "BP": "-(kappa+t)*BH+(beta+1)*JH",
+    "H2": "BH diamond BH",
+    "P2": "BP diamond BP",
+    "F": "Borel[f0]=1-2*mu*t",
+    "E1": "Borel[1/f0]=exp(2*mu*t)",
+    "E2": "Borel[1/f0^2]=(1+2*mu*t)*exp(2*mu*t)"
+  },
+  "common_metric_operator": {
+    "BD": "Borel[D]",
+    "BS": "Borel[S]",
+    "JD": "integral_0^t BD(s) ds",
+    "JS": "integral_0^t BS(s) ds",
+    "D_equation": "(2*kappa+t)*BD-(2*beta+3)*JD=BRD",
+    "S_equation": "(2*kappa+t)*BS-(2*beta+2)*JS=BRS",
+    "integral_equations": ["JD'=BD", "JS'=BS", "JD(0)=JS(0)=0"],
+    "solved_form": [
+      "BD=(BRD+(2*beta+3)*JD)/(2*kappa+t)",
+      "BS=(BRS+(2*beta+2)*JS)/(2*kappa+t)"
+    ],
+    "positive_ray_margin": "2*kappa+t>0 for t>=0 when kappa>0",
+    "nonzero_operator_singularity": "t=-2*kappa"
+  },
+  "positive_sources": {
+    "chart_parameters": ["mu=M", "omega^2=1-kappa^2"],
+    "BRD": "(omega^2*(E1 diamond H2)+(F diamond P2)+H2)/4",
+    "BRS": "(omega^2*(E2 diamond H2)+P2)/2",
+    "origin_values": [
+      "BRD(0)=h0^2/2=2*kappa*d0",
+      "BRS(0)=h0^2/2=2*kappa*e0"
+    ]
+  },
+  "vacuum_sources": {
+    "chart_parameters": [
+      "mu=eta*Mbar_infinity",
+      "a=1+2*eta*Nbar=1-eta*kappa^2"
+    ],
+    "BRD": "(a*(E1 diamond H2)+eta*(F diamond P2)+H2)/2",
+    "BRS": "a*(E2 diamond H2)+eta*P2",
+    "origin_values": [
+      "BRD(0)=h0^2=2*kappa*d0",
+      "BRS(0)=h0^2=2*kappa*e0"
+    ]
+  },
+  "growth_structure": {
+    "scalar_candidate_type": "2*mu",
+    "E1_and_E2_type": "2*mu with E2 carrying a degree-one polynomial prefactor",
+    "derivative_convolution_rule": "equal exponential types remain the same type and acquire at most polynomial prefactors",
+    "candidate_metric_type": "2*mu with additional polynomial prefactors",
+    "positive_ray_denominators": ["t*(t+2*kappa) for scalar B'', away from the regular origin", "t+2*kappa for D and S"],
+    "global_type_bound_proved": false,
+    "directed_polynomial_prefactor_bound_proved": false
+  },
+  "state_derivative_obligations": {
+    "maximum_order": 2,
+    "required_inputs": [
+      "kappa/beta directed value, gradient and Hessian",
+      "vacuum dependent Mbar_infinity value, gradient and Hessian",
+      "differentiated scalar Borel solution",
+      "differentiated derivative-convolutions",
+      "differentiated positive-ray denominator margins"
+    ],
+    "mixed_terms_may_be_omitted": false,
+    "complete": false
+  },
+  "readiness": {
+    "exact_borel_product_defined": true,
+    "K_and_P_transforms_derived": true,
+    "common_D_S_operator_derived": true,
+    "positive_sources_derived": true,
+    "vacuum_sources_derived": true,
+    "positive_ray_operator_zero_excluded_under_strict_kappa": true,
+    "global_growth_proved": false,
+    "state_derivatives_proved": false,
+    "directed_quadrature_defined": false,
+    "independently_acknowledged": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "document_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

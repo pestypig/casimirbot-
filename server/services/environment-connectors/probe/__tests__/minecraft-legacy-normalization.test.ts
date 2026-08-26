@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
   HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
@@ -46,6 +47,171 @@ const result = (
 });
 
 describe("Minecraft legacy probe normalization", () => {
+  it("normalizes one same-revision perception snapshot and preserves explicit UI unknowns", () => {
+    const details = {
+      snapshot_schema: "helix.minecraft_perception_snapshot.v1",
+      observation_revision: 420,
+      game_tick: 420,
+      capture_duration_ms: 3.25,
+      dimension: "minecraft:overworld",
+      actor: {
+        position: { x: 1.5, y: 64, z: -2.5 },
+        velocity: { x: 0.1, y: 0, z: -0.2 },
+        yaw: 90,
+        pitch: 4,
+        health: 18,
+        max_health: 20,
+        food_level: 16,
+        air: 300,
+        on_ground: true,
+        on_fire: false,
+        freezing: false,
+      },
+      focus: {
+        kind: "block",
+        distance_blocks: 3.5,
+        line_of_sight: true,
+        occlusion: "none",
+        block_id: "minecraft:stone",
+        position: { x: 4, y: 64, z: -2 },
+        aim_position: { x: 4.5, y: 64.5, z: -1.5 },
+      },
+      entities: [{
+        entity_type: "minecraft:zombie",
+        classification: "hostile",
+        distance_blocks: 6,
+        bearing_degrees: -35,
+        relative_elevation_blocks: 0,
+        closing_speed_blocks_per_second: 2.5,
+        targeting_actor: true,
+        line_of_sight: false,
+        occlusion: "block",
+      }],
+      hazards: [{
+        kind: "lava",
+        position: { x: 2, y: 63, z: -2 },
+        distance_blocks: 1.25,
+        bearing_degrees: 12,
+        critical: true,
+      }],
+      movement_candidates: ["forward", "right", "back", "left"].map(
+        (relative_direction, index) => ({
+          cardinal_direction: ["south", "west", "north", "east"][index],
+          relative_direction,
+          target_feet_position: { x: index, y: 64, z: 0 },
+          support_position: { x: index, y: 63, z: 0 },
+          support_block: index === 0 ? "minecraft:stone" : "helix:unobserved",
+          evidence_complete: index === 0,
+          feet_clear: index === 0,
+          head_clear: index === 0,
+          drop_depth_blocks: index === 0 ? 0 : 7,
+          drop_scan_complete: index === 0,
+          nearby_hazard_count: 0,
+          nearby_fluid_count: 0,
+          safe_candidate: index === 0,
+        }),
+      ),
+      navigation_frontier: {
+        frontier_schema: "helix.minecraft_navigation_frontier.v1",
+        planner: "casimirbot_native_bounded_dijkstra",
+        movement_model: ["walk", "diagonal", "ascend", "descend"],
+        origin: { x: 1, y: 64, z: -3 },
+        horizontal_radius: 4,
+        vertical_radius: 6,
+        reachable_foothold_count: 12,
+        evidence_complete: true,
+        coverage_boundary_reached: false,
+        route_step_limit_reached: false,
+        ranked_frontiers: [{
+          destination: { x: 1, y: 65, z: -2 },
+          steps: [{
+            from: { x: 1, y: 64, z: -3 },
+            to: { x: 1, y: 65, z: -2 },
+            movement: "ascend",
+            cost: 16,
+          }],
+          cost: 16,
+          displacement_blocks: 1.41,
+          vertical_gain_blocks: 1,
+          coverage_boundary: false,
+        }],
+        selection_authority: "runtime_codex",
+      },
+      inventory: {
+        item_count: 1,
+        slots: [{ slot: 0, item: "minecraft:iron_pickaxe", count: 1 }],
+      },
+      coverage: {
+        horizontal_radius: 4,
+        vertical_radius: 8,
+        loaded_region_complete: false,
+        unknown_cell_count: 153,
+        entities_complete: true,
+        hazards_complete: true,
+        omitted_categories: ["client_screen", "manual_input"],
+      },
+      ui_state: {
+        server_container_open: false,
+        same_revision: false,
+        client_screen_state: "unobserved",
+        input_capture_known: false,
+        input_activity: false,
+        freshness: "unobserved",
+      },
+      world_rules: {
+        keep_inventory: false,
+      },
+      semantic_fingerprint: `sha256:${"a".repeat(64)}`,
+      connector_private_field: "must-not-leak",
+    };
+    const normalized = normalizeLegacyEnvironmentProbeResultForTests(
+      result("perception_snapshot", { confidence: 0.95, details }),
+    );
+    const descriptor = readEnvironmentConnectorCapabilityDescriptor(
+      HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+    );
+
+    expect(normalized).not.toHaveProperty("connector_private_field");
+    expect(normalized).toMatchObject({
+      observation_revision: 420,
+      game_tick: 420,
+      coverage: {
+        loaded_region_complete: false,
+        unknown_cell_count: 153,
+      },
+      ui_state: {
+        client_screen_state: "unobserved",
+        input_capture_known: false,
+        same_revision: false,
+      },
+      world_rules: {
+        keep_inventory: false,
+      },
+      navigation_frontier: {
+        planner: "casimirbot_native_bounded_dijkstra",
+        reachable_foothold_count: 12,
+        selection_authority: "runtime_codex",
+        ranked_frontiers: [expect.objectContaining({
+          vertical_gain_blocks: 1,
+          steps: [expect.objectContaining({ movement: "ascend" })],
+        })],
+      },
+    });
+    expect(normalized.movement_candidates).toEqual(
+      expect.arrayContaining([expect.objectContaining({
+        relative_direction: "forward",
+        drop_depth_blocks: 0,
+        safe_candidate: true,
+      })]),
+    );
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        descriptor!.output_schema,
+        normalized,
+      ),
+    ).toEqual([]);
+  });
+
   it.each([
     [
       "actor_status",
@@ -129,9 +295,12 @@ describe("Minecraft legacy probe normalization", () => {
           entities: [
             {
               entity_type: "minecraft:zombie",
+              entity_label: "Zombie",
               classification: "hostile",
               distance_blocks: 6.25,
               targeting_actor: true,
+              health: 18,
+              max_health: 20,
             },
           ],
           mechanics_state: {
@@ -152,9 +321,12 @@ describe("Minecraft legacy probe normalization", () => {
         entities: [
           {
             entity_type: "minecraft:zombie",
+            entity_label: "Zombie",
             classification: "hostile",
             distance_blocks: 6.25,
             targeting_actor: true,
+            health: 18,
+            max_health: 20,
           },
         ],
       },

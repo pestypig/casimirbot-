@@ -1,0 +1,90 @@
+{
+  "schema": "nhm2.g2h_e.primary_result.v1",
+  "decision": "PARTIAL_EXECUTION_PRE_MATH_SELF_IDENTITY_FAIL",
+  "proposal_sha256": "bab85c219be9245b77b6a353b9aa47cebe13153107f7d46e0d0e699071feb46e",
+  "checkpoint_sha256": "531fe27b3fcd064f11ea612a9b01e41bfc6c372ef147e0fcdd1f9d644e844e61",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "authorization": {
+    "path": "artifacts/research/nhm2/g2h-authorizations/g2h-e-primary-v1.txt",
+    "bytes": 380,
+    "sha256": "348dc0f0f7bedf1e825b83218f55f3a20cdf3507b1b04189a8db8618778e87f3",
+    "decision": "AUTHORIZED",
+    "lane": "primary"
+  },
+  "runtime": {
+    "image": "nhm2-g2h-primary-proof:v1",
+    "image_id": "sha256:d074caaa8fb84e8b0c06d5e675e06f62c2223c3fb3b97588872f67b10403ae92",
+    "container_name": "nhm2-g2h-e-primary-v1",
+    "container_id": "ed7ed5fd641507c5457d83943489e0cc2c521a723509a76bcc1fd4668b00270c",
+    "exit_code": 66,
+    "oom_killed": false,
+    "network_mode": "none",
+    "readonly_rootfs": true,
+    "cap_drop": [
+      "ALL"
+    ],
+    "pids_limit": 64,
+    "memory_bytes": 2147483648,
+    "restart_policy": "no"
+  },
+  "immutable_ledger": {
+    "root": "artifacts/research/nhm2/g2h-executions",
+    "files": [
+      {
+        "name": "g2h-e-primary-v1-invocation.json",
+        "bytes": 515,
+        "sha256": "0640623244279e787b74b85980fa7d52a038f4312f006eb7100116849aaeb5c8"
+      },
+      {
+        "name": "g2h-e-primary-v1-result.json",
+        "bytes": 290,
+        "sha256": "44ab716de6b2657d549cc6589241fab7a728af3c5baf2e25c184911348913b0f"
+      },
+      {
+        "name": "g2h-e-primary-v1.stderr.log",
+        "bytes": 60,
+        "sha256": "8a51fa06ab6ee3ab86f7d081f8dc62c95d81c17c86ce12b8ae05cf8519be2643"
+      },
+      {
+        "name": "g2h-e-primary-v1.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "retry_allowed": false
+  },
+  "first_failure": {
+    "typed_failure": "SELF_EXECUTABLE_PROCFS_NOFOLLOW_ELOOP",
+    "program_message": "digest, source, runtime or authorization preflight rejected",
+    "proof_source": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_primary_proof.c",
+    "proof_source_sha256": "8a458dbb599c1ebb2c4bc7fa8263e724651607c7a39a5c458f44b73143613603",
+    "self_path": "/proc/self/exe",
+    "open_flags": "O_RDONLY|O_CLOEXEC|O_NOFOLLOW",
+    "runtime_diagnostic": {
+      "is_symlink": true,
+      "open_result": "FAIL",
+      "errno": 40,
+      "errno_name": "ELOOP",
+      "message": "Too many levels of symbolic links"
+    },
+    "short_circuit_before_contract_sources_authorization": true,
+    "surface_gate_reached": false,
+    "mathematical_duty_reached": false
+  },
+  "primary_candidate_path_invocations": 1,
+  "candidate_evaluations": 0,
+  "primary_output_root_exists": false,
+  "primary_manifest_exists": false,
+  "mathematical_decision": null,
+  "independent_execution_authorized": false,
+  "independent_execution_performed": false,
+  "independent_output_root_exists": false,
+  "candidate_admitted": false,
+  "classical_proof_established": false,
+  "geometry_state_accepted": false,
+  "lane_execution_authorized": false,
+  "diagnostic_lamp": false,
+  "physical_viability": false,
+  "propulsion_authority": false,
+  "transport_authority": false
+}

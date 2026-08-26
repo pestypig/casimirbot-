@@ -1,0 +1,152 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.classical_state_grid_contract.v1",
+  "status": "invalidated_before_implementation_by_s4_r1_state_grid_definition_audit_replacement_required",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "classical unknown vector, two-patch Lobatto grids, residual row order and cross-grid norms",
+    "current_maturity": "draft numerical-proof definition",
+    "target_maturity": "independently audited additive state/grid definition",
+    "required_frozen_inputs": ["R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a", "full solve grids 64,96,128,256", "256 domain cells", "y=r/(1+r)"],
+    "required_evidence": ["square-system count proof", "endpoint and interface fixture replay", "DCT reconstruction fixtures", "cross-grid norm fixtures", "no candidate values"],
+    "stop_fail_criteria": ["R2 equation drift", "grid drift", "implicit finite wall", "candidate-derived seed", "candidate evaluation", "authority promotion"],
+    "explicit_non_goals": ["analytic seed", "approximate inverse", "radii bounds", "candidate execution", "quantum products", "physical claims"],
+    "downstream_gate_unlocked": "state/grid portion of additive S4 proof definition"
+  },
+  "continuum_unknowns": {
+    "field_order": ["b", "s", "sigma", "p"],
+    "p_definition": "p=d_sigma/dr",
+    "scalar_order_after_fields": ["omega"],
+    "equation_order": ["b_prime", "s_prime", "sigma_prime_minus_p", "p_prime_from_KG"],
+    "metric_and_member": ["alpha=1/(b*s)", "s(0)*omega=6/5"],
+    "no_field_transform": true,
+    "stored_values_are_real_balls": true
+  },
+  "grid_meaning": {
+    "frozen_N_values": [64, 96, 128, 256],
+    "N_definition": "polynomial degree on each of two patches; each field has N+1 Lobatto nodal balls per patch",
+    "core_patch": {
+      "coordinate": "y",
+      "interval": "[0,255/256]",
+      "node_order": "j=0 origin through j=N interface",
+      "node_formula": "y_j=(255/512)*(1-cos(pi*j/N))"
+    },
+    "infinity_patch": {
+      "coordinate": "q=1/r",
+      "interval": "[0,1/255]",
+      "node_order": "j=0 interface through j=N infinity",
+      "node_formula": "q_j=(1/510)*(1+cos(pi*j/N))",
+      "infinity_is_analytic_endpoint": true,
+      "finite_wall": false
+    },
+    "node_enclosure": {
+      "pi_and_cosine": "512-bit directed-outward balls",
+      "maximum_width": "2^-400",
+      "exact_special_nodes": ["core y_0=0", "core y_N=255/256", "tail q_0=1/255", "tail q_N=0"]
+    },
+    "domain_partition_binding": {
+      "origin_cell": "y in [0,1/256]",
+      "bulk_cells": "y in [k/256,(k+1)/256], k=1,...,254",
+      "infinity_cell": "q in [0,1/255]",
+      "use": "post-solve interval residual, sign, curvature, completeness and remainder cover; not additional solve degrees of freedom"
+    }
+  },
+  "state_packing": {
+    "outer_order": ["core", "infinity", "omega"],
+    "patch_field_order": ["b", "s", "sigma", "p"],
+    "within_field_order": "node ordinal j=0,...,N",
+    "flat_index": {
+      "core": "index=field_ordinal*(N+1)+j",
+      "infinity": "index=4*(N+1)+field_ordinal*(N+1)+j",
+      "omega": "index=8*(N+1)"
+    },
+    "exact_length": "8*(N+1)+1=8*N+9",
+    "coefficient_codec": "apply the frozen DCT-I independently to each field/patch nodal array; omega remains scalar"
+  },
+  "dct_i": {
+    "forward": "a_k=(2/N)*(f_0/2+sum_{j=1}^{N-1} f_j*cos(pi*j*k/N)+((-1)^k)*f_N/2), k=0,...,N",
+    "inverse": "f_j=a_0/2+sum_{k=1}^{N-1} a_k*cos(pi*j*k/N)+((-1)^j)*a_N/2, j=0,...,N",
+    "coefficient_order": "k=0,...,N",
+    "arithmetic": "512-bit directed outward; every cosine ball width <=2^-400",
+    "fixture_identity": "inverse(forward(f)) encloses every input nodal ball"
+  },
+  "square_residual_map": {
+    "exact_row_count": "8*N+9",
+    "core_rows": {
+      "count": "4*N",
+      "order": "node j=0,...,N-1 then equation order",
+      "origin_j0": [
+        "d_b/dr=0",
+        "d_s/dr=0",
+        "d_sigma/dr-p=0",
+        "d_p/dr + b^2*(b^2*s^2*omega^2-1)*sigma/3=0"
+      ],
+      "interior_j1_through_N_minus_1": "the four frozen first-order R2 equations after dy/dr=(1-y)^2"
+    },
+    "infinity_rows": {
+      "count": "4*N",
+      "order": "node j=0,...,N-1 then equation order",
+      "rule": "the four frozen first-order R2 equations after dr/dq=-q^-2; q=0 is excluded from collocation and handled by the infinity recurrence proof"
+    },
+    "interface_rows": {
+      "count": 4,
+      "order": ["b_core_N-b_tail_0", "s_core_N-s_tail_0", "sigma_core_N-sigma_tail_0", "p_core_N-p_tail_0"]
+    },
+    "boundary_and_member_rows": {
+      "count": 5,
+      "order": ["b_core_0-1", "p_core_0", "s_tail_N-1", "sigma_tail_N", "s_core_0*omega-6/5"]
+    },
+    "count_identity": "4*N+4*N+4+5=8*N+9=state length",
+    "b_infinity_rule": "not a finite-wall boundary row; b(q=0)=1 must follow from the certified finite-mass infinity recurrence and strict positive branch",
+    "p_infinity_rule": "not an independent boundary row; p(q=0)=0 must follow from the certified exponential scalar-tail recurrence"
+  },
+  "frozen_cross_grid_norms": {
+    "comparison": "compare the two patch interpolants after DCT-I; zero-pad the lower-degree coefficient vector to the higher degree",
+    "component_order": ["core_b_minus_1", "core_s_minus_1", "core_sigma", "core_p", "tail_b_minus_1", "tail_s_minus_1", "tail_sigma", "tail_p", "omega"],
+    "component_weights": ["1", "1", "1", "1", "1", "1", "1", "1", "1"],
+    "coefficient_prime_weight": "endpoint coefficients k=0 and k=N carry reconstruction factor 1/2; all interior coefficients carry factor 1",
+    "norms_in_frozen_order": [
+      {
+        "id": "weighted_coefficient_l1_max",
+        "definition": "max over eight field components of sum_k reconstruction_factor(k)*((17/16)^k)*abs(delta_a_k), together with abs(delta_omega)"
+      },
+      {
+        "id": "chebyshev_supremum_majorant_max",
+        "definition": "max over eight field components of sum_k reconstruction_factor(k)*abs(delta_a_k), together with abs(delta_omega); valid because abs(T_k(x))<=1"
+      }
+    ],
+    "scaled_field_defect": "maximum of the two frozen norms",
+    "strict_contraction": "for each norm, defect(N_next,N_after_next)<defect(N_prev,N_next) and ratio<=1/4 in the R2 grid order",
+    "terminal_threshold": "scaled_field_defect(128,256)<=2^-70",
+    "interval_rule": "every absolute value, sum, maximum and ratio is outward-enclosed; a ratio interval with upper endpoint >1/4 fails"
+  },
+  "unsealed_dependencies": {
+    "analytic_seed": null,
+    "tail_factorization_and_recurrence": null,
+    "validated_nonlinear_operator_and_inverse": null,
+    "radii_polynomial_bounds": null,
+    "continuation_tube_and_orientation": null
+  },
+  "readiness": {
+    "state_packing_complete": false,
+    "grid_and_row_order_complete": false,
+    "cross_grid_norms_complete": false,
+    "independent_audit_complete": false,
+    "invalidating_audit": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-state-grid-definition-audit.md",
+    "replacement_required": true,
+    "sealed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_proof": false,
+    "fixture_is_candidate_evaluation": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

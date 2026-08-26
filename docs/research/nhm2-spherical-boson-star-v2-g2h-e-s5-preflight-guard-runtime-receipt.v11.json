@@ -1,0 +1,61 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v11",
+  "status": "PASS_CANDIDATE_NEUTRAL_78_COMPACT_BOX_ENVELOPES_AND_SIX_BELL12_WEIGHTED_NORMS_SCIENTIFIC_HANDLERS_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "31d8c4cd4e7da85db6b437a5e53252a0b48a2abaca4f9d74367dd977ccca0d98",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v16",
+    "image_id": "sha256:6ebc9a2b6a01013a334915e4bc8dad20c0bd1062d519fa5f20fbd08a25e70fb2",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 151120,
+    "executable_sha256": "495c50138fad496141add334d6ed8dbbe88b2390888e94d6ea7a6c9e42fb20e3",
+    "flat_carrier_header_sha256": "e88a344b6a31ae461d238a2c6ad3c5ff38c3f4278cbcfa6bf6c128758ba8bc5b",
+    "flat_carrier_cpp_sha256": "93b64b2f10876a2742c4becbae2328167c661b0914c33d910ea680cbecd08365"
+  },
+  "flat_carrier_scope": {
+    "fixture_status": "PASS_9_OF_9_MASK_511",
+    "working_precision_bits": 512,
+    "pointwise_mixed_derivative_inventory": 78,
+    "compact_box_envelope_inventory": 78,
+    "envelope_method": "exact monomial absolute sum with inf(A), sup(B), log(1/q)^v<=q^-v, and exact half-line exp(-inf(A)*x)*x^h maximizer for x>=255",
+    "endpoint_policy": "exact q=0 inserts all 78 entries as exact zero without division or logarithm",
+    "B_theta_12_inventory": 6,
+    "B_theta_12_method": "sum_j S(12,j)*B_(u,v,j)/510^j",
+    "weighted_coefficient_norm_inventory": 6,
+    "weighted_coefficient_norm_method": "B_(u,v,0)+556*B_theta_12",
+    "manufactured_box_containment_checked": true,
+    "selected_parameter_boxes_loaded": false,
+    "selected_chain_rules_computed": false,
+    "formal_flat_remainder_Y_Z_computed": false,
+    "C08_complete": false
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "4e5a2cc54cfa01abc6294d57b365cf285d663380791e682945fe0a5d9ec75580",
+    "status": "PASS",
+    "checks_passed": 28,
+    "checks_total": 28
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_handlers_installed": 0,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

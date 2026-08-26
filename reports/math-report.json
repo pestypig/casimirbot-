@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-23T19:03:37.017Z",
-  "registryCount": 318,
+  "generatedAt": "2026-08-25T05:39:57.911Z",
+  "registryCount": 323,
   "coverage": {
     "exploratory": {
       "count": 23,
@@ -81,7 +81,7 @@
       ]
     },
     "diagnostic": {
-      "count": 243,
+      "count": 248,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -313,6 +313,11 @@
         "shared/curvature-leverage.ts",
         "scripts/curvature-leverage-full-solve-report.ts",
         "scripts/curvature-leverage-benchmark-ladder.ts",
+        "shared/casimir-dp-causal-cone-clock-stage4-2e.ts",
+        "shared/casimir-dp-maxwell-macroscopic-qed-closure-stage4-2f.ts",
+        "shared/casimir-dp-empirical-feasibility-pilot-stage4-2g.ts",
+        "shared/casimir-dp-commissioning-intake-stage4-2h.ts",
+        "shared/casimir-dp-boundary-branch-interaction-stage4-2i.ts",
         "shared/casimir-dp-schrodinger-mass-density-stage4-2j.ts",
         "shared/casimir-dp-microscopic-em-closure-stage4-2k.ts",
         "shared/casimir-dp-empirical-authority-stage4-2l.ts",
@@ -414,7 +419,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 318,
+    "entriesWithUnits": 323,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -428,8 +433,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 243,
-        "withUnits": 243,
+        "total": 248,
+        "withUnits": 248,
         "missing": []
       },
       "certified": {
@@ -452,8 +457,8 @@
     ]
   },
   "autoGraph": {
-    "nodeCount": 3186,
-    "edgeCount": 7651
+    "nodeCount": 3197,
+    "edgeCount": 7686
   },
   "evidenceProfiles": [
     {

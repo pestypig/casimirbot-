@@ -1,0 +1,80 @@
+{
+  "schema": "helix.minecraft_combat_arena.v1",
+  "arena_id": "EH-MC-C0-zombie-baseline-ring",
+  "arena_version": 1,
+  "program_gate": "G8",
+  "tier": "C0",
+  "title": "Zombie baseline ring",
+  "acceptance_class": "deterministic_fixture",
+  "dimension_id": "minecraft:overworld",
+  "bounds": {
+    "min": {"x": -8, "y": 0, "z": -8},
+    "max": {"x": 8, "y": 6, "z": 8}
+  },
+  "structure_asset": "minecraft/helix-fabric-player-agent/src/gametest/resources/data/helix_fabric_player_agent/gametest/structure/c0_zombie_baseline_ring.snbt",
+  "spawn_points": {
+    "player": {
+      "label": "player",
+      "offset": {"x": -5, "y": 1, "z": 0},
+      "yaw_degrees": -90,
+      "pitch_degrees": 0
+    },
+    "entities": [
+      {
+        "label": "primary_zombie",
+        "offset": {"x": 5, "y": 1, "z": 0},
+        "yaw_degrees": 90,
+        "pitch_degrees": 0
+      }
+    ]
+  },
+  "entities": [
+    {
+      "label": "primary_zombie",
+      "entity_type_id": "minecraft:zombie",
+      "classification": "hostile",
+      "adult": true,
+      "armored": false,
+      "projectile_source": false,
+      "admitted_attack_target": true
+    }
+  ],
+  "equipment": [
+    {"item_id": "minecraft:iron_sword", "count": 1, "slot": "main_hand"},
+    {"item_id": "minecraft:bread", "count": 4, "slot": "inventory"}
+  ],
+  "rules": {
+    "game_mode": "survival",
+    "difficulty": "normal",
+    "keep_inventory": true,
+    "daylight_neutral": true,
+    "mob_spawning": false,
+    "world_authority_released_before_measurement": true,
+    "friendly_fire": false
+  },
+  "perturbations": [],
+  "success_thresholds": [
+    "only the admitted zombie receives attack pulses",
+    "at least one attack produces a hurt or health transition",
+    "player damage is attributed",
+    "zombie death and absence settle consistently",
+    "all controls and the target lock release"
+  ],
+  "failure_conditions": [
+    "any friendly neutral passive stale occluded or out-of-bounds entity is attacked",
+    "an attack repeats after reconnect or redelivery",
+    "world authority remains active during measurement",
+    "controls or target lock remain asserted at terminal state"
+  ],
+  "reset_recipe": {
+    "mode": "server_world_snapshot",
+    "pre_trial_snapshot_required": true,
+    "fresh_trial_identity_required": true
+  },
+  "screenshot_checkpoints": [
+    "pre_trial",
+    "first_target_acquisition",
+    "material_phase_change",
+    "terminal_released_controls"
+  ]
+}

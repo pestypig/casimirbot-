@@ -1375,7 +1375,7 @@
           "kind": "artifact_backed_theory_run",
           "label": "Open Stage-4.2D field-to-frequency witness diagnostics",
           "badgeIds": [
-            "study.casimir_dp.polarization_qed_control",
+            "study.casimir_dp.polarization_resolved_qed_control",
             "study.casimir_dp.thermal_radiative_closure",
             "study.casimir_dp.cross_scale_metrology_stage4_2d",
             "study.casimir_dp.claim_boundary"
@@ -1948,7 +1948,7 @@
       "equationId": "cdp-stage4-2j-homogeneous-sphere-energy",
       "label": "Stage-4.2J homogeneous-sphere robustness integral",
       "aliases": ["E_G sphere radial Fourier integral"],
-      "actions": [{"actionId":"open-cdp-stage4-2j-homogeneous-sphere-energy","kind":"artifact_backed_theory_run","label":"Open representation envelope","badgeIds":["study.casimir_dp.dp_mass_density_collapse","study.casimir_dp.schrodinger_mass_density_stage4_2j","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.schrodinger_mass_density_stage4_2j","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2j","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The two-representation result is diagnostic; complete constituent robustness is blocked."}],
+      "actions": [{"actionId":"open-cdp-stage4-2j-homogeneous-sphere-energy","kind":"artifact_backed_theory_run","label":"Open representation envelope","badgeIds":["collapse.objective.dp_gravitational_self_energy","study.casimir_dp.schrodinger_mass_density_stage4_2j","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.schrodinger_mass_density_stage4_2j","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2j","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The two-representation result is diagnostic; complete constituent robustness is blocked."}],
       "claimBoundaryNotes": ["Same R0 is required.", "Three density maps are missing."]
     },
     {
@@ -1995,7 +1995,7 @@
     },
     {
       "equationId": "cdp-stage4-2l-density-regularization-envelope", "label": "Stage-4.2L mass-density representation envelope", "aliases": ["E_G[rho;r0] representation envelope"],
-      "actions": [{"actionId":"open-cdp-stage4-2l-density-regularization-envelope","kind":"artifact_backed_theory_run","label":"Open mass-density robustness audit","badgeIds":["study.casimir_dp.dp_mass_density_collapse","study.casimir_dp.empirical_authority_stage4_2l","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.empirical_authority_stage4_2l","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2l","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"The frozen signal varies materially across defensible density representations; exact mapping to external bounds remains required."}],
+      "actions": [{"actionId":"open-cdp-stage4-2l-density-regularization-envelope","kind":"artifact_backed_theory_run","label":"Open mass-density robustness audit","badgeIds":["collapse.objective.dp_gravitational_self_energy","study.casimir_dp.empirical_authority_stage4_2l","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.empirical_authority_stage4_2l","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.stage4_2l","openPanels":["theory-badge-graph","scientific-calculator"],"alsoIngestLatex":false,"claimBoundaryNote":"The frozen signal varies materially across defensible density representations; exact mapping to external bounds remains required."}],
       "claimBoundaryNotes": ["The Gaussian result is model-specific, not a generic DP prediction."]
     },
     {
@@ -2123,6 +2123,13 @@
       "aliases": ["Delta tau useful heritability fitness covariance replicated selection"],
       "actions": [{"actionId":"open-cdp-supplement-evolutionary-coherence-control-conditional-gate","kind":"artifact_backed_theory_run","label":"Open evolutionary evidence ladder","badgeIds":["study.casimir_dp.boundary_conditioned_coherence_extension","study.casimir_dp.evolutionary_coherence_control_conditional","biology.evolution.selection_fitness_context","plant.photosynthesis.coherence_lifetime_gate","consciousness.claim_boundary.evolutionary_biology_context_only","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.evolutionary_coherence_control_conditional","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.conditional_life_implication","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The six-rung gate is noncomputable until independent physical and biological evidence packets exist."}],
       "claimBoundaryNotes": ["A null biological rung does not falsify an independently replicated non-biological law.", "Adaptation is not teleology."]
+    },
+    {
+      "equationId": "cdp-supplement-composition-universality-successor",
+      "label": "Supplement positive-result composition-universality admission gate",
+      "aliases": ["nine authority packet cohort normalized residual universality gate"],
+      "actions": [{"actionId":"open-cdp-supplement-composition-universality-successor","kind":"artifact_backed_theory_run","label":"Open successor admission and QCD nonbridge","badgeIds":["study.casimir_dp.composition_internal_energy_successor","study.casimir_dp.schrodinger_mass_density_stage4_2j","study.casimir_dp.blinded_model_comparison","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.composition_internal_energy_successor","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.positive_result_successor","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The successor is blocked: the parent positive-result trigger and nine same-campaign authority packets are absent."}],
+      "claimBoundaryNotes": ["Agreement is consistent with total-mass-density universality but does not identify a QCD collapse mechanism.", "Disagreement first challenges ordinary-null closure, cohort equivalence, or the frozen source representation."]
     }
   ]
 }

@@ -30,6 +30,18 @@ final class NativeFabricWorkflowEnginePlacementGeometryTest {
     }
 
     @Test
+    void itemUseTriesTheAdmittedSupportFaceBeforeTheAirPovFallback() {
+        assertEquals(
+            java.util.List.of("use_item_on", "use_item"),
+            NativeFabricWorkflowEngine.placementInteractionOrder("item_use")
+        );
+        assertEquals(
+            java.util.List.of("use_item_on"),
+            NativeFabricWorkflowEngine.placementInteractionOrder("block_item")
+        );
+    }
+
+    @Test
     void mapsPlayerInventoryIndexesToTheServersInventoryMenuBeforeHotbarSwap() {
         assertEquals(36, NativeFabricInventoryControls.menuSlotForInventoryIndex(0));
         assertEquals(44, NativeFabricInventoryControls.menuSlotForInventoryIndex(8));

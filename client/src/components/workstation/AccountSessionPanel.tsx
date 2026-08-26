@@ -1,6 +1,7 @@
 import React from "react";
 import { Archive, ChevronDown, Database, FlaskConical, KeyRound, Languages, Link2, LogIn, LogOut, RefreshCw, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { Auth0SignInButton } from "@/components/auth/Auth0SignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import {
   getInterfaceLanguageOption,
@@ -463,11 +464,9 @@ export default function AccountSessionPanel() {
     setLoading(true);
     setError(null);
     try {
-      const activeAuthMode = status.session?.profile.auth_mode;
-      const response = await fetch(
-        activeAuthMode === "web_auth" ? "/api/auth/google/sign-out" : "/api/account/session/sign-out",
-        { method: "POST" },
-      );
+      const response = await fetch("/api/account/session/sign-out", {
+        method: "POST",
+      });
       if (!response.ok) throw new Error(`sign-out ${response.status}`);
       cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY, null);
       await refresh();
@@ -476,7 +475,7 @@ export default function AccountSessionPanel() {
     } finally {
       setLoading(false);
     }
-  }, [refresh, status.session?.profile.auth_mode]);
+  }, [refresh]);
 
   const exportProfileStorage = React.useCallback(async () => {
     setLoading(true);
@@ -608,11 +607,14 @@ export default function AccountSessionPanel() {
     status.account_policy?.account_type === "developer";
   const sharedRoomsDeveloperIncluded =
     status.account_policy?.account_type === "developer";
-  const brokerageEnvironmentEnabled = Boolean(
+  const profileConnectionsEnabled = Boolean(
     session &&
-    status.account_policy?.account_type === "developer" &&
-    status.account_policy.feature_flags.includes("brokerage_environment") &&
-    !status.account_policy.locked_features.includes("brokerage_environment"),
+    (status.account_policy ?? HELIX_USER_ACCOUNT_POLICY).feature_flags.includes(
+      "profile_connections",
+    ) &&
+    !(status.account_policy ?? HELIX_USER_ACCOUNT_POLICY).locked_features.includes(
+      "profile_connections",
+    ),
   );
 
   const setSharedRoomsExperiment = React.useCallback(async (enabled: boolean) => {
@@ -912,6 +914,14 @@ export default function AccountSessionPanel() {
                 </div>
                 <div className="border-t border-white/10 pt-3">
                   <p className="mb-2 text-xs text-slate-400">
+                    Use the same Auth0 identity as your authorized MCP client to
+                    open the exact profile-owned rooms without exposing its
+                    bearer token to the page or agent.
+                  </p>
+                  <Auth0SignInButton />
+                </div>
+                <div className="border-t border-white/10 pt-3">
+                  <p className="mb-2 text-xs text-slate-400">
                     {t("account.signIn.googleProfileNote")}
                   </p>
                   <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
@@ -970,7 +980,7 @@ export default function AccountSessionPanel() {
           </div>
         </section>
 
-        {brokerageEnvironmentEnabled ? <BrokerageConnectionsCard /> : null}
+        {profileConnectionsEnabled ? <BrokerageConnectionsCard /> : null}
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

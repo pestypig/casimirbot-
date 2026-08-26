@@ -163,6 +163,9 @@ export const isAffirmativeMinecraftDurableGoalInspectPrompt = (
     /^(?:please\s+)?(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i.test(
       prompt,
     ) ||
+    /^(?:in|from|using)\s+(?:this|the\s+current|the\s+bound|the\s+shared(?:\s+live)?)\s+room,?\s+(?:please\s+)?(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i.test(
+      prompt,
+    ) ||
     /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:resume|continue|inspect|read|check|reconstruct|recover|reopen|re-open)\b/i.test(
       prompt,
     ) ||
@@ -170,6 +173,42 @@ export const isAffirmativeMinecraftDurableGoalInspectPrompt = (
       prompt,
     );
   if (!goalReference || !operativeInspect) return false;
+  return !(
+    /^(?:do\s+not|don't|dont|never|avoid|without)\b/i.test(prompt) ||
+    /^(?:later|eventually|tomorrow|after(?:ward|wards)?|in\s+the\s+future|if|when)\b/i.test(
+      prompt,
+    ) ||
+    /^(?:previously|earlier|historically|last\s+turn)\b/i.test(prompt) ||
+    /^(?:the\s+(?:screen|docs?|guide|transcript|message)\s+(?:says?|said|shows?|showed)|quoted?|someone\s+said)\b/i.test(
+      prompt,
+    ) ||
+    /^(?:explain|describe|show\s+me|tell\s+me)\b[\s\S]{0,80}\bhow\s+to\b/i.test(
+      prompt,
+    )
+  );
+};
+
+/** Recognizes an operative read of the G6 append-only supporting-role ledger. */
+export const isAffirmativeEnvironmentReasoningRoleInspectPrompt = (
+  promptText: string | null | undefined,
+): boolean => {
+  const prompt = String(promptText ?? "").trim();
+  if (!prompt) return false;
+  const goalReference =
+    /\benvironment_durable_goal:[a-z0-9][a-z0-9-]{7,}\b/i.test(prompt);
+  const roleLedgerReference =
+    /\b(?:concurrent[-\s]?reasoning|reasoning[-\s]?role|supporting[-\s]?role)\s+(?:ledger|history|outputs?|projection|support)\b/i.test(
+      prompt,
+    );
+  const operativeInspect =
+    /^(?:please\s+)?(?:inspect|read|check|reconstruct|report)\b/i.test(prompt) ||
+    /^(?:in|from|using)\s+(?:this|the\s+current|the\s+bound|the\s+shared(?:\s+live)?)\s+room,?\s+(?:please\s+)?(?:inspect|read|check|reconstruct|report)\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:inspect|read|check|reconstruct|report)\b/i.test(
+      prompt,
+    );
+  if (!goalReference || !roleLedgerReference || !operativeInspect) return false;
   return !(
     /^(?:do\s+not|don't|dont|never|avoid|without)\b/i.test(prompt) ||
     /^(?:later|eventually|tomorrow|after(?:ward|wards)?|in\s+the\s+future|if|when)\b/i.test(

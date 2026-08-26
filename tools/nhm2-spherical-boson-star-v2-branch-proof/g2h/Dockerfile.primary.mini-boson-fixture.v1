@@ -1,0 +1,53 @@
+FROM nhm2-g2h-s4-primary-fixture-builder:v2@sha256:9e94d19f9014938b510e95c776778d164cce120777adfc2d495c1812de5221a1 AS builder
+
+COPY mini_boson_star_fixture_primary.cpp /src/mini_boson_star_fixture_primary.cpp
+COPY mini_boson_star_wire_primary.cpp /src/mini_boson_star_wire_primary.cpp
+COPY mini_boson_star_wire_primary.hpp /src/mini_boson_star_wire_primary.hpp
+COPY mini_boson_star_budget_primary.cpp /src/mini_boson_star_budget_primary.cpp
+COPY mini_boson_star_budget_primary.hpp /src/mini_boson_star_budget_primary.hpp
+COPY mini_boson_star_arithmetic_primary.cpp /src/mini_boson_star_arithmetic_primary.cpp
+COPY mini_boson_star_arithmetic_primary.hpp /src/mini_boson_star_arithmetic_primary.hpp
+COPY mini_boson_star_inverse_primary.cpp /src/mini_boson_star_inverse_primary.cpp
+COPY mini_boson_star_inverse_primary.hpp /src/mini_boson_star_inverse_primary.hpp
+COPY mini_boson_star_continuation_primary.cpp /src/mini_boson_star_continuation_primary.cpp
+COPY mini_boson_star_continuation_primary.hpp /src/mini_boson_star_continuation_primary.hpp
+COPY mini_boson_star_stability_primary.cpp /src/mini_boson_star_stability_primary.cpp
+COPY mini_boson_star_stability_primary.hpp /src/mini_boson_star_stability_primary.hpp
+COPY mini_boson_star_quantum_radial_primary.cpp /src/mini_boson_star_quantum_radial_primary.cpp
+COPY mini_boson_star_quantum_radial_primary.hpp /src/mini_boson_star_quantum_radial_primary.hpp
+COPY mini_boson_star_quantum_angular_primary.cpp /src/mini_boson_star_quantum_angular_primary.cpp
+COPY mini_boson_star_quantum_angular_primary.hpp /src/mini_boson_star_quantum_angular_primary.hpp
+COPY mini_boson_star_quantum_negative_axis_primary.cpp /src/mini_boson_star_quantum_negative_axis_primary.cpp
+COPY mini_boson_star_quantum_negative_axis_primary.hpp /src/mini_boson_star_quantum_negative_axis_primary.hpp
+COPY mini_boson_star_quantum_measure_primary.cpp /src/mini_boson_star_quantum_measure_primary.cpp
+COPY mini_boson_star_quantum_measure_primary.hpp /src/mini_boson_star_quantum_measure_primary.hpp
+COPY mini_boson_star_hadamard_primary.cpp /src/mini_boson_star_hadamard_primary.cpp
+COPY mini_boson_star_hadamard_primary.hpp /src/mini_boson_star_hadamard_primary.hpp
+COPY mini_boson_star_noise_primary.cpp /src/mini_boson_star_noise_primary.cpp
+COPY mini_boson_star_noise_primary.hpp /src/mini_boson_star_noise_primary.hpp
+
+RUN g++ -std=c++20 -O2 -fno-fast-math -fno-common -Wall -Wextra -Werror \
+      -o /usr/local/bin/mini-boson-star-primary-fixture-v1 \
+      /src/mini_boson_star_fixture_primary.cpp \
+      /src/mini_boson_star_wire_primary.cpp \
+      /src/mini_boson_star_budget_primary.cpp \
+      /src/mini_boson_star_arithmetic_primary.cpp \
+      /src/mini_boson_star_inverse_primary.cpp \
+      /src/mini_boson_star_continuation_primary.cpp \
+      /src/mini_boson_star_stability_primary.cpp \
+      /src/mini_boson_star_quantum_radial_primary.cpp \
+      /src/mini_boson_star_quantum_angular_primary.cpp \
+      /src/mini_boson_star_quantum_negative_axis_primary.cpp \
+      /src/mini_boson_star_quantum_measure_primary.cpp \
+      /src/mini_boson_star_hadamard_primary.cpp \
+      /src/mini_boson_star_noise_primary.cpp \
+      -lflint-arb -lflint -lgmp -lmpfr
+
+ENTRYPOINT ["/usr/local/bin/mini-boson-star-primary-fixture-v1"]
+
+FROM nhm2-g2h-primary-proof:v2@sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab
+
+COPY --from=builder /usr/local/bin/mini-boson-star-primary-fixture-v1 \
+     /usr/local/bin/mini-boson-star-primary-fixture-v1
+
+ENTRYPOINT ["/usr/local/bin/mini-boson-star-primary-fixture-v1"]

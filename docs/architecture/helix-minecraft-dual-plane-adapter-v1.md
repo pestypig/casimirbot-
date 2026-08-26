@@ -550,6 +550,14 @@ failure observation for Codex re-entry.
 
 ## Differential acceptance
 
+The first reserved post-G7 integrated Player Embodiment objective is
+`docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md`. It combines
+the existing typed observations, survival workflows, fluid sequence, reactive
+guardian, durable checkpoints, semantic wake, and terminal-parity contracts in
+one legitimate Nether-entry journey. The packet is a future acceptance target,
+not an implemented `build_nether_portal` capability and not permission to use
+World Authority for survival postconditions.
+
 For every workflow, hold the starting world, selected player, permissions,
 capability descriptions and requested goal constant. Compare:
 

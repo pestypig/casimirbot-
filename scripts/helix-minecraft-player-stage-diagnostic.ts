@@ -71,6 +71,8 @@ const ceilingMsFor = (
       return 15_000;
     case "track_target":
       return Math.min(action.max_duration_ms + 5_000, 5 * 60_000);
+    case "attack":
+      return Math.min(action.max_duration_ms + 5_000, 60_000);
     case "hotbar_select":
       return 10_000;
     case "follow":

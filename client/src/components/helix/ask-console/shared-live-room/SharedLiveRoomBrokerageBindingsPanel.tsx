@@ -1,11 +1,13 @@
 import React from "react";
-import { RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
+import { RefreshCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
 import type {
   HelixBrokerageConnection,
   HelixBrokerageRoomBinding,
 } from "@shared/helix-brokerage-environment";
 import { SharedLiveRoomPaperTradingPanel } from
   "./SharedLiveRoomPaperTradingPanel";
+import { readCachedAccountCapabilityPolicy } from
+  "@/lib/workstation/accountCapabilityPolicy";
 
 type BrokerageResponse = {
   connections?: HelixBrokerageConnection[];
@@ -39,6 +41,12 @@ export function SharedLiveRoomBrokerageBindingsPanel({
   const [selectedConnectionId, setSelectedConnectionId] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
+  const accountPolicy = readCachedAccountCapabilityPolicy();
+  const developerBrokerageControls = Boolean(
+    accountPolicy?.account_type === "developer" &&
+    accountPolicy.feature_flags.includes("brokerage_environment") &&
+    !accountPolicy.locked_features.includes("brokerage_environment"),
+  );
 
   const refresh = React.useCallback(async () => {
     if (!isOwner) return;
@@ -99,6 +107,23 @@ export function SharedLiveRoomBrokerageBindingsPanel({
     }
   };
 
+  const revoke = async (binding: HelixBrokerageRoomBinding): Promise<void> => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await readJson(await fetch(
+        `/api/agi/brokerage-connections/${encodeURIComponent(binding.connection_id)}/room-bindings/${encodeURIComponent(roomId)}`,
+        { method: "DELETE", credentials: "same-origin" },
+      ));
+      setMessage("Robinhood read access revoked from this room.");
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to revoke Robinhood access.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!isOwner || !available) return null;
 
   return (
@@ -130,11 +155,22 @@ export function SharedLiveRoomBrokerageBindingsPanel({
               ? `${binding.capability_ids.length} read capabilities · orders disabled`
               : "Privacy invalidated · all room capabilities suspended"}
           </p>
+          {binding.status === "active" ? (
+            <button
+              type="button"
+              disabled={busy || roomClosed}
+              onClick={() => void revoke(binding)}
+              className="mt-2 inline-flex items-center gap-1 rounded border border-rose-300/30 px-2 py-1 text-rose-200 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" /> Revoke room access
+            </button>
+          ) : null}
           {binding.status === "active" && binding.privacy_state === "owner_private" ? (
             <SharedLiveRoomPaperTradingPanel
               connectionId={binding.connection_id}
               roomId={roomId}
               disabled={busy || roomClosed}
+              readOnly={!developerBrokerageControls}
             />
           ) : null}
         </div>

@@ -75,6 +75,7 @@ import {
   isTheoryBadgeGraphCurrentContextPrompt,
 } from "./theory-badge-graph-current-context-intent";
 import {
+  isAffirmativeEnvironmentReasoningRoleInspectPrompt,
   isAffirmativeImmediateMinecraftSituationPrompt,
   isAffirmativeMinecraftDurableGoalCreatePrompt,
   isAffirmativeMinecraftDurableGoalInspectPrompt,
@@ -87,6 +88,7 @@ import {
   type ExplicitCapabilityExtractionContext,
 } from "./explicit-capability-contract";
 import { isAffirmativeMinecraftPlayerEmbodimentActionPrompt } from "./minecraft-execution-plane-intent";
+import { isAffirmativeBrokerageEnvironmentReadPrompt } from "./brokerage-environment-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -809,6 +811,36 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (isAffirmativeBrokerageEnvironmentReadPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["affirmative_brokerage_environment_read"],
+      reasons: [
+        "brokerage_read_requires_authenticated_private_room_gateway",
+        "brokerage_observation_requires_current_identity_and_freshness",
+      ],
+      requestedOutputs: [
+        "field_evaluation_refs",
+        "tool_call_eligibility",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "workspace_directory",
+        "workspace_panel",
+        "internet_search_lookup",
+        "model_only_answer",
+        "no_tool_direct",
+      ],
+      precedenceReason: "affirmative_brokerage_environment_read",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isAffirmativeMinecraftDurableGoalCreatePrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -829,6 +861,33 @@ export function arbitrateAskSourceTarget(input: {
         "no_tool_direct",
       ],
       precedenceReason: "affirmative_minecraft_durable_goal_create",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isAffirmativeEnvironmentReasoningRoleInspectPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["affirmative_environment_reasoning_role_inspect"],
+      reasons: [
+        "environment_reasoning_role_ledger_requires_authenticated_room_gateway",
+        "g6_role_ledger_is_distinct_from_durable_goal_projection",
+      ],
+      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "workspace_panel",
+        "workspace_diagnostic",
+        "world_event_current_state",
+        "internet_search_lookup",
+        "model_only_answer",
+        "no_tool_direct",
+      ],
+      precedenceReason: "affirmative_environment_reasoning_role_inspect",
       confidence: 0.99,
       allowClientShortcut: false,
       allowNoToolDirect: false,

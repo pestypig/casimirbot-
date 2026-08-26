@@ -1,0 +1,247 @@
+{
+  "schema": "nhm2.g2g.tolman_vii_candidate_contract.v1",
+  "program_gate": "G2G",
+  "scientific_identity": "G2F_TOLMAN_VII_NATURAL_BETA_1_5_SCALAR_HADAMARD_V1",
+  "contract_status": "definition_frozen_candidate_unadmitted_unexecuted",
+  "semantic_change": "mathematical_definition_and_future_proof_chronology_only",
+  "frozen_member": {
+    "family": "Tolman VII isotropic perfect fluid",
+    "mu": "1",
+    "compactness_C_equals_M_over_R": "1/5",
+    "neary_radius_parameter_beta_N": "1",
+    "neary_identity": "R/M=5/beta_N^2",
+    "si_scale": "R>0 deliberately free until the later SI contract"
+  },
+  "conventions": {
+    "units": "G=c=hbar=1 for definitions; hbar is retained only when dimensional restoration is required",
+    "signature": "(-,+,+,+)",
+    "curvature": "R^a_bcd = partial_c Gamma^a_db - partial_d Gamma^a_cb + Gamma^a_ce Gamma^e_db - Gamma^a_de Gamma^e_cb",
+    "einstein_equation": "G_ab=8*pi*T_ab",
+    "areal_coordinate": "x=r/R",
+    "dimensionless_time": "tau=t/R with t normalized to Schwarzschild time at infinity",
+    "dimensionless_metric": "ds^2/R^2=-A(x) d tau^2+B(x) dx^2+x^2 dOmega^2",
+    "dimensionless_density": "RHO(x)=8*pi*R^2*rho(r)",
+    "dimensionless_pressure": "P(x)=8*pi*R^2*p(r)",
+    "dimensionless_mass": "u(x)=m(r)/R"
+  },
+  "exact_constants": {
+    "C": "1/5",
+    "s": "sqrt(3/5)",
+    "delta": "1/sqrt(15)",
+    "h1": "atanh(s/(1+s))"
+  },
+  "interior_definition": {
+    "domain": "0<=x<=1",
+    "RHO": "3*(1-x^2)",
+    "u": "(5*x^3-3*x^5)/10",
+    "Z": "1-2*u/x=1-x^2+(3/5)*x^4 with analytic value Z(0)=1",
+    "B": "1/Z",
+    "h": "atanh(s*x^2/(1+sqrt(Z)))",
+    "theta": "h-h1",
+    "Y": "s*cos(theta)+delta*sin(theta)",
+    "A": "Y^2",
+    "P": "2*Z*Y'/(x*Y)+(Z-1)/x^2 with the analytic x=0 limit",
+    "EOS": "P_EOS(RHO)=P(sqrt(1-RHO/3)) for 0<=RHO<=3",
+    "tov_mass": "u'=x^2*RHO/2",
+    "tov_pressure": "P'=-(RHO+P)*(u+x^3*P/2)/(x*(x-2*u))",
+    "isotropy_ode": "2*Z*Y''+Z'*Y'-2*Z*Y'/x+Z'*Y/x-2*(Z-1)*Y/x^2=0",
+    "reduced_source_ode": "d^2Y/dtheta^2+Y=0"
+  },
+  "origin_definition": {
+    "x": "0",
+    "RHO": "3",
+    "RHO_prime": "0",
+    "u": "0",
+    "u_over_x_cubed": "1/2",
+    "Z": "1",
+    "Z_prime": "0",
+    "theta": "-h1",
+    "Y0": "s*cos(h1)-delta*sin(h1)",
+    "Y_prime": "0",
+    "P0": "2*s*(s*sin(h1)+delta*cos(h1))/(s*cos(h1)-delta*sin(h1))-1",
+    "P_prime": "0",
+    "regularity": "all scalar functions are even analytic functions of x near zero"
+  },
+  "surface_definition": {
+    "x": "1",
+    "RHO": "0",
+    "u": "1/5",
+    "Z": "3/5",
+    "theta": "0",
+    "Y": "sqrt(3/5)",
+    "Y_prime": "1/sqrt(15)",
+    "A": "3/5",
+    "P": "0",
+    "junction": "continuity of induced metric and extrinsic curvature to the same Schwarzschild mass M=R/5; no surface shell"
+  },
+  "exterior_definition": {
+    "domain": "1<=x<infinity",
+    "RHO": "0",
+    "P": "0",
+    "u": "1/5",
+    "A": "1-2/(5*x)",
+    "B": "1/A",
+    "infinity": "A->1, B->1, u/x->0 and the chart is asymptotically Minkowski"
+  },
+  "classical_proof_duties": [
+    {"id": "G2G-C01", "assertion": "the frozen G2F identity, mu, C and G2D exclusions are byte-identical at ingress"},
+    {"id": "G2G-C02", "assertion": "route A and route B both derive RHO=3*(1-x^2), u=(5*x^3-3*x^5)/10 and Z=1-x^2+3*x^4/5"},
+    {"id": "G2G-C03", "assertion": "the closed-form Y satisfies the isotropy ODE and both exact surface conditions"},
+    {"id": "G2G-C04", "assertion": "the pressure definition satisfies the radial Einstein equation and the dimensionless TOV equation identically"},
+    {"id": "G2G-C05", "assertion": "the origin values are finite, even analytic and free of conical or curvature singularities"},
+    {"id": "G2G-C06", "assertion": "RHO>0 and P>0 on 0<=x<1, RHO(1)=P(1)=0, and RHO'<=0 and P'<0 on 0<x<1"},
+    {"id": "G2G-C07", "assertion": "Z>=7/12 on 0<=x<=1, with the exact minimum at x^2=5/6; hence no horizon or coordinate fold occurs"},
+    {"id": "G2G-C08", "assertion": "0<=c_s^2=dP/dRHO<=1 on the closed interval using analytic endpoint limits"},
+    {"id": "G2G-C09", "assertion": "RHO>=abs(P), RHO+P>=0 and RHO+3*P>=0 on the interior"},
+    {"id": "G2G-C10", "assertion": "Gamma=(RHO+P)*c_s^2/P obeys the frozen local stability bound Gamma>=2 wherever P>0"},
+    {"id": "G2G-C11", "assertion": "the Chandrasekhar radial Sturm-Liouville problem has fundamental dimensionless eigenvalue Omega_0^2>0"},
+    {"id": "G2G-C12", "assertion": "surface induced metric and extrinsic curvature agree with Schwarzschild, and the exterior reaches normalized flat infinity"}
+  ],
+  "radial_stability_definition": {
+    "displacement": "zeta=x^2*A^(-1/2)*xi_radial",
+    "equation": "d/dx(Pi*zeta')+(Q+Omega^2*W)*zeta=0",
+    "Pi": "Gamma*P*A^(3/2)*B^(1/2)/x^2",
+    "Q": "A^(3/2)*B^(1/2)/x^2*(P'^2/(RHO+P)-4*P'/x-P*(RHO+P)*B)",
+    "W": "(RHO+P)*A^(1/2)*B^(3/2)/x^2",
+    "origin_boundary": "zeta=O(x^3)",
+    "surface_boundary": "limit Pi*zeta'=0 as x approaches 1 from below",
+    "rayleigh_quotient": "Omega^2=(integral(Pi*zeta'^2-Q*zeta^2)dx)/(integral(W*zeta^2)dx)",
+    "authoritative_stability_gate": "strict certified lower bound Omega_0^2>0; source heuristics alone cannot pass this duty"
+  },
+  "quantum_control": {
+    "field": "one free real scalar Phi",
+    "field_equation": "(Box-m_phi^2-xi_R*R_scalar)Phi=0",
+    "dimensionless_mass": "m_phi*R=1",
+    "curvature_coupling": "xi_R=0",
+    "self_interaction": "0",
+    "boundary_condition": "regular origin and finite-energy scattering behavior at spatial infinity; no material-surface boundary condition",
+    "static_lapse": "N=sqrt(A)>0 on the complete horizon-free spacetime",
+    "spatial_hilbert_space": "L2(Sigma,N^(-1)*dvol_h)",
+    "spatial_operator": "K=-N*D_i(N*D^i)+N^2*m_phi^2 on C_c^infinity(Sigma), followed by its positive Friedrichs extension",
+    "state": "the unique quasifree time-translation-invariant beta_KMS=infinity ground state defined by positive spectral calculus of K",
+    "two_point_function": "G_plus(t,f;t',g)=<f,exp(-i*K^(1/2)*(t-t'))*(2*K^(1/2))^(-1)g> on the frozen Hilbert space",
+    "hadamard_gate": "prove global hyperbolicity, strict positivity/self-adjointness of K and applicability of the static-ground-state Hadamard theorem",
+    "asymptotic_gate": "W0 approaches the massive Minkowski vacuum two-point function in the normalized asymptotic end"
+  },
+  "renormalization_definition": {
+    "method": "four-dimensional covariant Hadamard point splitting",
+    "hadamard_length": "ell_H=R",
+    "source_normalization": "alpha_4=1/(4*pi^2) from Decanini-Folacci v2 equation (32)",
+    "stress_operator": "T_ab'=g_b^b'*nabla_a*nabla_b'-(1/2)*g_ab*g^(cd')*nabla_c*nabla_d'-(1/2)*g_ab*m_phi^2, the xi_R=0 specialization of Decanini-Folacci v2 equation (61)",
+    "subtraction": "subtract the local Hadamard parametrix through the order required for a conserved RSET before coincidence",
+    "regular_biscalar": "W_H is the smooth state-dependent Hadamard coefficient remaining from G_plus after the U/sigma and V*ln(sigma/ell_H^2) terms are removed in the source normalization",
+    "v1": "v1=(1/8)*m_phi^4-(1/24)*m_phi^2*R_scalar+(1/120)*Box*R_scalar+(1/288)*R_scalar^2-(1/720)*R_ab*R^ab+(1/720)*R_abcd*R^abcd",
+    "finite_ambiguity_basis": ["m_phi^4*g_ab", "m_phi^2*G_ab", "I_ab", "J_ab"],
+    "finite_ambiguity_coefficients": ["0", "0", "0", "0"],
+    "mean_stress": "<T_ab>_ren=(1/(8*pi^2))*(lim_x'_to_x T_ab'[W_H]+2*g_ab*v1), the D=4, xi_R=0, Theta_ab=0 specialization of Decanini-Folacci v2 equation (70)",
+    "conservation_gate": "nabla^a<T_ab>_ren=0 as a distribution",
+    "claim_boundary": "this scheme definition is not a computed RSET and cannot establish backreaction or source closure"
+  },
+  "connected_noise_definition": {
+    "fluctuation_operator": "t_ab=T_ab-<T_ab>_ren",
+    "noise_kernel": "N_ab_c'd'(x,x')=(1/2)*<anticommutator(t_ab(x),t_c'd'(x'))> in the same state G_plus",
+    "renormalization": "use the same Hadamard/OPE prescription and finite-ambiguity choice as the mean stress",
+    "distribution_rule": "only separated-point or smooth compactly supported smeared pairings are admissible; an unsmeared pointwise coincidence is forbidden",
+    "connectedness_gate": "all products of one-point means are subtracted exactly",
+    "claim_boundary": "this definition is not a computed noise kernel or a semiclassicality result"
+  },
+  "quantum_proof_duties": [
+    {"id": "G2G-Q01", "assertion": "the joined interior/exterior spacetime is globally hyperbolic, static, horizon-free and has a complete Cauchy surface"},
+    {"id": "G2G-Q02", "assertion": "K has one positive Friedrichs extension with a strictly positive lower spectral bound"},
+    {"id": "G2G-Q03", "assertion": "W0 is one global quasifree static ground state and satisfies the Hadamard microlocal spectrum condition"},
+    {"id": "G2G-Q04", "assertion": "the same G_plus, ell_H and zero ambiguity vector bind both mean RSET and connected noise"},
+    {"id": "G2G-Q05", "assertion": "the RSET is locally covariant and conserved and the noise kernel is a symmetric positive-type bidistribution after admissible smearing"},
+    {"id": "G2G-Q06", "assertion": "primary and independent quantum constructions agree on mode normalization, W0, RSET and smeared-noise outputs within the later frozen agreement ABI"}
+  ],
+  "future_proof_program": {
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false,
+    "primary": {
+      "source_lineage": "new G2H C17 source using Arb/FLINT ball arithmetic and exact rational preprocessing",
+      "runtime_lineage": "future digest-pinned offline Linux x86_64 container with Arb/FLINT/GMP/MPFR arithmetic lineage",
+      "method": "exact identities plus 512-bit ball arithmetic, interval Taylor models and certified Sturm count"
+    },
+    "independent": {
+      "source_lineage": "new G2H Rust source written without importing or translating the C17 implementation",
+      "runtime_lineage": "future digest-pinned offline Linux x86_64 musl container using a pure-Rust limb/interval kernel with no GMP, MPFR, FLINT, Arb or C math linkage",
+      "method": "exact rational/Bernstein bounds, independently coded transcendental remainders and interval Rayleigh/Sturm bracketing"
+    },
+    "toolchain_pin_rule": "source, compiler, dependency and container digests must be frozen in G2H before either implementation is built; each reproducibly built executable digest must then be captured and frozen before that executable or any candidate-capable path is run",
+    "shared_scientific_inputs_only": ["this contract digest", "the seven source digests", "the fixed partitions and tolerances below"],
+    "forbidden_shared_components": ["source files", "generated code", "arithmetic libraries", "transcendental kernels", "container base layers", "compiler runtime", "cached numerical tables"]
+  },
+  "proof_arithmetic": {
+    "working_precision_bits": 512,
+    "precision_escalation": "forbidden",
+    "exact_layer": "integers, rationals and declared algebraic numbers",
+    "transcendental_enclosure_width_max": "2^-400",
+    "identity_residual_rule": "exact symbolic zero or an interval containing zero with width<=2^-400",
+    "strict_sign_rule": "the certified lower bound must be >0 or upper bound <0 as applicable; touching zero fails a strict duty",
+    "nan_infinity_rule": "any non-finite arithmetic object is terminal FAIL"
+  },
+  "proof_partitions": {
+    "interior_cells": 256,
+    "interior_endpoints": "x_k=k/256 for k=0..256",
+    "origin_cell": "[0,1/256] uses even Taylor models with explicit remainders",
+    "bulk_cells": "[k/256,(k+1)/256] for k=1..254",
+    "surface_cell": "[255/256,1] uses y=1-x Taylor models and exact surface limits",
+    "exterior_coordinate": "q=1/x in [0,1]",
+    "exterior_cells": 256,
+    "infinity_cell": "q in [0,1/256] uses q-series with exact q=0 limits",
+    "adaptive_subdivision": "forbidden"
+  },
+  "failure_precedence": [
+    "CONTRACT_OR_SOURCE_DIGEST_MISMATCH",
+    "G2D_REUSE_OR_IDENTITY_DRIFT",
+    "ARITHMETIC_OR_RUNTIME_IDENTITY_MISMATCH",
+    "ORIGIN_REGULARITY_FAIL",
+    "INTERIOR_EINSTEIN_TOV_FAIL",
+    "JUNCTION_OR_INFINITY_FAIL",
+    "POSITIVITY_MONOTONICITY_OR_HORIZON_FAIL",
+    "CAUSALITY_FAIL",
+    "RADIAL_STABILITY_FAIL",
+    "GLOBAL_STATIC_STATE_FAIL",
+    "HADAMARD_RSET_OR_NOISE_DEFINITION_FAIL",
+    "PRIMARY_INDEPENDENT_DISAGREEMENT"
+  ],
+  "chronology": [
+    "verify absent future roots and every frozen digest",
+    "verify source/runtime disjointness before build",
+    "build both implementations without executing either candidate path",
+    "run implementation-specific no-candidate fixtures",
+    "obtain separate one-shot proof-execution authorization",
+    "run primary once into its exclusive root and persist first failure or complete receipt",
+    "only after primary completion, run independent once into its exclusive root",
+    "compare immutable receipts without retry, retune, deletion or alternate roots"
+  ],
+  "future_roots": {
+    "primary": "artifacts/research/nhm2/g2h/tolman-vii-primary-v1",
+    "independent": "artifacts/research/nhm2/g2h/tolman-vii-independent-v1",
+    "rule": "both roots must remain absent throughout G2G and until separately authorized in G2H"
+  },
+  "sources": [
+    {"id": "tolman_vii_exact", "url": "https://arxiv.org/pdf/1506.05813v2", "bytes": 684526, "sha256": "a36fe51c5e54b306260f7950a831c527cced0892e24fbc8bd54dce39093f3438", "role": "exact density, metric, pressure, EOS, junction, causality and source stability criteria"},
+    {"id": "tolman_vii_independent", "url": "https://arxiv.org/pdf/gr-qc/0104002v2", "bytes": 119321, "sha256": "81389455a1d94d1b46bc5f16e242f8f1f873a2aa551c41fc4aa34bc7f9aa51ac", "role": "independent exact natural-star parametrization, mass relation, matching and perturbative benchmark"},
+    {"id": "static_hadamard", "url": "https://arxiv.org/pdf/hep-th/9507097v1", "bytes": 621871, "sha256": "d65a9f9f82212aeabc1ae99e41315ebea2595d4c2676deeac89e9c188294aea6", "role": "static ground/KMS Hadamard theorem"},
+    {"id": "hadamard_rset", "url": "https://arxiv.org/pdf/gr-qc/0512118v2", "bytes": 448374, "sha256": "676f41aac1dcff7f622ac147936e58e5e2ff60939a9688043d1657b92db29977", "role": "four-dimensional massive-scalar Hadamard RSET and finite ambiguities"},
+    {"id": "noise_kernel", "url": "https://arxiv.org/pdf/gr-qc/0010019v2", "bytes": 283952, "sha256": "38f2698b3f1dbefb3eda28d8aa24520818a021fb3f648376c56247c62bf2e820", "role": "connected scalar stress-noise bidistribution"},
+    {"id": "renormalized_fluctuations", "url": "https://arxiv.org/pdf/2512.17789v2", "bytes": 452153, "sha256": "8642014b6bc46c5965fed0a7de217fd9ad0ffc3786418e684d3b05bba495df3e", "role": "same-state mean/fluctuation renormalization and later semiclassicality criterion"},
+    {"id": "radial_stability", "url": "https://articles.adsabs.harvard.edu/pdf/1964ApJ...140..417C", "bytes": 968364, "sha256": "be355176953fa63691948105a7e2e4f0ef3ed63d13adb34265b02c6c76cd509a", "role": "Chandrasekhar radial variational/Sturm-Liouville stability definition, DOI 10.1086/147938"}
+  ],
+  "authority": {
+    "candidate_evaluations": 0,
+    "candidate_execution_authorized": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "proof_implementation_authorized": false,
+    "proof_execution_authorized": false,
+    "readiness": false,
+    "lane_execution_authorized": false,
+    "independent_replay_ready": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

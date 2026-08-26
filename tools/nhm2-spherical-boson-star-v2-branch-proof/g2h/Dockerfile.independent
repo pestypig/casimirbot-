@@ -1,0 +1,3 @@
+FROM scratch
+COPY tolman-vii-independent /tolman-vii-independent
+ENTRYPOINT ["/tolman-vii-independent"]

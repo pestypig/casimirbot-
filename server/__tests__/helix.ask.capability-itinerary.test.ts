@@ -341,6 +341,23 @@ describe("Helix Ask capability itinerary", () => {
       .toBe(true);
   });
 
+  it("counts only successful provider-neutral environment gateway packets as live-environment observations", () => {
+    const packet = (status: string) => ({
+      artifact_id: `ask:g6-role-inspect:workstation_gateway:${status}`,
+      kind: "provider_gateway_observation_packet",
+      payload: {
+        schema: "helix.agent_step_observation_packet.v1",
+        capability_key: "com.casimirbot.environment.reasoning_role.inspect",
+        status,
+      },
+    });
+
+    expect(isHelixCapabilityItineraryFamilyObserved("live_environment", [packet("failed")]))
+      .toBe(false);
+    expect(isHelixCapabilityItineraryFamilyObserved("live_environment", [packet("succeeded")]))
+      .toBe(true);
+  });
+
   it("creates ordered compound subgoals for workspace status then calculator", () => {
     const itinerary = buildHelixCapabilityItinerary({
       turnId: "ask:workspace-then-calculator",

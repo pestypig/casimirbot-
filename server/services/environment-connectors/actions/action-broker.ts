@@ -816,6 +816,62 @@ const validateManifestIdentity = (
   }
 };
 
+type RegisteredActionCapability = {
+  capability_id: string;
+  capability_version: number;
+  action_kind: string;
+  effect_class: string;
+  workflow_modes: readonly string[];
+  allowed_control_engines: readonly string[];
+};
+
+export const resolveEnvironmentActionManifestCapabilityIntersection = (input: {
+  manifestCapabilities: HelixEnvironmentActionConnectorManifest["capabilities"];
+  registeredCapabilities: readonly RegisteredActionCapability[];
+  allowedCapabilityIds: ReadonlySet<string>;
+}): HelixEnvironmentActionConnectorManifest["capabilities"] => {
+  const registered = new Map(
+    input.registeredCapabilities.map((capability) => [
+      `${capability.capability_id}@${capability.capability_version}`,
+      capability,
+    ]),
+  );
+  const admitted: HelixEnvironmentActionConnectorManifest["capabilities"] = [];
+  for (const capability of input.manifestCapabilities) {
+    const trusted = registered.get(
+      `${capability.capability_id}@${capability.capability_version}`,
+    );
+    if (
+      !trusted ||
+      trusted.action_kind !== capability.action_kind ||
+      trusted.effect_class !== capability.effect_class ||
+      capability.workflow_modes.some(
+        (mode) => !trusted.workflow_modes.includes(mode),
+      ) ||
+      capability.control_engines.some(
+        (engine) => !trusted.allowed_control_engines.includes(engine),
+      )
+    ) {
+      throw new EnvironmentActionBrokerError(
+        "action_manifest_invalid",
+        403,
+        "The connector claimed a capability outside the registered adapter contract.",
+      );
+    }
+    if (input.allowedCapabilityIds.has(capability.capability_id)) {
+      admitted.push(capability);
+    }
+  }
+  if (admitted.length === 0) {
+    throw new EnvironmentActionBrokerError(
+      "action_manifest_invalid",
+      403,
+      "The connector manifest has no capability in the owner-approved intersection.",
+    );
+  }
+  return admitted;
+};
+
 export const recordEnvironmentActionConnectorManifest = async (input: {
   claim: EnvironmentActionConnectorClaim;
   manifest: unknown;
@@ -854,35 +910,12 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
     await readAuthorityConnectorRow(db, input.claim.authorityId),
   );
   const allowed = new Set(parseStringArray(authority.allowed_capability_ids));
-  const registered = new Map(
-    registry.profile.capabilities.map((capability) => [
-      `${capability.capability_id}@${capability.capability_version}`,
-      capability,
-    ]),
-  );
-  for (const capability of manifest.capabilities) {
-    const trusted = registered.get(
-      `${capability.capability_id}@${capability.capability_version}`,
-    );
-    if (
-      !trusted ||
-      !allowed.has(capability.capability_id) ||
-      trusted.action_kind !== capability.action_kind ||
-      trusted.effect_class !== capability.effect_class ||
-      capability.workflow_modes.some(
-        (mode) => !trusted.workflow_modes.includes(mode),
-      ) ||
-      capability.control_engines.some(
-        (engine) => !trusted.allowed_control_engines.includes(engine),
-      )
-    ) {
-      throw new EnvironmentActionBrokerError(
-        "action_manifest_invalid",
-        403,
-        "The connector claimed a capability outside the registered and owner-approved intersection.",
-      );
-    }
-  }
+  const admittedCapabilities =
+    resolveEnvironmentActionManifestCapabilityIntersection({
+      manifestCapabilities: manifest.capabilities,
+      registeredCapabilities: registry.profile.capabilities,
+      allowedCapabilityIds: allowed,
+    });
   const submittedManifestHash = environmentConnectorSha256(manifest);
   const existing = await db.query<ExistingManifestReplayRow>(
     `SELECT * FROM helix_environment_action_connector_manifests
@@ -911,13 +944,13 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
   const descriptors = listEnvironmentConnectorCapabilityDescriptors({
     adapterProfileId: registry.profile.profile_id,
   }).filter((descriptor) =>
-    manifest.capabilities.some(
+    admittedCapabilities.some(
       (capability) =>
         capability.capability_id === descriptor.capability_id &&
         capability.capability_version === descriptor.capability_version,
     ),
   );
-  if (descriptors.length !== manifest.capabilities.length) {
+  if (descriptors.length !== admittedCapabilities.length) {
     throw new EnvironmentActionBrokerError(
       "action_manifest_invalid",
       409,
@@ -1846,6 +1879,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
   ]);
   const interactionKinds = new Set([
     "interact",
+    "attack",
     "mine",
     "place",
     "craft",
@@ -2183,6 +2217,36 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
           "interaction",
         )
       );
+    case "attack": {
+      const pulses = finiteMeasurement(measurements, "attack_pulses");
+      const transitions = finiteMeasurement(
+        measurements,
+        "confirmed_hurt_or_health_transitions",
+      );
+      return (
+        measurements.target_defeated === true &&
+        measurements.safety_interrupted === false &&
+        measurements.friendly_fire === false &&
+        measurements.target_classification === "hostile" &&
+        stringMeasurementMatches(
+          measurements,
+          "target_ref",
+          args,
+          "target_ref",
+        ) &&
+        stringMeasurementMatches(
+          measurements,
+          "target_entity_type_id",
+          args,
+          "target_entity_type_id",
+        ) &&
+        wholeNonnegative(pulses) &&
+        pulses >= 1 &&
+        wholeNonnegative(transitions) &&
+        transitions >= 1 &&
+        finiteMeasurement(measurements, "rejected_attack_pulses") === 0
+      );
+    }
     case "hotbar_select":
       return (
         measurements.selection_matches === true &&
@@ -2228,8 +2292,11 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
     case "mine": {
       const removed = finiteMeasurement(measurements, "removed_count");
       const requested = finiteArgument(args, "count");
+      const requestedTarget = blockPositionKey(args.target_position);
+      const measuredTarget = blockPositionKey(measurements.target_position);
       return (
         stringMeasurementMatches(measurements, "block_id", args, "block_id") &&
+        (requestedTarget === null || requestedTarget === measuredTarget) &&
         wholeNonnegative(removed) &&
         wholeNonnegative(requested) &&
         wholeNonnegative(worldMutations) &&
@@ -2429,15 +2496,21 @@ export const canonicalizeEnvironmentActionResult = (input: {
       "The connector reported success after current-turn eligibility expired; the late result remains provenance but cannot prove the original turn succeeded.";
   } else if (
     input.result.outcome === "succeeded" &&
-    (!input.workflowEvidenceValid ||
-      !requiredPostconditionsVerified({
-        request: input.request,
-        result: input.result,
-      }))
+    !input.workflowEvidenceValid
   ) {
     outcome = "postcondition_failed";
     summary =
-      "The connector reported success without current execution-window evidence for every required action postcondition.";
+      "The connector reported success, but the matching terminal workflow event and its current execution-window measurements were not recorded consistently.";
+  } else if (
+    input.result.outcome === "succeeded" &&
+    !requiredPostconditionsVerified({
+      request: input.request,
+      result: input.result,
+    })
+  ) {
+    outcome = "postcondition_failed";
+    summary =
+      "The connector reported success, but its terminal measurements did not prove every required action postcondition.";
   }
   return helixEnvironmentActionResultSchema.parse({
     ...input.result,

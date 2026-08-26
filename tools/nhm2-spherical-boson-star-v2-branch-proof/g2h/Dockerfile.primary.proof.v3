@@ -1,0 +1,9 @@
+FROM nhm2-g2h-primary-proof:v2@sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab
+
+COPY tolman_vii_primary_proof_v3.c /src/tolman_vii_primary_proof_v3.c
+
+RUN gcc -std=c17 -O2 -fno-fast-math -fno-common -Wall -Wextra -Werror \
+      -o /usr/local/bin/tolman-vii-primary-proof-v3 /src/tolman_vii_primary_proof_v3.c \
+      -lflint-arb -lflint -lgmp -lmpfr
+
+ENTRYPOINT ["/usr/local/bin/tolman-vii-primary-proof-v3"]

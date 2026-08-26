@@ -363,6 +363,18 @@ const sessionRef = (
     .digest("hex")
     .slice(0, 32)}`;
 
+const oauthClientRef = (
+  issuer: string,
+  claims: JWTPayload,
+): string | null => {
+  const clientId = normalize(claims.azp) || normalize(claims.client_id);
+  if (!clientId) return null;
+  return `oauth_client:${crypto
+    .createHash("sha256")
+    .update(`${issuer}\n${clientId}`)
+    .digest("hex")}`;
+};
+
 export const resolveHelixAgentApiPrincipal = async (
   req: Request,
   verifier: HelixAgentAccessTokenVerifier = new DefaultHelixAgentAccessTokenVerifier(),
@@ -447,6 +459,7 @@ export const resolveHelixAgentApiPrincipal = async (
     subjectId: token.subject,
     accountProfileId: account.profile_id,
     accountType,
+    oauthClientRef: oauthClientRef(token.issuer, token.claims),
     scopes: token.scopes,
     tokenExpiresAt: token.expiresAt,
     accountContext: {

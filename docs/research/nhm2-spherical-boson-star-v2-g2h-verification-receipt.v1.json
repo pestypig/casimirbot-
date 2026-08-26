@@ -1,0 +1,52 @@
+{
+  "schema": "nhm2.g2h.verification_receipt.v1",
+  "status": "PASS",
+  "candidate_execution_performed": false,
+  "math": {
+    "command": "npm run math:report && npm run math:validate",
+    "report": "reports/math-report.json",
+    "report_bytes": 25037,
+    "report_sha256": "70023aee98b9ce972c3083cb6629364fd35eaa2e50cdc35c9f7aaac425ccca01",
+    "registry_entries": 318,
+    "validation": "PASS"
+  },
+  "warp": {
+    "required_files": 18,
+    "passed_files": 18,
+    "test_suites": 44,
+    "passed_test_suites": 44,
+    "tests": 179,
+    "passed_tests": 179,
+    "failed_tests": 0,
+    "report": "artifacts/research/nhm2/g2h-warp-vitest-v1.json",
+    "report_bytes": 58274,
+    "report_sha256": "9bbf1c924cca7f07c173b9a6cae55754ba3eab7e253ef6101e59314b7a62688f"
+  },
+  "casimir": {
+    "command": "npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200",
+    "trace_id": "adapter:19ccef1d-ecb7-46f2-9b0a-ddc0dbb16e16",
+    "run_id": "2461",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_status": "GREEN",
+    "integrity_ok": true,
+    "training_trace_export": "artifacts/training-trace.jsonl",
+    "training_trace_export_bytes_at_receipt": 4729098,
+    "training_trace_export_sha256_at_receipt": "1661bbba1fa7eae21ee07c34693e9c4601c20df9fc255244e9afa4c59cba88f0",
+    "run_record_sha256_without_line_ending": "b6a8fe14961273eb00cc7d844a90b5fd24724a5e57bdfe07dae3a9a487e1cd64"
+  },
+  "candidate_roots_absent": true,
+  "authorization_records_absent": true,
+  "candidate_evaluations": 0,
+  "candidate_admitted": false,
+  "classical_proof_established": false,
+  "geometry_state_accepted": false,
+  "lane_execution_authorized": false,
+  "diagnostic_lamp": false,
+  "physical_viability": false,
+  "propulsion_authority": false,
+  "transport_authority": false
+}

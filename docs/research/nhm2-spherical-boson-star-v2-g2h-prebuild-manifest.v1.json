@@ -1,0 +1,80 @@
+{
+  "schema": "nhm2.g2h.prebuild_manifest.v1",
+  "status": "fixture_harness_sources_frozen_candidate_path_hard_blocked",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "scope": "no-candidate fixture harness build only; not a completed proof implementation",
+  "primary": {
+    "source": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_primary.c",
+    "source_bytes": 4088,
+    "source_sha256": "beb200b2396d78960cd53d3fb56ca81691fa6cb484a846aac058a3950d9c2132",
+    "dockerfile": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.primary",
+    "dockerfile_sha256": "4e2c1b6beda162139037244fa1dfc05b8b720a7d171dd4faf306dfeaa8482c9e",
+    "base_image": "python@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
+    "base_rootfs_layers": [
+      "sha256:aca83606673032726b42f8e1396ceb979c32bfb26b602732baf699053e46b33e",
+      "sha256:9cec99e910cbef45442323a31a04c92b5c14dddf236dd769d02c54af99e56d6d",
+      "sha256:4858806d59148b044f1fb5491f84963f5742556eefa0ce9de13717e1a195edae",
+      "sha256:6bcbbe0b3546e8b3e707223aee64fd1c2d220d8d8c6834829e392648f38d5b6e"
+    ],
+    "offline_deb_cache": ".cal/nhm2-g2h/primary-debs",
+    "offline_deb_count": 79,
+    "offline_deb_bytes": 76542496,
+    "offline_deb_index_composite_sha256": "0318757b2cdf7c1a8e3899632cfd1daebcb547002f8fc697f689968887ae3dba",
+    "top_level_versions": {
+      "gcc": "4:12.2.0-3",
+      "libc6-dev": "2.36-9+deb12u14",
+      "libflint-dev": "2.9.0-5",
+      "libflint-arb-dev": "1:2.23.0-1+b1",
+      "libgmp-dev": "2:6.2.1+dfsg1-1.1",
+      "libmpfr-dev": "4.2.0-1"
+    },
+    "build_command": "docker build --network=none --no-cache -f Dockerfile.primary -t nhm2-g2h-primary-fixture:v1 .",
+    "executable_sha256": null,
+    "image_id": null
+  },
+  "independent": {
+    "source": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/tolman_vii_independent.rs",
+    "source_bytes": 4184,
+    "source_sha256": "5172f12298954a204c1df526e21c2ac1ddb67219aaf8896cbebc8971e82c09a0",
+    "dockerfile": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.independent",
+    "dockerfile_sha256": "b99d6a42837cc75b59e7ce00b4a2fe26211d6ef38a1e5ac800d7f87e4301e67a",
+    "rustc_version": "1.82.0 (f6e511eec 2024-10-15)",
+    "rustc_host": "x86_64-pc-windows-msvc",
+    "rustc_executable_sha256": "193d6c727e18734edbf7303180657e96e9d5a08432002b4e6c5bbe77c60cb3e8",
+    "rust_lld_executable_sha256": "53d1431f141aa2f591623778152efd461806af07f4f986902861551d351cdb45",
+    "target": "x86_64-unknown-linux-musl",
+    "target_component_files": 43,
+    "target_component_composite_sha256": "6fc73b34ece5e145a3b99694fcf8d4c0dc714ae2e53a99b056e80f6817b9a177",
+    "dependencies": [],
+    "runtime_base": "scratch",
+    "runtime_base_layers": [],
+    "build_command": "rustc --target x86_64-unknown-linux-musl -C linker=rust-lld -C opt-level=2 -C target-feature=+crt-static -C panic=abort -o tolman-vii-independent tolman_vii_independent.rs",
+    "executable_sha256": null,
+    "image_id": null
+  },
+  "fixture_inventory": [
+    "digest_mutation",
+    "authority_mutation",
+    "strict_sign_touching_zero",
+    "nonfinite_arithmetic",
+    "exact_rational_positive",
+    "chronology_interruption",
+    "deliberate_disagreement"
+  ],
+  "candidate_roots": [
+    "artifacts/research/nhm2/g2h/tolman-vii-primary-v1",
+    "artifacts/research/nhm2/g2h/tolman-vii-independent-v1"
+  ],
+  "authority": {
+    "candidate_evaluations": 0,
+    "proof_implementation_complete": false,
+    "candidate_execution_authorized": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

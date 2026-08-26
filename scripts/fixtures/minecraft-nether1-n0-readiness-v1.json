@@ -1,0 +1,133 @@
+{
+  "schema": "helix.minecraft.nether1_n0_readiness.v1",
+  "objective_id": "EH-MC-NETHER1",
+  "program_gate": "G8",
+  "maturity": "specified",
+  "ruleset": "survival_tas",
+  "execution_plane": "player_embodiment",
+  "required_player_capability_ids": [
+    "com.casimirbot.minecraft.player.workflow.status",
+    "com.casimirbot.minecraft.player.navigate",
+    "com.casimirbot.minecraft.player.look",
+    "com.casimirbot.minecraft.player.walk",
+    "com.casimirbot.minecraft.player.jump",
+    "com.casimirbot.minecraft.player.interact",
+    "com.casimirbot.minecraft.player.hotbar.select",
+    "com.casimirbot.minecraft.player.equipment.equip",
+    "com.casimirbot.minecraft.player.collect",
+    "com.casimirbot.minecraft.player.mine",
+    "com.casimirbot.minecraft.player.place",
+    "com.casimirbot.minecraft.player.craft",
+    "com.casimirbot.minecraft.player.inventory.transfer",
+    "com.casimirbot.minecraft.player.sequence.execute",
+    "com.casimirbot.minecraft.player.guardian.execute",
+    "com.casimirbot.minecraft.player.viability_guardian.arm",
+    "com.casimirbot.minecraft.player.viability_guardian.disarm",
+    "com.casimirbot.minecraft.player.workflow.cancel",
+    "com.casimirbot.minecraft.player.emergency_stop"
+  ],
+  "required_fabric_manifest_capability_ids": [
+    "com.casimirbot.minecraft.player.navigate",
+    "com.casimirbot.minecraft.player.look",
+    "com.casimirbot.minecraft.player.walk",
+    "com.casimirbot.minecraft.player.jump",
+    "com.casimirbot.minecraft.player.interact",
+    "com.casimirbot.minecraft.player.hotbar.select",
+    "com.casimirbot.minecraft.player.equipment.equip",
+    "com.casimirbot.minecraft.player.collect",
+    "com.casimirbot.minecraft.player.mine",
+    "com.casimirbot.minecraft.player.place",
+    "com.casimirbot.minecraft.player.craft",
+    "com.casimirbot.minecraft.player.inventory.transfer",
+    "com.casimirbot.minecraft.player.sequence.execute",
+    "com.casimirbot.minecraft.player.guardian.execute",
+    "com.casimirbot.minecraft.player.viability_guardian.arm",
+    "com.casimirbot.minecraft.player.viability_guardian.disarm"
+  ],
+  "required_read_capability_ids": [
+    "com.casimirbot.minecraft.actor.status.read",
+    "com.casimirbot.minecraft.inventory.check",
+    "com.casimirbot.minecraft.spatial_region.inspect",
+    "com.casimirbot.minecraft.situation_digest.read"
+  ],
+  "required_action_kinds": [
+    "navigate_to",
+    "look_at",
+    "walk",
+    "jump",
+    "interact",
+    "hotbar_select",
+    "equip",
+    "collect",
+    "mine",
+    "place",
+    "craft",
+    "inventory_transfer"
+  ],
+  "required_condition_kinds": [
+    "health_at_least",
+    "air_at_least",
+    "submerged_is",
+    "on_fire_is",
+    "in_lava_is",
+    "food_at_least",
+    "position_within",
+    "inventory_count_at_least",
+    "block_matches",
+    "focus_reachable",
+    "dimension_is",
+    "equipment_item_is",
+    "portal_nearby",
+    "hazard_clear",
+    "recipe_craftable",
+    "checkpoint_satisfied"
+  ],
+  "required_compositions": [
+    {
+      "composition_id": "standalone_collection",
+      "action_kinds": ["collect"],
+      "condition_kinds": ["inventory_count_at_least"]
+    },
+    {
+      "composition_id": "furnace_smelting",
+      "action_kinds": ["interact", "inventory_transfer"],
+      "condition_kinds": ["inventory_count_at_least"]
+    },
+    {
+      "composition_id": "portal_ignition",
+      "action_kinds": ["equip", "look_at", "place"],
+      "condition_kinds": ["portal_nearby"]
+    },
+    {
+      "composition_id": "portal_dimension_transition",
+      "action_kinds": ["navigate_to", "walk"],
+      "condition_kinds": ["portal_nearby", "dimension_is"]
+    }
+  ],
+  "required_contract_files": [
+    "shared/helix-environment-durable-goal.ts",
+    "server/services/environment-connectors/goals/durable-goal-store.ts",
+    "server/services/environment-connectors/live-mail/minecraft-situation-digest-mail-bridge.ts",
+    "shared/helix-environment-reasoning-role.ts",
+    "scripts/fixtures/minecraft-nether1-n0-compositions-v1.json",
+    "scripts/fixtures/minecraft-nether1-n0-course-v1.json",
+    "scripts/helix-minecraft-nether1-n0-course-plan.ts",
+    "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+    "scripts/helix-minecraft-launch-fabric-loopback.ps1",
+    "scripts/helix-minecraft-player-direct-diagnostic-capture.ts",
+    "scripts/helix-minecraft-player-mcp-capture.ts",
+    "scripts/helix-minecraft-player-helix-debug-capture.ts"
+  ],
+  "forbidden_capability_ids": [
+    "com.casimirbot.minecraft.player.build_nether_portal",
+    "com.casimirbot.minecraft.world.build_nether_portal"
+  ],
+  "acceptance_shortcuts_forbidden": [
+    "world_authority_survival_substitution",
+    "item_grant",
+    "teleportation",
+    "creative_inventory",
+    "server_command_portal_completion",
+    "hardcoded_portal_walkthrough"
+  ]
+}

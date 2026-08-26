@@ -1,0 +1,303 @@
+{
+  "schema": "nhm2.g2h_e_s3_r2.smooth_family_evidence_matrix.v1",
+  "assessment_date": "2026-08-23",
+  "protocol_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-selection-protocol.md",
+  "protocol_sha256": "f2fec60d0211e8762bee1a1b282dfdf3e38c8ebdbdb220ec068a8b02f2ba6cb2",
+  "historical_tolman_candidate_evaluations": 1,
+  "r2_candidate_evaluations": 0,
+  "candidate_execution_authorized": false,
+  "query_log": [
+    "site:arxiv.org mini boson star globally regular static asymptotically flat existence",
+    "site:arxiv.org mini boson star stability maximum mass ground state",
+    "site:arxiv.org quantum fields boson star renormalized stress tensor Hadamard noise kernel",
+    "site:arxiv.org boson star independent numerical convergence spectral code",
+    "site:arxiv.org solitonic boson star regular static asymptotically flat stability",
+    "site:arxiv.org solitonic boson star quantum field renormalized stress noise",
+    "site:arxiv.org spherical Proca star regular asymptotically flat stability ground state",
+    "site:arxiv.org Proca star renormalized stress tensor Hadamard noise kernel",
+    "site:arxiv.org spherical Dirac star regular asymptotically flat stability vacuum limit",
+    "site:arxiv.org Dirac star quantum field renormalized stress noise kernel",
+    "site:arxiv.org compact support C infinity perfect fluid star flat all orders boundary metric",
+    "site:arxiv.org static fluid sphere smooth compact support existence asymptotically flat",
+    "site:arxiv.org oscillaton exact periodic finite mass radiating tail asymptotically flat",
+    "site:arxiv.org oscillaton Hadamard renormalized stress tensor noise kernel",
+    "site:arxiv.org static globally hyperbolic ground state Hadamard scalar field",
+    "site:arxiv.org Hadamard renormalized stress tensor massive scalar general spacetime",
+    "site:arxiv.org stochastic gravity connected noise kernel curved spacetime"
+  ],
+  "sources": [
+    {
+      "id": "mini_boson_existence",
+      "title": "On existence of mini-boson stars",
+      "authors": "P. Bizoń and A. Wasserman",
+      "identifier": "arXiv:gr-qc/0002034; Commun. Math. Phys. 215 (2000) 357-373",
+      "url": "https://arxiv.org/abs/gr-qc/0002034",
+      "evidence": "Proves a countable family of globally regular, spherically symmetric mini-boson-star solutions of the Einstein-Klein-Gordon equations."
+    },
+    {
+      "id": "mini_boson_qft",
+      "title": "Quantum fields in boson star spacetime",
+      "authors": "P. M. Saffin and Q.-X. Xie",
+      "identifier": "arXiv:2601.05129; Phys. Rev. D 113, 125025 (2026)",
+      "url": "https://arxiv.org/abs/2601.05129",
+      "evidence": "Defines the regular static asymptotically flat quadratic mini-boson-star family, tabulates the source-coordinate member shat(0)=1.2 before the reported maximum-mass point near 1.24, and performs a direct spectral quantum-field/stress calculation on that family. The calculation uses a finite confining sphere and partial Pauli-Villars subtraction; it is a comparator, not a complete Hadamard/RSET/noise proof."
+    },
+    {
+      "id": "mini_boson_numerics",
+      "title": "A Numerical Study of Boson Stars",
+      "authors": "J. Balakrishna",
+      "identifier": "arXiv:gr-qc/9906110",
+      "url": "https://arxiv.org/abs/gr-qc/9906110",
+      "evidence": "Independent spherical and 3+1 numerical study, including equilibrium, perturbation and evolution benchmarks for ordinary boson stars."
+    },
+    {
+      "id": "mini_boson_stability",
+      "title": "Stable Phases of Boson Stars",
+      "authors": "B. Kleihaus, J. Kunz and S. Schneider",
+      "identifier": "arXiv:1109.5858; Phys. Rev. D 85, 024045 (2012)",
+      "url": "https://arxiv.org/abs/1109.5858",
+      "evidence": "Identifies the ordinary mini-boson-star stable phase and its turning-point structure."
+    },
+    {
+      "id": "mini_boson_dynamics",
+      "title": "Boson stars driven to the brink of black hole formation",
+      "authors": "S. H. Hawley and M. W. Choptuik",
+      "identifier": "boson-star stability study arXiv:gr-qc/0007039",
+      "url": "https://arxiv.org/abs/gr-qc/0007039",
+      "evidence": "Independent dynamical and mode evidence for stable and unstable ordinary boson-star branches around the maximum-mass turning point."
+    },
+    {
+      "id": "solitonic_boson",
+      "title": "Solitonic Boson Stars: Numerical solutions beyond the thin-wall approximation",
+      "authors": "L. G. Collodel and D. D. Doneva",
+      "identifier": "arXiv:2203.08203",
+      "url": "https://arxiv.org/abs/2203.08203",
+      "evidence": "Constructs static spherical solitonic boson-star families and documents their numerically stiff thin-wall regime."
+    },
+    {
+      "id": "scalar_dirac_proca_comparison",
+      "title": "Stars of bosons and fermions: a comparative study",
+      "authors": "C. A. R. Herdeiro, A. M. Pombo and E. Radu",
+      "identifier": "arXiv:1708.05674; Phys. Lett. B 773 (2017) 654-662",
+      "url": "https://arxiv.org/abs/1708.05674",
+      "evidence": "Constructs regular, horizonless, asymptotically flat spherical scalar, Dirac and Proca stars and records the dilute zero-field limit."
+    },
+    {
+      "id": "proca_radial_stability",
+      "title": "Numerical evolutions of spherical Proca stars",
+      "authors": "N. Sanchis-Gual et al.",
+      "identifier": "arXiv:1702.04532; Phys. Rev. D 95, 104028 (2017)",
+      "url": "https://arxiv.org/abs/1702.04532",
+      "evidence": "Nonlinear spherical evolutions identify a radially stable branch below maximum mass."
+    },
+    {
+      "id": "proca_nonspherical",
+      "title": "The non-spherical ground state of Proca stars",
+      "authors": "C. A. R. Herdeiro et al.",
+      "identifier": "arXiv:2311.14800",
+      "url": "https://arxiv.org/abs/2311.14800",
+      "evidence": "Finds that spherical fundamental Proca stars can evolve toward prolate configurations under nonspherical dynamics, preventing a full robustness score."
+    },
+    {
+      "id": "fluid_extent",
+      "title": "Static spherically symmetric perfect fluid solutions with finite radius",
+      "authors": "T. Makino",
+      "identifier": "arXiv:gr-qc/0204037",
+      "url": "https://arxiv.org/abs/gr-qc/0204037",
+      "evidence": "Gives finite- versus infinite-extent criteria for relativistic fluid solutions but does not establish a compact matter profile flat to all orders at a vacuum interface with a globally C-infinity joined metric."
+    },
+    {
+      "id": "oscillaton_tail",
+      "title": "Numerical simulation of oscillatons: extracting the radiating tail",
+      "authors": "P. Grandclément, G. Fodor and P. Forgács",
+      "identifier": "arXiv:1107.2791; Phys. Rev. D 84, 065037 (2011)",
+      "url": "https://arxiv.org/abs/1107.2791",
+      "evidence": "High-precision spectral work finds a nonzero tail: exact periodic configurations have infinite mass, whereas finite-mass oscillatons radiate and are not static."
+    },
+    {
+      "id": "static_hadamard",
+      "title": "Adiabatic Vacua and Hadamard States for Scalar Quantum Fields on Curved Spacetime",
+      "authors": "W. Junker",
+      "identifier": "arXiv:hep-th/9507097",
+      "url": "https://arxiv.org/abs/hep-th/9507097",
+      "evidence": "Supplies the static ground/KMS Hadamard route once the smooth globally hyperbolic and positive-operator hypotheses are proved."
+    },
+    {
+      "id": "general_hadamard_rset",
+      "title": "Hadamard renormalization of the stress-energy tensor for a quantized scalar field in a general spacetime of arbitrary dimension",
+      "authors": "Y. Décanini and A. Folacci",
+      "identifier": "arXiv:gr-qc/0512118; Phys. Rev. D 78, 044025 (2008)",
+      "url": "https://arxiv.org/abs/gr-qc/0512118",
+      "evidence": "Defines four-dimensional massive-scalar Hadamard RSET subtraction and finite ambiguity terms."
+    },
+    {
+      "id": "general_noise_kernel",
+      "title": "Noise Kernel in Stochastic Gravity and Stress Energy Bi-Tensor of Quantum Fields in Curved Spacetimes",
+      "authors": "N. G. Phillips and B. L. Hu",
+      "identifier": "arXiv:gr-qc/0010019; Phys. Rev. D 63, 104001 (2001)",
+      "url": "https://arxiv.org/abs/gr-qc/0010019",
+      "evidence": "Derives the connected scalar stress-noise bidistribution for general curved spacetimes."
+    },
+    {
+      "id": "xcfc_boson_convergence",
+      "title": "Constraint-satisfying initial data for scalar-field spacetimes in the extended conformal flatness condition",
+      "authors": "A. Palloni et al.",
+      "identifier": "arXiv:2605.20888",
+      "url": "https://arxiv.org/abs/2605.20888",
+      "evidence": "Independent constraint-solving and convergence benchmark for scalar-field/boson-star initial data; useful as a downstream comparator, not a proof of the selected static member."
+    }
+  ],
+  "negative_search_findings": [
+    "No primary source was found in the bounded queries that completes a Hadamard state, fully renormalized conserved RSET and connected-noise calculation on any candidate family.",
+    "The direct 2026 mini-boson-star calculation uses a finite confining sphere and incomplete logarithmic Pauli-Villars subtraction, so it raises Q only to 1 and cannot be imported as proof authority.",
+    "No solitonic-, Proca-, or Dirac-star-specific scalar RSET/noise calculation was found in the bounded queries.",
+    "No primary source was found that meets the compact-fluid candidate's all-orders matter-flatness and global C-infinity junction requirement.",
+    "The oscillaton negative control is nonstatic, and its exact-periodic and finite-mass requirements are incompatible in the cited high-precision tail calculation.",
+    "Search absence is not a nonexistence claim; unsupported scores are conservatively lowered as required by the protocol."
+  ],
+  "candidates": [
+    {
+      "id": "MINI_BOSON_STAR_ELL0_SCALAR_QFT_CONTROL",
+      "scores": {"S": 2, "D": 2, "L": 2, "V": 2, "K": 2, "Q": 1, "P": 2, "B": 2, "R": 2, "F": 2},
+      "member_rule_available": true,
+      "scientific_identity": "G2H_E_S3_R2_MINI_BOSON_STAR_SHAT0_6_5_SCALAR_HADAMARD_V1",
+      "member_selection_rule": "Freeze the fundamental nodeless quadratic mini-boson-star member at the source-tabulated central coordinate shat(0)=1.2, encoded exactly as 6/5 for ingress. Do not interpolate, optimize, retune or inspect a new solve. The source reports the maximum-mass point near 1.24, leaving a source-coordinate separation of 0.04 for this pre-turning-point member.",
+      "score_reasons": {
+        "S": "The EKG ansatz is exactly static in the metric and its fundamental nodeless soliton is regular everywhere; the complex phase carries no time dependence into the stress tensor.",
+        "D": "There is no material surface: regular origin and exponentially decaying scalar/metric profiles extend continuously through every finite radius to normalized asymptotically flat infinity.",
+        "L": "Regular nonvanishing metric functions, horizon absence and flat asymptotics reduce a positive global lapse minimum and spatial completeness to direct bounded duties.",
+        "V": "The source family has an explicit zero-field dilute limit with ADM mass and metric deformation tending to zero/Minkowski.",
+        "K": "For the frozen massive minimally coupled real control scalar, the static quadratic form is positive and the positive lapse infimum gives a finite strict mass-gap proof duty.",
+        "Q": "A direct same-family spectral quantum-field/stress calculation exists, but it is finite-volume and incompletely renormalized and supplies no full noise proof; standard smooth Hadamard/RSET/noise machinery remains required.",
+        "P": "A one-dimensional analytic-ODE plus interval/radii-polynomial route is bounded, aided by a global existence theorem and surface-free asymptotics.",
+        "B": "Independent equilibrium, mode, evolution, constraint and quantum calculations expose several source-disjoint comparators.",
+        "R": "The exact 6/5 source coordinate lies on the reported stable side of the maximum-mass turning point near 31/25 and is separately covered by ordinary mini-boson-star stability studies.",
+        "F": "A static spherical ODE, compactified exterior and one-dimensional mode decomposition are credible in two disjoint local runtimes."
+      },
+      "hard_falsifiers": [
+        "the ingress member differs from the nodeless quadratic EKG family at shat(0)=6/5",
+        "the metric is not one global C-infinity static asymptotically flat geometry",
+        "the lapse lacks a strictly positive global lower bound or the spatial slice is incomplete",
+        "the scalar has a node, the geometry has a horizon/fold, or any finite-radius interface/distribution is introduced",
+        "the branch cannot be continuously connected to Minkowski at zero field",
+        "the frozen real-scalar KG operator lacks a positive self-adjoint extension with a strict lower bound",
+        "a global static Hadamard ground state, conserved RSET and admissibly smeared connected noise cannot be constructed on the same geometry",
+        "the primary and independent implementations cannot be made source/runtime-disjoint",
+        "any frozen proof tolerance, grid, arithmetic rule or candidate parameter is changed after observing a result"
+      ]
+    },
+    {
+      "id": "SOLITONIC_BOSON_STAR_SCALAR_QFT_CONTROL",
+      "scores": {"S": 2, "D": 2, "L": 2, "V": 2, "K": 2, "Q": 1, "P": 1, "B": 1, "R": 1, "F": 1},
+      "member_rule_available": true,
+      "score_reasons": {
+        "S": "Static smooth solitonic boson-star solutions are constructed.",
+        "D": "The scalar field decays without a material surface and the solutions are asymptotically flat.",
+        "L": "A horizon-free branch exists, but a selected-member global lower-bound audit remains new work.",
+        "V": "The scalar family has a dilute zero-field limit.",
+        "K": "The same massive real-scalar positivity argument is available after lapse proof.",
+        "Q": "Only the general smooth static route was found; no same-family full RSET/noise calculation was found.",
+        "P": "The thin-wall regime is numerically stiff and substantially harder to validate globally.",
+        "B": "Independent family calculations exist, but the direct quantum comparator is absent.",
+        "R": "Stable configurations are reported, with potential-dependent branch structure requiring additional selection work.",
+        "F": "Feasible in principle but materially more expensive and fragile than the quadratic family."
+      },
+      "member_selection_rule": "Use the lowest nonzero source-tabulated stable-branch central amplitude for the exact source potential; no interpolation.",
+      "rejection_reason": "Eligible, but its frozen rank is strictly below the mini-boson-star row in quantum benchmarking, proof tractability, independent benchmarking and implementation boundedness."
+    },
+    {
+      "id": "FUNDAMENTAL_SPHERICAL_PROCA_STAR_SCALAR_QFT_CONTROL",
+      "scores": {"S": 2, "D": 2, "L": 2, "V": 2, "K": 2, "Q": 1, "P": 1, "B": 2, "R": 0, "F": 1},
+      "member_rule_available": true,
+      "score_reasons": {
+        "S": "The spherical Einstein-complex-Proca ansatz supplies a static smooth geometry.",
+        "D": "Regular horizonless solutions extend to asymptotically flat infinity without a material surface.",
+        "L": "The selected branch can support the same finite lapse/completeness proof duties.",
+        "V": "The field and mass continuously vanish in the dilute limit.",
+        "K": "The separate real-scalar control has the same positive massive operator route.",
+        "Q": "Only general scalar Hadamard/RSET/noise machinery was found on this background.",
+        "P": "A bounded spherical validated-numerics route is identifiable but adds vector constraints and components.",
+        "B": "Equilibrium and nonlinear-evolution comparators exist.",
+        "R": "Later nonspherical evolution evidence undermines the spherical configuration as a robust ground state.",
+        "F": "The vector system is implementable but more complex than the scalar control."
+      },
+      "member_selection_rule": "Use the lowest source-tabulated nonzero-amplitude member on the radially stable spherical branch; no interpolation.",
+      "rejection_reason": "Eligible under the frozen hard gates but lower-ranked, with a zero robustness score from nonspherical instability evidence."
+    },
+    {
+      "id": "FUNDAMENTAL_SPHERICAL_DIRAC_STAR_SCALAR_QFT_CONTROL",
+      "scores": {"S": 2, "D": 2, "L": 2, "V": 2, "K": 2, "Q": 1, "P": 1, "B": 1, "R": 0, "F": 1},
+      "member_rule_available": true,
+      "score_reasons": {
+        "S": "The minimum spinor multiplet admits a static spherical stress tensor and regular metric.",
+        "D": "The comparative construction supplies regular origin and asymptotically flat decay without a material surface.",
+        "L": "A selected horizonless member admits finite lapse/completeness proof duties.",
+        "V": "The classical field construction has a continuous dilute limit, although unit-charge physical interpretation is discrete.",
+        "K": "The separate massive real-scalar control retains the positive-operator route.",
+        "Q": "Only general smooth-background machinery was found for the scalar control.",
+        "P": "A spherical proof program exists but spinor constraints and normalization add complexity.",
+        "B": "The comparative construction is not accompanied by a same-family quantum or independent validated proof benchmark in the bounded evidence.",
+        "R": "No primary source establishing the required robust stable member was found.",
+        "F": "Credible but substantially more complex than the scalar family in two disjoint runtimes."
+      },
+      "member_selection_rule": "Use the lowest source-tabulated nonzero-amplitude fundamental member of the minimum spherical spinor multiplet; no interpolation.",
+      "rejection_reason": "Eligible under the frozen hard gates but strictly lower-ranked and lacks a robust stability benchmark."
+    },
+    {
+      "id": "SOURCE_DEFINED_C_INFINITY_COMPACT_FLUID_STAR_SCALAR_QFT_CONTROL",
+      "scores": {"S": 0, "D": 0, "L": 0, "V": 1, "K": 1, "Q": 1, "P": 0, "B": 0, "R": 0, "F": 1},
+      "member_rule_available": false,
+      "score_reasons": {
+        "S": "No primary source meeting the all-orders flat matter boundary and global C-infinity metric requirement was found.",
+        "D": "Finite-radius existence criteria do not prove a distribution-free all-orders vacuum join.",
+        "L": "No eligible member exists on which to bind the global lapse and completeness duties.",
+        "V": "Fluid families commonly possess weak-source limits, but no qualifying identity was found.",
+        "K": "General massive-scalar positivity is plausible only after the missing geometry is supplied.",
+        "Q": "General smooth machinery would apply to a qualifying background, but none was identified.",
+        "P": "There is no source-defined candidate to prove.",
+        "B": "There is no selected identity or independent comparator.",
+        "R": "There is no qualifying member or stability margin.",
+        "F": "A spherical fluid implementation is feasible, but that does not meet the mathematical gate."
+      },
+      "member_selection_rule": null,
+      "rejection_reason": "Ineligible: the defining all-orders compact-fluid source was not found, so S, D and P fail and no deterministic member exists."
+    },
+    {
+      "id": "QUADRATIC_REAL_SCALAR_OSCILLATON_QFT_CONTROL",
+      "scores": {"S": 0, "D": 0, "L": 0, "V": 1, "K": 0, "Q": 0, "P": 0, "B": 2, "R": 0, "F": 1},
+      "member_rule_available": false,
+      "score_reasons": {
+        "S": "The geometry is time-periodic rather than static.",
+        "D": "Exact periodicity has a radiating tail/infinite mass, while finite-mass configurations radiate.",
+        "L": "The frozen static lapse/spatial theorem hypotheses do not apply.",
+        "V": "A small-amplitude limit exists but does not repair staticity or the exact tail conflict.",
+        "K": "There is no time-independent KG spatial operator of the frozen form.",
+        "Q": "The frozen static-ground-state construction is inapplicable.",
+        "P": "No program can prove the mutually required staticity and selected oscillaton identity.",
+        "B": "Independent high-precision tail calculations make it a strong negative control.",
+        "R": "Finite-mass configurations radiate and are not stationary accepted geometries.",
+        "F": "Approximate evolution is feasible but cannot satisfy this gate."
+      },
+      "member_selection_rule": null,
+      "rejection_reason": "Ineligible: S, D, L, K, Q and P fail and no static member exists."
+    }
+  ],
+  "expected_decision": {
+    "verdict": "SELECT_ONE",
+    "selected_id": "MINI_BOSON_STAR_ELL0_SCALAR_QFT_CONTROL",
+    "scientific_identity": "G2H_E_S3_R2_MINI_BOSON_STAR_SHAT0_6_5_SCALAR_HADAMARD_V1",
+    "rank": [1, 1, 19, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+  },
+  "authority": {
+    "replacement_candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "lane_execution_authorized": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

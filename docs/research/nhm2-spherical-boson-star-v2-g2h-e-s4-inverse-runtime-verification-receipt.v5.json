@@ -1,0 +1,95 @@
+{
+  "schema": "nhm2.g2h_e_s4.inverse_runtime_verification_receipt.v5",
+  "status": "PASS_P02_P03_R02_R03_INVERSE_KERNELS_REMAINING_SCIENTIFIC_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source/runtime-disjoint inverse, exact determinant and finite Z0 constructors",
+    "current_maturity": "P01-P03 and R01-R03 complete on exact/manufactured pass/fail/corruption fixtures",
+    "target_maturity": "input evidence for P04/P05 and R04/R05 continuation builders",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "builder algorithms 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "fixture binding de5fce1ca1f0906d7cb36c003b7874e5a7fa39a5d63a43d918f47bcc2af8e290"
+    ],
+    "required_evidence": [
+      "complete-pivot Arb LU and all canonical unit-column solves",
+      "column-pivoted pure-Rust Householder QR and all canonical unit-column solves",
+      "2^-448 projected exact determinants under disjoint Bareiss and modular-CRT constructions",
+      "finite Z0 verification, singular/shape/corruption failures and fixed budgets",
+      "bound offline images/executables, independent audit and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "pivot, tie, dimension, projection, determinant, Hadamard-bound or Z0 semantic mismatch",
+      "shared scientific/runtime lineage, candidate ingress, root creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "continuation, stability or quantum constructor completion",
+      "candidate or positive-parameter evaluation",
+      "scientific Rust execution, authorization, G3, lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "P04/P05 then R04/R05 manufactured continuation-builder implementation"
+  },
+  "change_classification": {
+    "mathematical_semantics_changed": false,
+    "runtime_authority_changed": false,
+    "receipt_semantics_changed": false,
+    "proof_implementation_maturity_changed": true
+  },
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "manifest": {"bytes": 16709, "raw_sha256": "de5fce1ca1f0906d7cb36c003b7874e5a7fa39a5d63a43d918f47bcc2af8e290"},
+    "completion_matrix": {"bytes": 12993, "raw_sha256": "34ec3ba3115d514542a6e3c86e566228cd2c3a5570714cbc0f3c738ba6d2031c"},
+    "runtime_audit": {"bytes": 25669, "raw_sha256": "8d6e05163c9619c322363470a7adcc8a3b3b3b20d533a3806ba44fc92bc6db73"},
+    "completion_audit": {"bytes": 5005, "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"},
+    "arithmetic_audit": {"bytes": 6605, "raw_sha256": "2784eaf186dca24fe9cb826e997c0547901170046f4e9ce6564779ef2b6a9c55"},
+    "inverse_audit": {"bytes": 8571, "raw_sha256": "5918bdf8b1a53f2e3c59620b48ceea33533b5e565b2b2b0e61a8360c56f974a0"},
+    "canonical_work_program": {"bytes": 60029, "raw_sha256": "fe04d6395044b5246509c87a95808f81ff2c02769aa0a923dd2266acaaeb1555"},
+    "active_packet": {"bytes": 8304, "raw_sha256": "90dd065e82c659c00560fcfc51cc45d36baaa379ff147a6b84177121dd4b1347"}
+  },
+  "primary_P02_P03": {
+    "inverse_source_sha256": "bdc8928d3a4096950ca5dcc486fe81b169a19904e9658f005e27d46909b0e301",
+    "inverse_header_sha256": "3fdbc953e8c4b94c14b416dda82fdd8332ec4fb4fd5196a23be57688a3cc16f5",
+    "builder_image_id": "sha256:9e94d19f9014938b510e95c776778d164cce120777adfc2d495c1812de5221a1",
+    "runtime_image_id": "sha256:f802df1ee67232503cec2b29a20756268fbdcbe64c10687ec926aa4f3359cd31",
+    "executable_sha256": "8c2c5ee43f7083dee153c66f69815d1f3e02ff461f00aadbe66d9ec44222d5a8",
+    "fixture": {"status": "PASS", "inverse_checks_passed": 5, "inverse_checks_total": 5, "checks_passed": 29, "checks_total": 29}
+  },
+  "independent_R02_R03": {
+    "arithmetic_source_sha256": "bf03777db687a38c3edbccd5ca49a65abc9dc9f808e12ccdc53cc2613e91bcc2",
+    "inverse_source_sha256": "d23143c48bd63ff2004fa5ab8c1895feeebb45f2a5558d6820b2f94c151c89bc",
+    "determinant_source_sha256": "d336213d270a02d5f0e306fd860d452fd35c7ce3e3625b4d0f352a32d66227d6",
+    "runtime_image_id": "sha256:09d961892ab3e82f5e938aaa551eaaeec150bd51022e31a90fd097905e01ce2c",
+    "executable_sha256": "853641487a8f66e17311e8ccf424b41492027f1ee0f2692d009a63960f335d77",
+    "runtime_dependencies": [],
+    "fixture": {"status": "PASS", "arithmetic_checks_passed": 8, "arithmetic_checks_total": 8, "inverse_checks_passed": 8, "inverse_checks_total": 8, "determinant_checks_passed": 6, "determinant_checks_total": 6, "checks_passed": 29, "checks_total": 29}
+  },
+  "audits": {
+    "runtime": {"status": "PASS", "checks_passed": 72, "checks_total": 72},
+    "arithmetic": {"status": "PASS", "checks_passed": 15, "checks_total": 15},
+    "inverse": {"status": "PASS", "checks_passed": 19, "checks_total": 19},
+    "completion": {"status": "PASS_FAIL_CLOSED_MATRIX", "checks_passed": 8, "checks_total": 8, "common_roles_complete": 4, "primary_roles_complete": 3, "independent_roles_complete": 3, "S4_implementation_closure": false}
+  },
+  "regression_repair": {
+    "observed_fixture_failure": "R03 QR-derived inverse projection returned none while exact CRT fixtures passed",
+    "root_cause": "adding two same-sign 512-bit interval endpoints in a 512-bit container rejected a valid 513-bit exact midpoint sum",
+    "repair": "pure-Rust projection now uses exact signed 1024-bit endpoint accumulation followed by the unchanged 2^-448 ties-even rule and directed error construction",
+    "frozen_semantics_changed": false,
+    "candidate_data_used": false
+  },
+  "host_candidate_roots": {"primary": "absent", "independent": "absent"},
+  "execution": {"candidate_evaluations": 0, "positive_parameter_samples": 0, "scientific_builder_executed": false, "execution_authorized": false},
+  "authority": {
+    "receipt_is_scientific_proof": false,
+    "candidate_evaluated": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

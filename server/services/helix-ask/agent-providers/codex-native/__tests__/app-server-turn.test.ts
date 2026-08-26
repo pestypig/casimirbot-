@@ -461,6 +461,15 @@ describe("Codex native app-server turn", () => {
     expect(baseInstructions).toContain(
       "Selecting that capability is your semantic route proposal",
     );
+    expect(baseInstructions).toContain(
+      "the turn is incomplete until at least one matching dynamic Helix tool returns an observation",
+    );
+    expect(baseInstructions).toContain(
+      "Uncertainty about current state is a reason to call the narrowest matching read capability",
+    );
+    expect(baseInstructions).toContain(
+      "use a typed safety stop when the returned evidence cannot support the requested action",
+    );
     expect(baseInstructions).not.toContain("read-only reasoning worker");
     const lifecycle = result.debug.turn_lifecycle;
     const lifecycleKinds = lifecycle.events.map((event) => event.kind);

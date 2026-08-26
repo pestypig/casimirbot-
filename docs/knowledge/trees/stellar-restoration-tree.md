@@ -83,12 +83,12 @@ This tree connects star physics, ledgers, and restoration obligations. Minimal a
 ### Node: Deep Mixing Plan
 - id: deep-mixing-plan
 - type: concept
-- summary: Deep mixing plan describes slow tachocline circulation and guardrails used to extend the Sun's main-sequence lifetime (warp-web/deep-mixing-plan.html, docs/knowledge/deep-mixing.md). Minimal artifact: deep mixing plan overview.
+- summary: Deep mixing is a reduced-order hypothesis for testing whether conservative composition transport could extend a solar-mass star's main-sequence lifetime; it is not a solved solar intervention (warp-web/deep-mixing-plan.html, docs/knowledge/deep-mixing.md). Minimal artifact: deep mixing plan overview.
 
 ### Node: Deep Mixing Physics
 - id: deep-mixing-physics
 - type: concept
-- summary: Deep mixing physics helpers translate epsilon to tachocline flow setpoints (client/src/lib/deepMixingPhysics.ts). Minimal artifact: vr setpoint helpers.
+- summary: Deep mixing physics helpers separate gross circulation, net hydrogen delivery, cumulative accessible fuel, and tachocline flow setpoints (client/src/lib/deepMixingPhysics.ts). Minimal artifact: reduced-order ledger.
 
 ### Node: Deep Mixing Autopilot
 - id: deep-mixing-autopilot

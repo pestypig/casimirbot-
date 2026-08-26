@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-08-26T02:33:00.939Z" hostname="LAPTOP-FPCDI341" time="0.067">
+  <properties/>
+  <testcase name="readsEachVoxelAtMostOncePerBoundedAnalysis()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.03"/>
+  <testcase name="ranksTheFarthestReachableEndOfAWindingCorridor()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.004"/>
+  <testcase name="prefersADirectDiagonalOnlyWhenBothCornerColumnsAreClear()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.005"/>
+  <testcase name="exactGoalPlanningFailsClosedWhenTheRequiredVoxelEvidenceIsUnknown()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.003"/>
+  <testcase name="findsTheClearFootholdAboveABlockedForwardCell()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.002"/>
+  <testcase name="reportsUnknownCoverageInsteadOfPromotingItToASafeRoute()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.002"/>
+  <testcase name="recomputationReroutesAfterThePreferredCorridorBecomesBlocked()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.003"/>
+  <testcase name="supportsOneBlockDescentButRejectsHazardAdjacentFootholds()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.003"/>
+  <testcase name="plansToOneExactOwnedFrontierWaypoint()" classname="com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

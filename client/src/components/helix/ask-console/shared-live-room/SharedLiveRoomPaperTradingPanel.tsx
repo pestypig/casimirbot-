@@ -193,10 +193,12 @@ export function SharedLiveRoomPaperTradingPanel({
   connectionId,
   roomId,
   disabled,
+  readOnly = false,
 }: {
   connectionId: string;
   roomId: string;
   disabled: boolean;
+  readOnly?: boolean;
 }) {
   const [account, setAccount] = React.useState<PaperAccount | null>(null);
   const [lifecycle, setLifecycle] = React.useState<PaperLifecycle | null>(null);
@@ -278,8 +280,9 @@ export function SharedLiveRoomPaperTradingPanel({
   }, [refreshLifecycle, request]);
 
   React.useEffect(() => {
+    if (readOnly) return;
     void refresh();
-  }, [refresh]);
+  }, [readOnly, refresh]);
 
   React.useEffect(() => {
     if (!attendingLive || !liveControl?.deployment_enabled) return undefined;
@@ -380,7 +383,7 @@ export function SharedLiveRoomPaperTradingPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quote_probe_symbol: symbol }),
       });
-      await refresh();
+      if (!readOnly) await refresh();
       setMessage(receipt
         ? `${receipt.receipts.length} sanitized Robinhood read receipts recorded. No review or order tool was called.`
         : "Robinhood read acceptance returned no receipt.");
@@ -811,8 +814,33 @@ export function SharedLiveRoomPaperTradingPanel({
   return (
     <div className="mt-2 rounded border border-cyan-300/20 bg-cyan-400/5 p-2" data-testid="room-paper-trading">
       <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-200">
-        <ShieldAlert className="h-3 w-3" /> Deterministic paper risk
+        <ShieldAlert className="h-3 w-3" /> {readOnly
+          ? "Profile connection read access"
+          : "Deterministic paper risk"}
       </div>
+      <div className="mt-2 rounded border border-emerald-300/20 bg-emerald-400/5 p-1.5">
+        <p className="font-semibold text-emerald-100">
+          Robinhood read-only acceptance
+        </p>
+        <p className="mt-1 text-slate-400">
+          Selects only the account Robinhood marks agentic_allowed, then records five sanitized account/market receipts. It calls no review, placement, cancellation, option, crypto, transfer, or watchlist tool. A paper account is not required.
+        </p>
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          <input
+            aria-label="Read-only quote probe symbol"
+            value={readProbeSymbol}
+            onChange={(event) => setReadProbeSymbol(event.target.value.toUpperCase())}
+            disabled={busy || disabled}
+            className="w-24 rounded border border-white/15 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-50"
+          />
+          <button type="button" onClick={() => void verifyReadOnlyAccess()}
+            disabled={busy || disabled}
+            className="rounded border border-emerald-300/30 px-2 py-1 text-emerald-100 disabled:opacity-50">
+            Verify read-only access
+          </button>
+        </div>
+      </div>
+      {!readOnly ? <>
       {!account ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="flex min-w-0 flex-1 items-center gap-1 text-[10px] text-slate-300">
@@ -1030,28 +1058,6 @@ export function SharedLiveRoomPaperTradingPanel({
               </div>
             </div>
           ) : null}
-          <div className="mt-2 rounded border border-emerald-300/20 bg-emerald-400/5 p-1.5">
-            <p className="font-semibold text-emerald-100">
-              Robinhood read-only acceptance
-            </p>
-            <p className="mt-1 text-slate-400">
-              Selects only the account Robinhood marks agentic_allowed, then records five sanitized account/market receipts. It calls no review, placement, cancellation, option, crypto, transfer, or watchlist tool.
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              <input
-                aria-label="Read-only quote probe symbol"
-                value={readProbeSymbol}
-                onChange={(event) => setReadProbeSymbol(event.target.value.toUpperCase())}
-                disabled={busy || disabled}
-                className="w-24 rounded border border-white/15 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-50"
-              />
-              <button type="button" onClick={() => void verifyReadOnlyAccess()}
-                disabled={busy || disabled}
-                className="rounded border border-emerald-300/30 px-2 py-1 text-emerald-100 disabled:opacity-50">
-                Verify read-only access
-              </button>
-            </div>
-          </div>
           <div className="mt-2 rounded border border-cyan-300/20 bg-cyan-400/5 p-1.5">
             <div className="flex flex-wrap items-center justify-between gap-1">
               <div>
@@ -1328,6 +1334,7 @@ export function SharedLiveRoomPaperTradingPanel({
           ) : null}
         </div>
       ) : null}
+      </> : null}
       {message ? <p className="mt-2 text-[10px] text-cyan-100/70">{message}</p> : null}
     </div>
   );

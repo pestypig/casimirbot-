@@ -2,7 +2,7 @@
 
 **Document type:** model-specific experimental design and subsystem-commissioning protocol
 
-**Version:** first-reader external-review draft, 14 August 2026
+**Version:** first-reader external-review draft, 24 August 2026
 
 **Authors and affiliations:** to be supplied before external submission
 
@@ -237,10 +237,15 @@ supplement rather than used as scientific evidence.
 The executable prediction is not a generic “Diósi–Penrose” rate. It is one
 named reduced-order implementation: a nondissipative Diósi mass-density master
 equation for a single effective particle whose mass-density operator is
-Gaussian-smeared over the physical length R0 [1–3]. In schematic form,
+Gaussian-smeared over the physical length \(R_0\) [1–3]. The registered
+normalization is
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2f-dp-master-model -->
 \[
+\hat M_{R_0}(\mathbf x)=
+m(2\pi R_0^2)^{-3/2}
+\exp\!\left[-\frac{|\mathbf x-\hat{\mathbf q}|^2}{2R_0^2}\right],
+\qquad
 \frac{d\hat\rho}{dt}
 =-\frac{i}{\hbar}[\hat H,\hat\rho]
 -\frac{G}{2\hbar}
@@ -251,7 +256,9 @@ Gaussian-smeared over the physical length R0 [1–3]. In schematic form,
 \tag{1}
 \]
 
-The implementation freezes the convention, the mass representation, and R0.
+The implementation freezes this standard-deviation convention, the mass
+representation, and \(R_0\). A paper using a different Gaussian width convention
+must transform \(R_0\) before comparing rates.
 For two branches of the same effective Gaussian particle, with mass m and
 center separation d, the registered self-energy difference is
 
@@ -333,43 +340,73 @@ mass-density difference energy \(E_G\). The localized apparatus branches
 eigenstates, so the experiment reconstructs their projected complex coherence
 rather than assuming a literal two-line atomic spectrum.
 
-For the registered hypothesis lanes, the transparent scalar form is
+For the registered hypothesis lanes, a transparent reduced branch-basis ansatz
+is
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-schrodinger-coherence-factorization -->
 \[
 c_{AB}(t)=
-e^{-i\Delta E_Ht/\hbar}
+e^{-i\hbar^{-1}\int_0^t\Delta E_H(t')dt'}
 e^{-\chi_{\rm env}(t)}
-e^{-E_Gt/\hbar}.
+e^{-\int_0^t\Gamma_{\rm D}[d(t')]dt'}.
 \tag{5}
 \]
 
 The Hamiltonian energy difference \(\Delta E_H\) rotates phase. The ordinary
 open-system functional \(\chi_{\rm env}\) represents environmental contraction
 after the environment is traced out. The final factor is the additional
-nonunitary contraction of the frozen Diósi model. Equal units do not make these
-three objects interchangeable: in particular, a Schrödinger energy variance,
-a photon frequency, and the gravitational mass-density difference energy are
-not the same source term.
+nonunitary contraction of the frozen Diósi model, with
+\(\Gamma_{\rm D}=E_G/\hbar\). This product is authorized only when the effective
+channels are additive and separable (or commute in the reduced description),
+the branch histories are fixed, and no boundary--collapse coupling is present.
+For coupled or noncommuting dynamics the campaign must instead register and
+solve a joint master equation or time-ordered propagator. Constant
+\(\Delta E_H\), \(E_G\), and separation reduce Eq. (5) to the simpler exponential
+form used by the current synthetic fixture. Equal units do not make these
+objects interchangeable: a Schrödinger energy variance, a photon frequency,
+and the gravitational mass-density difference energy are not the same source
+term.
 
 After ordinary loss has been estimated from blinded controls, a remaining
 scalar contraction can be expressed as
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2j-dp-equivalent-energy-inverse -->
 \[
-E_{\rm D,eq}
+E_{\rm loss,eq}
 =-\frac{\hbar}{t}
 \ln\!\left|c_{AB,{\rm residual}}(t)\right|.
 \tag{6}
 \]
 
-Equation (6) is a conditional inference under the registered exponential
-model, not a calorimetric measurement of gravitational energy. The full
+Equation (6) is a conditional equivalent loss scale, not a calorimetric
+measurement of gravitational energy. It may be identified with \(E_G\) only
+after independently constrained ordinary loss has been removed and the
+registered Diósi-only exponential fixture is the model under test. The full
 whitened complex estimator in Eqs. (12)--(13), rather than this scalar summary,
 remains authoritative for distinguishing phase, loss, and correlated nuisance
 responses.
 
-#### 2.1.2 Constituent mass density changes the forecast
+#### 2.1.2 Closed-system mass and energy accounting
+
+The measured neutral-specimen mass is the authoritative \(m\) for an admitted
+apparatus identity. It already includes nuclear and electron rest masses and
+their binding and internal-energy contributions; none may be added again as an
+independent "electron weight." Absorption or emission changes the energy of a
+closed system by \(\pm h\nu\), and therefore its energy-equivalent mass by
+\(\pm h\nu/c^2\), but the same quantum is not also counted as a second mass
+source. Charge, current, polarizability, and photon exchange remain in the
+ordinary electromagnetic response lane.
+
+Only the branch-dependent total mass density enters
+\(\Delta\rho=\rho_A-\rho_B\). Common internal energy cancels from that
+difference; branch-correlated energy retained by the environment, boundary,
+supports, or readout does not cancel and must be carried in the complete
+joint-system ledger. Consequently any cross-ratio cancellation of Diósi loss
+requires identical complete branch-correlated mass-density histories,
+regularization, separation, exposure, and preparation in the paired cells.
+Otherwise each cell receives its own integrated \(E_G\) calculation.
+
+#### 2.1.3 Constituent mass density changes the forecast
 
 Equation (2) treats the apparatus as one effective Gaussian particle. Stage
 4.2J also evaluates a homogeneous sphere of physical radius \(R\), convolved
@@ -560,8 +597,10 @@ The boundary policy is deliberately independent. At matched branch mass-density
 and trajectory histories, changing the Casimir boundary does not modify this
 intrinsic candidate. Any proposed boundary modifier is a different model and
 must pass the existing tensor/noise/retarded-response manifold registry. Thus
-the experiment remains two-axis: the mass-separation-time campaign tests the
-registered Diósi model today and could later test a completed Penrose candidate;
+the experiment remains two-axis: an admitted mass--separation--time campaign
+would test the frozen Diósi model; a future Penrose candidate would require its
+own completed dynamics, prospective freeze, and admission before it could be
+tested;
 the four-cell estimator separately tests boundary-superposition
 nonfactorization.
 
@@ -761,8 +800,10 @@ nonequilibrium response belong first in H0.
 The motivating manifold statement is a research question, not an admitted
 mechanism: if alternative mass configurations source incompatible
 gravitational geometries, a collapse-like lifetime might scale with a
-gravitational self-energy. The present nonrelativistic master equation tests
-one phenomenological realization of that scale. A spacetime claim would
+gravitational self-energy. The present nonrelativistic master equation is a
+separate phenomenological Diósi model that uses the same Newtonian self-energy
+scale. It neither realizes nor directly tests Penrose's manifold hypothesis. A
+spacetime claim would
 additionally require a covariant source, a complete apparatus stress-energy
 tensor, a specified dynamical metric response, and a causal observable. Those
 objects are absent.
@@ -1101,7 +1142,7 @@ The parent synthetic redesign produced
 ![Figure 4. Identifiability progression.](figures/casimir-dp/identifiability-geometry.svg)
 
 *Figure 4. The first design's candidate direction lies almost inside the
-nuisance span. The parent redesign establishes the nominal whitened geometry
+nuisance span. The parent redesign supplies the nominal synthetic whitened geometry
 later transported by the bounded search. Both panels remain conditional on synthetic
 response vectors and an assumed covariance.*
 
@@ -1355,8 +1396,6 @@ Measured evidence remains `not_ready`; collapse identification and manifold
 dynamics remain `blocked`; physical viability remains `not_evaluated`; and no
 proper-time-to-collapse or Casimir-to-collapse bridge is registered.
 
-<!-- docs-print-page-break -->
-
 ### 5.8 Superconducting boundary control: bridge and nonbridges
 
 A superconducting boundary is useful here as an **ordinary-response control**,
@@ -1436,7 +1475,8 @@ collapse kernel.
 The integrated readiness gate turns the remaining feasibility
 questions into one fail-closed same-apparatus packet contract. It preserves the
 leading design, public component replays, proper-time budget, and
-superconducting boundary control as immutable upstream evidence. Public
+superconducting boundary control as upstream records retained at their original
+evidence tiers. Public
 measurements from different instruments remain useful component checks, but
 they are not fused into the proposed apparatus covariance or likelihood.
 
@@ -1472,7 +1512,8 @@ A standard boundary-independent Diósi factor multiplies both separated cells
 and cancels exactly from \(R_4\) when the active and reference cells share the
 same mass-density and branch-separation histories. Otherwise the two integrated
 Diósi exponents must be computed separately and cancellation is not asserted.
-Therefore the primary contraction tests the registered Diósi law, whereas
+Therefore an admitted primary contraction would test the registered Diósi law,
+whereas
 non-unit \(R_4\) tests boundary--superposition nonfactorization after the
 ordinary electromagnetic response is calibrated. Neither statistic alone
 establishes a Casimir-to-collapse mechanism.
@@ -1503,7 +1544,10 @@ provisional engineering convention; covariance uncertainty must be propagated
 and the threshold justified before confirmatory use. Blinding, train/holdout
 separation, custody, and zero cross-apparatus covariance fusion are mandatory.
 
-<!-- legacy-corrupted-stage4-2s-block
+
+### 5.10 Retarded-source propagation adds an executable ordinary-physics lane
+
+Empirical closure of this lane remains open.
 
 The leading design does not treat the boundary label as a magical switch.
 Every time-dependent voltage, current, trap field, compensation channel, and
@@ -1512,88 +1556,9 @@ phase, and dissipative response. Those responses belong to the ordinary null
 before any remaining contraction is compared with the frozen Diósi law.
 
 The familiar kinked-field-line construction is useful intuition, but field
-lines are not the dynamical derivation. In the nonrelativistic radiation limit,
-Maxwell's equations with a conserved source and retarded boundary condition
-give
-
-legacy-corrupted-equation-marker cdp-stage4-2s-retarded-radiation-field
-[
-mathbf E_{m rad}(mathbf r,t)=
-rac{q}{4piepsilon_0c^2R},
-hat{mathbf n}	imes
-left[hat{mathbf n}	imesmathbf a(t-R/c)ight].
-	ag{30}
-]
-
-The Stage-4.2S analytic benchmark recovers the transverse field, zero-
-acceleration limit, (1/R) amplitude law, retarded delay, circular-
-polarization projector, current conservation, and Larmor power. Numerical
-angular integration agrees with the analytic radiated power to relative error
-(2.57	imes10^{-16}). This establishes software and equation recovery, not a
-measured radiation background.
-
-The dimensionless propagation screen is
-
-legacy-corrupted-equation-marker cdp-stage4-2s-propagation-scale
-[
-kL=rac{2pi fL}{c}.
-	ag{31}
-]
-
-For the frozen (f=0.5) Hz boundary label and (L=80,mu{m m}),
-(kL=8.38	imes10^{-13}): geometric electromagnetic retardation at the
-fundamental is negligible. A synthetic 1550-nm optical benchmark gives
-(kL=324.29), so optical response requires a wave calculation. The registered
-1-kHz switching-edge and 1-MHz RF rows are scale demonstrations only; they do
-not assert the final rise time, trap frequency, or readout wavelength. A slow
-fundamental also does not bound unmeasured switching harmonics, ringing,
-material relaxation, mechanical sidebands, or optical backaction.
-
-The apparatus calculation must therefore use the measured source spectrum and
-the as-built retarded dyadic Green response:
-
-legacy-corrupted-equation-marker cdp-stage4-2s-green-to-coherence
-[
-E_i(mathbf r,omega)
-=imu_0omegaint d^3r',
-G^{m ret}_{ij}(mathbf r,mathbf r',omega)J_j(mathbf r',omega),
-qquad
-C_{0,eta}=C(0)e^{iPhi_{{m EM},eta}-chi_{{m EM},eta}}.
-	ag{32}
-]
-
-Stage 4.2S verifies, with a polarization-retaining synthetic Green matrix, the
-algebraic map from branch fields into differential energy and phase, absorption
-and heating, photon recoil, ordinary contraction, and the complex-coherence
-nuisance vector ((-chi_{m EM},Phi_{m EM})). Its numerical phase and
-loss are deliberately synthetic and are not apparatus forecasts.
-
-Ordinary-null integration remains unauthorized because 0/7 authorities are
-ready: measured source current maps and waveforms; the as-built retarded Green
-tensor; measured complex material response; branch geometry and polarization
-transfer; switching-edge spectral coverage; joint phase/loss/recoil/heating
-covariance; and independent full-wave plus energy-balance verification.
-Consequently measured evidence and retarded-source covariance remain
-`not_ready), residual attribution and collapse identification remain
-`blocked), physical viability remains `not_evaluated), and the physical
-pilot remains unauthorized. The frozen Diósi generator is unchanged and no
-radiation-, polarization-, Green-tensor-, frequency-, or Casimir-to-collapse
-edge is registered.
-
--->
-
-### 5.10 Retarded-source propagation closes a missing ordinary-physics lane
-
-The leading design does not treat the boundary label as a magical switch.
-Every time-dependent voltage, current, trap field, compensation channel, and
-readout field can propagate to the two branches with a delay, polarization,
-phase, and dissipative response. Those responses belong to the ordinary null
-before any remaining contraction is compared with the frozen Diósi law.
-
-The familiar kinked-field-line construction is useful intuition, but field
-lines are not the dynamical derivation. In the nonrelativistic radiation limit,
-Maxwell's equations with a conserved source and retarded boundary condition
-give
+lines are not the dynamical derivation. For a nonrelativistic point charge in
+vacuum, observed in the radiation zone, Maxwell's equations with a conserved
+source and retarded boundary condition give
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2s-retarded-radiation-field -->
 \[
@@ -1637,15 +1602,21 @@ E_i(\mathbf r,\omega)
 =i\mu_0\omega\int d^3r'\,
 G^{\rm ret}_{ij}(\mathbf r,\mathbf r',\omega)J_j(\mathbf r',\omega),
 \qquad
-C_{0,\beta}=C(0)e^{i\Phi_{{\rm EM},\beta}-\chi_{{\rm EM},\beta}}.
+\nabla_\mu J^\mu=0,
+\qquad
+C_{{\rm EM},\beta}=C(0)e^{i\Phi_{{\rm EM},\beta}-\chi_{{\rm EM},\beta}}.
 \tag{32}
 \]
 
-Stage 4.2S verifies, with a polarization-retaining synthetic Green matrix, the
+This Larmor recovery is a software benchmark, not a radiation model for the
+neutral diamond. Stage 4.2S verifies, with a polarization-retaining synthetic Green matrix, the
 algebraic map from branch fields into differential energy and phase, absorption
-and heating, photon recoil, ordinary contraction, and the complex-coherence
+and heating, radiated-energy/recoil screens, ordinary contraction, and the complex-coherence
 nuisance vector \((-\chi_{\rm EM},\Phi_{\rm EM})\). Its numerical phase and
-loss are deliberately synthetic and are not apparatus forecasts.
+loss are deliberately synthetic and are not apparatus forecasts. A photon-rate
+observable additionally requires a band-resolved \(P(\omega)\), quantum state,
+and detector response; a generic classical field supplies radiated-energy flux,
+not a unique photon count.
 
 Ordinary-null integration remains unauthorized because 0/7 authorities are
 ready: measured source current maps and waveforms; the as-built retarded Green
@@ -2039,7 +2010,79 @@ without a companion would motivate new tests and model comparison; it would not
 identify objective collapse. This is a scientific consequence of the detector
 gap, not merely cautious wording.
 
-### 11.4 What a null result would mean
+### 11.4 From residual inference to an internal-energy universality successor
+
+Rutherford's scattering analysis and modern collider reconstruction provide a
+methodological precedent, not a mechanism analogy. Rutherford inferred a
+compact central charge--the structure later called the nucleus--because a controlled probe produced an angular
+distribution that the diffuse-charge alternative could not explain [44]. At
+CERN and other collider programs, quark and gluon dynamics are inferred from
+detector-level final states through conservation laws, calibrated response,
+and competing QCD event models; confined quarks and gluons are not recovered as
+free objects [45]. The corresponding lesson here is narrower: a missing
+coherence term may justify a new dynamical hypothesis only after the apparatus
+response and alternative generators have been made predictive.
+
+This paper therefore registers a **successor experiment**, not an additional
+claim about the present data. Its admission trigger is a powered, independently
+replicated residual that follows the frozen mass--separation--hold-time law,
+survives the signed-phase controls, and retains the paper's lower interpretation
+ceiling while no independent companion is available. Design work may precede
+that trigger; physical acquisition may not.
+
+For composition cohort \(k\), define the registered Diósi exposure and a signed
+ordinary-null residual coordinate by
+
+<!-- helix-doc-equation-action/v1 id=cdp-composition-universality-successor -->
+\[
+\Lambda_k=\int_0^{T_k}\frac{E_{G,k}(t)}{\hbar}\,dt,\qquad
+\chi^{\rm res}_k=-\ln|C^{\rm meas}_k|+\ln|C^{H_0}_k|,
+\qquad
+\eta_k=\frac{\chi^{\rm res}_k}{\Lambda_k},\qquad
+\Delta\eta_{k\ell}=\eta_k-\eta_\ell .
+\tag{38}
+\]
+
+Here \(C^{H_0}_k\) is the cohort-specific complex-coherence prediction after
+measured ordinary response and covariance have been fitted without using the
+held-out residual cells. Equation (38) is a proposed comparison coordinate,
+not a presently authorized estimator: the joint complex likelihood, denominator
+uncertainty, selection rule, and coverage must be frozen before use. The
+registered universal Diósi comparator predicts \(\eta_k=1\) and hence
+\(\Delta\eta_{k\ell}=0\). A nonzero value first challenges ordinary-null closure,
+cohort equivalence, or the effective mass-density representation; it does not
+identify a constituent-specific collapse interaction.
+
+The successor should advance in four gated steps:
+
+| Step | Controlled change | Required matching and measurement | Maximum initial inference |
+| --- | --- | --- | --- |
+| material universality | low-loss specimens with different composition | measured total mass and three-dimensional density, geometry, preparation, optical and electromagnetic response, temperature, gas kernel, and readout covariance | whether the normalized residual is portable across materials |
+| isotope universality | isotope-enriched versions of one host material | isotopic assay, nuclear mass and binding ledger, density and phonon shifts, identical-branch preparation, and cohort-specific ordinary response | whether neutron content and nuclear binding expose a composition dependence after total-mass normalization |
+| internal-energy equivalence | independently prepared electronic, hyperfine, or ultimately nuclear-isomer states | state population, lifetime, emitted radiation, recoil, heating, branch-common energy history, and a complete source convention | whether a residual tracks a controlled internal-energy increment as its measured mass equivalent |
+| QCD interpretation | scheme- and scale-specified nuclear and lattice-QCD calculations applied after the physical comparisons | renormalization convention, nuclear-structure uncertainties, and no constituent double counting | bounds on a sourced model class, never direct gluon detection |
+
+The neutral specimen mass remains the authoritative input. It already contains
+nuclear rest energy, quark and gluon field dynamics, electrons, and nuclear,
+electromagnetic, and chemical binding contributions once. Lattice-QCD
+decompositions of proton energy are scheme and scale specified [46]; their
+individual terms are not invariant extra masses that may be added to the
+Diósi source. Moreover, the frozen \(R_0=100\) nm smearing scale is about eight
+orders of magnitude larger than hadronic structure. The present experiment is
+therefore insensitive to a spatially resolved quark or gluon distribution.
+
+The first two steps remain tests of the existing coarse-grained mass-density
+law. The third step is more demanding. Although conventional gravity couples
+to total stress-energy and mass--energy equivalence has been tested with atoms
+of specified mass and internal state [47], the registered nonrelativistic
+Diósi model does not provide a covariant rule that assigns separate collapse
+weights to internal QCD, nuclear, or electronic operators. Any such claim would
+require a new conserved-source dynamics, conventional gravitational-phase
+prediction, and preregistered likelihood. Agreement across cohorts would be
+consistent with universality of total mass-energy but would not prove QCD as a
+collapse mechanism. Disagreement would first be a material/source-model anomaly.
+
+### 11.5 What a null result would mean
 
 At a demonstrated sensitivity, a null result can exclude the registered
 effective-particle point. It cannot directly exclude a rigid-sphere
@@ -2051,7 +2094,7 @@ losses and all are within reach, the experiment tests a family. If their
 predictions diverge substantially, the representation itself becomes part of
 the prespecified alternative set.
 
-### 11.5 Priority order after this design study
+### 11.6 Priority order after this design study
 
 The next scientific work should be ordered by the chance that it invalidates
 the apparatus before costly acquisition:
@@ -2068,17 +2111,19 @@ the apparatus before costly acquisition:
    independent synthetic worlds;
 8. either demonstrate a companion instrument or retain the lower
    interpretation ceiling;
-9. only then freeze a blinded confirmatory campaign.
+9. only then freeze a blinded confirmatory campaign;
+10. only after a powered independent positive replication, admit the
+    composition and internal-energy universality successor in Section 11.4.
 
 This sequence keeps the paper's methodological core useful even if the present
 apparatus is rejected. The estimator, hypothesis separation, packet custody,
 and design gates can be carried into a lower-mass or otherwise redesigned
 platform without preserving the current sphere as a favored physical object.
 
-### 11.6 Supporting derivations and design ancestry
+### 11.7 Supporting derivations and design ancestry
 
 The full supporting derivations and historical apparatus narrative are
-preserved in Sections B.13--B.15 of the reproducibility supplement. The compact
+preserved in Sections B.13--B.20 of the reproducibility supplement. The compact
 record below retains the equations needed to understand why the present design
 was selected.
 
@@ -2094,13 +2139,22 @@ U_{\rm CP}(\mathbf r)=\frac{\hbar\mu_0}{2\pi}\int_0^\infty d\xi\,
 \xi^2\alpha_g(i\xi)\operatorname{Tr}\mathbf G^{(1)}(\mathbf r,\mathbf r;i\xi).
 \]
 
-For the diagnostic small-sphere limit,
+For an isotropic pointlike atom the first expression uses microscopic
+transition matrix elements. Alternatively, for a homogeneous isotropic sphere
+small compared with the relevant wavelengths and distances, the diagnostic
+macroscopic model is
 
 <!-- helix-doc-equation-action/v1 id=cdp-stage4-2k-sphere-polarizability -->
 \[
 \alpha_{\rm sph}(i\xi)=4\pi\epsilon_0R^3
 \frac{\epsilon(i\xi)-1}{\epsilon(i\xi)+2}.
 \]
+
+These are alternative response models, not consecutive multiplicative factors:
+the microscopic response must not be counted again if it is already encoded in
+the measured dielectric function \(\epsilon\). Neither point-dipole expression
+is authority for the finite, potentially anisotropic selected diamond; that
+case requires the as-built Maxwell/Green-tensor solution.
 
 Charge/current response controls this Casimir lane; mass density controls the
 registered Diósi lane. Phase fluctuations and gas collisions enter separately:
@@ -2119,8 +2173,9 @@ registered Diósi lane. Phase fluctuations and gas collisions enter separately:
 \left[1-e^{i\mathbf q\cdot\Delta\mathbf x/\hbar}\right].
 \]
 
-The superseded silica calculation established two design consequences: a normal
-split can generate an overwhelming boundary phase, whereas ideal-plane
+Within the superseded silica surrogate, the calculation produced two
+conditional design warnings: a normal split can generate an overwhelming
+boundary phase, whereas ideal-plane
 tangential symmetry cancels the nominal differential phase but not sensitivity
 to alignment noise. The selected specimen still requires a finite-geometry
 Maxwell solution, measured spectra, and a species-resolved gas kernel.
@@ -2217,8 +2272,8 @@ This paper establishes:
   synthetic ranking filters, while physical companion authority remains absent;
 - a synthetic normal/superconducting control assessment that preserves finite-
   frequency impedance, rejects thermally collinear and fabrication-degenerate
-  toggles, and verifies cancellation of standard boundary-independent Diósi
-  attenuation from the boundary ratio;
+  toggles, and recovers algebraic cancellation of standard boundary-independent
+  Diósi attenuation in the matched-history synthetic boundary-ratio fixture;
 - an executable integrated-pilot contract that separates the primary Diósi
   contraction from the four-cell boundary interaction and records a fail-closed
   readiness no-go while all eight same-apparatus authorities are absent;
@@ -2267,8 +2322,8 @@ space, the point retains cosine 0.7177 and condition number 6.53. The synthetic
 calculation assigns 1,028 dimensionless paired allocation units and gives
 conditional forecast power 0.927 at 1,600 units.
 
-The earlier no-go calculations are the evidence that shaped this design. They
-showed that the first signature was non-identifiable, the silica parent was gas
+The synthetic no-go calculations are design ancestry. Within their declared
+assumptions they found that the first signature was non-identifiable, the silica parent was gas
 dominated at its declared pressure, normal boundary orientation created an
 overwhelming phase screen, centered tangential cancellation was tolerance
 sensitive, and the Diósi energy varied by a factor of 6.77 across registered mass
@@ -2465,3 +2520,16 @@ submission.
 43. R. E. Stewart *et al.*, "Vacuum birefringence and the polarized X-ray
     emission from a radio magnetar," *Nature* (2026).
     https://doi.org/10.1038/s41586-026-10859-z; arXiv:2509.19446v4.
+44. E. Rutherford, "The Scattering of Alpha and Beta Particles by Matter and
+    the Structure of the Atom," *Philosophical Magazine* **21**, 669--688
+    (1911). https://doi.org/10.1080/14786440508637080
+45. S. Navas *et al.* (Particle Data Group), "Quantum Chromodynamics," in
+    *Review of Particle Physics*, *Physical Review D* **110**, 030001 (2024).
+    https://pdg.lbl.gov/2024/reviews/rpp2024-rev-qcd.pdf
+46. Y.-B. Yang *et al.*, "Proton Mass Decomposition from the QCD
+    Energy-Momentum Tensor," *Physical Review Letters* **121**, 212001 (2018).
+    https://doi.org/10.1103/PhysRevLett.121.212001
+47. L. Zhou *et al.*, "Joint mass-and-energy test of the equivalence principle
+    at the 10^-10 level using atoms with specified mass and internal energy,"
+    *Physical Review A* **104**, 022822 (2021).
+    https://doi.org/10.1103/PhysRevA.104.022822

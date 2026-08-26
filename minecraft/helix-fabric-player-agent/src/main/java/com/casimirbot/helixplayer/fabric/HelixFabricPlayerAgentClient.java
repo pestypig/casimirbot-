@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
@@ -389,9 +390,12 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
 
     private void maybeAutoJoin(Minecraft client) {
         PlayerAutoJoinInbox.AutoJoinRequest request = pendingAutoJoin;
+        boolean safeConnectionScreen =
+            client.screen instanceof TitleScreen ||
+            client.screen instanceof DisconnectedScreen;
         if (
             request == null || client.player != null || client.level != null ||
-            !(client.screen instanceof TitleScreen)
+            !safeConnectionScreen
         ) return;
         if (++autoJoinTitleTicks < 20) return;
 

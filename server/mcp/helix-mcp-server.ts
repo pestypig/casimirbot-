@@ -63,8 +63,13 @@ import {
 import {
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+  helixEnvironmentActionAuthoritySchema,
+  helixEnvironmentActionAuthoritySettingsSchema,
+  helixEnvironmentActionConnectorReadinessSchema,
   helixEnvironmentActionControlObservationSchema,
   helixEnvironmentActionObservationSchema,
+  type HelixEnvironmentActionAuthority,
+  type HelixEnvironmentActionConnectorReadiness,
 } from "@shared/helix-environment-action";
 import {
   HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
@@ -77,6 +82,18 @@ import {
   type HelixEnvironmentDurableGoalObjective,
   type HelixEnvironmentDurableGoalProjection,
 } from "@shared/helix-environment-durable-goal";
+import {
+  HELIX_ENVIRONMENT_MONITOR_EVENT_FAMILIES,
+  HelixEnvironmentMonitorContractError,
+  helixEnvironmentMonitorDeliverySchema,
+  helixEnvironmentMonitorLeaseSchema,
+  type HelixEnvironmentMonitorIdentity,
+} from "@shared/helix-environment-monitor";
+import {
+  buildHelixClientAuthorizationReadiness,
+  helixClientAuthorizationCapabilityProfileSchema,
+  helixClientAuthorizationReadinessSchema,
+} from "@shared/helix-client-authorization-readiness";
 import {
   HELIX_ENVIRONMENT_REASONING_ROLE_ARBITRATE_CAPABILITY,
   HELIX_ENVIRONMENT_REASONING_ROLE_DISPOSITION_CAPABILITY,
@@ -91,8 +108,21 @@ import {
 } from "@shared/helix-environment-reasoning-role";
 import {
   HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+  HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+  HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+  HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+  HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   helixEnvironmentProbeObservationSchema,
 } from "@shared/helix-environment-connector";
+import {
+  HELIX_BROKERAGE_READ_GATEWAY_ERROR_SCHEMA,
+  HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS,
+  helixBrokerageObservationSchema,
+} from "@shared/helix-brokerage-environment";
 import {
   helixRoomEnvironmentSelfBindingRequestSchema,
   helixRoomEnvironmentsReceiptSchema,
@@ -169,23 +199,50 @@ import {
   type EnvironmentProbeGatewayExecution,
 } from "../services/helix-ask/workstation-tool-gateway/environment-probe";
 import {
+  executeBrokerageReadGatewayCapability,
+  type BrokerageReadGatewayExecution,
+} from "../services/helix-ask/workstation-tool-gateway/brokerage-read";
+import {
   environmentDurableGoalStore,
   isEnvironmentDurableGoalError,
   type EnvironmentDurableGoalStore,
 } from "../services/environment-connectors/goals";
 import {
+  EnvironmentMonitorStoreError,
+  environmentMonitorStore,
+  type EnvironmentMonitorStore,
+} from "../services/environment-connectors/monitoring/environment-monitor-store";
+import {
+  environmentMonitorSemanticSource,
+  type EnvironmentMonitorSemanticSource,
+} from "../services/environment-connectors/monitoring/environment-monitor-semantic-source";
+import {
+  EnvironmentReasoningRoleError,
   environmentReasoningRoleStore,
   isEnvironmentReasoningRoleError,
   type EnvironmentReasoningRoleStore,
 } from "../services/environment-connectors/reasoning-roles/environment-reasoning-role-store";
-import { extendEnvironmentActionAuthorityLease } from
-  "../services/environment-connectors/actions/authority-store";
+import { createConnectorBootstrapPairing } from
+  "../services/environment-connectors/pairing/bootstrap-service";
+import { stageLocalMinecraftPlayerPairing } from
+  "../services/environment-connectors/pairing/local-player-pairing-handoff";
+import { stageLocalMinecraftServerPairing } from
+  "../services/environment-connectors/pairing/local-server-pairing-handoff";
+import {
+  configureEnvironmentActionAuthority,
+  extendEnvironmentActionAuthorityLease,
+  readEnvironmentActionAuthorities,
+  readEnvironmentActionConnectorReadiness,
+} from "../services/environment-connectors/actions/authority-store";
 import {
   bindOwnRoomEnvironmentSubject,
   isRoomEnvironmentSubjectError,
   listRoomEnvironmentProjections,
 } from "../services/environment-connectors/subjects";
-import { listStagePlayLiveSourceMailItems } from
+import {
+  enqueueStagePlayLiveSourceMailItem,
+  listStagePlayLiveSourceMailItems,
+} from
   "../services/stage-play/stage-play-live-source-mailbox-store";
 
 type RecordLike = Record<string, unknown>;
@@ -199,6 +256,10 @@ const HELIX_MINECRAFT_ACTION_MCP_SCOPES = [
   HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
 ] as const;
 const HELIX_MINECRAFT_STATUS_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+] as const;
+const HELIX_BROKERAGE_READ_MCP_SCOPES = [
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
 ] as const;
@@ -259,6 +320,8 @@ type HelixEnvironmentSubjectSelectToolArguments = {
 type HelixMinecraftPlayerActionToolArguments = {
   room_id: string;
   idempotency_key: string;
+  perception_semantic_fingerprint?: string;
+  principal_turn_id?: string;
   environment_label?: string;
   action: RecordLike & { action_kind: string };
 };
@@ -267,12 +330,79 @@ type HelixMinecraftActorStatusToolArguments = {
   room_id: string;
 };
 
+const HELIX_MINECRAFT_MCP_SITUATION_PROBE_KINDS = [
+  "inventory",
+  "nearby_entities",
+  "hazards",
+  "local_map",
+  "spatial_region",
+  "line_of_sight",
+  "reachability",
+  "perception_snapshot",
+] as const;
+
+type HelixMinecraftSituationProbeKind =
+  (typeof HELIX_MINECRAFT_MCP_SITUATION_PROBE_KINDS)[number];
+
+type HelixMinecraftSituationProbeToolArguments = {
+  room_id: string;
+  monitor?: {
+    monitor_id: string;
+    client_continuation_ref: string;
+  };
+  probe: {
+    kind: HelixMinecraftSituationProbeKind;
+    freshness_requirement_ms?: number;
+    position?: { x: number; y: number; z: number };
+    horizontal_radius?: number;
+    vertical_radius?: number;
+    purpose?:
+      | "general"
+      | "structure_planning"
+      | "build_planning"
+      | "structure_verification"
+      | "fire_safety"
+      | "landing_safety"
+      | "movement_safety";
+  };
+};
+
 type HelixEnvironmentSemanticWakeReadToolArguments = {
   room_id: string;
   source_id?: string;
   after_observation_revision?: number;
   limit: number;
 };
+
+type HelixEnvironmentMonitorCreateToolArguments = {
+  room_id: string;
+  goal_id: string;
+  client_continuation_ref: string;
+  event_families: Array<(typeof HELIX_ENVIRONMENT_MONITOR_EVENT_FAMILIES)[number]>;
+  max_event_age_ms: number;
+  wake_budget_total: number;
+  expires_in_seconds: number;
+};
+
+type HelixEnvironmentMonitorAccessToolArguments = {
+  monitor_id: string;
+  client_continuation_ref: string;
+};
+
+type HelixEnvironmentMonitorReadToolArguments =
+  HelixEnvironmentMonitorAccessToolArguments & {
+    timeout_ms: number;
+    limit: number;
+  };
+
+type HelixEnvironmentMonitorAcknowledgeToolArguments =
+  HelixEnvironmentMonitorAccessToolArguments & { cursor: number };
+
+type HelixEnvironmentMonitorSnapshotToolArguments =
+  HelixEnvironmentMonitorAccessToolArguments & {
+    snapshot_evidence_ref: string;
+    observed_at: string;
+  };
 
 type HelixMinecraftWorkflowStatusToolArguments = {
   room_id: string;
@@ -375,22 +505,109 @@ type HelixEnvironmentActionAuthorityExtendToolArguments = {
   expires_at: string;
 };
 
+type HelixEnvironmentActionAuthorityInspectToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+};
+
+type HelixEnvironmentActionAuthorityConfigureToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  settings: z.infer<typeof helixEnvironmentActionAuthoritySettingsSchema>;
+};
+
+type HelixEnvironmentPlayerPairLocalToolArguments = {
+  room_id: string;
+  binding_id: string;
+  action_authority_id: string;
+  credential_ttl_ms: number;
+  idempotency_key: string;
+};
+
+type HelixEnvironmentServerPairLocalToolArguments = {
+  room_id: string;
+  binding_id: string;
+  credential_ttl_ms: number;
+  idempotency_key: string;
+};
+
+type HelixBrokerageReadToolArguments = {
+  room_id: string;
+  connection_id?: string;
+  upstream_tool: (typeof HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS)[number];
+  upstream_arguments?: RecordLike;
+};
+
 export type HelixEnvironmentActionMcpExecutor =
   typeof executeEnvironmentActionGatewayCapability;
 export type HelixEnvironmentActionControlMcpExecutor =
   typeof executeEnvironmentActionControlGatewayCapability;
 export type HelixEnvironmentProbeMcpExecutor =
   typeof executeEnvironmentProbeGatewayCapability;
+export type HelixBrokerageReadMcpExecutor =
+  typeof executeBrokerageReadGatewayCapability;
 export type HelixEnvironmentDurableGoalMcpStore = Pick<
   EnvironmentDurableGoalStore,
   "create" | "inspect" | "append"
 >;
 export type HelixEnvironmentReasoningRoleMcpStore = Pick<
   EnvironmentReasoningRoleStore,
-  "recordOutput" | "inspect" | "recordPrincipalDisposition" | "arbitrate"
+  | "recordOutput"
+  | "inspect"
+  | "recordPrincipalDisposition"
+  | "arbitrate"
+  | "linkCompletedPrincipalExecution"
+>;
+export type HelixEnvironmentMonitorMcpStore = Pick<
+  EnvironmentMonitorStore,
+  | "create"
+  | "inspect"
+  | "readPendingDeliveries"
+  | "findDeliveredEvidenceRefs"
+  | "deliver"
+  | "markRetentionGap"
+  | "acknowledge"
+  | "recordFreshSnapshot"
+  | "revoke"
+>;
+export type HelixEnvironmentMonitorSemanticSourcePort = Pick<
+  EnvironmentMonitorSemanticSource,
+  "readOrWait"
 >;
 export type HelixEnvironmentActionAuthorityLeaseExtender =
   typeof extendEnvironmentActionAuthorityLease;
+export type HelixEnvironmentActionAuthorityConfigurator =
+  typeof configureEnvironmentActionAuthority;
+export type HelixEnvironmentActionAuthorityInspector = (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+}) => Promise<{
+  authorities: HelixEnvironmentActionAuthority[];
+  connectorReadiness: HelixEnvironmentActionConnectorReadiness[];
+}>;
+export type HelixEnvironmentPlayerPairLocalHandoff = (input: {
+  roomId: string;
+  ownerProfileId: string;
+  bindingId: string;
+  actionAuthorityId: string;
+  credentialTtlMs: number;
+  idempotencyKey: string;
+}) => Promise<{
+  pairing: RecordLike;
+  status: "player_pairing_inbox_staged";
+}>;
+
+export type HelixEnvironmentServerPairLocalHandoff = (input: {
+  roomId: string;
+  ownerProfileId: string;
+  bindingId: string;
+  credentialTtlMs: number;
+  idempotencyKey: string;
+}) => Promise<{
+  pairing: RecordLike;
+  status: "server_pairing_inbox_staged";
+}>;
 
 export type HelixEnvironmentDeviceCheckServicePort = (input: {
   ownerProfileId: string;
@@ -655,7 +872,15 @@ const normalizeMinecraftMcpActionArguments = (
     !Array.isArray(argumentsValue.target)
   ) {
     const { target, ...remaining } = argumentsValue;
-    return { ...remaining, ...(target as RecordLike) };
+    const flattenedTarget = { ...(target as RecordLike) };
+    if (action.action_kind === "track_target") {
+      // The canonical MCP action makes nearest-target selection explicit, while
+      // the model-facing gateway schema treats it as a fixed invariant and
+      // materializes it again before connector-protocol validation. Do not leak
+      // the invariant into the flat gateway arguments as an unadmitted field.
+      delete flattenedTarget.selection;
+    }
+    return { ...remaining, ...flattenedTarget };
   }
   return argumentsValue;
 };
@@ -683,11 +908,74 @@ const minecraftActorStatusOutputSchema = z
     status: z.enum(["completed", "blocked", "failed"]),
     summary: z.string(),
     observation: helixEnvironmentProbeObservationSchema,
+    perception_snapshot_compatibility: z
+      .object({
+        mode: z.literal("actor_status_catalog_compatibility_v1"),
+        catalog_refresh_required: z.literal(true),
+        ok: z.boolean(),
+        status: z.enum(["completed", "blocked", "failed"]),
+        summary: z.string(),
+        observation: helixEnvironmentProbeObservationSchema,
+      })
+      .strict(),
     answer_authority: z.literal(false),
     assistant_answer: z.literal(false),
     terminal_eligible: z.literal(false),
   })
   .strict();
+
+const minecraftSituationProbeOutputSchema = z
+  .object({
+    operation: z.literal("minecraft.situation.probe"),
+    probe_kind: z.enum(HELIX_MINECRAFT_MCP_SITUATION_PROBE_KINDS),
+    room_id: helixSharedLiveRoomIdSchema,
+    ok: z.boolean(),
+    status: z.enum(["completed", "blocked", "failed"]),
+    summary: z.string(),
+    observation: helixEnvironmentProbeObservationSchema,
+    monitor_projection: z.object({
+      disposition: z.enum(["not_requested", "projected", "unchanged"]),
+      monitor_id: z.string().trim().min(1).max(320).nullable(),
+      evidence_ref: z.string().trim().min(1).max(320).nullable(),
+    }).strict(),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const brokerageReadErrorObservationSchema = z.object({
+  schema: z.literal(HELIX_BROKERAGE_READ_GATEWAY_ERROR_SCHEMA),
+  ok: z.literal(false),
+  environment_domain: z.literal("brokerage"),
+  provider: z.literal("robinhood"),
+  error: z.string(),
+  summary: z.string(),
+  retryable: z.boolean(),
+  credential_included: z.literal(false),
+  account_numbers_included: z.literal(false),
+  raw_provider_payload_included: z.literal(false),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+  raw_content_included: z.literal(false),
+}).strict();
+
+const brokerageReadOutputSchema = z.object({
+  operation: z.literal("brokerage.robinhood.read"),
+  room_id: helixSharedLiveRoomIdSchema,
+  source_binding_id: z.string().trim().min(1).max(320).nullable(),
+  ok: z.boolean(),
+  status: z.enum(["completed", "blocked", "failed"]),
+  summary: z.string(),
+  observation: z.union([
+    helixBrokerageObservationSchema,
+    brokerageReadErrorObservationSchema,
+  ]),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
 
 const environmentSemanticWakeReadOutputSchema = z
   .object({
@@ -721,6 +1009,37 @@ const environmentSemanticWakeReadOutputSchema = z
     terminal_eligible: z.literal(false),
   })
   .strict();
+
+const environmentMonitorLeaseOutputSchema = z.object({
+  operation: z.enum([
+    "environment.monitor.create",
+    "environment.monitor.inspect",
+    "environment.monitor.acknowledge",
+    "environment.monitor.snapshot_record",
+    "environment.monitor.revoke",
+  ]),
+  lease: helixEnvironmentMonitorLeaseSchema,
+  credential_included: z.literal(false),
+  raw_events_included: z.literal(false),
+  content_role: z.literal("environment_monitor_control_not_assistant_answer"),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
+
+const environmentMonitorReadOutputSchema = z.object({
+  operation: z.literal("environment.monitor.read"),
+  lease: helixEnvironmentMonitorLeaseSchema,
+  delivery: helixEnvironmentMonitorDeliverySchema,
+  credential_included: z.literal(false),
+  raw_events_included: z.literal(false),
+  content_role: z.literal("environment_monitor_delivery_not_assistant_answer"),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
 
 const minecraftWorkflowControlOutputSchema = z
   .object({
@@ -795,6 +1114,78 @@ const environmentActionAuthorityExtendOutputSchema = z
     room_id: helixSharedLiveRoomIdSchema,
     authority: jsonObjectSchema,
     content_role: z.literal("environment_action_authority_receipt_not_assistant_answer"),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentActionAuthorityConfigureOutputSchema = z
+  .object({
+    operation: z.literal("environment.action_authority.configure"),
+    room_id: helixSharedLiveRoomIdSchema,
+    authority: helixEnvironmentActionAuthoritySchema,
+    content_role: z.literal(
+      "environment_action_authority_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentActionAuthorityInspectOutputSchema = z
+  .object({
+    operation: z.literal("environment.action_authority.inspect"),
+    room_id: helixSharedLiveRoomIdSchema,
+    environment_binding_id: z.string().trim().min(1).max(320),
+    authorities: z.array(helixEnvironmentActionAuthoritySchema),
+    connector_readiness: z.array(
+      helixEnvironmentActionConnectorReadinessSchema,
+    ),
+    content_role: z.literal(
+      "environment_action_authority_observation_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentPlayerPairLocalOutputSchema = z
+  .object({
+    operation: z.literal("environment.player_pair.local_handoff"),
+    room_id: helixSharedLiveRoomIdSchema,
+    action_authority_id: z.string().trim().min(1).max(320),
+    pairing: jsonObjectSchema,
+    handoff_status: z.literal("player_pairing_inbox_staged"),
+    credential_included: z.literal(false),
+    pairing_code_included: z.literal(false),
+    content_role: z.literal(
+      "environment_player_pairing_handoff_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentServerPairLocalOutputSchema = z
+  .object({
+    operation: z.literal("environment.server_pair.local_handoff"),
+    room_id: helixSharedLiveRoomIdSchema,
+    binding_id: z.string().trim().min(1).max(320),
+    pairing: jsonObjectSchema,
+    handoff_status: z.literal("server_pairing_inbox_staged"),
+    credential_included: z.literal(false),
+    pairing_code_included: z.literal(false),
+    content_role: z.literal(
+      "environment_server_pairing_handoff_receipt_not_assistant_answer",
+    ),
     reentry_required: z.literal(true),
     answer_authority: z.literal(false),
     assistant_answer: z.literal(false),
@@ -1066,6 +1457,34 @@ const toolError = (
 };
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+  if (
+    error instanceof EnvironmentMonitorStoreError ||
+    error instanceof HelixEnvironmentMonitorContractError
+  ) {
+    const value = {
+      schema: "helix.environment_monitor_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable:
+        error instanceof EnvironmentMonitorStoreError
+          ? error.statusCode >= 500
+          : false,
+      details:
+        error instanceof EnvironmentMonitorStoreError ? error.details : [],
+      credential_included: false,
+      raw_events_included: false,
+      content_role: "environment_monitor_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
   if (isRoomEnvironmentSubjectError(error)) {
     const value = {
       schema: "helix.environment_subject_error.v1",
@@ -1332,9 +1751,16 @@ export const createHelixMcpServer = (input: {
   environmentActionExecutor?: HelixEnvironmentActionMcpExecutor;
   environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
   environmentProbeExecutor?: HelixEnvironmentProbeMcpExecutor;
+  brokerageReadExecutor?: HelixBrokerageReadMcpExecutor;
   environmentDurableGoalService?: HelixEnvironmentDurableGoalMcpStore;
   environmentReasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
+  environmentMonitorService?: HelixEnvironmentMonitorMcpStore;
+  environmentMonitorSemanticSource?: HelixEnvironmentMonitorSemanticSourcePort;
+  environmentActionAuthorityInspector?: HelixEnvironmentActionAuthorityInspector;
+  environmentActionAuthorityConfigurator?: HelixEnvironmentActionAuthorityConfigurator;
   environmentActionAuthorityLeaseExtender?: HelixEnvironmentActionAuthorityLeaseExtender;
+  environmentPlayerPairLocalHandoff?: HelixEnvironmentPlayerPairLocalHandoff;
+  environmentServerPairLocalHandoff?: HelixEnvironmentServerPairLocalHandoff;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const roomControlService =
@@ -1357,13 +1783,75 @@ export const createHelixMcpServer = (input: {
       executeEnvironmentActionControlGatewayCapability;
   const environmentProbeExecutor =
     input.environmentProbeExecutor ?? executeEnvironmentProbeGatewayCapability;
+  const brokerageReadExecutor =
+    input.brokerageReadExecutor ?? executeBrokerageReadGatewayCapability;
   const durableGoalService =
     input.environmentDurableGoalService ?? environmentDurableGoalStore;
   const reasoningRoleService =
     input.environmentReasoningRoleService ?? environmentReasoningRoleStore;
+  const monitorService =
+    input.environmentMonitorService ?? environmentMonitorStore;
+  const monitorSemanticSource =
+    input.environmentMonitorSemanticSource ?? environmentMonitorSemanticSource;
+  const actionAuthorityInspector =
+    input.environmentActionAuthorityInspector ??
+    (async (request) => ({
+      authorities: await readEnvironmentActionAuthorities(request),
+      connectorReadiness: await readEnvironmentActionConnectorReadiness(
+        request,
+      ),
+    }));
+  const actionAuthorityConfigurator =
+    input.environmentActionAuthorityConfigurator ??
+      configureEnvironmentActionAuthority;
   const actionAuthorityLeaseExtender =
     input.environmentActionAuthorityLeaseExtender ??
       extendEnvironmentActionAuthorityLease;
+  const playerPairLocalHandoff =
+    input.environmentPlayerPairLocalHandoff ??
+    (async (request) => {
+      const created = await createConnectorBootstrapPairing({
+        roomId: request.roomId,
+        ownerProfileId: request.ownerProfileId,
+        purpose: "rotate",
+        bindingId: request.bindingId,
+        domainAdapter: "minecraft.fabric_mod.v1",
+        credentialTtlMs: request.credentialTtlMs,
+        commandCredentialRequested: false,
+        actionCredentialRequested: true,
+        actionAuthorityId: request.actionAuthorityId,
+        idempotencyKey: request.idempotencyKey,
+      });
+      const staged = await stageLocalMinecraftPlayerPairing({
+        command: `/helix-player pair ${created.pairingCode}`,
+      });
+      return {
+        pairing: created.pairing as unknown as RecordLike,
+        status: staged.status,
+      };
+    });
+  const serverPairLocalHandoff =
+    input.environmentServerPairLocalHandoff ??
+    (async (request) => {
+      const created = await createConnectorBootstrapPairing({
+        roomId: request.roomId,
+        ownerProfileId: request.ownerProfileId,
+        purpose: "rotate",
+        bindingId: request.bindingId,
+        domainAdapter: "minecraft.fabric_mod.v1",
+        credentialTtlMs: request.credentialTtlMs,
+        commandCredentialRequested: true,
+        actionCredentialRequested: false,
+        idempotencyKey: request.idempotencyKey,
+      });
+      const staged = await stageLocalMinecraftServerPairing({
+        command: `/helix pair ${created.pairingCode}`,
+      });
+      return {
+        pairing: created.pairing as unknown as RecordLike,
+        status: staged.status,
+      };
+    });
   const roomOwner = {
     tenantId: input.principal.tenantId,
     issuer: input.principal.issuer,
@@ -1401,6 +1889,42 @@ export const createHelixMcpServer = (input: {
     });
     return inspected.room.self_participant_id;
   };
+  const requireMonitorClientRef = (): string => {
+    const ref = input.principal.oauthClientRef?.trim();
+    if (ref) return ref;
+    throw new EnvironmentMonitorStoreError(
+      "mcp_client_identity_required",
+      403,
+      "The signed access token does not identify its OAuth client.",
+    );
+  };
+  const monitorAccess = (
+    argumentsValue: HelixEnvironmentMonitorAccessToolArguments,
+  ) => ({
+    monitorId: argumentsValue.monitor_id,
+    profileId: input.principal.accountProfileId,
+    mcpClientId: requireMonitorClientRef(),
+    clientContinuationRef: argumentsValue.client_continuation_ref,
+  });
+  const monitorOutput = (
+    operation:
+      | "environment.monitor.create"
+      | "environment.monitor.inspect"
+      | "environment.monitor.acknowledge"
+      | "environment.monitor.snapshot_record"
+      | "environment.monitor.revoke",
+    lease: z.infer<typeof helixEnvironmentMonitorLeaseSchema>,
+  ) => ({
+    operation,
+    lease,
+    credential_included: false as const,
+    raw_events_included: false as const,
+    content_role: "environment_monitor_control_not_assistant_answer" as const,
+    reentry_required: true as const,
+    answer_authority: false as const,
+    assistant_answer: false as const,
+    terminal_eligible: false as const,
+  });
   const server = new McpServer(
     {
       name: "casimirbot-helix-agent",
@@ -1418,6 +1942,47 @@ export const createHelixMcpServer = (input: {
         "Continue only while progress is possible and within the declared run budget.",
       ].join(" "),
     },
+  );
+
+  server.registerTool(
+    "helix_client_authorization_status",
+    {
+      title: "Check client authorization readiness",
+      description:
+        "Compares this signed bearer token with one named CasimirBot capability profile. It returns only required, granted-required, and missing scope names plus expiry and a stable recovery action; it exposes no bearer, subject, OAuth client identity, raw claims, credential, mutation, or answer authority.",
+      inputSchema: z.object({
+        capability_profile: helixClientAuthorizationCapabilityProfileSchema,
+      }).strict(),
+      outputSchema: helixClientAuthorizationReadinessSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async ({ capability_profile }) =>
+      callRoomTool(HELIX_SHARED_LIVE_ROOM_READ_SCOPE, async () => {
+        requireHelixAgentApiScope(
+          input.principal,
+          HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        );
+        const authorizationExpiresAt = input.principal.tokenExpiresAt?.trim();
+        if (!authorizationExpiresAt) {
+          throw new HelixAgentApiServiceError(
+            401,
+            "unauthorized",
+            "The bearer token has no verified expiry.",
+            false,
+          );
+        }
+        return buildHelixClientAuthorizationReadiness({
+          capabilityProfile: capability_profile,
+          grantedScopes: input.principal.scopes,
+          authorizationExpiresAt,
+        });
+      }),
   );
 
   server.registerTool(
@@ -1928,6 +2493,28 @@ export const createHelixMcpServer = (input: {
       callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
         requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
         requireCurrentRoomFeature();
+        if (
+          argumentsValue.payload.role_kind === "prospective_planning" &&
+          !argumentsValue.payload.abstain
+        ) {
+          const proposedActionKind =
+            typeof argumentsValue.payload.capability_arguments?.action_kind ===
+            "string"
+              ? argumentsValue.payload.capability_arguments.action_kind
+              : "";
+          const canonicalCapabilityId =
+            minecraftCapabilityIdForActionKind(proposedActionKind);
+          if (
+            !canonicalCapabilityId ||
+            canonicalCapabilityId !== argumentsValue.payload.capability_id
+          ) {
+            throw new EnvironmentReasoningRoleError(
+              "reasoning_role_capability_identity_mismatch",
+              409,
+              "The prospective plan must identify the canonical Minecraft capability registered for capability_arguments.action_kind. Repair the proposal before disposition or arbitration.",
+            );
+          }
+        }
         const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
         const projection = await reasoningRoleService.recordOutput({
           ownerProfileId: input.principal.accountProfileId,
@@ -2137,6 +2724,221 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_environment_action_authority_inspect",
+    {
+      title: "Inspect current player-action authority",
+      description:
+        "Lists the authenticated room member's visible Player Embodiment authorities and sanitized connector readiness for one exact environment. Credentials are never returned.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentActionAuthorityInspectOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentActionAuthorityInspectToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const inspected = await actionAuthorityInspector({
+          roomId: argumentsValue.room_id,
+          profileId: input.principal.accountProfileId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.action_authority.inspect",
+            room_id: argumentsValue.room_id,
+            environment_binding_id: argumentsValue.environment_binding_id,
+            authorities: inspected.authorities,
+            connector_readiness: inspected.connectorReadiness,
+            content_role:
+              "environment_action_authority_observation_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_action_authority_configure",
+    {
+      title: "Configure current player-action authority",
+      description:
+        "Lets the authenticated room owner configure the same finite Player Embodiment lease exposed by the owner UI. Exact participant/player binding, adapter capability registry, autonomy mode, manual override, and expiry remain server validated; no connector credential is returned.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        settings: helixEnvironmentActionAuthoritySettingsSchema,
+      }).strict(),
+      outputSchema: environmentActionAuthorityConfigureOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentActionAuthorityConfigureToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const authority = await actionAuthorityConfigurator({
+          roomId: argumentsValue.room_id,
+          ownerProfileId: input.principal.accountProfileId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          participantId: argumentsValue.settings.participant_id,
+          domainAdapter: argumentsValue.settings.domain_adapter,
+          allowedCapabilityIds:
+            argumentsValue.settings.allowed_capability_ids,
+          autonomyMode: argumentsValue.settings.autonomy_mode,
+          manualOverridePolicy:
+            argumentsValue.settings.manual_override_policy,
+          expiresAt: argumentsValue.settings.expires_at,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.action_authority.configure",
+            room_id: argumentsValue.room_id,
+            authority,
+            content_role:
+              "environment_action_authority_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_player_pair_local",
+    {
+      title: "Pair the same-host Minecraft player companion",
+      description:
+        "Creates an owner-authorized action-only pairing and stages it directly into the bounded same-host Fabric client inbox. The one-time code and connector credential never enter MCP output, model context, chat, or debug projections.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        credential_ttl_ms: z.number().int().min(60_000).max(30 * 24 * 60 * 60 * 1_000),
+        idempotency_key: idempotencyKeySchema,
+      }).strict(),
+      outputSchema: environmentPlayerPairLocalOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentPlayerPairLocalToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const handoff = await playerPairLocalHandoff({
+          roomId: argumentsValue.room_id,
+          ownerProfileId: input.principal.accountProfileId,
+          bindingId: argumentsValue.binding_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          credentialTtlMs: argumentsValue.credential_ttl_ms,
+          idempotencyKey: argumentsValue.idempotency_key,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.player_pair.local_handoff",
+            room_id: argumentsValue.room_id,
+            action_authority_id: argumentsValue.action_authority_id,
+            pairing: handoff.pairing,
+            handoff_status: handoff.status,
+            credential_included: false,
+            pairing_code_included: false,
+            content_role:
+              "environment_player_pairing_handoff_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_server_pair_local",
+    {
+      title: "Pair the same-host Minecraft server connector",
+      description:
+        "Creates an owner-authorized command-only pairing for the exact existing Fabric room-source binding and stages it into the fixed repository server inbox. The one-time code and connector credential never enter MCP output, model context, chat, or debug projections. This tool does not execute Minecraft commands or grant command authority.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        binding_id: z.string().trim().min(1).max(320),
+        credential_ttl_ms: z.number().int().min(60_000).max(30 * 24 * 60 * 60 * 1_000),
+        idempotency_key: idempotencyKeySchema,
+      }).strict(),
+      outputSchema: environmentServerPairLocalOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE),
+    },
+    async (argumentsValue: HelixEnvironmentServerPairLocalToolArguments) =>
+      callRoomObservationTool(
+        HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+        async () => {
+          requireHelixAgentApiScope(
+            input.principal,
+            HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+          );
+          requireCurrentRoomFeature();
+          const handoff = await serverPairLocalHandoff({
+            roomId: argumentsValue.room_id,
+            ownerProfileId: input.principal.accountProfileId,
+            bindingId: argumentsValue.binding_id,
+            credentialTtlMs: argumentsValue.credential_ttl_ms,
+            idempotencyKey: argumentsValue.idempotency_key,
+          });
+          return {
+            ok: true,
+            value: {
+              operation: "environment.server_pair.local_handoff",
+              room_id: argumentsValue.room_id,
+              binding_id: argumentsValue.binding_id,
+              pairing: handoff.pairing,
+              handoff_status: handoff.status,
+              credential_included: false,
+              pairing_code_included: false,
+              content_role:
+                "environment_server_pairing_handoff_receipt_not_assistant_answer",
+              reentry_required: true,
+              answer_authority: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+            },
+          };
+        },
+      ),
+  );
+
+  server.registerTool(
     "helix_environment_action_authority_extend",
     {
       title: "Extend an exact player-action authority lease",
@@ -2196,7 +2998,7 @@ export const createHelixMcpServer = (input: {
     {
       title: "Read the selected Minecraft actor status",
       description:
-        "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The observation is evidence for Codex re-entry, never an assistant answer or terminal authority.",
+        "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The result also carries a separately labeled same-revision perception snapshot compatibility observation for clients whose MCP catalog has not yet refreshed; callers should still refresh their catalog to use the dedicated situation-probe tool. Both observations are evidence for Codex re-entry, never assistant answers or terminal authority.",
       inputSchema: z
         .object({
           room_id: helixSharedLiveRoomIdSchema,
@@ -2226,6 +3028,22 @@ export const createHelixMcpServer = (input: {
             accountContext: input.principal.accountContext,
             conversationThreadId: `helix-ask:room:${room_id}`,
           });
+        const perceptionDigest = crypto.randomUUID();
+        const perceptionExecution: EnvironmentProbeGatewayExecution =
+          await environmentProbeExecutor({
+            capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+            turnId: `mcp_environment_perception_compat_turn:${perceptionDigest}`,
+            toolCallId:
+              `mcp_environment_perception_compat_tool_call:${perceptionDigest}`,
+            providerExecutionId:
+              `mcp_environment_perception_compat_execution:${perceptionDigest}`,
+            arguments: {
+              horizontal_radius: 7,
+              vertical_radius: 8,
+            },
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
         return {
           ok: execution.ok,
           value: {
@@ -2235,11 +3053,524 @@ export const createHelixMcpServer = (input: {
             status: execution.status,
             summary: execution.summary,
             observation: execution.observation,
+            perception_snapshot_compatibility: {
+              mode: "actor_status_catalog_compatibility_v1",
+              catalog_refresh_required: true,
+              ok: perceptionExecution.ok,
+              status: perceptionExecution.status,
+              summary: perceptionExecution.summary,
+              observation: perceptionExecution.observation,
+            },
             answer_authority: false,
             assistant_answer: false,
             terminal_eligible: false,
           },
         };
+      }),
+  );
+
+  const situationFreshnessSchema = z.number().int().min(1_000).max(120_000)
+    .optional();
+  const currentActorSituationProbeSchema = (kind: Extract<
+    HelixMinecraftSituationProbeKind,
+    "inventory" | "nearby_entities" | "hazards" | "local_map"
+  >) => z.object({
+    kind: z.literal(kind),
+    freshness_requirement_ms: situationFreshnessSchema,
+  }).strict();
+  const minecraftPositionSchema = z.object({
+    x: z.number().min(-30_000_000).max(30_000_000),
+    y: z.number().min(-2_048).max(2_048),
+    z: z.number().min(-30_000_000).max(30_000_000),
+  }).strict();
+  const positionSituationProbeSchema = (kind: Extract<
+    HelixMinecraftSituationProbeKind,
+    "line_of_sight" | "reachability"
+  >) => z.object({
+    kind: z.literal(kind),
+    position: minecraftPositionSchema,
+    freshness_requirement_ms: situationFreshnessSchema,
+  }).strict();
+  const situationProbeInputSchema = z.object({
+    room_id: helixSharedLiveRoomIdSchema,
+    monitor: z.object({
+      monitor_id: z.string().trim().min(1).max(320),
+      client_continuation_ref: z.string().trim().min(1).max(320),
+    }).strict().optional(),
+    probe: z.discriminatedUnion("kind", [
+      currentActorSituationProbeSchema("inventory"),
+      currentActorSituationProbeSchema("nearby_entities"),
+      currentActorSituationProbeSchema("hazards"),
+      currentActorSituationProbeSchema("local_map"),
+      z.object({
+        kind: z.literal("spatial_region"),
+        horizontal_radius: z.number().int().min(1).max(7).optional(),
+        vertical_radius: z.number().int().min(1).max(16).optional(),
+        purpose: z.enum([
+          "general",
+          "structure_planning",
+          "build_planning",
+          "structure_verification",
+          "fire_safety",
+          "landing_safety",
+          "movement_safety",
+        ]).optional(),
+        freshness_requirement_ms: situationFreshnessSchema,
+      }).strict(),
+      z.object({
+        kind: z.literal("perception_snapshot"),
+        horizontal_radius: z.number().int().min(1).max(7).optional(),
+        vertical_radius: z.number().int().min(2).max(16).optional(),
+        freshness_requirement_ms: situationFreshnessSchema,
+      }).strict(),
+      positionSituationProbeSchema("line_of_sight"),
+      positionSituationProbeSchema("reachability"),
+    ]),
+  }).strict();
+  const situationCapabilityByKind: Readonly<Record<
+    HelixMinecraftSituationProbeKind,
+    string
+  >> = Object.freeze({
+    inventory: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+    nearby_entities: HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+    hazards: HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+    local_map: HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+    spatial_region: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+    line_of_sight: HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+    reachability: HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+    perception_snapshot: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+  });
+
+  server.registerTool(
+    "helix_minecraft_situation_probe",
+    {
+      title: "Inspect the selected Minecraft player's situation",
+      description:
+        "Requests one authenticated read-only inventory, nearby-entity, hazard, local-map, bounded spatial-region, same-revision perception-snapshot, exact line-of-sight, or geometric-reachability observation for the selected player. Local-map, spatial-region, and perception results cover only their declared bounds. Reachability is straight-line distance evidence and never proves a navigable or safe path. The result is evidence for Codex re-entry, never an assistant answer or terminal authority.",
+      inputSchema: situationProbeInputSchema,
+      outputSchema: minecraftSituationProbeOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async ({ room_id, monitor, probe }: HelixMinecraftSituationProbeToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const digest = crypto.randomUUID();
+        const { kind, ...probeArguments } = probe;
+        const execution: EnvironmentProbeGatewayExecution =
+          await environmentProbeExecutor({
+            capabilityId: situationCapabilityByKind[kind],
+            turnId: `mcp_environment_probe_turn:${digest}`,
+            toolCallId: `mcp_environment_probe_tool_call:${digest}`,
+            providerExecutionId: `mcp_environment_probe_execution:${digest}`,
+            arguments:
+              kind === "line_of_sight" || kind === "reachability"
+                ? { ...probeArguments, target: "position" }
+                : probeArguments,
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
+        let monitorProjection: {
+          disposition: "not_requested" | "projected" | "unchanged";
+          monitor_id: string | null;
+          evidence_ref: string | null;
+        } = {
+          disposition: "not_requested",
+          monitor_id: null,
+          evidence_ref: null,
+        };
+        if (monitor && kind !== "perception_snapshot") {
+          throw new EnvironmentMonitorStoreError(
+            "monitor_identity_mismatch",
+            409,
+            "Only a same-revision perception_snapshot may be projected into the semantic monitor.",
+          );
+        }
+        if (monitor && execution.ok && kind === "perception_snapshot") {
+          const lease = await monitorService.inspect(monitorAccess(monitor));
+          if (lease.identity.room_id !== room_id) {
+            throw new EnvironmentMonitorStoreError(
+              "monitor_identity_mismatch",
+              409,
+              "The perception snapshot room does not match the exact monitor identity.",
+            );
+          }
+          const observation = execution.observation as RecordLike;
+          const result = observation.result as RecordLike | undefined;
+          const fingerprint = typeof result?.semantic_fingerprint === "string"
+            ? result.semantic_fingerprint
+            : "";
+          const observationRevision = Number(
+            result?.observation_revision ?? observation.observation_revision,
+          );
+          if (
+            result?.snapshot_schema !== "helix.minecraft_perception_snapshot.v1" ||
+            !/^sha256:[a-f0-9]{64}$/u.test(fingerprint) ||
+            !Number.isInteger(observationRevision) ||
+            observationRevision < 0
+          ) {
+            throw new EnvironmentMonitorStoreError(
+              "monitor_run_unavailable",
+              409,
+              "The connector did not return a provenance-ready perception snapshot.",
+            );
+          }
+          const priorMail = listStagePlayLiveSourceMailItems({
+            threadId: `helix-ask:room:${room_id}`,
+            roomId: room_id,
+            sourceId: lease.identity.source_id,
+            sourceKind: "minecraft_world_event",
+            limit: 250,
+          });
+          const latest = priorMail.at(-1);
+          const digestId =
+            `environment_perception_snapshot:${observationRevision}:` +
+            fingerprint.slice(7, 39);
+          if (latest?.environmentIdentity?.digestHash === fingerprint) {
+            monitorProjection = {
+              disposition: "unchanged",
+              monitor_id: lease.monitor_id,
+              evidence_ref: latest.environmentIdentity.digestId,
+            };
+          } else {
+            const actor = (result.actor ?? {}) as RecordLike;
+            const inventory = (result.inventory ?? {}) as RecordLike;
+            const focus = (result.focus ?? {}) as RecordLike;
+            const uiState = (result.ui_state ?? {}) as RecordLike;
+            const worldRules = (result.world_rules ?? {}) as RecordLike;
+            const hazards = Array.isArray(result.hazards) ? result.hazards : [];
+            const summaryText = JSON.stringify({
+              schema: "helix.minecraft_perception_snapshot_mail_bridge.v1",
+              changed_fields: [
+                "actor.perception",
+                "inventory.snapshot",
+                "hazards.directional",
+                "focus.current",
+                "screen.state",
+                "movement.coverage",
+                "world.rules",
+              ],
+              semantic_state: {
+                semantic_event_types: ["perception.snapshot.changed"],
+                health: actor.health ?? null,
+                item_count: inventory.item_count ?? null,
+                hazard_count: hazards.length,
+                focus_kind: focus.kind ?? "unknown",
+                client_screen_state: uiState.client_screen_state ?? "unobserved",
+                keep_inventory: worldRules.keep_inventory ?? null,
+                semantic_fingerprint: fingerprint,
+              },
+              snapshot_evidence_ref: observation.evidence_ref,
+              raw_snapshot_included: false,
+              answer_authority: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+            });
+            const observedAt = typeof observation.observed_at === "string"
+              ? observation.observed_at
+              : new Date().toISOString();
+            enqueueStagePlayLiveSourceMailItem({
+              threadId: `helix-ask:room:${room_id}`,
+              roomId: room_id,
+              environmentId: lease.identity.environment_binding_id,
+              sourceId: lease.identity.source_id,
+              sourceKind: "minecraft_world_event",
+              environmentIdentity: {
+                producerPlane: "player_embodiment",
+                roomSourceBindingId: lease.identity.environment_binding_id,
+                worldId: lease.identity.world_id,
+                producerEpochRef: lease.identity.producer_epoch_ref,
+                subjectRef: lease.identity.subject_ref,
+                participantId: lease.identity.participant_id,
+                selectedPlayerRef: lease.identity.subject_ref,
+                selectedPlayerNativeId: null,
+                observationRevision,
+                digestId,
+                digestHash: fingerprint,
+                provenanceValid: true,
+              },
+              evidenceRef: digestId,
+              observationRef: String(observation.evidence_ref),
+              sourceHash: fingerprint,
+              dedupeKey: digestId,
+              sourceIdentityKey:
+                `${lease.identity.subject_ref}:${observationRevision}`,
+              summaryText,
+              summaryPreview:
+                `Minecraft perception changed: ${hazards.length} bounded hazards; ` +
+                `focus ${String(focus.kind ?? "unknown")}; screen ` +
+                `${String(uiState.client_screen_state ?? "unobserved")}.`,
+              confidence: 0.95,
+              deterministicChangeHint: "summary_changed",
+              sourceFreshness: "fresh",
+              evidenceRefs: [
+                String(observation.evidence_ref),
+                lease.identity.subject_ref,
+                lease.identity.producer_epoch_ref,
+              ],
+              createdAt: observedAt,
+            });
+            monitorProjection = {
+              disposition: "projected",
+              monitor_id: lease.monitor_id,
+              evidence_ref: digestId,
+            };
+          }
+        }
+        return {
+          ok: execution.ok,
+          value: {
+            operation: "minecraft.situation.probe",
+            probe_kind: kind,
+            room_id,
+            ok: execution.ok,
+            status: execution.status,
+            summary: execution.summary,
+            observation: execution.observation,
+            monitor_projection: monitorProjection,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_monitor_create",
+    {
+      title: "Create an environment semantic monitor",
+      description:
+        "Creates a finite read-only monitor for the authenticated OAuth client, its exact continuation, and one durable environment run the profile may read. Authority identity is derived from server state; the tool grants no Minecraft mutation or answer authority.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        goal_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320)
+          .regex(/^[a-zA-Z0-9:._/-]+$/u),
+        event_families: z.array(z.enum(HELIX_ENVIRONMENT_MONITOR_EVENT_FAMILIES))
+          .min(1).max(HELIX_ENVIRONMENT_MONITOR_EVENT_FAMILIES.length),
+        max_event_age_ms: z.number().int().min(100).max(300_000).default(120_000),
+        wake_budget_total: z.number().int().min(1).max(10_000).default(64),
+        expires_in_seconds: z.number().int().min(30).max(3_600).default(900),
+      }).strict(),
+      outputSchema: environmentMonitorLeaseOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentMonitorCreateToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const participantId = await resolveSelfParticipantId(argumentsValue.room_id);
+        const goal = await durableGoalService.inspect({
+          goalId: argumentsValue.goal_id,
+          profileId: input.principal.accountProfileId,
+          participantId,
+        });
+        if (
+          goal.identity.room_id !== argumentsValue.room_id ||
+          !goal.identity.run_id
+        ) {
+          throw new EnvironmentMonitorStoreError(
+            "monitor_identity_mismatch",
+            409,
+            "The monitor must bind the authenticated participant to one exact authorized durable run.",
+          );
+        }
+        const tokenExpiresMs = Date.parse(input.principal.tokenExpiresAt ?? "");
+        const now = new Date();
+        if (!Number.isFinite(tokenExpiresMs) || tokenExpiresMs <= now.getTime()) {
+          throw new EnvironmentMonitorStoreError(
+            "monitor_run_unavailable",
+            409,
+            "The monitor cannot outlive an absent or expired MCP authorization.",
+          );
+        }
+        const expiresAt = new Date(Math.min(
+          tokenExpiresMs,
+          now.getTime() + argumentsValue.expires_in_seconds * 1_000,
+        )).toISOString();
+        const identity: HelixEnvironmentMonitorIdentity = {
+          owner_profile_id: input.principal.accountProfileId,
+          mcp_client_id: requireMonitorClientRef(),
+          client_continuation_ref: argumentsValue.client_continuation_ref,
+          run_id: goal.identity.run_id,
+          goal_id: goal.goal_id,
+          room_id: goal.identity.room_id,
+          participant_id: participantId,
+          environment_binding_id: goal.identity.environment_binding_id,
+          source_id: goal.identity.source_id,
+          world_id: goal.identity.world_id,
+          subject_ref: goal.identity.subject_binding_id,
+          producer_epoch_ref: goal.identity.producer_epoch_ref,
+          policy_revision: goal.identity.authority_policy_version,
+        };
+        const lease = await monitorService.create({
+          identity,
+          eventFamilies: argumentsValue.event_families,
+          maxEventAgeMs: argumentsValue.max_event_age_ms,
+          wakeBudgetTotal: argumentsValue.wake_budget_total,
+          expiresAt,
+        });
+        return monitorOutput("environment.monitor.create", lease);
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_monitor_inspect",
+    {
+      title: "Inspect an environment semantic monitor",
+      description:
+        "Returns the credential-free finite lease and cursor state for this exact OAuth client continuation.",
+      inputSchema: z.object({
+        monitor_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentMonitorLeaseOutputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentMonitorAccessToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        return monitorOutput(
+          "environment.monitor.inspect",
+          await monitorService.inspect(monitorAccess(argumentsValue)),
+        );
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_monitor_read",
+    {
+      title: "Read or briefly wait for semantic monitor evidence",
+      description:
+        "Returns the oldest unacknowledged compact semantic batch, one new admitted batch, or a typed bounded-wait disposition. It never streams raw ticks or wakes a different continuation.",
+      inputSchema: z.object({
+        monitor_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320),
+        timeout_ms: z.number().int().min(0).max(10_000).default(0),
+        limit: z.number().int().min(1).max(20).default(10),
+      }).strict(),
+      outputSchema: environmentMonitorReadOutputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentMonitorReadToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const result = await monitorSemanticSource.readOrWait({
+          ...monitorAccess(argumentsValue),
+          timeoutMs: argumentsValue.timeout_ms,
+          limit: argumentsValue.limit,
+        });
+        return {
+          operation: "environment.monitor.read",
+          ...result,
+          credential_included: false,
+          raw_events_included: false,
+          content_role: "environment_monitor_delivery_not_assistant_answer",
+          reentry_required: true,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_monitor_acknowledge",
+    {
+      title: "Acknowledge an environment monitor cursor",
+      description:
+        "Monotonically acknowledges an already delivered cursor for this exact OAuth client continuation; it performs no environment action.",
+      inputSchema: z.object({
+        monitor_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320),
+        cursor: z.number().int().min(0),
+      }).strict(),
+      outputSchema: environmentMonitorLeaseOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentMonitorAcknowledgeToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        return monitorOutput(
+          "environment.monitor.acknowledge",
+          await monitorService.acknowledge({
+            ...monitorAccess(argumentsValue),
+            cursor: argumentsValue.cursor,
+          }),
+        );
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_monitor_snapshot_record",
+    {
+      title: "Record a fresh monitor recovery snapshot",
+      description:
+        "Records the exact evidence reference and observation time of a separately materialized fresh subject snapshot after a retention gap. It does not obtain or invent the snapshot.",
+      inputSchema: z.object({
+        monitor_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320),
+        snapshot_evidence_ref: z.string().trim().min(1).max(320),
+        observed_at: z.string().datetime({ offset: true }),
+      }).strict(),
+      outputSchema: environmentMonitorLeaseOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentMonitorSnapshotToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        return monitorOutput(
+          "environment.monitor.snapshot_record",
+          await monitorService.recordFreshSnapshot({
+            ...monitorAccess(argumentsValue),
+            snapshotEvidenceRef: argumentsValue.snapshot_evidence_ref,
+            observedAt: argumentsValue.observed_at,
+          }),
+        );
+      }),
+  );
+
+  server.registerTool(
+    "helix_environment_monitor_revoke",
+    {
+      title: "Revoke an environment semantic monitor",
+      description:
+        "Revokes only this exact profile/client/continuation monitor lease. Later delivery and acknowledgement fail closed.",
+      inputSchema: z.object({
+        monitor_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: environmentMonitorLeaseOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentMonitorAccessToolArguments) =>
+      callRoomTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        return monitorOutput(
+          "environment.monitor.revoke",
+          await monitorService.revoke(monitorAccess(argumentsValue)),
+        );
       }),
   );
 
@@ -2353,15 +3684,77 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_brokerage_robinhood_read",
+    {
+      title: "Read a private-room Robinhood observation",
+      description:
+        "Runs one reviewed Robinhood read tool for the authenticated developer's profile-owned connection and exact private room. Output is credential-free, nonterminal evidence for Codex re-entry; it cannot review, approve, place, cancel, or reconcile an order.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        connection_id: z.string().trim().min(1).max(320)
+          .regex(/^[a-zA-Z0-9:._/-]+$/u).optional(),
+        upstream_tool: z.enum(HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS),
+        upstream_arguments: jsonObjectSchema.optional(),
+      }).strict(),
+      outputSchema: brokerageReadOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: oauthToolMeta(HELIX_BROKERAGE_READ_MCP_SCOPES),
+    },
+    async ({
+      room_id,
+      connection_id,
+      upstream_tool,
+      upstream_arguments,
+    }: HelixBrokerageReadToolArguments) =>
+      callRoomObservationTool(HELIX_BROKERAGE_READ_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_BROKERAGE_READ_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const execution: BrokerageReadGatewayExecution =
+          await brokerageReadExecutor({
+            arguments: {
+              ...(connection_id ? { connection_id } : {}),
+              upstream_tool,
+              upstream_arguments: upstream_arguments ?? {},
+            },
+            accountContext: input.principal.accountContext,
+            conversationThreadId: `helix-ask:room:${room_id}`,
+          });
+        return {
+          ok: execution.ok,
+          value: {
+            operation: "brokerage.robinhood.read",
+            room_id,
+            source_binding_id: execution.sourceBindingId ?? null,
+            ok: execution.ok,
+            status: execution.status,
+            summary: execution.summary,
+            observation: execution.observation,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
     "helix_minecraft_player_action",
     {
       title: "Execute a typed Minecraft player action",
       description:
-        "Executes one bounded typed action or an admitted concurrent guardian program through the exact room, participant/player binding, Fabric action authority, live manifest, lease, resource locks, and manual-override policy. It does not accept raw server commands, shell, files, credentials, pairing material, or embedded model code. The returned observation must re-enter Codex before any answer is written.",
+        "Executes one bounded typed action or an admitted concurrent guardian program through the exact room, participant/player binding, Fabric action authority, live manifest, lease, resource locks, and manual-override policy. For perception-guided play, pass the exact fresh semantic_fingerprint: the harness derives a stable action identity so the same action against unchanged perception cannot become a second physical effect merely by changing the caller's idempotency key. It does not accept raw server commands, shell, files, credentials, pairing material, or embedded model code. The returned observation must re-enter Codex before any answer is written.",
       inputSchema: z
         .object({
           room_id: helixSharedLiveRoomIdSchema,
           idempotency_key: idempotencyKeySchema,
+          perception_semantic_fingerprint: z.string()
+            .regex(/^sha256:[a-f0-9]{64}$/u).optional(),
+          principal_turn_id: z.string().trim().min(1).max(320).optional(),
           environment_label: z.string().trim().min(1).max(240).optional(),
           action: minecraftPlayerActionInputSchema,
         })
@@ -2378,6 +3771,8 @@ export const createHelixMcpServer = (input: {
     async ({
       room_id,
       idempotency_key,
+      perception_semantic_fingerprint,
+      principal_turn_id,
       environment_label,
       action,
     }: HelixMinecraftPlayerActionToolArguments) =>
@@ -2394,15 +3789,22 @@ export const createHelixMcpServer = (input: {
             "The requested Minecraft player action is not registered.",
           );
         }
+        const effectiveIdempotencyKey = perception_semantic_fingerprint
+          ? [
+              "perception",
+              perception_semantic_fingerprint.slice("sha256:".length),
+              helixEnvironmentReasoningRoleSha256(action).slice("sha256:".length),
+            ].join(":")
+          : idempotency_key;
         const digest = minecraftMcpIdentityDigest({
           principal: input.principal,
-          idempotencyKey: idempotency_key,
+          idempotencyKey: effectiveIdempotencyKey,
         });
         const actionArguments = normalizeMinecraftMcpActionArguments(action);
         const execution: EnvironmentActionGatewayExecution =
           await environmentActionExecutor({
             capabilityId,
-            turnId: `mcp_environment_turn:${digest}`,
+            turnId: principal_turn_id ?? `mcp_environment_turn:${digest}`,
             toolCallId: `mcp_environment_tool_call:${digest}`,
             providerExecutionId: `mcp_environment_execution:${digest}`,
             arguments: {
@@ -2412,6 +3814,25 @@ export const createHelixMcpServer = (input: {
             accountContext: input.principal.accountContext,
             conversationThreadId: `helix-ask:room:${room_id}`,
           });
+        if (
+          execution.ok &&
+          execution.status === "completed" &&
+          principal_turn_id
+        ) {
+          const participantId = await resolveSelfParticipantId(room_id);
+          await reasoningRoleService.linkCompletedPrincipalExecution({
+            profileId: input.principal.accountProfileId,
+            participantId,
+            roomId: room_id,
+            principalTurnId: principal_turn_id,
+            capabilityId,
+            capabilityArguments: action,
+            environmentActionRequestId:
+              execution.observation.action_request_ref,
+            environmentActionResultRef: execution.observation.evidence_ref,
+            reentryObservationRef: execution.observation.evidence_ref,
+          });
+        }
         return {
           ok: execution.ok,
           value: {
@@ -2925,6 +4346,7 @@ export const createHelixMcpServer = (input: {
     server,
     new Map<string, RequiredOAuthScopes>([
       ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_client_authorization_status", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_run_continue", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_run_cancel", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_run_inspect", HELIX_AGENT_RUN_READ_SCOPE],
@@ -2937,9 +4359,21 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_goal_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_goal_append", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_server_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_environment_action_authority_extend", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_minecraft_actor_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_minecraft_situation_probe", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_monitor_create", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_monitor_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_monitor_read", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_monitor_acknowledge", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_monitor_snapshot_record", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_environment_monitor_revoke", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_environment_semantic_wake_read", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+      ["helix_brokerage_robinhood_read", HELIX_BROKERAGE_READ_MCP_SCOPES],
       ["helix_minecraft_player_action", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_minecraft_workflow_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_minecraft_workflow_control", HELIX_MINECRAFT_ACTION_MCP_SCOPES],

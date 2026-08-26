@@ -1,0 +1,137 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.wire_record_contract.v1",
+  "status": "draft_unsealed_representational_contract_no_scientific_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "canonical scalar, interval, manifest, record, chronology and failure encoding",
+    "current_maturity": "draft definition",
+    "target_maturity": "independently audited sealed representation contract",
+    "required_frozen_inputs": ["R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a"],
+    "required_evidence": ["cross-language canonical fixtures", "mutation rejection", "hash-chain replay", "absent candidate roots"],
+    "stop_fail_criteria": ["ambiguous numeric encoding", "unpaired surrogate acceptance", "duplicate key acceptance", "candidate-derived fixture", "authority promotion"],
+    "explicit_non_goals": ["scientific operator selection", "candidate execution", "authorization", "physical claims"],
+    "downstream_gate_unlocked": "representational portion of additive S4 definition closure"
+  },
+  "wire": {
+    "media_type": "application/json",
+    "encoding": "UTF-8 without BOM",
+    "canonicalization": "RFC8785_JCS",
+    "ingress_requirements": [
+      "reject invalid UTF-8",
+      "reject BOM",
+      "reject duplicate object keys before object construction",
+      "reject every unpaired UTF-16 surrogate",
+      "reject nonfinite JSON numbers",
+      "reject trailing bytes after one JSON value",
+      "reject any integer-valued JSON number outside absolute value 9007199254740991"
+    ],
+    "abi_object_key_rule": "all contract-defined object keys are nonempty printable ASCII; arbitrary Unicode is permitted only in explicitly free-text string values and must consist solely of Unicode scalar values",
+    "arbitrary_precision_values": "encoded only by the exact scalar objects below, never JSON floating-point numbers"
+  },
+  "scalar_codecs": {
+    "integer_v1": {
+      "keys_in_lexicographic_order": ["decimal", "schema"],
+      "schema_value": "nhm2.integer.v1",
+      "decimal": "ASCII -?(0|[1-9][0-9]*); negative zero forbidden"
+    },
+    "rational_v1": {
+      "keys_in_lexicographic_order": ["denominator", "numerator", "schema"],
+      "schema_value": "nhm2.rational.v1",
+      "numerator": "integer_v1 decimal grammar",
+      "denominator": "ASCII [1-9][0-9]*",
+      "normal_form": "gcd(abs(numerator),denominator)=1 and zero is 0/1"
+    },
+    "dyadic_v1": {
+      "keys_in_lexicographic_order": ["exponent2", "mantissa", "schema"],
+      "schema_value": "nhm2.dyadic.v1",
+      "value": "mantissa*2^exponent2",
+      "mantissa": "integer_v1 decimal grammar",
+      "exponent2": "JSON safe integer",
+      "normal_form": "zero is mantissa 0 exponent2 0; otherwise mantissa is odd"
+    },
+    "real_ball_v1": {
+      "keys_in_lexicographic_order": ["midpoint", "radius", "schema"],
+      "schema_value": "nhm2.real_ball.v1",
+      "midpoint": "dyadic_v1",
+      "radius": "nonnegative dyadic_v1",
+      "meaning": "closed interval [midpoint-radius,midpoint+radius]",
+      "invalid": ["negative radius", "noncanonical nested scalar", "NaN", "infinity"]
+    }
+  },
+  "hashing": {
+    "algorithm": "SHA-256",
+    "payload_domain": "nhm2-g2h-e-s4/payload/v1\n",
+    "record_domain": "nhm2-g2h-e-s4/record/v1\n",
+    "manifest_self_domain": "nhm2-g2h-e-s4/manifest-self/v1\n",
+    "stream_domain": "nhm2-g2h-e-s4/stream/v1\n",
+    "rule": "hash UTF-8(domain)||RFC8785(canonical value with the relevant self-hash member omitted)"
+  },
+  "record_envelope": {
+    "required_keys": [
+      "authority",
+      "candidate_evaluations",
+      "contract_sha256",
+      "decision",
+      "duty_id",
+      "fixture_id",
+      "implementation_id",
+      "lane",
+      "payload",
+      "payload_sha256",
+      "previous_record_sha256",
+      "record_self_sha256",
+      "schema",
+      "sequence"
+    ],
+    "schema_value": "nhm2.g2h_e_s4.proof_record.v1",
+    "lane_values": ["primary_fixture", "independent_fixture"],
+    "decision_values": ["PASS", "FAIL", "INELIGIBLE_AFTER_FIRST_FAIL"],
+    "candidate_evaluations": 0,
+    "fixture_id_rule": "nonempty for S4; candidate identity or candidate-derived value forbidden",
+    "sequence_rule": "starts at 0 and increments by exactly 1",
+    "previous_rule": "sequence 0 uses 64 lowercase hexadecimal zeroes; later records bind prior record_self_sha256",
+    "authority": {
+      "candidate_admitted": false,
+      "classical_proof_established": false,
+      "diagnostic_lamp": false,
+      "geometry_state_accepted": false,
+      "physical_viability": false,
+      "propulsion_authority": false,
+      "transport_authority": false
+    }
+  },
+  "first_failure": {
+    "rule": "emit exactly one FAIL at the first frozen failing ordinal; every later scheduled duty emits INELIGIBLE_AFTER_FIRST_FAIL without evaluating its payload",
+    "retry": false,
+    "retune": false,
+    "precision_escalation": false,
+    "alternate_root": false,
+    "deletion_or_overwrite": false
+  },
+  "fixture_boundary": {
+    "allowed": ["exact", "manufactured", "synthetic_pass", "synthetic_fail", "corruption", "chronology"],
+    "candidate_values_allowed": false,
+    "candidate_output_roots_allowed": false,
+    "scientific_pass_authority": false
+  },
+  "readiness": {
+    "representation_definition_complete": true,
+    "independent_audit_complete": false,
+    "sealed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "contract_is_proof": false,
+    "fixture_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

@@ -1,4 +1,10 @@
-const CAPABILITY_PREFIX = "com.casimirbot.minecraft.";
+const CAPABILITY_PREFIXES = [
+  "com.casimirbot.minecraft.",
+  "com.casimirbot.environment.durable_goal.",
+];
+
+const isHarnessCapability = (capabilityId) =>
+  CAPABILITY_PREFIXES.some((prefix) => capabilityId?.startsWith(prefix));
 
 const record = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : null;
@@ -11,7 +17,7 @@ const capabilityForObservation = (candidate) => {
     string(candidate.capability_id) ||
     string(candidate.executed_capability) ||
     string(candidate.capability_key);
-  if (declared?.startsWith(CAPABILITY_PREFIX)) return declared;
+  if (isHarnessCapability(declared)) return declared;
   if (candidate.schema === "helix.environment_command.observation.v1") {
     return "com.casimirbot.minecraft.command";
   }
@@ -21,7 +27,8 @@ const capabilityForObservation = (candidate) => {
 const isMinecraftObservation = (candidate) =>
   candidate.schema === "helix.environment_connector.probe_observation.v1" ||
   candidate.schema === "helix.environment_command.observation.v1" ||
-  candidate.schema === "helix.environment_action.observation.v1";
+  candidate.schema === "helix.environment_action.observation.v1" ||
+  candidate.schema === "helix.environment_durable_goal_observation.v1";
 
 export const collectMinecraftCapabilityObservations = (ledger) => {
   const observations = [];
@@ -63,7 +70,7 @@ export const collectMinecraftCapabilityObservations = (ledger) => {
     }
     if (
       candidate.schema === "helix.capability_result.v1" &&
-      capabilityId?.startsWith(CAPABILITY_PREFIX)
+      isHarnessCapability(capabilityId)
     ) {
       const evidenceRef = array(candidate.evidence_refs)
         .map(string)

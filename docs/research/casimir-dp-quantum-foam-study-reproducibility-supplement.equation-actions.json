@@ -101,7 +101,7 @@
     {
       "equationId": "cdp-dp-self-energy",
       "label": "DP gravitational self-energy difference",
-      "sectionAnchor": "4-lane-b--disipenrose-diagnostic",
+      "sectionAnchor": "4-lane-b--registered-disi-diagnostic",
       "latex": "\\Delta E_G\\sim \\frac{G}{2}\\iint \\frac{\\Delta\\rho(\\mathbf{x})\\Delta\\rho(\\mathbf{y})} {|\\mathbf{x}-\\mathbf{y}|}\\,d^3x\\,d^3y.",
       "aliases": [
         "Delta E_G from Delta rho"
@@ -135,7 +135,7 @@
     {
       "equationId": "cdp-dp-timescale",
       "label": "DP collapse timescale",
-      "sectionAnchor": "4-lane-b--disipenrose-diagnostic",
+      "sectionAnchor": "4-lane-b--registered-disi-diagnostic",
       "latex": "\\tau_{DP}=\\frac{\\hbar}{\\Delta E_G}.",
       "aliases": [
         "tau_DP=hbar/deltaE_G_J"
@@ -937,7 +937,7 @@
       "equationId": "cdp-stage3-complete-apparatus-mass",
       "label": "Complete-apparatus Casimir mass and weight bound",
       "sectionAnchor": "mean-qed-response-noise-and-ordinary-gravity",
-      "latex": "\\Delta m_{\\rm app}=\\frac{\\Delta E_{\\rm app}}{c^2}, \\qquad \\Delta F_{\\rm weight}=g\\frac{\\Delta E_{\\rm app}}{c^2}.",
+      "latex": "\\Delta m_E=\\frac{\\Delta E_{\\rm app}}{c^2}, \\qquad \\Delta F_{\\rm support}^{\\rm weak}=g\\frac{\\Delta E_{\\rm app}}{c^2}.",
       "aliases": [
         "Delta m_app=Delta E_app/c^2",
         "Delta F_weight=g Delta E_app/c^2"
@@ -1574,7 +1574,7 @@
           "kind": "artifact_backed_theory_run",
           "label": "Open Stage-4.2D field-to-frequency witness diagnostics",
           "badgeIds": [
-            "study.casimir_dp.polarization_qed_control",
+            "study.casimir_dp.polarization_resolved_qed_control",
             "study.casimir_dp.thermal_radiative_closure",
             "study.casimir_dp.cross_scale_metrology_stage4_2d",
             "study.casimir_dp.claim_boundary"
@@ -1937,7 +1937,7 @@
       "equationId": "cdp-stage4-2f-dp-master-model",
       "label": "Stage-4.2F exact named DP master equation and companion",
       "sectionAnchor": "exact-named-dp-model-domain-box-and-apparatus-identity-audit",
-      "latex": "\\dot\\rho=-\\frac{i}{\\hbar}[H,\\rho] -\\frac{G}{2\\hbar}\\int d^3x\\,d^3y\\, \\frac{[\\hat\\mu_{r_0}(\\mathbf x), [\\hat\\mu_{r_0}(\\mathbf y),\\rho]]} {|\\mathbf x-\\mathbf y|}.",
+      "latex": "\\hat\\mu_{r_0}(\\mathbf x)= m(2\\pi r_0^2)^{-3/2} \\exp\\!\\left[-\\frac{|\\mathbf x-\\hat{\\mathbf q}|^2}{2r_0^2}\\right], \\qquad \\dot\\rho=-\\frac{i}{\\hbar}[H,\\rho] -\\frac{G}{2\\hbar}\\int d^3x\\,d^3y\\, \\frac{[\\hat\\mu_{r_0}(\\mathbf x), [\\hat\\mu_{r_0}(\\mathbf y),\\rho]]} {|\\mathbf x-\\mathbf y|}.",
       "aliases": [
         "dot rho=-i[H,rho]/hbar-(G/(2hbar)) integral [mu_R0(x),[mu_R0(y),rho]]/|x-y|"
       ],
@@ -2245,7 +2245,7 @@
       "equationId": "cdp-stage4-2j-schrodinger-coherence-factorization",
       "label": "Stage-4.2J coherence-factor separation",
       "sectionAnchor": "b12-stage-42j-schrdinger-mass-density-and-environment-recovery",
-      "latex": "C(t)=C(0)e^{-i\\Delta E_Ht/\\hbar} e^{-\\chi_{\\rm env}(t)}e^{-E_Gt/\\hbar}.",
+      "latex": "C(t)=C(0) e^{-i\\hbar^{-1}\\int_0^t\\Delta E_H(t')dt'} e^{-\\chi_{\\rm env}(t)} e^{-\\int_0^t\\Gamma_{\\rm D}[d(t')]dt'}.",
       "aliases": [
         "C=C0 exp(-i Delta_E_H t/hbar) exp(-chi_env) exp(-E_G t/hbar)"
       ],
@@ -2279,7 +2279,7 @@
       "equationId": "cdp-stage4-2j-dp-equivalent-energy-inverse",
       "label": "Stage-4.2J conditional residual inversion",
       "sectionAnchor": "b12-stage-42j-schrdinger-mass-density-and-environment-recovery",
-      "latex": "E_{\\rm D,eq}=-\\frac{\\hbar}{t} \\ln\\!\\left(\\frac{|C(t)|}{|C(0)|}\\right),",
+      "latex": "E_{\\rm loss,eq}=-\\frac{\\hbar}{t} \\ln\\!\\left(\\frac{|C(t)|}{|C(0)|}\\right),",
       "aliases": [
         "E_D,eq=-(hbar/t) ln(|C|/|C0|)"
       ],
@@ -2323,7 +2323,7 @@
           "kind": "artifact_backed_theory_run",
           "label": "Open representation envelope",
           "badgeIds": [
-            "study.casimir_dp.dp_mass_density_collapse",
+            "collapse.objective.dp_gravitational_self_energy",
             "study.casimir_dp.schrodinger_mass_density_stage4_2j",
             "study.casimir_dp.claim_boundary"
           ],
@@ -2623,7 +2623,7 @@
           "kind": "artifact_backed_theory_run",
           "label": "Open mass-density robustness audit",
           "badgeIds": [
-            "study.casimir_dp.dp_mass_density_collapse",
+            "collapse.objective.dp_gravitational_self_energy",
             "study.casimir_dp.empirical_authority_stage4_2l",
             "study.casimir_dp.claim_boundary"
           ],
@@ -3010,7 +3010,7 @@
       "equationId": "cdp-stage4-2s-supplement-green-coherence",
       "label": "Stage-4.2S Green response, phase, and coherence chain",
       "sectionAnchor": "b19-stage-42s-retarded-source-and-switching-radiation-closure",
-      "latex": "E_i=i\\mu_0\\omega\\int d^3r'\\,G^{\\rm ret}_{ij}J_j,\\qquad \\Phi_{\\rm EM}=-\\hbar^{-1}\\int\\Delta U_{\\rm EM}\\,dt,\\qquad C_0=C(0)e^{i\\Phi_{\\rm EM}-\\chi_{\\rm EM}}.",
+      "latex": "E_i(\\mathbf r,\\omega)=i\\mu_0\\omega\\int d^3r'\\, G^{\\rm ret}_{ij}(\\mathbf r,\\mathbf r',\\omega)J_j(\\mathbf r',\\omega),\\qquad \\nabla_\\mu J^\\mu=0,\\qquad \\Phi_{\\rm EM}=-\\hbar^{-1}\\int\\Delta U_{\\rm EM}\\,dt,\\qquad C_{\\rm EM}=C(0)e^{i\\Phi_{\\rm EM}-\\chi_{\\rm EM}}.",
       "aliases": [
         "retarded Green current branch phase ordinary coherence"
       ],
@@ -3245,6 +3245,41 @@
       "claimBoundaryNotes": [
         "A null biological rung does not falsify an independently replicated non-biological law.",
         "Adaptation is not teleology."
+      ]
+    },
+    {
+      "equationId": "cdp-supplement-composition-universality-successor",
+      "label": "Supplement positive-result composition-universality admission gate",
+      "sectionAnchor": "b20-positive-result-composition-and-internal-energy-successor-gate",
+      "latex": "\\Lambda_k=\\int_0^{T_k}\\frac{E_{G,k}(t)}{\\hbar}\\,dt, \\qquad \\chi_k^{\\rm res}=-\\ln|C_k^{\\rm meas}|+\\ln|C_k^{H_0}|, \\qquad \\eta_k=\\frac{\\chi_k^{\\rm res}}{\\Lambda_k}, \\qquad \\Delta\\eta_{k\\ell}=\\eta_k-\\eta_\\ell .",
+      "aliases": [
+        "nine authority packet cohort normalized residual universality gate"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-supplement-composition-universality-successor",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open successor admission and QCD nonbridge",
+          "badgeIds": [
+            "study.casimir_dp.composition_internal_energy_successor",
+            "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+            "study.casimir_dp.blinded_model_comparison",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.composition_internal_energy_successor",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.positive_result_successor",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The successor is blocked: the parent positive-result trigger and nine same-campaign authority packets are absent."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Agreement is consistent with total-mass-density universality but does not identify a QCD collapse mechanism.",
+        "Disagreement first challenges ordinary-null closure, cohort equivalence, or the frozen source representation."
       ]
     }
   ]

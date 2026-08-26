@@ -1,0 +1,43 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 0,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "base_primary_image_id": "sha256:d074caaa8fb84e8b0c06d5e675e06f62c2223c3fb3b97588872f67b10403ae92",
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "exhausted_evidence": {
+    "authorization_sha256": "348dc0f0f7bedf1e825b83218f55f3a20cdf3507b1b04189a8db8618778e87f3",
+    "container_id": "ed7ed5fd641507c5457d83943489e0cc2c521a723509a76bcc1fd4668b00270c",
+    "invocation_sha256": "0640623244279e787b74b85980fa7d52a038f4312f006eb7100116849aaeb5c8",
+    "proposal_sha256": "bab85c219be9245b77b6a353b9aa47cebe13153107f7d46e0d0e699071feb46e",
+    "result_sha256": "44ab716de6b2657d549cc6589241fab7a728af3c5baf2e25c184911348913b0f",
+    "stderr_sha256": "8a51fa06ab6ee3ab86f7d081f8dc62c95d81c17c86ce12b8ae05cf8519be2643",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "fixture": {
+    "dockerfile_bytes": 611,
+    "dockerfile_sha256": "1eda79032bfa7bbf624dc2691af6685135df2a1011e0c7ed751cbbf00b2cc729",
+    "executable_sha256": "9bbf05c06d389829082e3ec3497c873a635e9c9db6e32361344bd08c1545a6bd",
+    "image_id": "sha256:b64c6aa1f2ede1af0fa8cf3617b844712124e66a21ef5e37fdbb9e68588e870e",
+    "source_bytes": 2555,
+    "source_sha256": "df9b407db25556daee3f79f819daf10926cbc4b6a14e9a6e73ba3ffe34353a9a"
+  },
+  "primary_v2": {
+    "dockerfile_bytes": 512,
+    "dockerfile_sha256": "a6ffc8919712d2f0bf8aff7c623e709ac95c22f232c97d9e32793765a55125f1",
+    "executable_sha256": "666ba126413e63318275bf0861b860707ce7046bcd278c3ee73b1f65f9369028",
+    "image_id": "sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab",
+    "source_bytes": 23897,
+    "source_sha256": "2d20513005834ca87885a30ab65a1b4b3c1d835904d3247dc6cebc71e4e59740",
+    "surface_source_sha256": "e7de6b3534546a7e99ef339e3b2a5c37c305b24ed5e7a6f55359216e973015d4"
+  },
+  "repair_scope": "fixed_procfs_self_executable_descriptor_only",
+  "schema": "nhm2.g2h_e_r1.build_binding.v1",
+  "token_sha256": "d54ee55da5967062bfbc080bcfb3d962b07ed69b08e4316b3973aa5b24d2ff4b",
+  "v1_primary_source_sha256": "8a458dbb599c1ebb2c4bc7fa8263e724651607c7a39a5c458f44b73143613603"
+}

@@ -1327,6 +1327,58 @@ describe("environment probe workstation gateway", () => {
     );
   });
 
+  it("renews the exact first-party browser membership before an owner-only waiting-room probe", async () => {
+    let renewed = false;
+    const refreshPresence = vi.fn(async (input) => {
+      expect(input).toEqual({
+        roomId: ROOM_ID,
+        profileId: "profile:environment-probe",
+        presence: "present",
+      });
+      renewed = true;
+      return room;
+    });
+    const readMembership = vi.fn(async () =>
+      renewed
+        ? membership
+        : ({ ...membership, presence: "left" as const } satisfies SharedRealtimeRoomMembership),
+    );
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:owner-only-waiting-room`,
+      toolCallId: `${TOOL_CALL_ID}:owner-only-waiting-room`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: firstPartyAccountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        refreshPresence,
+        readMembership,
+        dispatchProbe,
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(refreshPresence).toHaveBeenCalledOnce();
+    expect(readMembership).toHaveBeenCalledOnce();
+    expect(dispatchProbe).toHaveBeenCalledOnce();
+  });
+
+  it("does not apply first-party presence renewal to an external Agent API run", async () => {
+    const refreshPresence = vi.fn(dependencies().refreshPresence!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:external-no-first-party-renewal`,
+      toolCallId: `${TOOL_CALL_ID}:external-no-first-party-renewal`,
+      arguments: { target: "current_actor" },
+      policy: policy(),
+      dependencies: dependencies({ refreshPresence }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(refreshPresence).not.toHaveBeenCalled();
+  });
+
   it("does not turn an ordinary browser Ask thread into room authority", async () => {
     const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
     const result = await executeEnvironmentProbeGatewayCapability({

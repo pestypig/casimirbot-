@@ -1,0 +1,148 @@
+{
+  "schema": "nhm2.g2h_e_s5_a.universal_scalar_borel_system.v1",
+  "status": "draft_unsealed_exact_derived_scalar_system_no_summability_or_implementation_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "universal positive/vacuum scalar Borel-plane system for S5-A formal-germ feasibility",
+    "current_maturity": "candidate-neutral exact symbolic derivation",
+    "target_maturity": "independently audited additive definition input for a later directed Borel realization",
+    "required_frozen_inputs": [
+      "positive-tail contract 363818f51349f844105bdb1ddb26fdd06cfdc62da4f2450ca2ab36fb22ec68bf",
+      "state/grid v2 cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c",
+      "flat-carrier contract 09ca71e9ea3d93ca31468ceb1a953cd0930b86f1f117211b3e4a5925cf865103",
+      "strict kappa positivity and the displayed parameter identities"
+    ],
+    "required_evidence": [
+      "independent coefficient extraction from both frozen scalar operators",
+      "exact recurrence-to-exponential-generating-function transform",
+      "positive-ray continuation and exponential-type proof",
+      "state-derivative bounds through order two",
+      "zero candidate ingress"
+    ],
+    "stop_fail_criteria": [
+      "a coefficient differs between either chart and the universal reduction",
+      "kappa touches zero",
+      "the positive-ray denominator or Laplace margin touches zero",
+      "local Borel analyticity is represented as global summability",
+      "candidate evaluation, selector creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "selecting a formal-germ truncation order",
+      "sealing a summation prescription",
+      "loading the selected 6/5 member",
+      "executing any continuation sample",
+      "implementing C08",
+      "changing frozen equations or authority"
+    ],
+    "downstream_gate_unlocked": "none until independent acknowledgement and the remaining Borel/metric/state-derivative obligations close"
+  },
+  "semantic_class": {
+    "derived_from_frozen_equations": true,
+    "frozen_equations_changed": false,
+    "numerical_selector_added": false,
+    "summation_prescription_selected": false,
+    "proof_maturity_promoted": false
+  },
+  "chart_reduction": {
+    "positive": {
+      "kappa": "sqrt(1-omega^2)>0",
+      "mu": "M"
+    },
+    "vacuum": {
+      "kappa": "kappa_bar=sqrt(-2*Nbar)>0",
+      "mu": "eta*Mbar_infinity"
+    },
+    "common_formal_metric": "f0=1-2*mu*x where x is q or Q",
+    "common_parameter_identity": "beta+1=mu*(1-2*kappa^2)/kappa"
+  },
+  "universal_scalar_recurrence": {
+    "series": "H=sum_(n>=0) h_n*x^n",
+    "equation": "2*kappa*(n+1)*h_(n+1)+c0(n)*h_n+c1(n)*h_(n-1)+c2(n)*h_(n-2)=0 with h_(-1)=h_(-2)=0",
+    "c0": "n^2-((4*mu*kappa^2+2*mu-kappa)/kappa)*n-mu*(8*mu*kappa^4-4*mu*kappa^2-mu+kappa)/kappa^2",
+    "c1": "-4*mu*n^2-(2*mu*(4*mu*kappa^2-4*mu-kappa)/kappa)*n+2*mu^2*(4*mu*kappa^2-2*mu-kappa)/kappa^2",
+    "c2": "4*mu^2*n^2+(8*mu^2*(2*mu*kappa^2-mu-kappa)/kappa)*n+4*mu^2*(2*mu*kappa^2-mu-kappa)^2/kappa^2",
+    "direct_balance": "coefficient(h_n)/coefficient(h_(n+1))~n/(2*kappa)",
+    "ordinary_power_series_convergence_established": false
+  },
+  "borel_transform": {
+    "definition": "B(t)=sum_(n>=0) h_n*t^n/n!",
+    "integrated_variables": [
+      "J1(t)=integral_0^t B(s) ds",
+      "J2(t)=integral_0^t J1(s) ds"
+    ],
+    "equation": "P2(t)*B''+P1(t)*B'+P0(t)*B+PJ1(t)*J1+PJ2*J2=0",
+    "P2": "t*(t+2*kappa)",
+    "P1": "-2*(2*mu*kappa^2*t+2*mu*kappa*t^2+mu*t-kappa^2-kappa*t)/kappa",
+    "P0": "mu*(-8*mu*kappa^4-8*mu*kappa^3*t+4*mu*kappa^2*t^2+4*mu*kappa^2+8*mu*kappa*t+mu-2*kappa^2*t-kappa)/kappa^2",
+    "PJ1": "2*mu^2*(2*kappa*t+1)*(4*mu*kappa^2-2*mu-kappa)/kappa^2",
+    "PJ2": "4*mu^2*(2*mu*kappa^2-mu-kappa)^2/kappa^2",
+    "first_order_state": ["B", "V=B'", "J1", "J2"],
+    "first_order_equations": [
+      "B'=V",
+      "V'=-(P1*V+P0*B+PJ1*J1+PJ2*J2)/P2 for t>0",
+      "J1'=B",
+      "J2'=J1"
+    ],
+    "origin_data": [
+      "B(0)=h0",
+      "B'(0)=h1",
+      "J1(0)=0",
+      "J2(0)=0",
+      "2*kappa*h1+P0(0)*h0=0"
+    ],
+    "positive_ray_principal_margin": "P2(t)>0 for t>0 when kappa>0",
+    "nonzero_principal_singularity": "t=-2*kappa on the negative ray"
+  },
+  "large_t_structure": {
+    "limits": [
+      "P2/t^2 -> 1",
+      "P1/t^2 -> -4*mu",
+      "P0/t^2 -> 4*mu^2",
+      "PJ1/t^2 -> 0",
+      "PJ2/t^2 -> 0"
+    ],
+    "scalar_characteristic": "r^2-4*mu*r+4*mu^2=(r-2*mu)^2",
+    "candidate_exponential_type": "2*mu with possible polynomial prefactor",
+    "global_type_bound_proved": false
+  },
+  "laplace_realization_obligation": {
+    "candidate_formula": "H_B(x)=x^-1*integral_0^infinity exp(-t/x)*B(t) dt for x>0",
+    "frozen_tail_interval": "0<x<=1/255",
+    "strict_margin": "a proved Borel type tau must satisfy tau<255",
+    "matching_formal_metric_margin": "f0=1-2*mu*x is strictly positive on the full tail only if 2*sup(mu)<255",
+    "matching_is_proof": false,
+    "remaining_obligations": [
+      "prove global positive-ray analytic continuation from the regular origin germ",
+      "prove a uniform exponential-type bound no larger than the strict Laplace margin",
+      "derive and bound first and second state derivatives",
+      "derive the D,S,K and vacuum metric/scalar companion Borel systems",
+      "bind directed quadrature and infinite-tail remainders",
+      "independent source/runtime-disjoint replay definition"
+    ]
+  },
+  "readiness": {
+    "exact_scalar_recurrence_derived": true,
+    "universal_chart_reduction_derived": true,
+    "exact_scalar_borel_system_derived": true,
+    "positive_ray_principal_zero_excluded_under_strict_kappa": true,
+    "global_positive_ray_continuation_proved": false,
+    "global_exponential_type_proved": false,
+    "state_derivatives_proved": false,
+    "metric_borel_systems_proved": false,
+    "summation_prescription_sealed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "document_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

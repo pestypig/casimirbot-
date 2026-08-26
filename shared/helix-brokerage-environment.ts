@@ -12,6 +12,15 @@ export const HELIX_BROKERAGE_OAUTH_START_RECEIPT_SCHEMA =
   "helix.brokerage_oauth_start_receipt.v1" as const;
 export const HELIX_BROKERAGE_OBSERVATION_SCHEMA =
   "helix.brokerage_observation.v1" as const;
+export const HELIX_BROKERAGE_READ_GATEWAY_CAPABILITY =
+  "environment.brokerage.robinhood.read" as const;
+export const HELIX_BROKERAGE_READ_GATEWAY_ERROR_SCHEMA =
+  "helix.brokerage_read_gateway_error.v1" as const;
+export const HELIX_BROKERAGE_SHADOW_MARKET_SESSION_CONTRACT = {
+  authority: "not_asserted",
+  source: "provider_observation_only",
+  execution_eligibility: false,
+} as const;
 
 export const HELIX_ROBINHOOD_PROVIDER_ID = "robinhood" as const;
 export const HELIX_ROBINHOOD_TRADING_MCP_RESOURCE =

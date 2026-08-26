@@ -90,6 +90,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   feature_flags: [
     "advanced_helix_ask_controls",
     "brokerage_environment",
+    "profile_connections",
     "developer_workstation_panels",
     "docs_viewer_print_pdf_export",
     "experimental_panels",
@@ -171,6 +172,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   ],
   feature_flags: [
     "docs_viewer_print_pdf_export",
+    "profile_connections",
     "stable_workstation_panels",
     "locked_dev_features_visible",
     "runtime_agent_controls",
@@ -353,7 +355,14 @@ export type HelixAccountSessionProfile = {
 };
 
 export type HelixAccountLinkedAccount = {
-  provider: "discord" | "minehut" | "browser" | "local" | "google" | "guest";
+  provider:
+    | "discord"
+    | "minehut"
+    | "browser"
+    | "local"
+    | "google"
+    | "auth0"
+    | "guest";
   external_id: string;
   display_name?: string | null;
   status: "linked" | "pending" | "revoked";

@@ -1,0 +1,62 @@
+{
+  "schema": "nhm2.g2h_e_s4.p13_r13_build_binding.v7",
+  "status": "bound_offline_fixture_runtime_P13_R13_only_no_scientific_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "primary P13 and independent R13 256-vector noise Gram, factor, residual and PSD fixture producers",
+    "current_maturity": "both source/runtime-disjoint full harnesses pass 37/37 with noise sub-suites 9/9",
+    "target_maturity": "identity-bound independently audited P13/R13 manufactured-fixture closure",
+    "required_frozen_inputs": ["R1 seal 728d8c9a...025ca", "total quantum builder 29893736...62fc", "P12/R12 binding 598ca3d3...336e"],
+    "required_evidence": ["source and Dockerfile hashes", "digest-pinned offline images", "executable hashes", "command and environment hashes", "exact runtime reports", "source/runtime disjointness", "absent roots"],
+    "stop_fail_criteria": ["identity mismatch", "fixture failure", "candidate ingress", "root creation", "authorization", "authority promotion"],
+    "explicit_non_goals": ["candidate noise evaluation", "scientific Rust run", "G3", "proposal before final closure", "physical authority"],
+    "downstream_gate_unlocked": "S4 final implementation/preexecution closure audit only"
+  },
+  "immutable_inputs": {
+    "predecessor_p12_r12_binding": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-p12-r12-build-binding.v6.json", "raw_sha256": "598ca3d3109805917ae999c75b43fe75e84bc3b117c4a236624d9a678eac336e"},
+    "r1_seal": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json", "bytes": 7805, "raw_sha256": "728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca"},
+    "quantum_builder": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r2-total-quantum-builder-algorithms.v2.json", "bytes": 30354, "raw_sha256": "2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc"}
+  },
+  "environment_binding": {"canonical": {"candidate_roots": "absent", "fixture_input_classes": ["exact", "manufactured", "synthetic_pass_fail", "corruption", "chronology"], "network": "none", "root_mount": "read_only", "rootfs": "read_only", "scientific_inputs": "forbidden"}, "canonical_json_sha256": "c0446a9105b7e949f35a3a83a3becf1297e96c333b5f2cb0a40fc5010d32acd6"},
+  "primary_cpp_fixture": {
+    "changed_sources": [
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_fixture_primary.cpp", "raw_sha256": "ee3e8b8546229d05de25d72346f14cd5777f7d89c7e076e09c6997f469db0774"},
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_noise_primary.cpp", "raw_sha256": "0b14fa5390a96190200f97f11f8cddc804147d3ae7cef68264f6f7b03921abbc"},
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_noise_primary.hpp", "raw_sha256": "3aa5782001157e50aafc26b0f2a966f16863c581c8974a9806665cb6aa59fcde"},
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.primary.mini-boson-fixture.v1", "raw_sha256": "73c806b9d3b94deace38762c69759a554149fdc71bc1a7a531657f0fd8978365"}
+    ],
+    "dependency_lineage": ["Arb via libflint-arb", "FLINT", "GMP", "MPFR"],
+    "builder_base": "nhm2-g2h-s4-primary-fixture-builder:v2@sha256:9e94d19f9014938b510e95c776778d164cce120777adfc2d495c1812de5221a1",
+    "runtime_base": "nhm2-g2h-primary-proof:v2@sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab",
+    "image": "nhm2-g2h-s4-primary-fixture:v7@sha256:27ae7d9a922d507b9c24d3616339144d2a17748a78ab860c1593e85893b48ecb",
+    "image_id": "sha256:27ae7d9a922d507b9c24d3616339144d2a17748a78ab860c1593e85893b48ecb",
+    "executable": {"path": "/usr/local/bin/mini-boson-star-primary-fixture-v1", "bytes": 158984, "sha256": "4134edbc80d613d959414b62a8c19f77841ff5f1a0cf744b6aa548eff258ad98"},
+    "canonical_build_argv": ["docker", "build", "--network", "none", "--no-cache", "-f", "Dockerfile.primary.mini-boson-fixture.v1", "-t", "nhm2-g2h-s4-primary-fixture:v7", "."],
+    "canonical_build_argv_sha256": "99b061f216ebfb8df40f06ec81c82e8b8d868329c109cff6b28236c02e05bdab",
+    "canonical_run_argv": ["docker", "run", "--rm", "--network", "none", "--read-only", "-v", "<canonical-root>:/work:ro", "-w", "/work", "nhm2-g2h-s4-primary-fixture:v7", "--fixture-suite", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json"],
+    "canonical_run_argv_sha256": "2c5b3ae3e200b2dfe7990e906c07dad5d8ec7cfa3818b7e2e4f42c9a002f32ee",
+    "expected_report": {"checks_passed": 37, "checks_total": 37, "noise_checks_passed": 9, "noise_checks_total": 9, "candidate_evaluations": 0, "candidate_roots_created": false, "authority_promoted": false, "status": "PASS"}
+  },
+  "independent_rust_fixture": {
+    "changed_sources": [
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_fixture_independent.rs", "raw_sha256": "a9f44a2a15c903c7b3ce974b3e5b77c628a9ebb9f3bb59e981aa2d57e309a5fe"},
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_noise_independent.rs", "raw_sha256": "5b1a66fe9c9317d5eaa06bd44539b6a5c85ba85ed7d24f4d27fe2a6f9097821c"},
+      {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.independent.mini-boson-fixture.v1", "raw_sha256": "af14241d1c8f38ec312c9221de79ca55829c431be28e52f60c54b0cc27e91374"}
+    ],
+    "dependency_lineage": ["Rust 1.82 standard/core only", "native fixed-limb directed balls", "no unsafe, FFI, C ABI or dynamic libraries"],
+    "builder_base": "rust:1.82.0-alpine3.20@sha256:2f42ce0d00c0b14f7fd84453cdc93ff5efec5da7ce03ead6e0b41adb1fbe834e",
+    "runtime_base": "scratch",
+    "image": "nhm2-g2h-s4-independent-fixture:v7@sha256:056e138985b7e068c0be34f782abae76920844992ab07f9b2eb4ce7e1385a319",
+    "image_id": "sha256:056e138985b7e068c0be34f782abae76920844992ab07f9b2eb4ce7e1385a319",
+    "executable": {"path": "/mini-boson-star-independent-fixture-v1", "bytes": 772376, "sha256": "0cd4359a994cfd016aeb90d698bc72af4472ddd6ca6876c24a278f26b6773990"},
+    "canonical_build_argv": ["docker", "build", "--network", "none", "--no-cache", "-f", "Dockerfile.independent.mini-boson-fixture.v1", "-t", "nhm2-g2h-s4-independent-fixture:v7", "."],
+    "canonical_build_argv_sha256": "f466a24365c8a4437a20af374f3ba3215b16f7f31de837c3ea248961b4154400",
+    "canonical_run_argv": ["docker", "run", "--rm", "--network", "none", "--read-only", "-v", "<canonical-root>:/work:ro", "-w", "/work", "nhm2-g2h-s4-independent-fixture:v7", "--fixture-suite", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json"],
+    "canonical_run_argv_sha256": "465b6e3b83045f7fcc61f8f20ad903dd27856b67ed595f18e876121a16e41b4c",
+    "expected_report": {"checks_passed": 37, "checks_total": 37, "noise_check_mask": "111111111", "noise_checks_passed": 9, "noise_checks_total": 9, "candidate_evaluations": 0, "candidate_roots_created": false, "authority_promoted": false, "status": "PASS"}
+  },
+  "disjointness": {"scientific_sources_distinct": true, "algorithms": ["direct 256-vector interval Gram plus unpivoted lower Arb Cholesky and two factor corrections", "native sparse projected vectors plus unpivoted two-pass MGS and independent direct Gram reconstruction"], "arithmetic_runtimes_distinct": true, "toolchains_distinct": true, "runtime_images_distinct": true, "executables_distinct": true, "output_roots_distinct_and_absent": true},
+  "closure_flags": {"P13_fixture_complete": true, "R13_fixture_complete": true, "all_scientific_roles_implemented": true, "S4_complete": false, "final_closure_audit_required": true, "inert_proposal_allowed": false},
+  "authority": {"binding_is_proof": false, "candidate_evaluated": false, "candidate_root_created": false, "quantum_state_established": false, "geometry_state_authority": false, "lane_authority": false, "diagnostic_lamp_authority": false, "physical_authority": false, "propulsion_authority": false, "transport_authority": false}
+}

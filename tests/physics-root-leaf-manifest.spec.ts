@@ -681,7 +681,12 @@ describe("validatePhysicsRootLeafManifest", () => {
         leaf_id?: string;
         bundle_id?: string;
         dag_bridges?: string[];
-        falsifier?: { reject_rule?: string; test_refs?: string[] };
+        falsifier?: {
+          observable?: string;
+          readiness_block_rule?: string;
+          reject_rule?: string;
+          test_refs?: string[];
+        };
         maturity_gate?: {
           max_claim_tier?: string;
           required_evidence_types?: string[];
@@ -736,6 +741,54 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(pathEntry?.maturity_gate?.required_evidence_types).toEqual(
       expect.arrayContaining(["measured", "proxy", "inferred"]),
     );
+    expect(pathEntry?.dag_bridges).toEqual(expect.arrayContaining([
+      "bridge-stage4-2p-worldline-to-ordinary-proper-time",
+      "bridge-stage4-2r-four-cell-to-boundary-interaction",
+      "bridge-stage4-2s-green-response-to-ordinary-complex-coherence",
+      "bridge-stage4-2s-zero-collapse-bridge-to-claim-boundary",
+    ]));
+    expect(pathEntry?.falsifier?.readiness_block_rule).toContain(
+      "stage4_2sOrdinaryNullIntegrationReady != true",
+    );
+    expect(pathEntry?.falsifier?.readiness_block_rule).toContain(
+      "stage4_2sZeroCollapseBridgePreserved != true",
+    );
+    expect(pathEntry?.falsifier?.observable).toContain(
+      "Stage-4.2S measured conserved source spectra",
+    );
+    expect(pathEntry?.falsifier?.test_refs).toEqual(expect.arrayContaining([
+      "tests/casimir-dp-proper-time-worldline-closure-stage4-2p.spec.ts",
+      "tests/casimir-dp-integrated-feasibility-pilot-stage4-2r.spec.ts",
+      "tests/casimir-dp-retarded-source-propagation-stage4-2s.spec.ts",
+      "tests/casimir-dp-stage4-2s-campaign.spec.ts",
+    ]));
+
+    const compositionPath = manifest.paths?.find(
+      (entry) =>
+        entry.id ===
+        "path_quantum_semiclassical_to_casimir_dp_composition_internal_energy_successor",
+    );
+    expect(compositionPath).toEqual(expect.objectContaining({
+      root_id: "physics_quantum_semiclassical",
+      leaf_id: "leaf_casimir_dp_composition_internal_energy_successor",
+      bundle_id: "casimir-dp.or-boundary-coherence",
+    }));
+    expect(compositionPath?.dag_bridges).toEqual(expect.arrayContaining([
+      "bridge-replicated-casimir-dp-residual-to-composition-successor",
+      "bridge-internal-energy-equivalence-to-conserved-source-gate",
+      "bridge-qcd-decomposition-to-constituent-nonbridge",
+    ]));
+    expect(compositionPath?.falsifier?.readiness_block_rule).toContain(
+      "parentPositiveIndependentReplicationReady != true",
+    );
+    expect(compositionPath?.falsifier?.readiness_block_rule).toContain(
+      "successorAuthorityPacketsReady != 9",
+    );
+    expect(compositionPath?.maturity_gate).toEqual(expect.objectContaining({
+      max_claim_tier: "diagnostic",
+      strict_fail_reason:
+        "ROOT_LEAF_CASIMIR_DP_COMPOSITION_SUCCESSOR_BLOCKED",
+    }));
 
     const evolutionaryPath = manifest.paths?.find(
       (entry) =>
@@ -1221,6 +1274,7 @@ describe("validatePhysicsRootLeafManifest", () => {
         max_claim_tier: "diagnostic",
         path_ids: [
           "path_quantum_semiclassical_to_casimir_dp_or_test",
+          "path_quantum_semiclassical_to_casimir_dp_composition_internal_energy_successor",
           "path_casimir_dp_residual_to_evolutionary_coherence_conditional",
           "path_complete_casimir_apparatus_to_ordinary_gravity_control",
         ],

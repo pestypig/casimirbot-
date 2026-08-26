@@ -35,6 +35,15 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "helix_fabric_player_agent_gametest"
+        enableGameTests = true
+        eula = true
+    }
+}
+
 tasks.processResources {
     inputs.property("version", project.version)
     filesMatching("fabric.mod.json") {

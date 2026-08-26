@@ -113,8 +113,16 @@ typed nonterminal evidence. They do not enumerate arbitrary registry contents,
 export recipe JSON, craft, execute commands, or choose a strategy. Dynamic
 recipe displays that cannot be resolved exactly are marked incomplete.
 
-The sensor does not advertise pathfinding or closed-container contents. When a room
-owner explicitly configures command authority and completes **Pair command
+The sensor does not advertise an unbounded pathfinding executor or
+closed-container contents. Its same-revision perception snapshot may include a
+bounded `helix.minecraft_navigation_frontier.v1` observation computed by the
+CasimirBot-owned connector core. That observation searches only fully observed
+local footholds under explicit walk, diagonal, ascend and descend primitives;
+it reports ranked route evidence and leaves waypoint selection to Runtime
+Codex. It does not use or require Baritone, choose a strategy, cross unknown
+coverage or grant action authority.
+
+When a room owner explicitly configures command authority and completes **Pair command
 access in game**, it also exposes a live, bounded Brigadier catalog and the
 `com.casimirbot.minecraft.command` capability. The command credential is
 separate from observation ingress, is delivered directly to the server-side

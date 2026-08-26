@@ -1,0 +1,10 @@
+FROM nhm2-g2h-primary-fixture:v3@sha256:1f1453fd28eaa9a2bf65d3d501a4324d6365bbc4cd3b4dab2a64f12ca4bc2142
+
+COPY tolman_vii_primary_surface_gate.c /src/tolman_vii_primary_surface_gate.c
+COPY tolman_vii_primary_proof.c /src/tolman_vii_primary_proof.c
+
+RUN gcc -std=c17 -O2 -fno-fast-math -fno-common -Wall -Wextra -Werror \
+      -o /usr/local/bin/tolman-vii-primary-proof /src/tolman_vii_primary_proof.c \
+      -lflint-arb -lflint -lgmp -lmpfr
+
+ENTRYPOINT ["/usr/local/bin/tolman-vii-primary-proof"]

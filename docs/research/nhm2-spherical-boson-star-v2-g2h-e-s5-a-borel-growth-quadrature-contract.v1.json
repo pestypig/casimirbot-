@@ -1,0 +1,755 @@
+{
+  "schema": "nhm2.g2h_e_s5_a.borel_growth_quadrature_contract.v1",
+  "status": "draft_unsealed_total_definition_pass_pending_independent_acknowledgement",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "directed positive-ray growth witness and Laplace-tail verifier ABI",
+    "current_maturity": "candidate-neutral total directed algorithm defined and expanded exact audits pass; unsealed pending independent acknowledgement",
+    "target_maturity": "independently acknowledged bounded verifier algorithm suitable for primary and disjoint replay implementations",
+    "required_frozen_inputs": [
+      "universal scalar Borel system v1",
+      "metric Borel system v1",
+      "Borel state-jet system v1",
+      "tail interval x in [0,1/255]",
+      "512-bit directed arithmetic for instantiated bounds"
+    ],
+    "required_evidence": [
+      "strict kappa and Laplace margins",
+      "finite positive-ray continuation enclosure",
+      "validated tail Lyapunov witness",
+      "value/gradient/Hessian growth bounds",
+      "directed finite quadrature and analytic tail remainder",
+      "independent verifier replay",
+      "zero candidate ingress during S5"
+    ],
+    "stop_fail_criteria": [
+      "any strict margin touches zero",
+      "a witness matrix is not proved positive definite",
+      "a tail matrix inequality is undecidable or fails",
+      "a polynomial prefactor or mixed state term is omitted",
+      "a quadrature remainder is heuristic",
+      "an order is invented before the selector is acknowledged",
+      "candidate evaluation, root creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "loading or tuning against a selected-member result",
+      "changing the bounded continuation or projection selectors after acknowledgement",
+      "loading the selected member",
+      "implementing or executing C08",
+      "authorizing an execution or changing frozen equations"
+    ],
+    "downstream_gate_unlocked": "A3 replacement byte-bound independent acknowledgement only; implementation remains forbidden"
+  },
+  "preacknowledgement_completeness": {
+    "review_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-a-borel-preacknowledgement-completeness-review.md",
+    "reviewed_raw_sha256": "732a340cb647e409d40e2c9fa35a860edee2a2327630f14d62d8332c0ea95d4b",
+    "verdict": "FAIL_DEFINITION_UNDER_SPECIFIED",
+    "repair_verdict": "PASS_TOTAL_DEFINITION_AUDITED_PENDING_INDEPENDENT_ACKNOWLEDGEMENT",
+    "remaining_open_bindings": [],
+    "acknowledgement_request_withdrawn": true,
+    "acknowledgement_occurred": false,
+    "open_bindings": [
+      "gevrey_witness_producer",
+      "tail_augmented_systems",
+      "polynomial_prefactor_closure",
+      "picard_enclosure_construction",
+      "volterra_convolution_remainder",
+      "truncated_coefficient_tail",
+      "frozen_wire_reconciliation",
+      "canonical_hash_and_failure_grammar",
+      "endpoint_observable_ingress",
+      "convolution_onset_and_edge_weighting",
+      "metric_output_derivative_bounds",
+      "p_norm_component_extraction",
+      "rational_growth_multiplier",
+      "weighted_history_panel_algorithm",
+      "derivative_convolution_orientation",
+      "borel_endpoint_factorial_normalization",
+      "all_orders_borel_laplace_realization",
+      "origin_state_component_tails",
+      "tail_selector_chronology_and_failure_mapping",
+      "interval_p_norm_evaluation",
+      "analytic_source_parameter_jets",
+      "lyapunov_momentum_symbol_namespace",
+      "gevrey_scalar_coefficient_namespace"
+    ],
+    "binding_closure": {
+      "gevrey_witness_producer": "audited_complete",
+      "tail_augmented_systems": "audited_complete",
+      "polynomial_prefactor_closure": "audited_complete",
+      "picard_enclosure_construction": "audited_complete",
+      "volterra_convolution_remainder": "audited_complete",
+      "truncated_coefficient_tail": "audited_complete",
+      "frozen_wire_reconciliation": "audited_complete",
+      "canonical_hash_and_failure_grammar": "audited_complete",
+      "endpoint_observable_ingress": "audited_complete",
+      "convolution_onset_and_edge_weighting": "audited_complete",
+      "metric_output_derivative_bounds": "audited_complete",
+      "p_norm_component_extraction": "audited_complete",
+      "rational_growth_multiplier": "audited_complete",
+      "weighted_history_panel_algorithm": "audited_complete",
+      "derivative_convolution_orientation": "audited_complete",
+      "borel_endpoint_factorial_normalization": "audited_complete",
+      "all_orders_borel_laplace_realization": "audited_complete",
+      "origin_state_component_tails": "audited_complete",
+      "tail_selector_chronology_and_failure_mapping": "audited_complete",
+      "interval_p_norm_evaluation": "audited_complete",
+      "analytic_source_parameter_jets": "audited_complete",
+      "lyapunov_momentum_symbol_namespace": "audited_complete",
+      "gevrey_scalar_coefficient_namespace": "audited_complete"
+    }
+  },
+  "immutable_predecessors": {
+    "universal_scalar_borel_system": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-a-universal-scalar-borel-system.v1.json",
+      "raw_sha256": "fb0e83ffcd2501a31605a080b4f463db58eccd3afc4520d3664ff52d6f9684e8"
+    },
+    "metric_borel_system": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-a-metric-borel-system.v1.json",
+      "raw_sha256": "46cad918b497d30dd0dcfa4bd1bcb5b5ac1a3904634d0346c9d2c372c3d8b945"
+    },
+    "borel_state_jet_system": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-a-borel-state-jet-system.v1.json",
+      "raw_sha256": "75eff0131c357480c938e466fe6338793fbdb980dc41cf7f3218a6f5acb6cffc"
+    },
+    "flat_carrier_remainder_contract": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-flat-carrier-remainder-contract.v1.json",
+      "raw_sha256": "09ca71e9ea3d93ca31468ceb1a953cd0930b86f1f117211b3e4a5925cf865103"
+    },
+    "classical_state_grid_contract": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json",
+      "raw_sha256": "cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c"
+    },
+    "wire_record_contract": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-wire-record-contract.v1.json",
+      "raw_sha256": "c225865343ccf3c2874b59e305c70891cdd944fa3f3a88179bc55eccbf59c160"
+    },
+    "s5_checkpoint_abi": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-checkpoint-abi.v1.json",
+      "raw_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca"
+    }
+  },
+  "input_margins": {
+    "kappa_lower": "strictly positive directed lower endpoint",
+    "mu_range": "0<=mu<=mu_upper",
+    "formal_metric_and_laplace_gap": "g=255-2*mu_upper>0",
+    "state_derivative_order": 2,
+    "nonfinite_or_undecidable": "FAIL"
+  },
+  "gevrey_witness_producer": {
+    "scope": "the universal scalar recurrence and its complete three-parameter value/first/second jets in each chart; metric origin localization is validated separately from the enclosed scalar source",
+    "parameter_tuples": {
+      "positive": "theta=(h0,kappa,mu) with mu=M",
+      "vacuum": "theta=(h0,kappa,Mbar_infinity) with eta fixed and mu=eta*Mbar_infinity"
+    },
+    "ordered_jet_components": [
+      "value",
+      "d_h0", "d_kappa", "d_theta2",
+      "d_h0_h0", "d_h0_kappa", "d_h0_theta2",
+      "d_kappa_h0", "d_kappa_kappa", "d_kappa_theta2",
+      "d_theta2_h0", "d_theta2_kappa", "d_theta2_theta2"
+    ],
+    "jet_count": 13,
+    "jet_algebra": {
+      "value": "(F*G)_0=F_0*G_0",
+      "first": "(F*G)_a=F_a*G_0+F_0*G_a",
+      "second": "(F*G)_ab=F_ab*G_0+F_a*G_b+F_b*G_a+F_0*G_ab",
+      "reciprocal": "construct G=1/F in the same component order by solving (F*G)_0=1, (F*G)_a=0 and (F*G)_ab=0 in value, first, then ordered second order",
+      "division_guard": "the value denominator must exclude zero before any reciprocal jet is constructed"
+    },
+    "lifted_recurrence": {
+      "formula": "U_(n+1)=-(C0(n) odot U_n+C1(n) odot U_(n-1)+C2(n) odot U_(n-2)) odot reciprocal(2*kappa*(n+1))",
+      "missing_negative_indices": "U_-1=U_-2=the exact zero jet",
+      "coefficient_jets": "C0,C1,C2 are obtained by exact symbolic differentiation of the recorded universal c0,c1,c2 after the chart parameter substitution",
+      "origin_jet": "U_0 is the jet of h0: value h0, d_h0=1, every other first and second parameter partial exactly zero",
+      "operation_order": "coefficient jets, three jet products, exact sum, denominator reciprocal, final product; no midpoint substitution"
+    },
+    "linear_majorant_matrices": {
+      "definition": "expand the lifted linear recurrence uniquely as U_(n+1)=L0(n)U_n+L1(n)U_(n-1)+L2(n)U_(n-2) in the frozen 13-component order",
+      "entry_normal_form": "each entry is (a2*n^2+a1*n+a0)/(n+1), where a2,a1,a0 are exact rational functions of the compact parameter box and fixed eta on the vacuum chart",
+      "coefficient_enclosure": "enclose every a2,a1,a0 with 512-bit directed balls after proving every kappa denominator strictly excludes zero",
+      "matrix_majorant": "G_s=max_row sum_column (mag(a2)+mag(a1)+mag(a0)) for s=0,1,2; G0,G1,G2 are Gevrey majorants and the predecessor scalar-equation coefficients retain the distinct names P0,P1,P2",
+      "proved_bound": "norm_infinity(L_s(n))<=G_s*(n+1) for every integer n>=0 because n^2/(n+1)<=n+1, n/(n+1)<=1<=n+1 and 1/(n+1)<=1<=n+1",
+      "missing_nonfinite_or_negative_G": "FAIL"
+    },
+    "dyadic_rate_selector": {
+      "candidates": "A=2^e in increasing e for e=0..1024",
+      "predicate": "G0/A+G1/A^2+G2/A^3<=1/2",
+      "selection": "first candidate whose directed upper bound satisfies the predicate",
+      "exhaustion": "FAIL"
+    },
+    "base_constant": {
+      "base_indices": [0, 1, 2],
+      "definition": "C=2*max_(j=0,1,2) norm_infinity(U_j)/(A^j*j!) using directed upper bounds",
+      "induction_claim": "norm_infinity(U_j)<=C*A^j*j! for all j>=0",
+      "proof_step": "for n>=2 divide the three majorant terms by C*A^(n+1)*(n+1)!; their ratios are at most G0/A, G1/A^2 and G2/A^3 respectively, whose sum is <=1/2",
+      "zero_C": "allowed only when all three base jets are exact zero; otherwise C must be strictly positive"
+    },
+    "record_fields": [
+      "chart and exact parameter-box identity",
+      "all directed a2,a1,a0 coefficient balls for L0,L1,L2",
+      "G0,G1,G2 Gevrey majorants, selected exponent e and A",
+      "U0,U1,U2 norm bounds and C",
+      "every denominator margin and resource counter"
+    ],
+    "candidate_sampling_or_post_result_rate_change": "FAIL"
+  },
+  "finite_positive_ray_witness": {
+    "interval": "t in [0,T] with tail-witness onset T0 and Laplace split T=2*T0",
+    "required_outputs": [
+      "directed enclosures for scalar Borel state and derivatives",
+      "directed derivative-convolution source enclosures",
+      "directed D,S,K states and derivatives",
+      "all first and second full-state jets",
+      "finite Laplace integral enclosures for required x/q derivative kernels"
+    ],
+    "continuation_algorithm": "finite_positive_ray_algorithm",
+    "local_series_order_selector": "finite_positive_ray_algorithm.origin_localization and positive_panel_continuation",
+    "maximum_order_and_resource_bound": "fixed_resource_bounds",
+    "selection_status": "new additive candidate-neutral definition pending independent acknowledgement; implementation remains stopped"
+  },
+  "tail_growth_witness": {
+    "interval": "the scalar LMI is verified on t in [T0,infinity); realized scalar/metric/convolution and Laplace tail bounds start at T=2*T0",
+    "producer_witness": [
+      "exact dyadic T0>0 and exact T=2*T0",
+      "exact rational or directed-ball positive-definite matrix P for the explicit scalar base system",
+      "directed internal sigma/tau tiers with polynomial degree fixed to zero after absorption",
+      "directed scalar value/first/second boundary norms at the LMI onset t=T0 and their absolute-exponential constants, plus metric boundary norms at T=2*T0",
+      "directed exponentially weighted finite-history edge constants on [0,T0] for every convolution term and companion tier",
+      "all parameter-box and state-jet margins"
+    ],
+    "verifier_conditions": [
+      "P is symmetric and lambda_min(P)>0",
+      "A_scalar(t,theta)^T*P+P*A_scalar(t,theta)-2*sigma0*P is strictly negative definite for every t>=T0 and every theta in the compact box",
+      "the t>=T0 LMI condition is mapped by u=1/t to u in [0,1/T0] and every positive denominator is cleared with its sign proved",
+      "inhomogeneous first/second variational forcing is bounded in the matching P norm",
+      "all derivative-convolution polynomial prefactors are included"
+    ],
+    "witness_discovery_may_differ_between_producers": true,
+    "verifier_predicate_may_differ_between_producers": false,
+    "failed_witness_may_be_retried_after_selected_result": false,
+    "witness_is_scientific_selector": false
+  },
+  "growth_tiers": {
+    "gap_partition": "g is divided into eight exact positive eighths",
+    "internal_scalar_definitions": [
+      "sigma0=2*mu_upper+g/8 for scalar values",
+      "sigma1=2*mu_upper+3*g/8 for scalar first parameter derivatives",
+      "sigma2=2*mu_upper+5*g/8 for scalar second parameter derivatives"
+    ],
+    "definitions": [
+      "tau0=2*mu_upper+2*g/8",
+      "tau1=2*mu_upper+4*g/8",
+      "tau2=2*mu_upper+6*g/8"
+    ],
+    "uses": [
+      "tau0 for values",
+      "tau1 for first state derivatives and their forcing",
+      "tau2 for second state derivatives and their forcing"
+    ],
+    "strict_laplace_margin": "delta=255-tau2=g/4>0",
+    "strict_internal_gaps": [
+      "tau0-sigma0=g/8",
+      "sigma1-tau0=g/8",
+      "tau1-sigma1=g/8",
+      "sigma2-tau1=g/8",
+      "tau2-sigma2=g/8"
+    ],
+    "tier_substitution_or_weakening": "FAIL"
+  },
+  "tail_augmented_systems_and_growth_closure": {
+    "symbol_namespace": "P_lyap is the accepted 4x4 Lyapunov matrix (displayed as P only inside standard LMI formulas); BP is the scalar momentum Borel component -(kappa+t)*B+(beta+1)*J1; the bare wire/member name P is forbidden",
+    "scalar_base_system": {
+      "state_order": ["B", "V", "J1", "J2"],
+      "definitions": ["V=B'", "J1'=B", "J2'=J1"],
+      "matrix_rows": [
+        "[0,1,0,0]",
+        "[-P0/P2,-P1/P2,-PJ1/P2,-PJ2/P2]",
+        "[1,0,0,0]",
+        "[0,0,1,0]"
+      ],
+      "P2": "t*(t+2*kappa)",
+      "asymptotic_matrix_rows": [
+        "[0,1,0,0]",
+        "[-4*mu^2,4*mu,0,0]",
+        "[1,0,0,0]",
+        "[0,0,1,0]"
+      ],
+      "tail_domain": "t>=T0>=1 with kappa_lower>0; output/Laplace bounds are rebased at T=2*T0",
+      "parameter_derivatives": "A_a and A_ab are exact first/ordered-second derivatives of the displayed matrix in the three-parameter jet algebra"
+    },
+    "scalar_lyapunov_verifier": {
+      "construction": "at each T0 candidate solve (A_infinity(theta_mid)-sigma0*I)^T*P+P*(A_infinity(theta_mid)-sigma0*I)=-I in directed balls and round the symmetric midpoint to denominator 2^256",
+      "positive_definite": "verify P=P^T and lambda_min(P)>0",
+      "base_lmi": "verify A^T*P+P*A-2*sigma0*P<0 strictly for t>=T0 and the complete parameter box after u=1/t substitution and sign-proved denominator clearing",
+      "compact_box_enclosure": "after u=1/t substitution, clear only denominators whose directed lower bounds are strictly positive, expand every symmetric-matrix entry as a polynomial, and evaluate it by directed multivariate Horner in fixed variable order u,h0,kappa,theta2 over [0,1/T0] times the complete chart parameter box; eta is a fixed coefficient in the vacuum chart; no subdivision or point sampling is permitted",
+      "parameter_operator_bounds": [
+        "verify A_a^T*P*A_a<=K1^2*P for each a with one common directed K1>=0",
+        "verify A_ab^T*P*A_ab<=K2^2*P for every ordered a,b with one common directed K2>=0"
+      ],
+      "operator_bound_selector": "for K1 and then K2 independently test K=2^e in increasing e=0..1024 with the same compact-box enclosure and select the first K making every required K^2*P-A_derivative^T*P*A_derivative strictly positive definite; exhaustion is FAIL",
+      "p_norm_component_extraction": "compute the exact rational inverse Pinv of the accepted rational P_lyap, verify P_lyap*Pinv=I entrywise, prove every diagonal Pinv_ii>0, and set EP=max_i sqrt(Pinv_ii) with 512-bit directed square roots; then abs(y_i)<=EP*norm_(P_lyap)(y) for each ordered component B,V,J1,J2 and for every value/parameter jet",
+      "matrix_comparison": "strict negative/positive definiteness is certified by exact symmetric LDL^T with directed pivots after interval remainder enclosure; any zero-containing pivot, touching or undecidable sign is FAIL"
+    },
+    "scalar_jet_constants": {
+      "interval_p_norm_upper": "for an interval state box Y in frozen B,V,J1,J2 order set qP=sum_(i=0)^3 sum_(j=0)^3 mag((P_lyap)_ij)*mag(Y_i)*mag(Y_j) outward and normP_upper(Y)=sqrt(qP) outward; invalid, negative or nonfinite qP is FAIL; use this same conservative map for every value/first/ordered-second boundary box",
+      "boundary_norms": [
+        "C0O=max P-norm of the value state at the onset T0",
+        "C1O=max P-norm over the three first parameter states at the onset T0",
+        "C2O=max P-norm over the nine ordered second parameter states at the onset T0"
+      ],
+      "definitions": [
+        "epsilon10=sigma1-sigma0=g/4",
+        "epsilon20=sigma2-sigma0=g/2",
+        "D0=C0O",
+        "D1=C1O+K1*D0/epsilon10",
+        "D2=C2O+2*K1*D1/epsilon10+K2*D0/epsilon20",
+        "C0=D0*exp(-sigma0*T0)",
+        "C1=D1*exp(-sigma1*T0)",
+        "C2=D2*exp(-sigma2*T0)",
+        "C0T=C0*exp(sigma0*T)",
+        "C1T=C1*exp(sigma1*T)",
+        "C2T=C2*exp(sigma2*T)"
+      ],
+      "proved_bounds": [
+        "norm_(P_lyap)(y_value(t))<=C0*exp(sigma0*t) for t>=T0",
+        "max_a norm_(P_lyap)(y_a(t))<=C1*exp(sigma1*t) for t>=T0",
+        "max_ab norm_(P_lyap)(y_ab(t))<=C2*exp(sigma2*t) for t>=T0"
+      ],
+      "proof_inequality": "z*exp(-epsilon*z)<=1/epsilon for z>=0 and epsilon>0",
+      "nonfinite_or_nonpositive_gap": "FAIL"
+    },
+    "finite_growth_bound_algebra": {
+      "bound_type": "G_a(C,d,sigma) means abs(F(t))<=C*(1+t)^d*exp(sigma*t) for t>=a>=0, C>=0 and integer d>=0; a is part of every growth-DAG node",
+      "sum": "set a=max(aF,aG), lift both inputs to sigma=max(sigmaF,sigmaG) and d=max(dF,dG) on t>=a, then add outward constants",
+      "polynomial_multiplier": "multiplication by a recorded polynomial of degree r adds r to d and multiplies C by its directed l1 coefficient majorant because abs(poly(t))<=l1(poly)*(1+t)^r for t>=0",
+      "rational_multiplier": "reduce R(t,theta)=N/D exactly, set r=max(0,degree_t(N)-degree_t(D)), prove D excludes zero on t>=a after u=1/t substitution, and compute LR>=sup abs(R(t,theta))/(1+t)^r by the fixed directed multivariate-Horner compact-box enclosure; multiplication by R adds r to d and multiplies C by LR; a nonfinite LR, undecidable denominator or degree above 64 is FAIL",
+      "derivative_convolution_tail_split": "for t>=T=2*T0 split integral_0^t into [0,T0], [T0,t-T0], [t-T0,t]; the left and right edge integrals use recorded finite-history L1 bounds with one tail factor, while the middle interval uses both tail bounds",
+      "finite_history_constants": "H_(F|sigmaG)=integral_0^T0 abs(F(s))*exp(-sigmaG*s)ds and H_(Gprime|sigmaF)=integral_0^T0 abs(G'(s))*exp(-sigmaF*s)ds are directed panel sums and are recorded for every value/parameter jet and every applicable companion tier",
+      "finite_history_panel_algorithm": "on each accepted panel s=sL+xi, xi in [0,h], write the retained Taylor model as sum_k p_k*xi^k plus uniform remainder R; bound the weighted absolute integral by sum_k mag(p_k)*exp(-sigma*sL)*integral_0^h xi^k*exp(-sigma*xi)dxi + mag(R)*exp(-sigma*sL)*integral_0^h exp(-sigma*xi)dxi, using directed incomplete-gamma moments for sigma>0 and exact h^(k+1)/(k+1) moments for sigma=0; sum panels in increasing chronology without cancellation",
+      "derivative_convolution": "if F has G_T0(CF,dF,sigmaF) and Gprime has G_T0(CGprime,dGprime,sigmaG), then on t>=T the boundary has (CF*abs(G(0)),dF,sigmaF), the left edge has (CGprime*H_(F|sigmaG),dGprime,sigmaG), the right edge has (CF*H_(Gprime|sigmaF),dF,sigmaF), and the middle has (CF*CGprime,dF+dGprime+1,max(sigmaF,sigmaG)); lift and sum all four outward",
+      "parameter_variations": "apply the exact base/first/second convolution identities first, then the same bound algebra term by term",
+      "maximum_degree": 64,
+      "degree_exhaustion": "FAIL"
+    },
+    "polynomial_to_exponential_absorption": {
+      "definition": "Absorb(d,epsilon)=sum_(k=0)^d binom(d,k)*k!/epsilon^k",
+      "inequality": "(1+z)^d*exp(-epsilon*z)<=Absorb(d,epsilon) for z>=0 because z^k*exp(-epsilon*z)<=k!/epsilon^k",
+      "value_target": "absorb every scalar-value source from sigma<=sigma0 into tau0 using epsilon>=tau0-sigma0=g/8",
+      "first_target": "absorb every first-parameter source from sigma<=sigma1 into tau1 using epsilon>=tau1-sigma1=g/8",
+      "second_target": "absorb every second-parameter source from sigma<=sigma2 into tau2 using epsilon>=tau2-sigma2=g/8",
+      "post_absorption_degree": 0,
+      "free_polynomial_degree_selector": false
+    },
+    "analytic_and_scalar_derived_inputs": {
+      "E1": "exp(2*mu*t) is lifted from type 2*mu to the applicable internal sigma with absolute-exponential constant 1",
+      "E2": "(1+2*mu*t)*exp(2*mu*t) is lifted with Absorb(1,sigma0-2*mu_upper)",
+      "analytic_mu_parameter_jets": [
+        "F=1-2*mu*t; F_mu=-2*t; F_mumu=0",
+        "E1=exp(2*mu*t); E1_mu=2*t*E1; E1_mumu=4*t^2*E1",
+        "E2=(1+2*mu*t)*E1; E2_mu=4*t*(1+mu*t)*E1; E2_mumu=4*t^2*(3+2*mu*t)*E1"
+      ],
+      "chart_coefficient_parameter_jets": [
+        "positive omega2=1-kappa^2; omega2_kappa=-2*kappa; omega2_kappakappa=-2",
+        "vacuum a=1-eta*kappa^2; a_kappa=-2*eta*kappa; a_kappakappa=-2*eta",
+        "eta has exact zero first and second parameter jets"
+      ],
+      "vacuum_mu_chain": "for theta2=Mbar_infinity, mu=eta*theta2, so X_theta2=eta*X_mu and X_theta2theta2=eta^2*X_mumu for X in F,E1,E2; all kappa/mu mixed partials of these X are exact zero before source products",
+      "analytic_jet_growth": "apply the fixed polynomial multiplier and absorption rules to every displayed t or t^2/t^3 factor before source convolution; missing either mixed orientation or any analytic-factor jet is FAIL",
+      "H": "B component of the scalar state",
+      "component_ingress": "convert every B,V,J1,J2 value/first/second P-norm bound to a component bound with the recorded EP before evaluating any source expression",
+      "K": "B'+t*B'' is V+t*row_2(A_scalar)*y; expand this exact row expression after EP component extraction and bound every rational/polynomial coefficient with the growth algebra before absorption",
+      "BP": "-(kappa+t)*B+(beta+1)*J1 bounded by the growth algebra before absorption",
+      "t_derivative_library": [
+        "B'=V",
+        "V'=row_2(A_scalar)*y",
+        "J1'=B",
+        "J2'=J1",
+        "P'=beta*B-(kappa+t)*V",
+        "F'=-2*mu",
+        "E1'=2*mu*E1",
+        "E2'=4*mu*(1+mu*t)*E1"
+      ],
+      "derivative_convolution_orientation": [
+        "H2: F=B, G=B, G'=V",
+        "P2: F=P, G=P, G'=beta*B-(kappa+t)*V",
+        "E1_diamond_H2: F=H2, G=E1, G'=2*mu*E1",
+        "F_diamond_P2: F=P2, G=F, G'=-2*mu",
+        "E2_diamond_H2: F=H2, G=E2, G'=4*mu*(1+mu*t)*E1"
+      ],
+      "orientation_rule": "use the displayed orientation in finite Volterra panels, weighted edge histories and tail growth; swapping operands, differentiating a different operand or using a pointwise product is FAIL",
+      "sources": "H2,P2,BRD,BRS and all parameter variations follow the exact metric-Borel expression DAG and derivative-convolution rules"
+    },
+    "metric_integral_systems": {
+      "states": ["JD", "JS"],
+      "equations": [
+        "JD'=mD(t)*JD+q(t)*BRD with mD=(2*beta+3)/(t+2*kappa) and q=1/(t+2*kappa)",
+        "JS'=mS(t)*JS+q(t)*BRS with mS=(2*beta+2)/(t+2*kappa)"
+      ],
+      "homogeneous_rate": "rhoM=tau0/2",
+      "verifier": "prove mD<=rhoM and mS<=rhoM for t>=T=2*T0 and the full parameter box after u=1/t substitution; prove q<=qT=1/(T+2*kappa_lower)",
+      "parameter_bounds": "derive common nonnegative KM0 for abs(mD),abs(mS), KM1 for every first parameter derivative of mD,mS,q, and KM2 for every ordered-second parameter derivative of mD,mS,q on the compact tail box",
+      "parameter_bound_selector": "for KM0, KM1 and KM2 independently test K=2^e in increasing e=0..1024 and select the first K whose directed multivariate-Horner enclosure proves abs(mD),abs(mS)<=KM0, abs(first derivative)<=KM1, or abs(ordered-second derivative)<=KM2 on u in [0,1/T] and the complete chart parameter box; exhaustion is FAIL",
+      "boundary_constants": "CMT0=exp(-tau0*T)*max norm of JD,JS at T; CMT1=exp(-tau1*T)*max first-jet norm at T; CMT2=exp(-tau2*T)*max ordered-second-jet norm at T",
+      "gap": "epsilonM=tau0-rhoM=tau0/2>0",
+      "value_constant": "CM0=CMT0+qT*CR0/epsilonM",
+      "first_constant": "CM1=CMT1+(qT*CR1+KM1*CM0+KM1*CR0)/epsilonM",
+      "second_constant": "CM2=CMT2+(qT*CR2+2*KM1*CM1+KM2*CM0+2*KM1*CR1+KM2*CR0)/epsilonM",
+      "output_value_constant": "CBM0=KM0*CM0+qT*CR0",
+      "output_first_constant": "CBM1=KM0*CM1+KM1*CM0+qT*CR1+KM1*CR0",
+      "output_second_constant": "CBM2=KM0*CM2+2*KM1*CM1+KM2*CM0+qT*CR2+2*KM1*CR1+KM2*CR0",
+      "outputs": "BD=JD' and BS=JS' are bounded by CBM0,CBM1,CBM2 at tau0,tau1,tau2 respectively; every displayed product is accumulated outward before absorption",
+      "touching_or_missing_bound": "FAIL"
+    },
+    "tail_record": [
+      "T0,T,P_lyap,Pinv,EP,each onset interval box qP and normP_upper,K1 exponent,K1,K2 exponent,K2,C0O,C1O,C2O,D0,D1,D2,C0,C1,C2,C0T,C1T,C2T",
+      "every analytic-factor value/first/ordered-second jet, every growth DAG node orientation,onset a,C,d,sigma, every rational multiplier r,LR, every weighted finite-history panel contribution and total, and every absorption constant",
+      "rhoM,qT,KM0 exponent,KM0,KM1 exponent,KM1,KM2 exponent,KM2,CMT0,CMT1,CMT2,CR0,CR1,CR2,CM0,CM1,CM2,CBM0,CBM1,CBM2",
+      "all compact-u denominator, LDL^T and first-failure evidence"
+    ],
+    "polynomial_degree_after_tail_verification": 0
+  },
+  "derivative_convolution_growth": {
+    "assumption": [
+      "abs(F(t))<=CF*(1+t)^p*exp(sigmaF*t) for t>=T0",
+      "abs(Gprime(t))<=CGprime*(1+t)^q*exp(sigmaG*t) for t>=T0",
+      "a matching bound is available for at least one derivative used in the boundary-plus-integral form"
+    ],
+    "identity": "(F diamond G)(t)=F(t)*G(0)+integral_0^t F(s)*G'(t-s) ds",
+    "split_domain": "for t>=T=2*T0 use [0,T0], [T0,t-T0], [t-T0,t] so every tail operand is evaluated at an argument >=T0",
+    "weighted_edges": "record integral_0^T0 abs(F(s))*exp(-sigmaG*s)ds and integral_0^T0 abs(G'(s))*exp(-sigmaF*s)ds; unweighted histories or evaluation of a growing tail at t-T0 are invalid",
+    "conclusion": "the derivative-convolution has exponential type max(sigmaF,sigmaG) and a directed polynomial prefactor of finite recorded degree on t>=T",
+    "pointwise_product_bound_allowed": false,
+    "degree_and_constant_must_be_recorded": true
+  },
+  "laplace_tail_bound": {
+    "assumption": "abs(F(t))<=C*(1+t)^p*exp(tau*t) for t>=T, integer p>=0, tau<=tau2<255",
+    "variables": [
+      "y=1/x>=255",
+      "a=y-tau>=delta=255-tau2>0"
+    ],
+    "exact_moment_identity": "integral_T^infinity t^k*exp(-a*t) dt=exp(-a*T)*sum_(l=0)^k (k!/l!)*T^l/a^(k-l+1)",
+    "uniform_ratio_bound": "y/a^m<=255/delta^m for every integer m>=1 and y>=255",
+    "uniform_tail_bound": "x^-1*integral_T^infinity exp(-t/x)*abs(F(t)) dt <= 255*C*exp(-delta*T)*sum_(k=0)^p binom(p,k)*sum_(l=0)^k (k!/l!)*T^l/delta^(k-l+1)",
+    "endpoint_x_zero": "insert the exact formal endpoint value; never evaluate 1/x",
+    "outward_evaluation_required": true
+  },
+  "coordinate_derivative_laplace_kernels": {
+    "scope": "x denotes q or Q; the identical formulas apply to every value, first-state-jet and second-state-jet Borel component",
+    "realization": "L_F(x)=x^-1*integral_0^infinity exp(-t/x)*F(t)dt for x>0",
+    "moment_definition": "I_m(y)=integral_0^infinity t^m*exp(-y*t)*F(t)dt with y=1/x",
+    "derivative_form": "d_x^j L_F=sum_(m=0)^j c_(j,m)*y^(j+m+1)*I_m(y)",
+    "coefficient_initial": "c_(0,0)=1",
+    "coefficient_recurrence": [
+      "c_(j+1,m)+=-(j+m+1)*c_(j,m)",
+      "c_(j+1,m+1)+=c_(j,m)"
+    ],
+    "exact_low_order_rows": [
+      "c_0=[1]",
+      "c_1=[-1,1]",
+      "c_2=[2,-4,1]"
+    ],
+    "required_coordinate_orders": "j=0..12 in increasing order; rows are generated with exact signed integers",
+    "tail_moment_term": "for a=y-tau and s=m+k-l+1, y^r*integral_T^infinity t^(m+k)*exp(-a*t)dt <= ((m+k)!/l!)*T^l*U_(r,s) after summing l=0..m+k",
+    "uniform_exponential_power_majorant": {
+      "Phi_d(delta,T)": [
+        "exp(-delta*T)*delta^d for integer d<=0",
+        "exp(-z*T)*z^d for integer d>0 and z=max(delta,d/T)"
+      ],
+      "U_(r,s)": "sum_(z=0)^r binom(r,z)*tau2^(r-z)*Phi_(z-s)(delta,T)",
+      "proof_route": "write y^r=(a+tau)^r, use 0<=tau<=tau2 and maximize exp(-a*T)*a^(z-s) over a>=delta",
+      "outward_evaluation": "tau2,delta,T, every power, maximum and exponential are directed; a nonpositive delta or T is FAIL"
+    },
+    "uniform_coordinate_tail_bound": "Tail_j <= C*sum_(m=0)^j abs(c_(j,m))*sum_(k=0)^p binom(p,k)*sum_(l=0)^(m+k) ((m+k)!/l!)*T^l*U_(j+m+1,m+k-l+1)",
+    "endpoint_x_zero": "insert d_x^j L_F(0)=j!*f_j exactly when the exponential-generating Borel input is F(t)=sum_(n>=0) f_n*t^n/n!; never evaluate y or 1/x",
+    "state_derivative_rule": "state differentiation commutes with the directed integral only after the matching value/first/second Borel growth witness has passed; apply the same j=0..12 kernels to F_i and F_ij",
+    "coefficient_space_use": "the j=0..12 bounds feed the frozen theta-pullback Bell-12 coefficient-tail theorem; j=0..2 also feed the order-8 to order-6 to order-4 residual derivative losses",
+    "signed_cancellation_in_bounds": false,
+    "outward_evaluation_required": true
+  },
+  "all_orders_borel_laplace_realization": {
+    "scope": "every positive/vacuum H,K,D,S value, ordered first parameter jet and ordered second parameter jet after its positive-ray continuation and matching growth witness pass",
+    "local_egf_remainder": "if F(t)=sum_n f_n*t^n/n! and abs(f_n)<=C*A^n*n!, then for A*t0<=1/4 and every integer N>=0, abs(F(t)-sum_(n=0)^(N-1) f_n*t^n/n!)<=C*(A*t)^N/(1-A*t0) on 0<=t<=t0",
+    "local_laplace_remainder": "the positive-kernel integral of the local EGF remainder is <=C*A^N*N!*x^N/(1-A*t0)",
+    "far_ray_flatness": "subtract the same finite EGF polynomial on t>=t0; the recorded polynomial-exponential bounds for F and that polynomial reduce every far-ray term to y^r*exp(-(y-tau)*t0); for y>=max(255,2*tau), use y-tau>=y/2 and exp(-z)<=L!/z^L with L=N+r to obtain an explicit directed constant times x^N for every N",
+    "cinfinity_endpoint": "therefore L_F(x)=x^-1*integral_0^infinity exp(-t/x)*F(t)dt for x>0 has the unique C-infinity extension at x=0 with d_x^j L_F(0)=j!*f_j for every integer j>=0",
+    "parameter_interchange": "apply the same local and far-ray estimates to every recorded first/ordered-second parameter jet; only after those uniform witnesses pass may parameter differentiation commute with the Laplace integral",
+    "product_homomorphism": "the absolute growth margins and weighted edge bounds justify Fubini and integration by parts, yielding L_(F diamond G)(x)=L_F(x)*L_G(x) for every 0<x<=1/255 with the displayed frozen derivative-convolution orientation",
+    "equation_replay": "replay the universal-scalar and metric-Borel transform tables symbolically; after applying the Laplace map, require exact-zero positive/vacuum H,K,D,S formal-subsystem residuals and exact-zero first/ordered-second parameter variations before any flat-remainder assembly",
+    "missing_nonuniform_or_nonzero_replay": "FAIL"
+  },
+  "finite_positive_ray_algorithm": {
+    "component_scope": "scalar Borel state (B,V,J1,J2), metric integral states JD/JS, four realized formal components H,K,D,S, and the complete three-parameter value/first/second jet inventory in each chart",
+    "compressed_jet_binding": "use borel-state-jet-system v1 compressed_parameter_jet_realization: 1 value + 3 ordered first parameter partials + 9 ordered second parameter partials per Borel component, followed by exact full-state composition",
+    "origin_localization": {
+      "gevrey_input": "a proved outward Gevrey witness abs(f_n)<=C*A^n*n! for every required parameter partial",
+      "start_point": "t0 is the largest positive dyadic not exceeding min(1/4,1/(4*A_upper))",
+      "borel_series_tail": "for A_upper*t0<=1/4, abs(sum_(n>r) f_n*t^n/n!)<=C*(A_upper*t)^(r+1)/(1-A_upper*t)",
+      "borel_derivative_tails": "for m=0,1,2 define DTail(m,r,z)=d^m/dz^m[z^(r+1)/(1-z)]; then abs(sum_(n>r) f_n*t^(n-m)/(n-m)!)<=C*A_upper^m*DTail(m,r,A_upper*t), omitting n<m; evaluate the displayed rational derivative exactly with directed z in [0,A_upper*t0]",
+      "integral_state_tails": "for z=A_upper*t and n>r, J1 tail <=C*t*z^(r+1)/((r+2)*(1-z)) and J2 tail <=C*t^2*z^(r+1)/((r+2)*(r+3)*(1-z)); use the same formulas for every parameter jet",
+      "orders": [32, 48, 64, 96, 128, 192, 256],
+      "selector": "use the first listed order whose directed B,V,J1,J2 value/derivative tails and origin compatibility enclose every required component within the fixed numerical-width rule; exhaustion is FAIL",
+      "zero_endpoint": "all endpoint values and coordinate derivatives are inserted from exact recurrence coefficients"
+    },
+    "positive_panel_continuation": {
+      "representation": "piecewise Taylor models in t with exact-power-series coefficient algebra and directed remainder balls",
+      "panel_width": "at each left endpoint tL>0 choose the largest dyadic h not exceeding min(tL/4,(tL+2*kappa_lower)/4,T-tL); if validation fails, halve h before trying a later T",
+      "orders": [24, 32, 48, 64, 96, 128, 192],
+      "selector": "for a fixed panel use the first listed order passing the exact defect and interval-Picard inclusion; if no order passes, halve the panel; never change equations or tolerances",
+      "validation": "apply validated_picard_enclosure to the exact rational first-order Borel equations and all ordered parameter variations over the full panel; require its strict componentwise self-inclusion and the numerical-width rule",
+      "singular_denominators": "prove t>0, t+2*kappa>0 and every cleared denominator sign on every panel; touching or undecidable is FAIL",
+      "chronology": "panels are accepted strictly left-to-right and no later panel is evaluated after the first failure"
+    },
+    "derivative_convolution_panels": {
+      "identity": "(F diamond G)(t)=F(t)*G(0)+t*integral_0^1 F(t*u)*G'(t*(1-u))du",
+      "target_panel": "t=tC+xi with xi in [-h/2,h/2] on one accepted scalar target panel; u is divided into P equal dyadic subpanels in increasing ordinal order",
+      "u_panel_candidates": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536],
+      "operand_model_selection": "for each (xi,u) rectangle, enumerate every accepted source panel intersected by t*u or t*(1-u), translate each intersected Taylor model to the exact affine image, and hull all models; no midpoint panel choice is allowed",
+      "polynomial_order": "rC=min(r_target,r_F,r_Gprime) in the accepted order schedule; compose and multiply exact bivariate polynomials, retain every xi degree <=rC, and move every discarded higher-xi term to the remainder",
+      "exact_u_integration": "integrate every retained rational/directed-ball u monomial exactly over its dyadic u subpanel and sum subpanels in increasing order; multiply the result by the full t=tC+xi polynomial Jacobian",
+      "remainder_cross_terms": "on every rectangle add mag(PF)*RG+mag(PGprime)*RF+RF*RG plus the directed discarded-polynomial tail, affine-composition remainder and source-panel hull radius; all are integrated against the positive u width without cancellation",
+      "selector": "use the first P candidate for which every output Taylor coefficient/remainder passes the fixed numerical-width rule; on exhaustion reject the current target panel so the outer panel rule halves h; if h-halving exhausts, FAIL",
+      "history_and_diagonal": "the same u rule covers origin history, all prior panels and the current diagonal; F(t)*G(0), the Jacobian t, u=0 and u=1 endpoint balls are retained exactly",
+      "state_jets": "apply the exact base/first/second derivative-convolution rules before interval projection; both mixed Hessian orientations are explicit",
+      "point_sampling_or_midpoint_convolution": "FAIL"
+    },
+    "metric_continuation": {
+      "method": "after scalar/source panel enclosure, solve JD'=(BRD+(2*beta+3)*JD)/(2*kappa+t) and JS'=(BRS+(2*beta+2)*JS)/(2*kappa+t) with the identical Taylor/Picard panel rule; set BD=JD' and BS=JS'",
+      "origin_values": "use the chart-specific exact BRD(0),BRS(0),JD(0)=JS(0)=0 normalizations",
+      "parameter_variations": "differentiate the unsolved metric equations first and retain every denominator, beta, source and integral-state term"
+    },
+    "tail_split_selector": {
+      "T0_candidates": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096],
+      "laplace_split": "T=2*T0, so T ranges from 2 through 8192",
+      "rule": "use the first T0 candidate for which the t>=T0 LMI and K1/K2 selectors verify, finite continuation succeeds through T=2*T0, scalar onset constants and every weighted edge history verify at T0, and every value/first/second realized and metric forcing witness verifies at T; a failed T0 is internal witness discovery inside the one bounded algorithm, not a retry of candidate execution",
+      "chronology": [
+        "visit T0 candidates in listed order and record every rejected witness reason",
+        "test parameter margins, construct P and test the compact-box LMI plus K1/K2 before requesting any new finite panel",
+        "after a tail predicate first passes, extend the accepted finite panel ledger append-only through T=2*T0; reuse all earlier panels byte-for-byte and never recompute an accepted endpoint, order, remainder or convolution enclosure",
+        "a finite origin, panel, Picard, convolution or fixed-resource failure is terminal at its producer failure code and no later T0 is visited",
+        "a finite continuation success followed by a tail/growth witness rejection may advance to the next T0 and extend the same append-only ledger",
+        "select the first T0 for which every displayed predicate and record field passes"
+      ],
+      "failure_mapping": "if all T0 candidates are rejected by tail/growth predicates, emit C08-011_TAIL_SPLIT_EXHAUSTION with the ordered child-reason ledger; C08-012_LYAPUNOV_OR_OPERATOR_BOUND is reserved for corruption or independent replay failure of the selected P,LMI,K1,K2,KM0,KM1,KM2 witness; resource failures remain at their originating earlier producer code",
+      "lyapunov_construction": "solve the shifted asymptotic Lyapunov equation in directed balls, round the midpoint matrix entrywise to denominator 2^256, then verify positive definiteness and the exact compact-u tail LMI; discovery has no authority without verifier replay",
+      "exhaustion": "FAIL"
+    },
+    "fixed_numerical_width_rule": "for every stored finite-continuation or finite-projection ball z, rad(z)<=2^-180*max(1,mag(z)); this controls implementation enclosure width and does not replace any scientific threshold",
+    "candidate_result_dependent_retuning": false,
+    "outward_512_bit_arithmetic": true
+  },
+  "validated_picard_enclosure": {
+    "scope": "every scalar and metric value/parameter-jet Taylor panel after all required source Taylor models are available",
+    "panel_coordinate": "xi=t-tL in [0,h] with exact dyadic tL,h and component weights all exactly one",
+    "polynomial_construction": "p(xi)=sum_(k=0)^r p_k*xi^k; p_0 is the complete left-end ball and p_(k+1) is obtained in increasing k by exact truncated power-series substitution into z'=F(t,z)",
+    "defect": "d(xi)=p'(xi)-F(tL+xi,p(xi)); coefficients 0..r-1 are replayed and must contain exact zero, while the complete interval range supplies component magnitudes D_i>=sup(abs(d_i))",
+    "correction_operator": "T(E)(xi)=integral_0^xi (F(tL+s,p(s)+E(s))-p'(s))ds with E(0)=0; evaluate F over the full parameter box, panel and candidate symmetric component box",
+    "exact_zero_defect": "if every D_i is exact zero, accept the exact zero remainder only after replaying the full ODE identity and denominator guards",
+    "inflation_candidates": "lambda=2^j in increasing j for j=1..16",
+    "candidate_box": "set Dmax=max_i D_i; unless every D_i is exact zero, E_lambda gives every component the common symmetric radius lambda*h*Dmax so coupled zero-defect components can receive a nonzero Picard image; the all-exact-zero case follows exact_zero_defect",
+    "acceptance": "the interval range of every component of T(E_lambda) is a strict subset of the corresponding symmetric E_lambda interval; equality, touching, nonfinite or undecidable containment rejects that lambda",
+    "selection": "use the first accepted lambda; if none passes, reject the current Taylor order, then follow the fixed later-order and panel-halving chronology",
+    "stored_remainder": "store the accepted componentwise E_lambda plus the complete defect, denominator, lambda, order, h and strict-containment margins",
+    "numerical_width": "the polynomial range plus accepted remainder must satisfy the fixed numerical-width rule",
+    "first_failure": "denominator, nonfinite coefficient, defect replay, exact-zero replay, inflation containment, numerical width, order exhaustion, panel-halving exhaustion"
+  },
+  "finite_laplace_projection_algorithm": {
+    "inner_finite_integrals": {
+      "scope": "for every accepted Taylor panel, every coordinate kernel moment m=0..12 and every value/parameter-jet component",
+      "method": "integrate each panel Taylor polynomial times t^m*exp(-y*t) with directed incomplete-gamma moment identities; bound the Taylor remainder by its uniform panel ball times the exact positive kernel integral",
+      "endpoint": "x=0 uses exact recurrence coefficients and performs no y or exponential evaluation",
+      "tail": "t>=T uses the applicable value/first/second growth tier and coordinate_derivative_laplace_kernels bound",
+      "cancellation": "signed polynomial contributions may be accumulated as balls; remainder magnitudes and separate coordinate-kernel terms are summed without cancellation"
+    },
+    "outer_chebyshev_projection": {
+      "map": "x(theta)=(1-cos(theta))/510 on theta in [0,pi], with x=q or Q",
+      "coefficients": "c0=pi^-1*integral_0^pi g(theta)dtheta and ck=2*pi^-1*integral_0^pi g(theta)cos(k*theta)dtheta for 1<=k<N",
+      "rule": "composite six-node Gauss-Legendre on equal dyadic theta panels",
+      "panel_candidates": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384],
+      "order_six_error": "for panel width h and an outward bound B12 on the twelfth derivative of the complete integrand, error<=B12*h^13*(6!)^4/(13*(12!)^3)",
+      "selector": "use the first panel count for which every projected coefficient and parameter jet passes the fixed numerical-width rule after inner-integral and outer-remainder accumulation; exhaustion is FAIL",
+      "integrand_derivative_bound": "use exact Leibniz through order 12, the coordinate derivative kernels, exact q(theta) derivatives and abs(d_theta^r cos(k*theta))<=k^r; omit no mixed term",
+      "node_weight_arithmetic": "derive GL6 nodes and positive weights from the exact degree-6 Legendre polynomial with 512-bit directed root isolation; verify symmetry, ordering, positivity and exact moments degree 0..11"
+    },
+    "coefficient_tail": {
+      "B_theta_12": "outward supremum of the complete realized component's twelfth theta derivative, separately for every value and parameter jet",
+      "bound": "abs(c_k)<=2*B_theta_12/k^12 for k>=1 and sum_(k>=0)(1+k)^8*abs(c_k)<=sup(abs(g))+556*B_theta_12",
+      "grid_orders": [64, 96, 128, 256],
+      "finite_projection_indices": "k=0..N-1 in increasing canonical Chebyshev order",
+      "separate_infinite_tail": "Tail8(N)=512*B_theta_12/(3*(N-1)^3) for N>=2",
+      "tail_proof": [
+        "(1+k)^8<=256*k^8 for every integer k>=1",
+        "(1+k)^8*abs(c_k)<=512*B_theta_12/k^4",
+        "sum_(k=N)^infinity k^-4<=integral_(N-1)^infinity x^-4 dx=1/(3*(N-1)^3)"
+      ],
+      "realized_weighted_norm": "sum_(k=0)^(N-1) (1+k)^8*abs(c_k)+Tail8(N), with every finite projection error included inside c_k",
+      "state_jet_rule": "compute the same separate Tail8(N) for every ordered value, first-parameter and second-parameter realized component before full-state composition",
+      "tail_is_not_556_total_bound": true,
+      "flat_remainder_use": "subtract the realized formal coefficient balls from the full-state coefficient balls, retain both infinite coefficient-tail envelopes, compose full-state jets, then assemble F_flat into Y,Z1,Z2"
+    },
+    "projection_is_scientific_pass": false,
+    "outward_512_bit_arithmetic": true
+  },
+  "fixed_resource_bounds": {
+    "precision_bits": 512,
+    "origin_max_order": 256,
+    "maximum_origin_borel_derivative_order": 2,
+    "maximum_gevrey_rate_exponent": 1024,
+    "maximum_growth_polynomial_degree": 64,
+    "maximum_tail_operator_bound_exponent": 1024,
+    "tail_operator_bound_attempts_per_constant": 1025,
+    "continuation_max_order": 192,
+    "picard_inflation_attempts_per_order": 16,
+    "maximum_accepted_positive_ray_panels_per_chart_cell": 65536,
+    "maximum_panel_halvings_per_left_endpoint": 32,
+    "maximum_convolution_u_subpanels_per_target_panel": 65536,
+    "maximum_convolution_u_refinement_levels": 16,
+    "maximum_bivariate_xi_degree": 192,
+    "maximum_tail_witness_onset": 4096,
+    "maximum_laplace_split": 8192,
+    "tail_split_attempts": 13,
+    "outer_gl_order": 6,
+    "maximum_outer_theta_panels": 16384,
+    "maximum_coordinate_derivative_order": 12,
+    "parameter_jet_components_per_borel_component": 13,
+    "maximum_grid_node_count": 256,
+    "resource_exhaustion": "FAIL at the first exhausted counter; no second invocation, alternate root, tolerance change or retune"
+  },
+  "endpoint_observable_ingress": {
+    "grid_node_counts": [64, 96, 128, 256],
+    "functional": "h0=H(0) or Hbar(0), the q=0 or Q=0 endpoint value of the full factored scalar function",
+    "canonical_chebyshev_identity": "T_k(1)=1, so h0=sum_(k=0)^(N-1) c_k+r_infinity",
+    "positive_finite_indices": "tail_H coefficients have flat indices 6*N+k for k=0..N-1 in the positive state of length 8*N+2",
+    "vacuum_finite_indices": "tail_Hbar coefficients have flat indices 6*N+k for k=0..N-1 in the vacuum state of length 8*N+1",
+    "finite_gradient": "d_h0/d_state_i=1 for 6*N<=i<7*N and 0 for every other finite flat index",
+    "finite_hessian": "d2_h0/d_state_i_d_state_j=0 for every ordered finite index pair",
+    "infinite_tail_input": "r_infinity is the directed endpoint image of the terminal Banach tail ball, centered as supplied by the validated terminal-ball record; its absolute radius is bounded by the order-8 tail norm because endpoint evaluation has operator norm at most one",
+    "infinite_tail_operator_norm": 1,
+    "full_banach_derivative": "the endpoint functional acts with coefficient 1 on every finite and infinite H/Hbar Chebyshev direction; Z1/Z2 operator bounds retain the infinite-tail norm-one contribution rather than truncating it to the finite gradient",
+    "parameter_jet_origin": "internal theta differentiation treats h0 as the first independent parameter, with d_h0=1 and zero second theta derivatives; full-state composition then uses the displayed finite and infinite functional",
+    "h1": "derived from 2*kappa*h1+P0(0)*h0=0 after strict kappa verification; never ingressed independently",
+    "strictness": "h0 must be finite and its lower endpoint strictly positive; missing/nonfinite tail image, wrong index range, state length mismatch or a touching h0 lower endpoint is FAIL"
+  },
+  "wire_compatibility_and_canonical_hashing": {
+    "inherited_wire": "S4-R1 wire-record contract c2258653...c160 and S5 checkpoint ABI 6fbf6cdb...911ca remain unchanged",
+    "legacy_field_reconciliation": {
+      "formal_germ_truncation_order": {
+        "kind": "not_applicable_infinite_borel_laplace_realization",
+        "value": null
+      },
+      "rule": "the inherited required field remains present as the displayed tagged object; null alone, an integer, omission or a renamed replacement is FAIL",
+      "additive_realization_order_ledger": [
+        "Gevrey rate exponent e and A",
+        "origin Borel order and t0",
+        "every positive-ray panel endpoint, Taylor order and Picard inflation ordinal",
+        "every convolution u-panel count",
+        "tail split T and growth-witness identities",
+        "outer GL6 theta-panel count and frozen grid N"
+      ]
+    },
+    "canonical_json": {
+      "encoding": "UTF-8 without BOM; invalid UTF-8, duplicate object keys and unpaired high or low UTF-16 surrogates are rejected before canonicalization",
+      "algorithm": "RFC8785-compatible JCS: object keys sorted by UTF-16 code units, minimal JSON string escaping, no Unicode normalization, lowercase literals and ECMAScript shortest finite-number serialization",
+      "number_boundary": "JSON numbers are finite IEEE-754 binary64 values and integer-valued resource fields must also lie in [-(2^53-1),2^53-1]; scientific dyadics, balls and hashes are canonical strings",
+      "raw_hash": "contract_raw_sha256=SHA-256 of the exact file bytes",
+      "canonical_domain": "nhm2-g2h-e-s5-a/borel-contract/v1\n",
+      "canonical_hash": "contract_canonical_sha256=SHA-256(UTF8(canonical_domain)||RFC8785(parsed contract))",
+      "payload_and_record_hashes": "C08 payload/record/self hashes use the inherited S4-R1 payload_domain, record_domain and self-member omission rules without modification"
+    },
+    "c08_failure_precedence": [
+      "C08-001_INPUT_IDENTITY_OR_STATE_LENGTH",
+      "C08-002_CANONICAL_JSON_OR_HASH",
+      "C08-003_ENDPOINT_FUNCTIONAL_OR_TAIL",
+      "C08-004_PARAMETER_OR_DENOMINATOR_MARGIN",
+      "C08-005_GEVREY_MAJORANT_OR_RATE_EXHAUSTION",
+      "C08-006_ORIGIN_SERIES_ORDER_EXHAUSTION",
+      "C08-007_POSITIVE_PANEL_DENOMINATOR_OR_COEFFICIENT",
+      "C08-008_PANEL_DEFECT_OR_EXACT_ZERO_REPLAY",
+      "C08-009_PICARD_INFLATION_OR_WIDTH_EXHAUSTION",
+      "C08-010_VOLTERRA_CONVOLUTION_OR_U_REFINEMENT_EXHAUSTION",
+      "C08-011_TAIL_SPLIT_EXHAUSTION",
+      "C08-012_LYAPUNOV_OR_OPERATOR_BOUND",
+      "C08-013_GROWTH_DAG_OR_ABSORPTION_DEGREE",
+      "C08-014_FINITE_LAPLACE_MOMENT",
+      "C08-015_GL6_PROJECTION_OR_THETA_REFINEMENT",
+      "C08-016_TRUNCATED_WEIGHTED_COEFFICIENT_TAIL",
+      "C08-017_FULL_STATE_JET_COMPOSITION",
+      "C08-018_F_FLAT_Y_ASSEMBLY",
+      "C08-019_F_FLAT_Z1_ASSEMBLY",
+      "C08-020_F_FLAT_Z2_ASSEMBLY",
+      "C08-021_WIRE_RECORD_OR_CHRONOLOGY"
+    ],
+    "precedence_rule": "evaluate codes strictly in listed order; within a code use the order in the referenced producer definition; persist only the earliest code/detail and mark every later scientific duty INELIGIBLE_AFTER_FIRST_FAIL",
+    "resource_rule": "resource exhaustion is reported at the producer code where its fixed counter first exhausts, never as a later generic failure",
+    "retry_retune_deletion_alternate_root": false
+  },
+  "record_wire_fields": {
+    "identity": [
+      "contract raw SHA-256 and canonical domain-separated SHA-256",
+      "chart, continuation-cell ordinal and frozen grid N",
+      "source/runtime/executable/argv/environment identities"
+    ],
+    "margins_and_selectors": [
+      "kappa_lower,mu_upper,g,tau0,tau1,tau2,delta",
+      "Gevrey C/A witnesses and chosen origin order/t0",
+      "tagged formal_germ_truncation_order and additive realization-order ledger",
+      "accepted panel endpoints/orders/Picard counts",
+      "chosen T0, derived T=2*T0, ordered rejected-T0 child reasons, append-only finite-ledger identity and every tail Lyapunov/growth witness",
+      "chosen outer theta panel count and GL6 node/weight identity"
+    ],
+    "outputs": [
+      "formal H,K,D,S value and parameter-jet coefficient balls",
+      "coordinate derivative tail bounds j=0..12",
+      "B_theta_12, finite projection error and infinite weighted coefficient tails",
+      "composed full-state first/second bounds and F_flat Y/Z1/Z2 contributions"
+    ],
+    "counters_and_failures": [
+      "every fixed resource counter",
+      "first-failure code and chronology predecessor hash",
+      "candidate evaluations and positive samples",
+      "endpoint finite/infinite functional identity and operator-norm contribution",
+      "all authority locks"
+    ],
+    "missing_nonfinite_touching_or_out_of_order": "FAIL"
+  },
+  "required_extensions": {
+    "coordinate_derivative_kernel_bounds": "coordinate_derivative_laplace_kernels",
+    "finite_continuation_algorithm": "finite_positive_ray_algorithm",
+    "finite_quadrature_algorithm": "finite_laplace_projection_algorithm",
+    "local_series_order_selector": "finite_positive_ray_algorithm.origin_localization and positive_panel_continuation",
+    "fixed_resource_bounds": "fixed_resource_bounds",
+    "record_wire_fields": "record_wire_fields",
+    "independent_acknowledgement": null
+  },
+  "readiness": {
+    "strict_margin_grammar_defined": true,
+    "tail_lyapunov_witness_grammar_defined": true,
+    "growth_tiers_defined": true,
+    "derivative_convolution_growth_rule_defined": true,
+    "uniform_laplace_tail_formula_defined": true,
+    "finite_continuation_defined": true,
+    "coordinate_derivative_tails_defined": true,
+    "finite_quadrature_defined": true,
+    "order_selector_defined": true,
+    "resource_bounds_defined": true,
+    "wire_record_defined": true,
+    "global_growth_budget_proved": false,
+    "directed_runtime_algorithm_defined": true,
+    "preacknowledgement_completeness_passed": true,
+    "independently_acknowledged": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "document_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

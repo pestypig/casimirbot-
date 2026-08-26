@@ -7,6 +7,7 @@ import {
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
   HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
   HELIX_MINECRAFT_READ_ONLY_CAPABILITY_IDS,
   HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
@@ -79,7 +80,8 @@ describe("environment connector capability catalog", () => {
     expect(paper?.capabilityDescriptors.map((entry) => entry.capability_id)).toEqual(
       HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.filter(
         (capabilityId) =>
-          capabilityId !== HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          capabilityId !== HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY &&
+          capabilityId !== HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
       ),
     );
     expect(fabric?.capabilityDescriptors.map((entry) => entry.capability_id)).toEqual(
@@ -157,6 +159,7 @@ describe("environment connector capability catalog", () => {
         [HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY, "line_of_sight"],
         [HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY, "crop_state"],
         [HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY, "reachability"],
+        [HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY, "perception_snapshot"],
         [HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY, "registry_fact"],
         [HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY, "recipe_fact"],
       ]),

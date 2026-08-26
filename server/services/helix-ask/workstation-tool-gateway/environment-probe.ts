@@ -1026,10 +1026,13 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
             "The authenticated in-game participant identity no longer matches this room-scoped turn.",
         });
       }
+    }
+    if (authority.kind === "first_party_shared_room") {
       try {
-        // The authenticated Minecraft request is itself an active room client.
-        // Refresh only its exact membership immediately before the probe so a
-        // slow model step cannot turn ordinary presence aging into revocation.
+        // A trusted browser Ask and an authenticated Minecraft interaction are
+        // both active first-party room clients. Refresh only the exact
+        // server-resolved membership immediately before the probe so a slow
+        // model step cannot turn ordinary presence aging into revocation.
         // Explicit leave, room closure, or inaccessible membership still fail
         // closed inside the room store and consent is checked below.
         await deps.refreshPresence({
@@ -1040,8 +1043,9 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       } catch {
         return fail({
           outcome: "permission_revoked",
-          summary:
-            "The authenticated in-game participant is no longer eligible to remain present in this room.",
+          summary: environmentInteractionActor
+            ? "The authenticated in-game participant is no longer eligible to remain present in this room."
+            : "The authenticated browser member is no longer eligible to remain present in this room.",
         });
       }
     }

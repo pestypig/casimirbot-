@@ -22,6 +22,7 @@ export type HelixEnvironmentProbeType =
   | "inventory_check"
   | "local_map_summary"
   | "spatial_region"
+  | "perception_snapshot"
   | "registry_fact"
   | "recipe_fact";
 
@@ -131,6 +132,7 @@ const probeTypeSchema = z.enum([
   "inventory_check",
   "local_map_summary",
   "spatial_region",
+  "perception_snapshot",
   "registry_fact",
   "recipe_fact",
 ]);

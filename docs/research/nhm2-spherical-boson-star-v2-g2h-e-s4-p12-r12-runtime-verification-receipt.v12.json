@@ -1,0 +1,24 @@
+{
+  "schema": "nhm2.g2h_e_s4.p12_r12_runtime_verification_receipt.v12",
+  "status": "PASS_FIXTURE_ONLY_12_OF_13_PER_LANE_NO_SCIENTIFIC_EXECUTION_AUTHORITY",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "P12/R12 Hadamard transport, state remainder, RSET and conservation fixture/runtime closure",
+    "current_maturity": "identity-bound source/runtime-disjoint P12/R12 fixture PASS",
+    "target_maturity": "continue P13/R13 while S4 remains fail-closed",
+    "required_frozen_inputs": ["R1 seal 728d8c9a...025ca", "quantum builder 29893736...62fc", "binding 598ca3d3...336e"],
+    "required_evidence": ["both 9/9 Hadamard suites", "both 36/36 full harnesses", "runtime/source/command/environment audit", "candidate-interface and corrupt-contract rejection", "matrix audit", "absent roots"],
+    "stop_fail_criteria": ["fixture failure", "identity drift", "candidate ingress", "root creation", "authorization", "authority promotion"],
+    "explicit_non_goals": ["candidate Hadamard/RSET evaluation", "quantum state proof", "P13/R13", "G3", "physical authority"],
+    "downstream_gate_unlocked": "P13/R13 noise Gram and PSD residual fixture implementation"
+  },
+  "bindings": {"quantum_builder": "2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc", "p11_r11_build": "476fabc72c7449ee019c469f4ccdb37ddc240b32dedd0bdb4792b8cc925814ca", "p12_r12_build": "598ca3d3109805917ae999c75b43fe75e84bc3b117c4a236624d9a678eac336e", "matrix": "a7d34b25dc8ebeb223da35a86deee146f961ae99269e133a22a17e0cc8186a83"},
+  "runtime_audit": {"path": "scripts/nhm2_g2h_e_s4_p12_r12_runtime_audit.py", "raw_sha256": "9565746374258f2dc3b4bedf13496cfc93a05edec4d3439fa37f6ca5f9813f7c", "result": "PASS_34_OF_34"},
+  "completion_audit": {"path": "scripts/nhm2_g2h_e_s4_producer_completion_audit.py", "raw_sha256": "f714ed8f1abf41f4d1465bb39d7630161d66c689ba78d5279671bd774c9cd23c", "result": "PASS_13_OF_13"},
+  "primary": {"image_id": "sha256:5b84d3bc5796515968cadefc3b2ed6bfe571c4aa308288ef04c246eed92af857", "executable_sha256": "ed62f080047acd2e5fea3550763d582321cbb149844a84e30eb70a662a190d44", "full_fixture": "PASS_36_OF_36", "hadamard_fixture": "PASS_9_OF_9"},
+  "independent": {"image_id": "sha256:182d5ec22d115788d8a1686c3e1ca15dbab41a84e23f0aec85e06a4d5234fbb7", "executable_sha256": "e8f7eb567f835da67036defc7f0a7aad213e45ba225200fee5a1ce1a943f7320", "full_fixture": "PASS_36_OF_36", "hadamard_fixture": "PASS_9_OF_9", "hadamard_mask": "111111111"},
+  "guard_evidence": {"primary_candidate_interface_exit": 64, "independent_candidate_interface_exit": 64, "primary_corrupt_quantum_contract_exit": 65, "independent_corrupt_quantum_contract_exit": 65, "candidate_evaluations": 0, "positive_parameter_samples": 0, "candidate_roots_created": false, "scientific_builder_executed": false},
+  "promotion": {"common_complete": 4, "primary_complete": 12, "primary_required": 13, "independent_complete": 12, "independent_required": 13, "S4_complete": false, "inert_future_primary_proposal_allowed": false},
+  "authority": {"receipt_is_proof": false, "candidate_evaluated": false, "candidate_root_created": false, "quantum_state_established": false, "geometry_state_authority": false, "lane_authority": false, "diagnostic_lamp_authority": false, "physical_authority": false, "propulsion_authority": false, "transport_authority": false}
+}

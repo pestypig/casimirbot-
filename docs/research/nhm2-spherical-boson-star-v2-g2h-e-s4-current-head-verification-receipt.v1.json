@@ -1,0 +1,69 @@
+{
+  "schema": "nhm2.g2h_e_s4.current_head_verification_receipt.v1",
+  "status": "PASS_CURRENT_HEAD_GATE_INTEGRITY_IMPLEMENTATION_PREEXECUTION_ONLY",
+  "program_gate": "G2H-E-S4",
+  "status_date": "2026-08-24",
+  "git_head": "c292770ccaad74f9f37f9d34a1ebd03b4daf1217",
+  "working_tree_identity_note": "S4 is an uncommitted byte-bound packet; git HEAD is not the identity of its evidence files.",
+  "closure_bindings": {
+    "final_closure_receipt_sha256": "539a4ac5f8ea605abbf05e34802fc4f407e106b3d6555c1928389eefc58ca191",
+    "producer_completion_matrix_sha256": "6e5a0119a1a5c41d3c0cb764463c3fe09ddfecae8ba3c2800de0c1d100956ede",
+    "inert_primary_proposal_sha256": "a95a63df5d2e1f3a755876d0d3f976b55a6a897cbaa86aa9a2b252115a68f4d9"
+  },
+  "math": {
+    "report_path": "reports/math-report.json",
+    "report_sha256": "9c4855196b953502f0766255f1509eeb9a88b9c15634e6f6f0a163ebf855b870",
+    "registry_entries": 318,
+    "validation": "PASS"
+  },
+  "warp": {
+    "test_files_passed": 18,
+    "test_files_total": 18,
+    "tests_passed": 179,
+    "tests_total": 179,
+    "status": "PASS"
+  },
+  "casimir": {
+    "command": "npm run casimir:verify -- --ci --url https://casimirbot.com/api/agi/adapter/run --trace-out artifacts/training-trace.jsonl",
+    "trace_id": "adapter:3d4f6014-3d2c-400e-8ce2-8b9f93359dd1",
+    "run_id": "1",
+    "verdict": "PASS",
+    "status": "GREEN",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_integrity_ok": true,
+    "training_trace_path": "artifacts/training-trace.jsonl",
+    "training_trace_sha256": "c471ed7fdf2112e540d1141c14bbbcef8921df7a825320855dc46acad8db0104",
+    "scope_note": "The adapter certificate establishes constraint-pack integrity. Current local S4 math and WARP results are separately recorded above; the certificate is not represented as a digest of every uncommitted worktree byte."
+  },
+  "closure_audits": {
+    "producer_completion": "PASS_15_OF_15",
+    "inert_primary_proposal": "PASS_12_OF_12",
+    "r2_definition_closure_receipt": "PASS_13_OF_13",
+    "final_completion": "PASS_23_OF_23",
+    "final_completion_audit_sha256": "130c9136014997e618b713d45ad2bce3abbf64ca504161094e3f502026ab2117"
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "primary_candidate_root_absent": true,
+    "independent_candidate_root_absent": true,
+    "authorization_token_created": false,
+    "primary_execution_authorized": false,
+    "independent_execution_authorized": false,
+    "rust_scientific_lane_executed": false,
+    "G3_started": false
+  },
+  "authority": {
+    "receipt_is_mathematical_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "disposition": "CLOSE_G2H_E_S4_AND_HAND_OFF_ONLY_TO_AN_INERT_PRIMARY_EXECUTION_PREFLIGHT_DECISION"
+}

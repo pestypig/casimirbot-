@@ -1,0 +1,59 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 0,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "lane_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "casimir": {
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_status": "GREEN",
+    "command": "npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200",
+    "deltas": [],
+    "fail_reason": "NONE",
+    "first_fail": null,
+    "integrity_ok": true,
+    "run_id": "2464",
+    "trace_id": "adapter:9c2d58bf-21be-40ba-b044-ec29bc3d013b",
+    "verdict": "PASS"
+  },
+  "closure_audit": {
+    "command": "python scripts/nhm2_g2h_e_r1_audit.py",
+    "passed": 21,
+    "script_bytes": 9455,
+    "script_sha256": "4a894c14f58773c7d9bce87c9ad4224eceddc03011c72f9262f9fa5f70e2d291",
+    "total": 21
+  },
+  "math": {
+    "command": "npm run math:report && npm run math:validate",
+    "registry_entries": 318,
+    "report_bytes": 25037,
+    "report_sha256": "83c0fa24866285f97fcd6d0ad45fd0529af6b1cea62d68b21f2a34cfe74dc321",
+    "validation": "PASS"
+  },
+  "proposal_sha256": "65093d0084a513b101172e339123ecb2839cd76ef4350c6a351acdf054dbcfdd",
+  "schema": "nhm2.g2h_e_r1.verification_receipt.v1",
+  "status": "PASS_CANDIDATE_NEUTRAL_PREEXECUTION_ONLY",
+  "training_trace": {
+    "bytes_at_receipt": 4732056,
+    "path": "artifacts/training-trace.jsonl",
+    "sha256_at_receipt": "04dbd10ccda172a0b6f81cc4fbe361a63f3c5c6de73f6867d33976807886b3f2"
+  },
+  "warp": {
+    "command": "npx vitest run <all 18 WARP_AGENTS required files> --pool=forks",
+    "failed_files": 0,
+    "failed_tests": 0,
+    "passed_files": 18,
+    "passed_tests": 179,
+    "required_files": 18,
+    "tests": 179
+  }
+}

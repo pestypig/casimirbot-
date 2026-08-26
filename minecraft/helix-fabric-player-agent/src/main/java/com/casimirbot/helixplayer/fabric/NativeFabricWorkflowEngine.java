@@ -2,7 +2,10 @@ package com.casimirbot.helixplayer.fabric;
 
 import static com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.*;
 
+import com.casimirbot.helixsensor.navigation.BoundedNavigationFrontier;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -10,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.recipebook.RecipeCollection;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -17,6 +21,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -33,6 +38,7 @@ import net.minecraft.world.item.crafting.display.ShapedCraftingRecipeDisplay;
 import net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay;
 import net.minecraft.world.item.crafting.display.SlotDisplayContext;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -41,6 +47,12 @@ import net.minecraft.world.phys.Vec3;
 final class NativeFabricWorkflowEngine {
     private static final int NATIVE_BLOCK_SEARCH_RADIUS_CEILING = 32;
     private static final int MAX_EXACT_TRANSFER_PER_STEP = 64;
+    private static final int MINING_NAVIGATION_NO_PROGRESS_TICKS = 200;
+    private static final int MAX_SENSING_TIMING_SAMPLES = 512;
+    private static final int NATIVE_NAVIGATION_RADIUS = 7;
+    private static final int NATIVE_NAVIGATION_VERTICAL_RADIUS = 6;
+    private static final int NATIVE_NAVIGATION_MAX_REPLANS = 4;
+    private static final int NATIVE_NAVIGATION_NO_PROGRESS_TICKS = 40;
 
     private final Minecraft minecraft;
     private final NativeFabricControlBridge bridge;
@@ -56,11 +68,25 @@ final class NativeFabricWorkflowEngine {
     private int pendingTicks;
     private double initialDistance = -1;
     private BlockPos blockTarget;
+    private Direction blockTargetFace;
+    private MiningTargetAffordance.ApproachPose blockApproach;
+    private long maxSensorCaptureDurationNanos;
+    private long maxAffordanceDeriveDurationNanos;
+    private final long[] sensingTimingSamplesNanos =
+        new long[MAX_SENSING_TIMING_SAMPLES];
+    private int sensingTimingSampleCount;
     private boolean blockActionStarted;
     private boolean containerOpenRequested;
     private boolean inventoryActionIssued;
     private int inventoryCountBeforeIssued;
     private boolean baritoneGoalOwned;
+    private boolean baritoneFinalApproach;
+    private BoundedNavigationFrontier.GoalPlan nativeNavigationPlan;
+    private int nativeNavigationStepIndex;
+    private int nativeNavigationReplanCount;
+    private int nativeNavigationNoProgressTicks;
+    private double nativeNavigationClosestStepDistance = Double.POSITIVE_INFINITY;
+    private String nativeNavigationLastReplanReason = "initial_plan";
     private Map<String, Object> latestPlacementForecast = Map.of();
     private Map<String, Object> dynamicPlacementBindingEvidence = Map.of();
     private BlockPos dynamicPlacementTarget;
@@ -71,6 +97,13 @@ final class NativeFabricWorkflowEngine {
     private boolean landingCleanupIssued;
     private int landingCleanupPendingTicks;
     private final Set<Long> completedBlockTargets = new HashSet<>();
+
+    static boolean usesReusableWorkflowEngine(String actionKind) {
+        return Set.of(
+            "navigate_to", "follow", "collect", "mine", "place", "craft",
+            "inventory_transfer"
+        ).contains(actionKind);
+    }
 
     NativeFabricWorkflowEngine(
         Minecraft minecraft,
@@ -104,7 +137,7 @@ final class NativeFabricWorkflowEngine {
             );
         }
         return switch (requestedKind) {
-            case "navigate_to" -> baritoneNavigate(actionTicks);
+            case "navigate_to" -> navigate(actionTicks);
             case "follow" -> follow(actionTicks);
             case "collect" -> collect(actionTicks);
             case "mine" -> mine(actionTicks);
@@ -116,6 +149,289 @@ final class NativeFabricWorkflowEngine {
                 Map.of("action_kind", requestedKind)
             );
         };
+    }
+
+    private WorkflowStep navigate(long actionTicks) {
+        return "baritone".equals(controlEngine)
+            ? baritoneNavigate(actionTicks)
+            : nativeNavigate(actionTicks);
+    }
+
+    private WorkflowStep nativeNavigate(long actionTicks) {
+        LocalPlayer player = requirePlayer();
+        Map<String, Object> destination = object(arguments.get("destination"));
+        double x = number(destination, "x");
+        double y = number(destination, "y");
+        double z = number(destination, "z");
+        double radius = number(arguments, "arrival_radius");
+        double distance = distance(player.getX(), player.getY(), player.getZ(), x, y, z);
+        if (initialDistance < 0) initialDistance = distance;
+        if (distance <= radius) {
+            bridge.applyMovement(MovementInput.released());
+            LinkedHashMap<String, Object> measurements = nativeNavigationMeasurements(
+                distance,
+                radius,
+                "native_navigation_arrived"
+            );
+            measurements.put("world_mutations_performed", 0);
+            measurements.put("inventory_mutations_performed", 0);
+            measurements.put("breaking_allowed", false);
+            measurements.put("placement_allowed", false);
+            return WorkflowStep.succeeded(
+                "The CasimirBot-native route follower reached the admitted destination radius.",
+                measurements
+            );
+        }
+
+        BlockPos admittedGoal = BlockPos.containing(x, y, z);
+        if (player.blockPosition().equals(admittedGoal)) {
+            WorkflowStep safetyFailure = navigateToward(
+                x,
+                y,
+                z,
+                radius,
+                false
+            );
+            if (safetyFailure != null) return safetyFailure;
+            LinkedHashMap<String, Object> progress = nativeNavigationMeasurements(
+                distance,
+                radius,
+                "native_navigation_precise_arrival"
+            );
+            progress.put("planner_status", "already_at_goal");
+            progress.put("route_step_index", 0);
+            progress.put("route_step_target", position(admittedGoal));
+            return WorkflowStep.running(
+                progressFromDistance(distance, radius),
+                "The CasimirBot-native route follower is refining arrival inside the admitted goal block.",
+                progress
+            );
+        }
+
+        if (nativeNavigationPlan == null) {
+            WorkflowStep planningFailure = replanNativeNavigation(
+                admittedGoal,
+                distance,
+                radius,
+                "initial_plan",
+                false
+            );
+            if (planningFailure != null) return planningFailure;
+        }
+
+        List<BoundedNavigationFrontier.Step> steps =
+            nativeNavigationPlan.route().steps();
+        BlockPos currentBlock = player.blockPosition();
+        while (
+            nativeNavigationStepIndex < steps.size() &&
+            currentBlock.equals(blockPosition(
+                steps.get(nativeNavigationStepIndex).to()
+            ))
+        ) {
+            nativeNavigationStepIndex++;
+            nativeNavigationClosestStepDistance = Double.POSITIVE_INFINITY;
+            nativeNavigationNoProgressTicks = 0;
+        }
+        if (nativeNavigationStepIndex >= steps.size()) {
+            WorkflowStep planningFailure = replanNativeNavigation(
+                admittedGoal,
+                distance,
+                radius,
+                "route_exhausted_before_precise_arrival",
+                true
+            );
+            if (planningFailure != null) return planningFailure;
+            steps = nativeNavigationPlan.route().steps();
+        }
+
+        BoundedNavigationFrontier.Step step = steps.get(nativeNavigationStepIndex);
+        BlockPos expectedFrom = blockPosition(step.from());
+        BlockPos stepTarget = blockPosition(step.to());
+        if (
+            chebyshevDistance(currentBlock, expectedFrom) > 1 &&
+            !currentBlock.equals(stepTarget)
+        ) {
+            WorkflowStep planningFailure = replanNativeNavigation(
+                admittedGoal,
+                distance,
+                radius,
+                "route_deviation",
+                true
+            );
+            if (planningFailure != null) return planningFailure;
+            step = nativeNavigationPlan.route().steps().get(0);
+            stepTarget = blockPosition(step.to());
+        }
+
+        BoundedNavigationFrontier.GoalPlan stepCheck =
+            BoundedNavigationFrontier.planTo(
+                frontierPosition(currentBlock),
+                step.to(),
+                2,
+                2,
+                this::nativeNavigationCell
+            );
+        if (
+            stepCheck.status() != BoundedNavigationFrontier.GoalPlanStatus.ROUTE_FOUND &&
+            stepCheck.status() != BoundedNavigationFrontier.GoalPlanStatus.ALREADY_AT_GOAL
+        ) {
+            WorkflowStep planningFailure = replanNativeNavigation(
+                admittedGoal,
+                distance,
+                radius,
+                "next_foothold_invalidated",
+                true
+            );
+            if (planningFailure != null) return planningFailure;
+            step = nativeNavigationPlan.route().steps().get(0);
+            stepTarget = blockPosition(step.to());
+        }
+
+        double stepX = stepTarget.getX() + 0.5;
+        double stepY = stepTarget.getY();
+        double stepZ = stepTarget.getZ() + 0.5;
+        double stepDistance = distance(
+            player.getX(), player.getY(), player.getZ(),
+            stepX, stepY, stepZ
+        );
+        if (stepDistance + 0.02 < nativeNavigationClosestStepDistance) {
+            nativeNavigationClosestStepDistance = stepDistance;
+            nativeNavigationNoProgressTicks = 0;
+        } else {
+            nativeNavigationNoProgressTicks++;
+        }
+        if (nativeNavigationNoProgressTicks >= NATIVE_NAVIGATION_NO_PROGRESS_TICKS) {
+            WorkflowStep planningFailure = replanNativeNavigation(
+                admittedGoal,
+                distance,
+                radius,
+                "bounded_non_progress",
+                true
+            );
+            if (planningFailure != null) return planningFailure;
+            step = nativeNavigationPlan.route().steps().get(0);
+            stepTarget = blockPosition(step.to());
+            stepX = stepTarget.getX() + 0.5;
+            stepY = stepTarget.getY();
+            stepZ = stepTarget.getZ() + 0.5;
+        }
+
+        WorkflowStep safetyFailure = navigateToward(
+            stepX,
+            stepY,
+            stepZ,
+            0.35,
+            bool(arguments, "allow_sprint") &&
+                step.kind() != BoundedNavigationFrontier.MoveKind.ASCEND
+        );
+        if (safetyFailure != null) return safetyFailure;
+
+        LinkedHashMap<String, Object> progress = nativeNavigationMeasurements(
+            distance,
+            radius,
+            "native_navigation_following"
+        );
+        progress.put("route_step_index", nativeNavigationStepIndex);
+        progress.put("route_step_movement", step.kind().name().toLowerCase());
+        progress.put("route_step_target", position(stepTarget));
+        progress.put("route_step_distance_blocks", stepDistance);
+        return WorkflowStep.running(
+            progressFromDistance(distance, radius),
+            "The CasimirBot-native route follower is executing a typed foothold step.",
+            progress
+        );
+    }
+
+    private WorkflowStep replanNativeNavigation(
+        BlockPos goal,
+        double distance,
+        double radius,
+        String reason,
+        boolean countsAsReplan
+    ) {
+        bridge.applyMovement(MovementInput.released());
+        if (countsAsReplan) nativeNavigationReplanCount++;
+        nativeNavigationLastReplanReason = reason;
+        if (nativeNavigationReplanCount > NATIVE_NAVIGATION_MAX_REPLANS) {
+            return WorkflowStep.failed(
+                "Native navigation exhausted its bounded reroute budget with controls released.",
+                nativeNavigationMeasurements(distance, radius, "native_replan_budget_exhausted")
+            );
+        }
+        BlockPos origin = requirePlayer().blockPosition();
+        nativeNavigationPlan = BoundedNavigationFrontier.planTo(
+            frontierPosition(origin),
+            frontierPosition(goal),
+            NATIVE_NAVIGATION_RADIUS,
+            NATIVE_NAVIGATION_VERTICAL_RADIUS,
+            this::nativeNavigationCell
+        );
+        nativeNavigationStepIndex = 0;
+        nativeNavigationNoProgressTicks = 0;
+        nativeNavigationClosestStepDistance = Double.POSITIVE_INFINITY;
+        if (
+            nativeNavigationPlan.status() ==
+                BoundedNavigationFrontier.GoalPlanStatus.ROUTE_FOUND
+        ) return null;
+        LinkedHashMap<String, Object> measurements = nativeNavigationMeasurements(
+            distance,
+            radius,
+            "native_plan_unavailable"
+        );
+        measurements.put(
+            "planner_status",
+            nativeNavigationPlan.status().name().toLowerCase()
+        );
+        measurements.put(
+            "planner_evidence_complete",
+            nativeNavigationPlan.evidenceComplete()
+        );
+        measurements.put(
+            "planner_reachable_foothold_count",
+            nativeNavigationPlan.reachableFootholdCount()
+        );
+        return WorkflowStep.failed(
+            "The CasimirBot-native planner could not prove a bounded route to the admitted waypoint.",
+            measurements
+        );
+    }
+
+    private LinkedHashMap<String, Object> nativeNavigationMeasurements(
+        double distance,
+        double radius,
+        String reasonCode
+    ) {
+        LinkedHashMap<String, Object> measurements = new LinkedHashMap<>();
+        measurements.put("reason_code", reasonCode);
+        measurements.put("distance_blocks", distance);
+        measurements.put("arrival_radius", radius);
+        measurements.put("control_engine", "native_fabric");
+        measurements.put("planner", "casimirbot_native_bounded_dijkstra");
+        measurements.put("replan_count", nativeNavigationReplanCount);
+        measurements.put("last_replan_reason", nativeNavigationLastReplanReason);
+        measurements.put("controls_released_on_replan", true);
+        measurements.put("mutation_policy", "movement_only");
+        if (nativeNavigationPlan != null) {
+            measurements.put(
+                "planner_status",
+                nativeNavigationPlan.status().name().toLowerCase()
+            );
+            measurements.put(
+                "planner_evidence_complete",
+                nativeNavigationPlan.evidenceComplete()
+            );
+            measurements.put(
+                "planner_reachable_foothold_count",
+                nativeNavigationPlan.reachableFootholdCount()
+            );
+            measurements.put(
+                "route_step_count",
+                nativeNavigationPlan.route() == null
+                    ? 0
+                    : nativeNavigationPlan.route().steps().size()
+            );
+        }
+        return measurements;
     }
 
     private WorkflowStep baritoneNavigate(long actionTicks) {
@@ -134,31 +450,145 @@ final class NativeFabricWorkflowEngine {
         double distance = distance(player.getX(), player.getY(), player.getZ(), x, y, z);
         if (initialDistance < 0) initialDistance = distance;
         if (distance <= radius) {
+            boolean usedNativeFinalApproach = baritoneFinalApproach;
+            boolean safeCancel = !baritoneGoalOwned || baritone.cancel();
+            baritoneGoalOwned = false;
             return WorkflowStep.succeeded(
                 "Baritone reached the admitted destination radius.",
-                Map.of("distance_blocks", distance, "arrival_radius", radius, "control_engine", "baritone")
+                Map.ofEntries(
+                    Map.entry("distance_blocks", distance),
+                    Map.entry("arrival_radius", radius),
+                    Map.entry(
+                        "control_engine",
+                        usedNativeFinalApproach
+                            ? "baritone_then_native_fabric"
+                            : "baritone"
+                    ),
+                    Map.entry("engine_version", baritone.version()),
+                    Map.entry("safe_cancel", safeCancel),
+                    Map.entry("mutation_policy", "movement_only"),
+                    Map.entry("breaking_allowed", false),
+                    Map.entry("placement_allowed", false),
+                    Map.entry("inventory_mutation_allowed", false),
+                    Map.entry("world_mutations_performed", 0),
+                    Map.entry("inventory_mutations_performed", 0),
+                    Map.entry("native_final_approach_used", usedNativeFinalApproach)
+                )
+            );
+        }
+        if (baritoneFinalApproach) {
+            if (distance < initialDistance - 0.05) {
+                initialDistance = distance;
+                noTargetTicks = 0;
+            } else if (miningNavigationStalled(++noTargetTicks)) {
+                bridge.applyMovement(MovementInput.released());
+                return WorkflowStep.failed(
+                    "The native final approach after Baritone settlement made no bounded progress.",
+                    Map.of(
+                        "reason_code", "baritone_native_final_approach_stalled",
+                        "distance_blocks", distance,
+                        "arrival_radius", radius,
+                        "control_engine", "baritone_then_native_fabric",
+                        "no_progress_ticks", noTargetTicks,
+                        "mutation_policy", "movement_only"
+                    )
+                );
+            }
+            WorkflowStep safetyFailure = navigateToward(x, y, z, radius, false);
+            if (safetyFailure != null) return safetyFailure;
+            return WorkflowStep.running(
+                progressFromDistance(distance, radius),
+                "Native Fabric is closing the final measured gap after Baritone approach settlement.",
+                Map.of(
+                    "reason_code", "baritone_native_final_approach_running",
+                    "distance_blocks", distance,
+                    "arrival_radius", radius,
+                    "control_engine", "baritone_then_native_fabric",
+                    "mutation_policy", "movement_only"
+                )
             );
         }
         if (actionTicks == 1) {
-            baritoneGoalOwned = baritone.start(floor(x), floor(y), floor(z));
+            baritoneGoalOwned = baritone.start(
+                floor(x), floor(y), floor(z),
+                Math.max(1, (int) Math.ceil(radius))
+            );
             if (!baritoneGoalOwned) {
+                BaritoneFacade.Status status = baritone.status();
                 return WorkflowStep.failed(
                     "Baritone was installed but rejected the admitted navigation goal.",
-                    Map.of("control_engine", "baritone", "goal_started", false)
+                    baritoneMeasurements(distance, radius, status, "baritone_goal_rejected")
                 );
             }
         }
-        if (actionTicks > 20 && !baritone.isPathing()) {
+        BaritoneFacade.Status status = baritone.status();
+        if (status.pathState() == BaritoneFacade.PathState.POLICY_VIOLATION ||
+            status.pathState() == BaritoneFacade.PathState.ERROR) {
+            baritoneGoalOwned = false;
+            return WorkflowStep.failed(
+                "Baritone failed closed before the destination postcondition was satisfied.",
+                baritoneMeasurements(distance, radius, status, "baritone_policy_or_status_failure")
+            );
+        }
+        if (actionTicks > 20 && status.pathState() == BaritoneFacade.PathState.IDLE) {
+            if (distance <= radius + 2.5) {
+                boolean safeCancel = baritone.cancel();
+                baritoneGoalOwned = false;
+                if (!safeCancel) {
+                    return WorkflowStep.failed(
+                        "Baritone reached the handoff neighborhood but could not cancel at a safe segment boundary.",
+                        baritoneMeasurements(distance, radius, status, "baritone_final_handoff_unsafe")
+                    );
+                }
+                baritoneFinalApproach = true;
+                initialDistance = distance;
+                noTargetTicks = 0;
+                WorkflowStep safetyFailure = navigateToward(x, y, z, radius, false);
+                if (safetyFailure != null) return safetyFailure;
+                return WorkflowStep.running(
+                    progressFromDistance(distance, radius),
+                    "Baritone settled near the destination and handed off to exact native final approach.",
+                    baritoneMeasurements(distance, radius, status, "baritone_final_handoff_started")
+                );
+            }
+            baritoneGoalOwned = false;
             return WorkflowStep.failed(
                 "Baritone stopped before the measured destination postcondition was satisfied.",
-                Map.of("distance_blocks", distance, "arrival_radius", radius, "control_engine", "baritone")
+                baritoneMeasurements(distance, radius, status, "baritone_stopped_before_arrival")
             );
         }
         return WorkflowStep.running(
             progressFromDistance(distance, radius),
             "Baritone is navigating toward the admitted destination.",
-            Map.of("distance_blocks", distance, "arrival_radius", radius, "control_engine", "baritone")
+            baritoneMeasurements(distance, radius, status, "baritone_navigation_running")
         );
+    }
+
+    private static Map<String, Object> baritoneMeasurements(
+        double distance,
+        double radius,
+        BaritoneFacade.Status status,
+        String reasonCode
+    ) {
+        LinkedHashMap<String, Object> measurements = new LinkedHashMap<>();
+        measurements.put("reason_code", reasonCode);
+        measurements.put("distance_blocks", distance);
+        measurements.put("arrival_radius", radius);
+        measurements.put("control_engine", "baritone");
+        measurements.put("engine_version", status.version());
+        measurements.put("path_state", status.pathState().name().toLowerCase());
+        measurements.put("goal_owned", status.goalOwned());
+        measurements.put("process_active", status.processActive());
+        measurements.put("mutation_policy", "movement_only");
+        measurements.put("mutation_policy_intact", status.mutationPolicyIntact());
+        measurements.put("safe_cancel_last_result", status.safeCancelLastResult());
+        if (status.estimatedTicksToGoal() != null) {
+            measurements.put("estimated_ticks_to_goal", status.estimatedTicksToGoal());
+        }
+        if (status.lastError() != null && !status.lastError().isBlank()) {
+            measurements.put("engine_error", status.lastError());
+        }
+        return Map.copyOf(measurements);
     }
 
     private WorkflowStep follow(long actionTicks) {
@@ -194,7 +624,10 @@ final class NativeFabricWorkflowEngine {
             );
         }
         if (current > desired) {
-            navigateToward(target.getX(), target.getY(), target.getZ(), desired, true);
+            WorkflowStep safetyFailure = navigateToward(
+                target.getX(), target.getY(), target.getZ(), desired, true
+            );
+            if (safetyFailure != null) return safetyFailure;
         } else {
             bridge.applyMovement(MovementInput.released());
             bridge.lookAt(target.getX(), target.getEyeY(), target.getZ(), 18.0F);
@@ -243,7 +676,10 @@ final class NativeFabricWorkflowEngine {
             }
         } else {
             noTargetTicks = 0;
-            navigateToward(target.getX(), target.getY(), target.getZ(), 0.75, true);
+            WorkflowStep safetyFailure = navigateToward(
+                target.getX(), target.getY(), target.getZ(), 0.75, true
+            );
+            if (safetyFailure != null) return safetyFailure;
         }
         return WorkflowStep.running(
             Math.min(0.99, (double) collected / requested),
@@ -264,6 +700,13 @@ final class NativeFabricWorkflowEngine {
         String blockId = text(arguments, "block_id");
         int requested = integer(arguments, "count");
         int radius = integer(arguments, "search_radius");
+        BlockPos exactTarget = optionalBlockPosition(arguments.get("target_position"));
+        if (exactTarget != null && requested != 1) {
+            return WorkflowStep.failed(
+                "Exact-target mining requires exactly one admitted block removal.",
+                Map.of("block_id", blockId, "requested_count", requested)
+            );
+        }
         if (radius > NATIVE_BLOCK_SEARCH_RADIUS_CEILING) {
             return WorkflowStep.failed(
                 "Native Fabric mining accepts a loaded search radius of at most 32 blocks; request a smaller radius or a declared pathing engine.",
@@ -271,14 +714,23 @@ final class NativeFabricWorkflowEngine {
             );
         }
         if (completedCount >= requested) {
+            LinkedHashMap<String, Object> success = new LinkedHashMap<>();
+            success.put("block_id", blockId);
+            success.put("requested_count", requested);
+            success.put("removed_count", completedCount);
+            success.put("world_mutations_performed", worldMutationCount);
+            success.put("max_sensor_capture_duration_nanos", maxSensorCaptureDurationNanos);
+            success.put("max_affordance_derive_duration_nanos", maxAffordanceDeriveDurationNanos);
+            success.put(
+                "max_sensing_total_duration_nanos",
+                maxSensorCaptureDurationNanos + maxAffordanceDeriveDurationNanos
+            );
+            success.put("sensing_timing_sample_count", sensingTimingSampleCount);
+            success.put("p95_sensing_total_duration_nanos", p95SensingDurationNanos());
+            if (exactTarget != null) success.put("target_position", position(exactTarget));
             return WorkflowStep.succeeded(
                 "The requested block removals were verified in the client world.",
-                Map.of(
-                    "block_id", blockId,
-                    "requested_count", requested,
-                    "removed_count", completedCount,
-                    "world_mutations_performed", worldMutationCount
-                )
+                Map.copyOf(success)
             );
         }
         if (blockTarget != null && !blockMatches(blockTarget, blockId)) {
@@ -286,44 +738,246 @@ final class NativeFabricWorkflowEngine {
             completedCount++;
             worldMutationCount++;
             blockTarget = null;
+            blockTargetFace = null;
+            blockApproach = null;
             blockActionStarted = false;
+            pendingTicks = 0;
+            noTargetTicks = 0;
+            initialDistance = -1;
             minecraft.gameMode.stopDestroyBlock();
             if (completedCount >= requested) return mine(actionTicks);
         }
         if (blockTarget == null) {
-            blockTarget = findNearestBlock(player.blockPosition(), blockId, radius);
+            if (exactTarget != null) {
+                BlockPos center = player.blockPosition();
+                boolean insideRadius =
+                    Math.abs(exactTarget.getX() - center.getX()) <= radius &&
+                    Math.abs(exactTarget.getY() - center.getY()) <= radius &&
+                    Math.abs(exactTarget.getZ() - center.getZ()) <= radius;
+                if (!insideRadius) {
+                    return WorkflowStep.failed(
+                        "The exact mining target is outside the admitted loaded-client search radius.",
+                        Map.of(
+                            "reason_code", "exact_mining_target_outside_radius",
+                            "block_id", blockId,
+                            "target_position", position(exactTarget),
+                            "search_radius", radius
+                        )
+                    );
+                }
+                if (!minecraft.level.hasChunkAt(exactTarget)) {
+                    return WorkflowStep.failed(
+                        "The exact mining target is not currently loaded in the paired client world.",
+                        Map.of(
+                            "reason_code", "exact_mining_target_unloaded",
+                            "block_id", blockId,
+                            "target_position", position(exactTarget)
+                        )
+                    );
+                }
+                if (!blockMatches(exactTarget, blockId)) {
+                    return WorkflowStep.failed(
+                        "The exact mining target no longer matches the admitted block identifier.",
+                        Map.of(
+                            "reason_code", "exact_mining_target_mismatch",
+                            "block_id", blockId,
+                            "target_position", position(exactTarget)
+                        )
+                    );
+                }
+                blockTarget = exactTarget.immutable();
+            } else {
+                blockTarget = findNearestBlock(player.blockPosition(), blockId, radius);
+            }
             if (blockTarget == null) {
                 return WorkflowStep.failed(
                     "No matching loaded block was found inside the admitted native mining radius.",
                     Map.of("block_id", blockId, "removed_count", completedCount, "search_radius", radius)
                 );
             }
+            blockTargetFace = nearestExposedMiningFace(
+                blockTarget,
+                player.getEyePosition(),
+                this::isOpenMiningNeighbor
+            );
+            if (blockTargetFace == null) {
+                blockTarget = null;
+                return WorkflowStep.failed(
+                    "No legitimately exposed face was available on the selected mining target.",
+                    Map.of("block_id", blockId, "removed_count", completedCount)
+                );
+            }
         }
-        double distance = eyeDistance(player, blockTarget);
+        PlayerSensorFrame frame = bridge.sensorFrame();
+        long affordanceStartedNanos = System.nanoTime();
+        MiningTargetAffordance affordance = MiningTargetAffordance.derive(
+            frame,
+            blockTarget,
+            player.blockInteractionRange(),
+            this::isOpenMiningNeighbor,
+            this::isMiningSupport
+        );
+        long affordanceDurationNanos = Math.max(
+            0,
+            System.nanoTime() - affordanceStartedNanos
+        );
+        maxSensorCaptureDurationNanos = Math.max(
+            maxSensorCaptureDurationNanos,
+            frame.captureDurationNanos()
+        );
+        maxAffordanceDeriveDurationNanos = Math.max(
+            maxAffordanceDeriveDurationNanos,
+            affordanceDurationNanos
+        );
+        recordSensingDuration(
+            frame.captureDurationNanos() + affordanceDurationNanos
+        );
+        if (blockApproach == null) blockApproach = affordance.approach();
+        if (blockTargetFace == null) blockTargetFace = affordance.face();
+        double distance = affordance.targetDistance();
         if (distance > player.blockInteractionRange()) {
-            navigateToward(blockTarget.getX() + 0.5, blockTarget.getY(), blockTarget.getZ() + 0.5, 3.5, false);
+            if (blockApproach == null) {
+                bridge.applyMovement(MovementInput.released());
+                return WorkflowStep.failed(
+                    "No bounded legitimately standable approach pose was available for the selected mining target.",
+                    Map.of(
+                        "reason_code", "mining_no_approach_pose",
+                        "block_id", blockId,
+                        "removed_count", completedCount,
+                        "target_position", position(blockTarget),
+                        "target_distance_blocks", distance,
+                        "sensor_world_revision", frame.worldRevision(),
+                        "sensor_game_tick", frame.gameTick()
+                    )
+                );
+            }
+            if (initialDistance < 0 || distance < initialDistance - 0.1) {
+                initialDistance = distance;
+                noTargetTicks = 0;
+            } else if (miningNavigationStalled(++noTargetTicks)) {
+                bridge.applyMovement(MovementInput.released());
+                return WorkflowStep.failed(
+                    "The selected mining target remained outside interaction range after bounded measured non-progress.",
+                    Map.of(
+                        "block_id", blockId,
+                        "removed_count", completedCount,
+                        "target_position", position(blockTarget),
+                        "target_distance_blocks", distance,
+                        "closest_target_distance_blocks", initialDistance,
+                        "no_progress_ticks", noTargetTicks,
+                        "reason_code", "mining_approach_stalled"
+                    )
+                );
+            }
+            WorkflowStep safetyFailure = navigateToward(
+                blockApproach.x(),
+                blockApproach.y(),
+                blockApproach.z(),
+                0.4,
+                false
+            );
+            if (safetyFailure != null) return safetyFailure;
         } else {
             bridge.applyMovement(MovementInput.released());
-            bridge.lookAt(blockTarget.getX() + 0.5, blockTarget.getY() + 0.5, blockTarget.getZ() + 0.5, 18.0F);
+            Vec3 faceCenter = affordance.faceCenter();
+            bridge.lookAt(faceCenter.x, faceCenter.y, faceCenter.z, 18.0F);
             if (!blockActionStarted) {
-                blockActionStarted = minecraft.gameMode.startDestroyBlock(blockTarget, Direction.UP);
+                if (!affordance.focused()) {
+                    pendingTicks++;
+                    if (miningFocusNeedsApproach(pendingTicks)) {
+                        if (initialDistance < 0 || distance < initialDistance - 0.1) {
+                            initialDistance = distance;
+                            noTargetTicks = 0;
+                        } else if (miningNavigationStalled(++noTargetTicks)) {
+                            bridge.applyMovement(MovementInput.released());
+                            return WorkflowStep.failed(
+                                "The selected exposed mining target did not become focusable after bounded measured repositioning.",
+                                Map.of(
+                                    "block_id", blockId,
+                                    "target_position", position(blockTarget),
+                                    "target_distance_blocks", distance,
+                                    "closest_target_distance_blocks", initialDistance,
+                                    "focus_reachable", false,
+                                    "no_progress_ticks", noTargetTicks,
+                                    "reason_code", "mining_focus_stalled",
+                                    "sensor_world_revision", frame.worldRevision(),
+                                    "sensor_game_tick", frame.gameTick()
+                                )
+                            );
+                        }
+                        if (blockApproach == null) {
+                            return WorkflowStep.failed(
+                                "The target was in nominal range but had no standable pose from which focus could be reacquired.",
+                                Map.of(
+                                    "reason_code", "mining_focus_no_approach_pose",
+                                    "block_id", blockId,
+                                    "target_position", position(blockTarget),
+                                    "sensor_world_revision", frame.worldRevision(),
+                                    "sensor_game_tick", frame.gameTick()
+                                )
+                            );
+                        }
+                        WorkflowStep safetyFailure = navigateToward(
+                            blockApproach.x(), blockApproach.y(), blockApproach.z(), 0.4, false
+                        );
+                        if (safetyFailure != null) return safetyFailure;
+                    } else if (pendingTicks > MINING_NAVIGATION_NO_PROGRESS_TICKS) {
+                        return WorkflowStep.failed(
+                            "The selected exposed mining target did not become legitimately reachable from the player's measured focus.",
+                            Map.of(
+                                "block_id", blockId,
+                                "target_position", position(blockTarget),
+                                "target_distance_blocks", distance,
+                                "focus_reachable", false,
+                                "reason_code", "mining_focus_unreachable"
+                            )
+                        );
+                    }
+                } else {
+                    noTargetTicks = 0;
+                    initialDistance = distance;
+                    Direction focusedFace = direction(frame.focus().face());
+                    if (focusedFace != null) blockTargetFace = focusedFace;
+                    blockActionStarted = minecraft.gameMode.startDestroyBlock(
+                        blockTarget,
+                        blockTargetFace
+                    );
+                    pendingTicks = 0;
+                }
             } else {
-                minecraft.gameMode.continueDestroyBlock(blockTarget, Direction.UP);
+                minecraft.gameMode.continueDestroyBlock(blockTarget, blockTargetFace);
             }
+        }
+        LinkedHashMap<String, Object> miningEvidence = new LinkedHashMap<>();
+        miningEvidence.put("block_id", blockId);
+        miningEvidence.put("requested_count", requested);
+        miningEvidence.put("removed_count", completedCount);
+        miningEvidence.put("world_mutations_performed", worldMutationCount);
+        miningEvidence.put("target_position", position(blockTarget));
+        miningEvidence.put("target_distance_blocks", distance);
+        miningEvidence.put("target_face", blockTargetFace == null ? "" : blockTargetFace.getSerializedName());
+        miningEvidence.put("focus_matches_target", affordance.focused());
+        miningEvidence.put("sensor_world_revision", frame.worldRevision());
+        miningEvidence.put("sensor_game_tick", frame.gameTick());
+        miningEvidence.put("sensor_capture_duration_nanos", frame.captureDurationNanos());
+        miningEvidence.put("affordance_derive_duration_nanos", affordanceDurationNanos);
+        miningEvidence.put(
+            "sensing_total_duration_nanos",
+            frame.captureDurationNanos() + affordanceDurationNanos
+        );
+        miningEvidence.put("horizontal_collision", frame.horizontalCollision());
+        miningEvidence.put("vertical_velocity", frame.velocityY());
+        if (blockApproach != null) {
+            miningEvidence.put("approach_position", Map.of(
+                "x", blockApproach.x(), "y", blockApproach.y(), "z", blockApproach.z()
+            ));
         }
         return WorkflowStep.running(
             Math.min(0.99, (double) completedCount / requested),
             distance > player.blockInteractionRange()
                 ? "The paired player is moving within legitimate block interaction range."
                 : "The client is mining the selected matching block through the normal game-mode controller.",
-            Map.of(
-                "block_id", blockId,
-                "requested_count", requested,
-                "removed_count", completedCount,
-                "world_mutations_performed", worldMutationCount,
-                "target_position", position(blockTarget),
-                "target_distance_blocks", distance
-            )
+            miningEvidence
         );
     }
 
@@ -419,7 +1073,13 @@ final class NativeFabricWorkflowEngine {
                 if (handChanged(placementHandBefore, placementHandAfter)) {
                     placementInventoryMutationCount++;
                 }
-                worldMutationCount++;
+                worldMutationCount += "minecraft:nether_portal".equals(blockId)
+                    ? Math.max(1, connectedMatchingBlockCount(
+                        positions.get(placeIndex),
+                        blockId,
+                        512
+                    ))
+                    : 1;
                 landingCleanupEligible = cleanupAfterLanding;
             }
             if (landingCleanupEligible && dynamicPlacementTarget != null) {
@@ -502,13 +1162,14 @@ final class NativeFabricWorkflowEngine {
                 // under the player before a clutch is reachable.
                 bridge.applyMovement(MovementInput.released());
             } else {
-                navigateToward(
+                WorkflowStep safetyFailure = navigateToward(
                     target.getX() + 0.5,
                     target.getY(),
                     target.getZ() + 0.5,
                     3.5,
                     false
                 );
+                if (safetyFailure != null) return safetyFailure;
             }
         } else {
             bridge.applyMovement(MovementInput.released());
@@ -942,25 +1603,31 @@ final class NativeFabricWorkflowEngine {
                 support,
                 false
             );
-            if ("item_use".equals(placementMethod)) {
-                bridge.lookAt(
-                    hitLocation.x,
-                    hitLocation.y,
-                    hitLocation.z,
-                    180.0F
-                );
-                // Bucket-like items implement Item.use and perform their own
-                // vanilla POV block ray cast. The caller has already waited
-                // for this exact support face to enter interaction range and
-                // aligned the local view to it.
-                InteractionResult result = minecraft.gameMode.useItem(player, hand);
+            bridge.lookAt(
+                hitLocation.x,
+                hitLocation.y,
+                hitLocation.z,
+                180.0F
+            );
+            for (String interactionMode : placementInteractionOrder(placementMethod)) {
+                InteractionResult result = "use_item".equals(interactionMode)
+                    ? minecraft.gameMode.useItem(player, hand)
+                    : minecraft.gameMode.useItemOn(player, hand, hit);
                 if (result.consumesAction()) return true;
-                continue;
             }
-            InteractionResult result = minecraft.gameMode.useItemOn(player, hand, hit);
-            if (result.consumesAction()) return true;
         }
         return false;
+    }
+
+    static List<String> placementInteractionOrder(String placementMethod) {
+        // Flint-and-steel and similar items require use-on-block semantics,
+        // while buckets implement Item.use and perform a POV ray cast. Try the
+        // already-admitted support face first, then the air/POV form only for
+        // the general item_use contract. Ordinary block items never need the
+        // fallback and therefore cannot produce a second interaction packet.
+        return "item_use".equals(placementMethod)
+            ? List.of("use_item_on", "use_item")
+            : List.of("use_item_on");
     }
 
     private static boolean handChanged(
@@ -968,7 +1635,34 @@ final class NativeFabricWorkflowEngine {
         HandObservation after
     ) {
         return before.available() && after.available() &&
-            (before.count() != after.count() || !before.itemId().equals(after.itemId()));
+            (
+                before.count() != after.count() ||
+                before.damage() != after.damage() ||
+                !before.itemId().equals(after.itemId())
+            );
+    }
+
+    private int connectedMatchingBlockCount(
+        BlockPos start,
+        String expectedBlockId,
+        int ceiling
+    ) {
+        if (!blockMatches(start, expectedBlockId) || ceiling < 1) return 0;
+        ArrayDeque<BlockPos> pending = new ArrayDeque<>();
+        Set<Long> visited = new HashSet<>();
+        pending.add(start);
+        while (!pending.isEmpty() && visited.size() < ceiling) {
+            BlockPos current = pending.removeFirst();
+            if (!visited.add(current.asLong())) continue;
+            for (Direction direction : Direction.values()) {
+                BlockPos adjacent = current.relative(direction);
+                if (
+                    !visited.contains(adjacent.asLong()) &&
+                    blockMatches(adjacent, expectedBlockId)
+                ) pending.addLast(adjacent);
+            }
+        }
+        return visited.size();
     }
 
     static Vec3 supportFaceHitLocation(BlockPos support, Direction supportFace) {
@@ -1015,7 +1709,12 @@ final class NativeFabricWorkflowEngine {
                         BlockPos candidate = center.offset(dx, dy, dz);
                         if (completedBlockTargets.contains(candidate.asLong()) ||
                             !minecraft.level.hasChunkAt(candidate) ||
-                            !blockMatches(candidate, blockId)) continue;
+                            !blockMatches(candidate, blockId) ||
+                            nearestExposedMiningFace(
+                                candidate,
+                                requirePlayer().getEyePosition(),
+                                this::isOpenMiningNeighbor
+                            ) == null) continue;
                         double distance = candidate.distSqr(center);
                         if (distance < nearestDistance) {
                             nearest = candidate.immutable();
@@ -1029,7 +1728,77 @@ final class NativeFabricWorkflowEngine {
         return null;
     }
 
-    private void navigateToward(
+    private boolean isOpenMiningNeighbor(BlockPos position) {
+        if (!minecraft.level.hasChunkAt(position)) return false;
+        BlockState state = minecraft.level.getBlockState(position);
+        return state.isAir() || state.canBeReplaced();
+    }
+
+    private boolean isMiningSupport(BlockPos position) {
+        if (!minecraft.level.hasChunkAt(position)) return false;
+        BlockState state = minecraft.level.getBlockState(position);
+        return !state.isAir() && !state.canBeReplaced();
+    }
+
+    static boolean miningNavigationStalled(int noProgressTicks) {
+        return noProgressTicks > MINING_NAVIGATION_NO_PROGRESS_TICKS;
+    }
+
+    static boolean miningFocusNeedsApproach(int pendingFocusTicks) {
+        return pendingFocusTicks > 5;
+    }
+
+    static Direction nearestExposedMiningFace(
+        BlockPos target,
+        Vec3 actorEye,
+        Predicate<BlockPos> openNeighbor
+    ) {
+        Direction nearest = null;
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (Direction direction : Direction.values()) {
+            if (!openNeighbor.test(target.relative(direction))) continue;
+            Vec3 face = miningFaceCenter(target, direction);
+            double distance = actorEye.distanceToSqr(face);
+            if (distance < nearestDistance) {
+                nearest = direction;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
+    private static Vec3 miningFaceCenter(BlockPos target, Direction face) {
+        return MiningTargetAffordance.faceCenter(target, face);
+    }
+
+    private static Direction direction(String serializedName) {
+        for (Direction direction : Direction.values()) {
+            if (direction.getSerializedName().equals(serializedName)) return direction;
+        }
+        return null;
+    }
+
+    private void recordSensingDuration(long durationNanos) {
+        if (sensingTimingSampleCount >= sensingTimingSamplesNanos.length) return;
+        sensingTimingSamplesNanos[sensingTimingSampleCount++] = Math.max(0, durationNanos);
+    }
+
+    private long p95SensingDurationNanos() {
+        return p95DurationNanos(sensingTimingSamplesNanos, sensingTimingSampleCount);
+    }
+
+    static long p95DurationNanos(long[] samples, int count) {
+        if (samples == null || count < 0 || count > samples.length) {
+            throw new IllegalArgumentException("bounded timing sample count is invalid");
+        }
+        if (count == 0) return 0;
+        long[] sorted = Arrays.copyOf(samples, count);
+        Arrays.sort(sorted);
+        int index = Math.max(0, (int) Math.ceil(sorted.length * 0.95) - 1);
+        return sorted[index];
+    }
+
+    private WorkflowStep navigateToward(
         double x,
         double y,
         double z,
@@ -1040,7 +1809,18 @@ final class NativeFabricWorkflowEngine {
         double current = distance(player.getX(), player.getY(), player.getZ(), x, y, z);
         if (current <= arrivalRadius) {
             bridge.applyMovement(MovementInput.released());
-            return;
+            return null;
+        }
+        double healthFloor = arguments.get("stop_below_health") instanceof Number value
+            ? value.doubleValue()
+            : 6.0;
+        LocomotionSafetyEnvelope.Check safety = locomotionSafetyCheck(x, z, healthFloor);
+        if (!safety.decision().admitted()) {
+            bridge.applyMovement(MovementInput.released());
+            return WorkflowStep.failed(
+                "Native locomotion stopped before asserting forward control because the local safety envelope refused the next step.",
+                safety.measurements()
+            );
         }
         bridge.lookAt(x, y + 0.5, z, 18.0F);
         bridge.applyMovement(new MovementInput(
@@ -1051,6 +1831,135 @@ final class NativeFabricWorkflowEngine {
             player.horizontalCollision && player.onGround(),
             sprint
         ));
+        return null;
+    }
+
+    LocomotionSafetyEnvelope.Check locomotionSafetyCheck(
+        double targetX,
+        double targetZ,
+        double minimumHealth
+    ) {
+        LocalPlayer player = requirePlayer();
+        PlayerSensorFrame frame = bridge.sensorFrame();
+        double dx = targetX - player.getX();
+        double dz = targetZ - player.getZ();
+        double horizontal = Math.hypot(dx, dz);
+        double stepX = horizontal < 0.001 ? player.getX() : player.getX() + dx / horizontal * 0.8;
+        double stepZ = horizontal < 0.001 ? player.getZ() : player.getZ() + dz / horizontal * 0.8;
+        BlockPos predictedFeet = BlockPos.containing(stepX, player.getY() + 0.01, stepZ);
+        boolean geometryKnown = minecraft.level.hasChunkAt(predictedFeet) &&
+            minecraft.level.hasChunkAt(predictedFeet.below(2));
+        boolean predictedLava = geometryKnown && (
+            minecraft.level.getFluidState(predictedFeet).is(FluidTags.LAVA) ||
+            minecraft.level.getFluidState(predictedFeet.below()).is(FluidTags.LAVA) ||
+            minecraft.level.getFluidState(predictedFeet.below(2)).is(FluidTags.LAVA)
+        );
+        double predictedDrop = 3;
+        if (geometryKnown) {
+            if (isLocomotionSupport(predictedFeet.below())) predictedDrop = 0;
+            else if (isLocomotionSupport(predictedFeet.below(2))) predictedDrop = 1;
+        }
+        LocomotionSafetyEnvelope.Decision decision = new LocomotionSafetyEnvelope(
+            minimumHealth,
+            1
+        ).assess(
+            new LocomotionSafetyEnvelope.Observation(
+                frame.health(), frame.onGround(), frame.velocityY(), player.fallDistance,
+                player.isInLava(), player.isOnFire(), geometryKnown,
+                predictedDrop, predictedLava
+            )
+        );
+        return new LocomotionSafetyEnvelope.Check(
+            decision,
+            movementSafetyMeasurements(frame, predictedFeet, geometryKnown, predictedDrop, decision, minimumHealth)
+        );
+    }
+
+    private Map<String, Object> movementSafetyMeasurements(
+        PlayerSensorFrame frame,
+        BlockPos predictedFeet,
+        boolean geometryKnown,
+        double predictedDrop,
+        LocomotionSafetyEnvelope.Decision decision,
+        double minimumHealth
+    ) {
+        LocalPlayer player = requirePlayer();
+        return Map.ofEntries(
+            Map.entry("reason_code", decision.reasonCode()),
+            Map.entry("safety_interrupted", true),
+            Map.entry("effect_prevented", true),
+            Map.entry("sensor_world_revision", frame.worldRevision()),
+            Map.entry("sensor_game_tick", frame.gameTick()),
+            Map.entry("measured_health", (double) frame.health()),
+            Map.entry("stop_below_health", minimumHealth),
+            Map.entry("vertical_velocity", frame.velocityY()),
+            Map.entry("fall_distance_blocks", (double) player.fallDistance),
+            Map.entry("landing_geometry_known", geometryKnown),
+            Map.entry("predicted_drop_blocks", predictedDrop),
+            Map.entry("predicted_landing_position", position(predictedFeet)),
+            Map.entry("controls_released", true)
+        );
+    }
+
+    private boolean isLocomotionSupport(BlockPos position) {
+        if (!minecraft.level.hasChunkAt(position)) return false;
+        BlockState state = minecraft.level.getBlockState(position);
+        return !state.getCollisionShape(minecraft.level, position).isEmpty();
+    }
+
+    private BoundedNavigationFrontier.CellKind nativeNavigationCell(
+        BoundedNavigationFrontier.Position position
+    ) {
+        BlockPos block = blockPosition(position);
+        if (minecraft.level == null || !minecraft.level.hasChunkAt(block)) {
+            return BoundedNavigationFrontier.CellKind.UNKNOWN;
+        }
+        BlockState state = minecraft.level.getBlockState(block);
+        if (
+            state.is(Blocks.LAVA) ||
+            state.is(Blocks.FIRE) ||
+            state.is(Blocks.SOUL_FIRE) ||
+            state.is(Blocks.MAGMA_BLOCK) ||
+            state.is(Blocks.CACTUS) ||
+            state.is(Blocks.SWEET_BERRY_BUSH) ||
+            state.is(Blocks.POWDER_SNOW)
+        ) return BoundedNavigationFrontier.CellKind.HAZARD;
+        if (!state.getFluidState().isEmpty()) {
+            return BoundedNavigationFrontier.CellKind.FLUID;
+        }
+        if (state.isAir() || state.canBeReplaced()) {
+            return BoundedNavigationFrontier.CellKind.CLEAR;
+        }
+        if (!state.getCollisionShape(minecraft.level, block).isEmpty()) {
+            return BoundedNavigationFrontier.CellKind.SOLID;
+        }
+        return BoundedNavigationFrontier.CellKind.BLOCKED;
+    }
+
+    private static BoundedNavigationFrontier.Position frontierPosition(
+        BlockPos position
+    ) {
+        return new BoundedNavigationFrontier.Position(
+            position.getX(),
+            position.getY(),
+            position.getZ()
+        );
+    }
+
+    private static BlockPos blockPosition(
+        BoundedNavigationFrontier.Position position
+    ) {
+        return new BlockPos(position.x(), position.y(), position.z());
+    }
+
+    private static int chebyshevDistance(BlockPos first, BlockPos second) {
+        return Math.max(
+            Math.max(
+                Math.abs(first.getX() - second.getX()),
+                Math.abs(first.getY() - second.getY())
+            ),
+            Math.abs(first.getZ() - second.getZ())
+        );
     }
 
     private AbstractClientPlayer findPlayer(String nativeId) {
@@ -1126,11 +2035,23 @@ final class NativeFabricWorkflowEngine {
         pendingTicks = 0;
         initialDistance = -1;
         blockTarget = null;
+        blockTargetFace = null;
+        blockApproach = null;
+        maxSensorCaptureDurationNanos = 0;
+        maxAffordanceDeriveDurationNanos = 0;
+        sensingTimingSampleCount = 0;
         blockActionStarted = false;
         containerOpenRequested = false;
         inventoryActionIssued = false;
         inventoryCountBeforeIssued = 0;
         baritoneGoalOwned = false;
+        baritoneFinalApproach = false;
+        nativeNavigationPlan = null;
+        nativeNavigationStepIndex = 0;
+        nativeNavigationReplanCount = 0;
+        nativeNavigationNoProgressTicks = 0;
+        nativeNavigationClosestStepDistance = Double.POSITIVE_INFINITY;
+        nativeNavigationLastReplanReason = "initial_plan";
         latestPlacementForecast = Map.of();
         dynamicPlacementBindingEvidence = Map.of();
         dynamicPlacementTarget = null;
@@ -1209,10 +2130,12 @@ final class NativeFabricWorkflowEngine {
         if (placementHandBefore.available()) {
             result.put("held_item_id_before", placementHandBefore.itemId());
             result.put("held_item_count_before", placementHandBefore.count());
+            result.put("held_item_damage_before", placementHandBefore.damage());
         }
         if (placementHandAfter.available()) {
             result.put("held_item_id_after", placementHandAfter.itemId());
             result.put("held_item_count_after", placementHandAfter.count());
+            result.put("held_item_damage_after", placementHandAfter.damage());
         }
         if (!latestPlacementForecast.isEmpty()) {
             result.put("placement_prediction", latestPlacementForecast);
@@ -1310,6 +2233,16 @@ final class NativeFabricWorkflowEngine {
             ));
         }
         return List.copyOf(positions);
+    }
+
+    private static BlockPos optionalBlockPosition(Object value) {
+        Map<String, Object> position = optionalObject(value);
+        if (position.isEmpty()) return null;
+        return new BlockPos(
+            integer(position, "x"),
+            integer(position, "y"),
+            integer(position, "z")
+        );
     }
 
     private static String text(Map<String, Object> map, String key) {

@@ -59,14 +59,14 @@ const isolatedEnvironment = () => {
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-const waitForHealth = async (origin, child) => {
-  const deadline = Date.now() + 20_000;
+const waitForServiceReady = async (origin, child) => {
+  const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(`Desktop smoke child exited with ${child.exitCode}`);
     }
     try {
-      const response = await fetch(`${origin}/health`, {
+      const response = await fetch(`${origin}/api/ready`, {
         headers: { [sessionHeader]: secret },
         signal: AbortSignal.timeout(1_000),
       });
@@ -74,7 +74,7 @@ const waitForHealth = async (origin, child) => {
     } catch {}
     await delay(200);
   }
-  throw new Error("Desktop smoke child did not become reachable");
+  throw new Error("Desktop smoke child did not finish mounting API routes");
 };
 
 const expectStatus = async (url, expected, headers = {}) => {
@@ -136,7 +136,7 @@ child.stdout.on("data", capture);
 child.stderr.on("data", capture);
 
 try {
-  await waitForHealth(origin, child);
+  await waitForServiceReady(origin, child);
   await expectStatus(`${origin}/health`, 401);
   await expectStatus(`${origin}/health`, 401, {
     [sessionHeader]: `${secret}-wrong`,

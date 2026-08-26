@@ -1,0 +1,135 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 1,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "decision": "UPHOLD_TOLMAN_FAIL_REQUIRE_STANDARD_C_INFINITY_ROUTE_NARROW_ANALYTIC_GERM_RULE",
+  "frozen_failure": {
+    "B_second_exterior": "100/27",
+    "B_second_interior": "-350/27",
+    "first_disjoint_order": 2,
+    "manifest_sha256": "b4eec02bdc166b10cfc0e795e7d3f1bb64b618356e07d1dfcf883e8cbe5edd98",
+    "proposal_exhausted": true,
+    "result_sha256": "4248b29a38588dc6c1b1a0c283bb78399eabd3d815376d0ddad3fd7e481392d7",
+    "typed_failure": "GLOBAL_STATIC_STATE_FAIL"
+  },
+  "junction_disposition": {
+    "ordinary_israel_darmois": "PASS_UNCHANGED",
+    "ordinary_scope": "matching induced metric and extrinsic curvature excludes a singular thin shell",
+    "quantum_implication": "ordinary junction PASS does not establish the smooth background assumed by the frozen Hadamard RSET and noise route"
+  },
+  "regularity_ladder": [
+    {
+      "layer": "ordinary_junction",
+      "tolman_status": "PASS",
+      "required_route": "piecewise smooth geometry with matching first and second fundamental forms",
+      "authority": "no_surface_stress_layer_only"
+    },
+    {
+      "layer": "weak_kg_and_friedrichs_form",
+      "tolman_status": "NOT_DECIDED_AND_NOT_NEEDED_AFTER_FIRST_FAIL",
+      "required_route": "a separately specified low-regularity divergence-form and closed-quadratic-form theory may be possible",
+      "authority": "does_not_establish_hadamard_rset_or_noise"
+    },
+    {
+      "layer": "static_ground_state_hadamard_theorem",
+      "tolman_status": "INELIGIBLE",
+      "required_route": "C_infinity static lapse and spatial metric plus the theorem's global and spectral hypotheses",
+      "authority": "standard_microlocal_hadamard_only"
+    },
+    {
+      "layer": "local_covariant_rset",
+      "tolman_status": "FAILS_FROZEN_SMOOTH_COEFFICIENT_ROUTE",
+      "required_route": "smooth Hadamard coefficients and curvature derivatives including Box_R with no unregistered interface distribution",
+      "authority": "mean_rset_definition_only"
+    },
+    {
+      "layer": "connected_noise",
+      "tolman_status": "INELIGIBLE",
+      "required_route": "same smooth Hadamard state and background supporting up to four covariant derivatives and admissible smearing",
+      "authority": "noise_definition_only"
+    }
+  ],
+  "tolman_distributional_replay": {
+    "dimensionless_scalar_curvature": "S=RHO-3*P",
+    "exterior_surface_derivative": "S_x(1+)=0",
+    "interior_surface_derivative": "S_x(1-)=-6",
+    "jump_exterior_minus_interior": "6",
+    "radial_inverse_metric_at_surface": "Z(1)=3/5",
+    "box_R_surface_delta_coefficient_dimensionless": "18/5",
+    "minimal_coupling_v1_box_R_coefficient": "1/120",
+    "v1_surface_delta_coefficient_dimensionless": "3/100",
+    "disposition": "the frozen smooth v1 coefficient cannot absorb or reinterpret this unregistered surface distribution"
+  },
+  "sharp_finite_regularity_minimum": {
+    "status": "NOT_ESTABLISHED_FOR_THE_FULL_FROZEN_PACKAGE",
+    "reason": "finite differentiability sufficient for selected weak KG evolution does not supply the cited smooth pseudodifferential Hadamard theorem, locally covariant point-split RSET and connected-noise construction together",
+    "claim_boundary": "this is not a proof that no alternative low-regularity quantum field theory exists"
+  },
+  "successor_standard_route": {
+    "analyticity_required": false,
+    "background_requirement": "one globally C_infinity static asymptotically flat Lorentzian metric in a compatible atlas",
+    "interface_requirement": "no curvature or curvature-derivative surface distribution; every finite material interface must have a structural all-orders smoothness proof",
+    "lapse_requirement": "smooth strictly positive lapse with the static theorem's positive lower bound",
+    "spatial_requirement": "smooth complete Cauchy metric with stated bounded-geometry or equivalent pseudodifferential hypotheses",
+    "spectral_requirement": "strictly positive self-adjoint Klein-Gordon spatial operator with a certified lower bound",
+    "sufficient_proof_methods": [
+      "global smooth field solution without a finite material boundary",
+      "C_infinity compact-support matter profile flat to all orders at each vacuum interface plus field-equation regularity proof",
+      "exact analytic interior/exterior germ identity as a sufficient special case"
+    ],
+    "insufficient_proof_methods": [
+      "Israel-Darmois matching alone",
+      "agreement through any preregistered finite jet order alone",
+      "post-result smoothing or mollification",
+      "an assumed interface counterterm or distributional renormalization not frozen before candidate selection"
+    ]
+  },
+  "alternative_low_regularity_route": {
+    "eligible_now": false,
+    "required_before_future_eligibility": [
+      "versioned low-regularity spacetime and causal-propagator category",
+      "ground-state theorem and microlocal spectrum replacement with explicit coefficient regularity",
+      "locally covariant RSET extension including all interface distributions and conservation",
+      "connected-noise product extension positivity and smearing domain",
+      "two source/runtime-disjoint implementations and replay ABI"
+    ],
+    "program_scope": "separate research program rather than a repair or reinterpretation of Tolman VII"
+  },
+  "sources": [
+    {
+      "id": "junker_static_hadamard",
+      "url": "https://arxiv.org/abs/hep-th/9507097",
+      "use": "static metric equation 3.26 takes a C_infinity lapse and smooth spatial metric; Corollary 3.16 and its static extension establish the standard ground-state Hadamard route"
+    },
+    {
+      "id": "decanini_folacci_rset",
+      "url": "https://arxiv.org/abs/gr-qc/0512118",
+      "use": "equations 70 and 109 bind the conserved Hadamard RSET and the v1 term containing Box_R"
+    },
+    {
+      "id": "phillips_hu_noise",
+      "url": "https://arxiv.org/abs/gr-qc/0010019",
+      "use": "noise kernel uses Green-function covariant derivatives through fourth order and smooth Hadamard coefficients"
+    },
+    {
+      "id": "hollands_wald_review",
+      "url": "https://arxiv.org/abs/1401.2026",
+      "use": "standard locally covariant QFT framework on classical globally hyperbolic spacetimes with microlocal states and renormalized nonlinear observables"
+    },
+    {
+      "id": "gerard_oulghazi_wrochna",
+      "url": "https://arxiv.org/abs/1602.00930",
+      "use": "modern pseudodifferential construction retains C_infinity coefficients and bounded-geometry hypotheses"
+    }
+  ],
+  "schema": "nhm2.g2h_e_s3_r1.regularity_disposition.v1"
+}

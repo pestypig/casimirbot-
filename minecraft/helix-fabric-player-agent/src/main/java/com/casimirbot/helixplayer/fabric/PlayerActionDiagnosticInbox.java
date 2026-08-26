@@ -40,7 +40,7 @@ final class PlayerActionDiagnosticInbox {
         "navigate_to", "look_at", "track_target", "walk", "jump", "follow"
     );
     private static final Set<String> FULL_ACTIONS = Set.of(
-        "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
+        "navigate_to", "look_at", "track_target", "walk", "jump", "interact", "attack",
         "hotbar_select", "equip", "follow", "collect", "mine", "place",
         "craft", "inventory_transfer", "execute_sequence",
         "execute_reactive_program", "arm_viability_guardian",
@@ -313,6 +313,7 @@ final class PlayerActionDiagnosticInbox {
             case "walk" -> walkArguments(value);
             case "jump" -> jumpArguments(value);
             case "interact" -> interactArguments(value);
+            case "attack" -> attackArguments(value);
             case "hotbar_select" -> hotbarArguments(value);
             case "equip" -> equipArguments(value);
             case "follow" -> followArguments(value);
@@ -640,6 +641,47 @@ final class PlayerActionDiagnosticInbox {
         return Map.copyOf(normalized);
     }
 
+    private static Map<String, Object> attackArguments(Map<String, Object> value) {
+        exactKeys(
+            value,
+            Set.of(
+                "target_ref", "target_entity_type_id", "target_classification",
+                "max_acquisition_distance", "require_line_of_sight",
+                "minimum_attack_cooldown", "max_attack_pulses",
+                "max_duration_ms", "stop_below_health", "friendly_fire"
+            ),
+            Set.of()
+        );
+        if (!"hostile".equals(enumText(
+            value,
+            "target_classification",
+            Set.of("hostile")
+        ))) {
+            throw invalid("player_diagnostic_inbox_attack_target_class_invalid");
+        }
+        if (!bool(value, "require_line_of_sight") || bool(value, "friendly_fire")) {
+            throw invalid("player_diagnostic_inbox_attack_safety_invalid");
+        }
+        return Map.ofEntries(
+            Map.entry("target_ref", subject(value, "target_ref")),
+            Map.entry("target_entity_type_id", resource(value, "target_entity_type_id")),
+            Map.entry("target_classification", "hostile"),
+            Map.entry(
+                "max_acquisition_distance",
+                finite(value, "max_acquisition_distance", 1, 16)
+            ),
+            Map.entry("require_line_of_sight", true),
+            Map.entry(
+                "minimum_attack_cooldown",
+                finite(value, "minimum_attack_cooldown", 0.1, 1)
+            ),
+            Map.entry("max_attack_pulses", integer(value, "max_attack_pulses", 1, 64)),
+            Map.entry("max_duration_ms", integer(value, "max_duration_ms", 1_000, 60_000)),
+            Map.entry("stop_below_health", finite(value, "stop_below_health", 1, 20)),
+            Map.entry("friendly_fire", false)
+        );
+    }
+
     private static Map<String, Object> jumpArguments(Map<String, Object> value) {
         exactKeys(value, Set.of("count"), Set.of());
         return Map.of("count", integer(value, "count", 1, 10));
@@ -720,12 +762,23 @@ final class PlayerActionDiagnosticInbox {
     }
 
     private static Map<String, Object> mineArguments(Map<String, Object> value) {
-        exactKeys(value, Set.of("block_id", "count", "search_radius"), Set.of());
-        return Map.of(
-            "block_id", resource(value, "block_id"),
-            "count", integer(value, "count", 1, 4_096),
-            "search_radius", integer(value, "search_radius", 1, 32)
+        exactKeys(
+            value,
+            Set.of("block_id", "count", "search_radius"),
+            Set.of("target_position")
         );
+        long count = integer(value, "count", 1, 4_096);
+        if (value.containsKey("target_position") && count != 1) {
+            throw invalid("player_diagnostic_inbox_exact_mine_count_invalid");
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("block_id", resource(value, "block_id"));
+        normalized.put("count", count);
+        normalized.put("search_radius", integer(value, "search_radius", 1, 32));
+        if (value.containsKey("target_position")) {
+            normalized.put("target_position", blockPosition(value.get("target_position")));
+        }
+        return Map.copyOf(normalized);
     }
 
     private static Map<String, Object> placeArguments(Map<String, Object> value) {

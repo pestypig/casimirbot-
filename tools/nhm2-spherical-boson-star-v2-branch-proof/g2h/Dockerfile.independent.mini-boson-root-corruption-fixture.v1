@@ -1,0 +1,10 @@
+FROM nhm2-g2h-s4-independent-fixture:v1@sha256:0a93751f4f31d081510b87dc6cae3f9da658422e805565e8da1ab22d2368c8a1
+
+COPY docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json \
+     /work/docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json
+COPY docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json \
+     /work/artifacts/nhm2/g2h-e-s4/mini-boson-star-primary/ephemeral-marker.json
+
+WORKDIR /work
+
+ENTRYPOINT ["/mini-boson-star-independent-fixture-v1"]

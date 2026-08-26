@@ -1,0 +1,290 @@
+{
+  "schema": "nhm2.g2f.evidence_matrix.v1",
+  "assessment_date": "2026-08-23",
+  "protocol_path": "docs/research/nhm2-spherical-boson-star-v2-g2f-selection-protocol.md",
+  "protocol_sha256": "785d984382f966a6e2811c645e412e29bcd6842f682dbcfb43e833c118d18272",
+  "candidate_evaluations": 0,
+  "candidate_execution_authorized": false,
+  "query_log": [
+    "site:arxiv.org Tolman VII solution regular causal stability Schwarzschild exterior exact perfect fluid",
+    "site:arxiv.org Tolman VII quantum field Hadamard renormalized stress tensor noise kernel",
+    "Buchdahl gaseous solution perfect fluid exact Schwarzschild exterior primary paper DOI",
+    "site:arxiv.org Buchdahl gaseous solution relativistic star stability causality",
+    "site:arxiv.org quantum scalar field static spherically symmetric star Hadamard renormalized stress energy tensor interior exterior",
+    "site:arxiv.org boson star quantum scalar renormalized stress tensor Hadamard 2026 Saffin Xie",
+    "site:arxiv.org stress tensor fluctuations boson star spacetime noise kernel semiclassical 2026",
+    "site:arxiv.org quantum field compact star interior renormalized stress tensor Tolman VII Buchdahl",
+    "site:arxiv.org ell=1 boson star spherical ground state existence stability numerical convergence",
+    "site:arxiv.org multi-field boson stars ell-boson stars spherical symmetry ground state",
+    "site:arxiv.org 2026 ell boson stars existence stability nonrelativistic",
+    "site:arxiv.org XCFC boson stars constraint satisfying initial data convergence 2026",
+    "site:arxiv.org/abs/2605.27529",
+    "\"Existence and stability\" \"ell-boson\" 2026",
+    "site:arxiv.org Chávez Nambo Sarbach 2026 boson stars existence stability",
+    "site:arxiv.org spherical Proca stars fundamental branch regular asymptotically flat stability numerical",
+    "site:arxiv.org Proca stars existence stability spherical ground state convergence code",
+    "site:arxiv.org quantum fields Proca star renormalized stress tensor Hadamard noise kernel",
+    "site:arxiv.org \"Proca star\" \"renormalized stress\"",
+    "site:arxiv.org oscillaton quadratic potential spherical convergence stability asymptotically flat fundamental",
+    "site:arxiv.org oscillatons exact periodic asymptotically flat no exact solution radiation tail",
+    "site:arxiv.org quantum field oscillaton renormalized stress tensor Hadamard noise kernel",
+    "site:arxiv.org oscillaton classical solution Fourier numerical convergence",
+    "site:arxiv.org Perez Sudarsky 2026 renormalized stress tensor fluctuations semiclassical gravity",
+    "site:aps.org 2026 Perez Sudarsky stress tensor fluctuations semiclassical gravity",
+    "site:arxiv.org stochastic gravity noise kernel Hadamard state stress tensor fluctuations general curved spacetime",
+    "site:arxiv.org noise kernel static spherically symmetric star",
+    "\"oscillatons\" \"not exactly periodic\" asymptotically flat arxiv",
+    "\"oscillaton\" \"radiating tail\" arxiv",
+    "site:arxiv.org/abs gr-qc oscillatons long lived radiating tails",
+    "site:arxiv.org oscillatons periodic solutions Einstein Klein Gordon asymptotically flat",
+    "site:arxiv.org static globally hyperbolic spacetime ground state Hadamard theorem scalar field",
+    "site:projecteuclid.org ground states static spacetimes Hadamard quantum field primary",
+    "site:arxiv.org Hadamard ground state static spacetime Klein Gordon existence"
+  ],
+  "sources": [
+    {
+      "id": "tolman_vii_physical",
+      "title": "Possible Physical Realizations of the Tolman VII solution",
+      "authors": "A. M. Raghoonundun and D. W. Hobill",
+      "identifier": "arXiv:1506.05813; doi:10.1103/PhysRevD.92.124005",
+      "url": "https://arxiv.org/abs/1506.05813",
+      "evidence": "Exact quadratic density, complete interior metric and pressure, regular-origin mass condition, Israel-Darmois matching to Schwarzschild, causal compactness boundary about 0.27--0.29, and stability criteria."
+    },
+    {
+      "id": "tolman_vii_modes",
+      "title": "The Tolman VII solution, trapped null orbits and w-modes",
+      "authors": "N. Neary, M. Ishak and K. Lake",
+      "identifier": "arXiv:gr-qc/0104002; doi:10.1103/PhysRevD.64.084001",
+      "url": "https://arxiv.org/abs/gr-qc/0104002",
+      "evidence": "Independent perturbative mode analysis on the exact Tolman VII geometry and a causal parameter region."
+    },
+    {
+      "id": "buchdahl_gaseous_original",
+      "title": "General-Relativistic Fluid Spheres",
+      "authors": "H. A. Buchdahl",
+      "identifier": "Astrophysical Journal 147 (1967) 310",
+      "url": "https://adsabs.harvard.edu/pdf/1967ApJ...147..310B",
+      "evidence": "A regular finite gaseous sphere with pressure and density vanishing together at the boundary and closed-form potentials, matter variables and equation of state."
+    },
+    {
+      "id": "buchdahl_gaseous_stability",
+      "title": "The Stability of an Isentropic Model for a Gaseous Relativistic Star",
+      "authors": "P. S. Negi",
+      "identifier": "arXiv:gr-qc/0702005; doi:10.1007/s10714-007-0402-x",
+      "url": "https://arxiv.org/abs/gr-qc/0702005",
+      "evidence": "Reports the isentropic Buchdahl subclass regular, stable and gravitationally bound for 0 < M/R <= 0.20."
+    },
+    {
+      "id": "ell_boson_original",
+      "title": "ell-Boson stars",
+      "authors": "M. Alcubierre et al.",
+      "identifier": "arXiv:1805.11488; doi:10.1088/1361-6382/aadcb6",
+      "url": "https://arxiv.org/abs/1805.11488",
+      "evidence": "Fully nonlinear static spherical EKG definition, rigorous local origin behavior, asymptotic shooting construction, globally regular numerical profiles and finite ADM mass."
+    },
+    {
+      "id": "ell_boson_dynamics",
+      "title": "Dynamical ell-boson stars: generic stability and evidence for non-spherical solutions",
+      "authors": "V. Jaramillo et al.",
+      "identifier": "arXiv:2004.08459; doi:10.1103/PhysRevD.101.124020",
+      "url": "https://arxiv.org/abs/2004.08459",
+      "evidence": "Independent 3D nonlinear evolutions support a stable spherical branch but also find zero-mode evidence, so robustness is not scored as fully closed."
+    },
+    {
+      "id": "ell_boson_existence_nr",
+      "title": "Existence of nonrelativistic ell- and multi-ell-boson stars and their radial stability",
+      "authors": "E. Chávez Nambo and O. Sarbach",
+      "identifier": "arXiv:2605.27529",
+      "url": "https://arxiv.org/abs/2605.27529",
+      "evidence": "Variational existence and orbital stability for the nonrelativistic system; useful benchmark, but not a proof of the relativistic EKG member."
+    },
+    {
+      "id": "boson_star_qft",
+      "title": "Quantum fields in boson star spacetime",
+      "authors": "P. M. Saffin and Q.-X. Xie",
+      "identifier": "arXiv:2601.05129",
+      "url": "https://arxiv.org/abs/2601.05129",
+      "evidence": "Direct spectral quantum-field and renormalized-stress computation on ordinary ell=0 boson-star backgrounds, with coherent-state fluctuations; explicitly generalizable, but not a same-family ell=1 result."
+    },
+    {
+      "id": "proca_evolution",
+      "title": "Numerical evolutions of spherical Proca stars",
+      "authors": "N. Sanchis-Gual et al.",
+      "identifier": "arXiv:1702.04532; doi:10.1103/PhysRevD.95.104028",
+      "url": "https://arxiv.org/abs/1702.04532",
+      "evidence": "Everywhere nonsingular spherical Einstein-Proca equilibria and nonlinear evolution confirming the stable/unstable split at maximum ADM mass."
+    },
+    {
+      "id": "proca_ground_state",
+      "title": "Nonrelativistic Proca stars: Spherical stationary and multi-frequency states",
+      "authors": "E. Chávez Nambo et al.",
+      "identifier": "arXiv:2412.06901",
+      "url": "https://arxiv.org/abs/2412.06901",
+      "evidence": "Analytic ground-state conditions plus numerical spherical solutions in the nonrelativistic theory; useful but not a relativistic proof."
+    },
+    {
+      "id": "oscillaton_tail",
+      "title": "Numerical simulation of oscillatons: extracting the radiating tail",
+      "authors": "P. Grandclément, G. Fodor and P. Forgács",
+      "identifier": "arXiv:1107.2791; doi:10.1103/PhysRevD.84.065037",
+      "url": "https://arxiv.org/abs/1107.2791",
+      "evidence": "High-precision spectral work finds a nonzero standing-wave tail: exact periodic solutions have infinite mass, while finite-mass oscillatons radiate and are only approximately periodic."
+    },
+    {
+      "id": "static_hadamard",
+      "title": "Adiabatic Vacua and Hadamard States for Scalar Quantum Fields on Curved Spacetime",
+      "authors": "W. Junker",
+      "identifier": "arXiv:hep-th/9507097",
+      "url": "https://arxiv.org/abs/hep-th/9507097",
+      "evidence": "Shows ground and KMS states on suitable static globally hyperbolic spacetimes are Hadamard, providing the state-construction route for static candidates."
+    },
+    {
+      "id": "general_hadamard_rset",
+      "title": "Hadamard renormalization of the stress-energy tensor for a quantized scalar field in a general spacetime of arbitrary dimension",
+      "authors": "Y. Décanini and A. Folacci",
+      "identifier": "arXiv:gr-qc/0512118; doi:10.1103/PhysRevD.78.044025",
+      "url": "https://arxiv.org/abs/gr-qc/0512118",
+      "evidence": "General local Hadamard RSET renormalization and ambiguity/counterterm framework."
+    },
+    {
+      "id": "general_noise_kernel",
+      "title": "Noise Kernel in Stochastic Gravity and Stress Energy Bi-Tensor of Quantum Fields in Curved Spacetimes",
+      "authors": "N. G. Phillips and B. L. Hu",
+      "identifier": "arXiv:gr-qc/0010019; doi:10.1103/PhysRevD.63.104001",
+      "url": "https://arxiv.org/abs/gr-qc/0010019",
+      "evidence": "Derives a regularized scalar-field stress-noise kernel for general curved spacetimes."
+    },
+    {
+      "id": "renormalized_fluctuations",
+      "title": "Renormalization of the Quantum Stress Tensor Fluctuations and the Limits of Semiclassical Gravity",
+      "authors": "A. Perez and D. Sudarsky",
+      "identifier": "arXiv:2512.17789; doi:10.1103/jvj4-hk16",
+      "url": "https://arxiv.org/abs/2512.17789",
+      "evidence": "Renormalizes both mean stress and the fluctuation tensor for suitable Hadamard states and supplies a later semiclassicality criterion."
+    }
+  ],
+  "negative_search_findings": [
+    "No primary source found in the bounded queries that computes a full Tolman-VII-specific Hadamard state, RSET and connected noise chain.",
+    "No primary source found in the bounded queries that computes that full chain on Buchdahl's gaseous star.",
+    "The direct 2026 boson-star QFT calculation concerns the ordinary ell=0 family, not the frozen ell=1 family.",
+    "No Proca-star-specific RSET or noise-kernel calculation was found in the bounded queries.",
+    "No oscillaton-specific Hadamard/RSET/noise calculation was found, and exact periodic finite-mass asymptotics are contradicted by the radiating-tail source.",
+    "Search absence is not a claim that the literature does not exist; every affected score was conservatively capped or lowered."
+  ],
+  "candidates": [
+    {
+      "id": "TOLMAN_VII_ISOTROPIC_FLUID_SCALAR_QFT_CONTROL",
+      "scores": {"N": 2, "D": 2, "P": 2, "Q": 1, "B": 2, "V": 2, "R": 2, "F": 2},
+      "member_rule_available": true,
+      "score_reasons": {
+        "N": "mu=1 has a quadratic density falloff to zero and is not constant-density or algebraically equivalent to G2D.",
+        "D": "The exact source supplies the regular origin, full interior, zero-pressure surface, Israel-Darmois Schwarzschild matching and asymptotically flat exterior.",
+        "P": "Closed-form density, mass, metric and pressure reduce the classical duties to analytic/interval identities rather than a branch solve.",
+        "Q": "Static-ground-state Hadamard, general RSET and general noise-kernel results give a credible chain, but no Tolman-VII-specific full computation was found.",
+        "B": "Exact Einstein/TOV/junction identities permit a source-disjoint symbolic/interval replay and an independent w-mode paper supplies external geometry use.",
+        "V": "The exact compactness parameter continuously tends to the Minkowski/zero-source limit with Schwarzschild mass tending to zero.",
+        "R": "The natural-star regime is regular; the source's causal boundary is above beta=0.27 and the frozen beta=0.20 member has explicit margin and reported stability criteria.",
+        "F": "A static spherical closed-form background and one-dimensional quantum modes fit bounded workstation execution."
+      },
+      "member_selection_rule": "Freeze the natural Tolman-VII member mu=1 at exact dimensionless compactness beta=M/r_b=1/5; retain scale freedom for the later SI contract and perform no numerical optimization.",
+      "scientific_identity": "G2F_TOLMAN_VII_NATURAL_BETA_1_5_SCALAR_HADAMARD_V1",
+      "hard_falsifiers": [
+        "density differs from rho_c*(1-(r/r_b)^2) on 0<=r<=r_b",
+        "dimensionless compactness differs from exactly 1/5",
+        "regular-origin limits or m(0)=0 fail",
+        "p(r_b)=0 or induced metric/extrinsic-curvature Schwarzschild matching fails",
+        "the exterior is not Schwarzschild through asymptotically flat infinity",
+        "1-2m(r)/r is nonpositive anywhere in the accepted domain",
+        "rho or p becomes negative, or dp/dr is positive, on the accepted member",
+        "the exact sound-speed enclosure leaves [0,1]",
+        "a globally defined accepted Hadamard state, renormalized mean stress and connected noise definition cannot be constructed on the same geometry",
+        "independent classical and quantum replay cannot be made source/runtime-disjoint"
+      ]
+    },
+    {
+      "id": "BUCHDAHL_GASEOUS_FLUID_SCALAR_QFT_CONTROL",
+      "scores": {"N": 2, "D": 2, "P": 2, "Q": 1, "B": 1, "V": 2, "R": 2, "F": 2},
+      "member_rule_available": true,
+      "score_reasons": {
+        "N": "The density is nonconstant and vanishes with pressure at the boundary.",
+        "D": "The original construction is a regular finite closed-form fluid sphere with a vacuum exterior.",
+        "P": "Closed-form potentials, matter functions and EOS provide an analytic proof route.",
+        "Q": "Only the general static Hadamard/RSET/noise route was found.",
+        "B": "A later stability calculation exists, but no source-disjoint implementation or comparably broad exact audit was found.",
+        "V": "The regular family includes 0<M/R<=0.20 and approaches dispersion/flat space as compactness tends to zero.",
+        "R": "The isentropic subclass is reported regular, stable and bound through M/R=0.20.",
+        "F": "The closed-form static spherical geometry is workstation-feasible."
+      },
+      "member_selection_rule": "If selected, use the original isentropic closed-form subclass at exact M/R=1/5 without optimization.",
+      "rejection_reason": "Eligible but its frozen rank is below Tolman VII because independent benchmark evidence is weaker."
+    },
+    {
+      "id": "GROUND_STATE_ELL1_BOSON_STAR_SCALAR_QFT_CONTROL",
+      "scores": {"N": 2, "D": 2, "P": 1, "Q": 1, "B": 2, "V": 2, "R": 1, "F": 1},
+      "member_rule_available": true,
+      "score_reasons": {
+        "N": "A three-complex-field ell=1 EKG soliton is distinct from every fluid-star identity.",
+        "D": "Primary sources give rigorous local origin behavior, the global shooting domain and asymptotically flat finite-mass solutions.",
+        "P": "A bounded validated-numerics route exists, but full relativistic global existence remains unproved in the construction paper.",
+        "Q": "Direct boson-star RSET/fluctuation machinery exists only for ell=0, so applicability to ell=1 is credible but indirect.",
+        "B": "Independent spherical and 3D evolutions plus a nonrelativistic existence theorem provide strong comparators.",
+        "V": "The field-amplitude branch has the standard zero-amplitude asymptotically flat vacuum limit.",
+        "R": "Stable-branch evidence exists, but observed zero modes and conjectured nonspherical branching prevent full robustness credit.",
+        "F": "Relativistic nonlinear shooting plus interval proof and multi-field QFT require substantial new infrastructure."
+      },
+      "member_selection_rule": "If selected, use the n=0 ell=1 source-tabulated stable-branch member with the lowest listed nonzero central amplitude; no interpolation.",
+      "rejection_reason": "Eligible but lower frozen rank: the relativistic proof and same-family quantum chain are not direct."
+    },
+    {
+      "id": "FUNDAMENTAL_SPHERICAL_PROCA_STAR_SCALAR_QFT_CONTROL",
+      "scores": {"N": 2, "D": 2, "P": 1, "Q": 1, "B": 2, "V": 2, "R": 2, "F": 1},
+      "member_rule_available": true,
+      "score_reasons": {
+        "N": "The Einstein-complex-Proca system is distinct from G2D and the scalar families.",
+        "D": "The relativistic construction/evolution literature supplies regular spherical profiles, finite ADM mass and asymptotic vacuum behavior.",
+        "P": "A numerical proof route is identifiable but no direct relativistic validated-numerics theorem was found.",
+        "Q": "Only the general scalar Hadamard/RSET/noise route was found on Proca-star geometry.",
+        "B": "Nonlinear evolutions independently confirm the equilibrium stability split; nonrelativistic ground-state analysis supplies another comparator.",
+        "V": "The fundamental branch tends continuously to vacuum at vanishing field amplitude.",
+        "R": "Nonlinear evolution confirms a stable branch below maximum ADM mass.",
+        "F": "The nonlinear Einstein-Proca proof and later QFT chain require substantial new infrastructure."
+      },
+      "member_selection_rule": "If selected, use the lowest source-tabulated nonzero-amplitude nodeless member on the stable branch; no interpolation.",
+      "rejection_reason": "Eligible but lower frozen rank: it lacks a direct relativistic proof and family-specific quantum calculation."
+    },
+    {
+      "id": "QUADRATIC_REAL_SCALAR_OSCILLATON_QFT_CONTROL",
+      "scores": {"N": 2, "D": 0, "P": 0, "Q": 1, "B": 2, "V": 1, "R": 0, "F": 1},
+      "member_rule_available": false,
+      "score_reasons": {
+        "N": "The real time-dependent EKG system is distinct from G2D.",
+        "D": "A nonzero radiating tail makes exactly periodic solutions nonlocalized/infinite-mass, while finite-mass solutions are not periodic; the frozen complete-domain requirement is not met.",
+        "P": "There is no bounded proof route for the mutually required exact periodicity and finite asymptotic mass.",
+        "Q": "General time-dependent Hadamard machinery is conceivable, but no oscillaton-specific chain was found.",
+        "B": "High-precision spectral and small-amplitude calculations agree on the nonzero tail.",
+        "V": "A small-amplitude limit exists but changes size and retains an exponentially small radiation issue.",
+        "R": "Physical finite-mass objects continuously radiate and therefore cannot supply the required stationary accepted geometry/state.",
+        "F": "Approximate evolutions are feasible, but they do not satisfy the gate."
+      },
+      "member_selection_rule": null,
+      "rejection_reason": "Ineligible: D=0, P=0, R=0 and no member-selection rule."
+    }
+  ],
+  "expected_decision": {
+    "verdict": "SELECT_ONE",
+    "selected_id": "TOLMAN_VII_ISOTROPIC_FLUID_SCALAR_QFT_CONTROL",
+    "scientific_identity": "G2F_TOLMAN_VII_NATURAL_BETA_1_5_SCALAR_HADAMARD_V1",
+    "rank": [1, 15, 1, 2, 2, 2, 2, 2, 2]
+  },
+  "authority": {
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "lane_execution_authorized": false,
+    "independent_replay_ready": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

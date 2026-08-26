@@ -1,0 +1,353 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.classical_state_grid_contract.v2",
+  "status": "draft_unsealed_representation_and_square_residual_packing_defined_pending_independent_audit_and_remainder_bounds_no_implementation_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "corrected node cardinality, origin parity, positive/vacuum tail variables and canonical coefficient norms",
+    "current_maturity": "replacement representation primitives after v1 invalidation",
+    "target_maturity": "independently audited square state/residual ABI for all four frozen grids and both continuation charts",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "frozen grid integers [64,96,128,256]",
+      "y=r/(1+r), interface r=255 and q=1/r infinity patch",
+      "positive-tail formal-germ contract",
+      "vacuum blow-up chart"
+    ],
+    "required_evidence": [
+      "node-count and endpoint replay",
+      "explicit even/odd origin reconstruction",
+      "canonical DCT prolongation preserving every lower polynomial",
+      "polynomial-weight Banach-algebra fixtures",
+      "exact chart-overlap reconstruction identities",
+      "separate Fredholm-index and square-row audit before packing is sealed"
+    ],
+    "stop_fail_criteria": [
+      "interpreting N as degree rather than node count",
+      "raw DCT zero padding",
+      "raw sigma or p in an exponential analytic tail algebra",
+      "claiming full nonlinear tail analyticity",
+      "a non-square or index-unreviewed residual packing",
+      "candidate evaluation, root creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "sealing the square residual row order",
+      "choosing an approximate inverse",
+      "executing endpoint or continuation proofs",
+      "candidate evaluation",
+      "quantum products or physical claims"
+    ],
+    "downstream_gate_unlocked": "a separate square/Fredholm packing review; implementation remains paused"
+  },
+  "semantic_change_class": "additive_representational_and_numerical_proof_semantics_R2_unchanged",
+  "immutable_predecessors": {
+    "r2": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+      "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "mutated": false
+    },
+    "invalidated_v1": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v1.json",
+      "raw_sha256": "01ace04cfff1e7271921749f060da2a01fc22a4be308c1b26024b3abd18cfa45",
+      "status": "remains invalidated; v2 does not rewrite its evidence"
+    },
+    "positive_tail": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-positive-branch-tail-factorization.v1.json",
+    "vacuum_chart": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-vacuum-blow-up-chart.v1.json"
+  },
+  "grid_cardinality": {
+    "frozen_values": [64, 96, 128, 256],
+    "additive_interpretation": "N is the node count on each patch",
+    "polynomial_degree": "n=N-1",
+    "nodes_per_patch": "N",
+    "coarse_to_fine_predictor_transfer": false,
+    "reason": "the repository lineage consistently calls these quantities node counts; this choice is frozen before any S4 candidate or endpoint evaluation"
+  },
+  "common_patch_geometry": {
+    "scope": "positive-kappa physical-r chart only",
+    "interface": {
+      "r": "255",
+      "y": "255/256",
+      "q": "1/255"
+    },
+    "core": {
+      "parity_coordinate": "u=(r/255)^2=[y/(255*(1-y))]^2 in [0,1]",
+      "chebyshev_coordinate": "x=2*u-1",
+      "spectral_node_order": "j=0 interface through j=n origin",
+      "x_j": "cos(pi*j/n)",
+      "u_j": "(1+cos(pi*j/n))/2",
+      "r_j": "255*sqrt(u_j)",
+      "y_j": "r_j/(1+r_j)",
+      "exact_special_nodes": ["j=0: r=255,y=255/256", "j=n: r=0,y=0"]
+    },
+    "tail": {
+      "coordinate": "q=1/r in [0,1/255]",
+      "chebyshev_coordinate": "x=1-510*q",
+      "spectral_node_order": "j=0 infinity through j=n interface",
+      "x_j": "cos(pi*j/n)",
+      "q_j": "(1-cos(pi*j/n))/510",
+      "exact_special_nodes": ["j=0: q=0 infinity", "j=n: q=1/255 interface"],
+      "finite_wall": false
+    },
+    "node_arithmetic": "pi, cosine and square root use 512-bit directed-outward balls of width at most 2^-400; special endpoints are inserted exactly"
+  },
+  "vacuum_scaled_patch_geometry": {
+    "reason_for_separate_map": "xi=epsilon*r is the nondegenerate vacuum coordinate; reusing a fixed physical-r interface would collapse the core to xi=0 as epsilon approaches zero",
+    "interface": {"xi": "255", "Y": "255/256", "Q": "1/255"},
+    "core": {
+      "parity_coordinate": "v=(xi/255)^2 in [0,1]",
+      "chebyshev_coordinate": "x=2*v-1",
+      "spectral_node_order": "j=0 xi=255 interface through j=n xi=0 origin",
+      "v_j": "(1+cos(pi*j/n))/2",
+      "xi_j": "255*sqrt(v_j)"
+    },
+    "tail": {
+      "coordinate": "Q=1/xi in [0,1/255]",
+      "chebyshev_coordinate": "x=1-510*Q",
+      "spectral_node_order": "j=0 Q=0 scaled infinity through j=n Q=1/255 interface",
+      "Q_j": "(1-cos(pi*j/n))/510",
+      "finite_wall": false
+    },
+    "node_arithmetic": "the same 512-bit outward node policy as the positive chart; special scaled endpoints are inserted exactly"
+  },
+  "positive_kappa_chart": {
+    "domain": "continuation cell ordinals 1 through 1023 after a proved chart overlap",
+    "core_unknowns": {
+      "ordered_even_functions_of_u": ["b", "s", "sigma", "pi_sigma"],
+      "physical_reconstruction": "p(r)=r*pi_sigma(u)",
+      "origin_parity": "b,s,sigma,pi_sigma are even smooth functions of r; p is odd and p(0)=0 identically"
+    },
+    "tail_unknowns": {
+      "ordered_factored_functions_of_q": ["D", "S", "H", "K"],
+      "scalars_after_patch_coefficients": ["omega", "M"],
+      "reconstruction_source": "positive-branch-tail-factorization.v1",
+      "regularity": "C-infinity full functions equal to their formal analytic germs plus C-infinity-flat remainders",
+      "raw_sigma_or_p_stored": false
+    },
+    "state_length": "8*N+2",
+    "packing_status": "component order, canonical coefficient order and exact flat indices are fixed below"
+  },
+  "vacuum_blow_up_chart": {
+    "domain": "continuation cell ordinal 0, eta in [0,1/(5120*delta)] corresponding to lambda in [0,1/1024]",
+    "core_unknowns": {
+      "ordered_even_functions_of_v": ["mu", "L", "U", "Pi"],
+      "physical_reconstruction": ["v=(xi/255)^2", "Mbar(xi)=xi^3*mu(v)", "W(xi)=xi*Pi(v)"],
+      "origin_parity": "L,U,mu,Pi are even; Mbar=O(xi^3), W=O(xi), Mbar(0)=W(0)=0 identically"
+    },
+    "tail_factorization": {
+      "Q": "1/xi",
+      "kappa_bar": "sqrt(-2*Nbar)>0",
+      "beta_bar": "Mbar_infinity*(1+4*eta*Nbar)/kappa_bar-1",
+      "Abar": "exp(-kappa_bar/Q)*Q^(-beta_bar), with C-infinity flat extension zero at Q=0",
+      "ordered_factored_functions": ["Dbar", "Sbar", "Hbar", "Kbar"],
+      "reconstruction": [
+        "Mbar=Mbar_infinity-Abar^2*Q^-2*Dbar",
+        "L=Abar^2*Q^-1*Sbar",
+        "U=Abar*Hbar",
+        "W=Abar*((-kappa_bar+beta_bar*Q)*Hbar-Q^2*Kbar)",
+        "Kbar=dHbar/dQ"
+      ],
+      "scalars_after_patch_coefficients": ["Nbar"],
+      "dependent_mass_observable": "Mbar_infinity=integral_0^infinity xi^2*R(xi)/2 dxi, evaluated as one joint directed enclosure from the same state; it is not an independent state scalar",
+      "regularity": "the exact factored functions are C-infinity formal-germ-plus-flat-remainder objects, not globally analytic claims",
+      "transformed_equations": [
+        "(2*kappa_bar-(2*beta_bar+2)*Q)*Dbar+Q^2*Dbar_Q=Rhat/2",
+        "(2*kappa_bar-(2*beta_bar+1)*Q)*Sbar+Q^2*Sbar_Q=That",
+        "Hbar_Q-Kbar=0",
+        "-(kappa_bar-beta_bar*Q)*Pbar-Q^2*Pbar_Q+(2*Q-2*b_log_xi-eta*L_xi)*Pbar+Qfun*Hbar=0"
+      ],
+      "transformed_definitions": [
+        "Pbar=(-kappa_bar+beta_bar*Q)*Hbar-Q^2*Kbar",
+        "f=1-2*eta*Q*Mbar",
+        "Rhat=exp(2*eta*L)*(1+2*eta*Nbar)*Hbar^2/f+eta*f*Pbar^2+Hbar^2",
+        "That=exp(2*eta*L)*(1+2*eta*Nbar)*Hbar^2/f^2+eta*Pbar^2",
+        "b_log_xi=eta*(Mbar_xi*Q-Mbar*Q^2)/f",
+        "Qfun=(exp(2*eta*L)*(1+2*eta*Nbar)-f)/(eta*f^2), with its frozen eta=0 extension"
+      ],
+      "formal_endpoint_recurrence": {
+        "formal_metric": "f0=1-2*eta*Mbar_infinity*Q, L0=0, Mbar=Mbar_infinity",
+        "parameter_identities": ["kappa_bar^2=-2*Nbar", "beta_bar+1=Mbar_infinity*(1+4*eta*Nbar)/kappa_bar"],
+        "series": ["Hbar=sum h_n*Q^n", "Kbar=sum (n+1)*h_(n+1)*Q^n", "Dbar=sum d_n*Q^n", "Sbar=sum e_n*Q^n"],
+        "scalar_formal_residual": "R_H=-(kappa_bar-beta_bar*Q)*Pbar-Q^2*Pbar_Q+(2*Q+2*eta*Mbar_infinity*Q^2/f0)*Pbar+2*(Nbar+Mbar_infinity*Q)*Hbar/f0^2",
+        "low_orders": "coefficients Q^0 and Q^1 vanish from the two parameter identities",
+        "scalar_rule": "for n>=0, h_(n+1)=-coefficient(Q^(n+2),R_H with h_(n+1)=0 and later h=0)/(2*kappa_bar*(n+1))",
+        "D0": "h_0^2/(2*kappa_bar)",
+        "S0": "h_0^2/(2*kappa_bar)",
+        "remaining_D_and_S": "use the same triangular first-order coefficient extraction from the two displayed transformed equations in increasing order",
+        "full_function_claim": "formal germ only; flat nonlinear terms remain in the directed full-function remainder"
+      }
+    },
+    "state_length": "8*N+1",
+    "packing_status": "component order, canonical coefficient order and exact flat indices are fixed below"
+  },
+  "exact_chart_overlap_map": {
+    "overlap_parameter": "the shared boundary lambda=1/1024, eta=lambda/(5*delta), epsilon=sqrt(eta)",
+    "coordinate": "Q=q/epsilon",
+    "tail_overlap_cover": "Q in [0,1/255], equivalently q in [0,epsilon/255]; this is a strict subset of the positive q-tail and the complete vacuum Q-tail",
+    "interface_rule": "the positive r=255 and vacuum xi=255 patch interfaces are not identified; only the displayed pointwise tail reconstruction map defines chart overlap",
+    "scalar_map": [
+      "omega=sqrt(1+2*eta*Nbar)",
+      "M=epsilon*Mbar_infinity",
+      "kappa=epsilon*kappa_bar",
+      "beta=beta_bar"
+    ],
+    "factored_map": [
+      "H(q)=sqrt(2)*epsilon^(beta+2)*Hbar(Q)",
+      "K(q)=sqrt(2)*epsilon^(beta+1)*Kbar(Q)",
+      "D(q)=epsilon^(2*beta+3)*Dbar(Q)",
+      "S(q)=epsilon^(2*beta+1)*Q*Abar(Q)^(-2)*expm1(epsilon^2*Abar(Q)^2*Q^(-1)*Sbar(Q))"
+    ],
+    "S_endpoint_extension": "S(0)=epsilon^(2*beta+3)*Sbar(0), obtained with expm1(z)/z -> 1",
+    "identity_required": "both charts reconstruct identical balls for m,b,s,sigma,p and their first radial derivatives on the preregistered overlap cover",
+    "definition_is_overlap_proof": false
+  },
+  "canonical_chebyshev_codec": {
+    "nodal_transform": "DCT-I on standard x_j=cos(pi*j/n), j=0..n",
+    "stored_DCT_coefficients": "a_k=(2/n)*(f_0/2+sum_(j=1)^(n-1) f_j*cos(pi*j*k/n)+(-1)^k*f_n/2)",
+    "canonical_polynomial_coefficients": [
+      "c_0=a_0/2",
+      "c_k=a_k for 0<k<n",
+      "c_n=a_n/2"
+    ],
+    "reconstruction": "f(x)=sum_(k=0)^n c_k*T_k(x)",
+    "prolongation": "only canonical c vectors may be zero-padded; stored a vectors may never be zero-padded across degrees",
+    "restriction": "truncate only for manufactured fixtures; scientific coarse grids are independently solved and never initialized from a finer or coarser state"
+  },
+  "coefficient_spaces_and_cross_grid_norms": {
+    "full_function_weight": "w_k=(1+k)^8",
+    "weight_reason": "submultiplicative polynomial weight supports a finite-smoothness Chebyshev convolution algebra without claiming analyticity of flat remainders",
+    "chebyshev_product_identity": "T_m*T_n=(T_(m+n)+T_(abs(m-n)))/2",
+    "multiplication_bound": "the canonical coefficient convolution has operator norm at most 1 from l1_8 times l1_8 to l1_8 because w_(m+n) and w_(abs(m-n)) are each at most w_m*w_n",
+    "basis_derivative_identity": "T_k'=k*U_(k-1); the sum of absolute canonical T coefficients of U_(k-1) is exactly k",
+    "derivative_loss": "for s>=2, norm_(s-2)(d_x f)<=norm_s(f); in particular order 8 maps to 6 with constant 1 and two x derivatives map to order 4 with constant 1",
+    "coordinate_derivative_constants": {
+      "positive_core": "x=2*u-1: d_u has constant 2 from order 8 to 6 and d_u^2 has constant 4 from order 8 to 4",
+      "positive_tail": "x=1-510*q: d_q has constant 510 and d_q^2 has constant 260100 under the same losses",
+      "vacuum_core": "x=2*v-1: d_v has constant 2 and d_v^2 has constant 4 under the same losses",
+      "vacuum_tail": "x=1-510*Q: d_Q has constant 510 and d_Q^2 has constant 260100 under the same losses"
+    },
+    "component_weights": "every stored component and scalar has exact dyadic weight 1",
+    "positive_component_order": ["core_b", "core_s", "core_sigma", "core_pi_sigma", "tail_D", "tail_S", "tail_H", "tail_K", "omega", "M"],
+    "vacuum_component_order": ["core_mu", "core_L", "core_U", "core_Pi", "tail_Dbar", "tail_Sbar", "tail_Hbar", "tail_Kbar", "Nbar"],
+    "norms_in_frozen_order": [
+      {
+        "id": "polynomial_weighted_coefficient_l1_max",
+        "definition": "maximum over function components of sum_k (1+k)^8*abs(delta_c_k), together with absolute scalar defects"
+      },
+      {
+        "id": "chebyshev_supremum_majorant_max",
+        "definition": "maximum over function components of sum_k abs(delta_c_k), together with absolute scalar defects"
+      }
+    ],
+    "comparison": "canonicalize each independently solved grid, zero-pad the lower canonical c vector, subtract, then outward-enclose both norms",
+    "strict_contraction": "for each frozen norm, successive defects strictly decrease and every ratio upper endpoint is <=1/4",
+    "terminal_threshold": "the maximum of both 128-to-256 norms is <=2^-70",
+    "unknown_touching_rule": "an interval touching a strict comparison or with ratio upper endpoint above 1/4 fails"
+  },
+  "domain_cell_evaluation": {
+    "positive_origin_cell": "y in [0,1/256] uses the physical-r core even variables and directed Taylor models in r^2 with explicit remainder",
+    "positive_bulk_cells": "y in [k/256,(k+1)/256], k=1..254, use directed Clenshaw evaluation after exact coordinate conversion",
+    "positive_infinity_cell": "q in [0,1/255] uses the positive factored reconstruction and explicit formal-germ-plus-flat remainder",
+    "vacuum_validation_cover": "the first continuation cell uses the separate scaled Y=xi/(1+xi) core and Q=1/xi tail; it is not falsely projected onto the 256 fixed physical-y post-solve cells",
+    "adaptive_subdivision": false
+  },
+  "square_residual_packing": {
+    "counting_rule": "each of eight first-order patch equations contributes N-1 finite/tau rows; each of the four tail equations contributes one independent q=0 or Q=0 recurrence row; interface reconstruction contributes four rows",
+    "positive_row_order": [
+      "core regularized equations: four origin rows followed by four rows at each remaining core tau/collocation ordinal, total 4*(N-1)",
+      "tail transformed equations at N-1 non-infinity ordinals, total 4*(N-1)",
+      "tail q=0 recurrence rows [D0,S0,K0,scalar_next], total 4",
+      "interface physical [b,s,sigma,p] continuity, total 4",
+      "origin b(0)-1, total 1",
+      "member s(0)*omega-6/5, total 1"
+    ],
+    "positive_origin_regular_rows": [
+      "3*b_u(0)/255^2-rho(0)/2=0 after b(0)=1",
+      "2*s_u(0)/255^2+s(0)*(rho(0)+p_r(0))/2=0",
+      "2*sigma_u(0)/255^2-pi_sigma(0)=0",
+      "3*pi_sigma(0)+(s(0)^2*omega^2-1)*sigma(0)=0"
+    ],
+    "positive_square_count": "4*(N-1)+4*(N-1)+4+4+1+1=8*N+2",
+    "vacuum_row_order": [
+      "core regularized equations: four origin rows followed by four rows at each remaining core tau/collocation ordinal, total 4*(N-1)",
+      "tail transformed equations at N-1 non-infinity ordinals, total 4*(N-1)",
+      "tail Q=0 recurrence rows [Dbar0,Sbar0,Kbar0,scalar_next], total 4",
+      "interface physical [Mbar,L,U,W] continuity, total 4",
+      "desingularized member row, total 1"
+    ],
+    "vacuum_origin_regular_rows": [
+      "3*mu(0)-R(0)/2=0",
+      "2*L_(xi^2)(0)+exp(2*eta*L(0))*(1+2*eta*Nbar)*U(0)^2=0",
+      "2*U_(xi^2)(0)-Pi(0)=0",
+      "3*Pi(0)+Qfun(0)*U(0)=0"
+    ],
+    "vacuum_square_count": "4*(N-1)+4*(N-1)+4+4+1=8*N+1",
+    "independence_note": "b(infinity)=1 and p(infinity)=0 on the positive chart, and Mbar(0)=W(0)=L(infinity)=U(infinity)=0 on the vacuum chart, are built consequences of the factorized representations and are not duplicated as boundary rows",
+    "approximate_inverse_block_structure": null,
+    "implementation_may_add_remove_or_guess_rows": false
+  },
+  "flat_index_codec": {
+    "function_coefficient_order": "component-major; within each component canonical Chebyshev coefficient k=0..N-1",
+    "positive_state": [
+      "core component c, coefficient k: c*N+k for c=0..3",
+      "tail component c, coefficient k: 4*N+c*N+k for c=0..3",
+      "omega: 8*N",
+      "M: 8*N+1"
+    ],
+    "vacuum_state": [
+      "core component c, coefficient k: c*N+k for c=0..3",
+      "tail component c, coefficient k: 4*N+c*N+k for c=0..3",
+      "Nbar: 8*N"
+    ],
+    "row_inner_order": "tau/collocation ordinal first, then the four equation ordinals in the component order",
+    "positive_rows": [
+      "core: [0,4*N-5]",
+      "tail finite: [4*N-4,8*N-9]",
+      "tail recurrence [D0,S0,K0,scalar_next]: [8*N-8,8*N-5]",
+      "interface [b,s,sigma,p]: [8*N-4,8*N-1]",
+      "origin b: 8*N",
+      "member: 8*N+1"
+    ],
+    "vacuum_rows": [
+      "core: [0,4*N-5]",
+      "tail finite: [4*N-4,8*N-9]",
+      "tail recurrence [Dbar0,Sbar0,Kbar0,scalar_next]: [8*N-8,8*N-5]",
+      "interface [Mbar,L,U,W]: [8*N-4,8*N-1]",
+      "member: 8*N"
+    ],
+    "empty_or_overlap_rule": "any empty, overlapping, out-of-range or non-covering range is a definition-audit FAIL"
+  },
+  "readiness": {
+    "N_node_count_complete": true,
+    "node_maps_complete": true,
+    "origin_parity_complete": true,
+    "positive_component_order_complete": true,
+    "vacuum_component_order_complete": true,
+    "canonical_coefficient_codec_complete": true,
+    "cross_grid_norms_complete": true,
+    "coefficient_algebra_and_derivative_constants_complete": true,
+    "chart_overlap_map_complete": true,
+    "square_residual_packing_complete": true,
+    "internal_Fredholm_count_audit_complete": true,
+    "flat_remainder_bounds_complete": false,
+    "independent_definition_audit_complete": false,
+    "sealed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "fixture_boundary": {
+    "allowed": ["exact node endpoints", "manufactured even/odd functions", "DCT polynomial preservation", "polynomial-weight convolution", "symbolic chart-map identities", "counting and corruption failures"],
+    "forbidden": ["endpoint solve", "positive-parameter sample", "selected-member evaluation", "candidate-root creation", "using fixture output as proof authority"]
+  },
+  "authority": {
+    "definition_is_proof": false,
+    "fixture_is_candidate_evaluation": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

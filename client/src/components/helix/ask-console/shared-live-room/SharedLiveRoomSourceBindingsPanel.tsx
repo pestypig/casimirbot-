@@ -562,6 +562,54 @@ export function SharedLiveRoomSourceBindingsPanel({
     }
   };
 
+  const pairLocalServer = async (
+    binding: HelixRoomSourceBinding,
+  ): Promise<void> => {
+    const sourceAdapter =
+      MINECRAFT_SOURCE_ADAPTERS.find(
+        (adapter) => adapter.id === binding.domain_adapter,
+      ) ?? MINECRAFT_SOURCE_ADAPTERS[0];
+    const action = `pairing-local-server:${binding.binding_id}`;
+    setBusy(action);
+    setMessage(null);
+    setPairingCommand(null);
+    setPairingCode(null);
+    setPairingExpiresAt(null);
+    setPairingCopyState("idle");
+    try {
+      const response = await fetch(`${pairingPath}/local-server-handoff`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `browser-local-server-pairing:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({
+          purpose: "rotate",
+          binding_id: binding.binding_id,
+          command_credential_requested: true,
+          action_credential_requested: false,
+          domain_adapter: sourceAdapter.id,
+          source_label: binding.source_label ?? sourceAdapter.sourceLabel,
+        }),
+      });
+      const created = await readPairingReceipt(response);
+      setMessage(
+        created.message ??
+          "Local server command access was staged without exposing the one-time code.",
+      );
+      await load();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not stage local server command access.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const revokePairing = async (
     pairing: HelixConnectorPairing,
   ): Promise<void> => {
@@ -928,6 +976,12 @@ export function SharedLiveRoomSourceBindingsPanel({
                     <p className="mt-0.5 text-[9px] text-slate-500">
                       {environment.capability_ids.length} admitted read capabilities
                     </p>
+                    <p
+                      className="mt-0.5 break-all font-mono text-[9px] text-slate-500"
+                      title="Exact bound world identity"
+                    >
+                      Bound world: {environment.world_id}
+                    </p>
                   </div>
                   {environment.self_subject_binding ? (
                     <span className={`rounded px-1.5 py-0.5 text-[9px] ${
@@ -1011,6 +1065,18 @@ export function SharedLiveRoomSourceBindingsPanel({
                         ? "The connector session changed. Choose the online player again before environment tools can act for you."
                         : "Only a safe display name and presence are shown here. The game identity and connector credential remain server-side."}
                     </p>
+                    {directory.freshness === "fresh" &&
+                    directory.subjects.length === 0 ? (
+                      <p
+                        role="status"
+                        className="mt-1 rounded border border-amber-300/25 bg-amber-400/10 p-1.5 text-[9px] text-amber-100"
+                      >
+                        The connector is online, but no player is present in this
+                        exact bound world. Do not pair Player Embodiment or run
+                        player actions until the intended client joins and its
+                        identity appears here.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -1182,6 +1248,23 @@ export function SharedLiveRoomSourceBindingsPanel({
                           >
                             <KeyRound className="h-2.5 w-2.5" />
                             Pair command access in game
+                          </button>
+                        ) : null}
+                        {authority?.status === "active" ? (
+                          <button
+                            type="button"
+                            disabled={
+                              authorityBusy || busy !== null || !sourceBinding
+                            }
+                            className="inline-flex items-center gap-1 rounded border border-emerald-300/30 px-2 py-1 text-[9px] font-semibold text-emerald-100 disabled:opacity-50"
+                            onClick={() =>
+                              sourceBinding
+                                ? void pairLocalServer(sourceBinding)
+                                : undefined
+                            }
+                          >
+                            <KeyRound className="h-2.5 w-2.5" />
+                            Pair local server privately
                           </button>
                         ) : null}
                         {authority?.status === "active" ? (

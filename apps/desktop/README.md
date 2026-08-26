@@ -61,6 +61,45 @@ and the OpenAI MCP tunnel:
   exposes only owner-scoped, read-only Device Check to a supported external
   OpenAI surface. It is not the full Helix Ask runtime.
 
+### Convergence target
+
+The product target is one installed CasimirBot node with two primary views of
+the same governed work:
+
+- the packaged CasimirBot UI uses the private local API and event stream; and
+- Codex or another authorized reasoning client uses the node's MCP facade.
+
+The EXE is the signed host and service supervisor, not the MCP tool by itself.
+Both surfaces must resolve the same durable `run_id`, lifecycle facts,
+observations, evidence references, cancellation state, serialized execution
+lease, and terminal product. They may not create separate answer writers or
+competing mutation paths. Hidden reasoning remains private to the reasoning
+client; shared lifecycle events and supported products remain inspectable.
+
+This is not the current alpha claim. Today the packaged tunnel exposes only
+Device Check, while the opaque repository launcher owns provider-keyed live
+testing. A future delivery packet must add native provider enrollment,
+full governed catalog publication, managed MCP reconnect/catalog refresh, and
+cross-surface run projection before the packaged app can claim complete parity.
+
+Keep these authorization classes separate during that convergence:
+
+1. model-provider authorization belongs to the native CasimirBot provider
+   broker and is never copied into Codex MCP configuration;
+2. MCP client authorization is a short-lived, least-scope OAuth/PKCE or device
+   grant to CasimirBot and cannot become provider authority; and
+3. environment credentials remain inside their exact connector or provider
+   adapter and never enter model-visible observations.
+
+Normal users must not edit `start-myapp-for-codex`, a replacement command file,
+or process arguments to supply keys. The production analogue is a signed
+native bootstrap that reads OS-protected credentials, starts exactly one
+private service, passes only ephemeral secret handles to bounded children, and
+supports enrollment, validation, revocation, rotation, crash recovery, and
+sanitized health reporting. Headless deployments may use an approved secret
+store reference, never a raw key in argv, logs, chat, MCP results, debug
+exports, or repository configuration.
+
 Minecraft Fabric loopback launch and join is intentionally identical in the
 localhost browser and packaged EXE. Their shared lifecycle card calls the same
 server executor and emits the same

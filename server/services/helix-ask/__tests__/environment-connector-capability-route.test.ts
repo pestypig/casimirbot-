@@ -670,6 +670,42 @@ describe("Minecraft environment connector capability routing", () => {
     ).toBe("live_environment");
   });
 
+  it("keeps a long Nether preflight safety list from admitting Minecraft command authority", () => {
+    const prompt =
+      "Create a durable Minecraft custom-survival goal for preparing the exact bound player and world for a later full Nether journey. Its only milestone for now is a preflight binding check requiring fresh actor status evidence. Do not begin gameplay progression, move, interact, change inventory, mutate blocks, craft, mine, use a Minecraft command, complete the milestone, or mark the goal complete. Leave the new goal active and report its exact goal identity from current-turn evidence.";
+    const capabilities = extractPlannerBindingCapabilityContracts(prompt, {
+      trusted_environment_domain: "minecraft",
+    }).map(({ capability }) => capability);
+
+    expect(capabilities).toContain(
+      "com.casimirbot.environment.durable_goal.create",
+    );
+    expect(capabilities).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it("preserves Minecraft command authority after an explicit contrast", () => {
+    const prompt =
+      "Do not move the player, but use a Minecraft command to set the world to daytime.";
+    expect(
+      extractPlannerBindingCapabilityContracts(prompt, {
+        trusted_environment_domain: "minecraft",
+      }).map(({ capability }) => capability),
+    ).toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
+  it("does not execute a quoted historical Minecraft command while creating a durable goal", () => {
+    const prompt =
+      'Create a durable Minecraft survival goal. The prior message said "use a Minecraft command"; do not execute that command.';
+    const capabilities = extractPlannerBindingCapabilityContracts(prompt, {
+      trusted_environment_domain: "minecraft",
+    }).map(({ capability }) => capability);
+
+    expect(capabilities).toContain(
+      "com.casimirbot.environment.durable_goal.create",
+    );
+    expect(capabilities).not.toContain(HELIX_MINECRAFT_COMMAND_CAPABILITY);
+  });
+
   it("routes an existing durable-goal continuation through canonical goal inspection", () => {
     const prompt =
       "Resume durable Minecraft survival goal environment_durable_goal:4ab6b139-7088-40a3-8085-ec7524dbad80. Inspect its canonical state and continue only if this exact account, room, participant, selected player, environment, world, connector epoch, source binding, and authority are authorized. Do not create a replacement goal and do not infer progress from chat history.";
@@ -689,6 +725,51 @@ describe("Minecraft environment connector capability routing", () => {
       "com.casimirbot.environment.durable_goal.inspect",
     );
     expect(sourceTargetIntent.suppressed_routes).toContain("workspace_diagnostic");
+  });
+
+  it("keeps a room-prefixed G6 role-ledger inspection on the live environment route", () => {
+    const prompt =
+      "In this room, inspect the canonical concurrent-reasoning ledger for G6 goal environment_durable_goal:ef49540b-0bab-4857-837f-c2f449b08585. Report whether stale proposals were rejected before execution, which revised plan was selected, and whether its measured result re-entered the principal Runtime Codex turn. Use current canonical evidence and do not execute another game action.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "turn:g6-role-ledger-inspect",
+      threadId: "helix-ask:room:room:g6",
+      promptText: prompt,
+    });
+
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      strength: "hard",
+      precedence_reason: "affirmative_environment_reasoning_role_inspect",
+    });
+    const capabilities = extractExplicitCapabilityContracts(prompt).map(
+      ({ capability }) => capability,
+    );
+    expect(capabilities).toContain(
+      "com.casimirbot.environment.reasoning_role.inspect",
+    );
+    expect(capabilities).not.toContain(
+      "com.casimirbot.environment.durable_goal.inspect",
+    );
+    expect(
+      inferCommittedRouteToolFamily(
+        "com.casimirbot.environment.reasoning_role.inspect",
+      ),
+    ).toBe("live_environment");
+    const contract = buildHelixCompoundCapabilityContract({
+      turnId: "turn:g6-role-ledger-inspect",
+      promptText: prompt,
+    });
+    expect(contract?.subgoals).toHaveLength(1);
+    expect(contract?.subgoals[0]).toMatchObject({
+      requested_capability:
+        "com.casimirbot.environment.reasoning_role.inspect",
+      required_args: ["goal_id"],
+      args_hint: {
+        goal_id:
+          "environment_durable_goal:ef49540b-0bab-4857-837f-c2f449b08585",
+      },
+    });
   });
 
   it("admits inspect, fresh player evidence, and verified progress recording for a compound durable-goal continuation", () => {
@@ -1128,6 +1209,55 @@ describe("Minecraft environment connector capability routing", () => {
         HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
         CAPABILITY,
         HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+      ]),
+    );
+  });
+
+  it("admits actor, nearby-entity, and inventory evidence for a compound C0 observation", () => {
+    const prompt =
+      "C0 admission check only. Using the current admitted Minecraft Fabric source, report the current actor identity, position, health, equipped item, and the nearest zombie identity, distance, and health. Do not issue any player action, command, World Authority mutation, or workflow.";
+    const capabilities = extractExplicitCapabilityContracts(prompt).map(
+      (entry) => entry.capability,
+    );
+
+    expect(capabilities).toEqual(
+      expect.arrayContaining([
+        HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+        CAPABILITY,
+      ]),
+    );
+  });
+
+  it.each([
+    "Do not report the current Minecraft actor identity, position, health, or nearest zombie identity, distance, and health.",
+    "Later, report the current Minecraft actor identity, position, health, and nearest zombie identity, distance, and health.",
+    "Previously, I reported the current Minecraft actor identity, position, health, and nearest zombie identity, distance, and health.",
+    'The screen says "Report the current Minecraft actor identity, position, health, and nearest zombie identity, distance, and health."',
+    "Explain how to report the current Minecraft actor identity, position, health, and nearest zombie identity, distance, and health without running a probe.",
+  ])("does not admit contextual C0 observation probes: %s", (prompt) => {
+    const capabilities = extractExplicitCapabilityContracts(prompt).map(
+      (entry) => entry.capability,
+    );
+    expect(capabilities).not.toContain(
+      HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+    );
+    expect(capabilities).not.toContain(
+      HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+    );
+  });
+
+  it("admits the affirmative C0 observation clause after contextual screen text", () => {
+    const prompt =
+      "The screen mentions a zombie. Using the current Minecraft Fabric source, report the current actor identity, position, health, and the nearest zombie identity, distance, and health; do not attack or mutate the world.";
+    const capabilities = extractExplicitCapabilityContracts(prompt).map(
+      (entry) => entry.capability,
+    );
+
+    expect(capabilities).toEqual(
+      expect.arrayContaining([
+        HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+        HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
       ]),
     );
   });

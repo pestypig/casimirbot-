@@ -937,6 +937,41 @@ export const attachRobinhoodConnectionToPrivateRoom = async (input: {
     return projectRoomBinding({ row: result.rows[0], privateRoom: true });
   });
 
+export const revokeRobinhoodPrivateRoomBinding = async (input: {
+  ownerProfileId: string;
+  connectionId: string;
+  roomId: string;
+}): Promise<void> => {
+  await withSharedRealtimeRoomTransaction(async (client) => {
+    const { rows } = await client.query<{ binding_id: string }>(
+      `
+        SELECT binding_id
+        FROM helix_brokerage_room_bindings
+        WHERE connection_id = $1 AND owner_profile_id = $2 AND room_id = $3
+          AND status <> 'revoked'
+        FOR UPDATE;
+      `,
+      [input.connectionId, input.ownerProfileId, input.roomId],
+    );
+    if (!rows[0]) {
+      throw new RobinhoodConnectionError(
+        "brokerage_room_binding_not_found",
+        404,
+        "The active Robinhood room grant was not found.",
+      );
+    }
+    const now = new Date().toISOString();
+    await client.query(
+      `
+        UPDATE helix_brokerage_room_bindings
+        SET status = 'revoked', revoked_at = $2, updated_at = $2
+        WHERE binding_id = $1;
+      `,
+      [rows[0].binding_id, now],
+    );
+  });
+};
+
 export const listPrivateRoomRobinhoodBindings = async (input: {
   ownerProfileId: string;
   roomId: string;

@@ -1,0 +1,304 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.analytic_seed_contract.v1",
+  "status": "draft_unsealed_complete_mathematical_predictor_definition_pending_independent_audit_no_candidate_implementation_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "one preregistered Newtonian-to-areal analytic predictor shared by all classical grids",
+    "current_maturity": "draft additive numerical-proof definition",
+    "target_maturity": "independently audited deterministic predictor definition",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "M5-R1 independent admission raw SHA-256 41b1fcd261f17b722197ccfd3bcc2e116c1941194c63c52712a28d7f5cd80d83",
+      "B1-R2 persisted initializer payload inventory",
+      "continuation shat_0(lambda)=1+lambda/5"
+    ],
+    "required_evidence": [
+      "all inherited payload bytes rehashed",
+      "IEEE-754 words interpreted as exact dyadics",
+      "normalization and coordinate-map derivation replayed",
+      "exact lambda=0 Minkowski fixture",
+      "no selected-member or positive-lambda evaluation"
+    ],
+    "stop_fail_criteria": [
+      "any inherited hash or byte count differs",
+      "nonfinite or negative-zero inherited word",
+      "nu0_minus_Vc is not strictly positive",
+      "areal coordinate Jacobian is not strictly positive at any requested finite seed point",
+      "candidate-derived tuning or alternate predictor",
+      "candidate evaluation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "proof that the predictor satisfies EKG",
+      "proof of Newton convergence",
+      "candidate evaluation",
+      "validated nonlinear map",
+      "radii polynomial",
+      "continuation proof",
+      "quantum products",
+      "physical claims"
+    ],
+    "downstream_gate_unlocked": "analytic-seed portion of the additive S4 proof definition"
+  },
+  "immutable_predecessor": {
+    "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+    "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+    "mutated": false
+  },
+  "admitted_seed_lineage": {
+    "m5_r1_independent_admission": {
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-m5-r1-independent-admission-v1.json",
+      "raw_sha256": "41b1fcd261f17b722197ccfd3bcc2e116c1941194c63c52712a28d7f5cd80d83",
+      "size_bytes": 12888,
+      "decision": "INDEPENDENT_CORE_DUTY_PASS",
+      "selected_mode_count": 128,
+      "candidate_solve": false
+    },
+    "b1_r1_materialization": {
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/receipt.json",
+      "raw_sha256": "7cd812092220aeae46a2757fa8a856ed723fa62b76c5e1a693ef896fcdf48d26",
+      "size_bytes": 9667,
+      "receipt_self_sha256": "5d8d66da56daf03d530cd9e3ddcb618549b39a883ebca0c16140fd471451781a",
+      "candidate_solve": false,
+      "persistence": false
+    },
+    "b1_r2_persistence": {
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/persistence-receipt.json",
+      "raw_sha256": "b4d585e834782e173e1a3d96118eb5756c728f509739ac5e126b72c895399424",
+      "size_bytes": 2092,
+      "receipt_self_sha256": "207922166d28f02c44da29a115f439d6e4185d8f48681c8416e0d53bd1ccdf5c",
+      "status": "PASS",
+      "candidate_solve": false
+    },
+    "lineage_limit": "these receipts authenticate one finite binary64 Newtonian predictor payload; they do not establish an exact Schroedinger-Poisson root, a relativistic EKG root, or proof authority"
+  },
+  "ordered_payload_bindings": [
+    {
+      "ordinal": 0,
+      "role": "scalars",
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/scalars.f64le",
+      "size_bytes": 72,
+      "raw_sha256": "da88f738edbcc722b83a1c780fff4c32316f7e6145445b883ef28e31d2793fc1",
+      "word_order": ["nu0", "Vc", "N0", "C", "kappa", "tail_power", "legacy_scale", "legacy_nu_star", "legacy_w_seed"]
+    },
+    {
+      "ordinal": 1,
+      "role": "core_u_chebyshev_coefficients",
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/coefficients/core_L2_u.f64le",
+      "size_bytes": 1024,
+      "raw_sha256": "0a943efd5b010baaa899bc323f4c1490bf2c2c7359e3b5328995b48739e983fb",
+      "word_count": 128
+    },
+    {
+      "ordinal": 2,
+      "role": "core_V_chebyshev_coefficients",
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/coefficients/core_L2_V.f64le",
+      "size_bytes": 1024,
+      "raw_sha256": "ff766c6893e58d9f3f130bf1806bdef2e0ef284f676d426e297e149fa76d544c",
+      "word_count": 128
+    },
+    {
+      "ordinal": 3,
+      "role": "tail_H_correction_coefficients",
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/coefficients/tail_H.f64le",
+      "size_bytes": 256,
+      "raw_sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+      "word_count": 32,
+      "every_word": "positive_zero"
+    },
+    {
+      "ordinal": 4,
+      "role": "tail_Q_correction_coefficients",
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/coefficients/tail_Q.f64le",
+      "size_bytes": 256,
+      "raw_sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+      "word_count": 32,
+      "every_word": "positive_zero"
+    },
+    {
+      "ordinal": 5,
+      "role": "legacy_join_barrier_diagnostic_only",
+      "path": "artifacts/nhm2-spherical-boson-star-v2-g2/g2b-b1-r1-initializer-v1/initializer/core_L2_join_barrier.f64le",
+      "size_bytes": 32,
+      "raw_sha256": "23f5fe0948668e598b5f1c469c7b987bc3fc08f94a122419b470202a406677b9",
+      "word_order": ["legacy_U", "legacy_U1", "legacy_V", "legacy_V1"],
+      "seed_evaluator_authority": false
+    }
+  ],
+  "binary_word_semantics": {
+    "encoding": "IEEE-754 binary64 little-endian",
+    "interpretation": "each finite payload word is decoded once as its exact dyadic rational; no host binary64 arithmetic occurs after decoding",
+    "normal_word": "(-1)^sign*(2^52+fraction)*2^(biased_exponent-1075)",
+    "subnormal_word": "(-1)^sign*fraction*2^-1074",
+    "positive_zero": "exact integer 0",
+    "rejected": ["negative_zero", "positive_infinity", "negative_infinity", "NaN", "short_read", "trailing_byte", "hash_mismatch"],
+    "transcendentals_and_square_roots": "512-bit directed-outward real balls",
+    "payload_words_are_not_reinterpreted_as_accuracy_claims": true
+  },
+  "base_profile": {
+    "dimensionless_radius": "z>=0",
+    "core": {
+      "interval": "0<=z<=32",
+      "rho": "z/(1+z)",
+      "t": "2*rho-1",
+      "u0": "sum_(n=0)^127 u_n*T_n(t)",
+      "V0": "sum_(n=0)^127 V_n*T_n(t)",
+      "chebyshev_recurrence": "T_0=1; T_1=t; T_(n+1)=2*t*T_n-T_(n-1), increasing n",
+      "endpoint_halves": false,
+      "derivatives": "differentiate the same recurrence in increasing n and apply d_rho/dz=(1+z)^-2"
+    },
+    "tail": {
+      "interval": "z>=32",
+      "eta": "32/z",
+      "B": "exp(-kappa*(z-32)+tail_power*log(z/32))",
+      "E": "B^2 from the same B ball",
+      "C1_lift_inputs": "U,U1,V,V1 are recomputed at z=32 from the exact-dyadic core coefficient words, not copied from the rounded legacy join barrier",
+      "H_1": "U",
+      "H_eta_1": "(-32*kappa+tail_power)*U-32*U1",
+      "Q_1": "V+C/32",
+      "Q_eta_1": "(-64*kappa+2*tail_power)*Q_1+C/32-32*V1",
+      "H": "H_1+H_eta_1*(eta-1)+(1-eta)^2*sum_(n=0)^31 h_n*T_n(2*eta-1)",
+      "Q": "Q_1+Q_eta_1*(eta-1)+(1-eta)^2*sum_(n=0)^31 q_n*T_n(2*eta-1)",
+      "u0": "B*H",
+      "V0": "-C/z+E*Q",
+      "infinity": "u0(infinity)=0 and V0(infinity)=0 by analytic endpoint extension",
+      "join_rule": "the derived S4 base profile is C1 at z=32 by construction; legacy join words are retained only for corruption and rounding-lineage diagnostics"
+    },
+    "scalar_use": {
+      "used_exact_dyadics": ["nu0", "Vc", "C", "kappa", "tail_power"],
+      "bound_but_not_used": ["N0", "legacy_scale", "legacy_nu_star", "legacy_w_seed"],
+      "required_signs": ["nu0<0", "Vc<nu0", "C>0", "kappa>0"],
+      "predictor_only": true
+    }
+  },
+  "continuation_scale": {
+    "r2_parameter": "lambda in [0,1]",
+    "r2_member_coordinate": "shat_0(lambda)=1+lambda/5",
+    "delta": "nu0-Vc",
+    "a_squared": "lambda/(5*delta)",
+    "a": "sqrt(a_squared)",
+    "scaled_isotropic_radius": "z=a*x",
+    "u_a": "a^2*u0(z)",
+    "u_a_prime_x": "a^3*u0_prime(z)",
+    "V_a": "a^2*V0(z)",
+    "V_a_prime_x": "a^3*V0_prime(z)",
+    "nu_a": "a^2*nu0",
+    "omega": "sqrt(1+2*nu_a)",
+    "motivation_not_acceptance_equation": "shat_0-1=a^2*(nu0-Vc)+O(a^4)=lambda/5+O(lambda^2)",
+    "exact_member_condition_claimed_for_seed": false,
+    "retuning_or_root_solving_for_a": false,
+    "lambda_zero_branch": "define a=0 and use the exact Minkowski/zero-field seed without evaluating any 0/0 expression"
+  },
+  "isotropic_to_r2_areal_map": {
+    "old_metric_predictor": "ds^2=-exp(2*V_a(x))*dt^2+exp(-2*V_a(x))*(dx^2+x^2*dOmega^2)",
+    "field_normalization": "old complex varphi=sqrt(8*pi*G)*Phi; R2 has Phi=(phi_0r+i*phi_0i)/sqrt(2), mbar_P=1 gives G=1/(8*pi), hence sigma=sqrt(2)*varphi",
+    "areal_radius": "r=x*exp(-V_a(x))",
+    "coordinate_jacobian": "dr/dx=exp(-V_a(x))*(1-x*V_a_prime_x(x))",
+    "finite_r_inverse": "x is the unique nonnegative root of r=x*exp(-V_a(x)); uniqueness is conditional on a strict directed proof that 1-x*V_a_prime_x(x)>0 over the requested bracket",
+    "alpha": "exp(V_a(x))",
+    "b": "1/(1-x*V_a_prime_x(x))",
+    "s": "(1-x*V_a_prime_x(x))*exp(-V_a(x))",
+    "sigma": "sqrt(2)*u_a(x)",
+    "p": "sqrt(2)*exp(V_a(x))*u_a_prime_x(x)/(1-x*V_a_prime_x(x))",
+    "omega": "sqrt(1+2*a^2*nu0)",
+    "infinity": ["b=1", "s=1", "sigma=0", "p=0"],
+    "origin": ["b=1", "p=0"],
+    "map_authority": "deterministic initial guess only; the validated EKG solver must resolve every field and omega independently"
+  },
+  "finite_radius_inverse_algorithm": {
+    "status": "mathematical_result_and_acceptance_complete_disjoint_producer_realizations_bind_at_implementation_gate",
+    "vacuum": "at lambda=0 return x=r exactly",
+    "origin": "at every lambda return x=0 exactly when r=0",
+    "infinity": "at q=1/r=0 use the analytic infinity seed directly and do not invert a finite number",
+    "finite_positive_radius": {
+      "function": "F_(lambda,r)(x)=x*exp(-V_a(x))-r",
+      "initial_bracket": "x in [0,r]",
+      "left_sign": "F(0)=-r<0",
+      "right_sign_obligation": "prove V_a(r)<=0, hence F(r)=r*(exp(-V_a(r))-1)>=0",
+      "uniqueness_obligation": "prove dF/dx=exp(-V_a(x))*(1-x*V_a_prime_x(x))>0 over [0,r]",
+      "mathematical_result": "the unique x in [0,r] with F_(lambda,r)(x)=0"
+    },
+    "global_seed_map_admissibility": {
+      "scaled_form": [
+        "V0(z)<=0 for every z>=0",
+        "J_a(z)=1-a^2*z*V0_prime(z)>0 for every z>=0",
+        "1+2*a^2*nu0>0"
+      ],
+      "cover": "origin, 254 bulk and infinity cells inherited from the fixed R2 256-cell domain partition",
+      "arithmetic": "512-bit directed-outward real balls with explicit origin and infinity limits",
+      "failure": "the seed is inadmissible and the enclosing solve fails before Newton; no alternate map, scale, seed or coordinate is allowed"
+    },
+    "output_enclosure": {
+      "required": true,
+      "contains_unique_mathematical_root": true,
+      "normalized_width": "diameter(x_ball)/(1+abs(midpoint(x_ball)))<=2^-400",
+      "point_value_export": false,
+      "downstream_use": "evaluate b,s,sigma,p through the same dependent x ball so correlations are not discarded"
+    },
+    "implementation_disjointness": {
+      "shared": "only this mathematical root and acceptance definition",
+      "primary_cpp": "a separately hash-bound Arb realization and fixed work budget",
+      "independent_rust": "a separately hash-bound pure-Rust realization and fixed work budget",
+      "bitwise_equal_intermediate_algorithm_required": false,
+      "joint_enclosure_and_same_mathematical_root_required": true
+    },
+    "alternate_coordinate_map_allowed": false
+  },
+  "grid_use": {
+    "rule": "for each frozen N, sample this same analytic predictor independently at that grid's areal nodes",
+    "coarse_to_fine_seed_transfer": false,
+    "candidate_or_prior_grid_values_may_change_seed": false,
+    "seed_values_are_not_proof_records": true,
+    "newton_solver_must_resolve": ["b", "s", "sigma", "p", "omega"],
+    "failure_of_any_grid": "terminal fail under R2 failure precedence; no alternate seed, damping schedule, grid, or parameter map"
+  },
+  "fixture_boundary": {
+    "allowed": [
+      "payload hash and byte-count replay",
+      "exact-dyadic codec accept/reject cases",
+      "base-profile algebra on manufactured coefficients",
+      "symbolic normalization identities",
+      "exact lambda=0 Minkowski seed",
+      "corruption and chronology failures"
+    ],
+    "forbidden": [
+      "evaluation at any positive R2 continuation lambda",
+      "evaluation of the selected member",
+      "creation of a candidate root",
+      "using fixture output to alter this definition"
+    ]
+  },
+  "open_definition_items": [
+    "independent audit of the two-patch N interpretation before this seed is sampled on it",
+    "separate fixed work budgets and operation orders for the future disjoint C++ and Rust inverse realizations",
+    "validated nonlinear map, approximate inverse, radii bounds and continuation overlap/orientation definitions"
+  ],
+  "authority": {
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "implementation_authorized": false,
+    "execution_authorized": false,
+    "proof_authority": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  },
+  "sources": [
+    {
+      "url": "https://arxiv.org/abs/2601.05129",
+      "use": "R2 two-real-field normalization, areal metric gauge, lapse and boundary conventions"
+    },
+    {
+      "path": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed.v1.ts",
+      "use": "Schroedinger-Poisson scaling and inherited isotropic relativistic initializer map"
+    },
+    {
+      "path": "shared/contracts/nhm2-spherical-boson-star-newtonian-seed-operation-policy.v1.ts",
+      "use": "core Chebyshev and C1 Coulomb-exponential tail semantics"
+    }
+  ]
+}

@@ -18,9 +18,11 @@ public final class HelixFabricSensorMod implements ModInitializer {
     private final AtomicBoolean connectorOperation = new AtomicBoolean(false);
     private volatile FabricConnectorRuntime runtime;
     private volatile MinecraftServer server;
+    private long pairingInboxPollTick;
 
     @Override
     public void onInitialize() {
+        HelixClientPerceptionNetworking.register();
         FabricConnectorCommands.register(this);
         FabricGameplayCommands.register();
         ServerLifecycleEvents.SERVER_STARTED.register(startedServer -> {
@@ -31,8 +33,10 @@ public final class HelixFabricSensorMod implements ModInitializer {
             FabricConnectorRuntime current = runtime;
             if (current != null) current.tick(tickingServer);
             FabricGameplayCommands.tick(tickingServer);
+            pollLocalPairingInbox(tickingServer);
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(stoppingServer -> {
+            FabricClientPerceptionBridge.clearAll();
             FabricGameplayCommands.clear(stoppingServer);
             FabricConnectorRuntime current = runtime;
             if (current != null) current.close();
@@ -57,6 +61,27 @@ public final class HelixFabricSensorMod implements ModInitializer {
         );
         runtime = replacement;
         replacement.start(activeServer);
+    }
+
+    private void pollLocalPairingInbox(MinecraftServer activeServer) {
+        pairingInboxPollTick++;
+        if (pairingInboxPollTick % 20L != 0L || connectorOperation.get()) return;
+        try {
+            FabricServerPairingInbox.PollResult result =
+                FabricServerPairingInbox.consumeDefault(System.currentTimeMillis());
+            if (result.code() != null) {
+                pairAsync(activeServer.createCommandSourceStack(), result.code());
+            } else if (!result.failureCode().isBlank()) {
+                LOGGER.warning(
+                    "The local Helix server pairing inbox was rejected: " +
+                    result.failureCode()
+                );
+            }
+        } catch (java.io.IOException error) {
+            LOGGER.warning(
+                "The local Helix server pairing inbox could not be consumed."
+            );
+        }
     }
 
     void pairAsync(CommandSourceStack source, String code) {

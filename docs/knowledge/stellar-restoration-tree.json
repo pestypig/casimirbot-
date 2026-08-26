@@ -699,8 +699,8 @@
       "id": "deep-mixing-plan",
       "slug": "deep-mixing-plan",
       "title": "Deep Mixing Plan",
-      "excerpt": "Tachocline circulation plan for extending solar lifetime.",
-      "bodyMD": "Deep mixing plan describes slow tachocline circulation and guardrails used to extend the Sun's main-sequence lifetime (warp-web/deep-mixing-plan.html, docs/knowledge/deep-mixing.md).\n\nMinimal artifact: deep mixing plan overview.",
+      "excerpt": "Reduced-order composition-transport feasibility hypothesis.",
+      "bodyMD": "Deep mixing is a reduced-order hypothesis for testing whether conservative composition transport could extend a solar-mass star's main-sequence lifetime; it is not a solved solar intervention (warp-web/deep-mixing-plan.html, docs/knowledge/deep-mixing.md).\n\nMinimal artifact: deep mixing plan overview.",
       "tags": [
         "solar",
         "mixing",
@@ -806,8 +806,8 @@
       "id": "deep-mixing-physics",
       "slug": "deep-mixing-physics",
       "title": "Deep Mixing Physics",
-      "excerpt": "Tachocline mixing setpoint helpers.",
-      "bodyMD": "Deep mixing physics helpers translate epsilon to tachocline flow setpoints (client/src/lib/deepMixingPhysics.ts).\n\nMinimal artifact: vr setpoint helpers.",
+      "excerpt": "Reduced-order circulation and hydrogen-delivery ledger.",
+      "bodyMD": "Deep mixing physics helpers separate gross circulation, net hydrogen delivery, cumulative accessible fuel, and tachocline flow setpoints (client/src/lib/deepMixingPhysics.ts).\n\nMinimal artifact: reduced-order ledger.",
       "tags": [
         "solar",
         "mixing",

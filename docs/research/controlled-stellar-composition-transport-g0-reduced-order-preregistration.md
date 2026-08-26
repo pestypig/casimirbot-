@@ -11,9 +11,11 @@ Downstream gate unlocked: G1 — real calibrated solar baseline
 
 # G0 reduced-order ledger repair and preregistration
 
-This is the sole active packet for the controlled stellar composition transport
-program. Its purpose is to make the current toy model honest, reproducible, and
-useful as a preregistration tool before any expensive stellar-evolution run.
+This packet is closed with `PASS_REDUCED_ORDER_PREREGISTERED`. Its immutable
+result summary is recorded in
+[`controlled-stellar-composition-transport-g0-result-record.md`](./controlled-stellar-composition-transport-g0-result-record.md).
+Its purpose was to make the current toy model honest, reproducible, and useful
+as a preregistration tool before any expensive stellar-evolution run.
 
 ## Frozen questions
 
@@ -165,5 +167,6 @@ G0 ends with exactly one result:
   efficiency, milestone, or acceptance definition cannot be frozen without new
   scientific input.
 
-Only the first result unlocks G1.
+Only the first result unlocks G1. G0 produced that result on August 24, 2026;
+future work must not rewrite this packet to absorb G1 evidence.
 

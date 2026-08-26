@@ -1,0 +1,319 @@
+{
+  "schema": "helix.minecraft.nether1_n0_compositions.v1",
+  "objective_id": "EH-MC-NETHER1",
+  "ruleset": "survival_tas",
+  "fixture_contract": {
+    "world_kind": "controlled_survival_course",
+    "world_authority_setup_only": true,
+    "player_embodiment_execution_only": true,
+    "restore_before_n1": true
+  },
+  "compositions": [
+    {
+      "composition_id": "furnace_smelting",
+      "preconditions": [
+        "a looked-at furnace is reachable",
+        "the player owns at least one raw iron and one coal",
+        "the player inventory has room for one iron ingot"
+      ],
+      "sequence": {
+        "action_kind": "execute_sequence",
+        "sequence_schema": "helix.minecraft.player_sequence.v1",
+        "sequence_id": "n0.furnace_smelting.v1",
+        "ruleset": "survival_tas",
+        "execution_plane": "player_embodiment",
+        "scheduler_engine": "native_fabric",
+        "optimization": {
+          "primary": "minimize_world_ticks",
+          "record_wall_clock": true,
+          "stop_on_first_verified_success": true
+        },
+        "start_node_id": "deposit_input",
+        "max_total_ticks": 600,
+        "required_checkpoint_ids": ["smelted_output_in_inventory"],
+        "mutation_scope": {
+          "world_mutation_allowed": false,
+          "max_block_mutations": 0,
+          "max_inventory_transfers": 3,
+          "allowed_block_ids": [],
+          "allowed_regions": [],
+          "combat_allowed": false
+        },
+        "nodes": [
+          {
+            "node_id": "deposit_input",
+            "node_kind": "workflow_action",
+            "earliest_tick": 0,
+            "timeout_ticks": 80,
+            "action": {
+              "action_kind": "inventory_transfer",
+              "direction": "deposit",
+              "item_id": "minecraft:raw_iron",
+              "count": 1,
+              "container_target": "looked_at_container"
+            },
+            "on_success": "deposit_fuel",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "deposit_fuel",
+            "node_kind": "workflow_action",
+            "earliest_tick": 0,
+            "timeout_ticks": 80,
+            "action": {
+              "action_kind": "inventory_transfer",
+              "direction": "deposit",
+              "item_id": "minecraft:coal",
+              "count": 1,
+              "container_target": "looked_at_container"
+            },
+            "on_success": "bounded_smelt_wait",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "bounded_smelt_wait",
+            "node_kind": "input_segment",
+            "earliest_tick": 0,
+            "duration_ticks": 220,
+            "controls": {
+              "forward": 0,
+              "strafe": 0,
+              "sprint": false,
+              "sneak": false,
+              "jump": "idle",
+              "use": "idle"
+            },
+            "on_complete": "withdraw_output",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "withdraw_output",
+            "node_kind": "workflow_action",
+            "earliest_tick": 0,
+            "timeout_ticks": 80,
+            "action": {
+              "action_kind": "inventory_transfer",
+              "direction": "withdraw",
+              "item_id": "minecraft:iron_ingot",
+              "count": 1,
+              "container_target": "looked_at_container"
+            },
+            "on_success": "verify_output",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "verify_output",
+            "node_kind": "checkpoint",
+            "earliest_tick": 0,
+            "checkpoint_id": "smelted_output_in_inventory",
+            "condition": {
+              "condition_kind": "inventory_count_at_least",
+              "item_id": "minecraft:iron_ingot",
+              "count": 1
+            },
+            "wait_up_to_ticks": 20,
+            "on_satisfied": "succeeded",
+            "on_timeout": "failed"
+          },
+          {
+            "node_id": "succeeded",
+            "node_kind": "terminal",
+            "terminal_outcome": "succeeded",
+            "reason_code": "furnace_smelting_verified"
+          },
+          {
+            "node_id": "failed",
+            "node_kind": "terminal",
+            "terminal_outcome": "failed",
+            "reason_code": "furnace_smelting_not_verified"
+          }
+        ]
+      }
+    },
+    {
+      "composition_id": "portal_ignition",
+      "preconditions": [
+        "a complete unlit obsidian frame surrounds cell 0,65,0",
+        "the player owns flint and steel",
+        "cell 0,65,0 is reachable and replaceable"
+      ],
+      "sequence": {
+        "action_kind": "execute_sequence",
+        "sequence_schema": "helix.minecraft.player_sequence.v1",
+        "sequence_id": "n0.portal_ignition.v1",
+        "ruleset": "survival_tas",
+        "execution_plane": "player_embodiment",
+        "scheduler_engine": "native_fabric",
+        "optimization": {
+          "primary": "minimize_world_ticks",
+          "record_wall_clock": true,
+          "stop_on_first_verified_success": true
+        },
+        "start_node_id": "equip_igniter",
+        "max_total_ticks": 300,
+        "required_checkpoint_ids": ["active_portal_observed"],
+        "mutation_scope": {
+          "world_mutation_allowed": true,
+          "max_block_mutations": 7,
+          "max_inventory_transfers": 2,
+          "allowed_block_ids": ["minecraft:fire", "minecraft:nether_portal"],
+          "allowed_regions": [
+            {
+              "min": {"x": 0, "y": 65, "z": 0},
+              "max": {"x": 1, "y": 67, "z": 0}
+            }
+          ],
+          "combat_allowed": false
+        },
+        "nodes": [
+          {
+            "node_id": "equip_igniter",
+            "node_kind": "workflow_action",
+            "earliest_tick": 0,
+            "timeout_ticks": 40,
+            "action": {
+              "action_kind": "equip",
+              "item_id": "minecraft:flint_and_steel",
+              "destination": "main_hand"
+            },
+            "on_success": "ignite_frame",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "ignite_frame",
+            "node_kind": "workflow_action",
+            "earliest_tick": 0,
+            "timeout_ticks": 100,
+            "action": {
+              "action_kind": "place",
+              "block_id": "minecraft:nether_portal",
+              "positions": [{"x": 0, "y": 65, "z": 0}],
+              "placement_method": "item_use",
+              "source_item_id": "minecraft:flint_and_steel",
+              "hand": "main_hand"
+            },
+            "on_success": "verify_portal",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "verify_portal",
+            "node_kind": "checkpoint",
+            "earliest_tick": 0,
+            "checkpoint_id": "active_portal_observed",
+            "condition": {
+              "condition_kind": "portal_nearby",
+              "portal_kind": "nether_portal",
+              "radius": 8,
+              "expected": true
+            },
+            "wait_up_to_ticks": 40,
+            "on_satisfied": "succeeded",
+            "on_timeout": "failed"
+          },
+          {
+            "node_id": "succeeded",
+            "node_kind": "terminal",
+            "terminal_outcome": "succeeded",
+            "reason_code": "portal_ignition_verified"
+          },
+          {
+            "node_id": "failed",
+            "node_kind": "terminal",
+            "terminal_outcome": "failed",
+            "reason_code": "portal_ignition_not_verified"
+          }
+        ]
+      }
+    },
+    {
+      "composition_id": "portal_dimension_transition",
+      "preconditions": [
+        "an active Nether portal occupies the controlled course entry cell",
+        "the player begins aligned two blocks from the portal",
+        "a viable return portal is enabled by ordinary server mechanics"
+      ],
+      "sequence": {
+        "action_kind": "execute_sequence",
+        "sequence_schema": "helix.minecraft.player_sequence.v1",
+        "sequence_id": "n0.portal_dimension_transition.v1",
+        "ruleset": "survival_tas",
+        "execution_plane": "player_embodiment",
+        "scheduler_engine": "native_fabric",
+        "optimization": {
+          "primary": "minimize_world_ticks",
+          "record_wall_clock": true,
+          "stop_on_first_verified_success": true
+        },
+        "start_node_id": "enter_portal",
+        "max_total_ticks": 400,
+        "required_checkpoint_ids": ["nether_dimension_observed", "return_portal_observed"],
+        "mutation_scope": {
+          "world_mutation_allowed": false,
+          "max_block_mutations": 0,
+          "max_inventory_transfers": 0,
+          "allowed_block_ids": [],
+          "allowed_regions": [],
+          "combat_allowed": false
+        },
+        "nodes": [
+          {
+            "node_id": "enter_portal",
+            "node_kind": "input_segment",
+            "earliest_tick": 0,
+            "duration_ticks": 120,
+            "controls": {
+              "forward": 1,
+              "strafe": 0,
+              "sprint": false,
+              "sneak": false,
+              "jump": "idle",
+              "use": "idle"
+            },
+            "on_complete": "verify_dimension",
+            "on_failure": "failed"
+          },
+          {
+            "node_id": "verify_dimension",
+            "node_kind": "checkpoint",
+            "earliest_tick": 0,
+            "checkpoint_id": "nether_dimension_observed",
+            "condition": {
+              "condition_kind": "dimension_is",
+              "dimension": "minecraft:the_nether"
+            },
+            "wait_up_to_ticks": 160,
+            "on_satisfied": "verify_return_portal",
+            "on_timeout": "failed"
+          },
+          {
+            "node_id": "verify_return_portal",
+            "node_kind": "checkpoint",
+            "earliest_tick": 0,
+            "checkpoint_id": "return_portal_observed",
+            "condition": {
+              "condition_kind": "portal_nearby",
+              "portal_kind": "nether_portal",
+              "radius": 8,
+              "expected": true
+            },
+            "wait_up_to_ticks": 40,
+            "on_satisfied": "succeeded",
+            "on_timeout": "failed"
+          },
+          {
+            "node_id": "succeeded",
+            "node_kind": "terminal",
+            "terminal_outcome": "succeeded",
+            "reason_code": "portal_transition_verified"
+          },
+          {
+            "node_id": "failed",
+            "node_kind": "terminal",
+            "terminal_outcome": "failed",
+            "reason_code": "portal_transition_not_verified"
+          }
+        ]
+      }
+    }
+  ]
+}

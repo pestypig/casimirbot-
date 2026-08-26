@@ -161,6 +161,38 @@ describe("Minecraft direct diagnostic inbox staging", () => {
     });
   });
 
+  it("stages an exact hostile attack with a finite outer diagnostic deadline", () => {
+    const envelope = buildDirectDiagnosticEnvelope({
+      action: {
+        action_kind: "attack",
+        target_ref: "target:00dd51226cf33aa465b609dc08fa100b0ae2c3bc",
+        target_entity_type_id: "minecraft:zombie",
+        target_classification: "hostile",
+        max_acquisition_distance: 16,
+        require_line_of_sight: true,
+        minimum_attack_cooldown: 0.9,
+        max_attack_pulses: 8,
+        max_duration_ms: 15_000,
+        stop_below_health: 6,
+        friendly_fire: false,
+      },
+      maxDurationMs: 20_000,
+      requestId: "direct_diagnostic_request:attack-test",
+    });
+
+    expect(envelope).toMatchObject({
+      action_kind: "attack",
+      control_engine: "native_fabric",
+      max_duration_ticks: 400,
+      arguments: {
+        target_ref: "target:00dd51226cf33aa465b609dc08fa100b0ae2c3bc",
+        max_attack_pulses: 8,
+        max_duration_ms: 15_000,
+      },
+    });
+    expect(Number.isFinite(envelope.max_duration_ticks)).toBe(true);
+  });
+
   it("stages one bounded fluid sequence for direct-Codex parity testing", () => {
     const envelope = buildDirectDiagnosticEnvelope({
       action: {

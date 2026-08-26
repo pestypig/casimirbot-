@@ -23,6 +23,7 @@ import {
   disconnectRobinhoodConnection,
   listPrivateRoomRobinhoodBindings,
   listRobinhoodConnections,
+  revokeRobinhoodPrivateRoomBinding,
   RobinhoodConnectionError,
   startRobinhoodOAuth,
 } from "../services/brokerage/robinhood-connection-store";
@@ -214,6 +215,41 @@ const boundary = new FirstPartyCookieBoundary({
   accountMax: 30,
 });
 
+const robinhoodOAuthCallbackBaseUrl = (req: Request): string => {
+  const configuredBaseUrl = resolveCasimirPublicBaseUrl();
+  if (process.env.NODE_ENV === "production") return configuredBaseUrl;
+
+  const suppliedOrigin = req.get("origin")?.trim();
+  const requestHost = req.get("host")?.trim();
+  if (
+    !suppliedOrigin ||
+    !requestHost ||
+    requestHost.includes(",") ||
+    /\s/.test(requestHost)
+  ) {
+    return configuredBaseUrl;
+  }
+
+  try {
+    const supplied = new URL(suppliedOrigin);
+    const expected = new URL(`${req.protocol}://${requestHost}`);
+    const isExactLoopbackOrigin =
+      supplied.origin === expected.origin &&
+      supplied.protocol === "http:" &&
+      (supplied.hostname === "127.0.0.1" ||
+        supplied.hostname === "localhost") &&
+      supplied.port.length > 0 &&
+      !supplied.username &&
+      !supplied.password &&
+      supplied.pathname === "/" &&
+      !supplied.search &&
+      !supplied.hash;
+    return isExactLoopbackOrigin ? supplied.origin : configuredBaseUrl;
+  } catch {
+    return configuredBaseUrl;
+  }
+};
+
 const errorPayload = (input: {
   code: string;
   message: string;
@@ -293,7 +329,7 @@ const route = (
   void handler(req, res).catch((error) => sendError(res, error));
 };
 
-const requireDeveloperBrokerageAccount = async (req: Request) => {
+const requireProfileConnectionAccount = async (req: Request) => {
   const sessionId = readHelixSessionCookie(req.headers.cookie);
   const context = await resolveWorkstationGatewayAccountContext(sessionId);
   if (
@@ -308,6 +344,21 @@ const requireDeveloperBrokerageAccount = async (req: Request) => {
       "Sign in before connecting Robinhood.",
     );
   }
+  if (
+    !context.account_policy.feature_flags.includes("profile_connections") ||
+    context.account_policy.locked_features.includes("profile_connections")
+  ) {
+    throw new RobinhoodConnectionError(
+      "brokerage_account_policy_locked",
+      403,
+      "Profile connections are locked by the current account policy.",
+    );
+  }
+  return context;
+};
+
+const requireDeveloperBrokerageAccount = async (req: Request) => {
+  const context = await requireProfileConnectionAccount(req);
   if (
     context.account_policy.account_type !== "developer" ||
     !context.account_policy.feature_flags.includes("brokerage_environment") ||
@@ -345,7 +396,7 @@ brokerageConnectionsRouter.use(
 brokerageConnectionsRouter.get(
   "/brokerage-connections",
   route(async (req, res) => {
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.json(await listRobinhoodConnections(context.profile_id!));
   }),
@@ -572,11 +623,11 @@ brokerageConnectionsRouter.post(
 brokerageConnectionsRouter.post(
   "/brokerage-connections/robinhood/oauth/start",
   route(async (req, res) => {
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.status(201).json(await startRobinhoodOAuth({
       ownerProfileId: context.profile_id!,
-      publicBaseUrl: resolveCasimirPublicBaseUrl(),
+      publicBaseUrl: robinhoodOAuthCallbackBaseUrl(req),
     }));
   }),
 );
@@ -816,7 +867,7 @@ brokerageConnectionsRouter.delete(
         "Robinhood connection not found.",
       );
     }
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     await disconnectRobinhoodConnection({
       ownerProfileId: context.profile_id!,
@@ -849,7 +900,7 @@ brokerageConnectionsRouter.post(
         "The private-room brokerage binding request is invalid.",
       );
     }
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.status(201).json(await attachRobinhoodConnectionToPrivateRoom({
       ownerProfileId: context.profile_id!,
@@ -857,6 +908,40 @@ brokerageConnectionsRouter.post(
       roomId: body.data.room_id,
       capabilityIds: body.data.capability_ids,
     }));
+  }),
+);
+
+brokerageConnectionsRouter.delete(
+  "/brokerage-connections/:connectionId/room-bindings/:roomId",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    if (!connectionId.success || !roomId.success) {
+      throw new RobinhoodConnectionError(
+        "brokerage_room_binding_not_found",
+        404,
+        "The Robinhood room grant was not found.",
+      );
+    }
+    const context = await requireProfileConnectionAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    await revokeRobinhoodPrivateRoomBinding({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+    });
+    res.json({
+      schema: "helix.brokerage_room_binding_revocation.v1",
+      ok: true,
+      revoked: true,
+      credential_included: false,
+      account_numbers_included: false,
+      raw_provider_payload_included: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
   }),
 );
 
@@ -873,7 +958,7 @@ brokerageConnectionsRouter.post(
         "The governed Robinhood read request is invalid.",
       );
     }
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.json(await executeRobinhoodPrivateRoomRead({
       ownerProfileId: context.profile_id!,
@@ -898,7 +983,7 @@ brokerageConnectionsRouter.post(
         "The Robinhood read-acceptance request is invalid.",
       );
     }
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.status(201).json(await runRobinhoodReadAcceptance({
       ownerProfileId: context.profile_id!,
@@ -1263,7 +1348,7 @@ brokerageConnectionsRouter.get(
         "The brokerage room identity is invalid.",
       );
     }
-    const context = await requireDeveloperBrokerageAccount(req);
+    const context = await requireProfileConnectionAccount(req);
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.json(await listPrivateRoomRobinhoodBindings({
       ownerProfileId: context.profile_id!,

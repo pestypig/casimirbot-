@@ -1,0 +1,66 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_evaluations": 1,
+    "candidate_execution_authorized": false,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "casimir": {
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_status": "GREEN",
+    "deltas": [],
+    "fail_reason": "NONE",
+    "first_fail": null,
+    "integrity_ok": true,
+    "run_id": "2471",
+    "trace_id": "adapter:e6b78bf0-ca5c-4fda-b8ad-0c6cf89dd3af",
+    "verdict": "PASS"
+  },
+  "disposition": {
+    "json_bytes": 6926,
+    "json_sha256": "e86dcd1060c9e753c5fef3a8d4bfb21d974244b7fd108d6b669765389902ec0a",
+    "markdown_bytes": 5352,
+    "markdown_sha256": "8a00b754c0e8760af7a173649faa6850d80201be179c155a81235a05c9a5b285"
+  },
+  "math": {
+    "registry_entries": 318,
+    "report_bytes": 25037,
+    "report_sha256": "5a8b53f55d29ec218ff8bf632f69cbd2de7ddec9e4cdc30f670b728fdc145bd5",
+    "validation": "PASS"
+  },
+  "regularity_audit": {
+    "passed": 27,
+    "script_bytes": 6887,
+    "script_sha256": "bd9fd33632e6432cfcc01a5ccaeca59176fc3552820db3af2e6c23ad6d100007",
+    "total": 27,
+    "upstream_primary_audit_passed": 77,
+    "upstream_primary_audit_total": 77
+  },
+  "schema": "nhm2.g2h_e_s3_r1.verification_receipt.v1",
+  "status": "PASS_THEORETICAL_DISPOSITION_INTEGRITY_ONLY",
+  "training_trace": {
+    "bytes_at_receipt": 4738958,
+    "path": "artifacts/training-trace.jsonl",
+    "sha256_at_receipt": "d341586304d044ce23c855c3112343f9a595b047a74e2de0e6c4133623557689"
+  },
+  "warp": {
+    "failed_files": 0,
+    "failed_tests": 0,
+    "passed_files": 18,
+    "passed_tests": 179,
+    "required_files": 18,
+    "tests": 179
+  },
+  "work_program": {
+    "active_gate": "G2H-E-S3-R2",
+    "bytes": 56892,
+    "sha256": "364244ea9d18370b6cf01d67cb9675f6380998ab9c7162953600468d66b2d30e"
+  }
+}

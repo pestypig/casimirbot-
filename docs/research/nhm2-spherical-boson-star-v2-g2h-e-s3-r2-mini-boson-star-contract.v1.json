@@ -1,0 +1,236 @@
+{
+  "schema": "nhm2.g2h_e_s3_r2.mini_boson_star_candidate_contract.v1",
+  "program_gate": "G2H-E-S3-R2",
+  "contract_status": "selected_and_preregistered_not_implemented_not_executed_not_admitted",
+  "selection_binding": {
+    "protocol_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-selection-protocol.md",
+    "protocol_sha256": "f2fec60d0211e8762bee1a1b282dfdf3e38c8ebdbdb220ec068a8b02f2ba6cb2",
+    "matrix_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-evidence-matrix.json",
+    "matrix_sha256": "7f7b7ac889de82d52a2b6fc667e4b458d42ac833f350c91c5c48890266310d03",
+    "decision": "SELECT_ONE",
+    "rank": [1, 1, 19, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+  },
+  "preserved_failure_lineage": {
+    "tolman_vii_result_sha256": "4248b29a38588dc6c1b1a0c283bb78399eabd3d815376d0ddad3fd7e481392d7",
+    "r1_disposition_sha256": "e86dcd1060c9e753c5fef3a8d4bfb21d974244b7fd108d6b669765389902ec0a",
+    "tolman_vii_candidate_evaluations": 1,
+    "r2_candidate_evaluations": 0,
+    "tolman_retry_retune_or_smoothing": false
+  },
+  "scientific_identity": "G2H_E_S3_R2_MINI_BOSON_STAR_SHAT0_6_5_SCALAR_HADAMARD_V1",
+  "family_identity": "MINI_BOSON_STAR_ELL0_SCALAR_QFT_CONTROL",
+  "frozen_member": {
+    "matter_system": "Einstein gravity plus one free massive complex scalar, represented as two real scalars",
+    "potential": "V=mu_b^2*(phi_0r^2+phi_0i^2)/2 with no self-interaction",
+    "cosmological_constant": "0",
+    "dimensionless_boson_mass": "mu_b=1",
+    "dimensionless_reduced_planck_mass": "mbar_P=1",
+    "source_coordinate_definition": "shat_0=s(0)*omega",
+    "source_coordinate_exact_ingress": "6/5",
+    "source_coordinate_display_value": "1.2",
+    "source_coordinate_rule": "the source-tabulated shat_0=1.2 member; exact 6/5 is an ingress encoding of that displayed coordinate, not a claim that the reported turning point is exact",
+    "reported_maximum_mass_coordinate": "approximately 1.24",
+    "reported_coordinate_separation": "approximately 0.04",
+    "radial_branch": "fundamental nodeless monotonically decreasing sigma(r)>0 branch",
+    "excluded_branches": [
+      "every radially excited/node-bearing branch",
+      "every post-maximum-mass spiral member",
+      "every self-interacting or solitonic potential",
+      "every rotating, ell>0, multistate, Proca, Dirac, fluid or oscillaton family",
+      "every parameter obtained by interpolation, optimization, retuning or a new solve"
+    ]
+  },
+  "conventions": {
+    "signature": "(-,+,+,+)",
+    "units": "hbar=c=mu_b=mbar_P=1 for the dimensionless control problem",
+    "coordinates": "(t,r,theta,phi), r in [0,infinity)",
+    "metric": "ds^2=-(b(r)^2*s(r)^2)^(-1)dt^2+b(r)^2dr^2+r^2dOmega^2",
+    "lapse": "alpha(r)=1/(b(r)*s(r))",
+    "classical_fields": "phi_0r=sigma(r)*cos(omega*t), phi_0i=-sigma(r)*sin(omega*t)",
+    "mass_function": "b(r)^(-2)=1-2*m(r)/r",
+    "compact_coordinate": "y=r/(1+r), r=y/(1-y), y in [0,1]",
+    "infinity_meaning": "y=1 is an analytic/asymptotic endpoint handled by explicit q=1/r=0 expansions, never a finite artificial wall"
+  },
+  "classical_equations": {
+    "rho": "(b^2*s^2*omega^2*sigma^2)/2+(sigma_prime^2)/(2*b^2)+sigma^2/2",
+    "p_r": "(b^2*s^2*omega^2*sigma^2)/2+(sigma_prime^2)/(2*b^2)-sigma^2/2",
+    "p_t": "(b^2*s^2*omega^2*sigma^2)/2-(sigma_prime^2)/(2*b^2)-sigma^2/2",
+    "b_prime": "(b-b^3)/(2*r)+(b^3*r*rho)/2",
+    "s_prime": "-(s*b^2*r*(rho+p_r))/2",
+    "sigma_equation": "sigma_second+(2/r-2*b_prime/b-s_prime/s)*sigma_prime+b^2*(b^2*s^2*omega^2-1)*sigma=0",
+    "lambda": "0",
+    "equation_source": "Saffin-Xie equations (16)-(25), with mu_b=mbar_P=1"
+  },
+  "boundary_and_global_conditions": {
+    "origin": [
+      "b(0)=1",
+      "sigma_prime(0)=0",
+      "b,s,sigma have even C-infinity origin expansions",
+      "s(0)>0 and sigma(0)>0"
+    ],
+    "member_condition": "s(0)*omega=6/5",
+    "infinity": [
+      "b(infinity)=1",
+      "s(infinity)=1",
+      "sigma(infinity)=0",
+      "0<omega<1",
+      "finite ADM/Komar mass and exponential scalar decay"
+    ],
+    "finite_interfaces": "none",
+    "global_domain": "one smooth charted spacetime from the regular origin through every finite radius to one normalized asymptotically flat end"
+  },
+  "ordered_classical_proof_duties": [
+    {"id": "R2-C01", "assertion": "all ingress hashes, exact constants, equations, branch exclusions and chronology are byte-bound before implementation"},
+    {"id": "R2-C02", "assertion": "the origin recurrence produces one even C-infinity local solution with b(0)=1 and sigma'(0)=0 and with a nonzero interval of existence"},
+    {"id": "R2-C03", "assertion": "the nonlinear compactified boundary-value solution at shat_0=6/5 exists and is unique inside its validated ball"},
+    {"id": "R2-C04", "assertion": "sigma is strictly positive and strictly decreasing for every finite r>0 and has no node"},
+    {"id": "R2-C05", "assertion": "b and s are finite and strictly positive everywhere, b never encodes 2m/r>=1, and alpha has a certified positive global infimum"},
+    {"id": "R2-C06", "assertion": "the spatial metric b^2dr^2+r^2dOmega^2 is smooth and geodesically complete"},
+    {"id": "R2-C07", "assertion": "the ODE residuals and Einstein constraints enclose zero on the complete compactified domain"},
+    {"id": "R2-C08", "assertion": "the q=1/r endpoint recurrence proves normalized asymptotic flatness, finite ADM mass and the frozen exponential scalar tail with explicit remainder"},
+    {"id": "R2-C09", "assertion": "ADM, Komar and integrated energy masses agree within one common interval"},
+    {"id": "R2-C10", "assertion": "curvature scalars and the metric are globally C-infinity with no finite-radius interface, shell or distribution"},
+    {"id": "R2-C11", "assertion": "the branch segment from shat_0=1 to 6/5 is covered by validated overlap cells with no fold or kernel loss and terminates in the selected ball"},
+    {"id": "R2-C12", "assertion": "the shat_0->1 endpoint reaches sigma=0, b=s=1, omega=1 and Minkowski space continuously with controlled remainder"},
+    {"id": "R2-C13", "assertion": "the selected member is on the stable side of the first mass turning point and has a strictly positive fundamental radial-mode eigenvalue"},
+    {"id": "R2-C14", "assertion": "all four frozen grids contract in the declared order and the N=256 state is enclosed by the continuum proof rather than promoted by grid agreement alone"},
+    {"id": "R2-C15", "assertion": "the primary and source/runtime-disjoint classical replay agree on the frozen field, frequency, mass, lapse, curvature and stability observables"}
+  ],
+  "quantum_control": {
+    "field": "one free real scalar Phi distinct from the classical complex boson-star source",
+    "equation": "(Box-m_phi^2-xi_R*R)Phi=0",
+    "dimensionless_mass": "m_phi=1",
+    "curvature_coupling": "xi_R=0",
+    "self_interaction": "0",
+    "hilbert_space": "L2(Sigma,alpha^(-1)*dvol_h)",
+    "spatial_operator": "K=-alpha*D_i(alpha*D^i)+alpha^2*m_phi^2 on C_c^infinity(Sigma), followed by its Friedrichs extension",
+    "strict_bound_duty": "prove alpha_min>0 and K>=alpha_min^2*m_phi^2>0 in quadratic-form sense",
+    "state": "the quasifree time-translation-invariant beta_KMS=infinity static ground state from positive spectral calculus of K",
+    "two_point_function": "G_plus(t,f;t_prime,g)=<f,exp(-i*K^(1/2)*(t-t_prime))*(2*K^(1/2))^(-1)g>",
+    "asymptotic_condition": "approaches the massive Minkowski ground-state two-point function at the normalized end",
+    "finite_box_forbidden": true,
+    "saffin_xie_role": "non-authoritative family-specific comparator only; its finite wall, extrapolation, averaging and incomplete Pauli-Villars subtraction are not accepted outputs"
+  },
+  "renormalization_definition": {
+    "scheme": "local covariant four-dimensional Hadamard point splitting",
+    "hadamard_length": "ell_H=1/m_phi",
+    "minkowski_normalization": "the RSET and connected noise approach their massive Minkowski ground-state values at infinity; the Minkowski RSET is zero",
+    "finite_ambiguity_vector": {"cosmological": "0", "einstein": "0", "R_squared": "0", "Ricci_squared": "0"},
+    "conservation": "nabla^a<T_ab>_ren=0 must be independently enclosed",
+    "pauli_villars_import": "forbidden"
+  },
+  "connected_noise_definition": {
+    "definition": "N_abcd(x,x_prime)=1/2*< {t_ab(x),t_cd(x_prime)} > with t_ab=T_ab-<T_ab>",
+    "state_binding": "the same static ground state, G_plus, ell_H and zero ambiguity vector as the mean RSET",
+    "admissible_outputs": "separated-point values and smooth compactly supported smeared pairings only",
+    "coincidence_rule": "unsmeared pointwise coincidence is forbidden",
+    "positivity": "every declared real test-tensor smearing must have a nonnegative certified quadratic form"
+  },
+  "ordered_quantum_proof_duties": [
+    {"id": "R2-Q01", "assertion": "the accepted background is globally hyperbolic, static, horizon-free and has a complete Cauchy surface"},
+    {"id": "R2-Q02", "assertion": "K has one positive Friedrichs extension and the frozen strict lower spectral bound"},
+    {"id": "R2-Q03", "assertion": "the global static ground state exists, is unique under the frozen construction and satisfies the Hadamard microlocal spectrum condition"},
+    {"id": "R2-Q04", "assertion": "one common G_plus and Hadamard parametrix produce a locally covariant conserved RSET with exactly the frozen ambiguity vector"},
+    {"id": "R2-Q05", "assertion": "the connected noise kernel is symmetric, conserved and positive type after every admissible smearing"},
+    {"id": "R2-Q06", "assertion": "two source/runtime-disjoint constructions agree on spectrum, mode normalization, G_plus, RSET and declared smeared-noise observables under a later sealed ABI"}
+  ],
+  "proof_arithmetic": {
+    "working_precision_bits": 512,
+    "precision_escalation": "forbidden within a frozen execution",
+    "exact_layer": "integers and reduced rationals, including shat_0=6/5",
+    "transcendental_enclosure_width_max": "2^-400",
+    "scaled_nonlinear_residual_max": "2^-160 on every grid",
+    "terminal_validated_correction_radius_max": "2^-120",
+    "strict_sign_rule": "a certified lower bound must be strictly positive or upper bound strictly negative; touching zero fails",
+    "identity_rule": "exact zero or an interval containing zero of width at most 2^-400",
+    "nonfinite_rule": "any NaN, infinity, invalid interval or undecidable comparison is terminal FAIL"
+  },
+  "proof_grids_and_partitions": {
+    "coordinate": "y=r/(1+r) in [0,1]",
+    "full_solve_grids": [64, 96, 128, 256],
+    "basis": "even-origin-aware Chebyshev-Lobatto representation with an explicit q=1/r infinity patch",
+    "predictor_rule": "each grid is solved independently from the same preregistered analytic seed; coarse-grid interpolation may be logged but cannot initialize or authorize a finer solve",
+    "cross_grid_rule": "for each frozen norm, successive defects must strictly decrease and each ratio must be <=1/4; the 128-to-256 scaled field defect must be <=2^-70",
+    "continuation_cells": 1024,
+    "continuation_parameter": "lambda in [0,1] with shat_0(lambda)=1+lambda/5",
+    "candidate_radii_per_cell": 73,
+    "domain_cells": 256,
+    "origin_cell": "y in [0,1/256] uses even Taylor models with explicit remainder",
+    "bulk_cells": "y in [k/256,(k+1)/256] for k=1..254",
+    "infinity_cell": "q=1/r in [0,1/255] uses mass-plus-exponential-tail asymptotics with explicit remainder",
+    "adaptive_subdivision": "forbidden during execution",
+    "post_result_threshold_changes": "forbidden"
+  },
+  "failure_precedence": [
+    "ingress_identity_or_hash",
+    "runtime_or_arithmetic_identity",
+    "authorization_or chronology",
+    "origin_regular_solution",
+    "N64",
+    "N96",
+    "N128",
+    "N256",
+    "cross_grid_contraction",
+    "global_lapse_no_fold_and_completeness",
+    "infinity_remainder",
+    "vacuum_continuation_and_no_fold",
+    "radial_stability",
+    "KG positivity_and_Hadamard",
+    "RSET",
+    "connected_noise",
+    "independent_replay_and_agreement"
+  ],
+  "future_implementations": {
+    "primary": {
+      "language": "C++",
+      "runtime": "future digest-pinned offline Linux x86_64 container",
+      "arithmetic": "Arb/FLINT/GMP/MPFR lineage",
+      "status": "not_implemented_not_authorized"
+    },
+    "independent": {
+      "language": "Rust",
+      "runtime": "future digest-pinned offline Linux x86_64 musl container",
+      "arithmetic": "pure-Rust limb and interval implementation with no C, GMP, MPFR, FLINT or Arb linkage",
+      "status": "not_implemented_not_authorized"
+    },
+    "disjointness": "no shared scientific evaluator, solver source, compiled library, runtime image, output root or mutable cache"
+  },
+  "preexecution_boundaries": {
+    "next_gate": "G2H-E-S4 mini-boson-star proof implementation and preexecution closure",
+    "r2_may_create_executable": false,
+    "r2_may_execute_candidate": false,
+    "r2_may_authorize_primary": false,
+    "r2_may_authorize_independent": false,
+    "r2_may_create_output_root": false,
+    "future_primary_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-primary",
+    "future_independent_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-independent",
+    "root_rule": "both future roots must remain absent until a separately sealed implementation/preexecution gate passes and the user issues exact versioned authorization",
+    "retry_retune_smoothing_alternate_root": "forbidden"
+  },
+  "sources": [
+    {"id": "mini_boson_existence", "url": "https://arxiv.org/abs/gr-qc/0002034", "role": "global regular solution family"},
+    {"id": "mini_boson_qft", "url": "https://arxiv.org/abs/2601.05129", "role": "family definition, source coordinate and direct but non-authoritative quantum comparator"},
+    {"id": "mini_boson_stability", "url": "https://arxiv.org/abs/1109.5858", "role": "stable-phase comparator"},
+    {"id": "mini_boson_dynamics", "url": "https://arxiv.org/abs/gr-qc/0007039", "role": "independent modes and dynamics"},
+    {"id": "static_hadamard", "url": "https://arxiv.org/abs/hep-th/9507097", "role": "static-ground-state Hadamard theorem"},
+    {"id": "hadamard_rset", "url": "https://arxiv.org/abs/gr-qc/0512118", "role": "four-dimensional massive-scalar Hadamard RSET"},
+    {"id": "noise_kernel", "url": "https://arxiv.org/abs/gr-qc/0010019", "role": "connected stress-noise bidistribution"}
+  ],
+  "authority": {
+    "replacement_selected_for_future_proof": true,
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_executed": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "si_lane_authorized": false,
+    "metric_lane_authorized": false,
+    "two_lanes_published": false,
+    "pair_agreement": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

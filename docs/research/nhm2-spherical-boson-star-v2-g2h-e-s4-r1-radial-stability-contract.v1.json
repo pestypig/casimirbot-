@@ -1,0 +1,189 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.radial_stability_contract.v1",
+  "status": "draft_unsealed_exact_radial_operator_and_positive_fundamental_mode_certificate_definition_no_scientific_stability_or_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "ell=0 radial-stability operator, half-line domain, essential threshold, turning-side comparator and strict fundamental-mode enclosure",
+    "current_maturity": "source operator and normalization map recovered; exact proof product previously unbound",
+    "target_maturity": "independently audited proof-carrying stability ABI suitable for disjoint fixture producers",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "accepted terminal classical continuum ball and all R2-C01 through R2-C12 prerequisites",
+      "alpha=1/(b*s), gamma=b, mu=1, psi=sigma/sqrt(2), kappa_0=1",
+      "256-cell y/r/q background cover with origin and infinity remainders",
+      "512-bit ball arithmetic and the frozen strict-sign/identity rules"
+    ],
+    "required_evidence": [
+      "exact ell=0 coefficient map",
+      "Friedrichs half-line domain and endpoint remainders",
+      "essential-spectrum threshold proof",
+      "global matrix-Riccati lower certificate",
+      "compact-trial upper certificate below the essential threshold",
+      "positive mass derivative on every frozen continuation cell",
+      "immutable first-failure record",
+      "manufactured pass/fail/corruption/chronology fixtures",
+      "zero candidate evaluation during R1"
+    ],
+    "stop_fail_criteria": [
+      "using a turning point, time evolution or shooting trace as the eigenvalue proof",
+      "a coefficient, endpoint, essential-spectrum or Riccati remainder is missing",
+      "a lower bound touches zero or an upper bound touches the essential threshold",
+      "post-observation alteration of a certificate-builder algorithm or work budget",
+      "candidate evaluation, candidate-root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "computing the selected-member eigenvalue during definition review",
+      "proving nonspherical stability",
+      "implementing or executing either scientific lane",
+      "using the stable-side comparator as spectral authority",
+      "G3, geometry/state admission, physical viability, propulsion or transport"
+    ],
+    "downstream_gate_unlocked": "radial-stability portion of R1 definition completeness after independent theory audit"
+  },
+  "semantic_change_class": "additive_scientific_operator_and_proof_certificate_semantics_R2_unchanged",
+  "immutable_predecessors": {
+    "r2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a", "mutated": false},
+    "state_grid_v2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json", "raw_sha256": "cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c"},
+    "continuation": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-continuation-tube-contract.v1.json", "raw_sha256": "7a0cdc0e45a09e0291b79a1ef3892e221d6ed71395e3e4cf5e767c0adb1cb16c"},
+    "mass": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-mass-observable-contract.v1.json", "raw_sha256": "431c0d421339ed9a2d689fc522c94b171cfdb4ce01425d93594cdb6797bacb18"}
+  },
+  "source_convention_map": {
+    "source": "Alcubierre et al., arXiv:2103.15012 equations (20)-(33), specialized to ell=0",
+    "metric": "alpha_A=alpha=1/(b*s), gamma_A=gamma=b",
+    "matter": "mu_A=1, omega_A=omega, psi_A=psi=sigma/sqrt(2), kappa_0=1",
+    "mass": "M_A=m=G*M_phys with G=1/(8*pi)",
+    "exact_background_checks": [
+      "M_A'=r^2*rho_R2/2=m'",
+      "gamma_A^2=(1-2*M_A/r)^(-1)=b^2",
+      "alpha_A'/alpha_A=-b'/b-s'/s",
+      "the mapped KG and lapse equations agree identically"
+    ],
+    "ground_state_requirement": "sigma(r)>0 for every finite r and has the certified positive factored tail, so logarithmic derivatives are used only with a nonzero denominator enclosure"
+  },
+  "exact_operator": {
+    "abbreviations": {
+      "a": "alpha'/alpha=-b'/b-s'/s",
+      "g": "b'/b",
+      "h": "sigma'/sigma",
+      "p": "alpha^2/b^2=1/(b^4*s^2)",
+      "z": "1/r+h",
+      "theta_prime": "omega*b/alpha=omega*b^2*s",
+      "J": "[[0,-1],[1,0]]"
+    },
+    "V11": "-4*b^2*omega^2/alpha^2-r*sigma'*(2*b^2*sigma+(g-a-1/r)*sigma')",
+    "V12_equals_V21": "-r*omega*sigma*(b^2*sigma+(g-a-1/r)*sigma')",
+    "V22": "(alpha^2/b^2)*((a-g)'+2*(a-g)*(2/r+2*h+a-g)-2/r^2+2*sigma''/sigma-2*h^2)+omega^2*r*sigma^2*(1/r+a-g)",
+    "Q": "diag(z-(a-g)/2,z+(a-g)/2)",
+    "W": "-[[p*V11,(alpha/b)*V12],[(alpha/b)*V12,V22]]+(p*Q)'+p*Q^2-2*omega*(alpha/b)*z*[[0,1],[1,0]]-omega^2*I2",
+    "rotation": "R=[[cos(theta),-sin(theta)],[sin(theta),cos(theta)]], theta(r)=omega*integral_0^r b/alpha dx",
+    "operator": "H_T=-d/dr[p*d/dr]+R^T*W*R",
+    "quadratic_form_v": "q[v]=integral_0^infinity (p*|v'|^2+v^T*R^T*W*R*v) dr",
+    "co_rotating_variable": "w=R*v",
+    "quadratic_form_w": "q[v]=integral_0^infinity (p*|w'-theta_prime*J*w|^2+w^T*W*w) dr",
+    "coefficient_reduction": "all derivatives and apparent 1/r or sigma denominators are evaluated through the certified origin parity, background ODE and factored-tail identities; point sampling or removable-singularity division is forbidden"
+  },
+  "self_adjoint_domain": {
+    "realization": "the Friedrichs realization generated by the closure of q on C_c^infinity((0,infinity);R^2)",
+    "origin_regular_rates_ell0": "v1=O(r), v2=O(r^2); the singular alternatives v1=O(1), v2=O(r^-1) are excluded",
+    "infinity": "v belongs to L2(dr;R^2), has finite form norm and the Lagrange boundary form p*(v'^T*u-v^T*u') vanishes",
+    "coefficient_duties": "p has a strictly positive global lower ball, the origin inverse-square coefficient is alpha_c^2*diag(0,2), and all remaining potential terms have directed locally integrable bounds",
+    "domain_authority": "a finite-radius Dirichlet wall, sampled decay check or unspecified self-adjoint extension is forbidden"
+  },
+  "endpoint_and_essential_spectrum": {
+    "origin_product": "the origin cell supplies even Taylor models plus explicit remainders for alpha,b,sigma and the regularized V,Q,W coefficients through the derivative order consumed by the verifier",
+    "tail_limits": {
+      "p": "1+O(1/r)",
+      "theta_prime": "omega+O(1/r)",
+      "W_infinity": "[[1+2*omega^2,2*omega*sqrt(1-omega^2)],[2*omega*sqrt(1-omega^2),1-2*omega^2]]",
+      "remainder": "W-W_infinity=O(1/r), with first derivative O(1/r^2), all as outward balls from the full factored tail"
+    },
+    "free_dispersion": "the two co-rotating asymptotic branches are (sqrt(k^2+1)-omega)^2 and (sqrt(k^2+1)+omega)^2",
+    "essential_threshold": "E_ess=(1-omega)^2",
+    "proof_duty": "certify 0<omega<1, the stated p/theta_prime/W limits and relative compactness of the vanishing coefficient remainders with respect to the constant-coefficient form; Weyl stability then gives spectrum_essential(H_T)=[E_ess,infinity)",
+    "finite_wall_forbidden": true
+  },
+  "strict_lower_certificate": {
+    "method": "global symmetric matrix-Riccati quadratic-form factorization",
+    "certificate_scalar": "L is an exact positive dyadic rational",
+    "certificate_field": "S(r)=R(r)^T*K(r)*R(r), where K=K^T has three exact-dyadic piecewise-polynomial/factored-tail components on the frozen 256-cell origin/bulk/infinity cover; interval balls enclose evaluation, not the stored certificate coefficients",
+    "co_rotated_residual": "C_L=W-(p*K)'-p*theta_prime*(K*J-J*K)-p*K^2-L*I2",
+    "cell_condition": "on every complete closed cell, directed interval-polynomial bounds first prove the C12-C21 identity under the R2 identity rule and then prove C_L positive definite by C11_lower>0 and det(C_L)_lower>0",
+    "internal_jump": "at every cell boundary r_i, the exact dyadic matrix D_i=K_left(r_i)-K_right(r_i) is positive semidefinite by exact rational principal-minor tests; because p(r_i)>0, B_i=p(r_i)*D_i is positive semidefinite. An undecidable interval jump is forbidden",
+    "origin_boundary": "r*K is bounded and the regular v rates make lim_(r->0) v^T*S*v=0",
+    "infinity_boundary": "K is uniformly bounded in the factored q=1/r representation and every form-domain trace has vanishing terminal boundary contribution",
+    "identity": "q[v]-L*||v||_L2^2=sum_cells integral p*|v'-S*v|^2+sum_cells integral v^T*R^T*C_L*R*v+sum_internal v(r_i)^T*R(r_i)^T*B_i*R(r_i)*v(r_i)",
+    "conclusion": "H_T>=L*I in quadratic-form sense, including exclusion of zero and all spectrum below L",
+    "builder_rule": "each lane may construct a different valid K, but its deterministic builder, degrees, iteration counts, rational projection, work budget and failure behavior are source-hash-bound before any scientific ingress"
+  },
+  "fundamental_mode_upper_certificate": {
+    "trial": "a nonzero compactly supported co-rotating two-vector w_trial with exact dyadic piecewise-polynomial coefficients, w_trial(0)=0 and exact intercell continuity",
+    "evaluation": "directed ball integration of integral (p*|w_trial'-theta_prime*J*w_trial|^2+w_trial^T*W*w_trial) divided by integral |w_trial|^2",
+    "upper_ball": "U_ball outwardly encloses the Rayleigh quotient and U=upper(U_ball)",
+    "strict_predicates": ["0<L", "L<=U", "U<lower(E_ess_ball)"],
+    "existence_conclusion": "the min-max principle and U<E_ess force a discrete lowest radial eigenvalue chi0_squared with L<=chi0_squared<=U",
+    "stability_conclusion": "strict L>0 proves the fundamental radial mode is oscillatory and excludes exponentially growing spherical linear modes in the frozen perturbation sector",
+    "nonclaims": "this does not prove nonspherical, nonlinear, apparatus, propulsion or transport stability"
+  },
+  "mass_turning_side_comparator": {
+    "observable": "the common geometrized mass intersection from the mass-observable contract, evaluated as a function of the frozen lambda continuation",
+    "cell_duty": "on every Lambda_i, i=0..1023, implicit differentiation of the validated continuation tube and the mass functional gives one outward ball for dM/dlambda with strictly positive lower endpoint",
+    "conclusion": "with lambda_turn=inf{lambda>0:dM/dlambda=0} and inf(empty)=+infinity, the cell proof gives lambda_turn>1; hence the selected endpoint lambda=1 is on the pre-first-turning side of the covered ground-state branch",
+    "separation_of_authority": "this comparator is mandatory for the first clause of R2-C13 but cannot replace either spectral certificate"
+  },
+  "chronology_and_record_abi": {
+    "construction_freeze": "both producer-specific K and trial builders, degrees, exact projections, search bounds and work budgets are persisted and self-hashed before selected-background ingress",
+    "observation_order": ["ingress identities", "background continuum ball", "operator coefficients", "endpoint remainders", "essential threshold", "K certificate", "lower verification", "trial certificate", "upper verification", "mass derivative cells", "record persistence"],
+    "post_observation_retune": false,
+    "required_record_fields": ["all source/runtime/executable/command/environment bindings", "background and predecessor hashes", "operator coefficient balls", "endpoint products", "E_ess_ball", "K certificate and every cell/jump margin", "L", "trial certificate", "U_ball", "1024 dM/dlambda balls", "first failure", "previous and self hashes"],
+    "failure_precedence": ["identity_or_chronology", "background_prerequisites", "operator_or_denominator", "origin_domain", "tail_or_essential_spectrum", "Riccati_cell", "Riccati_jump", "lower_bound", "trial_domain", "upper_bound", "turning_side", "persistence"],
+    "cross_lane_agreement": "the primary and independent [L,U] balls overlap, their E_ess balls overlap and both independently pass every strict predicate; K and trial coefficients need not agree",
+    "first_failure": "the earliest failing role terminates the lane; retry, retune, smoothing, deletion and alternate output roots are forbidden"
+  },
+  "fixture_boundary": {
+    "allowed": [
+      "constant diagonal half-line operators with manufactured positive gaps",
+      "coupled compactly supported matrix potentials with analytic certificates",
+      "origin inverse-square regular-domain fixtures",
+      "Riccati cell and jump pass/touch/fail fixtures",
+      "trial quotient below/touching/above essential-threshold fixtures",
+      "negative, zero and positive mass-derivative fixtures",
+      "corruption, missing-field, chronology and hash-chain fixtures"
+    ],
+    "forbidden": ["selected-member evaluation", "positive continuation sample", "candidate-root creation", "scientific Rust execution", "authority promotion"]
+  },
+  "readiness": {
+    "convention_map_complete": true,
+    "operator_complete": true,
+    "domain_complete": true,
+    "endpoint_and_essential_definition_complete": true,
+    "lower_certificate_definition_complete": true,
+    "upper_certificate_definition_complete": true,
+    "turning_side_definition_complete": true,
+    "record_and_failure_definition_complete": true,
+    "fixture_audit_complete": false,
+    "independent_theory_audit_complete": false,
+    "scientific_operator_evaluated": false,
+    "scientific_eigenvalue_computed": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_stability_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "radial_stability_established": false,
+    "classical_proof_established": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  },
+  "sources": [
+    {"url": "https://arxiv.org/abs/2103.15012", "use": "ell-boson radial perturbation operator, transformation, domain rates and asymptotic dispersion; its numerical shooting and unproved nodal hypotheses are not imported as rigorous evidence"},
+    {"url": "https://arxiv.org/abs/2601.05129", "use": "frozen mini-boson background normalization cross-map only"}
+  ]
+}

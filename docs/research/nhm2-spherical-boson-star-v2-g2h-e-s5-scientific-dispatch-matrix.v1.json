@@ -1,0 +1,82 @@
+{
+  "schema": "nhm2.g2h_e_s5.scientific_dispatch_matrix.v1",
+  "status": "active_fail_closed_implementation_matrix_no_execution_authority",
+  "program_gate": "G2H-E-S5",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "primary selected-member scientific duty dispatch",
+    "current_maturity": "outer guard complete; candidate-neutral manifest validation, first origin coefficients, frozen grid geometry/indexing and canonical DCT partial; selected-member constructors absent",
+    "target_maturity": "C01-C14 and Q01-Q05 source-complete behind the sealed guard; C15/Q06 explicitly deferred to independent replay",
+    "required_frozen_inputs": ["R2 041c406c...ed12a", "R1 seal 728d8c9a...025ca", "quantum builder 29893736...62fc", "checkpoint ABI 6fbf6cdb...911ca"],
+    "required_evidence": ["one implementation record per duty", "manufactured candidate-neutral fixtures", "first-failure chronology", "no selected-member evaluation"],
+    "stop_fail_criteria": ["a duty marked complete without a selected-data constructor", "fixture-only primitive represented as scientific implementation", "candidate ingress", "root or authorization creation"],
+    "explicit_non_goals": ["executing any duty", "Rust implementation", "pair agreement", "G3", "physical authority"],
+    "downstream_gate_unlocked": "final primary build binding only when every primary-eligible duty is complete"
+  },
+  "maturity_grammar": {
+    "missing": "no selected-data constructor or dispatch exists",
+    "partial": "some reusable primitive or dispatch exists but the complete duty does not",
+    "complete_unexecuted": "source-complete and fixture-audited but never invoked on selected data",
+    "deferred_independent": "not a primary-only duty; requires a later separately authorized independent result"
+  },
+  "infrastructure": {
+    "checkpoint_ABI": "complete_unexecuted",
+    "outer_guard": "complete_unexecuted",
+    "record_writer": "complete_unexecuted",
+    "scientific_dispatcher": "partial",
+    "fixed_duty_scheduler": "complete_unexecuted",
+    "candidate_ingress": "partial",
+    "state_grid_codec": "partial",
+    "primary_runtime_binding": "missing"
+  },
+  "duties": [
+    {"id":"R2-C01","status":"partial","reusable_evidence":"bounded manifest shape plus component-wise O_NOFOLLOW traversal, stable regular-descriptor identity, exact byte count and SHA-256 verification pass 7/7 candidate-neutral fixtures","missing":"final complete scientific source/input inventory, final build identities, and C01 handler/record"},
+    {"id":"R2-C02","status":"partial","reusable_evidence":"512-bit Arb first regular positive-origin coefficients pass Minkowski, synthetic rational, and nonfinite rejection fixtures 3/3","missing":"higher recurrence, validated local-existence remainder enclosure, selected origin record, and selected-member dispatch"},
+    {"id":"R2-C03","status":"partial","reusable_evidence":"all four frozen node grids, exact endpoints, state indices, and canonical DCT-I pass 8/8 candidate-neutral fixtures","missing":"positive/vacuum residual operators, approximate solutions, four selected BVP solves, inverse/radii proof, and validated terminal ball"},
+    {"id":"R2-C04","status":"missing","reusable_evidence":"strict-sign fixtures","missing":"selected global sigma positivity/monotonicity enclosure"},
+    {"id":"R2-C05","status":"missing","reusable_evidence":"no-fold/lapse fixtures","missing":"selected global b/s/lapse/no-horizon enclosure"},
+    {"id":"R2-C06","status":"missing","reusable_evidence":"boundary and completeness fixtures","missing":"selected smoothness and completeness certificate"},
+    {"id":"R2-C07","status":"partial","reusable_evidence":"exact frozen rho, p_r, p_t, b', s', and sigma bulk residual map is implemented at 512-bit Arb and passes Minkowski, synthetic rational closed-residual, and invalid-denominator fixtures 3/3","missing":"origin/tail regularized residual maps, 256-cell complete-domain evaluation, selected residual/constraint enclosure, and C07 handler"},
+    {"id":"R2-C08","status":"partial","reusable_evidence":"positive-kappa carrier reconstruction, transformed mass/lapse/H/KG residuals, stable q>0 evaluation, exact q=0 D0/S0 recurrence, non-dyadic interface insertion, and corruption checks pass 4/4; exact FLINT integer multivariate recurrence and symbolic parameter differentiation produce the full 78-entry pointwise (u,v,j) inventory through q-order 12; a conservative compact-box supremum engine uses exact monomials and the exp(-a*x)*x^h maximizer, then assembles all six Bell-12 and frozen 556-weighted mixed coefficient norms; combined candidate-neutral fixtures pass 9/9","missing":"selected per-cell parameter boxes for all six positive/vacuum carrier instances, directed kappa/beta Jacobian-Hessian chain rules, formal-germ flat-remainder state norms, exact F_flat contributions to Y/Z1/Z2, selected infinity certificate, and C08 handler/record"},
+    {"id":"R2-C09","status":"missing","reusable_evidence":"mass observable fixtures","missing":"selected common-unit ADM/Komar/integrated mass intervals"},
+    {"id":"R2-C10","status":"missing","reusable_evidence":"smooth manufactured profiles","missing":"selected global curvature and no-distribution enclosure"},
+    {"id":"R2-C11","status":"missing","reusable_evidence":"1024-cell continuation primitives","missing":"selected vacuum-to-member overlap/no-fold/kernel/transversality proof"},
+    {"id":"R2-C12","status":"missing","reusable_evidence":"vacuum endpoint fixtures","missing":"validated SP endpoint and controlled Minkowski remainder"},
+    {"id":"R2-C13","status":"missing","reusable_evidence":"Riccati/trial fixtures","missing":"selected turning-side and positive fundamental radial eigenvalue certificate"},
+    {"id":"R2-C14","status":"partial","reusable_evidence":"frozen 64/96/128/256 grid geometry, exact cardinalities, canonical coefficient packing and DCT-I are executable and fixture-audited","missing":"four selected independently solved grid states, cross-grid defects/contraction ratios, and continuum enclosure"},
+    {"id":"R2-C15","status":"deferred_independent","reusable_evidence":"wire ABI fixtures","missing":"later Rust result and cross-lane classical agreement"},
+    {"id":"R2-Q01","status":"missing","reusable_evidence":"geometric hypothesis fixtures","missing":"accepted selected background global-hyperbolicity/static/completeness certificate"},
+    {"id":"R2-Q02","status":"missing","reusable_evidence":"negative-axis and measure fixtures","missing":"selected K Friedrichs positivity and spectral lower bound"},
+    {"id":"R2-Q03","status":"missing","reusable_evidence":"radial/angular/measure fixtures","missing":"selected static ground-state and Hadamard microlocal certificate"},
+    {"id":"R2-Q04","status":"missing","reusable_evidence":"Hadamard/RSET fixtures","missing":"selected common-state locally covariant conserved RSET"},
+    {"id":"R2-Q05","status":"missing","reusable_evidence":"256-vector Gram/noise fixtures","missing":"selected connected smeared-noise symmetry/conservation/positivity certificate"},
+    {"id":"R2-Q06","status":"deferred_independent","reusable_evidence":"wire ABI fixtures","missing":"later Rust result and quantum agreement"}
+  ],
+  "counts": {
+    "primary_eligible_total": 19,
+    "complete_unexecuted": 0,
+    "partial": 6,
+    "missing": 13,
+    "deferred_independent": 2
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "matrix_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

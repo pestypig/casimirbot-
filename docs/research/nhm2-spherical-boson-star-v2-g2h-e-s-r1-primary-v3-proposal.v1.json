@@ -1,0 +1,65 @@
+{
+  "authorization_record_absent": true,
+  "authorization_template_lines": [
+    "schema=nhm2.g2h_execution_authorization.v2",
+    "decision=AUTHORIZED",
+    "lane=primary",
+    "token_sha256=39ee95896fbd9d39d13c2762c42cefcf5284a2cb66e78dddadcf0006530dd3c3",
+    "contract_sha256=30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+    "executable_sha256=1764b6bec075061eea815a2a9c44cba3ff459fb8cc0709c813762863225246e1",
+    "output_root=artifacts/research/nhm2/g2h/tolman-vii-primary-v3"
+  ],
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_evaluations": 0,
+    "diagnostic_lamp": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "build_binding_sha256": "5c9546b1bcb1a41a9f785b41969da14e789b00e0d177b58b0a89b0ad7a3cc164",
+  "candidate_definition_changed": false,
+  "checkpoint": {
+    "bytes": 12099,
+    "command": "python scripts/nhm2_g2h_e_s_r1_primary_v3_checkpoint.py --lane primary --token 622dfe119a646715cf8cf3855955cb1d23404b3b6a34cce1957cdd47b0a3d34a --execute",
+    "sha256": "c7266e346f7c1cf1afb38437fd723b3f9b3db7f17e05ed954c615df0e2560532"
+  },
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "exhausted_v1": {
+    "authorization_sha256": "348dc0f0f7bedf1e825b83218f55f3a20cdf3507b1b04189a8db8618778e87f3",
+    "container_id": "ed7ed5fd641507c5457d83943489e0cc2c521a723509a76bcc1fd4668b00270c",
+    "invocation_sha256": "0640623244279e787b74b85980fa7d52a038f4312f006eb7100116849aaeb5c8",
+    "proposal_sha256": "bab85c219be9245b77b6a353b9aa47cebe13153107f7d46e0d0e699071feb46e",
+    "result_sha256": "44ab716de6b2657d549cc6589241fab7a728af3c5baf2e25c184911348913b0f",
+    "root_required_absent": "artifacts/research/nhm2/g2h/tolman-vii-primary-v1"
+  },
+  "exhausted_v2": {
+    "authorization_sha256": "452537efaf5ae64260122fac63cc8817b3babb4eb15668dfe8dc92bcbb16cc10",
+    "container_id": "6ffbd649062affbfdc231cd3ae4fb5965d4f87b56bf06eb9596270ce07a9644b",
+    "invocation_sha256": "2b6e57dc5a9586f16737f6dc2d190d2d8f22f92ac09328e989112e035aaccdd2",
+    "proposal_sha256": "65093d0084a513b101172e339123ecb2839cd76ef4350c6a351acdf054dbcfdd",
+    "result_sha256": "0d3987694b1b47d5eb92cee644bff9458ec80185a819f8764f6de94b7bcb79c9",
+    "root_required_absent": "artifacts/research/nhm2/g2h/tolman-vii-primary-v2"
+  },
+  "future_authorization_path": "artifacts/research/nhm2/g2h-authorizations/g2h-e-primary-v3.txt",
+  "future_container": "nhm2-g2h-e-primary-v3",
+  "future_execution_ledger_prefix": "artifacts/research/nhm2/g2h-executions/g2h-e-primary-v3",
+  "future_output_root": "artifacts/research/nhm2/g2h/tolman-vii-primary-v3",
+  "independent_lane": {
+    "authorization_absent": true,
+    "execution_authorized": false,
+    "output_root_absent": true
+  },
+  "no_retune": true,
+  "primary_executable_sha256": "1764b6bec075061eea815a2a9c44cba3ff459fb8cc0709c813762863225246e1",
+  "primary_image_id": "sha256:5a790295492d607fc9c3ede7a527a86922e09608cce1eaa9af464d33a1617ada",
+  "repair_scope": "authorization_schema_alignment_and_versioned_runtime_identity_only",
+  "retry_allowed": false,
+  "schema": "nhm2.g2h_e_s_r1.primary_v3_proposal.v1",
+  "scientific_duties_changed": false,
+  "separate_user_authorization_required": true,
+  "stop_rule": "first persisted invocation, partial output, PASS or FAIL is immutable and exhausts this proposal",
+  "token_sha256": "39ee95896fbd9d39d13c2762c42cefcf5284a2cb66e78dddadcf0006530dd3c3"
+}

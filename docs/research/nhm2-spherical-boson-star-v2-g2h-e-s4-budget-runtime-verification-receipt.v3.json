@@ -1,0 +1,122 @@
+{
+  "schema": "nhm2.g2h_e_s4.budget_runtime_verification_receipt.v3",
+  "status": "PASS_COMMON_C04_FIXED_BUDGET_TERMINAL_EXHAUSTION_SCIENTIFIC_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source-disjoint frozen budget tables, terminal exhaustion and persistent first-failure replay",
+    "current_maturity": "all four common roles complete on exact/manufactured/adversarial fixtures",
+    "target_maturity": "input evidence for P01 and R01 arithmetic-kernel implementation",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "builder algorithms 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "fixture binding 4c63634980fcc8f444b89188b309e9d14e0ae6ddbc008b73cbfc09a8fcde5651"
+    ],
+    "required_evidence": [
+      "independently parsed exact producer-specific budget tables",
+      "every counter consumed through its exact frozen limit and once beyond it",
+      "typed terminal exhaustion persisted as the first hard failure",
+      "later work ineligible without counter advancement",
+      "source/runtime disjointness and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "missing, extra, duplicate or mismatched budget counter",
+      "nonterminal exhaustion, post-failure counter advancement or receipt overwrite",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "scientific producer completion",
+      "candidate or positive-parameter evaluation",
+      "primary or Rust scientific execution",
+      "G3, lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "P01 then R01 512-bit directed-ball and ties-even projection fixture implementation"
+  },
+  "change_classification": {
+    "mathematical_semantics_changed": false,
+    "runtime_authority_changed": false,
+    "receipt_semantics_changed": false,
+    "evidence_maturity_changed": true
+  },
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "fixture_build_manifest": {"bytes": 14248, "raw_sha256": "4c63634980fcc8f444b89188b309e9d14e0ae6ddbc008b73cbfc09a8fcde5651"},
+    "completion_matrix": {"bytes": 10922, "raw_sha256": "1d601e1af76fe17ab6faf1938945056e0c71ef713cc5a5795a2fa4575ed37c00"},
+    "runtime_audit": {"bytes": 24311, "raw_sha256": "13e4834b1dc08b0431f1484f6462f26ee1008e95ec4f6c6d9edc342fe8ba6202"},
+    "completion_audit": {"bytes": 5005, "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"},
+    "canonical_work_program": {"bytes": 59947, "raw_sha256": "20b3953fadd6b166a69b446fac317b1a87bb87644a3f3e4dcb1dd837bd31021a"},
+    "active_packet": {"bytes": 7137, "raw_sha256": "9c4a0531e92188c352bdcfccf97dac76abfb200b61cfd22bbc2381db2bf00ac5"}
+  },
+  "primary": {
+    "budget_source_sha256": "80707c7a8cc66e93c7e88c4756a5d130ab76b63bc3f054b571e34a87df105bae",
+    "budget_header_sha256": "a0e4ce42aec8e2b25aa7b52c5d0ac5f2bd0aae2fb79384ba3d2a63a135b23661",
+    "image_id": "sha256:0aaed86d10ccfd99895878f26bca8ea39d1ee1b5a72d2ba79195d6a7eef50e7f",
+    "executable_sha256": "1ab0dcd6ee5963f16761fa84b969866db3f6252fde5bb1f0082379c8fbf95112",
+    "budget_counters_expected": 29,
+    "budget_counters_observed": 29,
+    "fixture": {"status": "PASS", "checks_passed": 27, "checks_total": 27},
+    "receipt": {
+      "raw_stream_sha256": "2e5cd155b1cded9ac96a11eaf3c6ec51e04a6b1eff879200a3876197e78d620e",
+      "domain_stream_sha256": "11b383677b7029d3a0f08847fabdb60f838ba45b1876e4281f84f22b6cc5e6a8",
+      "terminal_record_sha256": "5a96b6ff9b69a047f067ed0980b520a645911fcf7909acef1f18422486a492da",
+      "typed_first_failure": "builder_budget_exhausted:classical_inverse:projection_retries",
+      "second_run_exit": 67,
+      "overwrite_occurred": false
+    }
+  },
+  "independent": {
+    "budget_source_sha256": "8b6fd0fde754c2a3779fd083ca87bfdc67030fa4c5443a5367b14b27da278547",
+    "image_id": "sha256:7a9dfe664c8af8c6919a01e4efb68ff066c216c9cf410fd19dec839ccd8b7733",
+    "executable_sha256": "4b1908d7ecd4951906db7b9e56089d80d317225bca3fc34fdbf2e869ee3314f7",
+    "budget_counters_expected": 32,
+    "budget_counters_observed": 32,
+    "fixture": {"status": "PASS", "checks_passed": 26, "checks_total": 26},
+    "receipt": {
+      "raw_stream_sha256": "fe95461b7291feda548b6dcd5d380ce2626fd7918f96bf3f78f294c26f1d7594",
+      "domain_stream_sha256": "8a31c818abfab337c1752f9a03a6b60d7b9f3c9bee73b666aaa63deac8e3f08c",
+      "terminal_record_sha256": "4b22861cca9263c300166c6cb3c37e2536b8be72e59fee0550bde980f3ea8c25",
+      "typed_first_failure": "builder_budget_exhausted:classical_inverse:projection_retries",
+      "second_run_exit": 67,
+      "overwrite_occurred": false
+    }
+  },
+  "runtime_audit": {
+    "status": "PASS",
+    "checks_passed": 62,
+    "checks_total": 62,
+    "source_sets_disjoint": true,
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "scientific_builder_executed": false,
+    "execution_authorized": false,
+    "authority_promoted": false
+  },
+  "completion_audit": {
+    "status": "PASS_FAIL_CLOSED_MATRIX",
+    "checks_passed": 8,
+    "checks_total": 8,
+    "common_roles_complete": 4,
+    "common_roles_required": 4,
+    "primary_scientific_roles_complete": 0,
+    "primary_scientific_roles_required": 13,
+    "independent_scientific_roles_complete": 0,
+    "independent_scientific_roles_required": 13,
+    "S4_implementation_closure": false,
+    "next_role": "P01 then R01 arithmetic kernels"
+  },
+  "host_candidate_roots": {"primary": "absent", "independent": "absent"},
+  "authority": {
+    "receipt_is_scientific_proof": false,
+    "candidate_evaluated": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

@@ -149,6 +149,8 @@ const acceptedLiveProviderCatalog = [
 
 describe("Robinhood brokerage connection boundary", () => {
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-12T15:00:00.000Z"));
     vi.stubEnv(
       "DATABASE_URL",
       `pg-mem://brokerage-route-${crypto.randomUUID()}`,
@@ -164,6 +166,7 @@ describe("Robinhood brokerage connection boundary", () => {
 
   afterEach(async () => {
     await resetDbClient();
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -184,7 +187,8 @@ describe("Robinhood brokerage connection boundary", () => {
     expect(response.body).toEqual({ reached_adapter: true });
   });
 
-  it("requires an authenticated developer and exact same-origin writes", async () => {
+  it("allows authenticated user profile connections but keeps mutation routes developer-only", async () => {
+    vi.stubGlobal("fetch", createRobinhoodOAuthFetch());
     const app = createApp();
     const anonymous = await request(app)
       .get("/api/agi/brokerage-connections")
@@ -201,7 +205,37 @@ describe("Robinhood brokerage connection boundary", () => {
       display_name: "Brokerage User",
       account_type: "user",
     }).expect(200);
-    await user.get("/api/agi/brokerage-connections").expect(403);
+    const userConnections = await user
+      .get("/api/agi/brokerage-connections")
+      .expect(200);
+    expect(userConnections.body).toMatchObject({
+      ok: true,
+      connections: [],
+      credential_included: false,
+    });
+    const userEnrollment = await user
+      .post("/api/agi/brokerage-connections/robinhood/oauth/start")
+      .set(SAME_ORIGIN_HEADERS)
+      .send({})
+      .expect(201);
+    expect(userEnrollment.body).toMatchObject({
+      ok: true,
+      provider: "robinhood",
+      browser_navigation_required: true,
+      credential_included: false,
+    });
+    expect(JSON.stringify(userEnrollment.body)).not.toContain("code_verifier");
+    const userPaper = await user
+      .post(
+        "/api/agi/brokerage-connections/connection:user/rooms/room:user/paper-account",
+      )
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        starting_equity_cents: 34_000,
+        trading_day: "2026-08-24",
+      })
+      .expect(403);
+    expect(userPaper.body.error).toBe("brokerage_account_policy_locked");
 
     const developer = request.agent(app);
     await developer.post("/api/account/session/sign-in").send({
@@ -259,6 +293,45 @@ describe("Robinhood brokerage connection boundary", () => {
     expect(fetchMock.mock.calls.some(
       ([input]) => input.toString().includes("attacker.example"),
     )).toBe(false);
+  });
+
+  it("registers the exact development loopback callback without changing production callback selection", async () => {
+    const fetchMock = createRobinhoodOAuthFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const developer = request.agent(createApp());
+    await developer.post("/api/account/session/sign-in").send({
+      profile_id: "profile:brokerage-loopback-owner",
+      display_name: "Brokerage Loopback Owner",
+    }).expect(200);
+
+    const developmentStart = await developer
+      .post("/api/agi/brokerage-connections/robinhood/oauth/start")
+      .set({
+        Host: "127.0.0.1:1522",
+        Origin: "http://127.0.0.1:1522",
+        "Sec-Fetch-Site": "same-origin",
+      })
+      .expect(201);
+    expect(new URL(developmentStart.body.authorization_url).searchParams.get(
+      "redirect_uri",
+    )).toBe(
+      "http://127.0.0.1:1522/api/agi/brokerage-connections/robinhood/oauth/callback",
+    );
+
+    vi.stubEnv("NODE_ENV", "production");
+    const productionStart = await developer
+      .post("/api/agi/brokerage-connections/robinhood/oauth/start")
+      .set({
+        Host: "127.0.0.1:1522",
+        Origin: "http://127.0.0.1:1522",
+        "Sec-Fetch-Site": "same-origin",
+      })
+      .expect(201);
+    expect(new URL(productionStart.body.authorization_url).searchParams.get(
+      "redirect_uri",
+    )).toBe(
+      "https://casimirbot.test/api/agi/brokerage-connections/robinhood/oauth/callback",
+    );
   });
 
   it("completes PKCE OAuth, stores only ciphertext, and fail-closes a room that gains a guest", async () => {
@@ -1652,5 +1725,26 @@ describe("Robinhood brokerage connection boundary", () => {
         capabilityId: "brokerage.robinhood.portfolio.read",
       }),
     ).rejects.toMatchObject({ code: "brokerage_room_not_private" });
+    await owner
+      .delete(
+        `/api/agi/brokerage-connections/${completed.body.connection.connection_id}/room-bindings/${roomId}`,
+      )
+      .set(SAME_ORIGIN_HEADERS)
+      .expect(200, {
+        schema: "helix.brokerage_room_binding_revocation.v1",
+        ok: true,
+        revoked: true,
+        credential_included: false,
+        account_numbers_included: false,
+        raw_provider_payload_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    const revokedBindings = await owner
+      .get(`/api/agi/brokerage-connections/rooms/${roomId}`)
+      .expect(200);
+    expect(revokedBindings.body.bindings).toEqual([]);
   });
 });

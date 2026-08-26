@@ -1,0 +1,88 @@
+{
+  "schema": "nhm2.g2h_e_s4.arithmetic_runtime_verification_receipt.v4",
+  "status": "PASS_P01_R01_ARITHMETIC_KERNELS_REMAINING_SCIENTIFIC_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source/runtime-disjoint 512-bit directed-ball arithmetic and exact 2^-448 ties-even projection",
+    "current_maturity": "P01 and R01 complete on exact/manufactured pass/fail/tie fixtures",
+    "target_maturity": "input evidence for P02/P03 and R02/R03 inverse builders",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "builder algorithms 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "fixture binding 17753923c7b75884efc6779929ce02e9a84ed4971fdf5a22da024fa5df3fdf4d"
+    ],
+    "required_evidence": [
+      "reusable primary Arb operations fixed at 512 bits",
+      "native pure-Rust signed eight-limb balls with sixteen-limb intermediates",
+      "exact midpoint projection to n*2^-448 with signed ties to even",
+      "directed exact_dyadic-x error balls and zero/nonfinite rejection",
+      "bound disjoint images/executables, independent audit and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "wrong precision, projection lattice or tie result",
+      "non-directed arithmetic, admitted zero divisor or nonfinite projection",
+      "shared arithmetic source/runtime, C/FFI in Rust, candidate ingress or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "inverse, continuation, stability or quantum constructor completion",
+      "candidate or positive-parameter evaluation",
+      "scientific Rust execution, G3, lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "P02/P03 then R02/R03 manufactured inverse-builder implementation"
+  },
+  "change_classification": {
+    "mathematical_semantics_changed": false,
+    "runtime_authority_changed": false,
+    "receipt_semantics_changed": false,
+    "proof_implementation_maturity_changed": true
+  },
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "manifest": {"bytes": 15076, "raw_sha256": "17753923c7b75884efc6779929ce02e9a84ed4971fdf5a22da024fa5df3fdf4d"},
+    "completion_matrix": {"bytes": 11532, "raw_sha256": "fa91a7a5c1821983db2ef26c0d9cfe4c64185465ded4fea366a16ccbc6c62c72"},
+    "runtime_audit": {"bytes": 25132, "raw_sha256": "5e413ad67bca0b4330bd7d036679346136c0e8516aa9ff4d8f8f0453bb6b73c6"},
+    "completion_audit": {"bytes": 5005, "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"},
+    "arithmetic_audit": {"bytes": 6598, "raw_sha256": "138a9615c6c927542b598eb4517534ee48ca47ddb5b84779ee2ee3bc13d599a6"},
+    "canonical_work_program": {"bytes": 60008, "raw_sha256": "d671a3c50cbb5e6dcae0286e70db029b41619f8bf028211fc6947abdd2b0fb8d"},
+    "active_packet": {"bytes": 7470, "raw_sha256": "2ead47c3289f13d5fe5aead33ce4c8546e1af8e5ea46970328005104d7e5726e"}
+  },
+  "primary_P01": {
+    "arithmetic_source_sha256": "b029ea10824ea0d2742ed8bf719126f91d2836b6eda13830daa4640c50205323",
+    "arithmetic_header_sha256": "e411127454b6375ac3a7a99ede4607d63c73c9145ce50c1528aa97a5f3f3a281",
+    "image_id": "sha256:58c357e2f4aecd57822f53bf6688713d69dd10ce5494d15f708baa65e6adafcd",
+    "executable_sha256": "99e9862a179ef8e570fe69986551fef18819f43c615cbcdcfd53f756892be4fd",
+    "fixture": {"status": "PASS", "arithmetic_checks_passed": 6, "arithmetic_checks_total": 6, "checks_passed": 28, "checks_total": 28}
+  },
+  "independent_R01": {
+    "arithmetic_source_sha256": "703261c0e3e2c27bdd0f24c3ab3508b2adc077f5462b21f289131281d1b87e79",
+    "image_id": "sha256:ba15eb472d519a63dd596a8e602fc7828194684ee467b66746942e8fed7fb598",
+    "executable_sha256": "b638db52eab5c1c8671ccc8650c3de198ba7f76d36f2e22b6c130705dc21e320",
+    "runtime_dependencies": [],
+    "fixture": {"status": "PASS", "arithmetic_check_mask": "111111", "arithmetic_checks_passed": 6, "arithmetic_checks_total": 6, "checks_passed": 27, "checks_total": 27}
+  },
+  "audits": {
+    "runtime": {"status": "PASS", "checks_passed": 67, "checks_total": 67},
+    "arithmetic": {"status": "PASS", "checks_passed": 15, "checks_total": 15},
+    "completion": {"status": "PASS_FAIL_CLOSED_MATRIX", "checks_passed": 8, "checks_total": 8, "common_roles_complete": 4, "primary_roles_complete": 1, "independent_roles_complete": 1, "S4_implementation_closure": false}
+  },
+  "projection_reference": {
+    "inputs": ["5*2^-449", "7*2^-449", "-5*2^-449", "-7*2^-449", "9*2^-450", "11*2^-450", "-9*2^-450", "-11*2^-450"],
+    "lattice_n": [2, 4, -2, -4, 2, 3, -2, -3]
+  },
+  "host_candidate_roots": {"primary": "absent", "independent": "absent"},
+  "execution": {"candidate_evaluations": 0, "positive_parameter_samples": 0, "scientific_builder_executed": false, "execution_authorized": false},
+  "authority": {
+    "receipt_is_scientific_proof": false,
+    "candidate_evaluated": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

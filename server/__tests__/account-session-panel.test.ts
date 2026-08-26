@@ -530,6 +530,52 @@ describe("account session panel API", () => {
     expect(receipt.session?.profile.profile_id).not.toBe("dan@example.com");
   });
 
+  it("reuses an explicitly Auth0-linked profile instead of deriving a second browser profile", async () => {
+    await signInLocalAccountSession({
+      profile_id: "profile:oauth-room-owner",
+      display_name: "Minecraft room owner",
+      account_type: "developer",
+    });
+    await getPool().query(
+      `
+        INSERT INTO helix_account_linked_providers (
+          provider, provider_subject, profile_id, display_name, created_at, updated_at
+        )
+        VALUES ('auth0', 'auth0|minecraft-owner', 'profile:oauth-room-owner',
+          'Minecraft room owner', now(), now());
+      `,
+    );
+
+    const receipt = await signInWebAccountSession({
+      provider: "auth0",
+      provider_subject: "auth0|minecraft-owner",
+      display_name: "Verified Auth0 owner",
+    });
+
+    expect(receipt).toMatchObject({
+      ok: true,
+      message: "Signed in with Auth0.",
+      session: {
+        profile: {
+          profile_id: "profile:oauth-room-owner",
+          auth_mode: "web_auth",
+          provider: "external_oauth",
+          provider_subject: "auth0|minecraft-owner",
+        },
+      },
+    });
+    expect(receipt.session?.profile.profile_id).not.toBe(
+      "auth0:auth0|minecraft-owner",
+    );
+    const linked = await getPool().query<{ profile_id: string }>(
+      `SELECT profile_id FROM helix_account_linked_providers
+       WHERE provider = 'auth0' AND provider_subject = 'auth0|minecraft-owner'`,
+    );
+    expect(linked.rows).toEqual([
+      { profile_id: "profile:oauth-room-owner" },
+    ]);
+  });
+
   it("creates and signs into a public password profile without granting developer policy", async () => {
     const app = createApp();
     const agent = request.agent(app);

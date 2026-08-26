@@ -3151,6 +3151,28 @@ describe("Codex provider capability lane adapter", () => {
     ).toEqual([inspectGoal, actorStatus].sort());
   });
 
+  it("preserves an exact hard-route G6 role inspection over nearby environment affordances", () => {
+    const roleInspect =
+      "com.casimirbot.environment.reasoning_role.inspect";
+
+    expect(
+      runtimeProviderAdmittedCapabilityIdsForQuestion({
+        question:
+          "Inspect the canonical concurrent-reasoning ledger for this exact G6 goal.",
+        admittedCapabilityIds: [
+          roleInspect,
+          "com.casimirbot.environment.durable_goal.inspect",
+          "com.casimirbot.minecraft.actor.status.read",
+          "live_env.query_world_events",
+        ],
+        admittedToolFamilies: ["live_environment"],
+        committedRouteAllowedToolFamilies: ["live_environment"],
+        requiredExactCapabilityIds: [roleInspect],
+        restrictAllCapabilitiesToAdmittedToolFamilies: true,
+      }),
+    ).toEqual([roleInspect]);
+  });
+
   it("keeps account-wide mutations out of historical and contextual runtime turns", () => {
     const admittedCapabilityIds = [
       "debug.inspect_current_turn",
@@ -3804,6 +3826,12 @@ describe("Codex provider capability lane adapter", () => {
       scholarlyDecision: "answer",
       scholarlyDecisionAuditStatus: "invalid",
     })).toBe(true);
+    expect(shouldRetryCodexContinuationAffordance({
+      continuationInstruction,
+      scholarlyDecision: null,
+      scholarlyDecisionAuditStatus: null,
+      nativeTerminalCandidateCompletedAfterObservation: true,
+    })).toBe(false);
   });
 
   it("retries a natural selected-paper PDF and measurements follow-up through Codex", () => {

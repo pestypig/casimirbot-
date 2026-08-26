@@ -310,6 +310,35 @@ const actionConnectorCapabilitySchema = z
   })
   .strict();
 
+const actionConnectorControlEngineSchema = z.union([
+  z
+    .object({
+      control_engine: z.literal("native_fabric"),
+      available: z.literal(true),
+      version: z.string().trim().min(1).max(80).nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      control_engine: z.literal("baritone"),
+      available: z.literal(false),
+      version: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      control_engine: z.literal("baritone"),
+      available: z.literal(true),
+      version: z.string().trim().min(1).max(80),
+      goal_forms: z.tuple([z.literal("near_position")]),
+      mutation_policy: z.literal("movement_only"),
+      breaking_allowed: z.literal(false),
+      placement_allowed: z.literal(false),
+      inventory_mutation_allowed: z.literal(false),
+    })
+    .strict(),
+]);
+
 export const helixEnvironmentActionConnectorManifestSchema = z
   .object({
     schema: z.literal(HELIX_ENVIRONMENT_ACTION_CONNECTOR_MANIFEST_SCHEMA),
@@ -331,15 +360,7 @@ export const helixEnvironmentActionConnectorManifestSchema = z
     protocol_version: z.string().trim().min(1).max(160),
     capabilities: z.array(actionConnectorCapabilitySchema).min(1).max(128),
     available_control_engines: z
-      .array(
-        z
-          .object({
-            control_engine: z.enum(HELIX_ENVIRONMENT_ACTION_CONTROL_ENGINES),
-            available: z.boolean(),
-            version: z.string().trim().min(1).max(80).nullable(),
-          })
-          .strict(),
-      )
+      .array(actionConnectorControlEngineSchema)
       .min(1)
       .max(2),
     safety_policy: z
@@ -413,6 +434,37 @@ export type HelixEnvironmentActionConnectorManifest = z.infer<
   typeof helixEnvironmentActionConnectorManifestSchema
 >;
 
+const actionConnectorHeartbeatEngineSchema = z.union([
+  z
+    .object({
+      control_engine: z.literal("native_fabric"),
+      status: z.enum(["available", "busy", "unavailable", "error"]),
+      last_error: z.string().trim().min(1).max(1_000).nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      control_engine: z.literal("baritone"),
+      status: z.enum([
+        "unavailable",
+        "idle",
+        "calculating",
+        "pathing",
+        "paused_or_pending",
+        "policy_violation",
+        "error",
+      ]),
+      goal_owned: z.boolean(),
+      process_active: z.boolean(),
+      mutation_policy: z.literal("movement_only"),
+      mutation_policy_intact: z.boolean(),
+      safe_cancel_last_result: z.boolean(),
+      last_error: z.string().trim().min(1).max(1_000).nullable(),
+      estimated_ticks_to_goal: z.number().finite().nonnegative().optional(),
+    })
+    .strict(),
+]);
+
 export const helixEnvironmentActionConnectorHeartbeatSchema = z
   .object({
     schema: z.literal(HELIX_ENVIRONMENT_ACTION_CONNECTOR_HEARTBEAT_SCHEMA),
@@ -433,15 +485,7 @@ export const helixEnvironmentActionConnectorHeartbeatSchema = z
     manual_input_detected: z.boolean(),
     emergency_stop_latched: z.boolean(),
     control_engines: z
-      .array(
-        z
-          .object({
-            control_engine: z.enum(HELIX_ENVIRONMENT_ACTION_CONTROL_ENGINES),
-            status: z.enum(["available", "busy", "unavailable", "error"]),
-            last_error: z.string().trim().min(1).max(1_000).nullable(),
-          })
-          .strict(),
-      )
+      .array(actionConnectorHeartbeatEngineSchema)
       .min(1)
       .max(2),
     latest_event_sequence: z.number().int().nonnegative().nullable(),
@@ -459,6 +503,17 @@ export const helixEnvironmentActionConnectorHeartbeatSchema = z
   })
   .strict()
   .superRefine((heartbeat, context) => {
+    const engineIds = new Set<string>();
+    for (const [index, engine] of heartbeat.control_engines.entries()) {
+      if (engineIds.has(engine.control_engine)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["control_engines", index, "control_engine"],
+          message: "Connector heartbeat engine identities must be unique.",
+        });
+      }
+      engineIds.add(engine.control_engine);
+    }
     if (heartbeat.controls_asserted && heartbeat.active_workflow_ids.length === 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "controlled-stellar-composition-transport-g0-preregistration/1",
+  "status": "preregistered_reduced_order_v1",
+  "maturity": "reduced_order_diagnostic",
+  "claimBoundary": {
+    "planningOnly": true,
+    "stellarEvolutionSolved": false,
+    "interventionFeasible": false,
+    "actuationAuthorized": false,
+    "nhm2OrWarpEvidence": false
+  },
+  "baseline": {
+    "object": "one_solar_mass_calibrated_solar_model",
+    "targetAgeGyr": 4.57,
+    "calibrationParameters": [
+      "initial_helium_fraction",
+      "initial_metal_fraction",
+      "mixing_length_parameter"
+    ],
+    "interventionParametersExcludedFromCalibration": true,
+    "zeroTransportRecoveryRequired": true
+  },
+  "milestones": {
+    "centralHydrogenExhaustion": {
+      "definition": "first accepted model step at or below a preregistered central hydrogen mass-fraction threshold",
+      "numericalThreshold": null,
+      "thresholdStatus": "freeze_in_g1_before_intervention_results"
+    },
+    "tams": {
+      "definition": "terminal-age main-sequence milestone derived from central hydrogen exhaustion under the frozen G1 convention",
+      "numericalThreshold": null,
+      "thresholdStatus": "freeze_in_g1_before_intervention_results"
+    },
+    "hydrogenShellIgnition": {
+      "definition": "first accepted model step satisfying a preregistered off-center hydrogen-luminosity dominance criterion",
+      "numericalThreshold": null,
+      "thresholdStatus": "freeze_in_g1_before_intervention_results"
+    },
+    "earlySubgiant": {
+      "definition": "post-TAMS interval ending at the preregistered radius threshold",
+      "numericalThreshold": null,
+      "thresholdStatus": "freeze_in_g1_before_intervention_results"
+    },
+    "radiusThreshold": {
+      "definition": "first accepted model step with photospheric radius at or above a preregistered multiple of the calibrated baseline solar radius",
+      "numericalThreshold": null,
+      "thresholdStatus": "freeze_in_g1_before_intervention_results"
+    }
+  },
+  "primaryOutputs": [
+    "delta_t_tams_myr",
+    "delta_t_radius_threshold_myr"
+  ],
+  "acceptanceVector": [
+    "luminosity",
+    "radius",
+    "effective_temperature",
+    "surface_z_over_x",
+    "surface_helium",
+    "convection_zone_depth",
+    "sound_speed_profile",
+    "density_profile",
+    "pp_neutrino_flux",
+    "be7_neutrino_flux",
+    "b8_neutrino_flux",
+    "cno_neutrino_flux",
+    "low_degree_mode_frequencies",
+    "r02",
+    "r13",
+    "lithium",
+    "beryllium",
+    "species_conservation",
+    "energy_conservation",
+    "ledoux_stability",
+    "schwarzschild_stability",
+    "brunt_vaisala_profile"
+  ],
+  "acceptancePolicy": {
+    "tolerances": null,
+    "covariancePolicy": null,
+    "multipleTestingPolicy": null,
+    "status": "must_be_versioned_in_g1_before_any_intervention_outcome_is_viewed",
+    "favorableSignsNeverSubstituteForResidualMagnitudes": true
+  },
+  "numericalPolicy": {
+    "spatialConvergenceRequired": true,
+    "temporalConvergenceRequired": true,
+    "baselineAndCandidateUseSamePolicy": true,
+    "failedAndNullRunsRetained": true,
+    "postResultRetuningAllowed": false,
+    "fixtureFallbackAllowed": false,
+    "gyreResultRequiresParentProfileHash": true
+  },
+  "terminalOutcomes": [
+    "NO_ADMISSIBLE_PROFILE",
+    "NARROW_ADMISSIBLE_PROFILE",
+    "ROBUST_ADMISSIBLE_FAMILY"
+  ]
+}

@@ -65,6 +65,34 @@ const authorityReceipt = (
   raw_content_included: false,
 });
 
+const activeAuthority = (allowedCapabilityIds: string[]) => ({
+  schema: "helix.environment_action.authority.v1",
+  action_authority_id: "environment_action_authority:player-ui",
+  environment_binding_id: environmentId,
+  room_source_binding_id: sourceBinding.binding_id,
+  room_id: roomId,
+  source_id: "source:room-ingress:player-ui",
+  world_id: "minecraft:local:player-ui",
+  adapter_profile_id: "game.minecraft.player.fabric.v1",
+  domain_adapter: "minecraft.fabric_client.v1",
+  participant_id: participantId,
+  subject_binding_id: "environment_subject_binding:player-ui",
+  allowed_capability_ids: allowedCapabilityIds,
+  autonomy_mode: "approved_capabilities",
+  manual_override_policy: "cancel",
+  status: "active",
+  policy_version: 1,
+  issued_at: "2026-08-05T22:00:00.000Z",
+  expires_at: "2099-08-05T23:00:00.000Z",
+  revoked_at: null,
+  credential_included: false,
+  content_role: "environment_action_authority_not_assistant_answer",
+  answer_authority: false,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -159,6 +187,24 @@ describe("Shared Live Room Player Embodiment controls", () => {
     );
 
     await screen.findByText("Minecraft Player Embodiment");
+    for (const capabilityLabel of [
+      "Camera tracking",
+      "Combat attack",
+      "Reactive guardian program",
+      "Arm viability guardian",
+      "Disarm viability guardian",
+    ]) {
+      expect(screen.getByRole("checkbox", { name: capabilityLabel }))
+        .toBeTruthy();
+    }
+    fireEvent.change(
+      screen.getByLabelText(
+        "Player action lease duration for Local Fabric 1.21.8",
+      ),
+      { target: { value: String(30 * 24 * 60 * 60_000) } },
+    );
+    expect(screen.getByText(/Long-lived player authority remains limited/i))
+      .toBeTruthy();
     const save = screen.getByRole("button", { name: "Save player authority" });
     expect(save.hasAttribute("disabled")).toBe(true);
     fireEvent.click(
@@ -183,7 +229,9 @@ describe("Shared Live Room Player Embodiment controls", () => {
       ]);
       expect(body.autonomy_mode).toBe("approved_capabilities");
       expect(body.manual_override_policy).toBe("cancel");
-      expect(Date.parse(body.expires_at)).toBeGreaterThan(Date.now());
+      expect(Date.parse(body.expires_at) - Date.now()).toBeGreaterThan(
+        29 * 24 * 60 * 60_000,
+      );
     });
 
     fireEvent.click(
@@ -202,6 +250,7 @@ describe("Shared Live Room Player Embodiment controls", () => {
         domain_adapter: "minecraft.fabric_mod.v1",
         action_credential_requested: true,
         action_authority_id: "environment_action_authority:player-ui",
+        credential_ttl_ms: 30 * 24 * 60 * 60_000,
       });
       expect(body.command_credential_requested).toBeUndefined();
     });
@@ -211,6 +260,38 @@ describe("Shared Live Room Player Embodiment controls", () => {
     expect(screen.getByText(/delivered directly to the client companion/i))
       .toBeTruthy();
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("bearer_token");
+  });
+
+  it("does not let readiness refreshes overwrite an unsaved capability draft", async () => {
+    const storedCapabilities = HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS.filter(
+      (id) => id !== "com.casimirbot.minecraft.player.combat.attack",
+    );
+    const authority = activeAuthority(storedCapabilities);
+    const fetchMock = vi.fn(async (): Promise<Response> =>
+      jsonResponse(authorityReceipt(authority)),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <SharedLiveRoomPlayerEmbodimentPanel
+        roomId={roomId}
+        environment={environment}
+        selfParticipantId={participantId}
+        sourceBinding={sourceBinding}
+        isOwner
+      />,
+    );
+
+    const combat = await screen.findByRole("checkbox", { name: "Combat attack" });
+    expect((combat as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(combat);
+    expect((combat as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Refresh Player Embodiment authority" }),
+    );
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
+    expect((combat as HTMLInputElement).checked).toBe(true);
   });
 
   it("distinguishes configured authority from a manifest-and-heartbeat-ready client", async () => {

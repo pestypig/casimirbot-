@@ -1,0 +1,85 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.verification_receipt.v1",
+  "status": "PASS_EXACT_DEFINITION_CLOSURE_AND_S4_FIXTURE_IMPLEMENTATION_HANDOFF_ONLY",
+  "definition_closure": {
+    "seal_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json",
+    "seal_bytes": 7805,
+    "seal_sha256": "728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+    "closure_audit_script_sha256": "ae249b1a00cb682a8cc5850bc9cb212a7c04082dc4ddea4928c156f7419c9e4e",
+    "cross_language_replay_script_sha256": "00a05cccde76df76de78aefb2c6b62e054f6ca6abefb69106b085dabceab16fd",
+    "quantum_audit_script_sha256": "72fc69854bde25200be6afebbab134ea7139cbd18ad81d5f5aa24090bc38be59",
+    "builder_audit_script_sha256": "69448a4df1e284551afdb5af26c625d062e8c2d934c5e68e860e9e46c8d7309e",
+    "closure_checks": [42, 42],
+    "fixture_suites": 18,
+    "cross_language_checks": [100, 100],
+    "quantum_checks": [49, 49],
+    "builder_checks": [40, 40],
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false
+  },
+  "math": {
+    "command": "npm run math:validate && npm run math:report",
+    "registry_entries": 318,
+    "validation": "PASS",
+    "report_json_bytes": 25037,
+    "report_json_sha256": "a764d2b3889a685805764bdb973348c8283ffc60052a890aa4ada74d67be93bb",
+    "report_markdown_bytes": 2051,
+    "report_markdown_sha256": "a88e778a944f75fe9a111ef0b2fa82918fad3039c757d78af0a63bd4158ea509"
+  },
+  "warp": {
+    "required_files": 18,
+    "passed_files": 18,
+    "failed_files": 0,
+    "tests": 179,
+    "passed_tests": 179,
+    "failed_tests": 0,
+    "verdict": "PASS"
+  },
+  "casimir": {
+    "command": "npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --export-url http://127.0.0.1:5050/api/agi/training-trace/export --trace-out artifacts/training-trace.jsonl --trace-limit 200",
+    "trace_id": "adapter:62a5e10e-bb18-474b-8fb2-43af10010f44",
+    "run_id": "2473",
+    "verdict": "PASS",
+    "first_fail": null,
+    "fail_reason": "NONE",
+    "deltas": [],
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_status": "GREEN",
+    "integrity_ok": true,
+    "bootstrapping_503_before_ready": 1,
+    "bootstrapping_meaning": "typed infrastructure readiness response before route mounting; no adapter run or certificate was created by that request"
+  },
+  "training_trace": {
+    "path": "artifacts/training-trace.jsonl",
+    "bytes_at_receipt": 4740930,
+    "sha256_at_receipt": "92ed9e851d2e32e5b757097b7701215847b20794b7360eff40c7d3670ed7173b"
+  },
+  "work_program": {
+    "active_gate": "G2H-E-S4",
+    "bytes": 59592,
+    "sha256": "6d076b7b631eb0acda12cbe701895b117e2c6a30ec9b30b703597d2d88c5d7df"
+  },
+  "handoff": {
+    "R1_definition_gate_closed": true,
+    "S4_fixture_implementation_active": true,
+    "eligible_work": "source/runtime-disjoint producer source, exact/manufactured/synthetic fixtures, guarded receipts, build/runtime/executable/command/environment manifests, independent disjointness audit and absent-root proof",
+    "ineligible_work": "selected candidate evaluation, positive continuation sample, either candidate root, authorization token, scientific Rust execution, G3 or any authority promotion"
+  },
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_execution_authorized": false,
+    "candidate_executed": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "two_lanes_published": false,
+    "pair_agreement": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

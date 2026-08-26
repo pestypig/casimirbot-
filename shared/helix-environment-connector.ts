@@ -36,6 +36,8 @@ export const HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY =
   "com.casimirbot.minecraft.crop_state.read" as const;
 export const HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY =
   "com.casimirbot.minecraft.reachability.check" as const;
+export const HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY =
+  "com.casimirbot.minecraft.perception_snapshot.read" as const;
 export const HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY =
   "com.casimirbot.minecraft.registry.fact.read" as const;
 export const HELIX_MINECRAFT_RECIPE_FACT_READ_CAPABILITY =
@@ -57,6 +59,7 @@ export const HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
   HELIX_MINECRAFT_CROP_STATE_READ_CAPABILITY,
   HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
 ] as const);
 export const HELIX_MINECRAFT_MECHANICS_FACT_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_REGISTRY_FACT_READ_CAPABILITY,

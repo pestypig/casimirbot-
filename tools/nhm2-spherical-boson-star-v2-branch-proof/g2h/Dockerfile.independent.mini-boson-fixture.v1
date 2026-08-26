@@ -1,0 +1,29 @@
+FROM rust:1.82.0-alpine3.20@sha256:2f42ce0d00c0b14f7fd84453cdc93ff5efec5da7ce03ead6e0b41adb1fbe834e AS builder
+
+COPY mini_boson_star_fixture_independent.rs /src/mini_boson_star_fixture_independent.rs
+COPY mini_boson_star_wire_independent.rs /src/mini_boson_star_wire_independent.rs
+COPY mini_boson_star_budget_independent.rs /src/mini_boson_star_budget_independent.rs
+COPY mini_boson_star_arithmetic_independent.rs /src/mini_boson_star_arithmetic_independent.rs
+COPY mini_boson_star_inverse_independent.rs /src/mini_boson_star_inverse_independent.rs
+COPY mini_boson_star_determinant_independent.rs /src/mini_boson_star_determinant_independent.rs
+COPY mini_boson_star_continuation_independent.rs /src/mini_boson_star_continuation_independent.rs
+COPY mini_boson_star_stability_independent.rs /src/mini_boson_star_stability_independent.rs
+COPY mini_boson_star_quantum_radial_independent.rs /src/mini_boson_star_quantum_radial_independent.rs
+COPY mini_boson_star_quantum_angular_independent.rs /src/mini_boson_star_quantum_angular_independent.rs
+COPY mini_boson_star_quantum_negative_axis_independent.rs /src/mini_boson_star_quantum_negative_axis_independent.rs
+COPY mini_boson_star_quantum_measure_independent.rs /src/mini_boson_star_quantum_measure_independent.rs
+COPY mini_boson_star_hadamard_independent.rs /src/mini_boson_star_hadamard_independent.rs
+COPY mini_boson_star_noise_independent.rs /src/mini_boson_star_noise_independent.rs
+
+RUN rustc --edition=2021 -C opt-level=2 -C debuginfo=0 -C panic=abort \
+      -C overflow-checks=yes -C target-feature=+crt-static \
+      -o /mini-boson-star-independent-fixture-v1 \
+      /src/mini_boson_star_fixture_independent.rs \
+    && strip /mini-boson-star-independent-fixture-v1
+
+FROM scratch
+
+COPY --from=builder /mini-boson-star-independent-fixture-v1 \
+     /mini-boson-star-independent-fixture-v1
+
+ENTRYPOINT ["/mini-boson-star-independent-fixture-v1"]

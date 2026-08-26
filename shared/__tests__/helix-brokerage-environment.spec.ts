@@ -66,7 +66,16 @@ describe("Robinhood brokerage environment contract", () => {
     ).toBe(false);
   });
 
-  it("keeps the environment developer-only at the account-policy boundary", () => {
+  it("publishes profile connections to users while keeping brokerage mutation developer-only", () => {
+    expect(HELIX_DEVELOPER_ACCOUNT_POLICY.feature_flags).toContain(
+      "profile_connections",
+    );
+    expect(HELIX_USER_ACCOUNT_POLICY.feature_flags).toContain(
+      "profile_connections",
+    );
+    expect(HELIX_USER_ACCOUNT_POLICY.locked_features).not.toContain(
+      "profile_connections",
+    );
     expect(HELIX_DEVELOPER_ACCOUNT_POLICY.feature_flags).toContain(
       "brokerage_environment",
     );

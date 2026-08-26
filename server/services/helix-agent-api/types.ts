@@ -11,6 +11,8 @@ export type HelixAgentApiPrincipal = {
   subjectId: string;
   accountProfileId: string;
   accountType: HelixAccountType;
+  /** Stable server-derived reference to the signed OAuth client, never its secret. */
+  oauthClientRef?: string | null;
   scopes: ReadonlySet<string>;
   tokenExpiresAt: string | null;
   accountContext: HelixWorkstationGatewayAccountContext;

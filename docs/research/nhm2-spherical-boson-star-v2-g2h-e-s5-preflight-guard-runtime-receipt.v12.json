@@ -1,0 +1,81 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v12",
+  "status": "PASS_CANDIDATE_NEUTRAL_FULL_STATE_CARRIER_PARAMETER_JETS_SCIENTIFIC_HANDLERS_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "60004c806a2574050d16c76a2a468319aeffbb91d0593e9f0df427bb50c75179",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v17",
+    "image_id": "sha256:bca5bdd17a48381cf2e2f79ecb414452a2b18db96381af6793c9fd06654dc5ba",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 165040,
+    "executable_sha256": "571604acbc4cf203de15c44f35f22df4038b0ecf9bbf0f980cd6fe6ecc3bc750",
+    "carrier_parameter_header_sha256": "9e4089c46a5012329d2d7cf1235de40a2f95d3046e929448c82859fb186cc39a",
+    "carrier_parameter_cpp_sha256": "dacae316fe94d05273881c3d18182bb71d5750266ed29fc86c7e1543250ff35c"
+  },
+  "carrier_parameter_scope": {
+    "fixture_status": "PASS_3_OF_3_MASK_7",
+    "working_precision_bits": 512,
+    "positive_state_coordinates": ["omega", "M"],
+    "positive_formulas": [
+      "kappa=sqrt(1-omega^2)",
+      "beta=M*(2*omega^2-1)/kappa-1"
+    ],
+    "vacuum_state_rule": "eta held fixed; Nbar is a direct state scalar and Mbar_infinity is a dependent state observable",
+    "vacuum_formulas": [
+      "kappa_bar=sqrt(-2*Nbar)",
+      "beta_bar=Mbar_infinity*(1+4*eta*Nbar)/kappa_bar-1"
+    ],
+    "dependent_mass_ingress": "complete directed Mbar_infinity state gradient and row-major Hessian are mandatory",
+    "mixed_hessian_rule": "both Nbar/Mbar_infinity orientations plus the supplied Mbar_infinity Hessian are composed without omission",
+    "carrier_instances": ["A", "W", "Z", "Abar", "Wbar", "Zbar"],
+    "strict_domain_rejections": [
+      "positive omega not strictly inside (0,1)",
+      "vacuum Nbar not strictly negative",
+      "nonfinite value, gradient or Hessian",
+      "invalid or overflowing state layout"
+    ],
+    "selected_parameter_boxes_loaded": false,
+    "selected_chain_rules_computed": false,
+    "formal_flat_remainder_Y_Z_computed": false,
+    "C08_complete": false
+  },
+  "audit": {
+    "runtime_audit": {
+      "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+      "sha256": "75871638570136c8a2471513a954d5c3947c87839364c4086101479c534d61e0",
+      "status": "PASS",
+      "checks_passed": 30,
+      "checks_total": 30
+    },
+    "independent_definition_audit": {
+      "path": "scripts/nhm2_g2h_e_s5_carrier_parameter_definition_audit.py",
+      "sha256": "3adc432630907cadb0e68b8da6d4358dbb8839855da3397a6ad8599ff2ec46b4",
+      "status": "PASS",
+      "checks_passed": 14,
+      "checks_total": 14,
+      "method": "independent SymPy differentiation of the frozen formulas plus candidate-neutral runtime and protected-root checks"
+    }
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_handlers_installed": 0,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

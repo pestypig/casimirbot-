@@ -114,6 +114,15 @@ const localPersistenceTables = [
   "helix_environment_durable_goal_participants",
   "helix_environment_durable_goal_participant_events",
   "helix_environment_durable_goal_events",
+  // Concurrent reasoning is an append-only child ledger of the durable goal.
+  // Persist the projection before its events so a keyed restart cannot retain
+  // the physical effect while losing the proposals, arbitration, and exact
+  // execution/result links that authorized it.
+  "helix_environment_reasoning_role_ledgers",
+  "helix_environment_reasoning_role_events",
+  "helix_environment_monitor_leases",
+  "helix_environment_monitor_events",
+  "helix_environment_monitor_delivered_evidence",
   "helix_environment_probe_requests",
   "helix_environment_probe_attempts",
   "helix_environment_probe_results",
@@ -176,6 +185,9 @@ const localPersistenceJsonColumns = new Set([
   "helix_environment_durable_goal_events.event_payload",
   "helix_environment_durable_goal_events.payload",
   "helix_environment_durable_goal_events.evidence_refs",
+  "helix_environment_reasoning_role_events.event_payload",
+  "helix_environment_monitor_leases.lease_payload",
+  "helix_environment_monitor_events.event_payload",
   "helix_environment_probe_requests.arguments",
   "helix_environment_probe_results.result_payload",
   "helix_environment_probe_observations.normalized_observation",

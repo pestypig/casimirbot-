@@ -1,0 +1,90 @@
+{
+  "scenario_id": "EH-MC-NETHER1-baritone-movement-only-a0",
+  "lane": "direct_codex",
+  "action_kind": "navigate_to",
+  "prompt": "Navigate to the nearby destination through the optional Baritone engine without digging, placing, sprinting, or changing inventory, then verify exact arrival.",
+  "starting_state": {
+    "fixture_kind": "bounded_player_action",
+    "required_preconditions": [
+      "connected",
+      "on_ground"
+    ]
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.navigate",
+    "capability_version": 1,
+    "control_engine": "baritone",
+    "manual_override_required": true,
+    "postcondition_verification_required": true
+  },
+  "source_artifact_refs": [
+    "minecraft_client_log_sha256:1efa902be168a402a9bd7dcc23fdc5e5bad92be22212eaaacab428bf57581f5f",
+    "direct_diagnostic_workflow:direct_player_action_workflow:ef915af1-4289-4eea-abb1-64d0c9cade93"
+  ],
+  "selected_capability_id": "com.casimirbot.minecraft.player.navigate",
+  "normalized_arguments": {
+    "allow_dig": false,
+    "allow_place": false,
+    "allow_sprint": false,
+    "arrival_radius": 1,
+    "destination": {
+      "x": -111,
+      "y": 63,
+      "z": -48.25
+    },
+    "engine_preference": "baritone"
+  },
+  "admission_status": "not_applicable",
+  "execution_outcome": "succeeded",
+  "normalized_progress": [
+    {
+      "sequence": 0,
+      "event_type": "workflow.started",
+      "workflow_state": "running",
+      "progress_fraction": 0,
+      "measurements": {},
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 1,
+      "event_type": "workflow.succeeded",
+      "workflow_state": "succeeded",
+      "progress_fraction": 1,
+      "measurements": {
+        "arrival_radius": 1,
+        "breaking_allowed": false,
+        "control_engine": "baritone_then_native_fabric",
+        "distance_blocks": 0.8641143409739785,
+        "engine_version": "installed",
+        "inventory_mutation_allowed": false,
+        "inventory_mutations_performed": 0,
+        "mutation_policy": "movement_only",
+        "native_final_approach_used": true,
+        "placement_allowed": false,
+        "safe_cancel": true,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": true
+    }
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "direct_diagnostic_observation:direct_player_action_workflow:ef915af1-4289-4eea-abb1-64d0c9cade93:5"
+  ],
+  "observation_reentered": false,
+  "final_candidate_text": null,
+  "final_candidate_support_refs": [],
+  "route_product_text": null,
+  "route_product_support_refs": [],
+  "terminal_outcome": "success",
+  "terminal_authority_status": "not_applicable",
+  "terminal_writer_text": null,
+  "terminal_writer_support_refs": [],
+  "visible_text": null,
+  "voice_projection_status": "not_applicable",
+  "voice_text": null,
+  "created_at": "2026-08-24T21:43:54.158487600Z",
+  "hidden_reasoning_included": false
+}

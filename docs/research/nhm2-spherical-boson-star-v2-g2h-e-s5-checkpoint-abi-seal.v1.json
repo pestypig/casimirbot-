@@ -1,0 +1,32 @@
+{
+  "schema": "nhm2.g2h_e_s5.checkpoint_abi_seal.v1",
+  "status": "PASS_SEALED_OUTER_CHECKPOINT_IMPLEMENTATION_ELIGIBLE_NO_EXECUTION_AUTHORITY",
+  "program_gate": "G2H-E-S5",
+  "checkpoint_abi_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-checkpoint-abi.v1.json",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "audit_path": "scripts/nhm2_g2h_e_s5_checkpoint_abi_audit.py",
+  "audit_sha256": "8cf4484106de433023eba85ad6b4c82a42f3022580515e0988b04a7bfd2e0ba4",
+  "audit_status": "PASS",
+  "checks_passed": 23,
+  "checks_total": 23,
+  "candidate_evaluations": 0,
+  "positive_parameter_samples": 0,
+  "candidate_roots_created": false,
+  "authorization_record_created": false,
+  "authorization_token_created": false,
+  "scientific_execution_authorized": false,
+  "scientific_execution_performed": false,
+  "eligible_next_work": "implement and candidate-neutrally test the outer primary checkpoint guard against this exact ABI",
+  "authority": {
+    "seal_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

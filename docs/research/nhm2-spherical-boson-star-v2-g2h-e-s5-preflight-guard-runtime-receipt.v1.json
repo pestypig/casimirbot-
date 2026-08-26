@@ -1,0 +1,61 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v1",
+  "status": "PASS_OUTER_GUARD_CANDIDATE_NEUTRAL_SCIENTIFIC_DISPATCH_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "outer primary checkpoint identity, interface, environment, authorization-parser, and root guards",
+    "current_maturity": "candidate-neutral outer guard runtime PASS; scientific dispatch deliberately unlinked",
+    "target_maturity": "input evidence for the later candidate-capable primary checkpoint",
+    "required_frozen_inputs": ["checkpoint ABI 6fbf6cdb...911ca", "ABI seal ea33c825...44627"],
+    "required_evidence": ["source/image/executable identity", "self-test", "argument/environment/token rejection", "protected paths absent"],
+    "stop_fail_criteria": ["guard test failure", "scientific dispatch reachable", "candidate ingress", "root or authorization creation"],
+    "explicit_non_goals": ["candidate-capable duty implementation", "candidate execution", "authorization", "Rust", "G3", "physical authority"],
+    "downstream_gate_unlocked": "candidate-neutral scientific duty-dispatch source implementation"
+  },
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "sources": {
+    "sha256_header": "99278b36da34a37e7e6a199f247f1e3d8ca91f10bff309cb19c1355dd3d199d2",
+    "guard_cpp": "3148d5325599ae52e8e7dc24c90e12ad170f13929c5f4f61ac41b6342499d001",
+    "dockerfile": "6a2c27f91f4bb27978bc23e11d0558bc4f01351ded061bb574a3e7f521ed8f6b"
+  },
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v3",
+    "image_id": "sha256:54239388e21c5651f2bdbaca4e9a166344868e84e0274d0d10e08b25b30673cd",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 48128,
+    "executable_sha256": "ab634011cafefa60b755f740e76953518db001a369a49a7d659cf2ae1e4fbcc9",
+    "network": "none",
+    "rootfs": "read_only",
+    "scientific_dispatch_linked": false
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "180f4e600db9eea33577fe4fa1da7fe470997def2f1ebdad9fdd2956297d4495",
+    "status": "PASS",
+    "checks_passed": 12,
+    "checks_total": 12
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_execution_authorized": false,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

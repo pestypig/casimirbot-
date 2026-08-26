@@ -2,17 +2,21 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G0 — reduced-order ledger repair and preregistration**
+Active program gate: **G1 — real calibrated solar baseline**
 
-Status date: **August 23, 2026**
+Status date: **August 24, 2026**
 
 This document is the sole current dependency and status roadmap for the solar
 restoration deep-mixing research branch. Dated audits, solver receipts, UI
 presets, and theory-graph rows are evidence snapshots or implementation
 surfaces; they do not replace this roadmap.
 
-The sole active packet is
-[`controlled-stellar-composition-transport-g0-reduced-order-preregistration.md`](./controlled-stellar-composition-transport-g0-reduced-order-preregistration.md).
+The completed G0 packet is
+[`controlled-stellar-composition-transport-g0-reduced-order-preregistration.md`](./controlled-stellar-composition-transport-g0-reduced-order-preregistration.md),
+and its result is preserved in
+[`controlled-stellar-composition-transport-g0-result-record.md`](./controlled-stellar-composition-transport-g0-result-record.md).
+The sole active packet is now
+[`controlled-stellar-composition-transport-g1-solar-baseline-calibration.md`](./controlled-stellar-composition-transport-g1-solar-baseline-calibration.md).
 The intended manuscript structure and evidence map are maintained in
 [`controlled-stellar-composition-transport-white-paper-outline.md`](./controlled-stellar-composition-transport-white-paper-outline.md).
 
@@ -151,8 +155,8 @@ failed observational closure.
 
 | Gate | State | Required closure evidence | Downstream gate unlocked |
 | --- | --- | --- | --- |
-| G0 — Reduced-order ledger repair and preregistration | **active** | Reproducible ledger notebook/script and tests; distinct burn, mass-loss, circulation, hydrogen-delivery, and accessible-fuel quantities; derived `alpha(epsilon,t,transport)` contract; symmetric uncertainty-normalized guardrails; frozen milestone and acceptance definitions; corrected claim language proposal | G1 |
-| G1 — Real calibrated solar baseline | blocked by G0 | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
+| G0 — Reduced-order ledger repair and preregistration | **closed: `PASS_REDUCED_ORDER_PREREGISTERED`** | Typed ledgers separate hydrogen-burning reference, gross circulation, net hydrogen delivery, and cumulative accessible fuel; numerical audit and adversarial controller tests pass; future-gate semantic contract is versioned; claim boundary remains diagnostic | G1 |
+| G1 — Real calibrated solar baseline | **active** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
 | G2 — Conservative transport implementation | blocked by G1 | Species-conservative diffusion/advection implementation; boundary conditions; mass/species/energy closure tests; radiative-interior bridge; resolution and timestep convergence; zero-transport recovery of the G1 baseline | G3 |
 | G3 — Frozen transport-family campaign | blocked by G2 | Preregistered families, parameter bounds, sampling/optimization procedure, compute budget, seeds where applicable, first-failure rules, and retained artifacts for null as well as surviving candidates | G4 |
 | G4 — Evolutionary milestone closure | blocked by G3 | Each candidate evolved through central hydrogen exhaustion, TAMS, core contraction, shell ignition, early subgiant evolution, and a frozen radius threshold; physical `Delta t_TAMS` and `Delta t_R>R_star` outputs replace the hazard proxy | G5 |
@@ -162,15 +166,15 @@ failed observational closure.
 
 ## Active-gate rule
 
-Exactly one gate is active. Until G0 closes, implementation work must contribute
-directly to the reduced-order ledger repair and preregistration, or be declared
-as a parallel literature/data-inventory lane that cannot perturb frozen G0
-definitions after results are observed.
+Exactly one gate is active. Until G1 closes, implementation work must contribute
+directly to the calibrated solar baseline, or be declared as a parallel
+literature/data-inventory lane that cannot perturb frozen G1 definitions after
+results are observed.
 
-The following do not close G0:
+The following do not close G1:
 
-- changing a label without separating the physical ledgers;
-- replacing the `+0.6 Gyr` preset with a different hand-set mapping;
+- rerunning the fixture-only solar reference and relabeling it as external;
+- importing an undeclared profile without solver inputs, logs, and hashes;
 - adding more UI controls or fleet details;
 - treating a MESA-like fixture or mock worker result as a real solar evolution;
 - tuning acceptance tolerances after inspecting intervention results; or
@@ -212,10 +216,11 @@ Downstream gate unlocked:
 
 ## Immediate execution sequence
 
-1. Complete the G0 active packet and encode its frozen ledger equations.
-2. Repair reduced-order names and guardrail semantics with targeted unit tests.
-3. Produce a G0 result record that either closes the ledger or documents a
-   blocking ambiguity.
-4. Only after G0 closure, author the exact G1 solar-calibration packet and
-   runtime preregistration.
-
+1. Complete the G1 reference-data and solver-runtime inventory without running
+   an intervention model.
+2. Freeze the solar calibration objective, tolerances, covariance policy,
+   microphysics, convergence policy, and exact MESA runtime identity.
+3. Execute the zero-transport baseline with no fixture fallback and retain all
+   declared inputs, outputs, logs, and hashes.
+4. Produce a G1 result record that either admits one calibrated baseline or
+   records the first blocking calibration failure.

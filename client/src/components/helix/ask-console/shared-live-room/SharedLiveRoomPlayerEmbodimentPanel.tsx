@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Copy, KeyRound, Power, RefreshCw, ShieldCheck, X } from "lucide-react";
 import type {
   HelixConnectorPairing,
@@ -14,9 +14,14 @@ import type {
 import type { HelixRoomEnvironmentProjection } from "@shared/helix-environment-subject";
 import {
   HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
@@ -34,6 +39,8 @@ import { MinecraftLocalLifecycleCard } from "./MinecraftLocalLifecycleCard";
 
 const PLAYER_ACTION_ADAPTER = "minecraft.fabric_client.v1";
 const DEFAULT_LEASE_MS = 2 * 60 * 60_000;
+const SEVEN_DAY_LEASE_MS = 7 * 24 * 60 * 60_000;
+const THIRTY_DAY_LEASE_MS = 30 * 24 * 60 * 60_000;
 const PLAYER_AUTHORITY_REFRESH_INTERVAL_MS = 10_000;
 
 const actionAuthoritiesPath = (
@@ -64,11 +71,35 @@ type SafePairingReceipt = Partial<HelixConnectorPairingReceipt> & {
 const CAPABILITY_OPTIONS: Array<{ id: string; label: string }> = [
   { id: HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY, label: "Navigate" },
   { id: HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY, label: "Look" },
+  {
+    id: HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
+    label: "Camera tracking",
+  },
   { id: HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY, label: "Walk" },
   { id: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY, label: "Jump" },
   { id: HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY, label: "Interact" },
+  {
+    id: HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+    label: "Combat attack",
+  },
   { id: HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY, label: "Hotbar" },
   { id: HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY, label: "Equip" },
+  {
+    id: HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
+    label: "Fluid TAS sequence",
+  },
+  {
+    id: HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
+    label: "Reactive guardian program",
+  },
+  {
+    id: HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
+    label: "Arm viability guardian",
+  },
+  {
+    id: HELIX_MINECRAFT_PLAYER_DISARM_VIABILITY_GUARDIAN_CAPABILITY,
+    label: "Disarm viability guardian",
+  },
   { id: HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY, label: "Follow" },
   { id: HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY, label: "Collect" },
   { id: HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY, label: "Mine" },
@@ -77,10 +108,6 @@ const CAPABILITY_OPTIONS: Array<{ id: string; label: string }> = [
   {
     id: HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
     label: "Inventory transfer",
-  },
-  {
-    id: HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
-    label: "Fluid TAS sequence",
   },
 ];
 
@@ -158,6 +185,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     useState<HelixEnvironmentActionManualOverridePolicy>("cancel");
   const [leaseMs, setLeaseMs] = useState(DEFAULT_LEASE_MS);
   const [acknowledged, setAcknowledged] = useState(false);
+  const authorityDraftDirtyRef = useRef(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pairingCommand, setPairingCommand] = useState<string | null>(null);
@@ -183,7 +211,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
           ) ?? null
           : null,
       );
-      if (next) {
+      if (next && !authorityDraftDirtyRef.current) {
         setSelectedCapabilities(next.allowed_capability_ids);
         setAutonomyMode(next.autonomy_mode);
         setManualOverridePolicy(next.manual_override_policy);
@@ -263,6 +291,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
         }),
       );
       setAuthority(receipt.authority ?? null);
+      authorityDraftDirtyRef.current = false;
       setAcknowledged(false);
       await load();
       setMessage(receipt.message ?? "Player Embodiment authority configured.");
@@ -427,11 +456,12 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                 value={autonomyMode}
                 disabled={busy !== null}
                 className="mt-1 w-full rounded border border-emerald-300/25 bg-slate-950 px-2 py-1 text-[10px] text-emerald-50 disabled:opacity-50"
-                onChange={(event) =>
+                onChange={(event) => {
+                  authorityDraftDirtyRef.current = true;
                   setAutonomyMode(
                     event.target.value as HelixEnvironmentActionAutonomyMode,
-                  )
-                }
+                  );
+                }}
               >
                 <option value="approved_capabilities">Approved capabilities</option>
                 <option value="autonomous">Autonomous for this lease</option>
@@ -444,11 +474,12 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                 value={manualOverridePolicy}
                 disabled={busy !== null}
                 className="mt-1 w-full rounded border border-emerald-300/25 bg-slate-950 px-2 py-1 text-[10px] text-emerald-50 disabled:opacity-50"
-                onChange={(event) =>
+                onChange={(event) => {
+                  authorityDraftDirtyRef.current = true;
                   setManualOverridePolicy(
                     event.target.value as HelixEnvironmentActionManualOverridePolicy,
-                  )
-                }
+                  );
+                }}
               >
                 <option value="cancel">Cancel workflow</option>
                 <option value="pause">Pause workflow</option>
@@ -467,9 +498,19 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                 <option value={DEFAULT_LEASE_MS}>2 hours</option>
                 <option value={8 * 60 * 60_000}>8 hours</option>
                 <option value={24 * 60 * 60_000}>24 hours</option>
+                <option value={SEVEN_DAY_LEASE_MS}>7 days</option>
+                <option value={THIRTY_DAY_LEASE_MS}>30 days</option>
               </select>
             </label>
           </div>
+
+          {leaseMs > 24 * 60 * 60_000 ? (
+            <p className="rounded border border-amber-300/20 bg-amber-950/15 px-2 py-1.5 text-[9px] text-amber-100/80">
+              Long-lived player authority remains limited to this exact room,
+              environment, player, and checked capability set. Revoke it with
+              Player emergency stop when the unattended test window ends.
+            </p>
+          ) : null}
 
           <fieldset className="rounded border border-white/10 p-2">
             <legend className="px-1 text-[9px] text-slate-400">
@@ -485,13 +526,14 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                     type="checkbox"
                     checked={selectedCapabilities.includes(capability.id)}
                     disabled={busy !== null}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      authorityDraftDirtyRef.current = true;
                       setSelectedCapabilities((current) =>
                         event.target.checked
                           ? [...new Set([...current, capability.id])]
                           : current.filter((id) => id !== capability.id),
-                      )
-                    }
+                      );
+                    }}
                   />
                   {capability.label}
                 </label>
@@ -568,7 +610,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
           <p>
             {authority.allowed_capability_ids.length} capabilities &middot; manual
             input {authority.manual_override_policy}s &middot; expires {authority.expires_at
-              ? new Date(authority.expires_at).toLocaleTimeString()
+              ? new Date(authority.expires_at).toLocaleString()
               : "when revoked"}
           </p>
           {readiness ? (

@@ -1,0 +1,257 @@
+{
+  "schema": "nhm2.g2h_e_s4_r2.total_quantum_builder_algorithms.v2",
+  "status": "sealed_additive_candidate_neutral_total_quantum_builder_definition_fixture_implementation_eligible_no_scientific_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R2",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "implementation-total deterministic P08-P13 and R08-R13 quantum constructors",
+    "current_maturity": "the parent S4 fixture implementation is preserved at seven of thirteen scientific roles per lane and quantum implementation is paused on twelve reproduced definition gaps",
+    "target_maturity": "one additive independently replayed total quantum-builder definition with no implementation-time scientific choices",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 definition seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "quantum contract cf0a49ad816af742f0d1f86acbe6afd33538f126ebf5eb7487dbb154359fe3cc",
+      "builder v1 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "gap inventory 3da161ec3c46b9c200397db7ff73c83866ffd30e758bb65a82b2dfa3053b4c52",
+      "stability receipt 36d46c2d7474ff41d7a318ed1f4aaf540071aa854eecb57dc201d1ffa99e5af4"
+    ],
+    "required_evidence": [
+      "exact audit of every inherited integer, order, epsilon level, threshold and authority lock",
+      "mechanical replay of panel coverage, nodes, weights, Richardson moments, error allocation, packing and finite exhaustion",
+      "source-language-disjoint manufactured replay",
+      "unchanged predecessors, absent future roots and zero selected-member ingress"
+    ],
+    "stop_fail_criteria": [
+      "any unresolved selector or unbounded inner loop",
+      "any change to an inherited scientific equation, member, grid integer, order, threshold, state, smearing or authority lock",
+      "any selector chosen from candidate or positive-continuation observations",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "selected-member spectrum, RSET or noise evaluation",
+      "primary or Rust scientific execution",
+      "retuning, G3, geometry/state acceptance, lanes, lamp, physical viability, propulsion or transport"
+    ],
+    "downstream_gate_unlocked": "resume fixture-only P08-P13 and R08-R13 source implementation after an exact seal and independent replay"
+  },
+  "semantic_change_class": "additive_pre_ingress_numerical_totality_repair_only_R2_quantum_products_and_builder_v1_selectors_unchanged",
+  "immutable_predecessors": {
+    "r2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "raw_sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a"},
+    "r1_definition_seal": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json", "raw_sha256": "728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca"},
+    "quantum": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-quantum-ground-rset-noise-contract.v1.json", "raw_sha256": "cf0a49ad816af742f0d1f86acbe6afd33538f126ebf5eb7487dbb154359fe3cc"},
+    "builder_v1": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-disjoint-builder-algorithms.v1.json", "raw_sha256": "5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf"},
+    "gap_inventory": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r2-quantum-builder-gap-inventory.v1.json", "raw_sha256": "3da161ec3c46b9c200397db7ff73c83866ffd30e758bb65a82b2dfa3053b4c52"},
+    "stability_receipt": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-stability-runtime-verification-receipt.v7.json", "raw_sha256": "36d46c2d7474ff41d7a318ed1f4aaf540071aa854eecb57dc201d1ffa99e5af4"}
+  },
+  "preserved_selectors": {
+    "common": {
+      "precision_bits": 512,
+      "projection_lattice": "2^-448",
+      "target_total_width": "2^-120",
+      "per_tail_target": "2^-132",
+      "static_state": "the one positive-frequency static ground G_plus from the quantum v1 contract",
+      "hadamard_length": "1",
+      "finite_ambiguity_vector": [0, 0, 0, 0],
+      "mean_shape": [64, 4],
+      "noise_shape": [256, 256],
+      "adaptive_panels": 0
+    },
+    "primary": {"radial_degree": 24, "angular_max": 255, "subtraction_order": 20, "kappa_panels": 1024, "kappa_nodes": 32, "energy_panels": 2048, "energy_nodes": 32, "epsilon_exponents": [32, 40, 48, 56, 64, 72, 80, 88, 96], "Hadamard_order": 20},
+    "rust": {"radial_degree": 28, "Taylor_steps_per_cell": 48, "angular_max": 287, "subtraction_order": 22, "kappa_panels": 1536, "kappa_nodes": 24, "energy_panels": 2304, "energy_nodes": 24, "epsilon_exponents": [36, 44, 52, 60, 68, 76, 84, 92, 100], "Hadamard_order": 22}
+  },
+  "common_total_rules": {
+    "arithmetic": "every inexact operation uses a 512-bit outward ball in its lane; exact integers, reduced rationals and dyadics remain exact",
+    "projection": "project only at the role-specific ordinal stated below; nearest n*2^-448 with ties-to-even, exactly once, no retry",
+    "ordering": "ascending role ordinal, then the explicit row-major or graded-lexicographic packing; every tie chooses the least canonical ordinal",
+    "strictness": "every upper width, tail, defect, contraction, residual and exhaustion bound is strict; equality touches and fails",
+    "no_fallback": "a failed predicate or exhausted fixed counter persists the partial role record and terminates the lane without precision escalation, subdivision, selector change or alternate method",
+    "candidate_neutrality": "all selectors in this contract are fixed from exact formulas and manufactured-fixture considerations; none consumes a selected background or positive continuation sample",
+    "error_components": ["radial", "angular", "negative_axis", "physical_energy", "Hadamard_coincidence", "smearing_time", "noise_factor", "rounding_record"],
+    "error_rule": "for every reported scalar entry persist all eight nonnegative outward component widths in the listed order; an unused component is exact zero; each component must be strictly below 2^-132 and their exact rational sum must be strictly below 2^-120",
+    "accumulation": "sum contributions lexicographically by component, role-output ordinal and quadrature ordinal; pairwise or parallel reduction is forbidden",
+    "threshold_rule": "lambda=1 belongs to the complete Stieltjes measure and is never removed; every energy panel crossing its compactified coordinate is split at the exact threshold before quadrature",
+    "root_rule": "the primary and independent future candidate roots must be absent before and throughout definition and fixture work"
+  },
+  "shared_exact_coordinates": {
+    "radial_compactification": "y=r/(1+r) on the frozen 256-cell origin/bulk/infinity cover",
+    "negative_axis_primary": "kappa=tan(pi*x/2)",
+    "negative_axis_rust": "kappa=sinh(t)",
+    "physical_energy": "e=(lambda-alpha_min^2)/(1+lambda-alpha_min^2), lambda=alpha_min^2+e/(1-e)",
+    "energy_threshold": "e_threshold=(1-alpha_min^2)/(2-alpha_min^2), represented as an outward ball derived from the certified alpha_min^2 ball",
+    "energy_truncation": "e_star=4095/4096 and lambda_star=alpha_min^2+4095",
+    "multiindex_order": "graded lexicographic (total degree,t,r,theta,phi), with the four-index tuple compared left to right within a degree",
+    "jet_count_through_four": 70
+  },
+  "primary_cpp_arb_total_algorithm": {
+    "lineage": "C++20 with Arb/FLINT/GMP/MPFR only in the already bound offline primary image",
+    "P08_radial_resolvent": {
+      "basis_and_nodes": "on each frozen radial cell use degree-24 first-kind Chebyshev coefficients and the 25 CGL nodes tau_j=cos(pi*j/24); physical wire order is ascending y, with the origin or infinity end first in its propagation direction",
+      "system": "rewrite each radial equation as the exact two-component first-order system fixed by the quantum v1 operator; solve 50 unknown coefficient entries using two incoming endpoint rows and both ODE components at the remaining 24 nodes",
+      "interfaces": "regular solutions propagate origin-to-infinity and Weyl solutions infinity-to-origin; the outgoing ball at one cell is the incoming ball of the next and no interface averaging occurs",
+      "factorization": "deterministic complete-pivot Arb LU using largest certified lower absolute pivot and least row-major ordinal tie; a best pivot containing zero fails",
+      "defect": "perform exactly eight defect-correction sweeps; exact-zero correction is a no-op, otherwise the directed max residual must strictly decrease; after sweep eight certify the degree-48 Bernstein enclosure of the integral defect and a strict contraction constant below one",
+      "endpoints": "use only the frozen origin Frobenius and q=1/r infinity recurrences and their pre-existing remainder covers",
+      "projection": "after the eighth sweep and before Wronskian assembly, project every canonical coefficient once",
+      "budgets": {"cells": 256, "nodes_per_cell": 25, "unknowns_per_cell": 50, "LU_per_cell_solution": 1, "defect_sweeps": 8, "defect_enclosure_degree": 48, "projection_passes": 1}
+    },
+    "P09_angular_subtraction": {
+      "coefficient_recurrence": "for each consumed derivative channel insert R=sum_(j=0)^20 a_j*nu^(-1-2*j), nu=ell+1/2, into the exact Liouville-normal diagonal-resolvent identity -2*R*R''+(R')^2+4*(V-z)*R^2=1 and solve a_j in ascending j and graded-lexicographic derivative order with the positive leading root",
+      "packing": "channel ordinal, derivative multiindex, coefficient j, radial cell, polynomial coefficient",
+      "finite_sum": "sum ell=0 through 255 in ascending ell and m-degeneracy order after subtracting the order-20 parametrix",
+      "tail": "sum each explicit inverse power using Arb Hurwitz zeta at q=511/2; enclose the first omitted recurrence coefficient by eight fixed majorant iterations and multiply by the geometric majorant 1/(1-rho), requiring rho<1",
+      "threshold": "apply the same Stieltjes threshold classifier used in P11; undecided resonance or accumulation enclosure fails before tail acceptance",
+      "budgets": {"ell_terms": 256, "recurrence_order": 20, "majorant_iterations": 8, "Hurwitz_zeta_calls_per_channel": 21, "projection_passes": 1}
+    },
+    "P10_negative_axis": {
+      "domain_and_panels": "x in [0,1023/1024], panel i=[1023*i/1048576,1023*(i+1)/1048576] for i=0..1023; kappa_star=cot(pi/2048)",
+      "Gauss_Legendre": "construct the 32 roots of P_32 once: scan the exact rational mesh j/4096 on [-1,1], isolate the 32 sign changes using the exact Legendre recurrence, perform 600 exact rational bisections, then 16 outward interval-Newton steps; weights are 2/((1-u^2)*(P_32'(u))^2); sort by increasing u",
+      "validation": "on every panel form a degree-63 interval Taylor model about its midpoint; integrate its polynomial exactly, compare with the mapped 32-node rule, and add the derivative-64 Taylor remainder in canonical order",
+      "tail": "apply the frozen order-20 resolvent/heat expansion from kappa_star to infinity; eight majorant iterations must certify ratio below one and the whole tail strictly below 2^-132",
+      "budgets": {"panels": 1024, "nodes_per_panel": 32, "mesh_intervals": 8192, "rational_bisections_per_root": 600, "interval_Newton_steps_per_root": 16, "validation_degree": 63, "tail_order": 20, "tail_majorant_iterations": 8}
+    },
+    "P11_physical_measure_and_smearing": {
+      "panels": "e in [0,4095/4096], base panel i=[4095*i/8388608,4095*(i+1)/8388608] for i=0..2047; split a base panel at the outward e_threshold ball into left/threshold/right tagged subpanels without changing the base-panel count",
+      "quadrature": "reuse the certified 32-point primary Gauss-Legendre rule and degree-63 Taylor validation on every tagged subpanel",
+      "Stieltjes_pairing": "for every compact-time multiplier F use I_epsilon(F)=pi^-1*integral F(lambda)*Im<m,(K-lambda-i*epsilon)^-1 m> d lambda over the complete measure; atoms and threshold accumulation remain inside this pairing",
+      "Richardson": "for the nine inherited epsilon values solve the exact 9x9 Vandermonde system sum_j w_j*epsilon_j^k=delta_(k,0) for k=0..8 and accumulate sum_j w_j*I_epsilon_j",
+      "remainder": "use the Poisson-semigroup identity and bound the ninth-order remainder by (sum_j |w_j|*epsilon_j^9)/9! times the certified total spectral mass of the smeared test vector times the certified L1 norm of |omega|^9 times the Fourier transform of F; strict closure below 2^-132 is required and no pointwise density assumption is made",
+      "energy_tail": "from e_star to one apply the order-20 heat/resolvent asymptotic with positivity and eight majorant iterations",
+      "smearing": "map each compact time and radial bump support affinely to [-1,1], use 128 equal panels per coordinate and the same GL32 rule; compute each Z_p and numerator separately, require lower(Z_p)>0, divide once and verify normalization contains one",
+      "budgets": {"base_energy_panels": 2048, "nodes_per_panel": 32, "epsilon_levels": 9, "Richardson_order": 8, "energy_tail_order": 20, "tail_majorant_iterations": 8, "smearing_panels_per_coordinate": 128, "smearing_nodes_per_panel": 32, "normalization_corrections": 0}
+    },
+    "P12_Hadamard_RSET": {
+      "basis": "covariant normal-coordinate monomials packed in the shared graded-lexicographic order; retain U and V through total order 20 and every coincidence jet through total derivative order four",
+      "transport_equations": "write P=Box-1, U=Delta^(1/2), V=sum_(n>=0) V_n*sigma^n. Fix [U]=1. In D=4 solve 2*V_0+2*sigma^;a*nabla_a V_0-2*V_0*Delta^(-1/2)*sigma^;a*nabla_a Delta^(1/2)+P*U=0 and, for n>=0, (n+1)*(2*n+4)*V_(n+1)+2*(n+1)*sigma^;a*nabla_a V_(n+1)-2*(n+1)*V_(n+1)*Delta^(-1/2)*sigma^;a*nabla_a Delta^(1/2)+P*V_n=0, in the exact sign and Feynman-parametrix convention of quantum v1",
+      "transport_solve": "substitute the packed series into those equations and solve triangular coefficient rows in increasing total degree, equation ordinal and component ordinal using complete-pivot Arb LU for each non-scalar row",
+      "state_remainder": "W_DF is not generated by local geometric transport: compute its packed coincidence jets by subtracting the projected U and V parametrix from the P10/P11 static-ground Feynman two-point product in the quantum-v1 bracket convention",
+      "correction": "perform exactly eight directed residual-correction sweeps; exact-zero rows are no-ops and every nonzero correction must strictly reduce the row residual",
+      "projection": "project every coefficient once after sweep eight, then recompute U, V, W_DF, v1, RSET and conservation residuals from projected bytes",
+      "remainder": "a degree-21 covariant Taylor majorant and eight ratio iterations must enclose every omitted term and every derivative consumed by conservation below its assigned 2^-132 component",
+      "budgets": {"transport_order": 20, "jet_total_order": 4, "jet_multiindices": 70, "correction_sweeps": 8, "remainder_majorant_iterations": 8, "projection_passes": 1}
+    },
+    "P13_noise_Gram": {
+      "vector_packing": "vector ordinal a=4*p+I, then angular ordinal, negative-axis or energy quadrature ordinal, radial cell, local coefficient and two-particle symmetrized pair ordinal; all omitted sectors are represented by one certified Hilbert-norm tail ball",
+      "normalization_phase": "normalize by a strictly positive enclosed norm; choose the phase so the first canonical coefficient whose ball excludes zero has positive real midpoint and zero imaginary midpoint; no such coefficient fails",
+      "factor": "form the direct interval Gram matrix, then perform unpivoted lower Cholesky in ordinal order; a pivot containing zero fails unless the entire residual row is exact zero, in which case the row of L is exact zero; apply exactly two lower-triangular linearized residual-correction sweeps and require strict row-residual decrease on each nonzero sweep",
+      "verification": "persist 32896 lower-triangular entries, reconstruct L*L^T, and require the lexicographic row-sum residual plus all vector-tail contributions strictly below 2^-132; no eigenvalue clipping occurs",
+      "projection": "project the finite vector coefficients once before direct Gram formation and project L once after factorization",
+      "smearing": "reuse P11's 128-panel GL32 time/radial bump construction for every p and channel",
+      "budgets": {"vectors": 256, "matrix_entries": 65536, "lower_entries": 32896, "Cholesky_factorizations": 1, "factor_correction_sweeps": 2, "projection_passes": 2, "smearing_panels_per_coordinate": 128}
+    }
+  },
+  "independent_pure_rust_total_algorithm": {
+    "lineage": "pure Rust in the already bound scratch-musl image using native fixed-limb integer, rational and rectangular complex-ball arithmetic with no C ABI or C arithmetic lineage",
+    "native_transcendentals": {
+      "pi": "Machin pi=16*atan(1/5)-4*atan(1/239), each atan evaluated by exactly 160 alternating-series terms plus the first-omitted-term enclosure",
+      "elementary": "sinh, cosh and exp on absolute arguments at most 12 use degree-256 Taylor series plus the Lagrange remainder; tanh is sinh/cosh with a strictly positive denominator",
+      "large_negative_exp": "for bump exponents below -12, repeatedly halve until magnitude at most 12, evaluate exp, and square outward at most 4096 times; if the exponent upper bound is below -1024, return [0,2^-1024] using the certified pi-independent exponential monotonicity bound",
+      "complex_division": "(a+ib)/(c+id) uses denominator c^2+d^2 and fails unless its lower endpoint is strictly positive"
+    },
+    "R08_radial_resolvent": {
+      "basis_and_steps": "on each frozen radial cell use 48 equal directed substeps in propagation order and a degree-28 midpoint Taylor model for both components",
+      "recurrence": "derive coefficient k+1 from coefficient k by exact formal substitution into the frozen first-order radial system, multiplying series by schoolbook ascending-index convolution and rounding once after each complete coefficient",
+      "Picard_seed": "the seed radius is the least power of two not below twice the outward local defect norm, capped at 2^-16; a larger requirement fails",
+      "Picard": "apply exactly 12 interval Picard images; each must be a strict interior subset of the previous enclosure after the first image and the final Lipschitz upper bound must be below one",
+      "interfaces": "propagate regular origin-to-infinity and Weyl infinity-to-origin without averaging; use only the frozen endpoint recurrences",
+      "projection": "project each cell's outgoing Taylor coefficients once after its twelfth Picard image",
+      "budgets": {"cells": 256, "steps_per_cell": 48, "Taylor_degree": 28, "Picard_iterations": 12, "seed_radius_cap": "2^-16", "projection_passes_per_cell": 1}
+    },
+    "R09_angular_subtraction": {
+      "coefficient_recurrence": "derive independent DeWitt-Schwinger coefficients a_0 through a_22 from the proper-time heat equation by ascending proper-time order and shared graded-lexicographic derivative order; choose the positive free leading coefficient",
+      "packing": "channel ordinal, derivative multiindex, heat coefficient, radial cell, Bernstein coefficient",
+      "finite_sum": "sum ell=0 through 287 in ascending ell and m-degeneracy order after subtracting order 22",
+      "tail": "sum inverse powers from nu=577/2 using a fixed 64-term Euler-Maclaurin formula with Bernoulli numbers generated by the exact Akiyama-Tanigawa recurrence; 12 majorant iterations must certify the first omitted derivative remainder and ratio below one",
+      "threshold": "reuse R11's complete-measure threshold classifier and fail on an undecided result",
+      "budgets": {"ell_terms": 288, "recurrence_order": 22, "Euler_Maclaurin_terms": 64, "majorant_iterations": 12, "projection_passes": 1}
+    },
+    "R10_negative_axis": {
+      "domain_and_panels": "t in [0,12], panel i=[i/128,(i+1)/128] for i=0..1535; kappa_star=sinh(12)",
+      "tanh_sinh": "for each panel use h=1/8 and s_k=(k+1/2)*h for k=-12..11; u_k=tanh((pi/2)*sinh(s_k)); mapped weight is panel_halfwidth*h*(pi/2)*cosh(s_k)/cosh((pi/2)*sinh(s_k))^2; sort by k",
+      "validation": "form a degree-47 midpoint Taylor model of the mapped integrand; add the exact polynomial moment defect of the 24-node rule and bound the order-48 remainder by derivative_bound/48! times integral|u|^48 plus sum|weight_k*u_k^48|",
+      "tail": "apply the independent order-22 resolvent expansion beyond sinh(12); 12 majorant iterations must prove ratio below one and tail below 2^-132",
+      "budgets": {"panels": 1536, "nodes_per_panel": 24, "tanh_sinh_h": "1/8", "pi_series_terms": 160, "transcendental_Taylor_degree": 256, "validation_degree": 47, "tail_order": 22, "tail_majorant_iterations": 12}
+    },
+    "R11_physical_measure_and_smearing": {
+      "panels": "e in [0,4095/4096], base panel i=[4095*i/9437184,4095*(i+1)/9437184] for i=0..2303; split the crossing base panel at the outward e_threshold ball into tagged left/threshold/right subpanels",
+      "quadrature": "map the fixed R10 24-node tanh-sinh rule to every tagged energy panel and use its degree-47 moment-defect validation",
+      "Stieltjes_pairing": "use the complete directed boundary resolvent pairing I_epsilon(F) from P11 without extracting a pointwise density",
+      "Richardson": "solve the lane's exact 9x9 rational Vandermonde moment system through order eight using fraction-free Bareiss elimination with least-ordinal pivot; accumulate the nine levels in ascending epsilon-exponent order",
+      "remainder": "independently certify (sum_j |w_j|*epsilon_j^9)/9! times the smeared-vector total spectral mass times the L1 norm of |omega|^9 times the Fourier transform of the bump multiplier, using native degree-256 Taylor enclosures",
+      "energy_tail": "from e_star to one use the order-22 heat/resolvent asymptotic and 12 majorant iterations",
+      "smearing": "map each bump support to [-1,1], use 192 equal panels per time and radial coordinate with R10's TS24 rule and degree-47 validation; require lower(Z_p)>0 and normalization contains one",
+      "budgets": {"base_energy_panels": 2304, "nodes_per_panel": 24, "epsilon_levels": 9, "Richardson_order": 8, "energy_tail_order": 22, "tail_majorant_iterations": 12, "smearing_panels_per_coordinate": 192, "smearing_nodes_per_panel": 24, "normalization_corrections": 0}
+    },
+    "R12_Hadamard_RSET": {
+      "basis": "midpoint Taylor monomials in the shared graded-lexicographic normal-coordinate packing through transport order 22 and jet total order four",
+      "transport_equations": "independently instantiate P=Box-1, U=Delta^(1/2), [U]=1 and the same displayed D=4 V_0/V_(n+1) equations in R12 from native tensor and connection code",
+      "transport_solve": "substitute directly into those equations and update coefficients by 12 interval Picard passes in increasing total degree, equation and component ordinal",
+      "state_remainder": "derive W_DF coincidence jets from the independently projected R10/R11 static-ground product minus the native U,V parametrix; never infer the state-dependent W_DF from the geometric V transport",
+      "projection": "project all coefficients once after pass 12 and recompute all jets, RSET and conservation residuals from projected bytes",
+      "remainder": "a degree-23 Taylor majorant plus 12 ratio iterations encloses omitted transport and conservation derivatives below their assigned component widths",
+      "budgets": {"transport_order": 22, "jet_total_order": 4, "jet_multiindices": 70, "Picard_passes": 12, "remainder_majorant_iterations": 12, "projection_passes": 1}
+    },
+    "R13_noise_Gram": {
+      "vector_packing": "use the same physical ordinals as P13 but Rust Bernstein/Taylor coefficient order and R10/R11 quadrature ordinals; append one Hilbert-norm tail ball per vector",
+      "normalization_phase": "strictly positive norm and the same first-nonzero positive-real canonical phase rule",
+      "factor": "apply unpivoted two-pass modified Gram-Schmidt in vector ordinal order; exact-zero residual vectors yield exact-zero factor rows, while an interval containing zero but not exact zero fails",
+      "verification": "form all 65536 unmodified direct interval dot products from original projected vectors, reconstruct the MGS factor Gram matrix, and require lexicographic row-sum residual plus tails below 2^-132",
+      "projection": "project each vector once before MGS and project the factor once after the second pass",
+      "smearing": "reuse R11's 192-panel TS24 bump construction",
+      "budgets": {"vectors": 256, "matrix_entries": 65536, "lower_entries": 32896, "MGS_passes": 2, "pivoting": 0, "projection_passes": 2, "smearing_panels_per_coordinate": 192}
+    }
+  },
+  "role_record_abi": {
+    "frozen_envelope": {"schema": "nhm2.g2h_e_s4.proof_record.v1", "required_keys": ["authority", "candidate_evaluations", "contract_sha256", "decision", "duty_id", "fixture_id", "implementation_id", "lane", "payload", "payload_sha256", "previous_record_sha256", "record_self_sha256", "schema", "sequence"], "hash_rule": "use the wire-v1 payload and record SHA-256 domains over RFC8785 bytes with the relevant self-hash member omitted"},
+    "common_prefix": ["role", "predecessor_hashes", "source_hashes", "toolchain_hash", "dependency_hashes", "image_id", "executable_hash", "command_hash", "environment_hash", "absent_root_assertion", "selector_hash"],
+    "P08_R08": ["radial_coordinate", "cell_endpoints", "basis", "node_or_step_ordinals", "endpoint_coefficients", "defect_transcript", "contraction_margin", "Wronskians", "projection_deltas", "error_components"],
+    "P09_R09": ["angular_ordinals", "subtraction_coefficients", "finite_sum", "analytic_tail", "remainder_majorants", "threshold_classification", "projection_deltas", "error_components"],
+    "P10_R10": ["spectral_coordinate", "panel_endpoints", "node_weight_table_hash", "quadrature_moments", "validation_remainder", "kappa_star", "tail_coefficients", "tail_remainder", "error_components"],
+    "P11_R11": ["energy_coordinate", "base_panels", "threshold_split", "epsilon_levels", "Richardson_weights", "Poisson_remainder", "spectral_mass_bound", "energy_tail", "Z_p", "mean_entries", "Fourier_multiplier_bounds", "error_components"],
+    "P12_R12": ["multiindex_table_hash", "transport_coefficients", "correction_transcript", "projection_deltas", "U_jets", "V_jets", "W_DF_jets", "v1", "RSET_cells", "conservation_residuals", "remainder_majorants", "error_components"],
+    "P13_R13": ["vector_index_table_hash", "vector_norms", "phase_ordinals", "vector_tail_norms", "factor_lower", "direct_Gram", "reconstructed_Gram", "row_residuals", "noise_matrix", "PSD_residual", "error_components"],
+    "common_suffix": ["counter_state", "first_failure", "partial_output_inventory"],
+    "array_order": "the listed fields constitute the envelope payload and arrays are persisted in each role's stated canonical ordinal; JSON object keys are RFC8785 sorted for hashing, payload_sha256 hashes the payload, previous_record_sha256 chains the prior envelope, and record_self_sha256 hashes the complete envelope under wire v1",
+    "partial_output_rule": "on first failure persist the common prefix, every fully completed field before the failing field, counter_state, typed first_failure and partial_output_inventory; omit all later scientific fields rather than null-filling",
+    "within_role_failure_precedence": ["identity_or_chronology", "input_or_predecessor", "endpoint_or_domain", "node_or_basis_construction", "linear_or_transport_solve", "defect_or_contraction", "projection", "quadrature_or_measure", "tail_or_remainder", "normalization_or_factor", "error_width", "cross_product", "persistence"],
+    "cross_product_order": ["radial_and_Wronskian", "angular_and_threshold", "negative_axis_and_equal_time", "physical_measure_and_time_multiplier", "Hadamard_and_local_RSET", "mean_and_noise_same_state", "symmetry_conservation_PSD", "complete_error_decomposition"]
+  },
+  "exhaustion_fixtures": {
+    "required_per_lane": ["radial_last_correction_touch", "node_generation_last_iteration_touch", "angular_majorant_last_iteration_touch", "negative_axis_tail_touch", "Richardson_remainder_touch", "Hadamard_last_correction_touch", "smearing_Z_lower_zero", "noise_interval_zero_nonexact_pivot", "component_width_touch", "total_width_touch"],
+    "typed_failure": "builder_budget_exhausted:<role>:<counter>:<ordinal>",
+    "corruption": ["node_order_swap", "weight_sign_flip", "epsilon_order_swap", "multiindex_duplicate", "factor_entry_mutation", "missing_error_component", "previous_record_hash_mutation"],
+    "chronology": "each corruption or exhaustion must stop at its earliest prescribed ordinal and must not materialize a later-role record"
+  },
+  "closure_predicates": {
+    "all_twelve_gap_classes_have_one_finite_selector_per_lane": true,
+    "all_inherited_selectors_byte_replayed": true,
+    "all_new_loops_have_literal_finite_budgets": true,
+    "pointwise_spectral_density_assumption": false,
+    "finite_bound_pole_inventory_assumption": false,
+    "threshold_mass_discarded": false,
+    "adaptive_scientific_subdivision": false,
+    "fallback_or_precision_escalation": false,
+    "candidate_ingress": false,
+    "execution_authorized": false
+  },
+  "readiness": {
+    "contract_draft_complete": true,
+    "exact_definition_audit_complete": true,
+    "source_language_disjoint_replay_complete": true,
+    "definition_sealed": true,
+    "quantum_source_implementation_eligible": true,
+    "candidate_evaluated": false,
+    "execution_authorized": false
+  },
+  "authority": {
+    "definition_is_quantum_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

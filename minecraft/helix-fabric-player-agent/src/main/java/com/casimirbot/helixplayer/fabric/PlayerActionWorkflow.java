@@ -80,23 +80,35 @@ public final class PlayerActionWorkflow {
 
     /**
      * One narrow postcondition sample for the hand used by an admitted action.
-     * This deliberately exposes only the held item identity and count, not the
-     * player's full inventory or any native client object.
+     * This deliberately exposes only held identity, count and durability, not
+     * the player's full inventory or any native client object.
      */
-    public record HandObservation(boolean available, String itemId, int count) {
+    public record HandObservation(
+        boolean available,
+        String itemId,
+        int count,
+        int damage
+    ) {
+        public HandObservation(boolean available, String itemId, int count) {
+            this(available, itemId, count, 0);
+        }
+
         public HandObservation {
             itemId = itemId == null ? "" : itemId;
-            if (count < 0) {
-                throw new IllegalArgumentException("A held item count cannot be negative.");
+            if (count < 0 || damage < 0) {
+                throw new IllegalArgumentException(
+                    "Held item count and damage cannot be negative."
+                );
             }
             if (!available) {
                 itemId = "";
                 count = 0;
+                damage = 0;
             }
         }
 
         public static HandObservation unavailable() {
-            return new HandObservation(false, "", 0);
+            return new HandObservation(false, "", 0, 0);
         }
     }
 
@@ -185,6 +197,74 @@ public final class PlayerActionWorkflow {
         }
     }
 
+    /**
+     * A combat-specific sample for one previously locked entity incarnation.
+     * The bridge must never substitute a nearest or crosshair entity for this
+     * reference.
+     */
+    public record CombatTargetObservation(
+        boolean available,
+        boolean alive,
+        boolean hostile,
+        boolean visible,
+        boolean withinAttackRange,
+        String targetRef,
+        String targetTypeId,
+        double x,
+        double y,
+        double z,
+        double distance,
+        double health,
+        double maxHealth,
+        int hurtTimeTicks,
+        int deathTimeTicks,
+        double attackCooldown
+    ) {
+        public CombatTargetObservation {
+            targetRef = targetRef == null ? "" : targetRef;
+            targetTypeId = targetTypeId == null ? "" : targetTypeId;
+            if (!available) {
+                alive = false;
+                hostile = false;
+                visible = false;
+                withinAttackRange = false;
+                health = 0;
+                maxHealth = 0;
+                hurtTimeTicks = 0;
+                deathTimeTicks = 0;
+                attackCooldown = 0;
+            } else {
+                requireIdentifier(targetRef, "targetRef");
+                requireIdentifier(targetTypeId, "targetTypeId");
+                for (double value : new double[] {
+                    x, y, z, distance, health, maxHealth, attackCooldown
+                }) {
+                    if (!Double.isFinite(value)) {
+                        throw new IllegalArgumentException(
+                            "Combat target observations require finite measurements."
+                        );
+                    }
+                }
+                if (
+                    distance < 0 || health < 0 || maxHealth < 0 ||
+                    hurtTimeTicks < 0 || deathTimeTicks < 0 ||
+                    attackCooldown < 0 || attackCooldown > 1
+                ) {
+                    throw new IllegalArgumentException(
+                        "Combat target observations contain an out-of-range measurement."
+                    );
+                }
+            }
+        }
+
+        public static CombatTargetObservation unavailable(String targetRef) {
+            return new CombatTargetObservation(
+                false, false, false, false, false, targetRef, "",
+                0, 0, 0, 0, 0, 0, 0, 0, 0
+            );
+        }
+    }
+
     public record WorkflowEvent(
         String workflowId,
         long sequence,
@@ -265,6 +345,19 @@ public final class PlayerActionWorkflow {
             return TargetObservation.unavailable(lockedTargetRef);
         }
 
+        default CombatTargetObservation observeCombatTarget(
+            String targetRef,
+            String expectedEntityTypeId,
+            double maxDistance,
+            boolean requireLineOfSight
+        ) {
+            return CombatTargetObservation.unavailable(targetRef);
+        }
+
+        default boolean attackCombatTarget(String targetRef) {
+            return false;
+        }
+
         default void updateCameraTrackingTarget(
             double x,
             double y,
@@ -298,8 +391,29 @@ public final class PlayerActionWorkflow {
 
         boolean equip(String itemId, String destination);
 
+        default boolean equipmentMatches(String itemId, String destination) {
+            return false;
+        }
+
         default boolean supportsControlEngine(String controlEngine) {
             return "native_fabric".equals(controlEngine);
+        }
+
+        default boolean ownsNativeRoutePlanner() {
+            return false;
+        }
+
+        default void expectScreenOpen(boolean expected) {}
+
+        default LocomotionSafetyEnvelope.Check checkLocomotionSafety(
+            double targetX,
+            double targetZ,
+            double minimumHealth
+        ) {
+            return new LocomotionSafetyEnvelope.Check(
+                LocomotionSafetyEnvelope.Decision.admit(),
+                Map.of("reason_code", "locomotion_safety_not_required_by_bridge")
+            );
         }
 
         default void beginWorkflow(

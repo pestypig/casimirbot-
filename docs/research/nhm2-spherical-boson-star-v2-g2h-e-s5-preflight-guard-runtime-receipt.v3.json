@@ -1,0 +1,64 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v3",
+  "status": "PASS_OUTER_GUARD_RECORD_INGRESS_AND_ORIGIN_FIXTURES_CANDIDATE_NEUTRAL_SCIENTIFIC_DISPATCH_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "c29de6367106e039be45abfa312c374f5f721f60a25c2ada75989bfe42b5a182",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "sources": {
+    "sha256_header": "99278b36da34a37e7e6a199f247f1e3d8ca91f10bff309cb19c1355dd3d199d2",
+    "guard_cpp": "effddd3822fc9d5089f3ddc5617a3e1b1c82f30711719a30fbceb577be174215",
+    "record_header": "158d45df58780489b81d0c090bde0bf7de972cc20cdd586d6ca7c62456057000",
+    "record_cpp": "6ef30ce771b94fa49fbdeffe6bc5084608a3dfc179a1d7bb6416321f8c9caa17",
+    "ingress_header": "022e49d82a74d1a6f2157a02bca34afdcdb3cef5358bee6712ff1849a8a38c6d",
+    "ingress_cpp": "eb2a1a973294994a78ab8f2b83410949cecdb527bedb5ddcc22064c4137ab1f4",
+    "origin_header": "eb93a0bba95d97a09be6650619d373faecde9a69dabdf36afdf9bd9b2bc94ce5",
+    "origin_cpp": "e80f7bc67a215916156452a350df3fe05c7e8d2fa3ec5c15ab66347eb1862d6d",
+    "dockerfile": "a757efd1b0f8bdbde5942bdb8ca37bfbff76e49bbeca2c3832f18b46faa92942"
+  },
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v5",
+    "image_id": "sha256:60a26a94f00195a4df9ca5292c574308a7af8da64c48b37ec0b7df3e33ec9a88",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 85304,
+    "executable_sha256": "cd54c5dba57f64a49ab4a2c6e06a8781c10a2dbe577ac719a4b78465307df889",
+    "record_writer_linked": true,
+    "record_fixture_checks": "PASS_2_OF_2",
+    "manifest_ingress_fixture_checks": "PASS_5_OF_5",
+    "origin_recurrence_fixture_checks": "PASS_3_OF_3",
+    "scientific_dispatch_linked": false
+  },
+  "maturity": {
+    "R2-C01": "partial_manifest_shape_and_resource_bounds_only_no_final_inventory_or_file_open",
+    "R2-C02": "partial_first_regular_coefficients_only_no_local_existence_or_selected_member",
+    "primary_eligible_complete": 0,
+    "primary_eligible_total": 19
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "b36fa97cf08b72c9df2966efcc5d359a0f6e474eb414b4689a6308967ef77786",
+    "status": "PASS",
+    "checks_passed": 18,
+    "checks_total": 18
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_execution_authorized": false,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

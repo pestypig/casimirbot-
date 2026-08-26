@@ -1,0 +1,49 @@
+ARG BUILDER_IMAGE=nhm2-g2h-s4-primary-fixture-builder:v2@sha256:9e94d19f9014938b510e95c776778d164cce120777adfc2d495c1812de5221a1
+ARG RUNTIME_IMAGE=nhm2-g2h-primary-proof:v2@sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab
+
+FROM ${BUILDER_IMAGE} AS builder
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_grid_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_grid_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_identity_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_identity_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_margins_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_margins_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_gevrey_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_gevrey_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_origin_series_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_origin_series_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_positive_panel_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_positive_panel_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_panel_defect_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_panel_defect_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_picard_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_picard_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_successor_panel_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_successor_panel_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_ledger_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_ledger_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_tail_split_chronology_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_tail_lyapunov_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_finite_history_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_origin_models_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_origin_models_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_scalar_ledger_provider_v1.hpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_scalar_ledger_provider_v1.cpp /src/
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_scalar_ledger_provider_fixture_v1.cpp /src/
+RUN g++ -std=c++20 -O2 -fno-fast-math -fno-common -Wall -Wextra -Werror \
+      -o /usr/local/bin/mini-boson-star-primary-c08-scalar-ledger-provider-fixture-v1 \
+      /src/mini_boson_star_primary_grid_v1.cpp \
+      /src/mini_boson_star_primary_c08_identity_v1.cpp \
+      /src/mini_boson_star_primary_c08_margins_v1.cpp \
+      /src/mini_boson_star_primary_c08_gevrey_v1.cpp \
+      /src/mini_boson_star_primary_c08_convolution_ledger_v1.cpp \
+      /src/mini_boson_star_primary_c08_origin_models_v1.cpp \
+      /src/mini_boson_star_primary_c08_successor_panel_v1.cpp \
+      /src/mini_boson_star_primary_c08_scalar_ledger_provider_v1.cpp \
+      /src/mini_boson_star_primary_c08_scalar_ledger_provider_fixture_v1.cpp \
+      -lflint-arb -lflint -lgmp -lmpfr -lm
+
+FROM ${RUNTIME_IMAGE}
+COPY --from=builder /usr/local/bin/mini-boson-star-primary-c08-scalar-ledger-provider-fixture-v1 /usr/local/bin/
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/mini-boson-star-primary-c08-scalar-ledger-provider-fixture-v1"]

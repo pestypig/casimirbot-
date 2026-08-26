@@ -2,8 +2,14 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
 import { buildHelixSharedRealtimeRoomsExperimentPolicy } from "@shared/helix-account-session";
-import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from "@shared/contracts/helix-shared-live-room-agent.v1";
-import { HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE } from "@shared/helix-environment-action";
+import {
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+} from "@shared/contracts/helix-shared-live-room-agent.v1";
+import {
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+} from "@shared/helix-environment-action";
 import {
   HELIX_ENVIRONMENT_REASONING_ROLE_PROJECTION_SCHEMA,
   helixEnvironmentReasoningRoleSha256,
@@ -34,6 +40,8 @@ const principal = (): HelixAgentApiPrincipal => {
     accountType: "developer",
     scopes: new Set([
       HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+      HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+      HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
       HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
     ]),
     tokenExpiresAt: "2099-01-01T00:00:00.000Z",
@@ -91,7 +99,58 @@ const connect = async () => {
     inspect: vi.fn(async () => projection),
     recordPrincipalDisposition: vi.fn(async () => ({ ...projection, revision: 2 })),
     arbitrate: vi.fn(async () => ({ ...projection, revision: 3 })),
+    linkCompletedPrincipalExecution: vi.fn(async () => ({
+      ...projection,
+      revision: 4,
+    })),
   } satisfies HelixEnvironmentReasoningRoleMcpStore;
+  const authorityInspector = vi.fn(async () => ({
+    authorities: [],
+    connectorReadiness: [],
+  }));
+  const authorityConfigurator = vi.fn(async () => ({
+    schema: "helix.environment_action.authority.v1" as const,
+    action_authority_id: "environment_action_authority:g6-mcp",
+    environment_binding_id: "environment_binding:g6-mcp",
+    room_source_binding_id: "room_source_binding:g6-mcp",
+    room_id: ROOM_ID,
+    source_id: "source:g6-mcp",
+    world_id: "minecraft:g6-mcp",
+    adapter_profile_id: "game.minecraft.player.fabric.v1",
+    domain_adapter: "minecraft.fabric_client.v1",
+    participant_id: PARTICIPANT_ID,
+    subject_binding_id: "environment_subject_binding:g6-mcp",
+    allowed_capability_ids: ["com.casimirbot.minecraft.player.look"],
+    autonomy_mode: "approved_capabilities" as const,
+    manual_override_policy: "cancel" as const,
+    status: "active" as const,
+    policy_version: 2,
+    issued_at: "2026-08-23T12:00:00.000Z",
+    expires_at: "2026-08-23T13:00:00.000Z",
+    revoked_at: null,
+    credential_included: false as const,
+    content_role: "environment_action_authority_not_assistant_answer" as const,
+    answer_authority: false as const,
+    assistant_answer: false as const,
+    terminal_eligible: false as const,
+    raw_content_included: false as const,
+  }));
+  const playerPairLocalHandoff = vi.fn(async () => ({
+    pairing: {
+      schema: "helix.connector_pairing.v1",
+      pairing_id: "connector_pairing:g6-mcp",
+      status: "pending",
+    },
+    status: "player_pairing_inbox_staged" as const,
+  }));
+  const serverPairLocalHandoff = vi.fn(async () => ({
+    pairing: {
+      schema: "helix.connector_pairing.v1",
+      pairing_id: "connector_pairing:server-g6-mcp",
+      status: "pending",
+    },
+    status: "server_pairing_inbox_staged" as const,
+  }));
   const server = createHelixMcpServer({
     principal: principal(),
     service: {} as HelixAgentApiService,
@@ -109,6 +168,10 @@ const connect = async () => {
     >,
     deviceCheckService: vi.fn(),
     environmentReasoningRoleService: roleStore,
+    environmentActionAuthorityInspector: authorityInspector,
+    environmentActionAuthorityConfigurator: authorityConfigurator,
+    environmentPlayerPairLocalHandoff: playerPairLocalHandoff,
+    environmentServerPairLocalHandoff: serverPairLocalHandoff,
   });
   const client = new Client(
     { name: "g6-mcp-test", version: "1.0.0" },
@@ -120,6 +183,10 @@ const connect = async () => {
   return {
     client,
     roleStore,
+    authorityInspector,
+    authorityConfigurator,
+    playerPairLocalHandoff,
+    serverPairLocalHandoff,
     close: async () => {
       await client.close();
       await server.close();
@@ -128,6 +195,50 @@ const connect = async () => {
 };
 
 describe("Helix MCP G6 environment reasoning roles", () => {
+  it("rejects a prospective action alias before it enters the canonical ledger", async () => {
+    const connection = await connect();
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_environment_reasoning_role_record",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: "environment_binding:g6-mcp",
+          action_authority_id: "environment_action_authority:g6-mcp",
+          subject_native_id: "player:g6-mcp",
+          turn_id: "ask:principal:g6-mcp",
+          goal_id: GOAL_ID,
+          expected_goal_revision: 1,
+          expected_ledger_revision: 0,
+          observation_revision: 1,
+          input_evidence_refs: ["evidence:g6-mcp"],
+          payload: {
+            role_kind: "prospective_planning",
+            proposal_id: "proposal:g6-mcp-alias",
+            objective_summary: "Turn the player camera ten degrees.",
+            capability_id: "com.casimirbot.minecraft.player.look_at",
+            capability_arguments: {
+              action_kind: "look_at",
+              target: { target_kind: "relative_rotation", yaw_degrees: 10 },
+            },
+            predicted_postconditions: [],
+            assumptions: [],
+            resource_keys: ["minecraft.player.camera"],
+            confidence: 0.9,
+            abstain: false,
+          },
+          expires_in_seconds: 60,
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result)).toContain(
+        "reasoning_role_capability_identity_mismatch",
+      );
+      expect(connection.roleStore.recordOutput).not.toHaveBeenCalled();
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("exposes record, inspect, disposition, and arbitration as nonterminal tools", async () => {
     const connection = await connect();
     try {
@@ -137,7 +248,124 @@ describe("Helix MCP G6 environment reasoning roles", () => {
         "helix_environment_reasoning_role_inspect",
         "helix_environment_reasoning_role_disposition",
         "helix_environment_reasoning_role_arbitrate",
+        "helix_environment_action_authority_inspect",
+        "helix_environment_action_authority_configure",
+        "helix_environment_player_pair_local",
+        "helix_environment_server_pair_local",
       ]));
+
+      const inspected = await connection.client.callTool({
+        name: "helix_environment_action_authority_inspect",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: "environment_binding:g6-mcp",
+        },
+      });
+      expect(inspected.isError, JSON.stringify(inspected)).not.toBe(true);
+      expect(inspected.structuredContent).toMatchObject({
+        operation: "environment.action_authority.inspect",
+        authorities: [],
+        connector_readiness: [],
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(connection.authorityInspector).toHaveBeenCalledWith({
+        roomId: ROOM_ID,
+        profileId: PROFILE_ID,
+        environmentBindingId: "environment_binding:g6-mcp",
+      });
+
+      const configured = await connection.client.callTool({
+        name: "helix_environment_action_authority_configure",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: "environment_binding:g6-mcp",
+          settings: {
+            participant_id: PARTICIPANT_ID,
+            domain_adapter: "minecraft.fabric_client.v1",
+            allowed_capability_ids: [
+              "com.casimirbot.minecraft.player.look",
+            ],
+            autonomy_mode: "approved_capabilities",
+            manual_override_policy: "cancel",
+            expires_at: "2026-08-23T13:00:00.000Z",
+          },
+        },
+      });
+      expect(configured.isError, JSON.stringify(configured)).not.toBe(true);
+      expect(configured.structuredContent).toMatchObject({
+        operation: "environment.action_authority.configure",
+        authority: {
+          action_authority_id: "environment_action_authority:g6-mcp",
+          policy_version: 2,
+        },
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(connection.authorityConfigurator).toHaveBeenCalledWith(
+        expect.objectContaining({
+          roomId: ROOM_ID,
+          ownerProfileId: PROFILE_ID,
+          participantId: PARTICIPANT_ID,
+        }),
+      );
+
+      const paired = await connection.client.callTool({
+        name: "helix_environment_player_pair_local",
+        arguments: {
+          room_id: ROOM_ID,
+          binding_id: "room_source_binding:g6-mcp",
+          action_authority_id: "environment_action_authority:g6-mcp",
+          credential_ttl_ms: 3_600_000,
+          idempotency_key: "g6-mcp-local-pairing",
+        },
+      });
+      expect(paired.isError, JSON.stringify(paired)).not.toBe(true);
+      expect(paired.structuredContent).toMatchObject({
+        operation: "environment.player_pair.local_handoff",
+        handoff_status: "player_pairing_inbox_staged",
+        credential_included: false,
+        pairing_code_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(JSON.stringify(paired)).not.toContain("Z4ZD-X2JJ");
+      expect(connection.playerPairLocalHandoff).toHaveBeenCalledWith({
+        roomId: ROOM_ID,
+        ownerProfileId: PROFILE_ID,
+        bindingId: "room_source_binding:g6-mcp",
+        actionAuthorityId: "environment_action_authority:g6-mcp",
+        credentialTtlMs: 3_600_000,
+        idempotencyKey: "g6-mcp-local-pairing",
+      });
+
+      const serverPaired = await connection.client.callTool({
+        name: "helix_environment_server_pair_local",
+        arguments: {
+          room_id: ROOM_ID,
+          binding_id: "room_source_binding:g6-mcp",
+          credential_ttl_ms: 3_600_000,
+          idempotency_key: "g6-mcp-local-server-pairing",
+        },
+      });
+      expect(serverPaired.isError, JSON.stringify(serverPaired)).not.toBe(true);
+      expect(serverPaired.structuredContent).toMatchObject({
+        operation: "environment.server_pair.local_handoff",
+        binding_id: "room_source_binding:g6-mcp",
+        handoff_status: "server_pairing_inbox_staged",
+        credential_included: false,
+        pairing_code_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(JSON.stringify(serverPaired)).not.toContain("Z4ZD-X2JJ");
+      expect(connection.serverPairLocalHandoff).toHaveBeenCalledWith({
+        roomId: ROOM_ID,
+        ownerProfileId: PROFILE_ID,
+        bindingId: "room_source_binding:g6-mcp",
+        credentialTtlMs: 3_600_000,
+        idempotencyKey: "g6-mcp-local-server-pairing",
+      });
 
       const adoptedArgs = { direction: "forward", duration_ms: 100, sprint: false };
       const result = await connection.client.callTool({

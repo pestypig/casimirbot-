@@ -1,0 +1,62 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_evaluations": 1,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "decision": "FAIL_GLOBAL_STATIC_STATE_SURFACE_GERMS_DISJOINT_ORDER_2",
+  "downstream_duties": {
+    "classical_ineligible": 12,
+    "quantum_ineligible": 6,
+    "typed_failure": "GLOBAL_STATIC_STATE_FAIL"
+  },
+  "execution": {
+    "authorization_bytes": 380,
+    "authorization_sha256": "29543f4b8f6cc524bf62a8ac65d5da40f9ef9aa0752f3ddf977c7cff66465450",
+    "container_id": "f972b7d44f35cc0a28b36eb1a3fdbfc98a9e533d3aa9de491c544f6a5ff2625e",
+    "container_oom_killed": false,
+    "container_returncode": 1,
+    "invocation_sha256": "6d024cac22d2c81101671bd0ac9e1a6df2c02ec1baf5c7cef30ec8108325caf9",
+    "process_result_sha256": "3ff31ae1859cb2128576796cad5f26944a2ba26025bb4ca8249008fc8df585c5",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "108d3861d6ceac396c88ae9068105aceca00134b05807676b48019daabf6493f"
+  },
+  "first_failure": {
+    "coefficient": "B",
+    "decision": "FAIL",
+    "exterior_exact": "100/27",
+    "first_disjoint_order": 2,
+    "interior_exact": "-350/27",
+    "record_sha256": "696d7c92db103ad4f37e5c71daf3655ed2826147d7a86d5e12a6ff0ab5110597",
+    "typed_result": "GLOBAL_STATIC_STATE_FAIL"
+  },
+  "independent_lane": {
+    "authorization_absent": true,
+    "execution_authorized": false,
+    "execution_ledger_absent": true,
+    "output_root_absent": true
+  },
+  "preflight": {
+    "candidate_evaluations": 0,
+    "decision": "PASS",
+    "record_sha256": "c380d692c2d9cc8cd8159e11d352850653f40353123782be31eaa2abbdce9fd3",
+    "sources_verified": 7
+  },
+  "proof_manifest_sha256": "b4eec02bdc166b10cfc0e795e7d3f1bb64b618356e07d1dfcf883e8cbe5edd98",
+  "proposal_exhausted": true,
+  "proposal_sha256": "af0a0394a16f58e7c7e4dff30a0f5e2fb97562baefc1c77f6a47d76499667384",
+  "retry_allowed": false,
+  "root": {
+    "bytes": 11502,
+    "files": 21,
+    "path": "artifacts/research/nhm2/g2h/tolman-vii-primary-v3"
+  },
+  "schema": "nhm2.g2h_e_s3.primary_result.v1",
+  "status": "IMMUTABLE_MATHEMATICAL_FAIL"
+}

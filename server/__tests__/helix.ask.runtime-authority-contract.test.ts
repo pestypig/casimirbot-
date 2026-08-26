@@ -2529,6 +2529,127 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toContain("typed_failure_missing_code");
   });
 
+  it("recognizes a verified provider runtime cycle before terminal arbitration emits its terminal event", () => {
+    const turnId = "ask:runtime-authority:pre-terminal-provider-cycle";
+    const capabilityId = "com.casimirbot.minecraft.nearby_entities.list";
+    const observationRef = `${turnId}:workstation_gateway:${capabilityId}:1`;
+    const recorder = createHelixTurnLifecycleRecorder({
+      turnId,
+      scope: "codex_native_provider_cycle",
+      now: () => 100,
+    });
+    const started = recorder.append({
+      kind: "turn.started",
+      producer: "helix_adapter",
+      status: "started",
+    });
+    const route = recorder.append({
+      kind: "route.committed",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: started.event_id,
+      route_commit_id: "route:pre-terminal",
+      capability_ids: [capabilityId],
+    });
+    const admitted = recorder.append({
+      kind: "capability.admitted",
+      producer: "helix_policy",
+      status: "succeeded",
+      causation_id: route.event_id,
+      route_commit_id: "route:pre-terminal",
+      capability_id: capabilityId,
+    });
+    const call = recorder.append({
+      kind: "tool.call.started",
+      producer: "codex_runtime",
+      status: "started",
+      causation_id: admitted.event_id,
+      route_commit_id: "route:pre-terminal",
+      call_id: "call:pre-terminal",
+      capability_id: capabilityId,
+    });
+    const completed = recorder.append({
+      kind: "tool.call.completed",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: call.event_id,
+      route_commit_id: "route:pre-terminal",
+      call_id: "call:pre-terminal",
+      capability_id: capabilityId,
+      observation_refs: [observationRef],
+    });
+    const reentered = recorder.append({
+      kind: "observation.reentered",
+      producer: "helix_adapter",
+      status: "succeeded",
+      causation_id: completed.event_id,
+      route_commit_id: "route:pre-terminal",
+      call_id: "call:pre-terminal",
+      capability_id: capabilityId,
+      observation_refs: [observationRef],
+    });
+    const message = recorder.append({
+      kind: "agent.message.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: reentered.event_id,
+      message_sha256: "hash:pre-terminal",
+    });
+    recorder.append({
+      kind: "runtime.turn.completed",
+      producer: "codex_runtime",
+      status: "succeeded",
+      causation_id: message.event_id,
+    });
+
+    const report = evaluateTerminalBoundaryEligibility({
+      turn_id: turnId,
+      source_target_intent: {
+        target_source: "live_environment",
+        target_kind: "live_environment",
+        strength: "hard",
+      },
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "environment_state_read",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      native_provider_turn_lifecycle: recorder.snapshot(),
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "model_synthesized_answer",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      current_turn_artifact_ledger: [{
+        artifact_id: observationRef,
+        kind: "live_environment_observation",
+        capability_key: capabilityId,
+        payload: {
+          schema: "helix.live_environment_observation.v1",
+          capability_key: capabilityId,
+        },
+      }],
+    });
+
+    expect(report.runtime_lifecycle).toMatchObject({
+      integrity_verified: true,
+      provider_cycle_completed: true,
+      authority_source: "verified_runtime_event_log",
+      supported_capability_ids: [capabilityId],
+      supported_observation_refs: [observationRef],
+    });
+    expect(report.checks).toMatchObject({
+      agent_runtime_loop: true,
+      agent_step_decision: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).toEqual([]);
+    expect(report.eligible).toBe(true);
+  });
+
   it("accepts a committed scholarly answer after verified observation re-entry despite a stale preflight goal frame", () => {
     const turnId = "ask:runtime-authority:scholarly-answer";
     const observationRef = `${turnId}:workstation_gateway:scholarly-research.lookup_papers:1`;

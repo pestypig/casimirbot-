@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  HELIX_DEVELOPER_ACCOUNT_POLICY,
+  HELIX_USER_ACCOUNT_POLICY,
+} from "@shared/helix-account-session";
+import {
+  cacheAccountCapabilityPolicy,
+  clearCachedAccountCapabilityPolicy,
+} from "@/lib/workstation/accountCapabilityPolicy";
 import { SharedLiveRoomBrokerageBindingsPanel } from
   "../SharedLiveRoomBrokerageBindingsPanel";
 
@@ -19,12 +27,16 @@ const connection = {
 
 describe("SharedLiveRoomBrokerageBindingsPanel", () => {
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
+    clearCachedAccountCapabilityPolicy();
   });
 
   it("lets the owner attach a connected read environment to the exact room", async () => {
+    cacheAccountCapabilityPolicy(HELIX_DEVELOPER_ACCOUNT_POLICY);
     let attached = false;
     let paperCreated = false;
+    let readAcceptanceCalled = false;
     let livePreviewStatus: "reviewed" | "approved" | null = null;
     const approvalPhrase =
       "APPROVE BUY 2.497502 TEST LIMIT 10.01 PREVIEW live_equity_preview:test";
@@ -82,6 +94,17 @@ describe("SharedLiveRoomBrokerageBindingsPanel", () => {
           live_order_execution_enabled: false,
         }) : response({}, 404);
       }
+      if (url.endsWith("/read-acceptance") && init?.method === "POST") {
+        readAcceptanceCalled = true;
+        return response({
+          receipts: Array.from({ length: 5 }, (_, index) => ({
+            upstream_tool: `read_tool_${index + 1}`,
+            observation_id: `observation:${index + 1}`,
+          })),
+          provider_order_tool_calls_made: 0,
+          live_order_execution_enabled: false,
+        }, 201);
+      }
       if (url.endsWith("/paper-account") && init?.method === "POST") {
         paperCreated = true;
         return response({
@@ -137,6 +160,12 @@ describe("SharedLiveRoomBrokerageBindingsPanel", () => {
       }),
     ));
     expect(await screen.findByText(/1 read capabilities · orders disabled/u)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Verify read-only access" })).toBeEnabled();
+    expect(screen.getByText(/A paper account is not required/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Verify read-only access" }));
+    await waitFor(() => expect(readAcceptanceCalled).toBe(true));
+    expect(await screen.findByText(/5 sanitized Robinhood read receipts recorded/u)).toBeTruthy();
+    expect(paperCreated).toBe(false);
     fireEvent.change(screen.getByLabelText("Paper bankroll in dollars"), {
       target: { value: "340.00" },
     });
@@ -162,6 +191,57 @@ describe("SharedLiveRoomBrokerageBindingsPanel", () => {
     fireEvent.click(approveButton);
     await waitFor(() => expect(livePreviewStatus).toBe("approved"));
     expect(await screen.findByText(/separately armed live control/u)).toBeTruthy();
+  });
+
+  it("gives a user only read controls and lets the owner revoke the room grant", async () => {
+    cacheAccountCapabilityPolicy(HELIX_USER_ACCOUNT_POLICY);
+    let attached = true;
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const url = input.toString();
+      if (url.endsWith("/brokerage-connections")) {
+        return response({ connections: [connection] });
+      }
+      if (url.endsWith("/rooms/room%3Atest")) {
+        return response({
+          bindings: attached ? [{
+            binding_id: "brokerage_binding:test",
+            connection_id: connection.connection_id,
+            room_id: "room:test",
+            status: "active",
+            privacy_state: "owner_private",
+            capability_ids: connection.capability_ids,
+          }] : [],
+        });
+      }
+      if (url.includes("/room-bindings/room%3Atest") &&
+          init?.method === "DELETE") {
+        attached = false;
+        return response({ ok: true, revoked: true });
+      }
+      return response({}, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <SharedLiveRoomBrokerageBindingsPanel
+        roomId="room:test"
+        roomClosed={false}
+        isOwner
+      />,
+    );
+
+    expect(await screen.findByText("Profile connection read access")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Verify read-only access" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Create paper account" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Request Robinhood review" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Revoke room access" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agi/brokerage-connections/brokerage_connection%3Atest/room-bindings/room%3Atest",
+      { method: "DELETE", credentials: "same-origin" },
+    ));
+    expect(await screen.findByText(/revoked from this room/iu)).toBeTruthy();
   });
 
   it("does not expose the panel to a non-owner", () => {

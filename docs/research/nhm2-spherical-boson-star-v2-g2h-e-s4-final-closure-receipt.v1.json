@@ -1,0 +1,121 @@
+{
+  "schema": "nhm2.g2h_e_s4.final_closure_receipt.v1",
+  "status": "PASS_IMPLEMENTATION_PREEXECUTION_ONLY",
+  "program_gate": "G2H-E-S4",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "bounded self-correcting mini-boson-star proof implementation and preexecution closure",
+    "current_maturity": "fixture-complete implementation with current-head repository verification",
+    "target_maturity": "closed implementation/preexecution gate with at most one inert future primary proposal",
+    "required_frozen_inputs": [
+      "R2 protocol f2fec60d0211e8762bee1a1b282dfdf3e38c8ebdbdb220ec068a8b02f2ba6cb2",
+      "R2 evidence matrix 7f7b7ac889de82d52a2b6fc667e4b458d42ac833f350c91c5c48890266310d03",
+      "R2 candidate contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "selected exact source coordinate 6/5",
+      "R1 definition seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "R2 total quantum builder 2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc"
+    ],
+    "required_evidence": [
+      "4/4 common roles and 13/13 scientific roles per source/runtime-disjoint producer",
+      "all nine required fixture classes covered without candidate-derived ingress",
+      "source, toolchain, dependency, runtime image, executable, command, environment and absent-root bindings",
+      "independent fail-closed runtime and receipt audits",
+      "math validation, all required WARP tests and Casimir certificate integrity"
+    ],
+    "stop_fail_criteria": [
+      "any frozen input changes",
+      "any producer or fixture audit fails",
+      "either candidate root exists",
+      "any candidate evaluation, positive parameter sample, token, authorization or authority promotion occurs"
+    ],
+    "explicit_non_goals": [
+      "candidate evaluation or execution",
+      "Rust scientific execution",
+      "candidate, classical-proof, quantum-state or geometry/state acceptance",
+      "G3, SI, metric, lane, replay, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "one inert versioned future primary execution proposal only; later execution still requires a new gate and explicit authorization"
+  },
+  "semantic_change_class": {
+    "mathematical_semantics_changed": false,
+    "runtime_authority_changed": false,
+    "receipt_semantics_changed": true,
+    "proof_maturity_changed": true,
+    "meaning": "fixture implementation and preexecution maturity close; no mathematical proof or scientific authority is established"
+  },
+  "preclosure_evidence": {
+    "producer_completion_matrix_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-producer-completion-matrix.v1.json",
+    "producer_completion_matrix_preclosure_sha256": "863e1ae137991c6aedcf58b4de1c0810a9882e1a5051aba9db4e438aca580056",
+    "final_preverification_audit_path": "scripts/nhm2_g2h_e_s4_final_preverification_closure_audit.py",
+    "final_preverification_audit_sha256": "c40399bc57a682fa3e2294153d4db911affa2fa5b345a0def5e963a7bb4cf9d2",
+    "final_preverification_audit_status": "PASS",
+    "final_preverification_checks_passed": 38,
+    "final_preverification_checks_total": 38,
+    "common_roles_complete": 4,
+    "primary_roles_complete": 13,
+    "independent_roles_complete": 13,
+    "fixture_classes_complete": 9
+  },
+  "final_build_identities": {
+    "binding_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-p13-r13-build-binding.v7.json",
+    "binding_sha256": "a2bcab1a647a21fd346f55dda6075a4634394b4a36c0ec478b6eb5ebb356760e",
+    "primary_image": "sha256:27ae7d9a922d507b9c24d3616339144d2a17748a78ab860c1593e85893b48ecb",
+    "primary_executable_sha256": "4134edbc80d613d959414b62a8c19f77841ff5f1a0cf744b6aa548eff258ad98",
+    "independent_image": "sha256:056e138985b7e068c0be34f782abae76920844992ab07f9b2eb4ce7e1385a319",
+    "independent_executable_sha256": "0cd4359a994cfd016aeb90d698bc72af4472ddd6ca6876c24a278f26b6773990",
+    "source_runtime_disjoint": true
+  },
+  "repository_verification": {
+    "git_head_at_verification": "c292770ccaad74f9f37f9d34a1ebd03b4daf1217",
+    "working_tree_note": "the S4 evidence is an uncommitted byte-bound worktree packet; git HEAD alone is not its identity",
+    "math_report_path": "reports/math-report.json",
+    "math_report_sha256": "4b433e4174d8a3696368a064afca2d77e63d786fdcc7ed285cc2ad910249c4c5",
+    "math_entries": 318,
+    "math_validate": "PASS",
+    "warp_test_files_passed": 18,
+    "warp_test_files_total": 18,
+    "warp_tests_passed": 179,
+    "warp_tests_total": 179,
+    "casimir_command": "npm run casimir:verify -- --ci --url https://casimirbot.com/api/agi/adapter/run --trace-out artifacts/training-trace.jsonl",
+    "casimir_trace_id": "adapter:3d70ae6a-26ce-4440-a466-4028340aabbb",
+    "casimir_run_id": "1",
+    "casimir_verdict": "PASS",
+    "casimir_status": "GREEN",
+    "casimir_certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "casimir_certificate_integrity_ok": true,
+    "training_trace_path": "artifacts/training-trace.jsonl",
+    "training_trace_sha256": "d1239d169e10f4e77b6c05cd1d3e8db376b74db89ea413c5bea50d65e0423464"
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "primary_candidate_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-primary",
+    "primary_candidate_root_absent": true,
+    "independent_candidate_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-independent",
+    "independent_candidate_root_absent": true,
+    "authorization_token_created": false,
+    "primary_execution_authorized": false,
+    "independent_execution_authorized": false,
+    "rust_scientific_lane_executed": false,
+    "retry_retune_or_semantic_change": false,
+    "G3_started": false
+  },
+  "authority": {
+    "receipt_is_mathematical_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "si_lane_authorized": false,
+    "metric_lane_authorized": false,
+    "two_lanes_published": false,
+    "pair_agreement": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "disposition": "CLOSE_G2H_E_S4_IMPLEMENTATION_PREEXECUTION_AND_ALLOW_AT_MOST_ONE_INERT_PRIMARY_PROPOSAL"
+}

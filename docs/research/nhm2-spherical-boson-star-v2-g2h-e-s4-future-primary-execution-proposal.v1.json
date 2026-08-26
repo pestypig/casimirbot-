@@ -1,0 +1,106 @@
+{
+  "schema": "nhm2.g2h_e_s4.future_primary_execution_proposal.v1",
+  "status": "INERT_NOT_AUTHORIZATION_NOT_EXECUTION_READY",
+  "program_gate": "G2H-E-S4",
+  "lane": "primary_cpp_arb_flint_gmp_mpfr",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "future primary selected-member execution proposal",
+    "current_maturity": "inert proposal after closed fixture implementation/preexecution gate",
+    "target_maturity": "a later separately reviewed authorization packet with an exact scientific checkpoint command and absent-root proof",
+    "required_frozen_inputs": [
+      "selected identity G2H_E_S3_R2_MINI_BOSON_STAR_SHAT0_6_5_SCALAR_HADAMARD_V1",
+      "exact source coordinate 6/5",
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 definition seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "R2 total quantum builder 2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc",
+      "S4 closure receipt 539a4ac5f8ea605abbf05e34802fc4f407e106b3d6555c1928389eefc58ca191"
+    ],
+    "required_evidence": [
+      "a versioned candidate-capable primary checkpoint implementation distinct from the fixture-only entrypoint",
+      "source, image, executable, exact argv and environment bindings",
+      "exclusive absent future primary root immediately before invocation",
+      "fresh explicit user authorization naming the final proposal digest",
+      "immutable PASS, FAIL or partial-output persistence with no retry, retune, deletion or alternate root"
+    ],
+    "stop_fail_criteria": [
+      "any scientific selector, equation, grid, arithmetic, threshold, chronology or identity changes",
+      "the future root exists",
+      "the authorization token or exact checkpoint command is absent or mismatched",
+      "the Rust lane is treated as authorized by a primary decision"
+    ],
+    "explicit_non_goals": [
+      "authorization or execution in S4",
+      "Rust scientific execution",
+      "candidate admission or geometry/state acceptance",
+      "G3, SI, metric, lane, replay, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "none until a later versioned primary execution-preflight gate is explicitly opened"
+  },
+  "closure_binding": {
+    "final_closure_receipt_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-final-closure-receipt.v1.json",
+    "final_closure_receipt_sha256": "539a4ac5f8ea605abbf05e34802fc4f407e106b3d6555c1928389eefc58ca191",
+    "producer_completion_matrix_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-producer-completion-matrix.v1.json",
+    "producer_completion_matrix_sha256": "6e5a0119a1a5c41d3c0cb764463c3fe09ddfecae8ba3c2800de0c1d100956ede",
+    "producer_completion_audit_path": "scripts/nhm2_g2h_e_s4_producer_completion_audit.py",
+    "producer_completion_audit_sha256": "2b8fcf6399db45ccfc6f23e9420ed9dfba104438eb9a3a6eaa863f3fc69d13ca",
+    "producer_completion_audit": "PASS_15_OF_15"
+  },
+  "implemented_fixture_identity": {
+    "meaning": "authenticated implementation lineage evidence only; this fixture entrypoint rejects candidate interfaces and is not the future scientific checkpoint",
+    "binding_sha256": "a2bcab1a647a21fd346f55dda6075a4634394b4a36c0ec478b6eb5ebb356760e",
+    "image": "sha256:27ae7d9a922d507b9c24d3616339144d2a17748a78ab860c1593e85893b48ecb",
+    "executable_sha256": "4134edbc80d613d959414b62a8c19f77841ff5f1a0cf744b6aa548eff258ad98",
+    "candidate_interface_exit": 64
+  },
+  "future_execution_identity": {
+    "candidate_capable_source_sha256": null,
+    "runtime_image_digest": null,
+    "executable_sha256": null,
+    "checkpoint_sha256": null,
+    "exact_command": null,
+    "environment_allowlist_sha256": null,
+    "authorization_token": null,
+    "authorization_record": null,
+    "invocation_record": null,
+    "result_record": null,
+    "future_output_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-primary",
+    "future_output_root_absent_at_proposal": true
+  },
+  "independent_rust_boundary": {
+    "proposal_created": false,
+    "authorization_token": null,
+    "execution_authorized": false,
+    "scientific_execution_performed": false,
+    "future_output_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-independent",
+    "future_output_root_absent": true,
+    "separate_later_decision_required": true
+  },
+  "inertness": {
+    "is_authorization": false,
+    "is_checkpoint_command": false,
+    "is_candidate_evaluation": false,
+    "may_be_executed_as_written": false,
+    "token_created": false,
+    "container_created": false,
+    "candidate_root_created": false,
+    "retry_allowed": false,
+    "retune_allowed": false,
+    "alternate_root_allowed": false
+  },
+  "authority": {
+    "candidate_execution_authorized": false,
+    "independent_execution_authorized": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "disposition": "PRESERVE_INERT_UNTIL_A_LATER_SEPARATELY_VERSIONED_PRIMARY_EXECUTION_PREFLIGHT_AND_EXPLICIT_USER_AUTHORIZATION"
+}

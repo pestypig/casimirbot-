@@ -14,6 +14,14 @@ import {
 import {
   HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
   HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+  HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+  HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+  HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+  HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   type HelixEnvironmentProbeObservation,
 } from "@shared/helix-environment-connector";
 import {
@@ -30,6 +38,7 @@ import {
   type HelixEnvironmentActionMcpExecutor,
   type HelixEnvironmentActionAuthorityLeaseExtender,
   type HelixEnvironmentProbeMcpExecutor,
+  type HelixEnvironmentReasoningRoleMcpStore,
 } from "../helix-mcp-server";
 import type { HelixAgentApiService } from
   "../../services/helix-agent-api/service";
@@ -137,11 +146,23 @@ const actorStatusObservation: HelixEnvironmentProbeObservation = {
   raw_content_included: false,
 };
 
+const situationObservation = (
+  capabilityId: string,
+): HelixEnvironmentProbeObservation => ({
+  ...actorStatusObservation,
+  probe_request_ref: `environment_probe_request:${capabilityId}`,
+  probe_attempt_ref: `environment_probe_attempt:${capabilityId}`,
+  capability_id: capabilityId,
+  summary: `Observed ${capabilityId}.`,
+  evidence_ref: `environment_probe_evidence:${capabilityId}`,
+});
+
 const connect = async (input: {
   scopes: readonly string[];
   executeAction: HelixEnvironmentActionMcpExecutor;
   executeProbe?: HelixEnvironmentProbeMcpExecutor;
   extendAuthority?: HelixEnvironmentActionAuthorityLeaseExtender;
+  reasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
 }) => {
   const roomControlService = {
     inspectRoom: vi.fn(async () => ({
@@ -163,6 +184,7 @@ const connect = async (input: {
     environmentActionExecutor: input.executeAction,
     environmentProbeExecutor: input.executeProbe,
     environmentActionAuthorityLeaseExtender: input.extendAuthority,
+    environmentReasoningRoleService: input.reasoningRoleService,
   });
   const client = new Client(
     { name: "helix-minecraft-action-mcp-test", version: "1.0.0" },
@@ -193,12 +215,28 @@ describe("Helix MCP Minecraft action boundary", () => {
       observation,
       idempotentReplay: false,
     })) as HelixEnvironmentActionMcpExecutor;
-    const executeProbe = vi.fn(async () => ({
-      ok: true,
-      status: "completed" as const,
-      summary: actorStatusObservation.summary,
-      observation: actorStatusObservation,
-    })) as HelixEnvironmentProbeMcpExecutor;
+    const executeProbe = vi.fn(async (
+      request: Parameters<HelixEnvironmentProbeMcpExecutor>[0],
+    ) => {
+      const probeObservation =
+        request.capabilityId === HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY
+          ? actorStatusObservation
+          : situationObservation(request.capabilityId);
+      return {
+        ok: true,
+        status: "completed" as const,
+        summary: probeObservation.summary,
+        observation: probeObservation,
+      };
+    }) as HelixEnvironmentProbeMcpExecutor;
+    const linkCompletedPrincipalExecution = vi.fn(async () => null);
+    const reasoningRoleService = {
+      recordOutput: vi.fn(),
+      inspect: vi.fn(),
+      recordPrincipalDisposition: vi.fn(),
+      arbitrate: vi.fn(),
+      linkCompletedPrincipalExecution,
+    } as unknown as HelixEnvironmentReasoningRoleMcpStore;
     const extendAuthority = vi.fn(async (input) => ({
       schema: "helix.environment_action_authority.v1",
       action_authority_id: input.actionAuthorityId,
@@ -235,6 +273,7 @@ describe("Helix MCP Minecraft action boundary", () => {
       executeAction,
       executeProbe,
       extendAuthority,
+      reasoningRoleService,
     });
     try {
       const catalog = await connection.client.listTools();
@@ -243,6 +282,9 @@ describe("Helix MCP Minecraft action boundary", () => {
       ) as (typeof catalog.tools)[number] & { _meta?: Record<string, unknown> };
       const actorStatus = catalog.tools.find(
         (candidate) => candidate.name === "helix_minecraft_actor_status",
+      ) as (typeof catalog.tools)[number] & { _meta?: Record<string, unknown> };
+      const situationProbe = catalog.tools.find(
+        (candidate) => candidate.name === "helix_minecraft_situation_probe",
       ) as (typeof catalog.tools)[number] & { _meta?: Record<string, unknown> };
       const semanticWake = catalog.tools.find(
         (candidate) => candidate.name === "helix_environment_semantic_wake_read",
@@ -255,6 +297,7 @@ describe("Helix MCP Minecraft action boundary", () => {
       );
       expect(action).toBeDefined();
       expect(actorStatus).toBeDefined();
+      expect(situationProbe).toBeDefined();
       expect(semanticWake).toBeDefined();
       expect(status).toBeDefined();
       expect(control).toBeDefined();
@@ -266,6 +309,13 @@ describe("Helix MCP Minecraft action boundary", () => {
         readOnlyHint: true,
         destructiveHint: false,
       });
+      expect(situationProbe.annotations).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+      });
+      expect(situationProbe.description).toContain(
+        "never proves a navigable or safe path",
+      );
       expect(actorStatus._meta?.securitySchemes).toEqual([{
         type: "oauth2",
         scopes: [
@@ -414,6 +464,18 @@ describe("Helix MCP Minecraft action boundary", () => {
           assistant_answer: false,
           terminal_eligible: false,
         },
+        perception_snapshot_compatibility: {
+          mode: "actor_status_catalog_compatibility_v1",
+          catalog_refresh_required: true,
+          ok: true,
+          status: "completed",
+          observation: {
+            capability_id: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
         answer_authority: false,
         assistant_answer: false,
         terminal_eligible: false,
@@ -429,6 +491,22 @@ describe("Helix MCP Minecraft action boundary", () => {
         toolCallId: expect.stringMatching(/^mcp_environment_probe_tool_call:/),
         providerExecutionId: expect.stringMatching(/^mcp_environment_probe_execution:/),
       }));
+      expect(executeProbe).toHaveBeenCalledWith(expect.objectContaining({
+        capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+        arguments: {
+          horizontal_radius: 7,
+          vertical_radius: 8,
+        },
+        accountContext: expect.objectContaining({
+          profile_id: "profile-mcp-minecraft-action",
+        }),
+        conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+        turnId: expect.stringMatching(/^mcp_environment_perception_compat_turn:/),
+        toolCallId:
+          expect.stringMatching(/^mcp_environment_perception_compat_tool_call:/),
+        providerExecutionId:
+          expect.stringMatching(/^mcp_environment_perception_compat_execution:/),
+      }));
 
       const actorStatusWithUnsupportedSelector = await connection.client.callTool({
         name: "helix_minecraft_actor_status",
@@ -438,13 +516,125 @@ describe("Helix MCP Minecraft action boundary", () => {
         },
       });
       expect(actorStatusWithUnsupportedSelector.isError).toBe(true);
-      expect(executeProbe).toHaveBeenCalledTimes(1);
+      expect(executeProbe).toHaveBeenCalledTimes(2);
+
+      const situationCases = [
+        {
+          probe: { kind: "inventory" },
+          capabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+          arguments: {},
+        },
+        {
+          probe: { kind: "nearby_entities", freshness_requirement_ms: 5_000 },
+          capabilityId: HELIX_MINECRAFT_NEARBY_ENTITIES_LIST_CAPABILITY,
+          arguments: { freshness_requirement_ms: 5_000 },
+        },
+        {
+          probe: { kind: "hazards" },
+          capabilityId: HELIX_MINECRAFT_HAZARDS_SCAN_CAPABILITY,
+          arguments: {},
+        },
+        {
+          probe: { kind: "local_map" },
+          capabilityId: HELIX_MINECRAFT_LOCAL_MAP_INSPECT_CAPABILITY,
+          arguments: {},
+        },
+        {
+          probe: {
+            kind: "spatial_region",
+            horizontal_radius: 5,
+            vertical_radius: 8,
+            purpose: "movement_safety",
+          },
+          capabilityId: HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
+          arguments: {
+            horizontal_radius: 5,
+            vertical_radius: 8,
+            purpose: "movement_safety",
+          },
+        },
+        {
+          probe: {
+            kind: "line_of_sight",
+            position: { x: 12.5, y: 64, z: -3.25 },
+          },
+          capabilityId: HELIX_MINECRAFT_LINE_OF_SIGHT_CHECK_CAPABILITY,
+          arguments: {
+            target: "position",
+            position: { x: 12.5, y: 64, z: -3.25 },
+          },
+        },
+        {
+          probe: {
+            kind: "reachability",
+            position: { x: 13, y: 64, z: -3 },
+          },
+          capabilityId: HELIX_MINECRAFT_REACHABILITY_CHECK_CAPABILITY,
+          arguments: {
+            target: "position",
+            position: { x: 13, y: 64, z: -3 },
+          },
+        },
+        {
+          probe: {
+            kind: "perception_snapshot",
+            horizontal_radius: 4,
+            vertical_radius: 8,
+          },
+          capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+          arguments: {
+            horizontal_radius: 4,
+            vertical_radius: 8,
+          },
+        },
+      ] as const;
+      for (const situationCase of situationCases) {
+        const situationResult = await connection.client.callTool({
+          name: "helix_minecraft_situation_probe",
+          arguments: { room_id: ROOM_ID, probe: situationCase.probe },
+        });
+        expect(situationResult.isError, JSON.stringify(situationResult)).not.toBe(true);
+        expect(situationResult.structuredContent).toMatchObject({
+          operation: "minecraft.situation.probe",
+          probe_kind: situationCase.probe.kind,
+          room_id: ROOM_ID,
+          ok: true,
+          observation: {
+            capability_id: situationCase.capabilityId,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        });
+        expect(executeProbe).toHaveBeenLastCalledWith(expect.objectContaining({
+          capabilityId: situationCase.capabilityId,
+          arguments: situationCase.arguments,
+          accountContext: expect.objectContaining({
+            profile_id: "profile-mcp-minecraft-action",
+          }),
+          conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+        }));
+      }
+
+      const missingPosition = await connection.client.callTool({
+        name: "helix_minecraft_situation_probe",
+        arguments: {
+          room_id: ROOM_ID,
+          probe: { kind: "line_of_sight" },
+        },
+      });
+      expect(missingPosition.isError).toBe(true);
+      expect(executeProbe).toHaveBeenCalledTimes(10);
 
       const result = await connection.client.callTool({
         name: "helix_minecraft_player_action",
         arguments: {
           room_id: ROOM_ID,
           idempotency_key: "mcp-minecraft-jump-once",
+          principal_turn_id: "g6-principal-turn",
           action: { action_kind: "jump", count: 1 },
         },
       });
@@ -471,10 +661,51 @@ describe("Helix MCP Minecraft action boundary", () => {
           profile_id: "profile-mcp-minecraft-action",
         }),
         conversationThreadId: `helix-ask:room:${ROOM_ID}`,
-        turnId: expect.stringMatching(/^mcp_environment_turn:/),
+        turnId: "g6-principal-turn",
         toolCallId: expect.stringMatching(/^mcp_environment_tool_call:/),
         providerExecutionId: expect.stringMatching(/^mcp_environment_execution:/),
       }));
+      expect(linkCompletedPrincipalExecution).toHaveBeenCalledWith({
+        profileId: "profile-mcp-minecraft-action",
+        participantId: "participant:mcp-self",
+        roomId: ROOM_ID,
+        principalTurnId: "g6-principal-turn",
+        capabilityId: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
+        capabilityArguments: { action_kind: "jump", count: 1 },
+        environmentActionRequestId: observation.action_request_ref,
+        environmentActionResultRef: observation.evidence_ref,
+        reentryObservationRef: observation.evidence_ref,
+      });
+
+      const guardedAction = {
+        room_id: ROOM_ID,
+        perception_semantic_fingerprint: `sha256:${"a".repeat(64)}`,
+        action: { action_kind: "jump", count: 1 },
+      };
+      const firstGuarded = await connection.client.callTool({
+        name: "helix_minecraft_player_action",
+        arguments: {
+          ...guardedAction,
+          idempotency_key: "caller-key-one",
+        },
+      });
+      const firstGuardedExecution = executeAction.mock.calls.at(-1)?.[0];
+      const secondGuarded = await connection.client.callTool({
+        name: "helix_minecraft_player_action",
+        arguments: {
+          ...guardedAction,
+          idempotency_key: "caller-key-two",
+        },
+      });
+      const secondGuardedExecution = executeAction.mock.calls.at(-1)?.[0];
+      expect(firstGuarded.isError, JSON.stringify(firstGuarded)).not.toBe(true);
+      expect(secondGuarded.isError, JSON.stringify(secondGuarded)).not.toBe(true);
+      expect(firstGuardedExecution?.providerExecutionId).toBe(
+        secondGuardedExecution?.providerExecutionId,
+      );
+      expect(firstGuardedExecution?.toolCallId).toBe(
+        secondGuardedExecution?.toolCallId,
+      );
 
       const lookResult = await connection.client.callTool({
         name: "helix_minecraft_player_action",
@@ -496,6 +727,44 @@ describe("Helix MCP Minecraft action boundary", () => {
           max_turn_degrees_per_tick: 1,
         },
       }));
+
+      const trackResult = await connection.client.callTool({
+        name: "helix_minecraft_player_action",
+        arguments: {
+          room_id: ROOM_ID,
+          idempotency_key: "mcp-minecraft-track-nearest-zombie",
+          action: {
+            action_kind: "track_target",
+            target: {
+              target_kind: "entity_type",
+              entity_type_id: "minecraft:zombie",
+              selection: "nearest",
+            },
+            aim_point: "center",
+            max_acquisition_distance: 16,
+            max_duration_ms: 15_000,
+            max_turn_degrees_per_tick: 20,
+            max_angular_acceleration_degrees_per_tick_squared: 4,
+            prediction_ticks: 2,
+            deadband_degrees: 0.5,
+            reacquire_ticks: 10,
+            require_line_of_sight: true,
+            stop_below_health: 6,
+          },
+        },
+      });
+      expect(trackResult.isError, JSON.stringify(trackResult)).not.toBe(true);
+      expect(executeAction).toHaveBeenLastCalledWith(expect.objectContaining({
+        capabilityId: "com.casimirbot.minecraft.player.camera.track",
+        arguments: expect.objectContaining({
+          target_kind: "entity_type",
+          entity_type_id: "minecraft:zombie",
+          aim_point: "center",
+        }),
+      }));
+      expect(
+        executeAction.mock.calls.at(-1)?.[0]?.arguments,
+      ).not.toHaveProperty("selection");
 
       const reactiveResult = await connection.client.callTool({
         name: "helix_minecraft_player_action",

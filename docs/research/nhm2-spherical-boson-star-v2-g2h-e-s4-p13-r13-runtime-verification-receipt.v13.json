@@ -1,0 +1,24 @@
+{
+  "schema": "nhm2.g2h_e_s4.p13_r13_runtime_verification_receipt.v13",
+  "status": "PASS_FIXTURE_ONLY_13_OF_13_PER_LANE_FINAL_S4_CLOSURE_PENDING_NO_SCIENTIFIC_EXECUTION_AUTHORITY",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "P13/R13 256-vector noise Gram, factor, residual and PSD fixture/runtime closure",
+    "current_maturity": "all 13 scientific roles per lane are identity-bound and fixture-complete; final S4 closure remains pending",
+    "target_maturity": "complete final S4 audit and current-head verification before any inert proposal",
+    "required_frozen_inputs": ["R1 seal 728d8c9a...025ca", "quantum builder 29893736...62fc", "binding a2bcab1a...760e"],
+    "required_evidence": ["both 9/9 noise suites", "both 37/37 full harnesses", "runtime/source/command/environment audit", "candidate-interface and corrupt-contract rejection", "13/13 matrix audit", "absent roots"],
+    "stop_fail_criteria": ["fixture failure", "identity drift", "candidate ingress", "root creation", "authorization", "authority promotion"],
+    "explicit_non_goals": ["candidate noise evaluation", "claiming S4 closure before final audit", "scientific Rust run", "G3", "physical authority"],
+    "downstream_gate_unlocked": "final S4 implementation/preexecution closure audit only"
+  },
+  "bindings": {"quantum_builder": "2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc", "p12_r12_build": "598ca3d3109805917ae999c75b43fe75e84bc3b117c4a236624d9a678eac336e", "p13_r13_build": "a2bcab1a647a21fd346f55dda6075a4634394b4a36c0ec478b6eb5ebb356760e", "matrix": "863e1ae137991c6aedcf58b4de1c0810a9882e1a5051aba9db4e438aca580056"},
+  "runtime_audit": {"path": "scripts/nhm2_g2h_e_s4_p13_r13_runtime_audit.py", "raw_sha256": "6f7de7b407384085c6af7b42834d8f6f5f806e30f0864c64853173bb7a164462", "result": "PASS_34_OF_34"},
+  "completion_audit": {"path": "scripts/nhm2_g2h_e_s4_producer_completion_audit.py", "raw_sha256": "a45c2e10e5871520e90d742e5dbf6caab51c1c2f6142e73c908534da8acc08c4", "result": "PASS_14_OF_14"},
+  "primary": {"image_id": "sha256:27ae7d9a922d507b9c24d3616339144d2a17748a78ab860c1593e85893b48ecb", "executable_sha256": "4134edbc80d613d959414b62a8c19f77841ff5f1a0cf744b6aa548eff258ad98", "full_fixture": "PASS_37_OF_37", "noise_fixture": "PASS_9_OF_9"},
+  "independent": {"image_id": "sha256:056e138985b7e068c0be34f782abae76920844992ab07f9b2eb4ce7e1385a319", "executable_sha256": "0cd4359a994cfd016aeb90d698bc72af4472ddd6ca6876c24a278f26b6773990", "full_fixture": "PASS_37_OF_37", "noise_fixture": "PASS_9_OF_9", "noise_mask": "111111111"},
+  "guard_evidence": {"primary_candidate_interface_exit": 64, "independent_candidate_interface_exit": 64, "primary_corrupt_quantum_contract_exit": 65, "independent_corrupt_quantum_contract_exit": 65, "candidate_evaluations": 0, "positive_parameter_samples": 0, "candidate_roots_created": false, "scientific_builder_executed": false},
+  "promotion": {"common_complete": 4, "primary_complete": 13, "primary_required": 13, "independent_complete": 13, "independent_required": 13, "all_required_roles_complete": true, "S4_complete": false, "final_closure_audit_required": true, "inert_future_primary_proposal_allowed": false},
+  "authority": {"receipt_is_proof": false, "candidate_evaluated": false, "candidate_root_created": false, "quantum_state_established": false, "geometry_state_authority": false, "lane_authority": false, "diagnostic_lamp_authority": false, "physical_authority": false, "propulsion_authority": false, "transport_authority": false}
+}

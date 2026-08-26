@@ -1,0 +1,199 @@
+{
+  "schema": "nhm2.g2h_e_s5.primary_checkpoint_abi.v1",
+  "status": "sealed_candidate_neutral_checkpoint_ABI_no_execution_authority",
+  "program_gate": "G2H-E-S5",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "primary candidate-capable checkpoint ABI and execution guard",
+    "current_maturity": "sealed exact ABI after independent 23/23 audit; source implementation not started",
+    "target_maturity": "sealed and independently audited ABI implemented in one offline primary executable",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 definition seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "R2 total quantum builder 2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc",
+      "S4 closure 539a4ac5f8ea605abbf05e34802fc4f407e106b3d6555c1928389eefc58ca191",
+      "S4 inert proposal a95a63df5d2e1f3a755876d0d3f976b55a6a897cbaa86aa9a2b252115a68f4d9"
+    ],
+    "required_evidence": [
+      "exact command and environment grammar",
+      "self-identity and all input hashes",
+      "exclusive root and ledger chronology",
+      "candidate-neutral pass/fail/corruption fixtures",
+      "no path from dry-run to scientific ingress"
+    ],
+    "stop_fail_criteria": [
+      "ambiguous command or path",
+      "unbounded input",
+      "candidate ingress before exclusive invocation persistence",
+      "retry, retune, alternate root, token creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "authorization",
+      "candidate evaluation",
+      "Rust scientific execution",
+      "proof or state acceptance",
+      "G3 or physical claims"
+    ],
+    "downstream_gate_unlocked": "outer checkpoint source implementation after ABI seal and independent audit"
+  },
+  "semantic_change_class": {
+    "mathematical_semantics_changed": false,
+    "runtime_authority_changed": false,
+    "receipt_semantics_changed": true,
+    "proof_maturity_changed": false
+  },
+  "identity": {
+    "scientific_identity": "G2H_E_S3_R2_MINI_BOSON_STAR_SHAT0_6_5_SCALAR_HADAMARD_V1",
+    "exact_source_coordinate": "6/5",
+    "lane": "primary_cpp20_arb_flint_gmp_mpfr",
+    "working_precision_bits": 512,
+    "candidate_evaluations_at_seal": 0,
+    "positive_parameter_samples_at_seal": 0
+  },
+  "paths": {
+    "contract": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+    "definition_seal": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json",
+    "quantum_builder": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r2-total-quantum-builder-algorithms.v2.json",
+    "preflight_binding": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-primary-build-binding.v1.json",
+    "execution_proposal": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-primary-execution-proposal.v1.json",
+    "authorization": "artifacts/nhm2/g2h-e-s5/authorizations/primary-v1.txt",
+    "invocation": "artifacts/nhm2/g2h-e-s5/executions/primary-v1-invocation.json",
+    "stdout": "artifacts/nhm2/g2h-e-s5/executions/primary-v1.stdout.log",
+    "stderr": "artifacts/nhm2/g2h-e-s5/executions/primary-v1.stderr.log",
+    "result": "artifacts/nhm2/g2h-e-s5/executions/primary-v1-result.json",
+    "primary_output_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-primary",
+    "independent_output_root": "artifacts/nhm2/g2h-e-s4/mini-boson-star-independent"
+  },
+  "command_grammar": {
+    "self_test": [
+      "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+      "--preflight-self-test",
+      "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-checkpoint-abi.v1.json"
+    ],
+    "scientific_execution_template": [
+      "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+      "--execute-once",
+      "--contract",
+      "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+      "--definition-seal",
+      "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-definition-seal.v1.json",
+      "--quantum-builder",
+      "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r2-total-quantum-builder-algorithms.v2.json",
+      "--binding",
+      "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-primary-build-binding.v1.json",
+      "--proposal",
+      "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-primary-execution-proposal.v1.json",
+      "--authorization",
+      "artifacts/nhm2/g2h-e-s5/authorizations/primary-v1.txt",
+      "--output-root",
+      "artifacts/nhm2/g2h-e-s4/mini-boson-star-primary"
+    ],
+    "extra_or_reordered_arguments": "reject",
+    "self_test_may_dispatch_science": false,
+    "execution_template_is_authorization": false
+  },
+  "environment_allowlist": {
+    "PATH": "/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "HOSTNAME": "runtime-assigned lowercase hexadecimal container id matching ^[0-9a-f]{12}$; logged but excluded from scientific identity",
+    "HOME": "/root",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "GPG_KEY": "7169605F62C751356D054A26A821E680E5FA6305",
+    "PYTHON_VERSION": "3.12.11",
+    "PYTHON_SHA256": "c30bb24b7f1e9a19b11b55a546434f74e739bb4c271a3e3a80ff4380d49f7adb",
+    "NHM2_EXECUTION_TOKEN": "future_exact_value_not_created_in_S5",
+    "all_other_environment_keys": "reject"
+  },
+  "authorization_record_grammar": {
+    "schema": "nhm2.g2h_e_s5.primary_execution_authorization.v1",
+    "ordered_lines": [
+      "schema=<exact-schema>",
+      "decision=AUTHORIZED",
+      "lane=primary",
+      "proposal_sha256=<future-proposal-sha256>",
+      "token_sha256=<future-token-sha256>",
+      "checkpoint_abi_sha256=<sealed-abi-sha256>",
+      "build_binding_sha256=<future-binding-sha256>",
+      "image_id=<future-image-id>",
+      "executable_sha256=<future-executable-sha256>",
+      "output_root=artifacts/nhm2/g2h-e-s4/mini-boson-star-primary"
+    ],
+    "maximum_bytes": 4096,
+    "symlink": "reject",
+    "missing_or_duplicate_line": "reject",
+    "authorization_record_created_in_S5": false,
+    "token_created_in_S5": false
+  },
+  "preflight_order": [
+    "runtime_identity",
+    "self_executable_identity",
+    "checkpoint_ABI_identity",
+    "frozen_scientific_input_identities",
+    "build_binding_identity",
+    "exact_argv",
+    "environment_allowlist",
+    "authorization_record_and_token",
+    "both_candidate_roots_absent",
+    "all_fixed_ledger_paths_absent",
+    "exclusive_invocation_persistence",
+    "selected_member_ingress",
+    "ordered_scientific_dispatch"
+  ],
+  "failure_precedence": {
+    "64": "interface_or_argument_rejected",
+    "65": "identity_or_regular_file_rejected",
+    "66": "environment_or_authorization_rejected",
+    "67": "root_or_ledger_chronology_rejected",
+    "68": "exclusive_invocation_persistence_failed",
+    "69": "scientific_first_failure_or_partial_output"
+  },
+  "record_rules": {
+    "canonical_json": "UTF-8 RFC8785-compatible object with no unpaired surrogate, duplicate key, nonfinite number or out-of-range resource",
+    "hash_chain": "SHA-256 domain-separated predecessor and self hashes",
+    "persistence": "exclusive create, flush, fsync file, fsync parent, never overwrite",
+    "first_failure": "terminal; all later duties receive explicit INELIGIBLE_AFTER_FIRST_FAIL records",
+    "retry": false,
+    "retune": false,
+    "deletion": false,
+    "alternate_root": false
+  },
+  "self_test_boundary": {
+    "allowed_inputs": [
+      "synthetic exact identities",
+      "synthetic authorization records",
+      "corrupt hashes",
+      "forbidden-root fixtures in an ephemeral noncandidate namespace",
+      "exclusive-ledger chronology fixtures",
+      "manufactured duty-dispatch fixtures"
+    ],
+    "forbidden_inputs": [
+      "the selected member contract through execution mode",
+      "any positive continuation parameter sample",
+      "either real candidate output root",
+      "a real authorization token or record"
+    ],
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false
+  },
+  "authority": {
+    "abi_is_proof": false,
+    "candidate_execution_authorized": false,
+    "candidate_executed": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

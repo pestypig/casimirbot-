@@ -112,6 +112,7 @@ public final class FabricProbeExecutor {
             case "hazard_check" -> hazardCheck(probe, player);
             case "local_map_summary" -> localMapSummary(probe, player);
             case "spatial_region" -> spatialRegion(probe, player);
+            case "perception_snapshot" -> perceptionSnapshot(probe, player);
             default -> blocked(probe, "Probe type is not implemented.");
         };
     }
@@ -602,6 +603,7 @@ public final class FabricProbeExecutor {
         );
         if (entity instanceof LivingEntity living) {
             details.put("health", round(living.getHealth()));
+            details.put("max_health", round(living.getMaxHealth()));
         }
         details.put(
             "scoreboard_tags",
@@ -917,6 +919,38 @@ public final class FabricProbeExecutor {
         return success(
             probe,
             spatialRegionSummary(purpose, details),
+            SensorScope.SENSOR_OBSERVABLE,
+            Map.of("confidence", 0.95, "details", details)
+        );
+    }
+
+    private Map<String, Object> perceptionSnapshot(
+        Map<String, Object> probe,
+        ServerPlayer player
+    ) {
+        Map<?, ?> target = target(probe);
+        int horizontalRadius = boundedInteger(
+            target.get("horizontal_radius"),
+            4,
+            1,
+            7
+        );
+        int verticalRadius = boundedInteger(
+            target.get("vertical_radius"),
+            8,
+            2,
+            16
+        );
+        Map<String, Object> details = FabricPerceptionSnapshot.capture(
+            serverLevel(player),
+            player,
+            config,
+            horizontalRadius,
+            verticalRadius
+        );
+        return success(
+            probe,
+            "Bounded same-revision Minecraft perception snapshot completed.",
             SensorScope.SENSOR_OBSERVABLE,
             Map.of("confidence", 0.95, "details", details)
         );

@@ -1,0 +1,160 @@
+{
+  "schema": "nhm2.g2h_e_s4.producer_completion_matrix.v1",
+  "status": "S4_implementation_preexecution_closed_inert_primary_proposal_eligible",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "requirement-by-requirement producer implementation and manufactured-fixture promotion matrix",
+    "current_maturity": "closed fixture-only implementation/preexecution gate; all common and scientific producer roles are identity-bound, fixture-complete and current-head verified",
+    "target_maturity": "achieved; at most one inert future primary proposal is eligible, with execution and every scientific authority still separately locked",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "builder algorithms 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "fixture build binding 215078e444fd4ff30c393b03daa2c70ef093fcc5719cf802d387f56d6c123515",
+      "P08/R08 build binding 69568e54998b7253aa5c6b9d81f792e06c524a79631684069e85b056e260b337",
+      "P09/R09 build binding 28931caf65027a5d27ac559dae1d2cee3e938c24de849c5a1a21c55490519647",
+      "P10/R10 build binding e5b1abda13d670ec56246f425766e0f424b09f9ec1df584db0d36a74c706e913",
+      "P11/R11 build binding 476fabc72c7449ee019c469f4ccdb37ddc240b32dedd0bdb4792b8cc925814ca",
+      "P12/R12 build binding 598ca3d3109805917ae999c75b43fe75e84bc3b117c4a236624d9a678eac336e",
+      "P13/R13 build binding a2bcab1a647a21fd346f55dda6075a4634394b4a36c0ec478b6eb5ebb356760e"
+    ],
+    "required_evidence": [
+      "source implementation for every frozen constructor role in both lanes",
+      "role-specific manufactured pass/fail and fixed-budget exhaustion fixtures",
+      "canonical record persistence and first-failure replay",
+      "source/runtime disjointness and absent candidate roots",
+      "no selected-member or positive-parameter ingress"
+    ],
+    "stop_fail_criteria": [
+      "a role is promoted from partial or missing without direct source and runtime evidence",
+      "a fixture predicate is substituted for its required constructor algorithm",
+      "a selector, budget, threshold, grid, duty or chronology changes",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "evaluating the frozen candidate",
+      "claiming a fixture is a proof",
+      "retuning or precision escalation",
+      "Rust scientific execution",
+      "G3, lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "at most one inert versioned future primary execution proposal; no authorization or execution"
+  },
+  "maturity_grammar": {
+    "complete": "the exact frozen algorithm is present in the bound source and a manufactured runtime fixture directly exercises its pass, fail and exhaustion semantics",
+    "partial": "some predicate or subroutine is exercised, but the exact frozen constructor or its full failure semantics is absent",
+    "missing": "no direct implementation evidence exists",
+    "rule": "partial and missing both block S4 closure"
+  },
+  "current_bound_evidence": {
+    "fixture_build_binding_raw_sha256": "215078e444fd4ff30c393b03daa2c70ef093fcc5719cf802d387f56d6c123515",
+    "p08_r08_build_binding_raw_sha256": "69568e54998b7253aa5c6b9d81f792e06c524a79631684069e85b056e260b337",
+    "p09_r09_build_binding_raw_sha256": "28931caf65027a5d27ac559dae1d2cee3e938c24de849c5a1a21c55490519647",
+    "p10_r10_build_binding_raw_sha256": "e5b1abda13d670ec56246f425766e0f424b09f9ec1df584db0d36a74c706e913",
+    "p11_r11_build_binding_raw_sha256": "476fabc72c7449ee019c469f4ccdb37ddc240b32dedd0bdb4792b8cc925814ca",
+    "p12_r12_build_binding_raw_sha256": "598ca3d3109805917ae999c75b43fe75e84bc3b117c4a236624d9a678eac336e",
+    "p13_r13_build_binding_raw_sha256": "a2bcab1a647a21fd346f55dda6075a4634394b4a36c0ec478b6eb5ebb356760e",
+    "final_closure_receipt_raw_sha256": "539a4ac5f8ea605abbf05e34802fc4f407e106b3d6555c1928389eefc58ca191",
+    "final_closure": {"status": "PASS_IMPLEMENTATION_PREEXECUTION_ONLY", "preverification_checks_passed": 38, "preverification_checks_total": 38, "math_entries": 318, "warp_tests_passed": 179, "warp_tests_total": 179, "casimir_verdict": "PASS", "casimir_certificate_integrity_ok": true},
+    "fixture_runtime_audit": {"status": "PASS", "checks_passed": 34, "checks_total": 34},
+    "primary_fixture": {"checks_passed": 37, "checks_total": 37, "arithmetic_checks_passed": 6, "arithmetic_checks_total": 6, "inverse_checks_passed": 5, "inverse_checks_total": 5, "continuation_checks_passed": 10, "continuation_checks_total": 10, "stability_checks_passed": 9, "stability_checks_total": 9, "quantum_radial_checks_passed": 9, "quantum_radial_checks_total": 9, "quantum_angular_checks_passed": 9, "quantum_angular_checks_total": 9, "quantum_negative_axis_checks_passed": 9, "quantum_negative_axis_checks_total": 9, "quantum_measure_checks_passed": 9, "quantum_measure_checks_total": 9, "hadamard_checks_passed": 9, "hadamard_checks_total": 9, "noise_checks_passed": 9, "noise_checks_total": 9},
+    "independent_fixture": {"checks_passed": 37, "checks_total": 37, "arithmetic_checks_passed": 8, "arithmetic_checks_total": 8, "inverse_checks_passed": 8, "inverse_checks_total": 8, "determinant_checks_passed": 6, "determinant_checks_total": 6, "continuation_checks_passed": 9, "continuation_checks_total": 9, "stability_check_mask": "111111111", "stability_checks_passed": 9, "stability_checks_total": 9, "quantum_radial_check_mask": "111111111", "quantum_radial_checks_passed": 9, "quantum_radial_checks_total": 9, "quantum_angular_check_mask": "111111111", "quantum_angular_checks_passed": 9, "quantum_angular_checks_total": 9, "quantum_negative_axis_check_mask": "111111111", "quantum_negative_axis_checks_passed": 9, "quantum_negative_axis_checks_total": 9, "quantum_measure_check_mask": "111111111", "quantum_measure_checks_passed": 9, "quantum_measure_checks_total": 9, "hadamard_check_mask": "111111111", "hadamard_checks_passed": 9, "hadamard_checks_total": 9, "noise_check_mask": "111111111", "noise_checks_passed": 9, "noise_checks_total": 9},
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false
+  },
+  "common_roles": [
+    {
+      "id": "C01_definition_and_root_ingress_guard",
+      "primary": "complete",
+      "independent": "complete",
+      "evidence": "exact seal byte/hash check, exact fixture-only argv, candidate-interface exit 64, corrupt-seal exit 65, forbidden-root exit 66"
+    },
+    {
+      "id": "C02_wire_scalar_JCS_and_record_codec",
+      "primary": "complete",
+      "independent": "complete",
+      "evidence": "source-disjoint parsers enforce BOM, UTF-8, surrogate-pair, decoded duplicate-key, printable-ASCII ABI key, trailing-byte, safe-integer and float rejection; exact integer/rational/dyadic/ball normalization uses GMP gcd versus native arbitrary-width binary gcd; canonical record envelopes and hashes independently replay"
+    },
+    {
+      "id": "C03_persistent_first_failure_receipt_stream",
+      "primary": "complete",
+      "independent": "complete",
+      "evidence": "five-record JCS hash chains persist with O_EXCL/create_new plus fsync/sync_all; independent replay validates PASS,PASS,FAIL,INELIGIBLE,INELIGIBLE and a second invocation rejects with exit 67 without changing bytes"
+    },
+    {
+      "id": "C04_fixed_budget_counter_and_terminal_exhaustion",
+      "primary": "complete",
+      "independent": "complete",
+      "evidence": "source-disjoint finite tables independently match all 29 primary and 32 Rust counters frozen by the builder contract; every counter is exercised through its exact limit, limit+1 produces builder_budget_exhausted:<role>:<counter>, later consumption is terminally ineligible without advancement, and the typed first failure persists in the exclusive five-record receipt stream"
+    }
+  ],
+  "primary_cpp_arb_flint_gmp_mpfr_roles": [
+    {"id": "P01_512_bit_directed_ball_and_2^-448_ties_even_projection", "status": "complete", "evidence": "bound reusable Arb functions perform add/subtract/multiply/divide at exactly 512 bits, reject zero-containing divisors, project the exact enclosed midpoint by FLINT floor quotient/remainder with ties to even, and return the directed Arb ball exact_dyadic-x; six manufactured pass/tie/sign/error/nonfinite fixtures pass"},
+    {"id": "P02_complete_pivot_Arb_LU_and_2050_column_solve", "status": "complete", "evidence": "bound C++ source forms a canonical 512-bit Arb midpoint matrix, performs exactly one deterministic complete-pivot LU using the largest certified absolute lower pivot with row-major least-ordinal ties, solves all canonical unit columns through that factorization, rejects zero-containing/singular pivots, enforces dimension <=2050 and projects every inverse entry with P01"},
+    {"id": "P03_Bareiss_determinants_and_Z0_block_verification", "status": "complete", "evidence": "bound FLINT source converts dyadic matrices to a common exact integer scale, records fraction-free Bareiss pivot/swap semantics, certifies nonzero and singular manufactured determinants, and evaluates the finite infinity-row-sum norm of I-A*A_dagger with Arb; the combined inverse suite passes 5/5"},
+    {"id": "P04_second_order_predictor_1024_cell_73_radius_tube", "status": "complete", "evidence": "bound C++ Arb source evaluates only the frozen second-order left-end predictor, scans all 73 radii in exact order while selecting the least strict radii/contraction/domain pass, enforces strict ball containment and terminal cell ordinals, and exercises a complete 1024-cell manufactured chain with exactly one inverse-build count per cell, no subdivision and no alternate predictor"},
+    {"id": "P05_Chebyshev_convolution_weighted_l1_majorants", "status": "complete", "evidence": "bound C++ Arb source performs polynomial convolution, exact FLINT (1+k)^8 weights beyond 64 bits, directed absolute weighted-l1 accumulation and mandatory nonnegative flat-carrier envelope inclusion; pass/fail/range fixtures contribute to a 10/10 continuation suite"},
+    {"id": "P06_degree12_Riccati_implicit_midpoint_Newton_and_jump", "status": "complete", "evidence": "bound C++ Arb/FLINT source represents the three symmetric K entries as degree-12 polynomials, executes the complete manufactured 256-cell by 32-step implicit-midpoint chronology, performs exactly 16 strictly residual-decreasing exact damped-Newton sweeps followed by one 2^-448 projection, verifies the C12-C21 identity plus strict C11/determinant positivity, and applies exactly one least-lattice forward jump repair to the 2^-160 margin"},
+    {"id": "P07_degree16_64_step_inverse_iteration_trial", "status": "complete", "evidence": "bound C++ source performs exactly 64 manufactured inverse iterations of the canonical-first-seed degree-16 trial operator, normalizes by the first nonzero coefficient, verifies the fixed C1 cutoff and one 2^-448 projection, enforces strict 0<L<=U<Eess with L=2^-96, and checks all 1024 manufactured mass-derivative cells plus zero/touch rejection; the stability suite passes 9/9"},
+    {"id": "P08_degree24_radial_collocation_and_defect", "status": "complete", "evidence": "bound C++ Arb source constructs all 25 physical-order CGL nodes, forms and solves the full 50-unknown two-component manufactured collocation system with deterministic complete-pivot inversion, performs exactly eight strict defect reductions, verifies a degree-48 zero-defect Bernstein enclosure, propagates all 256 cells in both endpoint directions, projects each canonical coefficient once, certifies the regular/Weyl Wronskian and rejects a touching contraction; radial suite 9/9 and full harness 32/32"},
+    {"id": "P09_ell255_order20_angular_subtraction_tail", "status": "complete", "evidence": "bound C++ Arb source solves all 21 coefficients of a manufactured positive-root Drach recurrence and substitutes them back into the exact diagonal-resolvent identity, enumerates ell=0..255 and all 65,536 m-degeneracy ordinals in order, makes exactly 21 positive finite Arb Hurwitz-zeta calls at q=511/2, executes eight fixed geometric-majorant iterations, applies the complete-measure threshold classifier before tail acceptance, projects every coefficient exactly once, rejects the 2^-132 touch and preserves first-failure chronology; angular suite 9/9 and full harness 33/33"},
+    {"id": "P10_tan_map_1024x32_negative_axis_spectral", "status": "complete", "evidence": "bound C++ Arb/FLINT source constructs P_32 by exact fmpq recurrence, scans all 8,192 rational mesh intervals, isolates exactly 32 roots, performs 600 exact rational bisections and 16 outward Arb interval-Newton steps per root, computes positive GL32 weights in increasing-node order, covers all 1,024 exact panels on [0,1023/1024], validates a degree-63 manufactured Taylor model and zero derivative-64 remainder, constructs kappa_star=cot(pi/2048), performs eight strict tail-majorant iterations, and rejects touch/order corruption before later roles; negative-axis suite 9/9 and full harness 34/34"},
+    {"id": "P11_2048x32_nine_level_physical_measure", "status": "complete", "evidence": "bound C++ Arb/FLINT source splits all 2,048 physical panels at the exact manufactured threshold, solves and exactly replays the nine-level order-8 epsilon Vandermonde system with fraction-free fmpq arithmetic, preserves the threshold atom, bounds the weighted ninth-order Poisson remainder strictly below 2^-132, closes the order-20 tail in eight iterations, normalizes 128x32 GL32 smearing and materializes the 64x4 mean inventory; physical-measure suite 9/9 and full harness 35/35"},
+    {"id": "P12_order20_Hadamard_transport_order4_jets", "status": "complete", "evidence": "bound C++ FLINT/Arb source enumerates all 70 graded four-dimensional multiindices, instantiates flat P=Box-1 with U=1, solves and exactly replays V0..V20 in transport order, exercises complete-pivot Arb inversion for a non-scalar row, performs eight strict residual corrections, derives a manufactured W_DF from the static-ground-minus-parametrix difference, projects all jets once, recomputes 64x4 zero RSET/conservation cells and closes the degree-21 remainder in eight iterations; Hadamard suite 9/9 and full harness 36/36"},
+    {"id": "P13_256_vector_lower_triangular_noise_Gram", "status": "complete", "evidence": "bound C++ Arb source projects the 256 canonical manufactured vectors, enforces positive norms and first-nonzero phases, forms all 65,536 direct interval Gram entries, performs one unpivoted 32,896-entry lower Cholesky with exact-zero-row and undecided-pivot semantics, executes two strict factor corrections, reconstructs the full Gram and certifies row residual plus tails below 2^-132 without clipping; noise suite 9/9 and full harness 37/37"}
+  ],
+  "independent_pure_rust_roles": [
+    {"id": "R01_native_512_bit_limb_directed_ball_and_2^-448_ties_even_projection", "status": "complete", "evidence": "bound pure-Rust 8-limb signed interval balls implement outward add/subtract/multiply/divide with native 16-limb intermediates, reject zero-containing divisors, and project exact interval midpoints to the 2^-448 lattice with signed ties-to-even plus a directed error ball; exact 1024-bit endpoint accumulation covers the valid 513-bit midpoint case and eight manufactured pass/tie/sign/error/overflow/sqrt regression fixtures pass without unsafe, FFI or dynamic libraries"},
+    {"id": "R02_column_pivoted_Householder_QR_and_2050_column_solve", "status": "complete", "evidence": "bound pure-Rust source independently midpoint-evaluates the matrix, performs deterministic column-pivoted Householder QR using the largest certified lower remaining column norm with least original-column ties, solves every canonical unit column, restores the column permutation, rejects singular/zero-midpoint input and enforces dimension <=2050; eight inverse fixtures pass"},
+    {"id": "R03_modular_determinant_reconstruction_and_Z0", "status": "complete", "evidence": "bound pure-Rust source projects matrices to signed 512-bit dyadics, evaluates determinants modulo fixed ascending deterministic 61-bit primes above 2^60, reconstructs the unique signed big integer by CRT only after a conservative Hadamard bound, enforces the 32768-prime cap, and directly verifies the finite row-sum Z0 ball including shape and corruption failures; six determinant/Z0 fixtures pass"},
+    {"id": "R04_independent_predictor_Taylor_tube_1024x73", "status": "complete", "evidence": "bound pure-Rust source re-evaluates the exact second-order predictor from native ball bytes, scans the same 73 radii, enforces strict containment and cell chronology, and exercises a complete 1024-cell manufactured chain with exactly one inverse-build count per cell and no alternate/subdivision path"},
+    {"id": "R05_Chebyshev_to_Bernstein_integer_convolution", "status": "complete", "evidence": "bound pure-Rust source constructs Chebyshev bases in Bernstein form by exact degree elevation and recurrence, multiplies Bernstein enclosures with native 512-bit exact binomial convolution through degree 512, returns a directed conversion-width remainder and frozen (1+k)^8 weighted-l1 majorant including the flat envelope; nine continuation fixtures pass without unsafe, FFI or dynamic libraries"},
+    {"id": "R06_degree14_Riccati_GL2_Newton_Krylov_and_jump_search", "status": "complete", "evidence": "bound pure-Rust source represents degree-14 Bernstein K, exercises both stages of every fixed 256-cell by 40-step GL2 manufactured equality sweep, performs exactly 20 strict midpoint Newton-Krylov decreases with 96 vectors per sweep and one native 2^-448 projection, verifies matrix positivity, and enumerates jump offsets lexicographically across all 65537 permitted ordinals with pass/touch/exhaustion fixtures"},
+    {"id": "R07_degree18_80_step_block_Lanczos_trial", "status": "complete", "evidence": "bound pure-Rust source performs exactly 80 manufactured block-Lanczos steps from the canonical two-vector seed on a symmetric invariant-plus-tridiagonal operator, proves the invariant least Ritz value by an exact Gershgorin separation, applies the fixed padded degree-18 C1 cutoff and native 2^-448 projection, and independently verifies strict stability predicates plus 1024 positive mass-derivative cells; the stability mask is 111111111 without unsafe, FFI or dynamic libraries"},
+    {"id": "R08_degree28_Taylor_radial_Picard_defect", "status": "complete", "evidence": "bound pure-Rust source executes all 256 by 48 fixed manufactured Taylor steps in degree 28 with ascending schoolbook coefficient convolution, selects the least power-of-two defect seed under the 2^-16 cap, verifies exactly twelve strict Picard enclosure decreases, projects once per cell, propagates both endpoint directions, implements native rectangular complex-ball division with a strict positive denominator guard, certifies the Wronskian and rejects a touching contraction; radial mask 111111111 and full harness 32/32"},
+    {"id": "R09_ell287_order22_angular_subtraction_tail", "status": "complete", "evidence": "bound pure-Rust source derives the complete order-22 manufactured flat DeWitt recurrence in ascending heat and derivative order, enumerates ell=0..287 and all 82,944 degeneracy ordinals, generates B_0 through B_128 with an exact normalized 512-bit rational Akiyama-Tanigawa recurrence, exercises all 64 Euler-Maclaurin corrections from nu=577/2, performs twelve fixed majorant iterations, fails an undecided threshold before projection, projects once, and rejects strict-width touches without unsafe, FFI, C ABI or primary arithmetic lineage; angular mask 111111111 and full harness 33/33"},
+    {"id": "R10_sinh_map_1536x24_negative_axis_spectral", "status": "complete", "evidence": "bound pure-Rust source encloses Machin pi with exactly 160 alternating terms per atan, constructs sinh/cosh/tanh with degree-256 Taylor plus fixed Lagrange enclosures, builds the 24 half-shift h=1/8 tanh-sinh nodes and positive weights in k order, verifies symmetry, covers all 1,536 exact 1/128 panels to t=12, applies the exact degree-47 polynomial moment defect and zero order-48 remainder, encloses kappa_star=sinh(12), performs twelve strict tail-majorant iterations, and rejects touch/order corruption without unsafe, FFI or C arithmetic lineage; negative-axis mask 111111111 and full harness 34/34"},
+    {"id": "R11_2304x24_nine_level_physical_measure", "status": "complete", "evidence": "bound pure-Rust source splits all 2,304 panels at the exact manufactured threshold, performs a native 4,096-bit fraction-free Bareiss solve and exact replay of the nine-level order-8 geometric-epsilon moments, preserves the threshold atom, retains exact cancellations through order 8 while enclosing the weighted ninth-order Poisson remainder strictly below 2^-132, closes the order-22 tail in twelve iterations, normalizes 192x24 TS24 smearing and materializes 64x4 means; mask 111111111 and full harness 35/35 without unsafe, FFI or C arithmetic lineage"},
+    {"id": "R12_order22_Hadamard_Taylor_transport_order4_jets", "status": "complete", "evidence": "bound pure-Rust source independently enumerates all 70 graded multiindices, constructs the native flat metric and connection for P=Box-1, exactly replays V0..V22, performs twelve strict interval Picard passes, derives state-dependent W_DF from the ground-product difference, projects once, recomputes 64x4 zero RSET/conservation cells and closes the degree-23 remainder in twelve iterations; mask 111111111 and full harness 36/36 without unsafe, FFI or C arithmetic lineage"},
+    {"id": "R13_256_vector_MGS_factor_and_direct_Gram", "status": "complete", "evidence": "bound pure-Rust source projects all 256 canonical manufactured vectors, enforces norm/phase rules, performs unpivoted two-pass MGS with exact-zero and nonexact-zero-containing residual semantics, projects the 32,896-entry factor, independently forms all 65,536 original-vector direct Gram entries, reconstructs the factor Gram and certifies row residual plus tails below 2^-132; mask 111111111 and full harness 37/37 without unsafe, FFI or C arithmetic lineage"}
+  ],
+  "fixture_class_coverage": [
+    {"id": "F01_Minkowski_zero_field_and_vacuum_endpoint", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F02_manufactured_smooth_nodeless_closed_residual", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F03_origin_even_and_conical_rejection", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F04_infinity_tail_and_finite_wall_rejection", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F05_lapse_no_fold_completeness_strict_sign", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F06_continuation_overlap_orientation_kernel_transversality_terminal", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F07_KG_domain_Hadamard_hypotheses", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F08_RSET_conservation_and_noise_positive_type", "status": "constructor_and_predicate_fixture_covered"},
+    {"id": "F09_hash_mutation_path_chronology_truncation_root_and_alternate_interface", "status": "predicate_runtime_guard_and_exclusive_receipt_persistence_covered"}
+  ],
+  "promotion_summary": {
+    "common_complete": 4,
+    "common_required": 4,
+    "primary_complete": 13,
+    "primary_required": 13,
+    "independent_complete": 13,
+    "independent_required": 13,
+    "all_required_roles_complete": true,
+    "S4_implementation_closure": true,
+    "inert_future_primary_proposal_allowed": true
+  },
+  "next_frozen_order": [
+    "write and audit at most one inert versioned future primary execution proposal; do not authorize or execute"
+  ],
+  "authority": {
+    "matrix_is_proof": false,
+    "candidate_evaluated": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "scenario_id": "EH-MC-NETHER1-responsive-stone-sequence-a0",
+  "lane": "direct_codex",
+  "action_kind": "mine",
+  "prompt": "Mine three nearby stone blocks consecutively through ordinary survival player embodiment and verify every removal.",
+  "starting_state": {
+    "fixture_kind": "bounded_player_action",
+    "required_preconditions": [
+      "connected",
+      "on_ground"
+    ]
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.mine",
+    "capability_version": 1,
+    "control_engine": "native_fabric",
+    "manual_override_required": true,
+    "postcondition_verification_required": true
+  },
+  "source_artifact_refs": [
+    "minecraft_client_log_sha256:5ac1ff000e99b07c39345411f10740c0e9665daf2f19447d1e626be593ee95d3",
+    "direct_diagnostic_workflow:direct_player_action_workflow:bd096dad-61a2-4909-902b-9789863104ed"
+  ],
+  "selected_capability_id": "com.casimirbot.minecraft.player.mine",
+  "normalized_arguments": {
+    "block_id": "minecraft:stone",
+    "count": 3,
+    "search_radius": 4
+  },
+  "admission_status": "not_applicable",
+  "execution_outcome": "succeeded",
+  "normalized_progress": [
+    {
+      "sequence": 0,
+      "event_type": "workflow.started",
+      "workflow_state": "running",
+      "progress_fraction": 0,
+      "measurements": {},
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 1,
+      "event_type": "workflow.succeeded",
+      "workflow_state": "succeeded",
+      "progress_fraction": 1,
+      "measurements": {
+        "block_id": "minecraft:stone",
+        "max_affordance_derive_duration_nanos": 1147600,
+        "max_sensing_total_duration_nanos": 1304500,
+        "max_sensor_capture_duration_nanos": 156900,
+        "p95_sensing_total_duration_nanos": 337700,
+        "removed_count": 3,
+        "requested_count": 3,
+        "sensing_timing_sample_count": 45,
+        "world_mutations_performed": 3
+      },
+      "manual_override_detected": false,
+      "controls_released": true
+    }
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "direct_diagnostic_observation:direct_player_action_workflow:bd096dad-61a2-4909-902b-9789863104ed:4"
+  ],
+  "observation_reentered": false,
+  "final_candidate_text": null,
+  "final_candidate_support_refs": [],
+  "route_product_text": null,
+  "route_product_support_refs": [],
+  "terminal_outcome": "success",
+  "terminal_authority_status": "not_applicable",
+  "terminal_writer_text": null,
+  "terminal_writer_support_refs": [],
+  "visible_text": null,
+  "voice_projection_status": "not_applicable",
+  "voice_text": null,
+  "created_at": "2026-08-24T21:17:44.507831600Z",
+  "hidden_reasoning_included": false
+}

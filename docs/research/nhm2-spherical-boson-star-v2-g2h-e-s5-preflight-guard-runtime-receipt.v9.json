@@ -1,0 +1,56 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v9",
+  "status": "PASS_CANDIDATE_NEUTRAL_FLAT_CARRIER_Q_RECURRENCE_THROUGH_ORDER_12_SCIENTIFIC_HANDLERS_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "259d023b6be02770bc6ffaec4eced7d1d64c40f7231441ef59418d577febf73a",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v11",
+    "image_id": "sha256:eaaaba2b9d401217af562cd8954d5c9468d757ad49e731c9c482d15986ae31a5",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 135768,
+    "executable_sha256": "98f15638e066e200a68ea57c88c1fe8251cecbb97e4ca1808f7ceaa305aa6815",
+    "flat_carrier_header_sha256": "924ea3811e3457dc2224a7f12f235bb621a7059571069602436cd45015973a9d",
+    "flat_carrier_cpp_sha256": "7e216cccbb1489bc8b12c43e148e07b084fcaa75871ef65f0ecc3177f90a1a4b"
+  },
+  "flat_carrier_scope": {
+    "fixture_status": "PASS_4_OF_4_MASK_15",
+    "working_precision_bits": 512,
+    "maximum_q_derivative_order": 12,
+    "recurrence": "P_0=1; P_(j+1)=(a-(b+2j)q)P_j+q^2*d_q(P_j)",
+    "endpoint_policy": "exact q=0 inserts every derivative as exact zero without division or logarithm",
+    "domain": "a>0, finite b, exact q=0 or provable q in (0,1/255]",
+    "candidate_specific_envelopes_computed": false,
+    "mixed_derivative_envelopes_complete": false,
+    "weighted_remainder_proved": false,
+    "C08_complete": false
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "41f5a784d84a7594692c1b4ad1975889837fad5cb2df49ccdb2cef51c2c10777",
+    "status": "PASS",
+    "checks_passed": 28,
+    "checks_total": 28
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_handlers_installed": 0,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

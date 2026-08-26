@@ -369,6 +369,40 @@ final class ConcurrentReactiveSchedulerTest {
     }
 
     @Test
+    void handsASettledActionToTheNextAdmittedActionInTheSameTick() {
+        FakeRuntime runtime = new FakeRuntime();
+        ConcurrentReactiveScheduler scheduler = new ConcurrentReactiveScheduler(runtime);
+        Map<String, Object> first = new LinkedHashMap<>(
+            actionNode("node:approach", walkAction(), 20)
+        );
+        first.put("on_success", "node:interact");
+        scheduler.begin(program(
+            "all_required",
+            List.of(lane(
+                "lane:sequence",
+                "interaction",
+                80,
+                true,
+                List.of("locomotion", "main_hand"),
+                Map.copyOf(first),
+                actionNode("node:interact", interactAction(), 20),
+                terminal("node:interact:done", "succeeded"),
+                terminal("node:approach:failed", "failed"),
+                terminal("node:interact:failed", "failed")
+            )),
+            List.of(),
+            List.of()
+        ));
+
+        WorkflowStep result = scheduler.step(0);
+
+        assertEquals(WorkflowStepStatus.SUCCEEDED, result.status());
+        assertEquals(List.of("lane:sequence#0@0", "lane:sequence#0@0"), runtime.actionCalls);
+        assertEquals(2, result.measurements().get("executed_action_count"));
+        assertEquals(true, result.measurements().get("controls_released"));
+    }
+
+    @Test
     void higherPriorityLaneOwnsAConflictingResourceUntilItSettles() {
         FakeRuntime runtime = new FakeRuntime();
         runtime.runningCallsBeforeSuccess.put("lane:high", 1);

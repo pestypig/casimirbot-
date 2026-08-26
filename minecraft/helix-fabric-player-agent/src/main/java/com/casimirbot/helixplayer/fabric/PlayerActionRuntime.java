@@ -384,13 +384,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             controller.activeWorkflowId() != null) {
             return "Helix cannot start a direct diagnostic while another player workflow is active.";
         }
-        if (!List.of(
-            "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
-            "hotbar_select", "equip", "follow", "collect", "mine", "place",
-            "craft", "inventory_transfer", "execute_sequence",
-            "execute_reactive_program", "arm_viability_guardian",
-            "disarm_viability_guardian"
-        ).contains(actionKind)) {
+        if (!directDiagnosticActionAllowed(actionKind)) {
             return "Helix direct diagnostics do not expose that action kind.";
         }
         if (!List.of("native_fabric", "baritone").contains(controlEngine)) {
@@ -1182,7 +1176,11 @@ final class PlayerActionRuntime implements AutoCloseable {
                 measurements,
                 "action_ticks_before_override"
             );
-        boolean executionPerformed = executionStarted && actionAppliedBeforeManualOverride;
+        boolean executionPerformed = effectExecutionPerformed(
+            executionStarted,
+            actionAppliedBeforeManualOverride,
+            measurements
+        );
         result.put(
             "side_effects_performed",
             executionPerformed && (
@@ -1211,6 +1209,16 @@ final class PlayerActionRuntime implements AutoCloseable {
         result.put("assistant_answer", false);
         result.put("raw_content_included", false);
         return result;
+    }
+
+    static boolean effectExecutionPerformed(
+        boolean executionStarted,
+        boolean actionAppliedBeforeManualOverride,
+        Map<String, Object> measurements
+    ) {
+        return executionStarted &&
+            actionAppliedBeforeManualOverride &&
+            !Boolean.TRUE.equals(measurements.get("effect_prevented"));
     }
 
     private Map<String, Object> manifest() {
@@ -1243,7 +1251,12 @@ final class PlayerActionRuntime implements AutoCloseable {
             engines.add(Map.of(
                 "control_engine", "baritone",
                 "available", true,
-                "version", bridge.baritoneVersion()
+                "version", bridge.baritoneVersion(),
+                "goal_forms", List.of("near_position"),
+                "mutation_policy", "movement_only",
+                "breaking_allowed", false,
+                "placement_allowed", false,
+                "inventory_mutation_allowed", false
             ));
         }
         manifest.put("available_control_engines", engines);
@@ -1305,10 +1318,19 @@ final class PlayerActionRuntime implements AutoCloseable {
         nativeEngine.put("last_error", lastTransportError.isBlank() ? null : lastTransportError);
         engineStates.add(nativeEngine);
         if (bridge.baritoneAvailable()) {
+            BaritoneFacade.Status status = bridge.baritoneStatus();
             Map<String, Object> baritoneEngine = new LinkedHashMap<>();
             baritoneEngine.put("control_engine", "baritone");
-            baritoneEngine.put("status", running && "baritone".equals(activeEngine) ? "busy" : "available");
-            baritoneEngine.put("last_error", null);
+            baritoneEngine.put("status", status.pathState().name().toLowerCase());
+            baritoneEngine.put("goal_owned", status.goalOwned());
+            baritoneEngine.put("process_active", status.processActive());
+            baritoneEngine.put("mutation_policy", "movement_only");
+            baritoneEngine.put("mutation_policy_intact", status.mutationPolicyIntact());
+            baritoneEngine.put("safe_cancel_last_result", status.safeCancelLastResult());
+            baritoneEngine.put("last_error", status.lastError().isBlank() ? null : status.lastError());
+            if (status.estimatedTicksToGoal() != null) {
+                baritoneEngine.put("estimated_ticks_to_goal", status.estimatedTicksToGoal());
+            }
             engineStates.add(baritoneEngine);
         }
         heartbeat.put("control_engines", engineStates);
@@ -1337,6 +1359,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             capability("com.casimirbot.minecraft.player.walk", "walk", "continuous_control", List.of("long_running")),
             capability("com.casimirbot.minecraft.player.jump", "jump", "player_motion", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.interact", "interact", "player_interaction", List.of("single_action")),
+            capability("com.casimirbot.minecraft.player.combat.attack", "attack", "player_interaction", List.of("long_running")),
             capability("com.casimirbot.minecraft.player.hotbar.select", "hotbar_select", "player_inventory", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.equipment.equip", "equip", "player_inventory", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.follow", "follow", "continuous_control", List.of("long_running")),
@@ -1475,6 +1498,16 @@ final class PlayerActionRuntime implements AutoCloseable {
         boolean heartbeatReady
     ) {
         return manifestReady && heartbeatReady;
+    }
+
+    static boolean directDiagnosticActionAllowed(String actionKind) {
+        return List.of(
+            "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
+            "attack", "hotbar_select", "equip", "follow", "collect", "mine", "place",
+            "craft", "inventory_transfer", "execute_sequence",
+            "execute_reactive_program", "arm_viability_guardian",
+            "disarm_viability_guardian"
+        ).contains(actionKind);
     }
 
     static boolean activeControlPlaneFailureRequiresStop(

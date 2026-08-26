@@ -36,7 +36,9 @@ describe("BrokerageConnectionsCard", () => {
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     render(<BrokerageConnectionsCard />);
 
+    expect(await screen.findByText("Profile connections")).toBeTruthy();
     await screen.findByText("No Robinhood connection is stored for this profile.");
+    expect(screen.queryByLabelText(/api key|token|secret|password/iu)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Connect Robinhood" }));
     await waitFor(() => expect(open).toHaveBeenCalledWith(
       "https://robinhood.com/oauth?state=safe-test-state",

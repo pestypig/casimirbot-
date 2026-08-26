@@ -1,6 +1,7 @@
 package com.casimirbot.helixplayer.fabric;
 
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.ControlBridge;
+import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.CombatTargetObservation;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.HandObservation;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.MovementInput;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.PlayerSnapshot;
@@ -20,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -30,6 +32,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Inventory;
@@ -60,6 +63,8 @@ final class NativeFabricControlBridge implements ControlBridge {
     private boolean jumpPulsePending;
     private boolean usePulsePending;
     private boolean attackPulsePending;
+    private Screen expectedScreen;
+    private long expectedScreenClaimDeadline = Long.MIN_VALUE;
     private Float controlledYaw;
     private Float controlledPitch;
     private final BaritoneFacade baritone;
@@ -72,6 +77,9 @@ final class NativeFabricControlBridge implements ControlBridge {
     private final String targetReferenceSalt = UUID.randomUUID().toString();
     private final Map<String, Entity> trackingTargets = new HashMap<>();
     private final Map<String, ParticleTrack> trackingParticles = new HashMap<>();
+    private Object observedSensorWorld;
+    private long sensorWorldRevision;
+    private PlayerSensorFrame sensorFrame = PlayerSensorFrame.disconnected(0);
     private long targetReferenceSequence;
     private Double cameraTrackingX;
     private Double cameraTrackingY;
@@ -94,38 +102,109 @@ final class NativeFabricControlBridge implements ControlBridge {
     @Override
     public PlayerSnapshot snapshot() {
         releaseOneTickPulses();
+        return captureSensorFrame().snapshot();
+    }
+
+    PlayerSensorFrame sensorFrame() {
+        return captureSensorFrame();
+    }
+
+    @Override
+    public LocomotionSafetyEnvelope.Check checkLocomotionSafety(
+        double targetX,
+        double targetZ,
+        double minimumHealth
+    ) {
+        return workflowEngine.locomotionSafetyCheck(targetX, targetZ, minimumHealth);
+    }
+
+    private PlayerSensorFrame captureSensorFrame() {
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.level == null || minecraft.gameMode == null) {
-            return new PlayerSnapshot(
-                false,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                false,
-                false,
-                false,
-                null
-            );
+            if (observedSensorWorld != null) {
+                observedSensorWorld = null;
+                sensorWorldRevision++;
+            }
+            sensorFrame = PlayerSensorFrame.disconnected(sensorWorldRevision);
+            return sensorFrame;
         }
+        if (observedSensorWorld != minecraft.level) {
+            observedSensorWorld = minecraft.level;
+            sensorWorldRevision++;
+            sensorFrame = PlayerSensorFrame.disconnected(sensorWorldRevision);
+        }
+        long gameTick = minecraft.level.getGameTime();
+        if (sensorFrame.connected() && sensorFrame.worldRevision() == sensorWorldRevision &&
+            sensorFrame.gameTick() == gameTick) return sensorFrame;
+
+        long captureStartedNanos = System.nanoTime();
         String manualInputReason = manualInputReason(player);
-        return new PlayerSnapshot(
+        Vec3 velocity = player.getDeltaMovement();
+        PlayerSensorFrame.Focus focus = sensorFocus(player);
+        long captureDurationNanos = Math.max(0, System.nanoTime() - captureStartedNanos);
+        sensorFrame = new PlayerSensorFrame(
+            sensorWorldRevision,
+            gameTick,
+            captureDurationNanos,
+            minecraft.level.dimension().location().toString(),
             true,
             player.getX(),
             player.getY(),
             player.getEyeY(),
             player.getZ(),
+            velocity.x,
+            velocity.y,
+            velocity.z,
             player.getYRot(),
             player.getXRot(),
             player.getHealth(),
             player.onGround(),
             player.horizontalCollision,
+            player.verticalCollision,
+            minecraft.screen != null,
             manualInputReason != null,
-            manualInputReason
+            manualInputReason,
+            focus
         );
+        return sensorFrame;
+    }
+
+    private PlayerSensorFrame.Focus sensorFocus(LocalPlayer player) {
+        HitResult hit = minecraft.hitResult;
+        if (hit == null || hit.getType() == HitResult.Type.MISS) {
+            return PlayerSensorFrame.Focus.miss(
+                player.getX(), player.getEyeY(), player.getZ()
+            );
+        }
+        Vec3 location = hit.getLocation();
+        double distance = player.getEyePosition().distanceTo(location);
+        if (hit instanceof BlockHitResult blockHit) {
+            BlockPos pos = blockHit.getBlockPos();
+            return new PlayerSensorFrame.Focus(
+                PlayerSensorFrame.FocusKind.BLOCK,
+                pos.getX(), pos.getY(), pos.getZ(),
+                blockHit.getDirection().getSerializedName(),
+                location.x, location.y, location.z, distance
+            );
+        }
+        return new PlayerSensorFrame.Focus(
+            PlayerSensorFrame.FocusKind.ENTITY,
+            0, 0, 0, "",
+            location.x, location.y, location.z, distance
+        );
+    }
+
+    @Override
+    public void expectScreenOpen(boolean expected) {
+        if (!expected) {
+            expectedScreen = null;
+            expectedScreenClaimDeadline = Long.MIN_VALUE;
+        } else if (expectedScreen == null && minecraft.screen != null) {
+            expectedScreen = minecraft.screen;
+            expectedScreenClaimDeadline = Long.MIN_VALUE;
+        } else if (expectedScreen == null) {
+            expectedScreenClaimDeadline = currentGameTick() + 2;
+        }
     }
 
     @Override
@@ -297,6 +376,74 @@ final class NativeFabricControlBridge implements ControlBridge {
             velocity.z,
             player.distanceTo(entity)
         );
+    }
+
+    @Override
+    public CombatTargetObservation observeCombatTarget(
+        String targetRef,
+        String expectedEntityTypeId,
+        double maxDistance,
+        boolean requireLineOfSight
+    ) {
+        LocalPlayer player = requirePlayer();
+        Entity entity = trackingTargets.get(targetRef);
+        if (entity == null || minecraft.level == null) {
+            return CombatTargetObservation.unavailable(targetRef);
+        }
+        String entityTypeId = BuiltInRegistries.ENTITY_TYPE
+            .getKey(entity.getType())
+            .toString();
+        if (
+            entity.level() != minecraft.level ||
+            entity.isRemoved() ||
+            !entityTypeId.equals(expectedEntityTypeId)
+        ) {
+            return CombatTargetObservation.unavailable(targetRef);
+        }
+        boolean visible = player.hasLineOfSight(entity);
+        double distance = player.distanceTo(entity);
+        if (distance > maxDistance || (requireLineOfSight && !visible)) {
+            return CombatTargetObservation.unavailable(targetRef);
+        }
+        LivingEntity living = entity instanceof LivingEntity candidate
+            ? candidate
+            : null;
+        if (living == null) {
+            return CombatTargetObservation.unavailable(targetRef);
+        }
+        return new CombatTargetObservation(
+            true,
+            living.isAlive(),
+            living instanceof Monster,
+            visible,
+            distance <= player.entityInteractionRange(),
+            targetRef,
+            entityTypeId,
+            living.getX(),
+            living.getBoundingBox().getCenter().y,
+            living.getZ(),
+            distance,
+            Math.max(0, living.getHealth()),
+            Math.max(0, living.getMaxHealth()),
+            Math.max(0, living.hurtTime),
+            Math.max(0, living.deathTime),
+            Mth.clamp(player.getAttackStrengthScale(0.0F), 0.0F, 1.0F)
+        );
+    }
+
+    @Override
+    public boolean attackCombatTarget(String targetRef) {
+        LocalPlayer player = requirePlayer();
+        Entity entity = trackingTargets.get(targetRef);
+        if (
+            entity == null || entity.isRemoved() || !entity.isAlive() ||
+            entity.level() != minecraft.level || !(entity instanceof Monster) ||
+            !player.hasLineOfSight(entity) ||
+            player.distanceTo(entity) > player.entityInteractionRange()
+        ) return false;
+        minecraft.gameMode.attack(player, entity);
+        player.swing(InteractionHand.MAIN_HAND);
+        return true;
     }
 
     /**
@@ -592,7 +739,7 @@ final class NativeFabricControlBridge implements ControlBridge {
                 entityHit.getEntity(),
                 hand
             );
-            return result.consumesAction();
+            return acceptInteraction(result);
         }
         if ("looked_at_block".equals(target)) {
             if (!(minecraft.hitResult instanceof BlockHitResult blockHit)) return false;
@@ -601,23 +748,29 @@ final class NativeFabricControlBridge implements ControlBridge {
                 hand,
                 blockHit
             );
-            return result.consumesAction();
+            return acceptInteraction(result);
         }
         if ("current_focus".equals(target)) {
             if (minecraft.hitResult instanceof EntityHitResult entityHit) {
-                return minecraft.gameMode.interact(
+                return acceptInteraction(minecraft.gameMode.interact(
                     player,
                     entityHit.getEntity(),
                     hand
-                ).consumesAction();
+                ));
             }
             if (minecraft.hitResult instanceof BlockHitResult blockHit) {
-                return minecraft.gameMode.useItemOn(player, hand, blockHit).consumesAction();
+                return acceptInteraction(minecraft.gameMode.useItemOn(player, hand, blockHit));
             }
             InteractionResult result = minecraft.gameMode.useItem(player, hand);
-            return result.consumesAction();
+            return acceptInteraction(result);
         }
         return false;
+    }
+
+    private boolean acceptInteraction(InteractionResult result) {
+        boolean accepted = result.consumesAction();
+        if (accepted) expectScreenOpen(true);
+        return accepted;
     }
 
     /**
@@ -663,11 +816,12 @@ final class NativeFabricControlBridge implements ControlBridge {
         ItemStack stack = "off_hand".equals(handName)
             ? player.getOffhandItem()
             : player.getMainHandItem();
-        if (stack.isEmpty()) return new HandObservation(true, "", 0);
+        if (stack.isEmpty()) return new HandObservation(true, "", 0, 0);
         return new HandObservation(
             true,
             BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(),
-            stack.getCount()
+            stack.getCount(),
+            stack.isDamageableItem() ? stack.getDamageValue() : 0
         );
     }
 
@@ -721,9 +875,23 @@ final class NativeFabricControlBridge implements ControlBridge {
     }
 
     @Override
+    public boolean equipmentMatches(String itemId, String destination) {
+        LocalPlayer player = minecraft.player;
+        return player != null && matches(
+            player.getItemBySlot(equipmentSlot(destination)),
+            itemId
+        );
+    }
+
+    @Override
     public boolean supportsControlEngine(String controlEngine) {
         return "native_fabric".equals(controlEngine) ||
             ("baritone".equals(controlEngine) && baritone.available());
+    }
+
+    @Override
+    public boolean ownsNativeRoutePlanner() {
+        return true;
     }
 
     @Override
@@ -750,14 +918,7 @@ final class NativeFabricControlBridge implements ControlBridge {
             ));
         } else if ("disarm_viability_guardian".equals(actionKind)) {
             disarmViabilityGuardian();
-        } else if (Set.of(
-            "follow",
-            "collect",
-            "mine",
-            "place",
-            "craft",
-            "inventory_transfer"
-        ).contains(actionKind)) {
+        } else if (NativeFabricWorkflowEngine.usesReusableWorkflowEngine(actionKind)) {
             workflowEngine.begin(actionKind, arguments, controlEngine);
         }
     }
@@ -1447,6 +1608,10 @@ final class NativeFabricControlBridge implements ControlBridge {
         return baritone.version();
     }
 
+    BaritoneFacade.Status baritoneStatus() {
+        return baritone.status();
+    }
+
     @Override
     public void releaseAll() {
         reactiveScheduler.cancelAll("global_control_release");
@@ -1661,7 +1826,24 @@ final class NativeFabricControlBridge implements ControlBridge {
     }
 
     private String manualInputReason(LocalPlayer player) {
-        if (minecraft.screen != null && !workflowEngine.screenAutomationAllowed()) {
+        if (
+            minecraft.screen != null &&
+            expectedScreen == null &&
+            currentGameTick() <= expectedScreenClaimDeadline
+        ) {
+            expectedScreen = minecraft.screen;
+            expectedScreenClaimDeadline = Long.MIN_VALUE;
+        } else if (
+            expectedScreen == null &&
+            currentGameTick() > expectedScreenClaimDeadline
+        ) {
+            expectedScreenClaimDeadline = Long.MIN_VALUE;
+        }
+        if (
+            minecraft.screen != null &&
+            minecraft.screen != expectedScreen &&
+            !workflowEngine.screenAutomationAllowed()
+        ) {
             return "screen_open";
         }
         if (minecraft.mouseHandler.isLeftPressed()) return "left_mouse_pressed";
@@ -1686,6 +1868,10 @@ final class NativeFabricControlBridge implements ControlBridge {
             return "sprint_key_pressed";
         }
         return viewWasManuallyChanged(player) ? "unexpected_view_change" : null;
+    }
+
+    private long currentGameTick() {
+        return minecraft.level == null ? 0 : minecraft.level.getGameTime();
     }
 
     private void releaseOneTickPulses() {

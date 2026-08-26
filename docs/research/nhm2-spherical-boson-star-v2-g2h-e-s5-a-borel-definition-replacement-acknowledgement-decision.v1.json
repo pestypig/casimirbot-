@@ -1,0 +1,51 @@
+{
+  "schema": "nhm2.g2h_e_s5_a.borel_definition_replacement_acknowledgement_decision.v1",
+  "decision": "ACKNOWLEDGED_CANDIDATE_NEUTRAL_IMPLEMENTATION_DEFINITION_ONLY",
+  "recorded_at_utc": "2026-08-24T20:07:32Z",
+  "program_gate": "G2H-E-S5-A/A3",
+  "statement": {
+    "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-a-borel-definition-replacement-acknowledgement-statement.txt",
+    "bytes": 820,
+    "raw_sha256": "8fb6486066bcb44b361e7d37df44c7549713cfde03b0038d09548c511fb01bd9",
+    "exact_gate_status": "ACKNOWLEDGEMENT_VALID"
+  },
+  "bound_artifacts": {
+    "growth_quadrature_contract_raw_sha256": "7dd4d30a64d9c7eae8637a79e40f16b19d564b0081aeec21d0cdf886c3094737",
+    "state_jet_definition_raw_sha256": "75eff0131c357480c938e466fe6338793fbdb980dc41cf7f3218a6f5acb6cffc",
+    "exact_audit_raw_sha256": "1b98e89afe645696b083f439a291f9a0ee131cf76f06584c1a4050360748f471",
+    "cross_language_replay_raw_sha256": "04902f6d784a1e38c04c7329f0cebc9ee9257c7be5db5b964130fa8f088b5b8c",
+    "completeness_review_raw_sha256": "01e00db3126bd0cc024faa2c88f2a9123c19e9c0448b2d0ab6899fd4435e6b13"
+  },
+  "verification": {
+    "acknowledgement_gate": "PASS",
+    "acknowledgement_gate_self_test": "7/7 PASS",
+    "exact_audit": "64/64 PASS",
+    "cross_language_replay": "27/27 PASS",
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_present": false,
+    "authorization_present": false,
+    "token_present": false,
+    "execution_ledger_present": false
+  },
+  "scope": {
+    "a3_complete": true,
+    "a4_candidate_neutral_implementation_eligible": true,
+    "candidate_execution_authorized": false,
+    "positive_sampling_authorized": false,
+    "rust_authorized": false,
+    "g3_si_metric_lane_work_authorized": false,
+    "retuning_authorized": false
+  },
+  "authority": {
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "immutability_note": "The acknowledged contract and its predecessor artifacts remain byte-identical. This separate additive record supplies the independent acknowledgement without rewriting pre-acknowledgement bytes."
+}

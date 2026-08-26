@@ -1,0 +1,69 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v4",
+  "status": "PASS_OUTER_GUARD_RECORD_INGRESS_ORIGIN_AND_GRID_FIXTURES_CANDIDATE_NEUTRAL_SCIENTIFIC_DISPATCH_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "45a0a96d1d9bdab6f6ada43176ff868befc49f60e13c49286abc5f31801960e8",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "sources": {
+    "sha256_header": "99278b36da34a37e7e6a199f247f1e3d8ca91f10bff309cb19c1355dd3d199d2",
+    "guard_cpp": "54ce7a317b3632ac7dcb4764ddecba8da7f3c61ebf9070330ccfa8feb546cca4",
+    "record_header": "158d45df58780489b81d0c090bde0bf7de972cc20cdd586d6ca7c62456057000",
+    "record_cpp": "6ef30ce771b94fa49fbdeffe6bc5084608a3dfc179a1d7bb6416321f8c9caa17",
+    "ingress_header": "022e49d82a74d1a6f2157a02bca34afdcdb3cef5358bee6712ff1849a8a38c6d",
+    "ingress_cpp": "eb2a1a973294994a78ab8f2b83410949cecdb527bedb5ddcc22064c4137ab1f4",
+    "origin_header": "eb93a0bba95d97a09be6650619d373faecde9a69dabdf36afdf9bd9b2bc94ce5",
+    "origin_cpp": "e80f7bc67a215916156452a350df3fe05c7e8d2fa3ec5c15ab66347eb1862d6d",
+    "grid_header": "85bebb7814a1dd7c190e58a031f8e791bb736b0693be0f04035f9826130252c7",
+    "grid_cpp": "63901c2dca4af9f77113249324a3004f002dd63f8d0b56bcc04d1e7eaad20a4b",
+    "dockerfile": "7d756c2efb5154680c46dca5b22017a2b9f097f823835c0f8a528ccc8eb3b6e0"
+  },
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v6",
+    "image_id": "sha256:0975beb5e16d9a2a1c0eb3515aa5bf61a9e34ac2ff5530bca2ea8ac4edc195d8",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 95744,
+    "executable_sha256": "e50decd7f6f5a64c1de9a4aeb3796b3cf91313ac5c12915cfd4c9be1c36988cc",
+    "record_writer_linked": true,
+    "record_fixture_checks": "PASS_2_OF_2",
+    "manifest_ingress_fixture_checks": "PASS_5_OF_5",
+    "origin_recurrence_fixture_checks": "PASS_3_OF_3",
+    "state_grid_codec_fixture_checks": "PASS_8_OF_8",
+    "scientific_dispatch_linked": false
+  },
+  "maturity": {
+    "R2-C01": "partial_manifest_shape_and_resource_bounds_only_no_final_inventory_or_file_open",
+    "R2-C02": "partial_first_regular_coefficients_only_no_local_existence_or_selected_member",
+    "R2-C03": "partial_frozen_grid_geometry_indexing_and_canonical_dct_only_no_bvp_or_terminal_ball",
+    "R2-C14": "partial_canonical_grid_codec_only_no_independent_grid_states_or_continuum_enclosure",
+    "primary_eligible_complete": 0,
+    "primary_eligible_total": 19
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "bbadd5ac7e0baf262ea8e7456c5cce487480feed0929f9541193e7a80bb6fd38",
+    "status": "PASS",
+    "checks_passed": 20,
+    "checks_total": 20
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_execution_authorized": false,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

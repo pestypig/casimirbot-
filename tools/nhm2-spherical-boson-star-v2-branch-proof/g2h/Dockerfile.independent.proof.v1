@@ -1,0 +1,5 @@
+FROM scratch
+
+COPY tolman-vii-independent-proof /tolman-vii-independent-proof
+
+ENTRYPOINT ["/tolman-vii-independent-proof"]

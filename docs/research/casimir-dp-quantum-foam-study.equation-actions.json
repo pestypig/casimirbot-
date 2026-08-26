@@ -177,7 +177,7 @@
       "equationId": "cdp-stage4-2f-dp-master-model",
       "label": "Named Gaussian-regularized Diósi master equation",
       "sectionAnchor": "21-registered-gaussian-regularized-disi-model",
-      "latex": "\\frac{d\\hat\\rho}{dt} =-\\frac{i}{\\hbar}[\\hat H,\\hat\\rho] -\\frac{G}{2\\hbar} \\int d^3x\\,d^3y\\, \\frac{[\\hat M_{R_0}(\\mathbf x), [\\hat M_{R_0}(\\mathbf y),\\hat\\rho]]} {|\\mathbf x-\\mathbf y|}. \\tag{1}",
+      "latex": "\\hat M_{R_0}(\\mathbf x)= m(2\\pi R_0^2)^{-3/2} \\exp\\!\\left[-\\frac{|\\mathbf x-\\hat{\\mathbf q}|^2}{2R_0^2}\\right], \\qquad \\frac{d\\hat\\rho}{dt} =-\\frac{i}{\\hbar}[\\hat H,\\hat\\rho] -\\frac{G}{2\\hbar} \\int d^3x\\,d^3y\\, \\frac{[\\hat M_{R_0}(\\mathbf x), [\\hat M_{R_0}(\\mathbf y),\\hat\\rho]]} {|\\mathbf x-\\mathbf y|}. \\tag{1}",
       "aliases": [
         "Diosi 1989 Gaussian-regularized nondissipative model"
       ],
@@ -417,7 +417,7 @@
       "equationId": "cdp-stage4-2j-schrodinger-coherence-factorization",
       "label": "Schrödinger, environment, and Diósi coherence factors",
       "sectionAnchor": "211-from-schrdinger-evolution-to-the-measured-residual",
-      "latex": "c_{AB}(t)= e^{-i\\Delta E_Ht/\\hbar} e^{-\\chi_{\\rm env}(t)} e^{-E_Gt/\\hbar}. \\tag{5}",
+      "latex": "c_{AB}(t)= e^{-i\\hbar^{-1}\\int_0^t\\Delta E_H(t')dt'} e^{-\\chi_{\\rm env}(t)} e^{-\\int_0^t\\Gamma_{\\rm D}[d(t')]dt'}. \\tag{5}",
       "aliases": [
         "C=C0 exp(-i Delta_E_H t/hbar) exp(-chi_env) exp(-E_G t/hbar)"
       ],
@@ -451,7 +451,7 @@
       "equationId": "cdp-stage4-2j-dp-equivalent-energy-inverse",
       "label": "Conditional DP-equivalent energy inversion",
       "sectionAnchor": "211-from-schrdinger-evolution-to-the-measured-residual",
-      "latex": "E_{\\rm D,eq} =-\\frac{\\hbar}{t} \\ln\\!\\left|c_{AB,{\\rm residual}}(t)\\right|. \\tag{6}",
+      "latex": "E_{\\rm loss,eq} =-\\frac{\\hbar}{t} \\ln\\!\\left|c_{AB,{\\rm residual}}(t)\\right|. \\tag{6}",
       "aliases": [
         "E_D,eq=-(hbar/t) ln(|C_residual|/|C0|)"
       ],
@@ -484,7 +484,7 @@
     {
       "equationId": "cdp-stage4-2j-homogeneous-sphere-energy",
       "label": "Gaussian-convolved homogeneous-sphere difference energy",
-      "sectionAnchor": "212-constituent-mass-density-changes-the-forecast",
+      "sectionAnchor": "213-constituent-mass-density-changes-the-forecast",
       "latex": "E_G^{\\rm sphere} =\\frac{2Gm^2}{\\pi R_0}\\int_0^\\infty du\\,e^{-u^2} \\left[\\frac{3(\\sin q-q\\cos q)}{q^3}\\right]^2 \\left[1-\\frac{\\sin(ud/R_0)}{ud/R_0}\\right], \\qquad q=\\frac{uR}{R_0}. \\tag{7}",
       "aliases": [
         "E_G sphere radial Fourier integral"
@@ -495,7 +495,7 @@
           "kind": "artifact_backed_theory_run",
           "label": "Open mass-density robustness diagnostic",
           "badgeIds": [
-            "study.casimir_dp.dp_mass_density_collapse",
+            "collapse.objective.dp_gravitational_self_energy",
             "study.casimir_dp.schrodinger_mass_density_stage4_2j",
             "study.casimir_dp.claim_boundary"
           ],
@@ -552,7 +552,7 @@
     {
       "equationId": "cdp-stage4-2k-ground-state-green-chain",
       "label": "Ground-state polarizability to Casimir-Polder Green response",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\alpha_g(i\\xi)=\\frac{2}{3\\hbar}\\sum_n \\frac{\\omega_{ng}|\\langle n|\\hat{\\mathbf d}|g\\rangle|^2} {\\omega_{ng}^2+\\xi^2},\\qquad U_{\\rm CP}(\\mathbf r)=\\frac{\\hbar\\mu_0}{2\\pi}\\int_0^\\infty d\\xi\\, \\xi^2\\alpha_g(i\\xi)\\operatorname{Tr}\\mathbf G^{(1)}(\\mathbf r,\\mathbf r;i\\xi).",
       "aliases": [
         "alpha_g(i xi) transition sum and U_CP Green tensor integral"
@@ -586,7 +586,7 @@
     {
       "equationId": "cdp-stage4-2k-sphere-polarizability",
       "label": "Small-sphere imaginary-axis polarizability",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\alpha_{\\rm sph}(i\\xi)=4\\pi\\epsilon_0R^3 \\frac{\\epsilon(i\\xi)-1}{\\epsilon(i\\xi)+2}.",
       "aliases": [
         "alpha_sph=4 pi epsilon0 R^3 (epsilon-1)/(epsilon+2)"
@@ -618,7 +618,7 @@
     {
       "equationId": "cdp-stage4-2k-phase-jitter-loss",
       "label": "Gaussian phase jitter to coherence loss",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\left\\langle e^{i\\delta\\phi}\\right\\rangle =e^{-\\sigma_\\phi^2/2},\\qquad \\chi_\\phi=\\frac{\\sigma_\\phi^2}{2}.",
       "aliases": [
         "chi_phi=sigma_phi^2/2"
@@ -651,7 +651,7 @@
     {
       "equationId": "cdp-stage4-2k-qlbe-decoherence",
       "label": "Quantum-linear-Boltzmann gas decoherence kernel",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\Gamma_{\\rm gas}(\\Delta\\mathbf x)=n_g\\!\\int d^3v\\,\\mu(\\mathbf v)v \\int d\\Omega\\,|f(\\mathbf q,\\mathbf v)|^2 \\left[1-e^{i\\mathbf q\\cdot\\Delta\\mathbf x/\\hbar}\\right].",
       "aliases": [
         "Gamma_gas(Delta x) momentum transfer scattering integral"
@@ -685,7 +685,7 @@
     {
       "equationId": "cdp-stage4-2l-finite-rectangle-surrogate",
       "label": "Finite rectangular-plate solid-angle response surrogate",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\Omega(\\mathbf r)=\\iint_A \\frac{z\\,dA'}{[(x'-x)^2+(y'-y)^2+z^2]^{3/2}},\\qquad U_{\\rm rect}(\\mathbf r)=\\frac{\\Omega(\\mathbf r)}{2\\pi} U_{\\rm CP}^{\\infty}(z).",
       "aliases": [
         "U_rect=(Omega/2pi) U_CP infinity"
@@ -719,7 +719,7 @@
     {
       "equationId": "cdp-stage4-2l-phase-covariance",
       "label": "Boundary-phase Jacobian and covariance propagation",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "J_i=\\frac{\\partial\\Phi_{\\rm EM}}{\\partial\\theta_i},\\qquad \\sigma_\\phi^2=\\mathbf J\\,\\boldsymbol\\Sigma_\\theta\\mathbf J^{\\mathsf T}.",
       "aliases": [
         "sigma_phi^2=J Sigma_theta J^T"
@@ -752,7 +752,7 @@
     {
       "equationId": "cdp-stage4-2l-qlbe-isotropic-proxy",
       "label": "Isotropic quantum-linear-Boltzmann gas proxy",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\Gamma_{\\rm gas}(d)=\\sum_s n_s\\bar v_s\\sigma_s \\frac12\\int_{-1}^{1}d\\mu\\, \\left[1-\\operatorname{sinc}\\!\\left( \\frac{m_s\\bar v_s d\\sqrt{2(1-\\mu)}}{\\hbar}\\right)\\right].",
       "aliases": [
         "Gamma_gas=sum n v sigma localization factor"
@@ -786,7 +786,7 @@
     {
       "equationId": "cdp-stage4-2l-density-regularization-envelope",
       "label": "DP mass-density and regularization sensitivity envelope",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "E_G^{(a)}(d,r_0)=\\frac{2Gm^2}{\\pi r_0} \\int_0^\\infty du\\,e^{-u^2}|F_a(uR/r_0)|^2 \\left[1-\\operatorname{sinc}(ud/r_0)\\right].",
       "aliases": [
         "E_G radial form factor grid"
@@ -798,7 +798,7 @@
           "label": "Open mass-density robustness envelope",
           "badgeIds": [
             "study.casimir_dp.empirical_authority_stage4_2l",
-            "study.casimir_dp.dp_mass_density_collapse",
+            "collapse.objective.dp_gravitational_self_energy",
             "study.casimir_dp.claim_boundary"
           ],
           "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
@@ -819,7 +819,7 @@
     {
       "equationId": "cdp-stage4-2m-multigate-objective",
       "label": "Stage-4.2M bounded multigate apparatus objective",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "G_M(q)=G_{\\rm D}\\wedge G_{\\rho}\\wedge G_{\\phi}\\wedge G_{\\rm gas} \\wedge G_{\\rm prep}\\wedge G_{\\rm bound}\\wedge G_{\\rm id} \\wedge G_{\\rm power}\\wedge G_{\\rm companion},",
       "aliases": [
         "G_M conjunction of apparatus gates"
@@ -853,7 +853,7 @@
     {
       "equationId": "cdp-stage4-2m-transported-backgrounds",
       "label": "Stage-4.2M transported phase and gas backgrounds",
-      "sectionAnchor": "116-supporting-derivations-and-design-ancestry",
+      "sectionAnchor": "117-supporting-derivations-and-design-ancestry",
       "latex": "\\sigma_{\\phi,\\rm echo}^2 =\\eta_{\\rm echo}^2\\mathbf J_{\\phi}(q)\\boldsymbol\\Sigma_q \\mathbf J_{\\phi}^{\\mathsf T}(q),\\qquad \\Gamma_{\\rm gas}(q)=\\Gamma_{\\rm gas,L}\\,\\mathcal T_{P,T,R,d}(q).",
       "aliases": [
         "sigma_phi_echo and Gamma_gas transport"
@@ -1299,7 +1299,7 @@
     {
       "equationId": "cdp-stage4-2s-retarded-radiation-field",
       "label": "Stage-4.2S retarded transverse radiation field",
-      "sectionAnchor": "510-retarded-source-propagation-closes-a-missing-ordinary-physics-lane",
+      "sectionAnchor": "510-retarded-source-propagation-adds-an-executable-ordinary-physics-lane",
       "latex": "\\mathbf E_{\\rm rad}(\\mathbf r,t)= \\frac{q}{4\\pi\\epsilon_0c^2R}\\, \\hat{\\mathbf n}\\times \\left[\\hat{\\mathbf n}\\times\\mathbf a(t-R/c)\\right]. \\tag{30}",
       "aliases": [
         "E radiation acceleration field at retarded time"
@@ -1333,7 +1333,7 @@
     {
       "equationId": "cdp-stage4-2s-propagation-scale",
       "label": "Stage-4.2S propagation-scale classifier",
-      "sectionAnchor": "510-retarded-source-propagation-closes-a-missing-ordinary-physics-lane",
+      "sectionAnchor": "510-retarded-source-propagation-adds-an-executable-ordinary-physics-lane",
       "latex": "kL=\\frac{2\\pi fL}{c}. \\tag{31}",
       "aliases": [
         "kL equals two pi f L over c"
@@ -1366,8 +1366,8 @@
     {
       "equationId": "cdp-stage4-2s-green-to-coherence",
       "label": "Stage-4.2S retarded Green response to ordinary complex coherence",
-      "sectionAnchor": "510-retarded-source-propagation-closes-a-missing-ordinary-physics-lane",
-      "latex": "E_i(\\mathbf r,\\omega) =i\\mu_0\\omega\\int d^3r'\\, G^{\\rm ret}_{ij}(\\mathbf r,\\mathbf r',\\omega)J_j(\\mathbf r',\\omega), \\qquad C_{0,\\beta}=C(0)e^{i\\Phi_{{\\rm EM},\\beta}-\\chi_{{\\rm EM},\\beta}}. \\tag{32}",
+      "sectionAnchor": "510-retarded-source-propagation-adds-an-executable-ordinary-physics-lane",
+      "latex": "E_i(\\mathbf r,\\omega) =i\\mu_0\\omega\\int d^3r'\\, G^{\\rm ret}_{ij}(\\mathbf r,\\mathbf r',\\omega)J_j(\\mathbf r',\\omega), \\qquad \\nabla_\\mu J^\\mu=0, \\qquad C_{{\\rm EM},\\beta}=C(0)e^{i\\Phi_{{\\rm EM},\\beta}-\\chi_{{\\rm EM},\\beta}}. \\tag{32}",
       "aliases": [
         "E equals retarded Green tensor times current; C0 ordinary phase and loss"
       ],
@@ -1569,6 +1569,42 @@
       "claimBoundaryNotes": [
         "Selection may favor a functional phenotype, not coherence or collapse as an abstract goal.",
         "No purpose, consciousness, or Orch-OR conclusion is admitted."
+      ]
+    },
+    {
+      "equationId": "cdp-composition-universality-successor",
+      "label": "Positive-result composition and internal-energy universality successor",
+      "sectionAnchor": "114-from-residual-inference-to-an-internal-energy-universality-successor",
+      "latex": "\\Lambda_k=\\int_0^{T_k}\\frac{E_{G,k}(t)}{\\hbar}\\,dt,\\qquad \\chi^{\\rm res}_k=-\\ln|C^{\\rm meas}_k|+\\ln|C^{H_0}_k|, \\qquad \\eta_k=\\frac{\\chi^{\\rm res}_k}{\\Lambda_k},\\qquad \\Delta\\eta_{k\\ell}=\\eta_k-\\eta_\\ell . \\tag{38}",
+      "aliases": [
+        "Lambda k Diósi exposure eta k normalized residual Delta eta cohort universality"
+      ],
+      "actions": [
+        {
+          "actionId": "open-cdp-composition-universality-successor",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open blocked composition-universality successor",
+          "badgeIds": [
+            "study.casimir_dp.integrated_feasibility_pilot_stage4_2r",
+            "study.casimir_dp.schrodinger_mass_density_stage4_2j",
+            "study.casimir_dp.blinded_model_comparison",
+            "study.casimir_dp.composition_internal_energy_successor",
+            "study.casimir_dp.claim_boundary"
+          ],
+          "preferredBadgeId": "study.casimir_dp.composition_internal_energy_successor",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "casimir_dp_quantum_foam",
+          "atlasGroupId": "casimir_dp.positive_result_successor",
+          "openPanels": [
+            "theory-badge-graph"
+          ],
+          "alsoIngestLatex": false,
+          "claimBoundaryNote": "The comparison coordinate is registered for future design only; parent positive replication and all nine successor authority packets are absent."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Measured total neutral-object mass is authoritative; constituent double counting is forbidden.",
+        "No direct quark, gluon, nuclear, electronic, binding-energy, or covariant internal-energy collapse interaction is identified."
       ]
     }
   ]

@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "npm run dev:low-memory",
-    "dev:low-memory": "npm run docs:metadata:generate && cross-env NODE_ENV=development HELIX_PUBLIC_ROOMS_EXPERIMENT=1 HELIX_GUEST_ROOM_CREATION=1 HELIX_ASK_GOLDEN_PATH_RUNTIME=0 HELIX_LOW_MEMORY_STARTUP_GC=1 HELIX_LOW_MEMORY_IDLE_GC=1 HELIX_LOCAL_PG_MEM_WRITE_MODE=deferred HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS=60000 HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS=300000 HELIX_HOST_COMMIT_REQUIRED=1 RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB=1024 RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB=2048 RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX=0.96 RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX=0.90 RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB=1024 SKIP_VITE_MIDDLEWARE=1 node --expose-gc --max-old-space-size=1024 --import tsx server/index.ts",
+    "dev:low-memory": "npm run docs:metadata:generate && cross-env NODE_ENV=development HELIX_PUBLIC_ROOMS_EXPERIMENT=1 HELIX_GUEST_ROOM_CREATION=1 HELIX_ASK_GOLDEN_PATH_RUNTIME=0 HELIX_LOW_MEMORY_STARTUP_GC=1 HELIX_LOW_MEMORY_IDLE_GC=1 HELIX_LOCAL_PG_MEM_WRITE_MODE=deferred HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS=60000 HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS=300000 HELIX_LOCAL_PG_MEM_ROOM_SOURCE_REQUEST_MAX_ROWS_PER_BINDING=128 HELIX_LOCAL_PG_MEM_SITUATION_DIGEST_MAX_ROWS_PER_SUBJECT=8 HELIX_LOCAL_PG_MEM_CAPABILITY_CATALOG_MAX_ROWS_PER_BINDING=1 HELIX_LOCAL_PG_MEM_ENVIRONMENT_EVENT_MAX_ROWS_PER_BINDING_PLANE=64 HELIX_LOCAL_PG_MEM_ACTION_HEARTBEAT_MAX_ROWS_PER_AUTHORITY=8 HELIX_HOST_COMMIT_REQUIRED=1 RUNTIME_MEMORY_HOST_COMMIT_FREE_MIN_MB=1024 RUNTIME_MEMORY_HOST_COMMIT_FREE_SOFT_MIN_MB=2048 RUNTIME_MEMORY_HOST_COMMIT_RATIO_MAX=0.96 RUNTIME_MEMORY_HOST_COMMIT_RATIO_SOFT_MAX=0.90 RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB=1024 SKIP_VITE_MIDDLEWARE=1 node --expose-gc --max-old-space-size=1280 --import tsx server/index.ts",
     "dev:hmr": "npm run docs:metadata:generate && cross-env NODE_ENV=development HELIX_PUBLIC_ROOMS_EXPERIMENT=1 HELIX_GUEST_ROOM_CREATION=1 HELIX_ASK_GOLDEN_PATH_RUNTIME=0 SKIP_VITE_MIDDLEWARE=0 node --max-old-space-size=3072 ./node_modules/tsx/dist/cli.mjs server/index.ts",
     "dev:golden-path": "npm run docs:metadata:generate && cross-env NODE_ENV=development HELIX_ASK_GOLDEN_PATH_RUNTIME=1 SKIP_VITE_MIDDLEWARE=0 node --max-old-space-size=3072 ./node_modules/tsx/dist/cli.mjs server/index.ts",
     "dev:agi": "npm run docs:metadata:generate && cross-env ENABLE_ESSENCE=1 ENABLE_AGI=1 HELIX_PUBLIC_ROOMS_EXPERIMENT=1 HELIX_GUEST_ROOM_CREATION=1 HELIX_ASK_GOLDEN_PATH_RUNTIME=0 SKIP_VITE_MIDDLEWARE=0 node --max-old-space-size=3072 ./node_modules/vite-node/vite-node.mjs server/index.ts",
@@ -172,6 +172,9 @@
     "helix:minecraft:player-helix-capture": "tsx scripts/helix-minecraft-player-helix-debug-capture.ts",
     "helix:minecraft:player-stage-diagnostic": "tsx scripts/helix-minecraft-player-stage-diagnostic.ts",
     "helix:minecraft:resident-capture": "tsx scripts/helix-minecraft-resident-decision-capture.ts",
+    "helix:minecraft:nether1:n0-readiness": "tsx scripts/audit-minecraft-nether1-n0-readiness.ts",
+    "helix:minecraft:nether1:n0-course-plan": "tsx scripts/helix-minecraft-nether1-n0-course-plan.ts",
+    "helix:minecraft:combat:c0-arena-plan": "tsx scripts/helix-minecraft-combat-c0-arena-plan.ts",
     "helix:minecraft:launch-fabric-loopback": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/helix-minecraft-launch-fabric-loopback.ps1",
     "mcp:provider-conformance": "tsx scripts/casimirbot-mcp-provider-conformance.ts",
     "helix:shared-room:live-acceptance": "tsx scripts/helix-shared-live-room-live-acceptance.ts",

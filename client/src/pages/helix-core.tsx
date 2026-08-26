@@ -2561,12 +2561,12 @@ useEffect(() => {
   const deepMixingLumFraction = useMemo(() => {
     const guard = deepMixingPlan.guardrails.dLogL_per_Myr_max;
     if (!Number.isFinite(guard) || guard <= 0) return null;
-    return deepMixingTelemetry.dLogL_per_Myr / guard;
+    return Math.abs(deepMixingTelemetry.dLogL_per_Myr) / guard;
   }, [deepMixingPlan.guardrails.dLogL_per_Myr_max, deepMixingTelemetry.dLogL_per_Myr]);
   const deepMixingTcFraction = useMemo(() => {
     const guard = deepMixingPlan.guardrails.dLogTc_per_Myr_max;
     if (!Number.isFinite(guard) || guard <= 0) return null;
-    return deepMixingTelemetry.dLogTc_per_Myr / guard;
+    return Math.abs(deepMixingTelemetry.dLogTc_per_Myr) / guard;
   }, [deepMixingPlan.guardrails.dLogTc_per_Myr_max, deepMixingTelemetry.dLogTc_per_Myr]);
   const deepMixingProjectedDeltaTLabel = useMemo(() => {
     if (deepMixingPlan.targetDeltaT_Myr >= 1000) {
@@ -2597,7 +2597,7 @@ useEffect(() => {
     setDeepMixingPlan((prev) => ({
       ...prev,
       targetDeltaT_Myr: option.deltaT_Myr,
-      epsilon: option.epsilon,
+      epsilon: option.epsilonHypothesis,
     }));
   }, []);
   const advanceDeepMixingState = useCallback(() => {
@@ -2635,22 +2635,22 @@ useEffect(() => {
       nominal: {
         dLogL_per_Myr: guardLum * 0.2,
         dLogTc_per_Myr: guardTc * 0.18,
-        seismicGrowth: -0.02,
-        neutrinoDelta: -2e-4,
+        seismicResidual: { value: 0.2, uncertainty: 1, sampleAgeDays: 0, evidenceMode: "synthetic" as const },
+        neutrinoResidual: { value: -0.2, uncertainty: 1, sampleAgeDays: 0, evidenceMode: "synthetic" as const },
         achievedEpsilon: deepMixingPlan.epsilon * 0.95,
       },
       guardrail: {
-        dLogL_per_Myr: guardLum * 1.4,
-        dLogTc_per_Myr: guardTc * 1.35,
-        seismicGrowth: 0.05,
-        neutrinoDelta: 0.0025,
+        dLogL_per_Myr: -guardLum * 1.4,
+        dLogTc_per_Myr: -guardTc * 1.35,
+        seismicResidual: { value: -1.4, uncertainty: 1, sampleAgeDays: 0, evidenceMode: "synthetic" as const },
+        neutrinoResidual: { value: 1.35, uncertainty: 1, sampleAgeDays: 0, evidenceMode: "synthetic" as const },
         achievedEpsilon: deepMixingPlan.epsilon * 0.98,
       },
       boost: {
         dLogL_per_Myr: guardLum * 0.7,
         dLogTc_per_Myr: guardTc * 0.65,
-        seismicGrowth: -0.01,
-        neutrinoDelta: -6e-4,
+        seismicResidual: { value: -0.4, uncertainty: 1, sampleAgeDays: 0, evidenceMode: "synthetic" as const },
+        neutrinoResidual: { value: -0.3, uncertainty: 1, sampleAgeDays: 0, evidenceMode: "synthetic" as const },
         achievedEpsilon: deepMixingPlan.epsilon * 0.72,
       },
     };
@@ -6432,7 +6432,7 @@ useEffect(() => {
                       </div>
                       <div>
                         <Label className="text-[11px] font-semibold uppercase text-slate-400">
-                          Lifetime Gain Target
+                          Requested Extension Threshold
                         </Label>
                         <Slider
                           value={[deepMixingTargetIndex]}
@@ -6488,7 +6488,7 @@ useEffect(() => {
                         </div>
                         <div className="space-y-3 text-[11px] text-slate-300">
                           <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono">
-                            <span>ε target</span>
+                            <span>ε hypothesis</span>
                             <span>{deepMixingPlan.epsilon.toExponential(2)}</span>
                             <span>ε achieved</span>
                             <span>
@@ -6526,7 +6526,7 @@ useEffect(() => {
                                   )}% diag / ${deepMixingFleetTotals.idlePct.toFixed(0)}% idle`
                                 : "configure"}
                             </span>
-                            <span>Projected delta t</span>
+                            <span>Requested delta t</span>
                             <span>{deepMixingProjectedDeltaTLabel}</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -6549,7 +6549,7 @@ useEffect(() => {
                               variant="outline"
                               onClick={() => setDeepMixingTelemetry({ ...deepMixingTelemetryScenarios.boost })}
                             >
-                              Build epsilon
+                              Lower delivery hypothesis
                             </Button>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -6567,6 +6567,10 @@ useEffect(() => {
                             Next trim -&gt; duty {(deepMixingControlPreview.duty * 100).toFixed(1)} %, cadence{" "}
                             {deepMixingControlPreview.cadenceDays.toFixed(2)} d{" "}
                             {deepMixingControlPreview.enteredSafe ? "(SAFE posture recommended)" : ""}
+                          </div>
+                          <div className="rounded border border-amber-900/50 bg-amber-950/20 px-3 py-2 text-[10px] text-amber-200/80">
+                            Reduced-order diagnostic only. Requested lifetime thresholds do not derive ε, and synthetic
+                            seismic/neutrino telemetry cannot authorize actuation.
                           </div>
                           <div className="text-[10px] uppercase tracking-wide text-slate-500">
                             sequence: {deepMixingSequence.join(" -> ")} -&gt; SAFE

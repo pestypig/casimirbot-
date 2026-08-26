@@ -1,0 +1,70 @@
+{
+  "schema": "nhm2.g2h_e.execution_proposal.v1",
+  "decision": "PENDING_SEPARATE_EXPLICIT_USER_AUTHORIZATION",
+  "program_gate": "G2H-E",
+  "proposal_only": true,
+  "execution_authorized": false,
+  "candidate_evaluations": 0,
+  "contract_sha256": "30de966d41d6342e8a047ee655a33e02f68d32a6ba49efcb39b0bbd7981c343d",
+  "proof_build_binding": "docs/research/nhm2-spherical-boson-star-v2-g2h-proof-build-binding.v1.json",
+  "proof_build_binding_sha256": "37738d325eb2e0eabe9ac9c34ecd65726071ae213c9fe3dd12f61f86b720362a",
+  "checkpoint": "scripts/nhm2_g2h_e_checkpoint.py",
+  "checkpoint_bytes": 11641,
+  "checkpoint_sha256": "531fe27b3fcd064f11ea612a9b01e41bfc6c372ef147e0fcdd1f9d644e844e61",
+  "token": "797cafb72170c8b441cc75b3ec74bb118fed24d3a2e628194d0280bb54a59ac7",
+  "token_sha256": "33524fdff6e69b40ae75cdff3b3ee1d049a718d70996e08a9397ff18b3e2960a",
+  "token_alone_authorizes_nothing": true,
+  "primary": {
+    "image": "nhm2-g2h-primary-proof:v1",
+    "image_id": "sha256:d074caaa8fb84e8b0c06d5e675e06f62c2223c3fb3b97588872f67b10403ae92",
+    "authorization_record": "artifacts/research/nhm2/g2h-authorizations/g2h-e-primary-v1.txt",
+    "authorization_record_currently_absent": true,
+    "output_root": "artifacts/research/nhm2/g2h/tolman-vii-primary-v1",
+    "output_root_currently_absent": true,
+    "fixed_container_name": "nhm2-g2h-e-primary-v1",
+    "command": [
+      "python",
+      "scripts/nhm2_g2h_e_checkpoint.py",
+      "--lane",
+      "primary",
+      "--token",
+      "797cafb72170c8b441cc75b3ec74bb118fed24d3a2e628194d0280bb54a59ac7",
+      "--execute"
+    ]
+  },
+  "independent": {
+    "image": "nhm2-g2h-independent-proof:v1",
+    "image_id": "sha256:03102ead4a5271f8ad85c3b75be25283d61593b5d2934778522eabfe87dbb427",
+    "authorization_record": "artifacts/research/nhm2/g2h-authorizations/g2h-e-independent-v1.txt",
+    "authorization_record_currently_absent": true,
+    "authorization_must_bind_observed_primary_manifest": true,
+    "output_root": "artifacts/research/nhm2/g2h/tolman-vii-independent-v1",
+    "output_root_currently_absent": true,
+    "fixed_container_name": "nhm2-g2h-e-independent-v1",
+    "command": [
+      "python",
+      "scripts/nhm2_g2h_e_checkpoint.py",
+      "--lane",
+      "independent",
+      "--token",
+      "797cafb72170c8b441cc75b3ec74bb118fed24d3a2e628194d0280bb54a59ac7",
+      "--execute"
+    ]
+  },
+  "chronology": [
+    "issue an exact primary AUTHORIZED record only after explicit user authorization",
+    "invoke the primary checkpoint exactly once",
+    "preserve PASS, FAIL or partial primary evidence without retry, retune, deletion or alternate root",
+    "bind the observed immutable primary proof-manifest SHA-256 into a new exact independent AUTHORIZED record",
+    "invoke the independent checkpoint exactly once",
+    "preserve PASS, FAIL or partial independent evidence without retry, retune, deletion or alternate root"
+  ],
+  "candidate_admitted": false,
+  "classical_proof_established": false,
+  "geometry_state_accepted": false,
+  "lane_execution_authorized": false,
+  "diagnostic_lamp": false,
+  "physical_viability": false,
+  "propulsion_authority": false,
+  "transport_authority": false
+}

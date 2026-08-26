@@ -1,0 +1,75 @@
+{
+  "scenario_id": "EH-MC-NETHER1-responsive-stone-a0",
+  "lane": "direct_codex",
+  "action_kind": "mine",
+  "prompt": "Mine one nearby stone block through ordinary survival player embodiment and verify the removal.",
+  "starting_state": {
+    "fixture_kind": "bounded_player_action",
+    "required_preconditions": [
+      "connected",
+      "on_ground"
+    ]
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.mine",
+    "capability_version": 1,
+    "control_engine": "native_fabric",
+    "manual_override_required": true,
+    "postcondition_verification_required": true
+  },
+  "source_artifact_refs": [
+    "minecraft_client_log_sha256:179cdd5d1d672cab6abe9f986d617867f42a79a10b0bf7afc5fd15e6dcd3b5fa",
+    "direct_diagnostic_workflow:direct_player_action_workflow:005ec61f-df88-4684-b326-8f014437ef85"
+  ],
+  "selected_capability_id": "com.casimirbot.minecraft.player.mine",
+  "normalized_arguments": {
+    "block_id": "minecraft:stone",
+    "count": 1,
+    "search_radius": 4
+  },
+  "admission_status": "not_applicable",
+  "execution_outcome": "succeeded",
+  "normalized_progress": [
+    {
+      "sequence": 0,
+      "event_type": "workflow.started",
+      "workflow_state": "running",
+      "progress_fraction": 0,
+      "measurements": {},
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 1,
+      "event_type": "workflow.succeeded",
+      "workflow_state": "succeeded",
+      "progress_fraction": 1,
+      "measurements": {
+        "block_id": "minecraft:stone",
+        "removed_count": 1,
+        "requested_count": 1,
+        "world_mutations_performed": 1
+      },
+      "manual_override_detected": false,
+      "controls_released": true
+    }
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "direct_diagnostic_observation:direct_player_action_workflow:005ec61f-df88-4684-b326-8f014437ef85:2"
+  ],
+  "observation_reentered": false,
+  "final_candidate_text": null,
+  "final_candidate_support_refs": [],
+  "route_product_text": null,
+  "route_product_support_refs": [],
+  "terminal_outcome": "success",
+  "terminal_authority_status": "not_applicable",
+  "terminal_writer_text": null,
+  "terminal_writer_support_refs": [],
+  "visible_text": null,
+  "voice_projection_status": "not_applicable",
+  "voice_text": null,
+  "created_at": "2026-08-24T21:08:36.853229200Z",
+  "hidden_reasoning_included": false
+}

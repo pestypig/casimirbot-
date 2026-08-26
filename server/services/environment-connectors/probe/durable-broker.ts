@@ -1906,12 +1906,33 @@ const normalizeLegacyResult = (
           typeof entity.targeting_actor === "boolean"
         );
       })
-      .map((entity) => ({
-        entity_type: String(entity.entity_type).trim(),
-        classification: String(entity.classification).trim(),
-        distance_blocks: Number(entity.distance_blocks),
-        targeting_actor: Boolean(entity.targeting_actor),
-      }));
+      .map((entity) => {
+        const normalizedEntity: Record<string, unknown> = {
+          entity_type: String(entity.entity_type).trim(),
+          classification: String(entity.classification).trim(),
+          distance_blocks: Number(entity.distance_blocks),
+          targeting_actor: Boolean(entity.targeting_actor),
+        };
+        if (
+          typeof entity.entity_label === "string" &&
+          entity.entity_label.trim().length > 0 &&
+          entity.entity_label.trim().length <= 160
+        ) {
+          normalizedEntity.entity_label = entity.entity_label.trim();
+        }
+        for (const key of ["health", "max_health"] as const) {
+          const value = entity[key];
+          if (
+            typeof value === "number" &&
+            Number.isFinite(value) &&
+            value >= 0 &&
+            value <= 2_147_483_647
+          ) {
+            normalizedEntity[key] = value;
+          }
+        }
+        return normalizedEntity;
+      });
   }
   if (typeof rawResult.reachable === "boolean") {
     if (result.domain === "minecraft") {
@@ -1942,6 +1963,30 @@ const normalizeLegacyResult = (
     normalized.distance_blocks = rawResult.distance_blocks;
     if (result.domain !== "minecraft") {
       normalized.distance = rawResult.distance_blocks;
+    }
+  }
+  if (
+    details.snapshot_schema === "helix.minecraft_perception_snapshot.v1"
+  ) {
+    for (const key of [
+      "snapshot_schema",
+      "observation_revision",
+      "game_tick",
+      "capture_duration_ms",
+      "dimension",
+      "actor",
+      "focus",
+      "entities",
+      "hazards",
+      "movement_candidates",
+      "navigation_frontier",
+      "inventory",
+      "coverage",
+      "ui_state",
+      "world_rules",
+      "semantic_fingerprint",
+    ] as const) {
+      if (details[key] !== undefined) normalized[key] = details[key];
     }
   }
   return normalized;

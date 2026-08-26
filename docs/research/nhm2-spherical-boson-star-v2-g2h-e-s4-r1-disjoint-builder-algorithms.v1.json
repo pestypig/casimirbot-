@@ -1,0 +1,169 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.disjoint_builder_algorithms.v1",
+  "status": "draft_unsealed_deterministic_builder_and_work_budget_definition_fixture_only_no_scientific_execution_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source/runtime-disjoint certificate constructors, fixed selectors and exhaustion behavior",
+    "current_maturity": "common proof products are encoded but producer-specific deterministic constructors were previously deferred",
+    "target_maturity": "independently audited complete builder ABI with no implementation-time scientific choices",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "validated inverse a180d03a7ea4f2b9499bdce9984b7310d178e777016a48a0809d76768a0ba529",
+      "continuation 7a0cdc0e45a09e0291b79a1ef3892e221d6ed71395e3e4cf5e767c0adb1cb16c",
+      "stability 36bb62c7f386ce16fda989dc896e862ee23ae9b04c52d936f9363b5b61d156f4",
+      "quantum cf0a49ad816af742f0d1f86acbe6afd33538f126ebf5eb7487dbb154359fe3cc",
+      "512-bit directed ball arithmetic and exact reduced-rational/dyadic certificate layer"
+    ],
+    "required_evidence": [
+      "two total deterministic algorithms for every constructor role",
+      "fixed pivot, projection, degree, iteration, quadrature and tail budgets",
+      "exact tie and exhaustion behavior",
+      "manufactured pass/fail and budget-exhaustion replay",
+      "no shared scientific source or arithmetic runtime lineage",
+      "zero selected-member ingress and absent future roots"
+    ],
+    "stop_fail_criteria": [
+      "a null selector, unspecified tie, adaptive scientific subdivision or unbounded search",
+      "a builder changes after any scientific bound is observed",
+      "a failed builder silently switches algorithm, raises precision or extends its budget",
+      "shared producer scientific source or C arithmetic in the Rust lane",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "constructing any selected-member certificate in R1",
+      "guaranteeing that the future candidate passes a fixed budget",
+      "compiling either producer before definition closure",
+      "G3 or any lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "combined independent R1 definition audit"
+  },
+  "semantic_change_class": "additive_numerical_construction_semantics_R2_and_all_scientific_predicates_unchanged",
+  "immutable_predecessors": {
+    "r2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "raw_sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a"},
+    "inverse": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-validated-inverse-radii-contract.v1.json", "raw_sha256": "a180d03a7ea4f2b9499bdce9984b7310d178e777016a48a0809d76768a0ba529"},
+    "continuation": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-continuation-tube-contract.v1.json", "raw_sha256": "7a0cdc0e45a09e0291b79a1ef3892e221d6ed71395e3e4cf5e767c0adb1cb16c"},
+    "stability": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-radial-stability-contract.v1.json", "raw_sha256": "36bb62c7f386ce16fda989dc896e862ee23ae9b04c52d936f9363b5b61d156f4"},
+    "quantum": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-quantum-ground-rset-noise-contract.v1.json", "raw_sha256": "cf0a49ad816af742f0d1f86acbe6afd33538f126ebf5eb7487dbb154359fe3cc"}
+  },
+  "common_rules": {
+    "precision": "512-bit significand directed balls for every inexact operation; exact integer/rational work has no precision concept and may not be substituted for a second floating precision",
+    "projection": "project the exact midpoint of an enclosed x to the nearest dyadic n*2^-448; ties choose even n; record a directed ball for exact_dyadic-x and let the later proof predicates, not membership of the dyadic in x, decide adequacy",
+    "ordering": "all matrices use canonical row-major wire order; all ties choose the least canonical ordinal",
+    "parallelism": "tasks may execute concurrently only when their input hashes and output ordinals are fixed; persistence is always in ascending ordinal order",
+    "budget_exhaustion": "the first exhausted counter emits builder_budget_exhausted:<role>:<counter>, persists the partial transcript and terminates; no fallback or extension exists",
+    "verification_separation": "a generated certificate is never trusted: the same lane re-evaluates every exact certificate through its directed verifier, and the later cross-language audit replays its wire semantics",
+    "candidate_ingress_rule": "the complete source, builder contract, numeric selector manifest, runtime and executable identities must be immutable before any selected-background byte is read"
+  },
+  "primary_cpp_arb_lineage": {
+    "identity": "future C++20 producer using Arb/FLINT/GMP/MPFR only in a digest-pinned offline Linux x86_64 image",
+    "classical_inverse_builder": {
+      "finite_matrix": "form the 512-bit midpoint Jacobian in canonical order; perform deterministic complete-pivot Arb LU with the largest certified lower absolute pivot and least ordinal tie; singular or zero-containing best pivot fails",
+      "inverse_columns": "solve all canonical unit columns through the one frozen LU; project every entry to 2^-448 dyadics; form A_dagger from the separately projected midpoint Jacobian",
+      "tail": "for each component use the projected reciprocal of the certified leading differential multiplier for gamma and its projected multiplier for delta; zero-containing leading balls fail",
+      "certificate": "FLINT fraction-free Bareiss determinants certify both dyadic finite matrices nonzero; Arb evaluates all finite/tail/cross blocks for Z0 before any later bound",
+      "budgets": {"maximum_dimension": 2050, "LU_factorizations": 1, "triangular_solves": 2050, "projection_retries": 0, "Bareiss_determinants": 2}
+    },
+    "continuation_builder": {
+      "center": "use the frozen second-order left-endpoint predictor and no other predictor",
+      "tube": "one inverse construction at the left center followed by the exact Y/Z tube assembly on each of 1024 cells and 73 radii in their frozen order",
+      "coefficient_majorants": "evaluate Chebyshev products by Arb polynomial convolution followed by the frozen (1+k)^8 weighted l1 majorant and the exact flat-carrier envelopes",
+      "budgets": {"cells": 1024, "inverse_builds_per_cell": 1, "radii_per_cell": 73, "adaptive_subdivisions": 0, "alternate_predictors": 0}
+    },
+    "stability_builder": {
+      "Riccati_K": "on each of the 256 origin/bulk/infinity cells represent the three symmetric K entries by degree-12 Chebyshev polynomials; initialize from a backward 32-step-per-cell implicit midpoint integration of the equality Riccati equation at L=2^-96, apply exactly 16 global damped Newton sweeps with damping sequence 2^0 through 2^-15 selected by first strict midpoint residual decrease, then project once to dyadics",
+      "jump_repair": "apply one forward exact-dyadic diagonal jump offset equal to the least multiple of 2^-448 that makes each jump midpoint principal-minor margin at least 2^-160; no second repair is allowed and directed verification remains authoritative",
+      "trial": "perform 64 inverse iterations on the degree-16, 256-cell co-rotating Galerkin midpoint operator with the canonical first basis vector seed; normalize by the first nonzero canonical coefficient, multiply by the fixed C1 cutoff supported in y<=255/256 and project to dyadics",
+      "budgets": {"cells": 256, "K_degree": 12, "implicit_midpoint_steps_per_cell": 32, "Newton_sweeps": 16, "jump_repairs": 1, "trial_degree": 16, "inverse_iterations": 64, "L": "2^-96"}
+    },
+    "quantum_builder": {
+      "radial": "degree-24 Arb Chebyshev collocation on each frozen cell for regular and negative-axis Weyl solutions, with interval defect correction against the exact radial ODE",
+      "angular": "sum ell=0..255 after a covariant Hadamard/WKB subtraction through order 20; evaluate the closed tail and bound the unsummed remainder",
+      "spectral": "split kappa by kappa=tan(pi*x/2), use 1024 fixed dyadic x panels and 32-point Gauss-Legendre balls per panel; use the order-20 heat-kernel tail beyond the last panel",
+      "physical_measure": "recover compact-time multipliers using 2048 fixed energy panels, 32-point Gauss-Legendre balls and directed limiting-absorption epsilon values 2^-32 through 2^-96 in steps of 2^-8; one interval extrapolation theorem must enclose the epsilon-to-zero remainder",
+      "Hadamard": "transport U and V through order 20 and compute coincidence jets through total derivative order 4",
+      "noise": "construct all 256 two-particle vectors in canonical order and persist the lower-triangular Gram factor before forming the symmetric 256 by 256 matrix",
+      "budgets": {"ell_max": 255, "Hadamard_WKB_order": 20, "radial_degree": 24, "kappa_panels": 1024, "kappa_nodes_per_panel": 32, "energy_panels": 2048, "energy_nodes_per_panel": 32, "limiting_absorption_levels": 9, "adaptive_panels": 0, "target_total_width": "2^-120", "per_tail_target": "2^-132"}
+    }
+  },
+  "independent_pure_rust_lineage": {
+    "identity": "future pure Rust producer in a digest-pinned offline x86_64-musl image with native 512-bit limb balls and no C, GMP, MPFR, FLINT or Arb linkage",
+    "classical_inverse_builder": {
+      "finite_matrix": "form the independently evaluated 512-bit midpoint Jacobian; perform deterministic column-pivoted Householder QR with largest certified lower remaining column norm and least ordinal tie; a zero-containing diagonal fails",
+      "inverse_columns": "solve all canonical unit columns through the one QR factorization, project entries to 2^-448 dyadics and independently project A_dagger from its own Jacobian evaluation",
+      "tail": "derive gamma and delta from independently evaluated leading differential multipliers and the same exact projection rule; zero-containing multipliers fail",
+      "certificate": "pure-Rust signed big-integer modular determinant reconstruction over fixed ascending 61-bit primes above 2^60 until the Hadamard bound gives a unique integer; failure to reconstruct within 32768 primes exhausts the budget",
+      "budgets": {"maximum_dimension": 2050, "QR_factorizations": 1, "triangular_solves": 2050, "projection_retries": 0, "maximum_modular_primes_per_determinant": 32768, "determinants": 2}
+    },
+    "continuation_builder": {
+      "center": "re-evaluate the frozen second-order left-endpoint predictor directly from exact tube bytes",
+      "tube": "one independent inverse construction per cell, exact Y/Z assembly by Taylor-model products and the same 73 radii order",
+      "coefficient_majorants": "convert canonical Chebyshev coefficients to Bernstein enclosures on each cell, multiply by exact integer convolution and return to the frozen weighted l1 norm with a directed conversion remainder",
+      "budgets": {"cells": 1024, "inverse_builds_per_cell": 1, "radii_per_cell": 73, "adaptive_subdivisions": 0, "alternate_predictors": 0}
+    },
+    "stability_builder": {
+      "Riccati_K": "represent the three K entries by degree-14 Bernstein polynomials per cell; initialize by a forward-backward 40-step-per-cell Gauss-Legendre-2 Riccati sweep at L=2^-96, apply exactly 20 interval-free midpoint Newton-Krylov sweeps with a fixed 96-vector Krylov budget and damping sequence 2^0 through 2^-19, then project once to dyadics",
+      "jump_repair": "solve one exact dyadic 2 by 2 positive-semidefinite jump completion per interface by lexicographic enumeration of offsets 0..2^16 times 2^-448; exhaustion or failed directed verification terminates",
+      "trial": "perform 80 block-Lanczos midpoint steps on the degree-18 Bernstein form with the canonical two-vector seed, select the least Ritz value, apply the fixed y<=255/256 C1 cutoff and project once to dyadics",
+      "budgets": {"cells": 256, "K_degree": 14, "Gauss_Legendre_steps_per_cell": 40, "Newton_Krylov_sweeps": 20, "Krylov_vectors_per_sweep": 96, "jump_offset_ordinals": 65537, "trial_degree": 18, "Lanczos_steps": 80, "L": "2^-96"}
+    },
+    "quantum_builder": {
+      "radial": "degree-28 Taylor models about each cell midpoint for regular and negative-axis Weyl solutions, propagated by fixed 48-step Taylor integration and verified by interval Picard defects",
+      "angular": "sum ell=0..287 after an independently derived DeWitt-Schwinger/large-ell subtraction through order 22; sum the analytic tail and interval bound its remainder",
+      "spectral": "use kappa=sinh(t), 1536 fixed dyadic t panels and 24-node tanh-sinh balls per panel with an order-22 resolvent tail",
+      "physical_measure": "use 2304 fixed energy panels, 24-node tanh-sinh balls and directed limiting-absorption epsilon values 2^-36 through 2^-100 in steps of 2^-8; verify the zero-epsilon remainder independently",
+      "Hadamard": "solve the transport recurrences in midpoint Taylor form through order 22 and compute coincidence jets through total derivative order 4",
+      "noise": "construct the 256 independently normalized two-particle vectors, use exact canonical modified Gram-Schmidt only as a factor representation and verify the unmodified symmetric Gram matrix by direct interval dot products",
+      "budgets": {"ell_max": 287, "Hadamard_WKB_order": 22, "radial_degree": 28, "Taylor_steps_per_cell": 48, "kappa_panels": 1536, "kappa_nodes_per_panel": 24, "energy_panels": 2304, "energy_nodes_per_panel": 24, "limiting_absorption_levels": 9, "adaptive_panels": 0, "target_total_width": "2^-120", "per_tail_target": "2^-132"}
+    }
+  },
+  "cross_lane_rules": {
+    "shared": ["R2 mathematical problem", "additive exact proof-product ABIs", "512-bit precision", "2^-448 certificate projection lattice", "strict thresholds and failure chronology"],
+    "must_be_disjoint": ["scientific source files", "matrix factorization implementation", "coefficient enclosure implementation", "stability constructor", "spectral constructor", "Hadamard constructor", "arithmetic library", "compiler toolchain", "runtime image", "executable", "mutable cache", "output root"],
+    "certificate_bytes_need_not_match": true,
+    "accepted_products": "both directed verifiers must independently pass and corresponding scientific solution/observable balls must overlap under their common exact semantics",
+    "one_lane_failure": "terminal pair failure; the other lane cannot donate a certificate, selector, cutoff, tail or implementation"
+  },
+  "fixture_boundary": {
+    "allowed": [
+      "exact diagonal, triangular and dense dyadic inverse fixtures",
+      "manufactured continuation tubes and strict radii pass/touch/fail fixtures",
+      "constant and compact-potential Riccati/trial fixtures",
+      "Minkowski and manufactured radial spectral measures",
+      "Hadamard, RSET-conservation and Fock-Gram fixtures",
+      "every fixed budget exhaustion, tie, corruption and chronology fixture"
+    ],
+    "forbidden": ["selected member ingress", "positive parameter sample", "candidate root", "scientific Rust run", "authorization token", "authority promotion"]
+  },
+  "readiness": {
+    "primary_classical_builder_complete": true,
+    "independent_classical_builder_complete": true,
+    "primary_stability_builder_complete": true,
+    "independent_stability_builder_complete": true,
+    "primary_quantum_builder_complete": true,
+    "independent_quantum_builder_complete": true,
+    "all_selectors_and_budgets_nonnull": true,
+    "fixture_audit_complete": false,
+    "independent_definition_audit_complete": false,
+    "producer_source_implemented": false,
+    "runtime_bound": false,
+    "candidate_evaluated": false,
+    "implementation_authorized": false,
+    "execution_authorized": false
+  },
+  "authority": {
+    "definition_is_certificate": false,
+    "builder_fixture_passed": false,
+    "scientific_builder_executed": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

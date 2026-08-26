@@ -1,0 +1,52 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v2",
+  "status": "PASS_OUTER_GUARD_AND_IN_MEMORY_RECORD_CHAIN_CANDIDATE_NEUTRAL_SCIENTIFIC_DISPATCH_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "b49c416551cef4c2cb27670d89f8c4204afb5a13771a1e8f9e54579bb55f42b6",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "sources": {
+    "sha256_header": "99278b36da34a37e7e6a199f247f1e3d8ca91f10bff309cb19c1355dd3d199d2",
+    "guard_cpp": "5b5979f224cab6397f191d398c978c79fb6e49a0b494b6968480921a91306b93",
+    "record_header": "158d45df58780489b81d0c090bde0bf7de972cc20cdd586d6ca7c62456057000",
+    "record_cpp": "6ef30ce771b94fa49fbdeffe6bc5084608a3dfc179a1d7bb6416321f8c9caa17",
+    "dockerfile": "2671167bafa4221052a4dd7f17dbcc7ca77daeceecf973197e2f0a43f489123b"
+  },
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v4",
+    "image_id": "sha256:eb78b9c6d2fdd90737a05af654d6eeb5a846fb952afab5757980c6bf0c417666",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 74600,
+    "executable_sha256": "dce2dd02e1382bb2841345a89c8e278edcb838b93c0fb2cb7861cdeacab70ed2",
+    "record_writer_linked": true,
+    "record_fixture_checks": "PASS_2_OF_2",
+    "scientific_dispatch_linked": false
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "a0302b0681068badbbe6d4275bf40c1079e4837d9903a33ce1b6c8996125a1cf",
+    "status": "PASS",
+    "checks_passed": 14,
+    "checks_total": 14
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_execution_authorized": false,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

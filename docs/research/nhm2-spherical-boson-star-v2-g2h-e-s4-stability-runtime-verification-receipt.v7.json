@@ -1,0 +1,82 @@
+{
+  "schema": "nhm2.g2h_e_s4.stability_runtime_verification_receipt.v7",
+  "status": "PASS_P06_P07_R06_R07_STABILITY_KERNELS_REMAINING_QUANTUM_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "source/runtime-disjoint radial-stability constructors, trials and strict spectral predicates",
+    "current_maturity": "P01-P07 and R01-R07 complete on exact/manufactured pass/fail/exhaustion fixtures",
+    "target_maturity": "input evidence for P08-P13 and R08-R13 quantum constructors",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "builder algorithms 5bd4c47069bf1716acef1bb572af8d1d9aee78d251f6df883f068d9ed75f0abf",
+      "radial stability definition 36bb62c7f386ce16fda989dc896e862ee23ae9b04c52d936f9363b5b61d156f4",
+      "fixture binding 215078e444fd4ff30c393b03daa2c70ef093fcc5719cf802d387f56d6c123515"
+    ],
+    "required_evidence": [
+      "complete frozen primary and Rust stability work counts",
+      "matrix-Riccati positivity, one jump repair/search and exhaustion behavior",
+      "fixed inverse-iteration and block-Lanczos trial constructors",
+      "one dyadic projection and fixed C1 cutoff per manufactured trial",
+      "strict 0<L<=U<E_ess and 1,024 positive mass-derivative fixtures",
+      "bound offline images/executables, independent exact audit and absent candidate roots"
+    ],
+    "stop_fail_criteria": [
+      "degree, cell, step, sweep, vector, jump, trial, projection, threshold or chronology mismatch",
+      "candidate ingress, scientific eigenvalue evaluation, root creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "scientific stability-operator or eigenvalue execution",
+      "claiming radial stability for the selected member",
+      "quantum constructor completion, candidate execution, Rust scientific execution, authorization, G3, lane, lamp or physical authority"
+    ],
+    "downstream_gate_unlocked": "P08-P13 then R08-R13 manufactured quantum-constructor implementation"
+  },
+  "change_classification": {
+    "mathematical_semantics_changed": false,
+    "runtime_authority_changed": false,
+    "receipt_semantics_changed": false,
+    "proof_implementation_maturity_changed": true
+  },
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "manifest": {"bytes": 18486, "raw_sha256": "215078e444fd4ff30c393b03daa2c70ef093fcc5719cf802d387f56d6c123515"},
+    "completion_matrix": {"bytes": 15849, "raw_sha256": "91dcd02ac43b04a9672c9552b9190a1efc432729400dbe27972a3ffe922c89a4"},
+    "runtime_audit": {"bytes": 25669, "raw_sha256": "8712756e4837a314bbde7498de24b5167c4249e58612f9e783edb5ae24adea9b"},
+    "completion_audit": {"bytes": 5005, "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"},
+    "stability_audit": {"bytes": 9268, "raw_sha256": "a79ecc6ce561aa2caf40bbe4422bc0d59e76826d9847b8e2179dd10ab9a6ff01"},
+    "canonical_work_program": {"bytes": 60224, "raw_sha256": "c9415d7ad08a4c0bd6bfaab3bfb9ec99d121274e1b4c613bad62105f487cd5f2"},
+    "active_packet": {"bytes": 10671, "raw_sha256": "43446d7abf7b815f8c0f6875bcb94f11b1d209b0543b6d43cdc895e466e971bf"}
+  },
+  "primary_P06_P07": {
+    "source_sha256": "96911a0d1926bf76ced7004bd991f9121347d5f344df581fb748b4cc3c962492",
+    "header_sha256": "68c2ec7669a2e1085901b4312443af28f2f7a0d0274001725aaad822f386978d",
+    "runtime_image_id": "sha256:f6472e4c54e0c3b896adf4ecd40362daaa631fa9b7c7e8fb9a4b235e33d9d116",
+    "executable_sha256": "c51efd70e5895c441e29af2d9e1b77de29fba23b157e57202e2334de4f76db06",
+    "fixture": {"status": "PASS", "stability_checks_passed": 9, "stability_checks_total": 9, "checks_passed": 31, "checks_total": 31}
+  },
+  "independent_R06_R07": {
+    "source_sha256": "e62c240f5c1b26230c194f25c378aba4a83cf34ce3222d68739967d83460b19b",
+    "runtime_image_id": "sha256:0a93751f4f31d081510b87dc6cae3f9da658422e805565e8da1ab22d2368c8a1",
+    "executable_sha256": "3533abae8eaf8451037aa0553fe5e29ad621a676ea76708c63edddc6619c10d8",
+    "runtime_dependencies": [],
+    "fixture": {"status": "PASS", "stability_check_mask": "111111111", "stability_checks_passed": 9, "stability_checks_total": 9, "checks_passed": 31, "checks_total": 31}
+  },
+  "audits": {
+    "runtime": {"status": "PASS", "checks_passed": 78, "checks_total": 78},
+    "stability": {"status": "PASS", "checks_passed": 26, "checks_total": 26},
+    "completion": {"status": "PASS_FAIL_CLOSED_MATRIX", "checks_passed": 8, "checks_total": 8, "common_roles_complete": 4, "primary_roles_complete": 7, "independent_roles_complete": 7, "S4_implementation_closure": false}
+  },
+  "manufactured_execution": {
+    "riccati_cells_exercised_per_lane": 256,
+    "mass_derivative_cells_exercised_per_lane": 1024,
+    "candidate_data_used": false,
+    "scientific_stability_operators_executed": 0,
+    "scientific_eigenvalues_computed": 0,
+    "radial_stability_established": false
+  },
+  "host_candidate_roots": {"primary": "absent", "independent": "absent"},
+  "execution": {"candidate_evaluations": 0, "positive_parameter_samples": 0, "scientific_builder_executed": false, "execution_authorized": false},
+  "authority": {"receipt_is_scientific_proof": false, "candidate_evaluated": false, "radial_stability_established": false, "classical_proof_established": false, "quantum_state_established": false, "geometry_state_authority": false, "lane_authority": false, "diagnostic_lamp_authority": false, "physical_authority": false, "propulsion_authority": false, "transport_authority": false}
+}

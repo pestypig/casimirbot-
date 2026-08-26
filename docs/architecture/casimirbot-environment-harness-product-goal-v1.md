@@ -79,7 +79,7 @@ The labels below are deliberately strict:
 | Device Check MCP | One OAuth-protected, owner-scoped, read-only tool for connector identity, health, freshness, bindings, capability IDs, credential status and actionable blockers | Implemented; it cannot execute an environment action or expose credentials |
 | Public Codex plugin | Bundled Device Check plugin and marketplace payload | Staged behind Auth0/Codex production OAuth and release acceptance |
 | Helix Agent API | Provider-neutral durable run lifecycle over REST and MCP, with idempotency, owner isolation, evidence and events | Implemented server contract; not evidence of a public deployment |
-| Shared Live Rooms | Room/run/source bindings, browser-selected chat handoff, observer projections and owner-scoped revocation | Implemented contract; real OAuth/provider, multi-user and text/voice acceptance remain deployment gates |
+| Shared Live Rooms | Room/run/source bindings, browser-selected chat handoff, observer projections and owner-scoped revocation | Implemented contract; deterministic Auth0 web-session convergence now reuses the already-linked MCP profile without exposing a bearer, while live exact-callback/profile/room, multi-user and text/voice acceptance remain deployment gates |
 | Environment adapters | Versioned adapter registry, exact producer admission, normalized nonterminal observations and mechanics collections | Minecraft read-only profile enabled; synthetic adapter is fixture-only |
 | Minecraft read plane | Authenticated Paper/Fabric source ingress, bounded observations, mechanics retrieval and exact room/world/source provenance | Implemented; release claims require fresh keyed room evidence |
 | Minecraft action planes | Separately governed World Authority and Player Embodiment, finite reactive guardian/sequence programs, manual override and Emergency Stop | Implementation and deterministic evidence exist; the complete fluid, unexpected-event and durable-goal acceptance remains open |
@@ -102,6 +102,64 @@ the tunnel does not itself grant Minecraft action authority, expose Robinhood,
 or enable arbitrary workstation control.
 
 ## Intended user experience
+
+### One installed node, multiple northbound surfaces
+
+The downloadable product converges on one CasimirBot node rather than a
+separate backend for each client:
+
+```text
+Codex or another reasoning client -- authenticated MCP --+
+CasimirBot desktop UI --------------- local API/events ---+--> one CasimirBot node
+Helix Ask / Shared Room / voice ------ governed APIs ------+         |
+                                                                  policy, ledger,
+                                                                  run state, arbiter
+                                                                         |
+                                                               environment connectors
+```
+
+The installed EXE is therefore not itself “an MCP plugin.” It supervises the
+private CasimirBot service that publishes the governed MCP facade while also
+hosting the desktop experience. A run started from either supported surface
+must retain the same `run_id`, tool requests, normalized observations, evidence
+references, cancellation state, supported terminal product, and presentation
+certainty. Hidden model reasoning is not mirrored between surfaces. Public
+lifecycle evidence and products are.
+
+Only one serialized execution lease may mutate an environment. A second
+surface may observe, request cancellation, or submit a new governed turn when
+authorized; it cannot create a competing writer or silently replay an effect.
+
+### Credential classes and user onboarding
+
+The product must keep these credentials distinct:
+
+| Credential class | Purpose | Storage and exposure boundary |
+| --- | --- | --- |
+| Model-provider authorization | Allows CasimirBot Runtime Codex to call the selected model provider | Enrolled through the native provider-connection surface and retained by an OS-protected broker; never sent to MCP clients or model context |
+| CasimirBot MCP client authorization | Allows Codex or another client to call the user's CasimirBot node | Short-lived, least-scope OAuth/PKCE or device authorization; never substitutes for a provider or connector credential |
+| Environment/provider authorization | Connects Minecraft, brokerage, a device, or another adapter to its environment | Owned only by the corresponding connector boundary; results are normalized and credential-free before model re-entry |
+
+An ordinary user installs the signed application, creates or links a profile,
+enrolls a provider through the application, connects an MCP client through an
+authorization flow, and approves individual environment scopes. The user must
+not edit a key-bearing command file, paste a provider key into Codex MCP
+configuration, or place secrets in repository files. Headless and enterprise
+installations may use an approved OS or deployment secret-store reference, but
+not a raw secret in process arguments.
+
+The existing opaque `start-myapp-for-codex` command remains a developer
+acceptance mechanism for the keyed repository runtime. The product equivalent
+is a signed native bootstrap that opens protected storage, starts exactly one
+private service, supplies only ephemeral secret handles to bounded child
+processes, supervises MCP transport, and reports sanitized health. It is not a
+distributed user-editable launcher.
+
+The current desktop Device Check tunnel is the first narrow vertical slice of
+this experience. Full provider enrollment, governed MCP catalog parity,
+managed client reconnect/catalog refresh, shared durable-run projection, and
+cross-surface cancellation/steering require their own acceptance packet; they
+must not be inferred from Device Check readiness alone.
 
 ### Local single-user use
 
@@ -301,6 +359,15 @@ automation packaged as a platform.
 6. **Downloadable public product.** Complete signing, updates, provider OAuth,
    multi-user isolation, resource budgets, support diagnostics and external
    installation acceptance.
+
+The first reserved post-G7 return-to-Minecraft integration demonstration is
+`docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md`. It requires
+Codex to prepare for the Nether, acquire and craft resources through legitimate
+survival Player Embodiment, construct and ignite a portal, enter it, establish a
+viable arrival and return point, and recover from representative deviations
+without a portal-specific adapter planner or World Authority substitution. The
+objective remains capability-specific and `specified` until its staged direct,
+keyed, known-seed, and unknown-world evidence exists.
 
 ## Honest external description
 

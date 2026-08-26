@@ -15,6 +15,7 @@ import {
 } from "./terminal-answer-envelope";
 import {
   committedRouteAllowsTerminalKind,
+  inferCommittedRouteToolFamily,
   readCommittedAskRoute,
 } from "./committed-ask-route";
 import {
@@ -629,11 +630,25 @@ const readRequiredGatewayObservationFailure = (
   const terminalCriteria = readRecord(
     itinerary?.terminal_success_criteria,
   );
+  const requiredObservationFamilies = new Set(
+    readStringArray(terminalCriteria?.required_observation_families),
+  );
+  const turnAdmission =
+    readRecord(payload.tool_call_admission_decision) ??
+    readRecord(debug?.tool_call_admission_decision);
   const requiredCapabilities = new Set([
     ...readStringArray(terminalCriteria?.required_capabilities),
     ...readStringArray(executionState?.missing_required_capabilities),
+    ...[
+      readString(turnAdmission?.requested_capability),
+      readString(turnAdmission?.mandatory_next_tool_name),
+      readString(turnAdmission?.selected_capability),
+    ].filter((entry): entry is string => Boolean(entry)),
   ]);
-  if (requiredCapabilities.size === 0) return null;
+  if (
+    requiredCapabilities.size === 0 &&
+    requiredObservationFamilies.size === 0
+  ) return null;
 
   const gatewayResults = [
     ...readArray(payload.workstation_gateway_call_results),
@@ -650,7 +665,15 @@ const readRequiredGatewayObservationFailure = (
       readString(record.capability_id) ??
       readString(admission?.requested_capability) ??
       readString(lifecycle?.requested_capability);
-    if (!capability || !requiredCapabilities.has(capability)) continue;
+    if (
+      !capability ||
+      (
+        !requiredCapabilities.has(capability) &&
+        !requiredObservationFamilies.has(
+          inferCommittedRouteToolFamily(capability),
+        )
+      )
+    ) continue;
     if (
       compoundCapabilityOccurrencesHaveSatisfiedObservations(
         payload,
@@ -685,7 +708,9 @@ const readRequiredGatewayObservationFailure = (
           ? "tool_admission"
           : "capability_execution",
       repairTarget:
-        followupAction === "ask_user" || followupAction === "repair"
+        failureCode === "capability_outside_account_policy"
+          ? "account_session"
+          : followupAction === "ask_user" || followupAction === "repair"
           ? "subgoal_argument_extraction"
           : "tool_execution",
       selectedCapability: capability,
@@ -6960,9 +6985,23 @@ export function applyHelixTerminalAuthoritySingleWriter(
     compoundSynthesisReadiness.complete === true
       ? []
       : rawMissingItineraryFamilies;
-  const firstIncompleteCompoundSubgoalRailFailure = compoundCoverageFailedClosed
-    ? readFirstIncompleteCompoundSubgoalRailFailure(input.payload)
-    : null;
+  const terminalItineraryExecutionState = readRecord(
+    input.payload.capability_itinerary_execution_state,
+  );
+  const exactCapabilityItineraryIncomplete = Boolean(
+    terminalItineraryExecutionState?.applies === true &&
+      terminalItineraryExecutionState?.complete !== true &&
+      (readArray(
+        terminalItineraryExecutionState?.missing_required_capabilities,
+      ).length > 0 ||
+        readArray(
+          terminalItineraryExecutionState?.missing_compound_subgoal_ids,
+        ).length > 0),
+  );
+  const firstIncompleteCompoundSubgoalRailFailure =
+    compoundCoverageFailedClosed || exactCapabilityItineraryIncomplete
+      ? readFirstIncompleteCompoundSubgoalRailFailure(input.payload)
+      : null;
   const itineraryObservationCriteriaSatisfied =
     missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = finalArtifactLedger.filter(
@@ -7280,6 +7319,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     (providerRequestUserInputAuthorizedByContinuation ||
       (!agentContinuationAnswerBlocked &&
         itineraryObservationCriteriaSatisfied &&
+        !exactCapabilityItineraryIncomplete &&
         !providerRouteProductCompoundSupportMissing &&
         providerRouteProductQualityGate?.ok !== false));
   const providerRouteProductQualityRejected =
@@ -8627,7 +8667,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
-  } else if (compoundCoverageFailedClosed) {
+  } else if (
+    compoundCoverageFailedClosed ||
+    exactCapabilityItineraryIncomplete
+  ) {
     const unresolved = readArray(
       compoundCoverageGate?.unresolved_requirement_ids,
     )

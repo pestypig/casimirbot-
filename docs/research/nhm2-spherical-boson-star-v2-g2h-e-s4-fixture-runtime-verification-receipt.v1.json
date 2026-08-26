@@ -1,0 +1,139 @@
+{
+  "schema": "nhm2.g2h_e_s4.fixture_runtime_verification_receipt.v1",
+  "status": "PASS_FIXTURE_RUNTIME_ONLY_SCIENTIFIC_PRODUCERS_INCOMPLETE",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "bound disjoint fixture runtimes, exclusive first-failure receipts and fail-closed guard replay",
+    "current_maturity": "independently audited manufactured-fixture runtime",
+    "target_maturity": "input evidence for the still-open scientific producer implementation gate",
+    "required_frozen_inputs": [
+      "R2 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "R1 seal 728d8c9a807d27356a6d9f33e897feb73331abb12e6a76435dbce099d9c025ca",
+      "fixture binding 5cf8b39ad8757e56e61d37477dbc12ef2c49879b0f470c01b0c5f6581c2344f8"
+    ],
+    "required_evidence": [
+      "source, executable and image identity replay",
+      "both positive fixture suites",
+      "candidate-interface, corrupt-seal and forbidden-root rejection",
+      "exclusive first-failure receipt persistence, independent hash-chain replay and no-overwrite rejection",
+      "absent host candidate roots before and after"
+    ],
+    "stop_fail_criteria": [
+      "any identity mismatch or fixture failure",
+      "receipt overwrite or chronology divergence",
+      "candidate root creation, candidate evaluation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "scientific producer completion",
+      "candidate or positive-parameter evaluation",
+      "primary or Rust scientific execution",
+      "G3, lane, lamp, physical, propulsion or transport authority"
+    ],
+    "downstream_gate_unlocked": "fail-closed producer completion matrix and the next common wire-codec role"
+  },
+  "observed_utc_date": "2026-08-24",
+  "bindings": {
+    "fixture_build_manifest": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-fixture-build-bindings.v1.json",
+      "bytes": 12815,
+      "raw_sha256": "5cf8b39ad8757e56e61d37477dbc12ef2c49879b0f470c01b0c5f6581c2344f8"
+    },
+    "runtime_audit": {
+      "path": "scripts/nhm2_g2h_e_s4_fixture_runtime_audit.py",
+      "bytes": 20202,
+      "raw_sha256": "731328068fd4ac8ffc3de530a86740b56c6c0fd48b04e0c2a8b2b58bdcde011b"
+    },
+    "producer_completion_matrix": {
+      "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-producer-completion-matrix.v1.json",
+      "bytes": 10621,
+      "raw_sha256": "2ad3571f09003901ad674ac8e220a7dd1a44a3252b482921160294c10183ee99"
+    },
+    "producer_completion_audit": {
+      "path": "scripts/nhm2_g2h_e_s4_producer_completion_audit.py",
+      "bytes": 5005,
+      "raw_sha256": "574681736e30cb6d731137311abce88bf62fb98d7ebdae04a5525b833c0ae474"
+    }
+  },
+  "runtime_audit_result": {
+    "command": ["python", "scripts/nhm2_g2h_e_s4_fixture_runtime_audit.py"],
+    "status": "PASS",
+    "checks_passed": 53,
+    "checks_total": 53,
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "scientific_builder_executed": false,
+    "execution_authorized": false,
+    "authority_promoted": false
+  },
+  "primary": {
+    "source_sha256": "f7c4d30a7c0dd6882df7af00f6b535e7a5fc1b8859efe293ea501943d38a63b3",
+    "image_id": "sha256:1433ed55d29887d7807a3b2e7ecc8d8be05bdd4a6bba8d45c193125640f71157",
+    "executable_sha256": "9fc21ea4f1b8bbedf739b0b86169983bf248c731de050bcc8049d04449cceb50",
+    "fixture_report": {"status": "PASS", "checks_passed": 25, "checks_total": 25},
+    "receipt_report": {
+      "status": "PASS",
+      "records": 5,
+      "raw_stream_sha256": "a9adbe88f9a084a0fd6cf655c0d3258a7f8038d550291bb7f989ec1df3c872d5",
+      "domain_stream_sha256": "bed1a92130af39271323295cef75e7642a82884cd573df3800451628e5a8ae86",
+      "terminal_record_sha256": "60bcf4fe0c2913558ebd0525912518e36bbfadad7868b825266e875671c25ad1",
+      "second_run_exit": 67,
+      "overwrite_occurred": false
+    }
+  },
+  "independent": {
+    "source_sha256": "d594b86ad6af15b0779743450e8b8e4088e163ad7868a60bc05491f80d159394",
+    "image_id": "sha256:56b54e37b718b514bea4c446b948fcc6c45e221d2da1c5e60f27407e6a7d018e",
+    "executable_sha256": "b7fce2ec371b6f2e5589af2bafec6a014f79e4c717c973e37b158afd112335bb",
+    "fixture_report": {"status": "PASS", "checks_passed": 24, "checks_total": 24},
+    "receipt_report": {
+      "status": "PASS",
+      "records": 5,
+      "raw_stream_sha256": "33bb69d90e37cb3bb0a4e13a76f1a091f26dd57b9ba1ec867aaf33ca7b97a414",
+      "domain_stream_sha256": "1706c4415daa46ba9415932e5891b75364c8d776570339fdad411062fe45c3de",
+      "terminal_record_sha256": "cfeac41538c9d85d3670c2465048ecffadce64a4c25d76e0eaed68e6ff2271d3",
+      "second_run_exit": 67,
+      "overwrite_occurred": false
+    }
+  },
+  "first_failure_decisions": [
+    "PASS",
+    "PASS",
+    "FAIL",
+    "INELIGIBLE_AFTER_FIRST_FAIL",
+    "INELIGIBLE_AFTER_FIRST_FAIL"
+  ],
+  "host_candidate_roots": {
+    "primary_before": "absent",
+    "primary_after": "absent",
+    "independent_before": "absent",
+    "independent_after": "absent"
+  },
+  "producer_completion_result": {
+    "command": ["python", "scripts/nhm2_g2h_e_s4_producer_completion_audit.py"],
+    "status": "PASS_FAIL_CLOSED_MATRIX",
+    "checks_passed": 8,
+    "checks_total": 8,
+    "common_roles_complete": 2,
+    "common_roles_required": 4,
+    "primary_roles_complete": 0,
+    "primary_roles_required": 13,
+    "independent_roles_complete": 0,
+    "independent_roles_required": 13,
+    "S4_implementation_closure": false,
+    "next_role": "C02_wire_scalar_JCS_and_record_codec"
+  },
+  "authority": {
+    "receipt_is_scientific_proof": false,
+    "candidate_evaluated": false,
+    "classical_proof_established": false,
+    "quantum_state_established": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

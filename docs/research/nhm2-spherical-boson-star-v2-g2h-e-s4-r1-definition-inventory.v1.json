@@ -1,0 +1,70 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.definition_inventory.v1",
+  "status": "draft_unsealed_definition_review_no_implementation_or_execution_authority",
+  "immutable_predecessor": {
+    "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json",
+    "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+    "mutated": false
+  },
+  "ordered_gaps": [
+    {"ordinal": 1, "id": "unknown_vector_and_coefficient_packing", "class": "representational_and_numerical_proof", "status": "wire_codec_passed_corrected_v2_positive_and_vacuum_packing_internal_audit_passed_pending_independent_review", "draft_paths": ["docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-wire-record-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json"], "preserved_invalidated_predecessor": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v1.json"},
+    {"ordinal": 2, "id": "analytic_seed", "class": "numerical_proof_semantic", "status": "draft_complete_pending_independent_audit_and_disjoint_realization_bindings", "draft_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-analytic-seed-contract.v1.json"},
+    {"ordinal": 3, "id": "grid_nodes_maps_and_frozen_norms", "class": "numerical_proof_semantic", "status": "corrected_node_count_parity_canonical_DCT_polynomial_weight_norms_derivative_constants_scaled_vacuum_map_overlap_square_counts_and_flat_remainder_envelopes_pass_internal_and_cross_language_fixtures_pending_independent_theory_review", "draft_paths": ["docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-positive-branch-tail-factorization.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-flat-carrier-remainder-contract.v1.json"], "preserved_invalidated_predecessor": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v1.json"},
+    {"ordinal": 4, "id": "validated_nonlinear_map", "class": "numerical_proof_semantic", "status": "positive_vacuum_SP_flat_carrier_inverse_class_Y_Z_radii_and_two_disjoint_deterministic_builder_definitions_pass_internal_fixtures_pending_independent_closure_audit_and_scientific_values", "draft_paths": ["docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-positive-branch-tail-factorization.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-vacuum-blow-up-chart.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-sp-endpoint-proof-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-flat-carrier-remainder-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-validated-inverse-radii-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-disjoint-builder-algorithms.v1.json"]},
+    {"ordinal": 5, "id": "continuation_cell_proof", "class": "numerical_proof_semantic", "status": "exact_1024_cell_inventory_second_order_tubes_Y_Z_radii_first_failure_and_terminal_containment_defined_pending_independent_audit_and_scientific_execution", "draft_paths": ["docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-vacuum-blow-up-chart.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-validated-inverse-radii-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-continuation-tube-contract.v1.json"]},
+    {"ordinal": 6, "id": "continuation_orientation_and_endpoint_maps", "class": "numerical_proof_semantic", "status": "endpoint_scale_border_exact_orientation_same_chart_containment_scaled_chart_handoff_no_fold_and_terminal_containment_defined_pending_independent_audit_and_proof", "draft_paths": ["docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-vacuum-blow-up-chart.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-sp-endpoint-proof-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-continuation-tube-contract.v1.json"]},
+    {
+      "ordinal": 7,
+      "id": "mass_observable_normalization",
+      "class": "scientific_convention",
+      "status": "exact_ADM_Komar_integrated_energy_common_interval_and_residual_ABI_passes_16_of_16_internal_checks_pending_independent_derivation_review",
+      "draft_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-mass-observable-contract.v1.json",
+      "primary_source": "https://arxiv.org/abs/2601.05129 equations 24-25"
+    },
+    {
+      "ordinal": 8,
+      "id": "radial_stability_problem",
+      "class": "scientific_and_numerical_proof",
+      "status": "exact_ell0_operator_Friedrichs_domain_essential_threshold_matrix_Riccati_lower_bound_trial_upper_bound_turning_side_and_record_ABI_passes_37_of_37_internal_checks_pending_independent_theory_review",
+      "draft_paths": [
+        "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-stability-mapping.md",
+        "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-radial-stability-contract.v1.json",
+        "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-disjoint-builder-algorithms.v1.json"
+      ],
+      "primary_sources": [
+        "https://arxiv.org/abs/2106.01740 equations 28-39",
+        "https://arxiv.org/abs/2103.15012 equations 20-33"
+      ]
+    },
+    {"ordinal": 9, "id": "classical_record_abi", "class": "representational", "status": "draft_complete_pending_independent_cross_language_audit", "draft_path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-wire-record-contract.v1.json"},
+    {
+      "ordinal": 10,
+      "id": "quantum_mode_and_observable_abi",
+      "class": "scientific_and_numerical_proof",
+      "status": "exact_positive_K_optical_global_hyperbolicity_complete_spectral_measure_static_ground_Hadamard_RSET_64x4_mean_256x256_noise_Gram_and_tail_ABI_passes_49_of_49_internal_checks_pending_independent_theory_review",
+      "draft_paths": ["docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-quantum-ground-rset-noise-contract.v1.json", "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-disjoint-builder-algorithms.v1.json"],
+      "primary_sources": [
+        "https://arxiv.org/abs/hep-th/9507097",
+        "https://arxiv.org/abs/gr-qc/0512118",
+        "https://arxiv.org/abs/gr-qc/0010019"
+      ],
+      "forbidden_imports": ["finite_spherical_wall", "Pauli_Villars", "modal_extrapolation", "smoothing"]
+    }
+  ],
+  "counts": {
+    "total": 10,
+    "hard_gaps_closed": 0,
+    "hard_gaps_still_open": 10,
+    "draft_complete_pending_independent_audit": 10,
+    "partial_definition_with_hard_subdefinitions_unbound": 0,
+    "source_recovered_pending_definition_or_review": 0,
+    "unbound_finite_products": 0,
+    "invalidated_drafts_preserved_not_gap_count": 1,
+    "counting_rule": "a gap remains open until every required subdefinition is independently audited; partial drafts are not counted as bound"
+  },
+  "candidate_evaluated": false,
+  "candidate_roots_created": false,
+  "implementation_authorized": false,
+  "execution_authorized": false,
+  "authority_promoted": false
+}

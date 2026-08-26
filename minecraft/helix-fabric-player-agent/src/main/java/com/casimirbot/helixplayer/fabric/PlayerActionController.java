@@ -8,6 +8,7 @@ import java.util.Objects;
 
 public final class PlayerActionController {
     private static final int INTERACTION_FOCUS_ACQUISITION_TICKS = 10;
+    private static final long EQUIP_CONFIRMATION_TICKS = 20;
     private final ControlBridge bridge;
     private final EventListener listener;
     private final Runnable releaseOwnedControls;
@@ -47,6 +48,13 @@ public final class PlayerActionController {
     private double trackingFinalYawError;
     private double trackingFinalPitchError;
     private long[] trackingErrorHistogram = new long[181];
+    private int attackPulses;
+    private int attackConfirmedTransitions;
+    private int attackRejectedPulses;
+    private boolean attackAwaitingTransition;
+    private double attackHealthBeforePulse;
+    private int attackHurtTimeBeforePulse;
+    private long attackLastPulseTick;
     private Map<String, Object> lastMeasurements = Map.of();
 
     public PlayerActionController(ControlBridge bridge, EventListener listener) {
@@ -105,7 +113,15 @@ public final class PlayerActionController {
         trackingFinalYawError = 0;
         trackingFinalPitchError = 0;
         trackingErrorHistogram = new long[181];
+        attackPulses = 0;
+        attackConfirmedTransitions = 0;
+        attackRejectedPulses = 0;
+        attackAwaitingTransition = false;
+        attackHealthBeforePulse = 0;
+        attackHurtTimeBeforePulse = 0;
+        attackLastPulseTick = -1;
         lastMeasurements = Map.of();
+        bridge.expectScreenOpen(false);
         bridge.beginWorkflow(request.actionKind(), request.arguments(), request.controlEngine());
         emit("workflow.started", 0.0, "The admitted player workflow started.", false, false);
         return true;
@@ -113,6 +129,9 @@ public final class PlayerActionController {
 
     public synchronized void tick() {
         if (active == null || state != State.RUNNING) return;
+        bridge.expectScreenOpen(
+            "interact".equals(active.actionKind()) && oneShotAttempted
+        );
         PlayerSnapshot snapshot = bridge.snapshot();
         if (!snapshot.connected()) {
             settle(
@@ -241,6 +260,7 @@ public final class PlayerActionController {
             case "walk" -> walk(snapshot);
             case "jump" -> jump(snapshot);
             case "interact" -> interact();
+            case "attack" -> attack(snapshot);
             case "hotbar_select" -> selectHotbar();
             case "equip" -> equip();
             case "follow", "collect", "mine", "place", "craft", "inventory_transfer" ->
@@ -250,7 +270,10 @@ public final class PlayerActionController {
     }
 
     private void navigate(PlayerSnapshot snapshot) {
-        if ("baritone".equals(active.controlEngine())) {
+        if (
+            "baritone".equals(active.controlEngine()) ||
+            bridge.ownsNativeRoutePlanner()
+        ) {
             reusableWorkflow();
             return;
         }
@@ -308,17 +331,35 @@ public final class PlayerActionController {
         if (yawError > 12.0F || horizontalDistance <= radius) {
             bridge.applyMovement(MovementInput.released());
         } else {
+            LocomotionSafetyEnvelope.Check safety = bridge.checkLocomotionSafety(
+                x,
+                z,
+                6.0
+            );
+            if (!safety.decision().admitted()) {
+                lastMeasurements = safety.measurements();
+                settle(
+                    State.FAILED,
+                    "workflow.failed",
+                    "Native navigation stopped before asserting forward control because the local safety envelope refused the next step."
+                );
+                return;
+            }
             bridge.applyMovement(new MovementInput(
                 true,
                 false,
                 false,
                 false,
                 snapshot.horizontalCollision() && snapshot.onGround(),
-                bool(active.arguments(), "allow_sprint") && distance > Math.max(3.0, radius + 1.5)
+                bool(active.arguments(), "allow_sprint") &&
+                    distance > Math.max(3.0, radius + 1.5)
             ));
         }
         if (actionTicks == 1 || actionTicks % 20 == 0) {
-            double initialBound = Math.max(radius + 1.0, numberOr(active.arguments(), "initial_distance", distance));
+            double initialBound = Math.max(
+                radius + 1.0,
+                numberOr(active.arguments(), "initial_distance", distance)
+            );
             emit(
                 "workflow.progress",
                 Math.max(0.0, Math.min(0.99, 1.0 - (distance / initialBound))),
@@ -615,6 +656,280 @@ public final class PlayerActionController {
         }
     }
 
+    private void attack(PlayerSnapshot snapshot) {
+        String targetRef = text(active.arguments(), "target_ref");
+        String expectedTypeId = text(active.arguments(), "target_entity_type_id");
+        if (!"hostile".equals(text(active.arguments(), "target_classification"))) {
+            throw new IllegalArgumentException(
+                "Combat v1 admits only a target explicitly classified as hostile."
+            );
+        }
+        if (bool(active.arguments(), "friendly_fire")) {
+            throw new IllegalArgumentException("Combat v1 requires friendly_fire=false.");
+        }
+        double stopBelowHealth = number(active.arguments(), "stop_below_health");
+        if (snapshot.health() < stopBelowHealth) {
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                null,
+                false,
+                true,
+                "health_floor_crossed"
+            );
+            settle(
+                State.SUCCEEDED,
+                "workflow.succeeded",
+                "The exact-target attack safely stopped because measured player health crossed the admitted floor."
+            );
+            return;
+        }
+
+        double maxDistance = number(active.arguments(), "max_acquisition_distance");
+        boolean requireLineOfSight = bool(active.arguments(), "require_line_of_sight");
+        CombatTargetObservation observation = bridge.observeCombatTarget(
+            targetRef,
+            expectedTypeId,
+            maxDistance,
+            requireLineOfSight
+        );
+        if (!observation.available()) {
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                false,
+                false,
+                "exact_target_unavailable"
+            );
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "The locked combat target became stale, occluded, out of reach, or unavailable; no substitute target was selected."
+            );
+            return;
+        }
+        if (
+            !targetRef.equals(observation.targetRef()) ||
+            !expectedTypeId.equals(observation.targetTypeId())
+        ) {
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                false,
+                false,
+                "target_identity_mismatch"
+            );
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "The bridge returned a different combat target incarnation or entity type."
+            );
+            return;
+        }
+        if (!observation.hostile()) {
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                false,
+                false,
+                "target_not_hostile"
+            );
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "The locked entity is no longer classified as hostile; the attack was refused."
+            );
+            return;
+        }
+        if (requireLineOfSight && !observation.visible()) {
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                false,
+                false,
+                "line_of_sight_lost"
+            );
+            settle(State.FAILED, "workflow.failed", "Line of sight to the exact target was lost.");
+            return;
+        }
+
+        if (attackAwaitingTransition && (
+            !observation.alive() ||
+            observation.health() < attackHealthBeforePulse ||
+            observation.hurtTimeTicks() > attackHurtTimeBeforePulse
+        )) {
+            attackConfirmedTransitions++;
+            attackAwaitingTransition = false;
+        }
+        if (!observation.alive()) {
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                true,
+                false,
+                "target_dead"
+            );
+            settle(
+                State.SUCCEEDED,
+                "workflow.succeeded",
+                "The admitted hostile target reached an observed death state after exact-target attacks."
+            );
+            return;
+        }
+
+        bridge.lookAt(observation.x(), observation.y(), observation.z(), 30.0F);
+        double dx = observation.x() - snapshot.x();
+        double dy = observation.y() - snapshot.eyeY();
+        double dz = observation.z() - snapshot.z();
+        double horizontal = Math.sqrt(dx * dx + dz * dz);
+        double targetYaw = Math.toDegrees(Math.atan2(-dx, dz));
+        double targetPitch = -Math.toDegrees(Math.atan2(dy, horizontal));
+        double angularError = Math.hypot(
+            wrapDegrees(targetYaw - snapshot.yaw()),
+            targetPitch - snapshot.pitch()
+        );
+        if (angularError > 8.0) {
+            if (actionTicks == 1 || actionTicks % 5 == 0) {
+                lastMeasurements = attackMeasurements(
+                    targetRef,
+                    expectedTypeId,
+                    observation,
+                    false,
+                    false,
+                    "aligning_exact_target"
+                );
+                emit(
+                    "workflow.progress",
+                    progress(),
+                    "The player is aligning to the exact admitted hostile before attacking.",
+                    false,
+                    false
+                );
+            }
+            return;
+        }
+
+        if (!observation.withinAttackRange()) {
+            if (actionTicks == 1 || actionTicks % 5 == 0) {
+                lastMeasurements = attackMeasurements(
+                    targetRef,
+                    expectedTypeId,
+                    observation,
+                    false,
+                    false,
+                    "waiting_for_vanilla_reach"
+                );
+                emit(
+                    "workflow.progress",
+                    progress(),
+                    "The exact hostile remains acquired; the player is waiting for vanilla attack reach before pulsing.",
+                    false,
+                    false
+                );
+            }
+            return;
+        }
+
+        int maximumPulses = integer(active.arguments(), "max_attack_pulses");
+        if (attackPulses >= maximumPulses) {
+            if (attackAwaitingTransition && actionTicks - attackLastPulseTick <= 12) return;
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                false,
+                false,
+                "attack_pulse_budget_exhausted"
+            );
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "The admitted attack pulse budget was exhausted while the exact hostile remained alive."
+            );
+            return;
+        }
+        double minimumCooldown = number(active.arguments(), "minimum_attack_cooldown");
+        if (observation.attackCooldown() < minimumCooldown || attackAwaitingTransition) {
+            return;
+        }
+        attackHealthBeforePulse = observation.health();
+        attackHurtTimeBeforePulse = observation.hurtTimeTicks();
+        if (!bridge.attackCombatTarget(targetRef)) {
+            attackRejectedPulses++;
+            lastMeasurements = attackMeasurements(
+                targetRef,
+                expectedTypeId,
+                observation,
+                false,
+                false,
+                "vanilla_attack_rejected"
+            );
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "The vanilla client refused the exact-target attack; no retry against another entity was attempted."
+            );
+            return;
+        }
+        attackPulses++;
+        attackLastPulseTick = actionTicks;
+        attackAwaitingTransition = true;
+        lastMeasurements = attackMeasurements(
+            targetRef,
+            expectedTypeId,
+            observation,
+            false,
+            false,
+            "attack_pulse_sent"
+        );
+        emit(
+            "workflow.progress",
+            Math.min(0.99, (double) attackPulses / maximumPulses),
+            "The vanilla client sent one cooldown-admitted pulse to the exact hostile target.",
+            false,
+            false
+        );
+    }
+
+    private Map<String, Object> attackMeasurements(
+        String targetRef,
+        String expectedTypeId,
+        CombatTargetObservation observation,
+        boolean targetDefeated,
+        boolean safetyInterrupted,
+        String reasonCode
+    ) {
+        Map<String, Object> measured = new LinkedHashMap<>();
+        measured.put("target_ref", targetRef);
+        measured.put("target_entity_type_id", expectedTypeId);
+        measured.put("target_classification", "hostile");
+        measured.put("friendly_fire", false);
+        measured.put("attack_pulses", attackPulses);
+        measured.put("confirmed_hurt_or_health_transitions", attackConfirmedTransitions);
+        measured.put("rejected_attack_pulses", attackRejectedPulses);
+        measured.put("target_defeated", targetDefeated);
+        measured.put("safety_interrupted", safetyInterrupted);
+        measured.put("reason_code", reasonCode);
+        if (observation != null && observation.available()) {
+            measured.put("target_alive", observation.alive());
+            measured.put("target_hostile", observation.hostile());
+            measured.put("line_of_sight", observation.visible());
+            measured.put("within_attack_range", observation.withinAttackRange());
+            measured.put("distance_blocks", observation.distance());
+            measured.put("target_health", observation.health());
+            measured.put("target_max_health", observation.maxHealth());
+            measured.put("target_hurt_time_ticks", observation.hurtTimeTicks());
+            measured.put("target_death_time_ticks", observation.deathTimeTicks());
+            measured.put("attack_cooldown", observation.attackCooldown());
+        }
+        return Map.copyOf(measured);
+    }
+
     private Map<String, Object> trackingMeasurements(
         String targetKind,
         boolean requireLineOfSight,
@@ -672,6 +987,7 @@ public final class PlayerActionController {
     }
 
     private void handleManualOverride(String manualInputReason) {
+        bridge.expectScreenOpen(false);
         lastMeasurements = Map.of(
             "manual_input_reason", manualInputReason,
             "action_ticks_before_override", actionTicks
@@ -738,6 +1054,28 @@ public final class PlayerActionController {
             return;
         }
         String direction = text(active.arguments(), "direction");
+        double heading = Math.toRadians(snapshot.yaw() + switch (direction) {
+            case "back" -> 180;
+            case "left" -> -90;
+            case "right" -> 90;
+            default -> 0;
+        });
+        double targetX = snapshot.x() - Math.sin(heading);
+        double targetZ = snapshot.z() + Math.cos(heading);
+        LocomotionSafetyEnvelope.Check safety = bridge.checkLocomotionSafety(
+            targetX,
+            targetZ,
+            6.0
+        );
+        if (!safety.decision().admitted()) {
+            lastMeasurements = safety.measurements();
+            settle(
+                State.FAILED,
+                "workflow.failed",
+                "The bounded walk stopped before asserting movement because the local safety envelope refused the next step."
+            );
+            return;
+        }
         bridge.applyMovement(new MovementInput(
             "forward".equals(direction),
             "back".equals(direction),
@@ -843,7 +1181,8 @@ public final class PlayerActionController {
         if (observed) {
             int delta = after.count() - interactionHandBefore.count();
             boolean changed = delta != 0 ||
-                !after.itemId().equals(interactionHandBefore.itemId());
+                !after.itemId().equals(interactionHandBefore.itemId()) ||
+                after.damage() != interactionHandBefore.damage();
             int consumed = after.itemId().equals(interactionHandBefore.itemId()) ||
                 after.itemId().isBlank()
                 ? Math.max(0, -delta)
@@ -852,6 +1191,8 @@ public final class PlayerActionController {
             measured.put("held_item_id_after", after.itemId());
             measured.put("held_item_count_before", interactionHandBefore.count());
             measured.put("held_item_count_after", after.count());
+            measured.put("held_item_damage_before", interactionHandBefore.damage());
+            measured.put("held_item_damage_after", after.damage());
             measured.put("held_item_count_delta", delta);
             measured.put("consumed_item_count", consumed);
             measured.put("inventory_mutations_performed", changed ? 1 : 0);
@@ -881,7 +1222,13 @@ public final class PlayerActionController {
     private void equip() {
         String itemId = text(active.arguments(), "item_id");
         String destination = text(active.arguments(), "destination");
-        if (!bridge.equip(itemId, destination)) {
+        boolean equipped = actionTicks == 1
+            ? bridge.equip(itemId, destination)
+            : bridge.equipmentMatches(itemId, destination);
+        if (!equipped && actionTicks < EQUIP_CONFIRMATION_TICKS) {
+            return;
+        }
+        if (!equipped) {
             throw new IllegalArgumentException(
                 "The requested item could not be equipped in the requested destination."
             );
@@ -929,6 +1276,9 @@ public final class PlayerActionController {
         String summary,
         boolean manualOverrideDetected
     ) {
+        if (!(next == State.SUCCEEDED && "interact".equals(active.actionKind()))) {
+            bridge.expectScreenOpen(false);
+        }
         releaseOwnedControls.run();
         state = next;
         emit(

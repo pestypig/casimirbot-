@@ -28,6 +28,13 @@ import {
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
+import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+  HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-durable-goal";
+import {
+  HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+} from "@shared/helix-environment-reasoning-role";
 
 type RecordLike = Record<string, unknown>;
 
@@ -734,6 +741,13 @@ const minecraftCommandIsConditionalOnPriorInspection = (input: {
   );
 };
 
+const environmentDurableGoalIdFromPrompt = (
+  promptText: string,
+): string | null =>
+  promptText.match(
+    /\benvironment_durable_goal:[A-Za-z0-9][A-Za-z0-9._:-]{7,319}\b/u,
+  )?.[0] ?? null;
+
 const argsHintForSubgoal = (input: {
   turnId: string;
   promptText: string;
@@ -743,6 +757,17 @@ const argsHintForSubgoal = (input: {
   const capability = input.match.contract.capability;
   const boundedPromptArg = (): string =>
     boundedPromptArgForSubgoal(input.promptText, input.match, input.ordered);
+  if (
+    capability === HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY ||
+    capability === HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY
+  ) {
+    const goalId = environmentDurableGoalIdFromPrompt(input.promptText);
+    return goalId ? { goal_id: goalId } : {};
+  }
+  if (capability === HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY) {
+    const goalId = environmentDurableGoalIdFromPrompt(input.promptText);
+    return goalId ? { goal_id: goalId } : {};
+  }
   if (input.match.contract.capability_family === "calculator") {
     const expression = extractCalculatorSubgoalExpression(
       input.promptText,

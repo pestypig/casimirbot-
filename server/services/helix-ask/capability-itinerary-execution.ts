@@ -1421,6 +1421,7 @@ export const isHelixCapabilityItineraryFamilyObserved = (
         capability &&
         (
           capability.startsWith("live_env.") ||
+          capability.startsWith("com.casimirbot.environment.") ||
           capability.startsWith("com.casimirbot.minecraft.")
         ) &&
         /^(?:succeeded|completed|success|ok)$/i.test(status ?? ""),

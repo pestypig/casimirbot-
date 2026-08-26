@@ -6,9 +6,68 @@ import {
   assertEnvironmentActionCatalogAvailable,
   environmentActionManifestReplayCompatible,
   renewEnvironmentActionAdmissionLease,
+  resolveEnvironmentActionManifestCapabilityIntersection,
 } from "../action-broker";
 
 describe("environment action manifest admission lease", () => {
+  const trustedCapability = {
+    capability_id: "com.casimirbot.minecraft.player.walk",
+    capability_version: 1,
+    action_kind: "walk",
+    effect_class: "continuous_control",
+    workflow_modes: ["long_running"],
+    control_engines: ["native_fabric"],
+  } as const;
+  const trustedRegisteredCapability = {
+    ...trustedCapability,
+    allowed_control_engines: ["native_fabric"],
+  } as const;
+
+  it("admits only the owner-approved intersection of a trusted manifest", () => {
+    const look = {
+      capability_id: "com.casimirbot.minecraft.player.look",
+      capability_version: 1,
+      action_kind: "look_at",
+      effect_class: "player_motion",
+      workflow_modes: ["single_action"],
+      control_engines: ["native_fabric"],
+    } as const;
+
+    expect(resolveEnvironmentActionManifestCapabilityIntersection({
+      manifestCapabilities: [trustedCapability, look],
+      registeredCapabilities: [
+        trustedRegisteredCapability,
+        { ...look, allowed_control_engines: ["native_fabric"] },
+      ],
+      allowedCapabilityIds: new Set([look.capability_id]),
+    })).toEqual([look]);
+  });
+
+  it("still rejects an unregistered or contract-mismatched declaration", () => {
+    expect(() => resolveEnvironmentActionManifestCapabilityIntersection({
+      manifestCapabilities: [{
+        ...trustedCapability,
+        action_kind: "execute_shell",
+      }],
+      registeredCapabilities: [trustedRegisteredCapability],
+      allowedCapabilityIds: new Set([trustedCapability.capability_id]),
+    })).toThrowError(expect.objectContaining({
+      code: "action_manifest_invalid",
+      statusCode: 403,
+    }));
+  });
+
+  it("fails closed when the trusted manifest and owner lease do not intersect", () => {
+    expect(() => resolveEnvironmentActionManifestCapabilityIntersection({
+      manifestCapabilities: [trustedCapability],
+      registeredCapabilities: [trustedRegisteredCapability],
+      allowedCapabilityIds: new Set(["com.casimirbot.minecraft.player.look"]),
+    })).toThrowError(expect.objectContaining({
+      code: "action_manifest_invalid",
+      statusCode: 403,
+    }));
+  });
+
   it("renews the immutable catalog and manifest together after API downtime", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
     const expiresAt = "2026-08-13T18:00:00.000Z";

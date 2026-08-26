@@ -1,9 +1,11 @@
 import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
 import {
+  HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
   HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
   HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
   HELIX_ENVIRONMENT_DURABLE_GOAL_PROJECTION_SCHEMA,
   type HelixEnvironmentDurableGoalProjection,
+  helixEnvironmentDurableGoalSha256,
 } from "@shared/helix-environment-durable-goal";
 import { describe, expect, it, vi } from "vitest";
 import type { HelixWorkstationGatewayAccountContext } from "../account-policy";
@@ -181,6 +183,70 @@ describe("durable environment goal workstation gateway", () => {
     });
     expect(result.summary).toContain("mechanics_collection_ref");
     expect(deps.store.create).not.toHaveBeenCalled();
+  });
+
+  it("publishes canonical checkpoint fields and derives their integrity hash server-side", async () => {
+    const deps = dependencies();
+    const evidenceRefs = ["environment_probe_evidence:current"];
+    const payload = {
+      kind: "checkpoint_verified" as const,
+      checkpoint_id: "checkpoint:preflight",
+      milestone_id: "milestone:one",
+      observation_revision: 42,
+      verified_facts: { actor_status_bound: true },
+      completed_postcondition_ids: ["postcondition:viable"],
+      incomplete_postcondition_ids: ["postcondition:advancement"],
+      postconditions: ["ignored_cross_variant_field"],
+      rationale: "ignored cross-variant narration",
+    };
+    const appendManifest = environmentDurableGoalManifests.find(
+      (entry) =>
+        entry.capability_id === HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+    );
+
+    expect(
+      (appendManifest?.input_schema.properties.payload as {
+        properties?: Record<string, unknown>;
+      }).properties,
+    ).toHaveProperty("checkpoint_id");
+
+    const result = await executeEnvironmentDurableGoalGatewayCapability({
+      capabilityId: HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
+      turnId: "turn:append-checkpoint",
+      arguments: {
+        goal_id: projection.goal_id,
+        expected_revision: 1,
+        payload,
+        evidence_refs: evidenceRefs,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(deps.store.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goalId: projection.goal_id,
+        payload: {
+          kind: payload.kind,
+          checkpoint_id: payload.checkpoint_id,
+          milestone_id: payload.milestone_id,
+          observation_revision: payload.observation_revision,
+          verified_facts: payload.verified_facts,
+          completed_postcondition_ids: payload.completed_postcondition_ids,
+          incomplete_postcondition_ids: payload.incomplete_postcondition_ids,
+          checkpoint_evidence_hash: helixEnvironmentDurableGoalSha256({
+            evidence_refs: evidenceRefs,
+            observation_revision: 42,
+            verified_facts: payload.verified_facts,
+            completed_postcondition_ids: payload.completed_postcondition_ids,
+            incomplete_postcondition_ids: payload.incomplete_postcondition_ids,
+          }),
+        },
+        evidenceRefs,
+      }),
+    );
   });
 
   it("returns model-repair guidance for a paraphrased optional environment label", async () => {

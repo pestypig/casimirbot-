@@ -8,6 +8,13 @@ const REQUIRED_G2_SCOPES = [
   "helix.environment_actions.write",
 ] as const;
 
+const REQUIRED_G8_MONITOR_SCOPES = [
+  ...REQUIRED_G2_SCOPES,
+  "helix.agent_runs.write",
+] as const;
+
+export type CodexMcpOAuthCapabilityProfile = "g2-action" | "g8-monitor";
+
 const DEFAULT_BASE_URL = "http://127.0.0.1:1522";
 const DEFAULT_CALLBACK_PORT = 8766;
 
@@ -16,6 +23,7 @@ type FetchLike = typeof fetch;
 
 export type CodexMcpOAuthPreflight = {
   schema: "casimirbot.codex_mcp_oauth_preflight.v1";
+  capability_profile: CodexMcpOAuthCapabilityProfile;
   status:
     | "ready_for_interactive_login"
     | "client_registration_required"
@@ -93,8 +101,13 @@ export const inspectCodexMcpOAuthReadiness = async (input: {
   oauthClientId?: string | null;
   callbackPort?: number;
   derivedCallbackUrl?: string | null;
+  capabilityProfile?: CodexMcpOAuthCapabilityProfile;
   fetcher?: FetchLike;
 }): Promise<CodexMcpOAuthPreflight> => {
+  const capabilityProfile = input.capabilityProfile ?? "g2-action";
+  const requiredScopes = capabilityProfile === "g8-monitor"
+    ? REQUIRED_G8_MONITOR_SCOPES
+    : REQUIRED_G2_SCOPES;
   const baseUrl = new URL(input.baseUrl ?? DEFAULT_BASE_URL);
   if (!new Set(["http:", "https:"]).has(baseUrl.protocol)) {
     throw new Error("codex_mcp_oauth_base_url_invalid");
@@ -155,7 +168,7 @@ export const inspectCodexMcpOAuthReadiness = async (input: {
     ...strings(protectedResource.scopes_supported),
     ...strings(discovery.scopes_supported),
   ]);
-  const missingScopes = REQUIRED_G2_SCOPES.filter(
+  const missingScopes = requiredScopes.filter(
     (scope) => !advertisedScopes.has(scope),
   );
   const pkceS256Supported = strings(
@@ -177,6 +190,7 @@ export const inspectCodexMcpOAuthReadiness = async (input: {
       : "ready_for_interactive_login";
   return {
     schema: "casimirbot.codex_mcp_oauth_preflight.v1",
+    capability_profile: capabilityProfile,
     status,
     resource,
     resource_discovery_authoritative: true,
@@ -192,7 +206,7 @@ export const inspectCodexMcpOAuthReadiness = async (input: {
     // Discovery can advertise an endpoint even when the tenant rejects DCR.
     // This observer deliberately performs no registration request.
     dynamic_registration_verified: false,
-    required_scopes: [...REQUIRED_G2_SCOPES],
+    required_scopes: [...requiredScopes],
     missing_scopes: [],
     oauth_client_id_configured: oauthClientIdConfigured,
     oauth_client_secret_required: false,
@@ -223,6 +237,14 @@ const option = (name: string): string | undefined => {
 
 const run = async (): Promise<void> => {
   const callbackPortRaw = option("--callback-port");
+  const capabilityProfileRaw = option("--capability-profile");
+  if (
+    capabilityProfileRaw !== undefined &&
+    capabilityProfileRaw !== "g2-action" &&
+    capabilityProfileRaw !== "g8-monitor"
+  ) {
+    throw new Error("capability_profile_invalid");
+  }
   const result = await inspectCodexMcpOAuthReadiness({
     baseUrl: option("--base-url"),
     oauthClientId: option("--oauth-client-id"),
@@ -230,6 +252,7 @@ const run = async (): Promise<void> => {
       ? undefined
       : Number(callbackPortRaw),
     derivedCallbackUrl: option("--derived-callback-url"),
+    capabilityProfile: capabilityProfileRaw,
   });
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   const outputPath = option("--out");

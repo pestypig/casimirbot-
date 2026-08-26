@@ -2,10 +2,43 @@ param(
   [string]$Address = "localhost:25565",
   [string]$MinecraftRoot = (Join-Path $env:APPDATA ".minecraft"),
   [string]$RequiredGameVersion = "1.21.8",
+  [string]$ProfileId = "",
   [int]$LaunchTimeoutSeconds = 90,
   [int]$ConnectTimeoutSeconds = 45,
-  [switch]$RestartClient
+  [switch]$RestartClient,
+  [switch]$AllowAdditionalClient
 )
+
+if ($PSVersionTable.PSEdition -eq "Core") {
+  $windowsPowerShell = Join-Path $env:SystemRoot `
+    "System32\WindowsPowerShell\v1.0\powershell.exe"
+  if (-not (Test-Path -LiteralPath $windowsPowerShell -PathType Leaf)) {
+    throw "minecraft_windows_powershell_required"
+  }
+  $forwardedArguments = @(
+    "-NoProfile"
+    "-ExecutionPolicy"
+    "Bypass"
+    "-File"
+    $PSCommandPath
+    "-Address"
+    $Address
+    "-MinecraftRoot"
+    $MinecraftRoot
+    "-RequiredGameVersion"
+    $RequiredGameVersion
+    "-ProfileId"
+    $ProfileId
+    "-LaunchTimeoutSeconds"
+    [string]$LaunchTimeoutSeconds
+    "-ConnectTimeoutSeconds"
+    [string]$ConnectTimeoutSeconds
+  )
+  if ($RestartClient) { $forwardedArguments += "-RestartClient" }
+  if ($AllowAdditionalClient) { $forwardedArguments += "-AllowAdditionalClient" }
+  & $windowsPowerShell @forwardedArguments
+  exit $LASTEXITCODE
+}
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -37,8 +70,6 @@ $normalizedAddress = "$($addressMatch.Groups[1].Value.ToLowerInvariant()):$port"
 
 $root = [IO.Path]::GetFullPath($MinecraftRoot)
 $profilesPath = Join-Path $root "launcher_profiles.json"
-$logsPath = Join-Path $root "logs\latest.log"
-$autoJoinInbox = Join-Path $root "config\helix-fabric-player-agent.autojoin-inbox"
 $launcherPath = "C:\Program Files (x86)\Minecraft Launcher\MinecraftLauncher.exe"
 if (-not (Test-Path -LiteralPath $profilesPath -PathType Leaf)) {
   Fail-Typed "minecraft_launcher_profiles_missing"
@@ -66,6 +97,15 @@ $existingMinecraftClient = Get-Process javaw -ErrorAction SilentlyContinue |
   Sort-Object StartTime -Descending |
   Select-Object -First 1
 
+if ($RestartClient -and $AllowAdditionalClient) {
+  Fail-Typed "minecraft_restart_and_additional_client_conflict"
+}
+if ($AllowAdditionalClient) {
+  # An explicitly selected isolated profile may allocate a second client. Do
+  # not reuse or disturb another verified Minecraft window in this mode.
+  $existingMinecraftClient = $null
+}
+
 if ($RestartClient -and $existingMinecraftClient) {
   $verifiedClientId = [int]$existingMinecraftClient.Id
   $verifiedClient = Get-Process -Id $verifiedClientId -ErrorAction SilentlyContinue
@@ -84,7 +124,12 @@ if ($RestartClient -and $existingMinecraftClient) {
   }
   $existingMinecraftClient = $null
 }
-if ((Get-MemoryUsedPercent) -ge 90) { Fail-Typed "minecraft_launch_memory_ceiling" }
+# Reusing an already verified client only stages the bounded autojoin inbox and
+# must remain available under launch pressure. Preserve the launch ceiling for
+# the branch that would allocate a new Minecraft client.
+if (-not $existingMinecraftClient -and (Get-MemoryUsedPercent) -ge 90) {
+  Fail-Typed "minecraft_launch_memory_ceiling"
+}
 
 $profiles = Get-Content -LiteralPath $profilesPath -Raw | ConvertFrom-Json
 $fabricProfiles = @(
@@ -94,6 +139,7 @@ $fabricProfiles = @(
         id = $_.Name
         name = [string]$_.Value.name
         version = [string]$_.Value.lastVersionId
+        gameDir = [string]$_.Value.gameDir
         lastUsed = if ($_.Value.lastUsed) {
           [datetime]$_.Value.lastUsed
         } else {
@@ -105,7 +151,12 @@ $fabricProfiles = @(
     Sort-Object lastUsed -Descending
 )
 if ($fabricProfiles.Count -eq 0) { Fail-Typed "minecraft_fabric_profile_missing" }
-$selectedProfile = $fabricProfiles[0]
+$selectedProfile = if ([string]::IsNullOrWhiteSpace($ProfileId)) {
+  $fabricProfiles[0]
+} else {
+  @($fabricProfiles | Where-Object { $_.id -eq $ProfileId })[0]
+}
+if (-not $selectedProfile) { Fail-Typed "minecraft_fabric_profile_not_found" }
 $mostRecentProfile = @(
   $profiles.profiles.PSObject.Properties |
     ForEach-Object {
@@ -123,6 +174,16 @@ $mostRecentProfile = @(
 if ($mostRecentProfile.id -ne $selectedProfile.id) {
   Fail-Typed "minecraft_fabric_profile_selection_required"
 }
+$gameRoot = if ([string]::IsNullOrWhiteSpace($selectedProfile.gameDir)) {
+  $root
+} else {
+  [IO.Path]::GetFullPath($selectedProfile.gameDir)
+}
+if ($AllowAdditionalClient -and $gameRoot -eq $root) {
+  Fail-Typed "minecraft_additional_client_isolated_game_directory_required"
+}
+$logsPath = Join-Path $gameRoot "logs\latest.log"
+$autoJoinInbox = Join-Path $gameRoot "config\helix-fabric-player-agent.autojoin-inbox"
 
 Add-Type -AssemblyName System.Drawing
 Add-Type -ReferencedAssemblies ([Drawing.Bitmap].Assembly.Location) -TypeDefinition @'
@@ -656,6 +717,7 @@ if (-not $connection) {
   status = "connected"
   profile_id = $selectedProfile.id
   profile_version = $selectedProfile.version
+  isolated_game_directory = $gameRoot -ne $root
   client_process_id = $client.Id
   server_address = $normalizedAddress
   launcher_action = $launcherAction

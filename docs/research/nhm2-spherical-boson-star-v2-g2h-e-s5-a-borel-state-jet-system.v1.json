@@ -1,0 +1,159 @@
+{
+  "schema": "nhm2.g2h_e_s5_a.borel_state_jet_system.v1",
+  "status": "draft_unsealed_exact_variational_definition_no_global_bounds_or_implementation_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "complete first/second full-state jets for scalar and metric Borel systems",
+    "current_maturity": "exact candidate-neutral variational identities defined; no directed global bound",
+    "target_maturity": "independently audited state-jet definition with a uniform positive-ray growth budget",
+    "required_frozen_inputs": [
+      "carrier parameter state jets v17 receipt ade5e77a51b5c18b6ac594492efbdca61c36228be332d6b934405d8d96e7ba16",
+      "universal scalar Borel system v1",
+      "metric Borel system v1",
+      "eta held fixed during vacuum state differentiation"
+    ],
+    "required_evidence": [
+      "all first and second mixed variational terms",
+      "dependent Mbar_infinity composition",
+      "Borel derivative-convolution product rules",
+      "uniform exponential-type and polynomial-prefactor bounds",
+      "zero candidate ingress"
+    ],
+    "stop_fail_criteria": [
+      "an i/j mixed orientation is omitted",
+      "Mbar_infinity is treated as an independent vacuum state scalar",
+      "eta is silently differentiated as a state coordinate",
+      "pointwise multiplication replaces derivative-convolution",
+      "candidate evaluation, selector creation or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "loading the selected member",
+      "selecting a truncation or continuation step order",
+      "sealing a summation prescription",
+      "implementing or executing C08",
+      "changing frozen equations or authority"
+    ],
+    "downstream_gate_unlocked": "none until independent acknowledgement and directed global bounds"
+  },
+  "state_convention": {
+    "indices": "i,j range over the complete chart state vector in frozen flat-index order",
+    "positive": [
+      "kappa=sqrt(1-omega^2)",
+      "mu=M",
+      "beta=M*(2*omega^2-1)/kappa-1"
+    ],
+    "vacuum": [
+      "kappa=kappa_bar=sqrt(-2*Nbar)",
+      "mu=eta*Mbar_infinity",
+      "beta=beta_bar=Mbar_infinity*(1+4*eta*Nbar)/kappa-1",
+      "eta is fixed during state differentiation",
+      "Mbar_infinity value, gradient and Hessian are dependent-observable inputs"
+    ],
+    "vacuum_mu_jets": [
+      "mu_i=eta*(Mbar_infinity)_i",
+      "mu_ij=eta*(Mbar_infinity)_ij"
+    ]
+  },
+  "linear_scalar_variational_system": {
+    "base": "y'=A(t,p)*y for the augmented first-order scalar Borel state y=(B,V,J1,J2)",
+    "first": "(y_i)'=A*y_i+A_i*y",
+    "second": "(y_ij)'=A*y_ij+A_i*y_j+A_j*y_i+A_ij*y",
+    "matrix_derivatives": [
+      "A_i is the exact directed derivative through kappa_i and mu_i",
+      "A_ij includes A_kappa*kappa_ij+A_mu*mu_ij and every quadratic parameter-chain term",
+      "origin data h0 and its state jets enter separately and may not be assumed constant"
+    ],
+    "mixed_orientation_count": 2,
+    "omitted_mixed_terms_allowed": false
+  },
+  "compressed_parameter_jet_realization": {
+    "purpose": "compute the complete full-state Jacobian/Hessian without integrating one Borel trajectory per full-state index pair",
+    "positive_parameter_tuple": "theta=(h0,kappa,mu) with mu=M and beta+1=mu*(1-2*kappa^2)/kappa",
+    "vacuum_parameter_tuple": "theta=(h0,kappa,Mbar_infinity) with eta held fixed, mu=eta*Mbar_infinity and beta+1=Mbar_infinity*(1-2*eta*kappa^2)/kappa",
+    "integrated_inventory_per_borel_component": "one value, three ordered first parameter partials and nine ordered second parameter partials; both mixed orientations are retained",
+    "full_state_first_composition": "F_i=sum_(a=0)^2 F_a*theta_(a,i)",
+    "full_state_second_composition": "F_ij=sum_(a=0)^2 F_a*theta_(a,ij)+sum_(a=0)^2 sum_(b=0)^2 F_ab*theta_(a,i)*theta_(b,j)",
+    "positive_state_inputs": [
+      "h0 value, complete state gradient and complete state Hessian from the tail endpoint observable",
+      "kappa value, complete state gradient and complete state Hessian",
+      "M value, canonical scalar gradient and zero Hessian"
+    ],
+    "vacuum_state_inputs": [
+      "h0 value, complete state gradient and complete state Hessian from the scaled-tail endpoint observable",
+      "kappa_bar value, complete state gradient and complete state Hessian",
+      "dependent Mbar_infinity value, complete directed state gradient and complete directed state Hessian"
+    ],
+    "eta_rule": "eta is an external frozen continuation-cell parameter and has zero state derivatives",
+    "equivalence_requirement": "the composed F_i and F_ij must be exactly the same interval expressions as direct differentiation of the full-state variational equations before any norm projection",
+    "projection_order": "compose every full-state entry first; only then apply the frozen operator/coefficient norm bound",
+    "missing_parameter_or_mixed_orientation": "FAIL"
+  },
+  "derivative_convolution_rules": {
+    "base": "C=F diamond G",
+    "first": "C_i=F_i diamond G+F diamond G_i",
+    "second": "C_ij=F_ij diamond G+F_i diamond G_j+F_j diamond G_i+F diamond G_ij",
+    "square_first": "(F diamond F)_i=2*(F_i diamond F)",
+    "square_second": "(F diamond F)_ij=2*(F_ij diamond F+F_i diamond F_j)",
+    "commutativity_used_only_after_both_mixed_orientations_are_present": true
+  },
+  "metric_variational_system": {
+    "base_solved_forms": [
+      "BD=(BRD+(2*beta+3)*JD)/(2*kappa+t)",
+      "BS=(BRS+(2*beta+2)*JS)/(2*kappa+t)"
+    ],
+    "derivative_rule": "differentiate the unsolved equations before division so denominator, beta, source and integral-state jets are all retained",
+    "D_first_unsolved": "(2*kappa+t)*BD_i+2*kappa_i*BD-(2*beta+3)*JD_i-2*beta_i*JD=BRD_i",
+    "S_first_unsolved": "(2*kappa+t)*BS_i+2*kappa_i*BS-(2*beta+2)*JS_i-2*beta_i*JS=BRS_i",
+    "D_second_unsolved": "(2*kappa+t)*BD_ij+2*kappa_i*BD_j+2*kappa_j*BD_i+2*kappa_ij*BD-(2*beta+3)*JD_ij-2*beta_i*JD_j-2*beta_j*JD_i-2*beta_ij*JD=BRD_ij",
+    "S_second_unsolved": "(2*kappa+t)*BS_ij+2*kappa_i*BS_j+2*kappa_j*BS_i+2*kappa_ij*BS-(2*beta+2)*JS_ij-2*beta_i*JS_j-2*beta_j*JS_i-2*beta_ij*JS=BRS_ij",
+    "integral_jets": [
+      "(JD_i)'=BD_i",
+      "(JD_ij)'=BD_ij",
+      "(JS_i)'=BS_i",
+      "(JS_ij)'=BS_ij"
+    ]
+  },
+  "growth_budget_template": {
+    "input_margins": [
+      "kappa>=kappa0>0",
+      "0<=mu<=mu1",
+      "g=255-2*mu1>0"
+    ],
+    "candidate_type_tiers": [
+      "tau0=2*mu1+g/4 for values",
+      "tau1=2*mu1+g/2 for first state derivatives",
+      "tau2=2*mu1+3*g/4 for second state derivatives"
+    ],
+    "remaining_laplace_margin": "255-tau2=g/4>0",
+    "meaning": "tiering reserves strict exponential room for variational forcing and polynomial prefactors; it is a proof template, not a proved bound",
+    "global_tier_bounds_proved": false,
+    "finite_to_asymptotic_split_selected": false
+  },
+  "readiness": {
+    "full_state_convention_defined": true,
+    "vacuum_dependent_mu_composition_defined": true,
+    "scalar_first_variation_defined": true,
+    "scalar_second_variation_defined": true,
+    "derivative_convolution_variations_defined": true,
+    "metric_first_variation_defined": true,
+    "metric_second_variation_defined": true,
+    "compressed_parameter_jet_realization_defined": true,
+    "global_growth_budget_proved": false,
+    "directed_runtime_algorithm_defined": false,
+    "independently_acknowledged": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "document_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

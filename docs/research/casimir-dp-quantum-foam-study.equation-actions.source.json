@@ -338,7 +338,7 @@
         "actionId": "open-cdp-stage4-2j-homogeneous-sphere-energy",
         "kind": "artifact_backed_theory_run",
         "label": "Open mass-density robustness diagnostic",
-        "badgeIds": ["study.casimir_dp.dp_mass_density_collapse", "study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.claim_boundary"],
+        "badgeIds": ["collapse.objective.dp_gravitational_self_energy", "study.casimir_dp.schrodinger_mass_density_stage4_2j", "study.casimir_dp.claim_boundary"],
         "preferredBadgeId": "study.casimir_dp.schrodinger_mass_density_stage4_2j",
         "compoundRunMode": "dependency_path",
         "atlasLensId": "casimir_dp_quantum_foam",
@@ -461,7 +461,7 @@
       "aliases": ["E_G radial form factor grid"],
       "actions": [{
         "actionId": "open-cdp-stage4-2l-density-regularization-envelope", "kind": "artifact_backed_theory_run", "label": "Open mass-density robustness envelope",
-        "badgeIds": ["study.casimir_dp.empirical_authority_stage4_2l", "study.casimir_dp.dp_mass_density_collapse", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
+        "badgeIds": ["study.casimir_dp.empirical_authority_stage4_2l", "collapse.objective.dp_gravitational_self_energy", "study.casimir_dp.claim_boundary"], "preferredBadgeId": "study.casimir_dp.empirical_authority_stage4_2l",
         "compoundRunMode": "dependency_path", "atlasLensId": "casimir_dp_quantum_foam", "atlasGroupId": "casimir_dp.stage4_2l", "openPanels": ["theory-badge-graph"], "alsoIngestLatex": false,
         "claimBoundaryNote": "The representation envelope quantifies sensitivity and does not choose a physical density without internal metrology."
       }],
@@ -640,6 +640,13 @@
       "aliases": ["replicated bridge biological map lifetime heritability fitness selection gate"],
       "actions": [{"actionId":"open-cdp-evolutionary-coherence-control-conditional-gate","kind":"artifact_backed_theory_run","label":"Open conditional evolutionary hypothesis path","badgeIds":["study.casimir_dp.boundary_conditioned_coherence_extension","study.casimir_dp.evolutionary_coherence_control_conditional","biology.evolution.selection_fitness_context","plant.photosynthesis.coherence_lifetime_gate","consciousness.claim_boundary.evolutionary_biology_context_only","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.evolutionary_coherence_control_conditional","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.conditional_life_implication","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"This gate records a hypothetical dependency only; every physical, biological, heritability, fitness, and selection authority is presently absent."}],
       "claimBoundaryNotes": ["Selection may favor a functional phenotype, not coherence or collapse as an abstract goal.", "No purpose, consciousness, or Orch-OR conclusion is admitted."]
+    },
+    {
+      "equationId": "cdp-composition-universality-successor",
+      "label": "Positive-result composition and internal-energy universality successor",
+      "aliases": ["Lambda k Diósi exposure eta k normalized residual Delta eta cohort universality"],
+      "actions": [{"actionId":"open-cdp-composition-universality-successor","kind":"artifact_backed_theory_run","label":"Open blocked composition-universality successor","badgeIds":["study.casimir_dp.integrated_feasibility_pilot_stage4_2r","study.casimir_dp.schrodinger_mass_density_stage4_2j","study.casimir_dp.blinded_model_comparison","study.casimir_dp.composition_internal_energy_successor","study.casimir_dp.claim_boundary"],"preferredBadgeId":"study.casimir_dp.composition_internal_energy_successor","compoundRunMode":"dependency_path","atlasLensId":"casimir_dp_quantum_foam","atlasGroupId":"casimir_dp.positive_result_successor","openPanels":["theory-badge-graph"],"alsoIngestLatex":false,"claimBoundaryNote":"The comparison coordinate is registered for future design only; parent positive replication and all nine successor authority packets are absent."}],
+      "claimBoundaryNotes": ["Measured total neutral-object mass is authoritative; constituent double counting is forbidden.", "No direct quark, gluon, nuclear, electronic, binding-energy, or covariant internal-energy collapse interaction is identified."]
     }
   ]
 }

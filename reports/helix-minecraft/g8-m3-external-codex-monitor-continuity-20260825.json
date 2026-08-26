@@ -1,0 +1,105 @@
+{
+  "schema": "helix.environment_harness.g8_m3_external_codex_monitor_continuity.v1",
+  "recorded_at": "2026-08-25T11:35:17Z",
+  "program_gate": "G8",
+  "capability": "profile_scoped_semantic_mcp_monitoring",
+  "capability_maturity_claim": "deterministically verified",
+  "installed_node": {
+    "server": "keyed_loopback",
+    "mcp_resource": "http://127.0.0.1:1522/mcp",
+    "minecraft_version": "1.21.8",
+    "client_surface": "fresh_external_codex_process"
+  },
+  "authorization": {
+    "capability_profile": "g8-monitor",
+    "ready": true,
+    "required_scopes": [
+      "helix.rooms.read",
+      "helix.environment_actions.read",
+      "helix.environment_actions.write",
+      "helix.agent_runs.write"
+    ],
+    "missing_scopes": [],
+    "credential_included": false
+  },
+  "identity": {
+    "run_ref": "run_60484c50-3acf-401d-b27e-10c3dc33a518",
+    "goal_ref": "environment_durable_goal:707a3460-ff2a-4f5e-ba38-78edc3ee2341",
+    "monitor_ref": "environment_monitor:d6b8ce69-1186-4d73-8a84-ebec03e0edf1",
+    "continuation_ref": "codex_cli:m3-nether-preflight-20260825-a",
+    "room_ref": "shared_realtime_room:1ac9e158-c650-4644-8485-29974d406ef7",
+    "environment_ref": "environment_binding:legacy:897791b2c62787c63c0c051157f3d86ffb1fd91d",
+    "subject_binding_ref": "environment_subject_binding:73f9f615-50fa-4bc2-851e-8bfcf36a2ad7"
+  },
+  "bounded_recovery": {
+    "first_action_disposition": "request_canceled",
+    "first_action_reason": "screen_open",
+    "first_delivery_cursor": 1,
+    "first_cursor_acknowledged": 1,
+    "first_actor_snapshot_disposition": "permission_revoked",
+    "first_actor_snapshot_reason": "participant_not_present",
+    "operator_visible_recovery": [
+      "closed only the Minecraft game menu with Escape",
+      "restored the authenticated owner's room presence to present"
+    ],
+    "unbounded_retry_used": false
+  },
+  "successful_observation": {
+    "action_kind": "look_at",
+    "target_kind": "current_focus",
+    "max_turn_degrees_per_tick": 1,
+    "displacement": false,
+    "status": "succeeded",
+    "idempotency_replayed": false,
+    "request_ref": "environment_action_request:9e30e4ad-8eb2-48c3-81ae-87265eb7d7a8",
+    "workflow_ref": "environment_action_workflow:d8f2d3b8-1f49-4460-b160-252639f15c2e",
+    "execution_ref": "environment_action_execution:bec35746-6513-4563-b964-67b640033aee",
+    "evidence_ref": "environment_action_evidence:fddcdfadb8594d633d2e483d19559080eac99929c0",
+    "delivery_cursor": 2,
+    "acknowledged_cursor": 2,
+    "actor_snapshot": {
+      "status": "succeeded",
+      "freshness_age_ms": 264,
+      "dimension": "minecraft:overworld",
+      "game_mode": "survival",
+      "health": 20,
+      "food": 20,
+      "evidence_ref": "environment_probe_evidence:cda42b6cd2d0b869fcf1bad600846edc7ba90bb30"
+    }
+  },
+  "fresh_process_reconnect": {
+    "inspect_status": "active",
+    "delivered_cursor": 2,
+    "acknowledged_cursor": 2,
+    "read_disposition": "timeout",
+    "items_delivered": 0,
+    "duplicate_delivery": false,
+    "physical_effect_replayed": false
+  },
+  "revocation": {
+    "status": "revoked",
+    "post_revocation_read_disposition": "lease_inactive",
+    "post_revocation_lease_status": "revoked",
+    "post_revocation_items_delivered": 0,
+    "fail_closed": true
+  },
+  "bounded_acceptance": {
+    "authorization_ready": "pass",
+    "semantic_delivery": "pass",
+    "fresh_actor_snapshot": "pass",
+    "cursor_acknowledgement": "pass",
+    "fresh_process_reconnect": "pass",
+    "no_duplicate_delivery_or_effect": "pass",
+    "revocation_fail_closed": "pass",
+    "credential_exclusion": "pass",
+    "verdict": "pass"
+  },
+  "remaining_before_full_nether_journey": [
+    "owner-approved World Authority plus snapshot/restore boundary for the N0 controlled course",
+    "operator-visible material Nether replanning through the accepted action arbiter",
+    "one recorded unknown-world portal entry and safe-return-point demonstration",
+    "native wake of a closed Codex task remains unsupported until a client continuation transport exists"
+  ],
+  "terminal_authority_claimed": false,
+  "full_nether_readiness_claimed": false
+}

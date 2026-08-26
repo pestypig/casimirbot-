@@ -16,6 +16,7 @@ import {
   listConnectorBootstrapPairings,
   revokeConnectorBootstrapPairing,
 } from "../../services/environment-connectors/pairing";
+import { stageLocalMinecraftServerPairing } from "../../services/environment-connectors/pairing/local-server-pairing-handoff";
 import {
   buildSharedLiveRoomControlActorFromAccountContext,
   sharedLiveRoomActorAllowsSourceIngress,
@@ -177,6 +178,53 @@ sharedRealtimeRoomConnectorPairingRouter.get(
         ok: true,
         message: "Connector pairing status listed.",
         pairings,
+      }),
+    );
+  }),
+);
+
+sharedRealtimeRoomConnectorPairingRouter.post(
+  "/realtime/rooms/:roomId/connector-pairings/local-server-handoff",
+  route(async (req, res) => {
+    const parsed = helixConnectorPairingCreateRequestSchema.safeParse(req.body);
+    if (
+      !parsed.success ||
+      parsed.data.purpose !== "rotate" ||
+      !parsed.data.binding_id ||
+      parsed.data.command_credential_requested !== true ||
+      parsed.data.action_credential_requested === true
+    ) {
+      res.status(400).json(
+        receipt({
+          ok: false,
+          error: "connector_pairing_invalid",
+          message: "A command-only rotation for an existing local server binding is required.",
+        }),
+      );
+      return;
+    }
+    const account = await ownerContext(req, res);
+    const created = await createConnectorBootstrapPairing({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      purpose: "rotate",
+      bindingId: parsed.data.binding_id,
+      worldId: parsed.data.world_id,
+      domainAdapter: parsed.data.domain_adapter,
+      sourceLabel: parsed.data.source_label,
+      credentialTtlMs: parsed.data.credential_ttl_ms,
+      commandCredentialRequested: true,
+      actionCredentialRequested: false,
+      idempotencyKey: idempotencyKey(req),
+    });
+    await stageLocalMinecraftServerPairing({
+      command: `/helix pair ${created.pairingCode}`,
+    });
+    res.status(201).json(
+      receipt({
+        ok: true,
+        message: "Local server command access was staged without exposing the one-time code.",
+        pairing: created.pairing,
       }),
     );
   }),

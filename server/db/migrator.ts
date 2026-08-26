@@ -61,6 +61,7 @@ import { migration059 } from "./migrations/059_environment_durable_goals";
 import { migration060 } from "./migrations/060_durable_goal_transient_identity";
 import { migration061 } from "./migrations/061_durable_goal_connector_identity_history";
 import { migration062 } from "./migrations/062_environment_reasoning_roles";
+import { migration063 } from "./migrations/063_environment_monitor_leases";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -126,6 +127,7 @@ const MIGRATIONS = [
   migration060,
   migration061,
   migration062,
+  migration063,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

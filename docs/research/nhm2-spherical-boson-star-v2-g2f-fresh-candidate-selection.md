@@ -1,8 +1,8 @@
 Program gate: G2F — fresh classical-control candidate selection
 Workstream: authenticated classical control branch
 Capability or component: evidence-ranked selection of one genuinely new proof identity
-Current maturity: G2E infrastructure repaired; no eligible scientific candidate selected
-Target maturity: one preregistered family/member or an evidence-supported stop
+Current maturity: closed; one family/member selected without candidate evaluation
+Target maturity: achieved; G2G preregistration activated
 Required frozen inputs: closed G2B/G2D evidence and G2E result
 Required evidence: primary literature, exclusion matrix, exact definitions and falsifiers
 Stop/fail criteria: G2D reuse, post-result selection, unfrozen parameters or authority promotion
@@ -10,6 +10,13 @@ Explicit non-goals: candidate execution, G3, 68-file lanes, lamp or physical cla
 Downstream gate unlocked: new candidate preregistration and implementation only
 
 # G2F fresh candidate selection
+
+Status: closed by
+[`nhm2-spherical-boson-star-v2-g2f-selection-result.md`](./nhm2-spherical-boson-star-v2-g2f-selection-result.md).
+
+The outcome-blind protocol, bounded primary-source matrix, primary selector and
+independent replay select the natural Tolman-VII `mu=1`, `beta=1/5` identity.
+This packet authorizes no candidate execution or admission.
 
 ## Purpose
 

@@ -131,6 +131,23 @@ describe("internet-search arbitration for workstation context", () => {
     ).not.toBe("internet_search");
   });
 
+  it("does not reinterpret current G6 room-ledger evidence as current web evidence", () => {
+    const prompt =
+      "In this room, inspect the canonical concurrent-reasoning ledger for G6 goal environment_durable_goal:ef49540b-0bab-4857-837f-c2f449b08585. Report the current canonical evidence.";
+
+    expect(buildToolUseRestatement(prompt).requiredToolFamilies).not.toContain(
+      "internet_search",
+    );
+    expect(detectInternetSearchIntent(prompt).searchRequested).toBe(false);
+    expect(
+      arbitrateAskSourceTarget({
+        turnId: "ask:test:g6-room-ledger",
+        threadId: "helix-ask:room:room:g6",
+        promptText: prompt,
+      }).target_source,
+    ).toBe("live_environment");
+  });
+
   it("still admits an explicit web request from a Minecraft room", () => {
     const prompt =
       "In this Minecraft room, search the web for the current Fabric release notes.";

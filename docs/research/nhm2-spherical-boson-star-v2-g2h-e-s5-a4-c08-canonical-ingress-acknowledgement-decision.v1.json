@@ -1,0 +1,67 @@
+{
+  "schema": "nhm2.g2h_e_s5_a4.c08_canonical_ingress_acknowledgement_decision.v1",
+  "decision": "ACKNOWLEDGED_CANDIDATE_NEUTRAL_ADDITIVE_RESOURCE_DEFINITION_ONLY",
+  "recorded_at_utc": "2026-08-24T23:03:22Z",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S5 / A4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "independent acknowledgement of C08-002 canonical-ingress resource definition",
+    "current_maturity": "exact acknowledgement received and recorded",
+    "target_maturity": "candidate-neutral implementation eligibility only",
+    "required_frozen_inputs": [
+      "resource definition efbff4c1f9490803e7283ff8d1906fbdeedae787d78047d42f3061bd975efc48",
+      "exact audit 04e1f050fc46f9263753abd2145672b30afc569cddc989fb707dfc089df295b1",
+      "cross-language replay 44498cd85d1e480df33b53bb1b3f208deeee37aa84db3e6de45756ab9ac4f3f7"
+    ],
+    "required_evidence": ["exact statement", "read-only acknowledgement gate PASS", "protected roots absent"],
+    "stop_fail_criteria": ["statement drift", "artifact drift", "candidate ingress", "authority promotion"],
+    "explicit_non_goals": ["candidate execution", "positive sampling", "authorization", "Rust/G3/SI/metric/lane work", "physical claims"],
+    "downstream_gate_unlocked": "candidate-neutral C08-002 implementation and fixtures only"
+  },
+  "statement": {
+    "path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s5-a4-c08-canonical-ingress-acknowledgement-statement.txt",
+    "bytes": 753,
+    "raw_sha256": "92ca4c820f879946911e111ca8e7f6c0524947a7e6bab6efa70183850cba53c1",
+    "exact_gate_status": "ACKNOWLEDGEMENT_VALID"
+  },
+  "bound_artifacts": {
+    "resource_definition_raw_sha256": "efbff4c1f9490803e7283ff8d1906fbdeedae787d78047d42f3061bd975efc48",
+    "exact_audit_raw_sha256": "04e1f050fc46f9263753abd2145672b30afc569cddc989fb707dfc089df295b1",
+    "cross_language_replay_raw_sha256": "44498cd85d1e480df33b53bb1b3f208deeee37aa84db3e6de45756ab9ac4f3f7",
+    "borel_contract_raw_sha256": "7dd4d30a64d9c7eae8637a79e40f16b19d564b0081aeec21d0cdf886c3094737",
+    "borel_contract_canonical_sha256": "665b6d9ddd9d2108274652414ec9d6a0a2fb43f86f28ab3ab64db70003c7f520"
+  },
+  "verification": {
+    "definition_exact_audit": "32/32 PASS",
+    "definition_cross_language_replay": "30/30 PASS",
+    "acknowledgement_gate_self_test": "9/9 PASS",
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_present": false,
+    "authorization_present": false,
+    "token_present": false,
+    "execution_ledger_present": false
+  },
+  "scope": {
+    "candidate_neutral_c08_002_implementation_eligible": true,
+    "candidate_execution_authorized": false,
+    "positive_sampling_authorized": false,
+    "authorization_or_token_authorized": false,
+    "output_root_authorized": false,
+    "rust_authorized": false,
+    "g3_si_metric_lane_work_authorized": false,
+    "retuning_authorized": false
+  },
+  "authority": {
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "immutability_note": "The acknowledged definition and audit artifacts remain byte-identical. This separate record stores the independently supplied acknowledgement and grants only candidate-neutral C08-002 implementation eligibility."
+}

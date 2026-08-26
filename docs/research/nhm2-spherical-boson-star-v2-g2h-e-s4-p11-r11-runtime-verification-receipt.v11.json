@@ -1,0 +1,24 @@
+{
+  "schema": "nhm2.g2h_e_s4.p11_r11_runtime_verification_receipt.v11",
+  "status": "PASS_FIXTURE_ONLY_11_OF_13_PER_LANE_NO_SCIENTIFIC_EXECUTION_AUTHORITY",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "P11/R11 physical-measure recovery and smearing fixture/runtime closure",
+    "current_maturity": "identity-bound source/runtime-disjoint P11/R11 fixture PASS",
+    "target_maturity": "continue P12/R12 while S4 remains fail-closed",
+    "required_frozen_inputs": ["R1 seal 728d8c9a...025ca", "quantum builder 29893736...62fc", "binding 476fabc7...14ca"],
+    "required_evidence": ["both 9/9 physical-measure suites", "both 35/35 full harnesses", "runtime/source/command/environment audit", "candidate-interface and corrupt-contract rejection", "matrix audit", "absent roots"],
+    "stop_fail_criteria": ["fixture failure", "identity drift", "candidate ingress", "root creation", "authorization", "authority promotion"],
+    "explicit_non_goals": ["candidate physical measure", "quantum state proof", "remaining quantum roles", "G3", "physical authority"],
+    "downstream_gate_unlocked": "P12/R12 Hadamard transport and order-4 jets fixture implementation"
+  },
+  "bindings": {"quantum_builder": "2989373624362e7f591ca0f00b76d1b01e2aa861f01eaf53f9b62c666f2862fc", "p10_r10_build": "e5b1abda13d670ec56246f425766e0f424b09f9ec1df584db0d36a74c706e913", "p11_r11_build": "476fabc72c7449ee019c469f4ccdb37ddc240b32dedd0bdb4792b8cc925814ca", "matrix": "5f3c232c1f1281027cb151b46a0525cb7d2ec8827929f31691f6980629a8e159"},
+  "runtime_audit": {"path": "scripts/nhm2_g2h_e_s4_p11_r11_runtime_audit.py", "raw_sha256": "e398d4815a768e16b249259bc7dbad20e4379ec91e0f789be0dab063896dbe97", "result": "PASS_36_OF_36"},
+  "completion_audit": {"path": "scripts/nhm2_g2h_e_s4_producer_completion_audit.py", "raw_sha256": "dfa3ba7573c02688bbc65ccc6c1416cca7c8d4b128c22d89be75281768f1079f", "result": "PASS_12_OF_12"},
+  "primary": {"image_id": "sha256:76a63853fbb2407235305ef0a080890d5430697f231527763f6bbf4926ea3719", "executable_sha256": "b3d9b876642a28639a0914b263fe165bd4a50b339b8ccec3b8704efe959d4249", "full_fixture": "PASS_35_OF_35", "physical_measure_fixture": "PASS_9_OF_9"},
+  "independent": {"image_id": "sha256:d4099be4f9dbaf1356e7b9ce16f77146adf6bdc4337a1d3c1fd8827f1f561caa", "executable_sha256": "3abce9f7f3c4bbfc859e2fe912ccb1b94610da208b68a9a4da23f6825a45e501", "full_fixture": "PASS_35_OF_35", "physical_measure_fixture": "PASS_9_OF_9", "physical_measure_mask": "111111111", "diagnostic": 0},
+  "guard_evidence": {"primary_candidate_interface_exit": 64, "independent_candidate_interface_exit": 64, "primary_corrupt_quantum_contract_exit": 65, "independent_corrupt_quantum_contract_exit": 65, "candidate_evaluations": 0, "positive_parameter_samples": 0, "candidate_roots_created": false, "scientific_builder_executed": false},
+  "promotion": {"common_complete": 4, "primary_complete": 11, "primary_required": 13, "independent_complete": 11, "independent_required": 13, "S4_complete": false, "inert_future_primary_proposal_allowed": false},
+  "authority": {"receipt_is_proof": false, "candidate_evaluated": false, "candidate_root_created": false, "quantum_state_established": false, "geometry_state_authority": false, "lane_authority": false, "diagnostic_lamp_authority": false, "physical_authority": false, "propulsion_authority": false, "transport_authority": false}
+}

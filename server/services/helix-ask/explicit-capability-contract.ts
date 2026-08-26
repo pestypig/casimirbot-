@@ -77,6 +77,7 @@ import {
 } from "./theory-formal-artifact-intent";
 import { isAffirmativeReadAloudPrompt } from "./referent-resolution";
 import {
+  isAffirmativeEnvironmentReasoningRoleInspectPrompt,
   isAffirmativeImmediateMinecraftSituationPrompt,
   isAffirmativeMinecraftDurableGoalAppendPrompt,
   isAffirmativeMinecraftDurableGoalCreatePrompt,
@@ -232,7 +233,7 @@ const MINECRAFT_PLAYER_ACTION_CONTRACT_ARGS = new Map<
     "com.casimirbot.minecraft.player.mine",
     {
       required: ["block_id", "count", "search_radius"],
-      optional: ["environment_label"],
+      optional: ["target_position", "environment_label"],
     },
   ],
   [
@@ -2247,7 +2248,11 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     }),
     liveEnvironmentEvidenceContract({
       capability: HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
-      aliases: ["inspect revision-bound environment reasoning support"],
+      aliases: [
+        "inspect revision-bound environment reasoning support",
+        "inspect concurrent-reasoning ledger",
+        "inspect reasoning-role ledger",
+      ],
       requiredObservationKinds: [
         "helix.environment_reasoning_role_observation.v1",
         "helix.agent_step_observation_packet.v1",
@@ -3030,18 +3035,25 @@ const negatedCommandMentionsCapabilityAt = (
   prompt: string,
   matchIndex: number,
 ): boolean => {
-  const before = prompt.slice(Math.max(0, matchIndex - 140), matchIndex);
+  const before = prompt.slice(Math.max(0, matchIndex - 360), matchIndex);
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  // A safety instruction can enumerate several forbidden actions before it
+  // reaches the matched capability. Keep the whole local clause, while
+  // treating an explicit contrast as the start of a new operative instruction.
+  const operativeClausePrefix =
+    clausePrefix.split(/\b(?:but|however|instead)\b/i).pop() ?? clausePrefix;
   const strongNegation = new RegExp(
-    String.raw`\b(?:do\s+not|don['’]t|dont|never|avoid|without)\b[\s\S]{0,80}\b(?:${commandVerb})?\b[\s\S]{0,80}$`,
+    String.raw`\b(?:do\s+not|don['’]t|dont|never|avoid|without)\b[\s\S]{0,280}$`,
     "i",
-  ).test(clausePrefix);
+  ).test(operativeClausePrefix);
   const explicitBareNo =
     new RegExp(
       String.raw`\bno(?:\s+(?:need|reason|permission|request))?(?:\s+to)?\s+(?:${commandVerb})\b[\s\S]{0,80}$`,
       "i",
-    ).test(clausePrefix) ||
-    /\bno(?:\s+(?:more|further|additional|any))?\s*$/i.test(clausePrefix);
+    ).test(operativeClausePrefix) ||
+    /\bno(?:\s+(?:more|further|additional|any))?\s*$/i.test(
+      operativeClausePrefix,
+    );
   return strongNegation || explicitBareNo;
 };
 
@@ -3582,6 +3594,10 @@ const naturalMinecraftCommandActionPromptMatch = (
     /^(?:make|create)\b(?:\s+(?:one|a|an|the))?\s+(?:(?:fresh|current|new|read[-\s]?only|bounded|post[-\s]?action)\s+){0,5}(?:(?:player|actor)[-\s]?status\s+)?(?:check|inspection|observation|assessment|report|summary)\b/i.test(
       actionTail,
     );
+  const requestsDurableGoalArtifactRatherThanMutation =
+    /^(?:make|create|start)\b[\s\S]{0,100}\bdurable\b[\s\S]{0,80}\bgoal\b/i.test(
+      actionTail,
+    );
   const explainsInsteadOfActs =
     /\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:explain|describe|tell|show|teach|outline|write|plan|simulate|quote|repeat|discuss)\b/i.test(
       clausePrefix,
@@ -3621,12 +3637,14 @@ const naturalMinecraftCommandActionPromptMatch = (
 
   if (
     explainsInsteadOfActs ||
+    negatedCommandMentionsCapabilityAt(prompt, matchIndex) ||
     negatedOrNoChange ||
     deferredOrConditional ||
     contextualDiscussion ||
     targetsCommandTextOrHostArtifact ||
     requestsCommandDescriptionInsteadOfExecution ||
-    requestsObservationArtifactRatherThanMutation
+    requestsObservationArtifactRatherThanMutation ||
+    requestsDurableGoalArtifactRatherThanMutation
   ) {
     return null;
   }
@@ -3744,6 +3762,7 @@ const naturalMinecraftSituationProbePromptMatches = (
         /\b(?:make|perform|run|take)\b[\s\S]{0,80}\b(?:fresh|current|post[-\s]?action)?\s*player[-\s]?status\s+check\b/i,
         /\b(?:verify|check|confirm|establish)\b[\s\S]{0,120}\b(?:my|the|current)\s+(?:minecraft\s+)?player\b[\s\S]{0,80}\b(?:alive|viable|surviving|safe)\b/i,
         /\b(?:fresh|current)(?:[-\s]game|\s+minecraft)?\s+evidence\b[\s\S]{0,120}\b(?:my|the|current)\s+(?:minecraft\s+)?player\b[\s\S]{0,80}\b(?:alive|viable|surviving|safe)\b/i,
+        /\b(?:report|show|read|inspect|check|verify|tell\s+me)\b[\s\S]{0,100}\b(?:the\s+)?(?:current\s+)?actor(?:'?s)?\b[\s\S]{0,120}\b(?:identity|position|health|hearts?|status)\b/i,
       ],
     },
     {
@@ -3751,6 +3770,7 @@ const naturalMinecraftSituationProbePromptMatches = (
       patterns: [
         /\b(?:what|which|list|show|check|inspect)\b[\s\S]{0,50}\b(?:mobs?|entities|players?|animals?)\b(?:\s+(?:are|is))?[\s\S]{0,12}\b(?:nearby|near\s+me|around\s+me|close\s+by)\b/i,
         /\b(?:nearby|near\s+me|around\s+me|close\s+by)\s+(?:hostile\s+)?(?:mobs?|entities|players?|animals?)\b/i,
+        /\b(?:report|show|check|inspect|identify|find|tell\s+me)\b[\s\S]{0,180}\b(?:nearest|closest)\s+(?:hostile\s+)?(?:zombie|mob|entity)\b[\s\S]{0,120}\b(?:identity|distance|health|hearts?|status)\b/i,
       ],
     },
     {
@@ -3995,8 +4015,45 @@ const readOnlyMinecraftProbeNoMutationConstraint = (input: {
     input.matchIndex,
   );
   const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
-  return /\bwithout\s+(?:changing|altering|modifying|mutating|placing|removing|breaking|executing|running)\b[\s\S]{0,100}\b(?:look\s+around|recheck|check|scan|inspect|survey|map|list|read|show|find|identify|locate|verify)\b/i.test(
-    clausePrefix,
+  if (
+    /\bwithout\s+(?:changing|altering|modifying|mutating|placing|removing|breaking|executing|running)\b[\s\S]{0,100}\b(?:look\s+around|recheck|check|scan|inspect|survey|map|list|read|show|find|identify|locate|verify)\b/i.test(
+      clausePrefix,
+    )
+  ) {
+    return true;
+  }
+
+  const priorBoundary = Math.max(
+    input.prompt.lastIndexOf(".", input.matchIndex - 1),
+    input.prompt.lastIndexOf("!", input.matchIndex - 1),
+    input.prompt.lastIndexOf("?", input.matchIndex - 1),
+    input.prompt.lastIndexOf(";", input.matchIndex - 1),
+    input.prompt.lastIndexOf("\n", input.matchIndex - 1),
+  );
+  const readIntentWindow = input.prompt.slice(
+    priorBoundary + 1,
+    Math.min(input.prompt.length, input.matchIndex + 80),
+  );
+  const hasAffirmativeReadIntent =
+    /\b(?:report|show|read|inspect|check|verify|list|identify|find|tell\s+me)\b/i.test(
+      readIntentWindow,
+    );
+  const negatesReadIntent =
+    /\b(?:do\s+not|don't|dont|never|avoid|without)\b[\s\S]{0,80}\b(?:report|show|read|inspect|check|verify|list|identify|find|tell)\b/i.test(
+      readIntentWindow,
+    );
+  const trailingConstraintWindow = input.prompt.slice(
+    input.matchIndex,
+    Math.min(input.prompt.length, input.matchIndex + 320),
+  );
+  const explicitlyForbidsMutationAfterRead =
+    /\b(?:do\s+not|don't|dont|never)\b[\s\S]{0,80}\b(?:issue|execute|run|perform|start|use|cause)\b[\s\S]{0,140}\b(?:player\s+action|command|world\s+authority|mutation|workflow)\b/i.test(
+      trailingConstraintWindow,
+    );
+  return (
+    hasAffirmativeReadIntent &&
+    !negatesReadIntent &&
+    explicitlyForbidsMutationAfterRead
   );
 };
 
@@ -4161,6 +4218,7 @@ export const extractExplicitCapabilityContracts = (
   if (
     durableGoalInspectContract &&
     isAffirmativeMinecraftDurableGoalInspectPrompt(prompt) &&
+    !isAffirmativeEnvironmentReasoningRoleInspectPrompt(prompt) &&
     !familySuppressed(prompt, durableGoalInspectContract)
   ) {
     const match = prompt.match(
@@ -4171,6 +4229,25 @@ export const extractExplicitCapabilityContracts = (
       contract: durableGoalInspectContract,
       capability: durableGoalInspectContract.capability,
       matched_name: match?.[0] ?? "durable_minecraft_goal_inspect",
+      match_index: matchIndex,
+      match_end_index: matchIndex + (match?.[0]?.length ?? 0),
+      source: "natural_capability_intent",
+    });
+  }
+  const reasoningRoleInspectContract = explicitCapabilityContractForCapability(
+    HELIX_ENVIRONMENT_REASONING_ROLE_INSPECT_CAPABILITY,
+  );
+  if (
+    reasoningRoleInspectContract &&
+    isAffirmativeEnvironmentReasoningRoleInspectPrompt(prompt) &&
+    !familySuppressed(prompt, reasoningRoleInspectContract)
+  ) {
+    const match = prompt.match(/\b(?:inspect|read|check|reconstruct|report)\b/i);
+    const matchIndex = match?.index ?? 0;
+    matches.push({
+      contract: reasoningRoleInspectContract,
+      capability: reasoningRoleInspectContract.capability,
+      matched_name: match?.[0] ?? "environment_reasoning_role_inspect",
       match_index: matchIndex,
       match_end_index: matchIndex + (match?.[0]?.length ?? 0),
       source: "natural_capability_intent",
@@ -4272,10 +4349,15 @@ export const extractExplicitCapabilityContracts = (
   if (
     minecraftInventoryContract &&
     minecraftInventoryMatch &&
-    !negatedCommandMentionsCapabilityAt(
+    (!negatedCommandMentionsCapabilityAt(
       prompt,
       minecraftInventoryMatch.match_index,
-    ) &&
+    ) ||
+      readOnlyMinecraftProbeNoMutationConstraint({
+        prompt,
+        matchIndex: minecraftInventoryMatch.match_index,
+        capability: minecraftInventoryContract.capability,
+      })) &&
     !capabilityMentionIsNonExecutableContextAt(
       prompt,
       minecraftInventoryMatch.match_index,
@@ -4451,6 +4533,15 @@ export const extractExplicitCapabilityContracts = (
     (match, index, ordered) =>
       !ordered.some((other, otherIndex) => {
         if (otherIndex === index) return false;
+        const distinctMinecraftSituationCapabilities =
+          other.capability !== match.capability &&
+          HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.includes(
+            other.capability as (typeof HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS)[number],
+          ) &&
+          HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS.includes(
+            match.capability as (typeof HELIX_MINECRAFT_SITUATION_CAPABILITY_IDS)[number],
+          );
+        if (distinctMinecraftSituationCapabilities) return false;
         const matchLength = Math.max(
           0,
           match.match_end_index - match.match_index,

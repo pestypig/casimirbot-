@@ -229,6 +229,81 @@ describe("provider-neutral environment player-action contract", () => {
     ).toBe(false);
   });
 
+  it("admits one exact mining target without weakening bounded search", () => {
+    const exactMine = {
+      action_kind: "mine" as const,
+      block_id: "minecraft:iron_ore",
+      count: 1,
+      search_radius: 32,
+      target_position: { x: -11, y: 40, z: -2 },
+    };
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse(exactMine).success,
+    ).toBe(true);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...exactMine,
+        count: 2,
+      }).success,
+    ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...exactMine,
+        target_position: { x: -11.5, y: 40, z: -2 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires an exact mine receipt to preserve the admitted coordinate", () => {
+    const request = {
+      ...baseActionRequest(),
+      capability_id: "com.casimirbot.minecraft.player.mine",
+      action_kind: "mine",
+      arguments: {
+        action_kind: "mine",
+        block_id: "minecraft:iron_ore",
+        count: 1,
+        search_radius: 32,
+        target_position: { x: -11, y: 40, z: -2 },
+      },
+      constraints: {
+        ...baseActionRequest().constraints,
+        max_block_mutations: 1,
+        max_inventory_transfers: 1,
+        world_mutation_allowed: true,
+      },
+    } as any;
+    const result = {
+      ...settledResult(),
+      capability_id: "com.casimirbot.minecraft.player.mine",
+      action_kind: "mine",
+      world_mutation_performed: true,
+    } as any;
+    const measurements = {
+      block_id: "minecraft:iron_ore",
+      removed_count: 1,
+      world_mutations_performed: 1,
+      target_position: { x: -11, y: 40, z: -2 },
+    };
+    expect(
+      environmentActionWorkflowMeasurementsValid({
+        request,
+        result,
+        measurements,
+      }),
+    ).toBe(true);
+    expect(
+      environmentActionWorkflowMeasurementsValid({
+        request,
+        result,
+        measurements: {
+          ...measurements,
+          target_position: { x: -11, y: 40, z: -1 },
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("validates a bounded camera tracker and rejects forged target evidence", () => {
     const argumentsValue = {
       action_kind: "track_target" as const,
@@ -612,6 +687,58 @@ describe("provider-neutral environment player-action contract", () => {
         ],
       }).success,
     ).toBe(false);
+
+    const baritoneAvailable = {
+      ...manifest,
+      capabilities: [
+        {
+          ...manifest.capabilities[0],
+          control_engines: ["native_fabric", "baritone"],
+        },
+      ],
+      available_control_engines: [
+        manifest.available_control_engines[0],
+        {
+          control_engine: "baritone",
+          available: true,
+          version: "1.15.0",
+          goal_forms: ["near_position"],
+          mutation_policy: "movement_only",
+          breaking_allowed: false,
+          placement_allowed: false,
+          inventory_mutation_allowed: false,
+        },
+      ],
+    } as const;
+    expect(
+      helixEnvironmentActionConnectorManifestSchema.safeParse(baritoneAvailable)
+        .success,
+    ).toBe(true);
+    expect(
+      helixEnvironmentActionConnectorManifestSchema.safeParse({
+        ...baritoneAvailable,
+        available_control_engines: [
+          baritoneAvailable.available_control_engines[0],
+          {
+            ...baritoneAvailable.available_control_engines[1],
+            breaking_allowed: true,
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      helixEnvironmentActionConnectorManifestSchema.safeParse({
+        ...baritoneAvailable,
+        available_control_engines: [
+          baritoneAvailable.available_control_engines[0],
+          {
+            control_engine: "baritone",
+            available: true,
+            version: "1.15.0",
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it("does not let a heartbeat assert controls without an exact workflow", () => {
@@ -653,6 +780,51 @@ describe("provider-neutral environment player-action contract", () => {
     } as const;
 
     expect(helixEnvironmentActionConnectorHeartbeatSchema.parse(heartbeat)).toBeTruthy();
+    const baritoneHeartbeat = {
+      ...heartbeat,
+      control_engines: [
+        heartbeat.control_engines[0],
+        {
+          control_engine: "baritone",
+          status: "idle",
+          goal_owned: false,
+          process_active: false,
+          mutation_policy: "movement_only",
+          mutation_policy_intact: true,
+          safe_cancel_last_result: true,
+          last_error: null,
+        },
+      ],
+    } as const;
+    expect(
+      helixEnvironmentActionConnectorHeartbeatSchema.safeParse(
+        baritoneHeartbeat,
+      ).success,
+    ).toBe(true);
+    expect(
+      helixEnvironmentActionConnectorHeartbeatSchema.safeParse({
+        ...baritoneHeartbeat,
+        control_engines: [
+          baritoneHeartbeat.control_engines[0],
+          {
+            ...baritoneHeartbeat.control_engines[1],
+            mutation_policy: "unrestricted",
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      helixEnvironmentActionConnectorHeartbeatSchema.safeParse({
+        ...baritoneHeartbeat,
+        control_engines: [
+          baritoneHeartbeat.control_engines[0],
+          {
+            ...baritoneHeartbeat.control_engines[1],
+            status: "available",
+          },
+        ],
+      }).success,
+    ).toBe(false);
     expect(
       helixEnvironmentActionConnectorHeartbeatSchema.safeParse({
         ...heartbeat,

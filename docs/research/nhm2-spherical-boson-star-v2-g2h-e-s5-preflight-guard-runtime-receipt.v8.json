@@ -1,0 +1,53 @@
+{
+  "schema": "nhm2.g2h_e_s5.preflight_guard_runtime_receipt.v8",
+  "status": "PASS_CANDIDATE_NEUTRAL_PRIMARY_FOUNDATIONS_WITH_DESCRIPTOR_MANIFEST_VERIFICATION_SCIENTIFIC_HANDLERS_UNLINKED",
+  "program_gate": "G2H-E-S5",
+  "predecessor_receipt_sha256": "2e61f22be649e6da86ce86f74a9aa3e9f0f53c46a6eeec91bc97c975ac3889cf",
+  "checkpoint_abi_sha256": "6fbf6cdbb80e6da390c84f6d87f13f37f2b81b2226bf937cbcfd2c8aff3911ca",
+  "runtime": {
+    "image": "nhm2-g2h-s5-primary-preflight-guard:v10",
+    "image_id": "sha256:efc679bb4651337903aae9d4dd3508db1c3fb7cdf51cfe7f6b970ea06f1ef0d0",
+    "executable_path": "/usr/local/bin/mini-boson-star-primary-checkpoint-v1",
+    "executable_bytes": 130064,
+    "executable_sha256": "a95b9c58b559061c170c33b8aacf234f65190b517b0e96c31082553414f7b127",
+    "ingress_header_sha256": "5a8443d8a14dbab69dd8a04fa446043a32c3e89435d78083659e8e9745db9465",
+    "ingress_cpp_sha256": "5b0419c1814a00cbae7d91b1c8fcc959e2eb48fb4cc31ad61b135646c07786eb"
+  },
+  "manifest_verification": {
+    "fixture_status": "PASS_7_OF_7",
+    "path_policy": "bounded_relative_components_no_dot_dot_backslash_colon_or_duplicate",
+    "traversal": "component_wise_openat_O_NOFOLLOW",
+    "file_policy": "stable_regular_descriptor_exact_bytes_SHA256",
+    "resource_policy": "maximum_256_records_and_checked_cumulative_bytes",
+    "negative_fixtures": ["duplicate", "traversal", "uppercase_hash", "integer_overflow", "corrupt_hash", "wrong_size", "missing_file"],
+    "final_scientific_inventory_bound": false
+  },
+  "audit": {
+    "path": "scripts/nhm2_g2h_e_s5_preflight_guard_runtime_audit.py",
+    "sha256": "4bce5a665a9e99aa1d80ad11bcbf25ffcdd4d4ff49913608908281459db7237d",
+    "status": "PASS",
+    "checks_passed": 26,
+    "checks_total": 26
+  },
+  "execution_boundary": {
+    "candidate_evaluations": 0,
+    "positive_parameter_samples": 0,
+    "candidate_roots_created": false,
+    "authorization_created": false,
+    "token_created": false,
+    "scientific_handlers_installed": 0,
+    "scientific_execution_performed": false
+  },
+  "authority": {
+    "receipt_is_proof": false,
+    "candidate_admitted": false,
+    "classical_proof_established": false,
+    "quantum_state_accepted": false,
+    "geometry_state_accepted": false,
+    "lane_authority": false,
+    "diagnostic_lamp": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

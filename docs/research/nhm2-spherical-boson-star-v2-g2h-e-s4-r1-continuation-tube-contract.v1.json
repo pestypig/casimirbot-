@@ -1,0 +1,160 @@
+{
+  "schema": "nhm2.g2h_e_s4_r1.continuation_tube_contract.v1",
+  "status": "draft_unsealed_exact_1024_cell_tube_overlap_orientation_and_terminal_containment_definition_no_scientific_continuation_authority",
+  "work_packet_header": {
+    "program_gate": "G2H-E-S4-R1",
+    "workstream": "authenticated classical and quantum control branch",
+    "capability_or_component": "vacuum-to-selected-member 1024-cell validated continuation tube, overlap, no-fold and terminal containment ABI",
+    "current_maturity": "endpoint, chart maps, inverse/radii predicates defined; no continuation cell executed",
+    "target_maturity": "independently audited deterministic continuation definition suitable for disjoint fixture producers",
+    "required_frozen_inputs": [
+      "R2 contract 041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a",
+      "1024 cells on lambda in [0,1] and shat_0(lambda)=1+lambda/5",
+      "73 radii per cell",
+      "vacuum chart d6cbff356b6bfc8db39f65f28407b2064f0ff024f611472342f73c8687d816de",
+      "state/grid v2 cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c",
+      "validated inverse/radii a180d03a7ea4f2b9499bdce9984b7310d178e777016a48a0809d76768a0ba529"
+    ],
+    "required_evidence": [
+      "exact cell and local-coordinate inventory",
+      "deterministic second-order left-end predictor chronology",
+      "radii proof in every cell",
+      "same-chart boundary containment",
+      "vacuum-to-positive chart containment",
+      "no-fold and exact orientation",
+      "terminal N=256 ball containment",
+      "synthetic pass and first-failure fixtures"
+    ],
+    "stop_fail_criteria": [
+      "using a coarse-grid state to initialize a finer terminal solve",
+      "using right-end observations to alter a cell predictor or inverse",
+      "an overlap or containment interval touching its boundary",
+      "kernel/invertibility loss",
+      "skipping, retrying, subdividing or reordering a cell",
+      "candidate evaluation, root creation, authorization or authority promotion"
+    ],
+    "explicit_non_goals": [
+      "executing any cell",
+      "evaluating the frozen member",
+      "changing terminal-grid predictor rules",
+      "implementing scientific producers",
+      "G3, quantum products or physical claims"
+    ],
+    "downstream_gate_unlocked": "classical continuation-definition component after independent audit; implementation remains blocked on remaining R1 definitions"
+  },
+  "semantic_change_class": "additive_continuation_proof_and_receipt_semantics_R2_unchanged",
+  "immutable_predecessors": {
+    "r2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s3-r2-mini-boson-star-contract.v1.json", "sha256": "041c406c4113c6915bf02db36c1fadd2ad685278ce9d2ce445da5176a90ed12a", "mutated": false},
+    "vacuum_chart": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-vacuum-blow-up-chart.v1.json", "raw_sha256": "d6cbff356b6bfc8db39f65f28407b2064f0ff024f611472342f73c8687d816de"},
+    "state_grid_v2": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-classical-state-grid-contract.v2.json", "raw_sha256": "cd98fb110a6d0d94cd69d1134e8f5233444ea34f7894bc14333075d0dfa5013c"},
+    "validated_inverse": {"path": "docs/research/nhm2-spherical-boson-star-v2-g2h-e-s4-r1-validated-inverse-radii-contract.v1.json", "raw_sha256": "a180d03a7ea4f2b9499bdce9984b7310d178e777016a48a0809d76768a0ba529"}
+  },
+  "cell_inventory": {
+    "ordinals": "i=0..1023 in increasing order",
+    "lambda_interval": "Lambda_i=[i/1024,(i+1)/1024]",
+    "local_coordinate": "tau=2048*lambda-(2*i+1), so tau in [-1,1]",
+    "source_coordinate": "shat_0=1+lambda/5 exactly",
+    "vacuum_cell": "i=0 uses eta=lambda/(5*delta), xi=sqrt(eta)*r and the scaled vacuum state/grid chart",
+    "positive_cells": "i=1..1023 use the positive-kappa physical-r state/grid chart",
+    "cell_count": 1024,
+    "candidate_radii_each": 73,
+    "adaptive_subdivision": false
+  },
+  "prerequisite_terminal_solves": {
+    "grids": [64, 96, 128, 256],
+    "rule": "each lambda=1 terminal grid solve is initialized independently from the same authenticated analytic seed and completes before continuation proof construction",
+    "coarse_to_fine_initialization": false,
+    "continuation_to_terminal_initialization": false,
+    "purpose": "the terminal N=256 ball is an independently obtained containment target, not a predictor for the continuation cells"
+  },
+  "cell_center_tube": {
+    "degree": 2,
+    "left_coordinate": "h=lambda-i/1024 in [0,1/1024]",
+    "formula": "xbar_i(lambda)=x_i_left+h*v_i_left+(h^2/2)*a_i_left",
+    "first_tangent_equation": "D_xF*v_i_left+F_lambda=0",
+    "second_tangent_equation": "D_xF*a_i_left+F_lambdalambda+2*D_xlambdaF*v_i_left+D_xxF[v_i_left,v_i_left]=0",
+    "dyadic_projection": "x_i_left,v_i_left,a_i_left are exact dyadic vectors produced by the producer's frozen deterministic projection algorithm before that cell's inverse or Y/Z values",
+    "projection_acceptance": "directed residual and tangent-defect balls for all three dyadic vectors are mandatory inputs to Y and Z1",
+    "right_observation_forbidden": "no value first observed at lambda=(i+1)/1024 may alter the already frozen cell-i center, derivatives, inverse, work budget or radii"
+  },
+  "sequential_left_endpoint_rule": {
+    "cell_0": "x_0_left is the exact dyadic center of the proved SP endpoint ball mapped into the eta=0 vacuum layout",
+    "cell_i_positive": "for i>=1, x_i_left is the producer's deterministic exact-dyadic projection of the preceding accepted right-end center/ball evidence after the required chart map when i=1",
+    "projection_containment": "the projected point must lie strictly inside the preceding accepted right-end ball with a directed positive margin",
+    "chronology": "cell i+1 projection and construction begin only after cell i proof, right-end persistence and self-hash complete",
+    "failure": "projection outside/touching, missing preceding proof or chronology mismatch is terminal at cell i+1"
+  },
+  "cell_validation": {
+    "inverse_and_bounds": "each cell uses one immutable producer-specific inverse record and Y,Z0,Z1,Z2 under validated-inverse-radii.v1",
+    "parameter_supremum": "all bounds cover the entire closed Lambda_i and selected state ball, not sampled parameter points",
+    "radius": "the least passing member of 2^-192..2^-120",
+    "unique_tube": "a pass proves one unique solution x_i(lambda) inside the varying center ball for every lambda in Lambda_i",
+    "simple_kernel": "the contraction/inverse margin proves D_xF is invertible throughout the cell ball",
+    "no_fold": "lambda is the exact independent parameter and D_xF remains invertible, so the normalized branch is one graph over Lambda_i with no fold",
+    "orientation": "d(shat_0)/d(lambda)=1/5>0 exactly on every cell"
+  },
+  "same_chart_overlap": {
+    "boundaries": "between cells i and i+1 for i=1..1022",
+    "centers": "c_left=xbar_i((i+1)/1024), c_right=xbar_(i+1)((i+1)/1024)",
+    "strict_containment": "either norm(c_right-c_left)+r_(i+1)<r_i or norm(c_right-c_left)+r_i<r_(i+1)",
+    "meaning": "one complete validated ball lies strictly inside the other; the contained ball's zero belongs to both uniqueness regions, so both claims identify the same boundary solution",
+    "touching": "if neither directed strict containment passes, including equality/touching, overlap fails"
+  },
+  "chart_handoff": {
+    "boundary": "lambda=1/1024 between vacuum cell 0 and positive cell 1",
+    "map": "the exact state/grid v2 tail map Q=q/epsilon on Q in [0,1/255], q in [0,epsilon/255], together with the exact core reconstruction into common physical observables",
+    "comparison_space": "common physical [m,b,s,sigma,p,omega] value/first-derivative balls on the complete overlap cover plus ADM mass",
+    "strict_containment": "in every frozen comparison norm, either the positive cell-1 left physical ball is strictly contained in the mapped vacuum cell-0 right ball or the mapped vacuum ball is strictly contained in the positive ball; one common direction must hold for the joint product ball",
+    "interface_warning": "physical r=255 and scaled xi=255 patch interfaces are not equated",
+    "failure": "any missing cover, denominator margin, non-overlap or touching is terminal"
+  },
+  "terminal_containment": {
+    "boundary": "lambda=1 at the right endpoint of cell 1023",
+    "continuation_ball": "the cell-1023 accepted right-end positive-chart ball",
+    "terminal_ball": "the independently solved and continuum-validated N=256 selected-member ball",
+    "strict_rule": "either norm(c_terminal-c_continuation)+r_terminal<r_continuation or norm(c_terminal-c_continuation)+r_continuation<r_terminal",
+    "same_solution": "strict containment plus uniqueness identifies the continuation endpoint with the frozen selected-member terminal solution",
+    "no_grid_promotion": "grid agreement alone never substitutes for this continuum containment"
+  },
+  "first_failure_and_records": {
+    "cell_order": "0 through 1023 with no skip or retry",
+    "within_cell_precedence": ["ingress_and_previous_hash", "chart_and_denominator_domain", "left_projection", "center_and_tangent_defects", "inverse_chronology", "Y", "Z0", "Z1", "Z2", "radii", "right_endpoint", "overlap_or_handoff", "record_persistence"],
+    "terminal_precedence": "terminal N=256 containment runs only after cell 1023 passes",
+    "record_chain": "each cell record binds the exact previous cell self-hash; cell 0 binds the endpoint record",
+    "first_failure": "the first failing cell and within-cell role terminates the lane and becomes immutable evidence",
+    "retry_retune_alternate_root": false
+  },
+  "fixture_boundary": {
+    "allowed": ["scalar and finite-vector operators with exact known branches", "synthetic cell chains", "same-chart and mapped overlap pass/touch/fail", "kernel-loss", "out-of-order, mutation and previous-hash fixtures"],
+    "forbidden": ["loading a boson-star center", "evaluating any scientific cell", "selected-member evaluation", "candidate-root creation", "authority promotion"]
+  },
+  "readiness": {
+    "cell_inventory_complete": true,
+    "center_tube_complete": true,
+    "same_chart_overlap_complete": true,
+    "chart_handoff_complete": true,
+    "no_fold_orientation_complete": true,
+    "terminal_containment_complete": true,
+    "record_chronology_complete": true,
+    "fixture_audit_complete": false,
+    "independent_definition_audit_complete": false,
+    "scientific_cells_executed": 0,
+    "vacuum_connection_established": false,
+    "implementation_authorized": false,
+    "candidate_execution_authorized": false
+  },
+  "authority": {
+    "definition_is_continuation": false,
+    "definition_is_proof": false,
+    "candidate_evaluated": false,
+    "candidate_root_created": false,
+    "classical_proof_established": false,
+    "candidate_authority": false,
+    "geometry_state_authority": false,
+    "lane_authority": false,
+    "diagnostic_lamp_authority": false,
+    "physical_authority": false,
+    "propulsion_authority": false,
+    "transport_authority": false
+  }
+}

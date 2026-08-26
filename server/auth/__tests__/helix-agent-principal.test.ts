@@ -385,6 +385,7 @@ describe("resolveHelixAgentApiPrincipal", () => {
       issuer: "https://issuer.example",
       subject: "subject-linked",
       tenantId: "tenant-linked",
+      claims: { azp: "codex-desktop-client" },
     });
     const verifier = verifierDouble(token);
     const request = requestWithHeaders({
@@ -401,6 +402,7 @@ describe("resolveHelixAgentApiPrincipal", () => {
       subjectId: "subject-linked",
       accountProfileId: "profile-1",
       accountType: "user",
+      oauthClientRef: expect.stringMatching(/^oauth_client:[a-f0-9]{64}$/),
       tokenExpiresAt: token.expiresAt,
       accountContext: {
         profile_id: "profile-1",

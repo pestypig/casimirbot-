@@ -11528,8 +11528,18 @@ export const shouldRetryCodexContinuationAffordance = (input: {
   continuationInstruction: string | null;
   scholarlyDecision: "answer" | "recover" | "ask_user" | "fail" | null;
   scholarlyDecisionAuditStatus: "valid" | "invalid" | null;
+  nativeTerminalCandidateCompletedAfterObservation?: boolean;
 }): boolean => {
   if (!input.continuationInstruction) return false;
+  // A completed native Codex cycle already owns the semantic continuation:
+  // it selected and executed the admitted tool, received the observation,
+  // reasoned after re-entry, and authored a terminal candidate. Do not make a
+  // pre-answer requirement projection reopen that exact capability. The
+  // candidate still passes through the normal route, evidence, quality, and
+  // terminal-authority checks, which may return a typed rejection to Codex.
+  if (input.nativeTerminalCandidateCompletedAfterObservation === true) {
+    return false;
+  }
   const validatedTerminalDecision =
     input.scholarlyDecisionAuditStatus === "valid" &&
     input.scholarlyDecision !== null &&
@@ -24666,10 +24676,17 @@ export const codexProvider: HelixAgentProvider = {
     );
     const runtimeProviderRequiredGroundingCapabilityIdsUnfiltered =
       runtimeProviderRequiredGroundingCapabilityIdsFromBody(request.body);
-    const exactCommittedDurableGoalInspect =
-      exactCommittedCapability ===
-      HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY;
-    const exactCommittedCapabilityIds = exactCommittedDurableGoalInspect
+    const exactCommittedCapabilityManifest = gatewayManifest.capabilities.find(
+      (capability) => capability.capability_id === exactCommittedCapability,
+    );
+    const exactCommittedReadOnlyEnvironmentCapability =
+      hardCommittedRoute &&
+      Boolean(exactCommittedCapability) &&
+      inferCommittedRouteToolFamily(exactCommittedCapability ?? "") ===
+        "live_environment" &&
+      exactCommittedCapabilityManifest?.mutating === false;
+    const exactCommittedCapabilityIds =
+      exactCommittedReadOnlyEnvironmentCapability
       ? uniqueStrings([
           exactCommittedCapability,
           ...runtimeProviderRequiredGroundingCapabilityIdsUnfiltered,
@@ -24687,7 +24704,7 @@ export const codexProvider: HelixAgentProvider = {
         ],
         admittedToolFamilies: runtimeAdmittedToolFamilies,
         committedRouteAllowedToolFamilies:
-          hardCommittedRoute && exactCommittedDurableGoalInspect
+          exactCommittedReadOnlyEnvironmentCapability
           ? boundaryCommittedRoute?.capability_policy.allowed_tool_families
           : undefined,
         requiredExactCapabilityIds:
@@ -24722,7 +24739,7 @@ export const codexProvider: HelixAgentProvider = {
     let providerContinuationAdmittedCapabilityIds =
       semanticPlayerEmbodimentActionRequired
         ? nativeProviderAdmittedCapabilityIds
-        : exactCommittedDurableGoalInspect
+        : exactCommittedReadOnlyEnvironmentCapability
           ? nativeProviderAdmittedCapabilityIds
           : runtimeProviderAdmittedCapabilityIds;
     const admittedRequiredContinuationCapabilityIds = uniqueStrings([
@@ -27598,12 +27615,12 @@ export const codexProvider: HelixAgentProvider = {
             readString(gatewayRequest.capabilityId);
           if (!capabilityId) return false;
           if (
-            exactCommittedDurableGoalInspect &&
+            exactCommittedReadOnlyEnvironmentCapability &&
             !nativeProviderAdmittedCapabilityIdSet.has(capabilityId)
           ) {
             return false;
           }
-          return exactCommittedDurableGoalInspect &&
+          return exactCommittedReadOnlyEnvironmentCapability &&
             compatibilityBoundaryCommittedRoute
             ? assertCapabilityAllowedByCommittedRoute({
                 committedRoute: compatibilityBoundaryCommittedRoute,
@@ -27690,6 +27707,18 @@ export const codexProvider: HelixAgentProvider = {
       );
     const nativeTurnEligibleForTerminal =
       nativeTurnSucceeded && nativeRouteViolationCapabilityIds.length === 0;
+    const nativeTerminalCandidateCompletedAfterObservation = Boolean(
+      nativeTurnEligibleForTerminal &&
+        nativeProviderBridgeAttempt.result?.debug.terminal_candidate_present ===
+          true &&
+        nativeTurnLifecycle?.reduction.post_observation_reasoning_completed ===
+          true &&
+        nativeTurnLifecycle.reduction.tool_calls.some(
+          (toolCall) =>
+            toolCall.reentered === true &&
+            toolCall.observation_refs.length > 0,
+        ),
+    );
     const compatibilityGatewayRecoveryAttempted =
       shouldAttemptCodexCompatibilityGatewayRecovery({
         nativeProviderBridgeAttempted: nativeProviderBridgeAttempt.attempted,
@@ -28016,6 +28045,7 @@ export const codexProvider: HelixAgentProvider = {
         scholarlyDecision: latestScholarlyEvidenceDecision?.decision ?? null,
         scholarlyDecisionAuditStatus:
           latestScholarlyEvidenceDecisionAudit?.status ?? null,
+        nativeTerminalCandidateCompletedAfterObservation,
       })
         ? continuationAffordanceRetryCandidate
         : null;
@@ -28084,6 +28114,7 @@ export const codexProvider: HelixAgentProvider = {
       initialRuntimeLaneRequestCandidate,
     );
     const observationDependentCapabilityProposalRetryRequired =
+      !nativeTerminalCandidateCompletedAfterObservation &&
       continuationStateRequiresCodexModelAuthoredCapabilityProposal(
         providerContinuationState,
       );
@@ -28094,6 +28125,7 @@ export const codexProvider: HelixAgentProvider = {
       });
     let runtimeLaneRequestRetry: Record<string, unknown> | null = null;
     if (
+      !nativeTerminalCandidateCompletedAfterObservation &&
       !runtimeLaneRequestCandidate &&
       (Boolean(continuationLaneCandidateRejection) ||
         Boolean(continuationAffordanceRetryInstruction) ||

@@ -97,4 +97,56 @@ final class FabricCommandClassifierTest {
             FabricCommandClassifier.classify("time set day")
         );
     }
+
+    @Test
+    void classifiesEveryControlledCourseCommandRootAcrossNestedExecuteForms() {
+        assertEquals(
+            new FabricCommandClassifier.Classification("world_build", "world_mutation"),
+            FabricCommandClassifier.classify(
+                "execute in minecraft:overworld run fill 92 64 -208 108 71 -192 minecraft:air replace"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("world_build", "world_mutation"),
+            FabricCommandClassifier.classify(
+                "execute in minecraft:overworld run setblock 97 65 -200 minecraft:furnace replace"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("player_state", "player_mutation"),
+            FabricCommandClassifier.classify("gamemode survival FixturePlayer")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("player_state", "player_mutation"),
+            FabricCommandClassifier.classify("effect clear FixturePlayer")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("player_inventory", "player_mutation"),
+            FabricCommandClassifier.classify("clear FixturePlayer")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("player_inventory", "player_mutation"),
+            FabricCommandClassifier.classify(
+                "give FixturePlayer minecraft:flint_and_steel 1"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("entity_control", "world_mutation"),
+            FabricCommandClassifier.classify(
+                "execute in minecraft:overworld run summon minecraft:item 95 65 -198 {Item:{id:\"minecraft:cobblestone\",count:1}}"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("player_movement", "player_mutation"),
+            FabricCommandClassifier.classify(
+                "execute in minecraft:overworld run tp FixturePlayer 94 65 -200 -90 0"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("query", "read_only"),
+            FabricCommandClassifier.classify(
+                "execute in minecraft:overworld run execute unless block 100 66 -200 minecraft:nether_portal run data get entity FixturePlayer Pos"
+            )
+        );
+    }
 }

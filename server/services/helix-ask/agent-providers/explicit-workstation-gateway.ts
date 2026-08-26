@@ -90,6 +90,7 @@ import {
 import {
   buildPromptDerivedLivePipelineControlGatewayCallRequests,
 } from "./live-pipeline-control-tool-requests";
+import { buildPromptDerivedBrokerageEnvironmentGatewayCallRequests } from "./brokerage-environment-tool-requests";
 import {
   assertCapabilityAllowedByCommittedRoute,
   readCommittedAskRoute,
@@ -1047,6 +1048,8 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
     );
   const promptDerivedLivePipelineControlRequests =
     buildPromptDerivedLivePipelineControlGatewayCallRequests(input.body);
+  const promptDerivedBrokerageEnvironmentRequests =
+    buildPromptDerivedBrokerageEnvironmentGatewayCallRequests(input.body);
   const promptNamedRequests =
     buildPromptNamedCapabilityGatewayCallRequests(input.body);
   const minecraftMechanicsDocs =
@@ -1148,6 +1151,7 @@ export const readWorkstationGatewayCallRequestsForTurn = (input: {
   // Minecraft requests so a model cannot author a mutation from an ungrounded
   // command guess and only discover the playbook afterwards.
   appendPromptDerivedDedupe(minecraftMechanicsDocs);
+  appendPromptDerivedDedupe(promptDerivedBrokerageEnvironmentRequests);
   appendDedupe(requests, seen, structured);
   appendPromptDerivedDedupe(promptDerivedLivePipelineControlRequests);
   if (

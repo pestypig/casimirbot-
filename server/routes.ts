@@ -222,11 +222,13 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { docsTranslationRouter } = await import("./routes/docs-translation");
   const { researchLibraryRouter } = await import("./routes/research-library");
   const { googleAuthRouter } = await import("./routes/google-auth");
+  const { auth0WebAuthRouter } = await import("./routes/auth0-web-auth");
   const { profileIngressRouter } = await import("./routes/profile-ingress");
   const { roomSourceIngressRouter } = await import("./routes/room-source-ingress");
   const { environmentCommandRouter } = await import("./routes/environment-command-routes");
   const { environmentActionRouter } = await import("./routes/environment-action-routes");
   app.use("/api/auth", googleAuthRouter);
+  app.use("/api/auth", auth0WebAuthRouter);
   app.use("/api/account", accountSessionRouter);
   app.use("/api", desktopReleaseRouter);
   app.use("/api/docs", docsPrintPdfRouter);

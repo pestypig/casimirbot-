@@ -14,6 +14,8 @@ export const HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY =
   "com.casimirbot.minecraft.player.jump" as const;
 export const HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY =
   "com.casimirbot.minecraft.player.interact" as const;
+export const HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY =
+  "com.casimirbot.minecraft.player.combat.attack" as const;
 export const HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY =
   "com.casimirbot.minecraft.player.hotbar.select" as const;
 export const HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY =
@@ -54,6 +56,7 @@ export const HELIX_MINECRAFT_PLAYER_MVP_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
@@ -77,6 +80,7 @@ export const HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
@@ -102,6 +106,7 @@ export const HELIX_MINECRAFT_PLAYER_ACTION_KINDS = [
   "walk",
   "jump",
   "interact",
+  "attack",
   "hotbar_select",
   "equip",
   "follow",
@@ -287,6 +292,23 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
       .strict(),
     z
       .object({
+        action_kind: z.literal("attack"),
+        target_ref: subjectRefSchema.describe(
+          "Opaque exact entity incarnation reference returned by a prior target-lock receipt.",
+        ),
+        target_entity_type_id: resourceLocationSchema,
+        target_classification: z.literal("hostile"),
+        max_acquisition_distance: z.number().finite().min(1).max(16),
+        require_line_of_sight: z.literal(true),
+        minimum_attack_cooldown: z.number().finite().min(0.1).max(1),
+        max_attack_pulses: z.number().int().min(1).max(64),
+        max_duration_ms: z.number().int().min(1_000).max(60_000),
+        stop_below_health: z.number().finite().min(1).max(20),
+        friendly_fire: z.literal(false),
+      })
+      .strict(),
+    z
+      .object({
         action_kind: z.literal("hotbar_select"),
         slot: z.number().int().min(0).max(8),
       })
@@ -332,6 +354,11 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
         block_id: resourceLocationSchema,
         count: z.number().int().min(1).max(4_096),
         search_radius: z.number().int().positive().max(32),
+        target_position: helixMinecraftBlockPositionSchema
+          .optional()
+          .describe(
+            "Optional exact loaded block to mine. When supplied, count must be 1 and the block must still match block_id inside the admitted search radius.",
+          ),
       })
       .strict(),
     z
@@ -386,6 +413,18 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
       .strict(),
   ])
   .superRefine((value, context) => {
+    if (
+      value.action_kind === "mine" &&
+      value.target_position &&
+      value.count !== 1
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["count"],
+        message: "Exact-target mining requires count to equal 1.",
+      });
+      return;
+    }
     if (value.action_kind === "place") {
       if (
         (value.positions === undefined) ===
@@ -486,6 +525,8 @@ export const minecraftPlayerCapabilityForActionKind = (
       return HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY;
     case "interact":
       return HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY;
+    case "attack":
+      return HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY;
     case "hotbar_select":
       return HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY;
     case "equip":

@@ -1,0 +1,54 @@
+{
+  "authority": {
+    "candidate_admitted": false,
+    "candidate_evaluations": 1,
+    "classical_proof_established": false,
+    "diagnostic_lamp": false,
+    "geometry_state_accepted": false,
+    "independent_execution_authorized": false,
+    "physical_viability": false,
+    "propulsion": false,
+    "transport": false
+  },
+  "casimir": {
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_id": "constraint-pack:repo-convergence:6e84f965957f",
+    "certificate_status": "GREEN",
+    "deltas": [],
+    "fail_reason": "NONE",
+    "first_fail": null,
+    "integrity_ok": true,
+    "run_id": "2470",
+    "trace_id": "adapter:fe571d94-4efb-4be5-a242-c9cd1c797b4a",
+    "verdict": "PASS"
+  },
+  "math": {
+    "registry_entries": 318,
+    "report_bytes": 25037,
+    "report_sha256": "a8c7f402ed2ec04ba0826ac86dc49bc73ee95902b27d22b5b091e902c5cfc164",
+    "validation": "PASS"
+  },
+  "primary_result_md_sha256": "1433249b240add63f0a5ec157855f5dce28e9a29fbd731ab7eb22b25aa149c39",
+  "primary_result_sha256": "4248b29a38588dc6c1b1a0c283bb78399eabd3d815376d0ddad3fd7e481392d7",
+  "result_audit": {
+    "passed": 77,
+    "script_bytes": 7808,
+    "script_sha256": "ae02d07d90ead212072901d14dc5fc5b0dbee879628e421b4851609986726896",
+    "total": 77
+  },
+  "schema": "nhm2.g2h_e_s3.primary_verification_receipt.v1",
+  "status": "PASS_IMMUTABLE_MATHEMATICAL_FAIL_INTEGRITY_ONLY",
+  "training_trace": {
+    "bytes_at_receipt": 4737972,
+    "path": "artifacts/training-trace.jsonl",
+    "sha256_at_receipt": "d3e1131b2e70500a3621dfd87b37079d4c2b8879975c8ffce719f7959071b679"
+  },
+  "warp": {
+    "failed_files": 0,
+    "failed_tests": 0,
+    "passed_files": 18,
+    "passed_tests": 179,
+    "required_files": 18,
+    "tests": 179
+  }
+}
