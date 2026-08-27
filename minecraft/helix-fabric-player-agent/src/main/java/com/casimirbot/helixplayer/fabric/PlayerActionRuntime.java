@@ -1152,11 +1152,11 @@ final class PlayerActionRuntime implements AutoCloseable {
         boolean programKind = "execute_sequence".equals(actionKind) ||
             "execute_reactive_program".equals(actionKind);
         boolean motionKind = List.of(
-            "navigate_to", "look_at", "track_target", "walk", "jump", "follow", "collect", "mine", "place"
+            "navigate_to", "look_at", "track_target", "walk", "jump", "combat_guard", "follow", "collect", "mine", "place"
         ).contains(actionKind) ||
             (programKind && Boolean.TRUE.equals(measurements.get("player_motion_performed")));
         boolean interactionKind = List.of(
-            "interact", "mine", "place", "craft", "inventory_transfer"
+            "interact", "attack", "combat_guard", "mine", "place", "craft", "inventory_transfer"
         ).contains(actionKind) ||
             (programKind && Boolean.TRUE.equals(measurements.get("player_interaction_performed")));
         boolean directInventoryKind = List.of("hotbar_select", "equip").contains(actionKind) ||
@@ -1360,6 +1360,14 @@ final class PlayerActionRuntime implements AutoCloseable {
             capability("com.casimirbot.minecraft.player.jump", "jump", "player_motion", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.interact", "interact", "player_interaction", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.combat.attack", "attack", "player_interaction", List.of("long_running")),
+            capability(
+                "com.casimirbot.minecraft.player.combat.guard",
+                "combat_guard",
+                "continuous_control",
+                List.of("long_running"),
+                List.of("native_fabric"),
+                true
+            ),
             capability("com.casimirbot.minecraft.player.hotbar.select", "hotbar_select", "player_inventory", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.equipment.equip", "equip", "player_inventory", List.of("single_action")),
             capability("com.casimirbot.minecraft.player.follow", "follow", "continuous_control", List.of("long_running")),
@@ -1503,7 +1511,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     static boolean directDiagnosticActionAllowed(String actionKind) {
         return List.of(
             "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
-            "attack", "hotbar_select", "equip", "follow", "collect", "mine", "place",
+            "attack", "combat_guard", "hotbar_select", "equip", "follow", "collect", "mine", "place",
             "craft", "inventory_transfer", "execute_sequence",
             "execute_reactive_program", "arm_viability_guardian",
             "disarm_viability_guardian"

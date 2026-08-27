@@ -2,9 +2,9 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G1 — real calibrated solar baseline**
+Active program gate: **G1 — real calibrated solar baseline (blocked at runtime-capacity preflight)**
 
-Status date: **August 24, 2026**
+Status date: **August 26, 2026**
 
 This document is the sole current dependency and status roadmap for the solar
 restoration deep-mixing research branch. Dated audits, solver receipts, UI
@@ -17,6 +17,14 @@ and its result is preserved in
 [`controlled-stellar-composition-transport-g0-result-record.md`](./controlled-stellar-composition-transport-g0-result-record.md).
 The sole active packet is now
 [`controlled-stellar-composition-transport-g1-solar-baseline-calibration.md`](./controlled-stellar-composition-transport-g1-solar-baseline-calibration.md).
+The first G1 attempt is preserved in
+[`controlled-stellar-composition-transport-g1-result-record.md`](./controlled-stellar-composition-transport-g1-result-record.md)
+with terminal decision `BLOCKED_BASELINE_CALIBRATION`; G2 remains blocked.
+The bounded infrastructure response is specified in
+[`controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md`](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md):
+a Google Drive archival connector is the primary recovery path, and a narrow
+Windows window-state broker is an optional reusable capability. This parallel
+packet can enable another G1 attempt but cannot close G1 or unlock G2.
 The intended manuscript structure and evidence map are maintained in
 [`controlled-stellar-composition-transport-white-paper-outline.md`](./controlled-stellar-composition-transport-white-paper-outline.md).
 
@@ -138,6 +146,8 @@ rounding rules are encoded and tested.
 ```mermaid
 flowchart TD
     G0["G0 Reduced-order ledger repair and preregistration"] --> G1["G1 Real calibrated solar baseline"]
+    DR["G1-R Google Drive archival and verified capacity release"] --> G1
+    WB["Optional narrow Windows window-state broker"] -. "operator-surface support only" .-> DR
     G1 --> G2["G2 Conservative transport implementation"]
     G2 --> G3["G3 Frozen transport-family campaign"]
     G3 --> G4["G4 Evolutionary milestone closure"]
@@ -156,7 +166,7 @@ failed observational closure.
 | Gate | State | Required closure evidence | Downstream gate unlocked |
 | --- | --- | --- | --- |
 | G0 — Reduced-order ledger repair and preregistration | **closed: `PASS_REDUCED_ORDER_PREREGISTERED`** | Typed ledgers separate hydrogen-burning reference, gross circulation, net hydrogen delivery, and cumulative accessible fuel; numerical audit and adversarial controller tests pass; future-gate semantic contract is versioned; claim boundary remains diagnostic | G1 |
-| G1 — Real calibrated solar baseline | **active** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
+| G1 — Real calibrated solar baseline | **active, blocked: `INSUFFICIENT_DISK_FOR_MESA_IMAGE`** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
 | G2 — Conservative transport implementation | blocked by G1 | Species-conservative diffusion/advection implementation; boundary conditions; mass/species/energy closure tests; radiative-interior bridge; resolution and timestep convergence; zero-transport recovery of the G1 baseline | G3 |
 | G3 — Frozen transport-family campaign | blocked by G2 | Preregistered families, parameter bounds, sampling/optimization procedure, compute budget, seeds where applicable, first-failure rules, and retained artifacts for null as well as surviving candidates | G4 |
 | G4 — Evolutionary milestone closure | blocked by G3 | Each candidate evolved through central hydrogen exhaustion, TAMS, core contraction, shell ignition, early subgiant evolution, and a frozen radius threshold; physical `Delta t_TAMS` and `Delta t_R>R_star` outputs replace the hazard proxy | G5 |
@@ -170,6 +180,12 @@ Exactly one gate is active. Until G1 closes, implementation work must contribute
 directly to the calibrated solar baseline, or be declared as a parallel
 literature/data-inventory lane that cannot perturb frozen G1 definitions after
 results are observed.
+
+The G1 runtime-capacity recovery packet is a non-evidentiary enabling lane. Its
+Drive connector and optional window-state broker are governed environment G8
+capability specifications, not new solar gates. Upload verification and local
+capacity release may authorize a new versioned G1 attempt; they do not establish
+a solver execution, calibrated baseline, intervention result, or G2 eligibility.
 
 The following do not close G1:
 
@@ -216,11 +232,15 @@ Downstream gate unlocked:
 
 ## Immediate execution sequence
 
-1. Complete the G1 reference-data and solver-runtime inventory without running
-   an intervention model.
-2. Freeze the solar calibration objective, tolerances, covariance policy,
-   microphysics, convergence policy, and exact MESA runtime identity.
-3. Execute the zero-transport baseline with no fixture fallback and retain all
+1. Execute the frozen, no-delete archival and verification stages in the
+   [G1 runtime-capacity recovery packet](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md),
+   then obtain separate owner confirmation for the exact local-release manifest.
+2. Measure at least the frozen 25 GB on the Docker data drive, or preregister a
+   different content-addressed runtime with adequate capacity.
+3. Verify the pinned image digest and create a new versioned G1 attempt.
+4. Freeze the solar calibration objective, tolerances, covariance policy,
+   microphysics, convergence policy, and exact inlists before viewing results.
+5. Execute the zero-transport baseline with no fixture fallback and retain all
    declared inputs, outputs, logs, and hashes.
-4. Produce a G1 result record that either admits one calibrated baseline or
-   records the first blocking calibration failure.
+6. Produce a new G1 result record that either admits one calibrated baseline or
+   preserves its first hard failure.

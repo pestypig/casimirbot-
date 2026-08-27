@@ -933,13 +933,7 @@ export const requestEnvironmentActionWorkflowControl = async (input: {
     }
     if (
       input.controlKind === "cancel" &&
-      ![
-        "admitted",
-        "leased",
-        "running",
-        "paused_manual_override",
-        "cancel_requested",
-      ].includes(workflowRow.status)
+      !canCancelEnvironmentActionWorkflowStatus(workflowRow.status)
     ) {
       throw new EnvironmentActionAuthorityError(
         "action_control_invalid",
@@ -1016,6 +1010,21 @@ export const requestEnvironmentActionWorkflowControl = async (input: {
     return controlRequest;
   });
 };
+
+export const canCancelEnvironmentActionWorkflowStatus = (
+  status: string,
+): boolean =>
+  [
+    "admitted",
+    "leased",
+    "running",
+    "paused_manual_override",
+    "cancel_requested",
+    // The broker deadline is an observation boundary, not proof that the
+    // connector released its local controls. Permit a release-only cancel so
+    // a timed-out connector workflow can be reconciled without replaying it.
+    "timed_out",
+  ].includes(status);
 
 export const emergencyStopEnvironmentActionAuthority = async (input: {
   roomId: string;

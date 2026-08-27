@@ -503,6 +503,25 @@ describe("Shared Live Room environment panel", () => {
       const url = String(input);
       if (url.endsWith("/environments")) return jsonResponse(environmentReceipt());
       if (
+        url.endsWith("/connector-pairings/local-source-handoff") &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse({
+          schema: "helix.connector_pairing_receipt.v1",
+          ok: true,
+          error: null,
+          message:
+            "Local server sensing was staged without exposing the one-time code or enabling command access.",
+          pairing: null,
+          pairing_code_shown_once: false,
+          credential_included: false,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        });
+      }
+      if (
         url.endsWith("/connector-pairings/local-server-handoff") &&
         init?.method === "POST"
       ) {
@@ -725,6 +744,26 @@ describe("Shared Live Room environment panel", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText("/helix pair WXYZ-6789")).toBeNull();
+    expect(confirm).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Re-pair local sensing privately" }),
+    );
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/connector-pairings/local-source-handoff"),
+        expect.objectContaining({
+          method: "POST",
+          credentials: "include",
+          body: expect.stringContaining('"command_credential_requested":false'),
+        }),
+      ),
+    );
+    expect(
+      await screen.findByText(
+        "Local server sensing was staged without exposing the one-time code or enabling command access.",
+      ),
+    ).toBeTruthy();
     expect(confirm).not.toHaveBeenCalled();
   });
 });

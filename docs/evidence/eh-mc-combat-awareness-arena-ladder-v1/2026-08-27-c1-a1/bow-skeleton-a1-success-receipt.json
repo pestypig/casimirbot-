@@ -1,0 +1,63 @@
+{
+  "schema": "helix.minecraft.c1.a1.acceptance_receipt.v1",
+  "scenario_id": "eh-mc-c1-bow-skeleton-a1-v1",
+  "lane": "codex_mcp",
+  "observed_at": "2026-08-27T05:32:23.744Z",
+  "artifact_version": "1.2.4",
+  "artifact_sha256": "BCB8E93F52CCDD749C23898FDFB306F4F3D0B3933E7D885933DA7685506E73BE",
+  "capability_id": "com.casimirbot.minecraft.player.combat.guard",
+  "action_request_ref": "environment_action_request:542a7813-8593-4542-9a51-c4706647c8ec",
+  "workflow_ref": "environment_action_workflow:d5d90b42-bd26-4d2d-88d8-764e75465796",
+  "action_execution_ref": "environment_action_execution:c54c9240-1078-430b-ba31-856b520d838d",
+  "evidence_ref": "environment_action_evidence:271da8402e795e1e60d1ecef07993f20f43cb7842",
+  "outcome": "succeeded",
+  "summary": "No admitted hostile remains in the bounded combat envelope.",
+  "measurements": {
+    "duration_ticks": 67,
+    "approach_policy": "local_reroute_bounded",
+    "approach_ticks": 38,
+    "attack_pulses": 4,
+    "peak_hostile_count": 1,
+    "eligible_hostile_count": 0,
+    "peak_projectile_threat_count": 0,
+    "shield_ticks": 0,
+    "player_health": 20,
+    "target_switches": 0,
+    "friendly_fire": false,
+    "world_mutations_performed": 0,
+    "inventory_mutations_performed": 0,
+    "reason_code": "hostiles_cleared"
+  },
+  "effect_accounting": {
+    "side_effects_performed": true,
+    "player_motion_performed": true,
+    "player_interaction_performed": true,
+    "inventory_mutation_performed": false,
+    "world_mutation_performed": false
+  },
+  "safety": {
+    "server_watchdog_armed": true,
+    "health_floor": 12,
+    "manual_override_detected": false,
+    "controls_released": true,
+    "host_access_performed": false,
+    "automatic_replay_performed": false,
+    "model_invoked_in_connector": false
+  },
+  "fixture": {
+    "opponent": "minecraft:skeleton",
+    "opponent_equipment": "minecraft:bow",
+    "starting_distance_blocks": 14,
+    "ai_enabled_before_action_request": true
+  },
+  "screenshot": {
+    "path": "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a1/bow-skeleton-a1-success-terminal.png",
+    "sha256": "58484B5B6DE91E33E13DE6629EC766EFA0A684A8DAD3A9ABF487345B71CD0538"
+  },
+  "credential_included": false,
+  "pairing_code_included": false,
+  "hidden_reasoning_included": false,
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

@@ -659,6 +659,10 @@ export const createHelixAskLiveDebugSlimBuilder = (
       golden_path_runtime_status: payload.golden_path_runtime_status ?? debug.golden_path_runtime_status ?? null,
       session_id: payload.session_id ?? payload.sessionId ?? debug.session_id ?? null,
       agent_runtime: payload.agent_runtime ?? debug.agent_runtime ?? null,
+      runtime_path_identity:
+        payload.runtime_path_identity ?? debug.runtime_path_identity ?? null,
+      public_lifecycle_projection:
+        payload.public_lifecycle_projection ?? debug.public_lifecycle_projection ?? null,
       agent_runtime_adapter_contract:
         payload.agent_runtime_adapter_contract ?? debug.agent_runtime_adapter_contract ?? null,
       fail_reason: payload.fail_reason ?? debug.fail_reason ?? null,

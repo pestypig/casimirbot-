@@ -32,6 +32,51 @@ describe("local player pairing handoff", () => {
     ), "utf8")).resolves.toBe("/helix-player pair Z4ZD-X2JJ");
   });
 
+  it("targets an explicitly configured isolated client game directory", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
+    roots.push(root);
+    const isolatedGameDirectory = path.join(root, ".minecraft-helix-c0");
+
+    await expect(stageLocalMinecraftPlayerPairing({
+      appDataPath: root,
+      minecraftGameDirectoryPath: isolatedGameDirectory,
+      command: "/helix-player pair Z4ZD-X2JJ",
+    })).resolves.toEqual({ status: "player_pairing_inbox_staged" });
+
+    await expect(readFile(path.join(
+      isolatedGameDirectory,
+      "config",
+      "helix-fabric-player-agent.pairing-inbox",
+    ), "utf8")).resolves.toBe("/helix-player pair Z4ZD-X2JJ");
+    await expect(readFile(path.join(
+      root,
+      ".minecraft",
+      "config",
+      "helix-fabric-player-agent.pairing-inbox",
+    ), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("rejects relative or filesystem-root game directories", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
+    roots.push(root);
+
+    await expect(stageLocalMinecraftPlayerPairing({
+      appDataPath: root,
+      minecraftGameDirectoryPath: ".minecraft-helix-c0",
+      command: "/helix-player pair Z4ZD-X2JJ",
+    })).rejects.toMatchObject<Partial<LocalPlayerPairingHandoffError>>({
+      code: "local_player_pairing_game_directory_invalid",
+    });
+
+    await expect(stageLocalMinecraftPlayerPairing({
+      appDataPath: root,
+      minecraftGameDirectoryPath: path.parse(root).root,
+      command: "/helix-player pair Z4ZD-X2JJ",
+    })).rejects.toMatchObject<Partial<LocalPlayerPairingHandoffError>>({
+      code: "local_player_pairing_game_directory_invalid",
+    });
+  });
+
   it("rejects actions and malformed pairing material", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
     roots.push(root);

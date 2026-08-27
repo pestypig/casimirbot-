@@ -22,10 +22,10 @@ export const HELIX_ASK_LEGACY_CONSOLE_ACTIVE_PATH = [
 
 export const HELIX_ASK_LEGACY_CONSOLE_SOURCE_SNAPSHOT = {
   file: "client/src/components/helix/HelixAskPill.tsx",
-  lineCountAtInventory: 23740,
-  exportedComponentStartsAtLine: 6383,
-  liveRenderSliceStartsAtLine: 23524,
-  liveLegacyConsoleViewStartsAtLine: 23524,
+  lineCountAtInventory: 23809,
+  exportedComponentStartsAtLine: 6391,
+  liveRenderSliceStartsAtLine: 23584,
+  liveLegacyConsoleViewStartsAtLine: 23584,
   inventoryReason:
     "The normal Ask path remains on the legacy-looking bridge until the recrowned minimal runtime shell reaches live visual parity. Extracted ask-console display owners should continue to grow in the recrowned directory, not inside HelixAskPill.",
 } as const;
@@ -1159,11 +1159,39 @@ export const HELIX_ASK_LEGACY_CONSOLE_SLICES = [
       "MediaRecorder setup, STT dispatch, command confirmation, auto-dispatch, and voice steering remain active runtime behavior in the legacy file.",
   },
   {
-    key: "legacy_fallbacks_and_dev_branches",
-    classification: "unknown_trap_door_quarantined",
+    key: "legacy_backend_transport_selection",
+    classification: "behavior_sensitive_quarantined",
     source: "HelixAskPill.tsx",
     evidence:
-      "Local Ask fallback admission/execution paths, prompt classifiers, and older runtime branches must be audited before copying or deleting.",
+      "The default manual canary sends turns through runAskTurnStream and falls back to runAskTurn on a stream error. Legacy askLocal remains reachable from non-canary callers; its lane-parity flag defaults to /ask/turn, while disabling the flag admits the jobs and /ask routes. Preserve the path identity and turn-id continuity until G1 proves transport fallback cannot duplicate execution.",
+  },
+  {
+    key: "legacy_multilang_and_scope_retry",
+    classification: "behavior_sensitive_quarantined",
+    source: "HelixAskPill.tsx",
+    evidence:
+      "askLocalWithPreflightScopeFallback can retry once with multilangConfirm and can remove mode, allowTools, requiredEvidence, and verify after an AGI-bot preflight-scope error. This is now inventoried as a client-owned retry/downgrade path and remains quarantined for G1 runtime-path and downgrade observability.",
+  },
+  {
+    key: "legacy_client_workstation_execution_fast_path",
+    classification: "behavior_sensitive_quarantined",
+    source: "HelixAskPill.tsx",
+    evidence:
+      "When the manual Ask-turn canary is disabled and a prompt is not backend-forced, client parser/classifier code may call dispatchWorkstationActionSequence and getWorkstationFastPathReplyText without a completed backend solver turn. The default canary suppresses the ordinary manual path, but the branch remains reachable and is assigned to G6 removal after parity.",
+  },
+  {
+    key: "legacy_client_process_graph_answer_shortcut",
+    classification: "behavior_sensitive_quarantined",
+    source: "HelixAskPill.tsx",
+    evidence:
+      "A prompt admitted by shouldUseProcessGraphContextPack can build and project buildProcessGraphOverviewText directly from the client store without a backend Ask turn. This is a known presentation/answer shortcut assigned to G6 removal after an equivalent governed route exists.",
+  },
+  {
+    key: "legacy_conversation_preflight_classifier",
+    classification: "behavior_sensitive_quarantined",
+    source: "HelixAskPill.tsx",
+    evidence:
+      "When the manual canary is disabled and workstation intent needs classification, runConversationTurn may return a clarification that short-circuits the main Ask turn; preflight failures are swallowed before deterministic client routing continues. This known classifier branch is assigned to G6 removal after backend intent parity.",
   },
 ] as const satisfies readonly HelixAskLegacyConsoleSlice[];
 

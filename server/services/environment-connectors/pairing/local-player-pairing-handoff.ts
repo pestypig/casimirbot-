@@ -12,6 +12,7 @@ export class LocalPlayerPairingHandoffError extends Error {
     readonly code:
       | "local_player_pairing_root_unavailable"
       | "local_player_pairing_command_invalid"
+      | "local_player_pairing_game_directory_invalid"
       | "local_player_pairing_path_invalid",
     message: string,
   ) {
@@ -23,6 +24,7 @@ export class LocalPlayerPairingHandoffError extends Error {
 export const stageLocalMinecraftPlayerPairing = async (input: {
   command: string;
   appDataPath?: string | null;
+  minecraftGameDirectoryPath?: string | null;
 }): Promise<{ status: "player_pairing_inbox_staged" }> => {
   const command = input.command.trim();
   if (
@@ -42,7 +44,24 @@ export const stageLocalMinecraftPlayerPairing = async (input: {
       "The same-host Minecraft instance root is unavailable.",
     );
   }
-  const minecraftRoot = path.resolve(appDataPath, ".minecraft");
+  const configuredGameDirectory =
+    input.minecraftGameDirectoryPath?.trim() ||
+    process.env.HELIX_MINECRAFT_PLAYER_GAME_DIR?.trim();
+  if (configuredGameDirectory && !path.isAbsolute(configuredGameDirectory)) {
+    throw new LocalPlayerPairingHandoffError(
+      "local_player_pairing_game_directory_invalid",
+      "The configured Minecraft player game directory must be absolute.",
+    );
+  }
+  const minecraftRoot = configuredGameDirectory
+    ? path.resolve(configuredGameDirectory)
+    : path.resolve(appDataPath, ".minecraft");
+  if (minecraftRoot === path.parse(minecraftRoot).root) {
+    throw new LocalPlayerPairingHandoffError(
+      "local_player_pairing_game_directory_invalid",
+      "The configured Minecraft player game directory cannot be a filesystem root.",
+    );
+  }
   const configDirectory = path.resolve(minecraftRoot, "config");
   const relativeConfig = path.relative(minecraftRoot, configDirectory);
   if (relativeConfig.startsWith("..") || path.isAbsolute(relativeConfig)) {

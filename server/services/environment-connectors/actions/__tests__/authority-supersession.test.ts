@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canCancelEnvironmentActionWorkflowStatus,
   isEnvironmentActionAuthorityLeaseExtension,
   planEnvironmentActionAuthoritySupersession,
 } from "../authority-store";
 
 describe("environment action authority supersession", () => {
+  it("permits release-only cancellation after the broker observation deadline", () => {
+    expect(canCancelEnvironmentActionWorkflowStatus("timed_out")).toBe(true);
+    expect(canCancelEnvironmentActionWorkflowStatus("succeeded")).toBe(false);
+    expect(canCancelEnvironmentActionWorkflowStatus("failed")).toBe(false);
+  });
+
   it("retires every older active lease across player subject epochs", () => {
     const plan = planEnvironmentActionAuthoritySupersession([
       {

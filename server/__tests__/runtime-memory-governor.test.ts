@@ -943,6 +943,21 @@ describe("runtime memory governor", () => {
     expect(snapshot.limits.maxRssMiB).toBe(3200);
   });
 
+  it("reports the effective configured task-class burst estimate", () => {
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_ESTIMATED_BURST_MB = "768";
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const snapshot = runtimeMemoryGovernor.getRuntimeTaskSnapshot();
+    const activeUserTurn = snapshot.classes.find(
+      (entry) => entry.taskClass === "active_user_turn",
+    );
+
+    expect(activeUserTurn?.estimatedBurstMiB).toBe(768);
+  });
+
   it("reports per-task-class pressure when headline pressure is normal", () => {
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),

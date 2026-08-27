@@ -22,6 +22,7 @@ export {
   affirmativeMinecraftPlayerControlCapabilityIds,
   isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
   minecraftPlayerEmbodimentActionPromptMatch,
+  requiredMinecraftPlayerCombatCapabilityIds,
   requiredMinecraftResidentRecoveryCapabilityIds,
   resolveMinecraftExecutionPlaneConstraint,
 } from "../minecraft-execution-plane-intent";

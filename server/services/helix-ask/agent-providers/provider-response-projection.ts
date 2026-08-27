@@ -14,6 +14,7 @@ import {
   resolveTerminalAnswerEnvelope,
 } from "../terminal-answer-envelope";
 import { reconcileAuthoritativeTypedFailureLifecycle } from "../runtime/typed-failure-lifecycle-reconciliation";
+import { attachHelixAskRuntimeTransparency } from "../runtime/runtime-path-identity";
 import type { HelixAgentRuntimeSelectionTrace } from "./runtime-debug";
 import type { HelixAgentProvider, HelixAgentRunResult } from "./types";
 
@@ -450,5 +451,6 @@ export const buildHelixAgentProviderAskPayload = (input: {
       });
     }
   }
+  attachHelixAskRuntimeTransparency(payload);
   return sanitizeHelixAgentProviderPublicPayload(payload);
 };

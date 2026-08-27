@@ -76,6 +76,12 @@ import {
 } from "../services/helix-ask/workstation-tool-gateway/account-policy";
 import { readHelixSessionCookie } from
   "../services/helix-account/session-cookie";
+import {
+  createRoomReadGrant,
+  listRoomSharedCapabilities,
+  revokeRoomReadGrant,
+  RoomReadGrantStoreError,
+} from "../services/environment-connectors/profiles/room-read-grant-store";
 
 const identifier = z
   .string()
@@ -124,6 +130,14 @@ const deviceManagementSchema = z
 const deviceCheckListQuerySchema = z
   .object({
     room_id: identifier.optional(),
+  })
+  .strict();
+
+const roomReadGrantCreateSchema = z
+  .object({
+    connection_ref: identifier,
+    capability_ids: z.array(identifier).min(1).max(128),
+    expires_in_minutes: z.number().int().min(5).max(24 * 60),
   })
   .strict();
 
@@ -203,6 +217,12 @@ const sendError = (res: Response, error: unknown): void => {
     return;
   }
   if (error instanceof MinecraftLocalLifecycleError) {
+    res
+      .status(error.statusCode)
+      .json(errorPayload({ code: error.code, message: error.message }));
+    return;
+  }
+  if (error instanceof RoomReadGrantStoreError) {
     res
       .status(error.statusCode)
       .json(errorPayload({ code: error.code, message: error.message }));
@@ -679,6 +699,79 @@ environmentConnectorBrowserRouter.get(
       roomId: parsed.data.room_id,
     });
     res.json(deviceCheck);
+  }),
+);
+
+environmentConnectorBrowserRouter.get(
+  "/environment-connectors/rooms/:roomId/capability-grants",
+  route(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    browserBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    const projection = await listRoomSharedCapabilities({
+      roomId: req.params.roomId,
+      requestingProfileId: account.profileId,
+      requestingIsOwner: membership.role === "owner",
+    });
+    res.json(projection);
+  }),
+);
+
+environmentConnectorBrowserRouter.post(
+  "/environment-connectors/rooms/:roomId/capability-grants",
+  route(async (req, res) => {
+    const parsed = roomReadGrantCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      invalid(res, "The room read-grant request is invalid.");
+      return;
+    }
+    const account = await requireSharedRoomAccount(req);
+    browserBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    requireOwner(membership);
+    const grant = await createRoomReadGrant({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      ownerParticipantId: membership.participantId,
+      connectionRef: parsed.data.connection_ref,
+      capabilityIds: parsed.data.capability_ids,
+      expiresInMinutes: parsed.data.expires_in_minutes,
+    });
+    res.status(201).json({
+      ok: true,
+      grant,
+      credential_included: false,
+      private_endpoint_included: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+environmentConnectorBrowserRouter.delete(
+  "/environment-connectors/rooms/:roomId/capability-grants/:grantRef",
+  route(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    browserBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    requireOwner(membership);
+    const grant = await revokeRoomReadGrant({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      grantRef: req.params.grantRef,
+    });
+    res.json({
+      ok: true,
+      grant,
+      credential_included: false,
+      private_endpoint_included: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
   }),
 );
 

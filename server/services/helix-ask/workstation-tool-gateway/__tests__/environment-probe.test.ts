@@ -28,6 +28,8 @@ import type { SharedLiveRoomRunRoomBinding } from "../../../shared-live-room-con
 import { readEnvironmentConnectorCapabilityDescriptor } from "../../../environment-connectors/catalog";
 import { validateEnvironmentConnectorSchemaValue } from "../../../environment-connectors/conformance";
 import { RoomEnvironmentSubjectError } from "../../../environment-connectors/subjects";
+import { RoomReadGrantStoreError } from
+  "../../../environment-connectors/profiles/room-read-grant-store";
 import { resolveEnvironmentAdapterProfile } from "../../../situation-room/environment-adapter-registry";
 import type { SharedRealtimeRoomMembership } from "../../realtime-room/room-store";
 import type { HelixExternalCapabilityPolicy } from "../../runtime/external-capability-policy";
@@ -355,6 +357,11 @@ const dependencies = (
     replayed: false,
   }),
   awaitProbe: async () => observation,
+  authorizeRoomRead: async () => ({
+    basis: "connection_owner",
+    grantRef: null,
+    policyRevision: 1,
+  }),
   now: () => NOW,
   ...overrides,
 });
@@ -454,6 +461,36 @@ describe("environment probe workstation gateway", () => {
       "ask_user",
     );
   });
+
+  it("preserves a late disposition while returning the canonical current-turn retry code", async () => {
+    const lateObservation: HelixEnvironmentProbeObservation = {
+      ...observation,
+      eligible_for_current_turn_reentry: false,
+      late_result_disposition: "late_after_supersession",
+    };
+
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:late-superseded-read`,
+      toolCallId: `${TOOL_CALL_ID}:late-superseded-read`,
+      arguments: { target: "current_actor" },
+      policy: policy(),
+      dependencies: dependencies({
+        awaitProbe: async () => lateObservation,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "current_turn_reentry_ineligible",
+      summary: "late_after_supersession",
+      observation: {
+        eligible_for_current_turn_reentry: false,
+        late_result_disposition: "late_after_supersession",
+      },
+    });
+  });
+
   it("canonicalizes a bounded spatial radius alias without weakening the trusted schema", () => {
     const spatialDescriptor = readEnvironmentConnectorCapabilityDescriptor(
       HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
@@ -1301,6 +1338,11 @@ describe("environment probe workstation gateway", () => {
       ],
     };
     const materializeConnector = vi.fn(dependencies().materializeConnector!);
+    const authorizeRoomRead = vi.fn(async () => ({
+      basis: "room_grant" as const,
+      grantRef: "room_capability_grant:test",
+      policyRevision: 1,
+    }));
     const result = await executeEnvironmentProbeGatewayCapability({
       turnId: TURN_ID,
       toolCallId: `${TOOL_CALL_ID}:member`,
@@ -1318,6 +1360,7 @@ describe("environment probe workstation gateway", () => {
           },
         ],
         materializeConnector,
+        authorizeRoomRead,
       }),
     });
 
@@ -1325,6 +1368,49 @@ describe("environment probe workstation gateway", () => {
     expect(materializeConnector).toHaveBeenCalledWith(
       expect.objectContaining({ ownerProfileId: "profile:room-owner" }),
     );
+    expect(authorizeRoomRead).toHaveBeenCalledWith(expect.objectContaining({
+      requestingProfileId: "profile:environment-probe",
+      requestingParticipantId: memberParticipantId,
+      connectionOwnerProfileId: "profile:room-owner",
+      capabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+    }));
+  });
+
+  it("fails before dispatch when the owner has not granted the member's exact read", async () => {
+    const dispatchProbe = vi.fn(dependencies().dispatchProbe!);
+    const result = await executeEnvironmentProbeGatewayCapability({
+      turnId: `${TURN_ID}:grant-denied`,
+      toolCallId: `${TOOL_CALL_ID}:grant-denied`,
+      arguments: { target: "current_actor" },
+      policy: null,
+      accountContext: firstPartyAccountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: dependencies({
+        listSourceCandidates: async () => [{
+          ...sourceCandidate,
+          ownerProfileId: "profile:room-owner",
+        }],
+        authorizeRoomRead: async () => {
+          throw new RoomReadGrantStoreError(
+            "room_read_grant_not_found",
+            403,
+            "This room member does not have the exact owner-granted read capability.",
+          );
+        },
+        dispatchProbe,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: "permission_revoked",
+      observation: {
+        result: {
+          room_grant_error: "room_read_grant_not_found",
+        },
+      },
+    });
+    expect(dispatchProbe).not.toHaveBeenCalled();
   });
 
   it("renews the exact first-party browser membership before an owner-only waiting-room probe", async () => {

@@ -55,4 +55,50 @@ describe("local Fabric server pairing handoff", () => {
       code: "local_server_pairing_command_invalid",
     });
   });
+
+  it("stages into one explicitly selected child server profile", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-server-pairing-"));
+    roots.push(root);
+    const serverRunDirectory = path.join(
+      root,
+      "minecraft",
+      "helix-fabric-sensor",
+      "run",
+      "combat-c0-server",
+    );
+
+    await expect(
+      stageLocalMinecraftServerPairing({
+        workspaceRoot: root,
+        serverRunDirectory,
+        command: "/helix pair Z4ZD-X2JJ",
+      }),
+    ).resolves.toEqual({ status: "server_pairing_inbox_staged" });
+
+    await expect(
+      readFile(
+        path.join(
+          serverRunDirectory,
+          "config",
+          "helix-fabric-sensor.pairing-inbox",
+        ),
+        "utf8",
+      ),
+    ).resolves.toBe("/helix pair Z4ZD-X2JJ");
+  });
+
+  it("rejects a selected server profile outside the fixed Fabric run root", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-server-pairing-"));
+    roots.push(root);
+
+    await expect(
+      stageLocalMinecraftServerPairing({
+        workspaceRoot: root,
+        serverRunDirectory: path.join(root, "other-server"),
+        command: "/helix pair Z4ZD-X2JJ",
+      }),
+    ).rejects.toMatchObject<Partial<LocalServerPairingHandoffError>>({
+      code: "local_server_pairing_path_invalid",
+    });
+  });
 });

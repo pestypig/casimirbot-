@@ -782,3 +782,946 @@ Fabric servers, the Minecraft client and the keyed harness were left running.
 This replay therefore neither passes nor falsifies the live owner-room repair.
 The next safe C0 B attempt requires enough host headroom for the unchanged
 runtime memory policy; do not lower or bypass that guard.
+
+### C0 provider lifecycle and camera-evidence repair — 2026-08-26
+
+After local persistence compaction restored enough bounded headroom, the
+unchanged C0 turn reached the native Codex loop. Two general lifecycle defects
+were repaired before any combat action was accepted:
+
+- owner-only first-party room presence is renewed from the exact authenticated
+  browser membership immediately before an environment probe, while external
+  runs, closed rooms and identity or consent changes remain fail closed; and
+- a provider runtime cycle is complete after `runtime.turn.completed`, final
+  agent output, post-observation reasoning and zero pending tool calls. It no
+  longer circularly requires the later Helix terminal event. An exact governed
+  observation packet can also prove its declared capability from its typed
+  capability identity and observation schema instead of incidental prose.
+
+The focused environment-probe suite passes 34/34 and the runtime-authority
+contract suite passes 52/52. On live replay, Codex then executed the same-revision
+perception snapshot, exact nearby-zombie read and bounded camera tracker in
+order. The previous generic missing-runtime-authority reasons disappeared;
+Helix retained only `goal_satisfaction_not_terminal`, correctly preventing a
+combat completion claim after the camera receipt was rejected.
+
+The camera rejection was traced to the Fabric measurement source, not to a
+missing event or relaxed server policy. Action request
+`environment_action_request:fccfc313-7327-4da9-b7b6-1e5420c71f0f` and workflow
+`environment_action_workflow:59539b62-c2ce-45ba-8146-d8245ebaa995` recorded all
+five referenced events, the exact terminal event, released controls and 60/60
+retained target ticks. Its histogram rounded a sub-degree p95 error upward to
+`1.0` degree while the exact observed maximum was
+`0.6875163819559228` degree. That impossible `p95 > max` relation correctly
+failed the server verifier.
+
+`PlayerActionController` now clamps the upper-bound histogram estimate to the
+exact observed maximum, preserving the mathematical `p95 <= max` invariant
+without weakening server-side evidence validation. A sub-degree regression
+reproduces the old failure. The focused controller suite and all three required
+Fabric GameTests pass on Java 21; the complete player-agent build passes. The
+installed isolated-profile artifact is
+`HelixFabricPlayerAgent-0.4.0.jar`, SHA-256
+`e01dcab0fbe4f7f1556e8f50376661baf33d4893582a83c7e3f2897574d87049`;
+the prior artifact is preserved outside the `mods` directory.
+
+The isolated client was relaunched and joined only `127.0.0.1:25566`. Its log
+proves `Helix Fabric Player Agent loaded with a separately paired action
+authority`, and the client holds exact loopback connections to the arena and
+the keyed harness. The existing room recovered without re-pairing: Fabric
+source active, 19 admitted reads, bound world
+`minecraft:connector:e64fda9a-4f6`, DatDamPig selected, observation-only command
+authority, and active/client-ready 19-capability Player Embodiment including
+combat. The heartbeat was current after restart.
+
+The unchanged post-repair replay was admitted to the UI but rejected by the
+runtime governor as `memory_hard_pressure` before Codex sampling or Minecraft
+action. A separate Casimir Node listener on port `5050` and a separate Chrome
+tree appeared during this interval and consumed approximately 1.8 GiB; they
+belong to other work and were not stopped. Docker/WSL was not touched. The idle
+preserved `25565` server was stopped through a console control signal, reached
+`Stopping server`, and was restored from its exact root under a retained console
+session, but overlapping external work still prevented safe admission. This is
+a genuine capacity blocker for the next live replay, not a camera or combat
+failure. C0 A1/B remains open at the unchanged prompt; C1-C8 and the Wither
+decision remain **NO-GO** until that replay passes and the ladder advances.
+
+### C0 exact-effect continuation and release-readiness findings — 2026-08-26
+
+The disposable owner-only C0 topology was recovered without requiring a second
+room participant. The active room is
+`shared_realtime_room:61732092-6036-4dc1-a367-337ed18b069b`, the exact Fabric
+world is `minecraft:connector:e109834f-147`, DatDamPig is selected, command
+authority remains observation-only, and the separate Player Embodiment lease
+is active/client-ready with 19 capabilities including combat attack. The
+isolated client profile is selected with
+`HELIX_MINECRAFT_PLAYER_GAME_DIR=C:\Users\dan\AppData\Roaming\.minecraft-helix-c0`.
+The preserved `25565` Survival/Nether server was cleanly saved and stopped to
+free bounded in-scope capacity; Docker/WSL and the unrelated port-5050 workload
+were not touched.
+
+The wrong-profile local handoff was repaired in
+`local-player-pairing-handoff.ts`: an explicitly selected isolated game
+directory is validated fail closed and handed to the Fabric client lifecycle
+without reading or exposing a Minecraft/Microsoft credential. Its focused
+battery passes 4/4, and the live C0 rotation recovered the source, DatDamPig
+binding and action heartbeat after keyed restarts. The user-facing Player
+Embodiment panel now exposes **Pair local player privately** through a
+same-origin owner-only route. It creates the action-only rotation, stages the
+generated command into the bounded configured Fabric-profile inbox, and returns
+neither the one-time code nor connector credential. The manual **Pair player
+client in game** path remains available for a genuinely remote Minecraft
+client, but local users no longer need its code rendered or copied. The focused
+panel plus local-player handoff battery passes 8/8. One release-boundary issue
+remains open: the current MCP authorization lacks
+`helix.room_sources.manage`, which forced a server-console sensor pairing path.
+Test operators must also never inspect or dump full Minecraft launcher process
+command lines: a prior Win32 diagnostic exposed a launcher access token in tool
+output. Opaque inbox/handle delivery is the required profile and room
+credential boundary.
+
+After the preserved server was stopped, the unchanged C0 prompt reached the
+live action plane. Actor evidence
+`environment_probe_evidence:59ac632c00c6aed503581b3bbbe902964f8168a6` and
+target evidence
+`environment_probe_evidence:55fd1e1f7ba9158b504c81fd1fdf2960b4b95b65`
+verified DatDamPig at 20/20 health and one exact 20/20 hostile zombie at ten
+blocks. Action request
+`environment_action_request:a2889098-ce93-4d00-8604-00f9faa52920`, workflow
+`environment_action_workflow:b84624e2-47b6-413e-8238-2e9be9b140cf`, execution
+`environment_action_execution:670a96e7-2a76-4e86-bf30-14b0361c0a37` and
+evidence
+`environment_action_evidence:6acdd5d85cbf4e05e887d6bebbb65e6516849e7db`
+prove 100/100 target-retention ticks, retained line of sight, approximately
+0.69-degree mean angular error, zero loss/reacquisition ticks and released
+controls. No attack or other mutation occurred.
+
+That run exposed a terminal-contract defect: the generic
+`minecraft.player_embodiment.action` any-of group treated successful camera
+tracking as sufficient even though the affirmative prompt explicitly required
+combat. Prompt interpretation now adds
+`com.casimirbot.minecraft.player.combat.attack` as exact effect evidence for an
+affirmative combat request while leaving attack arguments and execution choice
+to Runtime Codex. Contextual, negated, quoted, historical, future and
+explanatory combat mentions add no such requirement. The focused semantic
+sequencing battery passes 72/72, and the exact provider regression passes.
+
+The first post-patch live run correctly refused camera-only terminalization but
+then failed closed as `subgoal_observation_missing`. Debug turn
+`ask:1ff258cf-99eb-4bce-b38b-a396f84d39b9` showed that the admitted compound
+ledger retained combat as mandatory subgoal two while post-camera continuation
+consulted only an absent itinerary execution projection. Continuation
+arbitration now also consumes the pending authoritative compound subgoal. It
+does not choose combat or author arguments; it keeps the already-admitted
+missing effect available for the next model decision. The focused regression
+`continues from a pending compound combat rail when the itinerary projection is
+absent` passes.
+
+The runtime-governor rejection was diagnosed separately rather than weakened.
+Its exact recorded reason was `host_memory_limit`; Node heap and RSS remained
+inside their active-turn ceilings. The low-memory launcher now uses a calibrated
+768 MiB active-turn burst estimate while retaining the immutable four-percent
+physical floor, 1 GiB commit reserve, heap safety reserve and process ceilings.
+The subsequent live turn was admitted with approximately 2.2 GiB free physical
+memory. The task-class status surface previously reported the static 1536 MiB
+catalog default while the actual effective limits and admission decision used
+768 MiB. `getRuntimeTaskSnapshot()` now projects the same environment-resolved
+limits used by admission instead of the immutable catalog seed. The complete
+runtime memory-governor suite passes 37/37. After an opaque keyed-harness
+restart, live `/api/runtime/tasks` and `/api/runtime/memory` both reported 768
+MiB for the active-user-turn burst, with normal pressure, reason `ok`, and
+approximately 3.3 GiB free physical memory. This release-polish defect is
+closed.
+
+The post-restart room state also revealed a durable UX defect: the first Ask
+could use a non-room thread until the Shared GPT Live Room panel was opened once
+and restored `helix-ask:room:<room_id>`. This produced a correct but avoidable
+`permission_revoked`. Typed Ask submission now resolves its room scope against
+the authenticated room service before constructing the backend thread ID. An
+already selected room is re-read and rejected if closed; when client state has
+not hydrated after restart, the only non-closed room is restored. Multiple open
+rooms are ambiguous and now fail closed until the user or room UI supplies an
+explicit selection; recency alone cannot choose authority. A room-service
+failure stops submission with a typed client error instead of falling back to
+an unrelated desktop thread. The focused room-scope battery passes 5/5, and the
+Helix Ask discipline quick static guard passes. This repair is independent of
+opening the room modal and requires no credential persistence in browser
+storage.
+
+The final unchanged replay loaded the continuation repair and its native trace
+confirmed the full Minecraft read/action catalog, including
+`com.casimirbot.minecraft.player.combat.attack`. It then stopped before any
+gameplay decision with `native_provider_quota_exhausted`: the configured OpenAI
+API account has no credits remaining. No connector re-pairing is required, no
+tool was requested or executed, and the room subsequently showed the source
+active, DatDamPig selected, command authority off, Player Embodiment active and
+client-ready with a fresh heartbeat. This is an external provider-capacity
+stop, not C0 combat evidence.
+
+After the room-scope repair, the keyed harness and Minecraft telemetry remained
+live, but the separate Codex MCP OAuth session could no longer refresh and both
+the authorization-status and action-authority inspection calls returned
+`OAuth authorization required`. This does not require a Docker, Minecraft or
+keyed-harness restart and does not invalidate prior evidence. It is a second
+external readiness gate for the next live replay: refresh the MCP OAuth session
+and provide funded Runtime Codex capacity, then revalidate the exact room,
+world and Player Embodiment lease before sending the unchanged C0 prompt.
+
+The required prompt-solving benchmark completed 32 cases before its Vitest
+worker RPC timed out under host pressure with six infrastructure errors and four
+cases uncompleted; it is not a clean pass. The broad provider file produced 276
+passes and 22 unrelated scholarly/Image Lens/translation failures, while both
+new combat regressions passed. Helix Ask discipline quick static checks pass
+with the change classified as prompt interpretation plus capability-itinerary
+and terminal-evidence enforcement.
+
+**NO-GO for C1 or a Wither attempt.** The harness now preserves exact combat as
+a post-camera obligation and can re-offer the pending combat rail, but a funded
+Runtime Codex turn must still execute the unchanged C0 prompt and produce exact
+attack, target-health/death and all-path control-release evidence. Only that
+evidence can close C0 and unlock C1 projectile calibration. The keyed harness,
+C0 server/client and room are otherwise staged for that retry; Docker remains
+outside this work packet's process authority.
+
+### C0 private re-pair and quota-stop confirmation — 2026-08-26
+
+The keyed harness was restarted only through the opaque launcher, the exact
+`combat-c0-server` was restored on `127.0.0.1:25566`, and Docker/WSL remained
+untouched. A source-only rotation was delivered through the connector's opaque
+inbox without command or player-action authority. The room projection then
+reported a fresh active Fabric source, DatDamPig selected, observation-only
+World Authority and a separately paired Player Embodiment with all 19 declared
+capabilities and a fresh heartbeat. No Minecraft command authority was enabled.
+
+This recovery exposed two credential/profile boundaries rather than a gameplay
+failure. The browser-owned `qte-demo-dev` room and the OAuth-owned `pestypig`
+room are correctly tenant-isolated; the G2 bearer cannot inspect the former.
+OAuth was reauthorized with the narrowly required
+`helix.room_sources.manage` scope, but the already-running Codex task retained
+its older in-memory MCP bearer. The refreshed credential is durable for the
+next MCP connection; no Codex-app restart was forced while other user tasks
+were active.
+
+The unchanged C0 prompt was submitted in the live browser-owned room. Native
+turn `ask:2910d15b-ce56-4492-8de4-eaacf38fc9b8` received the complete admitted
+catalog: 12 read capabilities and 19 Player Embodiment capabilities including
+camera tracking and exact combat attack. It stopped as
+`native_provider_quota_exhausted` before the model selected a tool. The bridge
+recorded zero requested, executed, successful or failed tools, zero observation
+re-entry references and no terminal candidate. Therefore the player and zombie
+were untouched, and this replay is clean provider-capacity evidence rather than
+C0 combat evidence.
+
+Local sensor pairing now has a user-facing source-only private route and a
+validated server-profile selector. `HELIX_MINECRAFT_SERVER_RUN_DIR` may select
+the canonical Fabric run root or one direct child such as
+`combat-c0-server`; paths outside that boundary and deeper nested profiles fail
+closed. This prevents a C0 repair from being staged into the preserved default
+server. The focused source-panel and local-server-handoff suites pass 11/11.
+
+**C0 remains open and C1/Wither remain NO-GO.** The next replay needs funded
+Runtime Codex capacity and a refreshed MCP connection if MCP-side observation
+is required. Before submitting the same prompt, revalidate one exact account,
+room, world, source and Player Embodiment tuple; do not auto-select a room by
+recency alone when multiple open rooms belong to the profile.
+
+### C0 funded-provider replay and combat deadline — 2026-08-26
+
+After API credits were replenished, the exact `localhost` profile and room tuple
+was revalidated before replay: room
+`shared_realtime_room:67ce81da-fbb9-4fa5-9eaf-f7f71fff9f9c`, active Fabric
+world `minecraft:connector:e64fda9a-4f6`, DatDamPig selected, observation-only
+World Authority, and client-ready Player Embodiment with all 19 declared
+capabilities. The keyed harness and C0 server remained live on ports 1522 and
+25566 respectively. Docker/WSL remained outside process authority and was not
+touched.
+
+The unchanged natural C0 replay materialized as native turn
+`ask:7dc4489f-53a0-476a-8b86-07ec8ca16a92`. This proves provider-credit
+recovery: Runtime Codex started normally, requested admitted Minecraft tools,
+received their observations, and did not emit another quota failure. Its first
+perception request used an invalid `horizontal_radius`, then repaired the
+arguments and obtained a bounded same-revision snapshot. Camera tracking
+subsequently retained the exact zombie for 60/60 measured ticks with 0.69-degree
+mean and p95 angular error.
+
+The run progressed beyond the previous camera-only divergence and requested
+`com.casimirbot.minecraft.player.combat.attack` as `workstation_gateway_4`.
+That mutating workflow did not return before the gateway deadline, so its
+outcome is unknown and Helix correctly did not replay it. The observation was
+re-entered and the turn terminated as a typed failure because the required
+combat observation was absent. This is the current first divergence; it is not
+a C0 pass and must not be relabeled by a later world-state read.
+
+A separate read-only post-timeout safety prompt was then rejected at admission
+with `memory_hard_pressure`. At that instant the host reported 15.78 GiB total
+physical memory with 0.48 GiB free, and 31.68 GiB total virtual memory with 1.15
+GiB free. No post-timeout actor, target or control-release observation was
+therefore obtained. Do not remove the memory guard or stop Docker for this
+packet; retry that read-only safety probe only after unrelated host pressure
+falls, then diagnose the combat workflow deadline without replaying the unknown
+attack.
+
+**Provider capacity is restored, but C0 remains open and C1/Wither remain
+NO-GO.** Progress now depends on a safe post-timeout observation followed by a
+fresh checkpointed C0 attempt that returns an exact attack receipt, target
+health/death evidence and all-path control release within the bounded deadline.
+
+### C0 restart and sensing-readiness audit — 2026-08-26
+
+The keyed harness was restarted through the opaque launcher while the existing
+`combat-c0-server` remained live on port 25566. Docker/WSL was not stopped or
+modified. Restore discarded an invalid historical connector row, so the exact
+room initially projected the Fabric source as missing. The source-only private
+re-pair path restaged the connector without exposing its one-time credential or
+granting command or player-action authority. The exact room then reported the
+Fabric source active with a fresh observation, DatDamPig selected,
+observation-only World Authority, and expired/inactive Player Embodiment.
+
+The required read-only post-timeout probe was submitted without renewing the
+action lease. Native turn `ask:107cd6fd-1b0b-4729-81ac-a40d1a1df1b4` was
+rejected before model sampling or Minecraft tool execution with
+`memory_hard_pressure`; the runtime decision recorded the exact reason as
+`host_memory_limit`, zero active tasks and a 768 MiB active-turn burst reserve.
+The contemporaneous runtime snapshot showed the active-turn class itself below
+its heap and RSS ceilings, but only approximately 1.32 GiB host physical memory
+free. After subtracting the calibrated burst reserve, projected free memory was
+below the immutable four-percent physical floor. This is a real host-capacity
+admission stop, not a provider-credit, connector, OAuth or gameplay failure.
+
+**The C0 environment is sensing-ready but not turn-ready. C1 and Wither remain
+NO-GO.** Resume with the same read-only safety probe only after the host has at
+least approximately 1.42 GiB free physical memory under the current 768 MiB
+burst estimate and four-percent floor. Do not weaken the memory guard, stop
+Docker, renew Player Embodiment or replay the unknown attack merely to bypass
+this check. Once the safety probe returns exact actor, zombie and control-release
+evidence, diagnose the combat workflow deadline and run a fresh checkpointed C0
+attempt.
+
+### C0 combat deadline first-divergence repair — 2026-08-26
+
+Patch classification: `tool admission`, `evidence re-entry`, and action-result
+lifecycle timing. This repair does not add gameplay strategy, a private retry
+loop, broader combat authority, or a terminal shortcut.
+
+The first divergent gateway boundary was reproducible in request construction.
+`attack` did not participate in declared-duration budgeting, so a bounded exact
+attack inherited the descriptor's full 60-second execution constraint. The same
+request also carried `combat_allowed=false` despite admission of the dedicated
+exact-hostile attack capability. For duration-bearing actions the gateway had
+additionally assigned the five-second result-delivery allowance to the Fabric
+execution constraint itself, leaving no separate time for the connector's
+durable outbox to publish the terminal event, normalized environment event and
+action result before the outer deadline.
+
+The gateway now keeps these clocks distinct. Exact attack, camera tracking,
+follow, finite sequence and finite reactive-program execution receive only their
+declared execution duration in `constraints.max_duration_ms`; the outer action
+deadline retains up to five seconds of bounded delivery allowance within the
+catalog ceiling. Only `action_kind=attack` receives `combat_allowed=true` on
+this surface. Host access and automatic replay remain false, so an unknown
+mutating outcome still fails closed and is never replayed automatically.
+
+Focused verification passed:
+
+- `environment-action.test.ts`: 23/23, including an exact zombie attack proving
+  the maximum 60,000 ms Fabric execution ceiling, a 65,000 ms outer deadline,
+  combat authority true, host authority false and automatic replay false;
+- `action-result-canonicalization.test.ts`: 27/27; and
+- `catalog.test.ts`: 8/8, including descriptor-schema validation; and
+- `npm run helix:ask:discipline:quick`: PASS.
+
+`npm run typecheck:environment-actions` remains red from pre-existing
+repository-wide failures across unrelated active work. Its output did not
+identify a new error at the changed duration/authority construction or focused
+test. This is not treated as a passing typecheck.
+
+**C0 remains open and C1/Wither remain NO-GO.** Live acceptance requires the
+patched keyed harness to be relaunched by its current supervisor owner, followed
+by the still-required read-only actor/zombie/control-release safety probe. Only
+then may a fresh C0 checkpoint be restored and the unchanged natural zombie
+prompt run once for exact attack, target-health/death, evidence-re-entry,
+terminal-continuity and all-path control-release proof.
+
+### C0 patched-runtime live handoff blocker — 2026-08-26
+
+Three consecutive goal continuations rechecked the required live topology after
+the combat-deadline repair. In every check, the disposable C0 Minecraft server
+remained listening on `127.0.0.1:25566`, while no process listened on the keyed
+harness port `127.0.0.1:1522` and `/healthz` was unreachable. The final check at
+2026-08-26T19:07:10-04:00 measured approximately 3.07 GiB free physical memory,
+well above the earlier C0 turn-admission threshold. Host capacity and Minecraft
+availability are therefore not the current stopping condition.
+
+The shared keyed-harness supervisor is being repaired by a separately owned
+task. This packet did not race that owner by starting another instance, because
+two launchers could diverge in service identity, in-memory room/invite state and
+execution-lease ownership. No read-only C0 probe, authority renewal, checkpoint
+restore or attack was attempted while the governed service boundary was absent.
+Docker/WSL remained untouched.
+
+**C0 is blocked at live acceptance, not at implementation. C1, Nether and
+Wither remain NO-GO.** Recovery requires the owning task to launch the patched
+workspace as the single keyed harness on port 1522 and provide a healthy
+supervisor/service-instance handoff. The first resumed operation remains the
+read-only actor/zombie/control-release probe; mutation authority must not be
+renewed until that probe settles.
+
+### C0 client recovery and safe post-timeout probe — 2026-08-26
+
+The keyed harness recovered on port 1522 from the patched workspace, but the
+M1 room correctly reported no online subject. The isolated C0 client log showed
+that Minecraft had exited cleanly at 19:24:53 local time; the C0 server itself
+remained listening on port 25566. This was a client-lifecycle stop, not a stale
+room projection.
+
+The approved loopback launcher initially failed closed before process creation
+because strict PowerShell property access assumed every unrelated entry in
+`launcher_profiles.json` declared optional `gameDir` and `lastUsed` fields. The
+launcher now reads those optional fields through an explicit property lookup,
+while preserving exact profile selection, loopback-only validation, memory
+ceiling, credential exclusion and receipt semantics. The retried launch emitted
+`helix.minecraft.workstation_launch_receipt.v1` with status `connected`, exact
+profile `helix-combat-c0-isolated`, Fabric 1.21.8, isolated game directory,
+server `127.0.0.1:25566`, `mod_loaded=true` and
+`credentials_exposed=false`. The room then re-established DatDamPig as the
+selected online subject in bound world `minecraft:connector:7596075d-cc1`.
+
+With Player Embodiment still off, the required read-only safety probe completed
+successfully:
+
+- actor-status evidence
+  `environment_probe_evidence:442a7e7623de355d8852cb0f61323d71b7a42e24`:
+  DatDamPig, survival, overworld, position `(-4.5, 65, 0.5)`, health 20/20,
+  food 20, saturation 20 and no status effects;
+- same-revision perception evidence
+  `environment_probe_evidence:e38a8b3fd50744a9aa168d5ba7bdc0893b5f1762`:
+  one exact hostile `minecraft:zombie`, 10 blocks away, zero closing speed,
+  clear line of sight, no occlusion, not targeting the actor, no hazards and
+  stationary actor state; and
+- inventory: one iron sword and four bread. `keep_inventory=true` remains an
+  arena rule, not evidence that a failed combat attempt is acceptable.
+
+The earlier unknown attack therefore did not defeat or displace the C0 target,
+and the safe starting state is available without a checkpoint mutation.
+However, the active room is the other task's two-member M1 room and this task is
+the participant; its owner controls the separately paired Player Embodiment
+lease. This task did not leave or replace the room because doing so would
+invalidate M1's live acceptance topology.
+
+**C0 is sensing-ready and safe, but mutation remains owner-gated. C1, Nether
+and Wither remain NO-GO.** The M1 room owner must enable the exact bounded C0
+Player Embodiment lease, or complete the M1 handoff so C0 can move to an
+owner-controlled room. After that single authority transition, run the unchanged
+natural zombie objective once and require exact attack, health/death,
+evidence-re-entry, terminal-continuity and control-release proof.
+
+### C0 hostile-AI diagnosis and deterministic restage — 2026-08-26
+
+The apparent non-attacking zombie was not a Peaceful-mode failure. The isolated
+server was configured for Normal difficulty and Survival; `spawn-monsters=false`
+only suppresses unbounded natural spawning. A temporary local setup authority
+query returned `NoAI:1b` for the exact staged zombie. That fixture-level freeze
+fully explains the earlier zero closing speed and `targeting_actor=false`
+observation.
+
+Setup authority cleared `NoAI` and invulnerability on that same persistent
+zombie. The result was immediate and unambiguous: it crossed the arena, filled
+the player's first-person view, reduced DatDamPig from 20 health to 6 and then
+killed the stationary player. This was an A0 arena-validation event, not a C0
+combat pass: Player Embodiment was off, no harness attack occurred and no
+terminal claim is authorized from the death alone. It nevertheless proves that
+Normal hostile AI and zombie damage are functioning when the fixture is active.
+
+The disposable arena was then recovered deterministically. One temporary
+Peaceful restart removed the live attacker, the isolated client rejoined with
+DatDamPig at full health and preserved inventory, Normal difficulty was restored
+both live and in `server.properties`, and one persistent frozen zombie was
+reseeded at `(5.5, 65, 0.5)`, ten blocks from the player baseline. Temporary
+operator status was revoked live and `ops.json` is empty. The settled server is
+Normal/Survival with `spawn-monsters=false`, one safe frozen baseline target and
+no retained setup authority.
+
+The M1 room boundary also tightened during this recovery: the participant now
+receives `room_read_grant_not_found` for both actor status and perception, in
+addition to having no owner-granted Player Embodiment. The next owner action is
+therefore a least-privilege C0 lease bundle for DatDamPig: restore the bounded
+combat read share, camera tracking and exact combat attack, with no raw command
+authority. Activate the frozen zombie only as the scored turn begins so the
+agent can observe and react rather than being attacked during setup.
+
+**C0 remains open; C1, Nether and Wither remain NO-GO.** The game/fixture is
+healthy and safely staged. The sole live-test boundary is the M1 owner's exact
+read plus Player Embodiment grant; it must not be bypassed by participant-side
+self-granting.
+
+### C0 owner-room recovery and command-observation divergence — 2026-08-26
+
+The C0 task recovered an owner-controlled room with DatDamPig selected and an
+active least-privilege Player Embodiment lease containing only camera tracking
+and exact hostile combat attack. A fresh readiness inspection reported the
+Fabric client ready, 19 declared capabilities, a fresh active heartbeat, zero
+active workflows and no asserted controls. Camera tracking had already retained
+the exact frozen zombie for 24/24 ticks with 1.17-degree mean and p95 angular
+error and a clean control release.
+
+The retained keyed Node listener then exited while Minecraft and the disposable
+C0 server remained live. Local-supervisor preflight returned `start` with
+`reason=no_listener`; the approved opaque launcher restarted the patched
+canonical workspace and reached `[express] app ready`. All three required
+surfaces returned HTTP 200: account session, Helix pipeline and agent providers.
+The persisted room, source, selected subject and exact Player Embodiment lease
+were restored, and the patched MCP action registry was therefore live without
+restarting Minecraft.
+
+The server-side command connector was paired opaquely through the verified
+`combat-c0-server` profile. World Authority was restricted to `world_operator`,
+approved-category mode and `entity_control` only. Natural turn
+`ask:bbbb2509-7df1-4d7a-b143-495b1e96d4b5` requested one exact mutation to
+clear `NoAI` on the nearest staged zombie. The turn reached
+`com.casimirbot.minecraft.command`, but no required command observation returned
+to the compound turn. Helix terminated with a typed failure and the command
+outcome is treated as unknown; the command was not replayed.
+
+The mandatory read-only safety probe then returned:
+
+- actor evidence
+  `environment_probe_evidence:5f05af5079ca3187de165f6a1110c20b3f5aab49`:
+  DatDamPig remained stationary at `(-4.5, 65, 0.5)`, survival, health 20/20,
+  food 20 and saturation 20; and
+- perception evidence
+  `environment_probe_evidence:df545ee8c6eed88eb956bf7db3691f32b895f6b4`:
+  the one hostile zombie remained exactly 10 blocks away with clear line of
+  sight, zero closing speed and `targeting_actor=false`. The semantic
+  fingerprint changed only with the camera heading; no hostile-AI transition
+  was observed.
+
+**The first live divergence is now command-result continuity, not room
+ownership, OAuth, memory, sensing, camera tracking or Player Embodiment. C0
+remains open; C1, Nether and Wither remain NO-GO.** Before another scored
+attempt, repair or prove the exact path `command request -> connector lease ->
+Fabric execution -> command result -> observation re-entry`. Do not replay the
+unknown mutation or begin an attack against the frozen ten-block target. Once
+that path returns an unambiguous activation receipt, run the unchanged C0
+camera/attack attempt and require target health/death plus all-path control
+release evidence.
+
+### C0 command-risk correction and authenticated exact-target pass — 2026-08-26
+
+The preceding command-continuity diagnosis was superseded by a narrower first
+divergence. The connector and result path were healthy; both the server and
+Fabric command-risk classifiers categorized every mutating `data` command as
+`world_build`, even when the command targeted an entity. The staged request
+correctly declared `entity_control`, so the category mismatch failed closed
+before the activation mutation could execute.
+
+Both classifiers now inspect the semantic `data` target kind. Mutating
+`data merge|modify|remove entity ...` commands classify as `entity_control` /
+`world_mutation`, while block and storage targets remain `world_build` /
+`world_mutation`. Focused TypeScript and Fabric tests cover direct and nested
+`execute ... run data merge entity ...` forms, and the patched Fabric server
+artifact was rebuilt and deployed to the disposable C0 server. The focused
+TypeScript battery passed 56 tests, the Java 21 Fabric focused tests and full
+build passed, and `npm run helix:ask:discipline:quick` passed.
+
+Live keyed turn `ask:023ed874-a2fc-4f34-b2e0-f219678b50c4` then executed the
+exact activation command and returned the unambiguous result `Modified entity
+data of Zombie`. The first released zombie attacked normally, but the operator
+killed it manually; that event is setup/activation evidence only and is not a
+scored combat attempt.
+
+A fresh adult zombie was therefore summoned frozen at `(5.5, 65, 0.5)`, with
+DatDamPig restored to the canonical `(-4.5, 65, 0.5)` baseline at health 20/20,
+food 20 and saturation 20. Authenticated camera action evidence
+`environment_action_evidence:7854a37104e111ba9b30127032229c39ac78b3bfb`
+retained that exact zombie for 60/60 measured ticks, with 0.36-degree mean
+angular error, no target loss and clean control release. It produced exact
+incarnation lock `target:ab13e4ad4e9ddc64f815728d3e868d3ba37c1d10`.
+
+After an explicit setup release, authenticated MCP A1 attack evidence
+`environment_action_evidence:2f3788285a5f666f65ba39b3dc090045042fad41b`
+settled successfully in 122 ticks. The native Fabric controller waited for the
+zombie to enter vanilla reach, issued four cooldown-admitted sword pulses,
+observed four independent hurt/health transitions, rejected zero pulses and
+observed the exact admitted target at zero health with death time one tick.
+Friendly fire remained false, no manual override occurred and all controls
+released. Independent post-fight actor evidence
+`environment_probe_evidence:c45831ac07de2d05cb9e0667cd4d13bbc55fdd18`
+showed DatDamPig alive at health 20/20, and perception evidence
+`environment_probe_evidence:6c235059d736efb3ddbe49e9f7104874dd90c140`
+showed no remaining entity or hazard.
+
+This is the first scored authenticated MCP A1 C0 defeat and closes the prior
+activation and exact-effect blockers. It does not by itself prove the unchanged
+natural keyed Helix B turn, so B parity remains open and must not be inferred
+from the direct MCP result. Deterministic P3 work may advance to C1; live P5
+promotion still requires the keyed B parity receipt.
+
+### C0 three-zombie exploratory stress result — 2026-08-26
+
+An operator-requested, non-promotional stress trial then placed three frozen
+adult zombies at 10.00, 10.44 and 10.44 blocks from the same unarmored player
+baseline. Perception evidence
+`environment_probe_evidence:d635af0020972cec62e9904cc805811bbda23520`
+correctly reported all three hostile bearings with complete local coverage.
+Camera evidence
+`environment_action_evidence:613fb18793a00c5b7b1ae74b1c6455e0dc9ce04f7`
+locked one exact incarnation for 20/20 ticks.
+
+The first group-release command failed closed because vanilla `data merge
+entity` requires a selector resolving to one entity. The corrected fan-out
+`execute as @e[type=minecraft:zombie] run data merge entity @s {NoAI:0b}`
+then activated all three. However, the repeated exact-target attack was
+deduplicated to the prior no-effect timeout evidence
+`environment_action_evidence:5db6c4ffc079161a971a0480c7ccf5e42f66d07dc`
+instead of becoming a second physical effect. With no resident reacquisition
+workflow active, the three zombies killed the stationary player. They were
+then frozen; evidence
+`environment_probe_evidence:146f438a92643194190bc3f5506f9beef40f78f9`
+showed the dead player and three stationary hostiles at 0.72, 0.96 and 1.15
+blocks.
+
+This exploratory failure does not invalidate the single-zombie C0 pass. It
+does prove that exact single-target attack plus caller retries is not a
+multi-hostile combat controller. Before C5 mixed-pressure promotion, the
+resident combat guardian needs an explicit bounded target-reacquisition loop
+and an admitted new-attempt identity that preserves no-duplicate-effect safety
+without replaying a prior terminal timeout. The player must be respawned and
+the disposable arena reset before further live trials.
+
+### C1 sensing compatibility and fresh three-zombie reacquisition trial — 2026-08-26
+
+The first live C1 sensor deployment exposed an adapter-schema divergence rather
+than a trajectory-math failure. The Fabric sensor emitted the new bounded
+`projectiles` forecast array and `coverage.projectiles_complete`, but the
+strict perception capability output schema did not yet admit either field.
+The probe therefore failed closed at
+`$.coverage.projectiles_complete`. The harness catalog now admits optional,
+backward-compatible projectile forecasts, the legacy normalization boundary
+preserves them, and absent nullable forecast values are omitted rather than
+serialized outside the constrained schema vocabulary. Focused TypeScript
+verification passed 21 tests and the Java 21 Fabric sensor build passed.
+
+After redeployment and keyed-harness restart, authenticated perception evidence
+`environment_probe_evidence:7ddb12e1a3e43b34399907182f8f329500ff45c6`
+returned `projectiles: []` with `projectiles_complete=true`; this supersedes the
+schema-validation failure for the empty-projectile case. Full moving-projectile
+C1 live calibration remains open.
+
+The dead disposable player state was recovered without altering the world. The
+exact `.dat` and `.dat_old` records were moved to recoverable backups inside the
+arena player-data directory, producing a new survival player at health 20/20.
+The isolated-client pairing handoff then exposed a profile-routing defect: the
+opaque one-time inbox was staged in the default Minecraft profile even though
+the running test client used `.minecraft-helix-c0`. Moving that unread file to
+the isolated profile allowed the companion to claim it; the new bounded
+authority became ready with 19 declared capabilities, fresh heartbeat and no
+asserted controls. Release work should bind local pairing handoff to the exact
+selected profile instead of relying on the default profile path.
+
+A fresh three-zombie trial staged all hostiles frozen and separated at 7.60,
+7.74 and 8.06 blocks. Perception evidence
+`environment_probe_evidence:c7ab19ecaadf3144e7e61ed56435182875fbbdae`
+reported all three with clear line of sight and complete coverage. Camera
+evidence
+`environment_action_evidence:e0a0bc963600da9756b9286222e47d3730ef28c63`
+retained the nearest exact incarnation for 60/60 ticks and returned target lock
+`target:ccc0255a9a05a3129022a9c30ca32703d12191ae` with clean control release.
+After a correct three-entity fan-out release, attack evidence
+`environment_action_evidence:2636fbdf5845482f15243f902c983af214454d9c6`
+defeated that exact zombie in four accepted pulses and four observed health
+transitions, with zero rejected pulses and no manual override.
+
+The unattended pair simultaneously reduced DatDamPig from health 20 to 8.67
+and displaced the player by knockback before the first target's terminal result
+could re-enter Codex. Fresh perception evidence
+`environment_probe_evidence:1f870af12c0c89c3ff0bd0b76f6ccc7ee0653488`
+showed both survivors inside one block and targeting the actor. The next bounded
+camera reacquisition was canceled at tick zero by `screen_open`, with controls
+released, because the player had already died. Final evidence
+`environment_probe_evidence:3602bfc2519240593d6e67ed81f3c3c2e2425aa2`
+showed health zero and both surviving hostiles; they were frozen immediately
+afterward.
+
+This fresh trial removes the earlier duplicate-request ambiguity: the
+single-target primitive performed one real kill, but the observation/reasoning/
+reacquisition round trip was slower than the damage window from the other two
+hostiles. Caller-paced sequential action is therefore insufficient for C5.
+The next multi-hostile implementation must be a bounded resident combat
+guardian that can retain a threat set, switch targets on verified death or
+reachability loss, interleave retreat with cooldown-admitted attacks, enforce a
+health floor and emit per-switch evidence. Jump-critical timing remains a later
+optimization and must not substitute for the missing survival/reacquisition
+control loop. The single-zombie C0 A1 pass remains valid; keyed B parity and
+moving-projectile C1 acceptance remain open, so Nether/Wither readiness remains
+NO-GO.
+
+### C1 resident hostile-combat controller implementation — 2026-08-26
+
+The multi-hostile failure is now represented by a new explicit Player
+Embodiment capability rather than a caller-paced chain of camera and attack
+requests. `com.casimirbot.minecraft.player.combat.guard` / `combat_guard`
+admits one short native-Fabric lease with an allowlist of hostile entity type
+identities, acquisition radius, cooldown floor, attack-pulse and target-switch
+budgets, target-commit interval, retreat hysteresis, hostile-count threshold,
+duration ceiling and player-health floor. `friendly_fire=false` and
+`require_line_of_sight=true` are literals. The connector runtime advertises
+the capability as native-only continuous control.
+
+The compiled profile `resident.minecraft.hostile-combat.v1` now performs the
+bounded tick-speed repertoire. It enumerates only loaded vanilla `Monster`
+instances whose exact type is in the admitted allowlist, creates stable opaque
+incarnation references, prioritizes mobs currently targeting the player,
+retains a viable target through a commitment/hysteresis window, aims at the
+selected hostile, backpedals inside the retreat envelope and uses only the
+normal vanilla attack path when reach, line of sight and cooldown all pass.
+It releases camera, locomotion and attack controls on success, health-floor
+interruption, target-switch exhaustion, attack-budget exhaustion, vanilla
+rejection, cancellation, disconnect or Emergency Stop. It cannot select a
+player, passive entity or neutral non-`Monster`, invent a target type, synthesize
+damage, mutate inventory or mutate the world.
+
+Receipts include the resident profile and artifact versions, eligible and peak
+hostile counts, selected opaque target reference, switch count, attack pulses,
+retreat ticks, current health, reason code and explicit friendly-fire/world/
+inventory mutation denials. Natural affirmative multi-hostile combat intent is
+narrowed to this capability for terminal evidence, while a single exact-target
+fight continues to require the existing exact combat-attack capability.
+Contextual, quoted, historical, hypothetical and negated combat language still
+passes through the established operative-action gate and does not authorize an
+effect.
+
+Deterministic verification currently passes for threat-first target selection,
+commitment anti-oscillation, cooldown-gated attacks, retreat activation,
+health-floor release and target-switch budget refusal. The Fabric Java 21
+module compiled successfully, all five existing Fabric game tests passed, the
+focused resident-controller tests passed 4/4, and the focused TypeScript MCP
+plus action-profile parity tests passed 6/6. This is implementation evidence,
+not live combat acceptance. The next admissible step is to rebuild and deploy
+the exact Fabric artifact, re-pair the isolated client, stage a clean three-
+zombie arena baseline and run A0 then authenticated MCP A1 with per-tick and
+postcondition receipts. Nether/Wither readiness remains NO-GO until that live
+resident round, keyed B parity and the open moving-projectile C1 acceptance
+have passed.
+
+### C1 resident hostile-combat A0 live repeatability result — 2026-08-26
+
+The rebuilt isolated-client artifact was deployed with SHA-256
+`9E1DF076A8E2FBDFE51E06A85738A28F80EB71A2C23E8EDBE50B2B1D8BF3816D`.
+Focused Java verification for the strict diagnostic-inbox parser and resident
+guardian passed before deployment. The deployed parser accepted the exact
+bounded `combat_guard` request; no broader action kind or target vocabulary was
+enabled.
+
+The first staging attempt is retained as a non-pass. It completed immediately
+with `peak_hostile_count=0` and `attack_pulses=0` because the three zombies had
+been placed at an incorrect absolute height and were absent from the admitted
+client envelope at acquisition. This false-positive-looking visual outcome was
+rejected by the structured receipt. The arena procedure was corrected to spawn
+each frozen, invulnerable setup entity relative to DatDamPig, prove that all
+three tagged entities existed, admit and start the guard, verify a running
+receipt with `eligible_hostile_count=3`, and only then release AI and
+invulnerability for all three through an exact server-side fan-out.
+
+Corrected A0 run 1, workflow
+`direct_player_action_workflow:0eb052f2-28b7-46a3-a733-1cfb7048228f`,
+settled `workflow.succeeded` with `reason_code=hostiles_cleared`. It observed a
+peak of three admitted hostiles, issued 11 cooldown-admitted attack pulses,
+performed 18 retreat ticks and six target switches, ended with zero eligible
+hostiles, retained player health 20/20, reported `friendly_fire=false`, and
+released all controls. Independent server inspection found no remaining zombie.
+
+At the operator's request, a second independent attempt used three fresh tagged
+zombies and a new diagnostic request identity. Run 2, workflow
+`direct_player_action_workflow:c4738981-027b-4593-97fb-04769e59734d`, also
+settled `workflow.succeeded` with `reason_code=hostiles_cleared`. It observed a
+peak of three hostiles, issued 12 attack pulses, performed 20 retreat ticks and
+seven target switches, ended with zero eligible hostiles, retained player
+health 20/20, reported `friendly_fire=false`, and released all controls.
+
+In-game proof images are retained at:
+
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-26-c1-a0/three-zombie-run-1-cleared-arena.png`;
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-26-c1-a0/three-zombie-run-1-terminal-receipt.png`; and
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-26-c1-a0/three-zombie-run-2-terminal-receipt.png`.
+
+This closes the local diagnostic A0 repeatability slice for the resident
+three-zombie controller. It does not promote authenticated MCP A1, the natural
+keyed Helix B path, moving-projectile C1 acceptance, PvP, Nether readiness or
+Wither readiness. The live Node harness on port 1522 still advertises the
+pre-patch capability catalog, so the next admissible step is a safe owning-
+process restart of the exact patched keyed harness followed by private
+re-pairing and the same three-zombie trial through authenticated MCP A1.
+
+### C1 A0 opponent-boundary probes — 2026-08-26
+
+Three exploratory single-opponent probes followed the repeatable zombie result.
+The first skeleton was observed by the operator to be unarmed. Although workflow
+`direct_player_action_workflow:2ba96d06-7d55-4268-92fe-f35f465828b5`
+cleared it with four attack pulses, 43 retreat ticks and player health 20/20,
+that result is classified only as another melee-opponent pass. It is not
+projectile or ranged-combat evidence.
+
+The corrected skeleton fixture explicitly replaced its main-hand item with a
+bow and received the server result `Replaced a slot on Skeleton with [Bow]`
+before admission. From nine blocks away, workflow
+`direct_player_action_workflow:407a9d72-3897-4834-afea-46bce9e8741d`
+tracked the one admitted hostile but issued zero attack pulses and zero retreat
+ticks. It failed closed at the admitted health floor with
+`reason_code=player_health_floor_reached`, measured health 12 and
+`controls_released=true`. This proves target sensing without ranged engagement:
+the current controller has no approach/closing policy, projectile-evasion
+policy, cover selection, shield use or ranged weapon repertoire.
+
+The bow skeleton then fired again after the controller had correctly released
+controls and killed the stationary player. The server-side fixture was manually
+contained and DatDamPig was respawned with inventory preserved. This exposes a
+harness-level safety gap distinct from controller release semantics: a scored
+arena needs a server-owned watchdog that freezes or removes every admitted test
+hostile when a workflow reaches a health floor, timeout, cancellation,
+disconnect or Emergency Stop. Releasing player controls while leaving the
+hazard active is not a sufficient arena fail-safe.
+
+After arena reset, a frozen spider was admitted and released as a fast lateral
+melee probe. Workflow
+`direct_player_action_workflow:55e4069c-7642-4648-8184-3d34af758781`
+settled `workflow.succeeded` with `reason_code=hostiles_cleared`, three attack
+pulses, 12 retreat ticks, peak hostile count one, player health 20/20 and clean
+control release. The observed strength boundary is therefore close-range
+hostiles that enter vanilla sword reach, including faster lateral motion; the
+observed weakness boundary is distance-maintaining ranged pressure.
+
+Additional in-game proof images are retained at:
+
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-26-c1-a0/unarmed-skeleton-nonprojectile-result.png`;
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-26-c1-a0/bow-skeleton-post-release-death.png`; and
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-26-c1-a0/spider-cleared-arena.png`.
+
+These probes do not change the promotion boundary. A0 melee repeatability is
+supported; authenticated MCP A1, keyed B parity, the server-owned arena
+watchdog, and moving-projectile C1 sensing/response remain open. Nether/Wither
+readiness remains NO-GO.
+
+### C1 ranged-response and arena-watchdog implementation — 2026-08-27
+
+The bow-skeleton failure now has two separately owned deterministic responses.
+The Fabric server's World Authority fixture surface adds a bounded
+`combat_watchdog` lease keyed by exact player and validated literal mob tag.
+It captures one dimension and arena volume, then freezes only admitted tagged
+monsters on health-floor crossing, player death, disconnect, lease expiry,
+explicit disarm or server stop. Its settled status records the terminal reason,
+contained entity count and measured player health. This closes the earlier
+failure mode in which Player Embodiment correctly released its controls while
+the diagnostic hostile remained able to kill the stationary player.
+
+The resident Player Embodiment guardian initially advanced to artifact version `1.2.2`
+with separately admitted and metered repertoires:
+
+- `direct_bounded` closing uses only vanilla forward input after immediate
+  collision and support checks, while separately admitted
+  `local_reroute_bounded` may use one checked lateral direction and its
+  alternate when the direct step is unavailable; closing, retreat and reroute
+  vectors are derived from the selected hostile position rather than lagging
+  camera orientation;
+- `lateral_bounded` cover prefers a short collision-safe lateral corridor only
+  when bounded block-ray lookahead finds actual occlusion from the projectile
+  source;
+- projectile forecasts identify imminent collision ticks and admit a bounded
+  sidestep when cover is unavailable;
+- `shield_or_sidestep` may hold only an actual off-hand shield and falls back to
+  the admitted evasion budget when the shield is absent; and
+- approach, cover, evasion and shield holding have independent tick ceilings,
+  fail-closed cross-field validation and terminal receipt counters.
+
+Strategy remains outside the harness planner. Helix admits the finite profile;
+the Fabric companion applies only tick-local reactions, hostile-only targeting,
+vanilla reach/cooldown attacks and all-path control release. No copied Baritone
+code, hidden model loop, PvP target, arbitrary command, jump-critical timing or
+unbounded movement was added.
+
+Focused Java 21 verification passes for the guardian, diagnostic inbox and
+projectile forecaster, including approach exhaustion, cover preference,
+sidestep, shield use and malformed-budget rejection. The Fabric watchdog and
+command-classifier focused tests also pass. Shared TypeScript action and
+capability-catalog verification passes 23/23 tests. These are deterministic
+implementation results only: deployable artifact hashes, live watchdog
+containment, the repeated bow-skeleton A0 journey, authenticated MCP A1 parity
+and keyed B parity remain open. Nether and Wither readiness therefore remain
+NO-GO.
+
+### C1 ranged-response A0 and authenticated MCP A1 acceptance — 2026-08-27
+
+Live testing exposed and closed three integration defects after the initial
+`1.2.2` implementation. World-direction closing had been translated into
+fixed keyboard directions instead of camera-relative inputs; the direct
+diagnostic staging helper omitted the `combat_guard` duration conversion; and
+the MCP canonical result verifier did not yet admit `combat_guard` terminal
+measurements or classify its movement and attack effects. Artifact `1.2.4`
+contains the corrected camera-relative movement translation and effect
+accounting. The MCP boundary now also returns credential-free typed connector
+pairing errors instead of collapsing known pairing failures into
+`internal_error`.
+
+The server-owned watchdog was exercised live. At the configured health floor
+it froze the exact tagged arena skeletons and settled with
+`player_health_floor_reached`; explicit disarm also settled cleanly with zero
+remaining admitted hostiles. Invalid early trials in which the watchdog was
+armed on the same tick as healing, or a hostile was released before the player
+action was staged, are retained as fixture-order failures and are not counted
+as controller evidence. The accepted fixture order is: heal and verify,
+spawn frozen, arm watchdog, admit the player action, then release the hostile.
+
+Direct A0 bow-skeleton workflow
+`direct_player_action_workflow:6e0f86c1-bf14-444f-a9e1-451ccaad9f49`
+closed from 10.89 blocks, used 47 approach ticks and four attacks, cleared the
+hostile at health 20 and released every control. The 14-block repeat,
+`direct_player_action_workflow:736bad2a-84de-445f-90b0-be858a986693`,
+used 42 approach ticks and four attacks with the same terminal safety result.
+Because the controller killed both live skeletons before an arrow entered the
+forecast horizon, a separate deterministic projectile fixture injected one
+arrow on a collision path while a bow skeleton was present. Workflow
+`direct_player_action_workflow:d661caa5-bbfa-4e56-9402-f85078220ea6`
+observed one projectile threat, held the real off-hand shield for 132 ticks,
+earned the vanilla `Not Today, Thank You` advancement, then closed and cleared
+the hostile with health 20 and controls released. This is deterministic
+projectile/shield evidence; it is not represented as a skeleton-fired-arrow
+observation.
+
+The first authenticated MCP execution physically succeeded but correctly
+remained a non-pass because the pre-patch verifier returned
+`postcondition_failed`. Its measurements proved 53 approach ticks, four
+attacks, health 20 and hostile clearance, exposing that the verifier lacked a
+`combat_guard` measurement branch and that the client falsely labeled the
+effect as side-effect-free. Focused regression coverage now validates the
+bounded combat measurements, typed pairing errors and effect classification.
+
+The decisive authenticated MCP A1 run enabled an ordinary bow skeleton at 14
+blocks before submitting the action. Request
+`environment_action_request:542a7813-8593-4542-9a51-c4706647c8ec`, workflow
+`environment_action_workflow:d5d90b42-bd26-4d2d-88d8-764e75465796` and
+evidence `environment_action_evidence:271da8402e795e1e60d1ecef07993f20f43cb7842`
+settled `outcome=succeeded`. Artifact `1.2.4` used 38 approach ticks and four
+attacks over 67 total ticks, cleared the hostile, retained health 20, performed
+no inventory or world mutation, reported both player motion and player
+interaction, and released all controls. The skeleton did not release a tracked
+projectile before defeat, so projectile-response promotion continues to rely
+on the separate A0 collision-path fixture above.
+
+Durable evidence is retained at:
+
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a0/bow-skeleton-a0-success-terminal.png`;
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a0/projectile-shield-a0-success-terminal.png`;
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a0/projectile-shield-a0-public-capture.json`;
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a1/bow-skeleton-a1-success-terminal.png`; and
+- `docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a1/bow-skeleton-a1-success-receipt.json`.
+
+Focused TypeScript verification passes 32/32 tests. The Java 21 Fabric build,
+focused guardian/runtime tests and all five Fabric GameTests pass, and the
+remapped client jar SHA-256 is
+`BCB8E93F52CCDD749C23898FDFB306F4F3D0B3933E7D885933DA7685506E73BE`.
+The C1 A0/A1 ranged-response slice is therefore accepted. Natural keyed Helix
+B parity, PvP, Nether readiness and Wither readiness remain open; this result
+does not promote any of them. The opaque launcher also still needs to load the
+per-profile Minecraft game directory automatically: this run had to move the
+unread pairing inbox from `.minecraft` to `.minecraft-helix-c0` before the
+client could redeem it.

@@ -151,6 +151,24 @@ describe("Shared Live Room Player Embodiment controls", () => {
               : [],
           ));
         }
+        if (url.endsWith("/connector-pairings/local-player-handoff") && init?.method === "POST") {
+          return jsonResponse({
+            schema: "helix.connector_pairing_receipt.v1",
+            ok: true,
+            error: null,
+            message: "Local player action access was staged without exposing the one-time code.",
+            pairing: {
+              pairing_id: "connector_pairing:player-ui-private",
+              expires_at: "2099-01-01T00:10:00.000Z",
+            },
+            pairing_code_shown_once: false,
+            credential_included: false,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          });
+        }
         if (url.endsWith("/connector-pairings") && init?.method === "POST") {
           return jsonResponse({
             schema: "helix.connector_pairing_receipt.v1",
@@ -259,6 +277,28 @@ describe("Shared Live Room Player Embodiment controls", () => {
     expect(screen.getByText(/run \/helix-player status/i)).toBeTruthy();
     expect(screen.getByText(/delivered directly to the client companion/i))
       .toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pair local player privately" }),
+    );
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input).endsWith("/connector-pairings/local-player-handoff") &&
+          init?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      const body = JSON.parse(String(call?.[1]?.body));
+      expect(body).toMatchObject({
+        purpose: "rotate",
+        binding_id: sourceBinding.binding_id,
+        action_credential_requested: true,
+        action_authority_id: "environment_action_authority:player-ui",
+      });
+    });
+    expect(await screen.findByText(
+      "Local player action access was staged without exposing the one-time code.",
+    )).toBeTruthy();
+    expect(screen.queryByText("/helix-player pair ABCD-6789")).toBeNull();
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("bearer_token");
   });
 

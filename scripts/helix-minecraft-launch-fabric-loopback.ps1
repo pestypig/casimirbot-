@@ -55,6 +55,15 @@ function Get-MemoryUsedPercent {
   )
 }
 
+function Get-OptionalProfileProperty(
+  [object]$Profile,
+  [string]$PropertyName
+) {
+  $property = $Profile.PSObject.Properties[$PropertyName]
+  if ($null -eq $property) { return $null }
+  return $property.Value
+}
+
 $addressMatch = [regex]::Match(
   $Address.Trim(),
   '^(localhost|127\.0\.0\.1|\[::1\])(?::([0-9]{1,5}))?$'
@@ -135,13 +144,15 @@ $profiles = Get-Content -LiteralPath $profilesPath -Raw | ConvertFrom-Json
 $fabricProfiles = @(
   $profiles.profiles.PSObject.Properties |
     ForEach-Object {
+      $gameDir = Get-OptionalProfileProperty $_.Value "gameDir"
+      $lastUsed = Get-OptionalProfileProperty $_.Value "lastUsed"
       [pscustomobject]@{
         id = $_.Name
         name = [string]$_.Value.name
         version = [string]$_.Value.lastVersionId
-        gameDir = [string]$_.Value.gameDir
-        lastUsed = if ($_.Value.lastUsed) {
-          [datetime]$_.Value.lastUsed
+        gameDir = [string]$gameDir
+        lastUsed = if ($lastUsed) {
+          [datetime]$lastUsed
         } else {
           [datetime]::MinValue
         }
@@ -160,10 +171,11 @@ if (-not $selectedProfile) { Fail-Typed "minecraft_fabric_profile_not_found" }
 $mostRecentProfile = @(
   $profiles.profiles.PSObject.Properties |
     ForEach-Object {
+      $lastUsed = Get-OptionalProfileProperty $_.Value "lastUsed"
       [pscustomobject]@{
         id = $_.Name
-        lastUsed = if ($_.Value.lastUsed) {
-          [datetime]$_.Value.lastUsed
+        lastUsed = if ($lastUsed) {
+          [datetime]$lastUsed
         } else {
           [datetime]::MinValue
         }

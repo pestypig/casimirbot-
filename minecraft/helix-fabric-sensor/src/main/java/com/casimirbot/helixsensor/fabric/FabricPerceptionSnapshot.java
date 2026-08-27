@@ -1,6 +1,7 @@
 package com.casimirbot.helixsensor.fabric;
 
 import com.casimirbot.helixsensor.HelixSensorConfig;
+import com.casimirbot.helixsensor.combat.ProjectileThreatForecaster;
 import com.casimirbot.helixsensor.navigation.BoundedNavigationFrontier;
 import com.casimirbot.helixsensor.snapshot.SectionHasher;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
@@ -34,6 +36,9 @@ import net.minecraft.world.phys.Vec3;
 final class FabricPerceptionSnapshot {
     static final String SCHEMA = "helix.minecraft_perception_snapshot.v1";
     private static final int MAX_HAZARDS = 128;
+    private static final int MAX_PROJECTILES = 128;
+    private static final int PROJECTILE_SUPPORT_TICKS = 20;
+    private static final double PROJECTILE_NEAR_MISS_MARGIN = 0.75d;
     private static final int DROP_SCAN_DEPTH = 6;
     private static final long MAX_CLIENT_UI_AGE_TICKS = 10L;
 
@@ -67,6 +72,11 @@ final class FabricPerceptionSnapshot {
 
         Map<String, Object> focus = focus(level, player);
         EntityCollection entityCollection = entities(level, player, config);
+        ProjectileCollection projectileCollection = projectiles(
+            level,
+            player,
+            config
+        );
         HazardCollection hazardCollection = hazards(
             level,
             player,
@@ -96,6 +106,10 @@ final class FabricPerceptionSnapshot {
         coverageMap.put("loaded_region_complete", coverage.unknownCells() == 0);
         coverageMap.put("unknown_cell_count", coverage.unknownCells());
         coverageMap.put("entities_complete", entityCollection.complete());
+        coverageMap.put(
+            "projectiles_complete",
+            projectileCollection.complete()
+        );
         coverageMap.put("hazards_complete", hazardCollection.complete());
         FabricClientPerceptionBridge.Snapshot clientSnapshot =
             FabricClientPerceptionBridge.fresh(
@@ -151,6 +165,7 @@ final class FabricPerceptionSnapshot {
         semantic.put("actor", actor);
         semantic.put("focus", focus);
         semantic.put("entities", entityCollection.entities());
+        semantic.put("projectiles", projectileCollection.projectiles());
         semantic.put("hazards", hazardCollection.hazards());
         semantic.put("movement_candidates", movementCandidates);
         semantic.put("navigation_frontier", navigationFrontier);
@@ -167,6 +182,7 @@ final class FabricPerceptionSnapshot {
         details.put("actor", actor);
         details.put("focus", focus);
         details.put("entities", entityCollection.entities());
+        details.put("projectiles", projectileCollection.projectiles());
         details.put("hazards", hazardCollection.hazards());
         details.put("movement_candidates", movementCandidates);
         details.put("navigation_frontier", navigationFrontier);
@@ -263,6 +279,162 @@ final class FabricPerceptionSnapshot {
         row.put("line_of_sight", clear);
         row.put("occlusion", clear ? "none" : "block");
         return row;
+    }
+
+    private static ProjectileCollection projectiles(
+        ServerLevel level,
+        ServerPlayer player,
+        HelixSensorConfig config
+    ) {
+        double radius = config.snapshotOptions().nearbyEntityRadius();
+        List<Projectile> all = level.getEntitiesOfClass(
+            Projectile.class,
+            player.getBoundingBox().inflate(radius, radius / 2.0d, radius),
+            projectile -> projectile.isAlive()
+        ).stream().sorted(Comparator.comparingDouble(player::distanceToSqr)).toList();
+        List<Map<String, Object>> rows = all.stream()
+            .limit(MAX_PROJECTILES)
+            .map(projectile -> projectile(level, player, projectile))
+            .toList();
+        return new ProjectileCollection(rows, all.size() <= MAX_PROJECTILES);
+    }
+
+    private static Map<String, Object> projectile(
+        ServerLevel level,
+        ServerPlayer actor,
+        Projectile projectile
+    ) {
+        boolean arrowPhysicsSupported = projectile instanceof AbstractArrow &&
+            !projectile.isInWater();
+        double drag = 0.99d;
+        Vec3 acceleration = arrowPhysicsSupported
+            ? new Vec3(0, projectile.isNoGravity() ? 0 : -0.05d, 0)
+            : Vec3.ZERO;
+        ProjectileThreatForecaster.Input provisionalInput = projectileInput(
+            projectile,
+            actor,
+            acceleration,
+            drag,
+            arrowPhysicsSupported,
+            null
+        );
+        ProjectileThreatForecaster.Forecast provisional =
+            ProjectileThreatForecaster.forecast(provisionalInput);
+        TrajectoryCoverage trajectoryCoverage = trajectoryCoverage(
+            level,
+            actor,
+            provisional.samples()
+        );
+        boolean evidenceComplete = arrowPhysicsSupported &&
+            trajectoryCoverage.complete();
+        ProjectileThreatForecaster.Forecast forecast =
+            ProjectileThreatForecaster.forecast(projectileInput(
+                projectile,
+                actor,
+                acceleration,
+                drag,
+                evidenceComplete,
+                trajectoryCoverage.occlusionTick()
+            ));
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("projectile_ref", opaqueEntityRef("projectile", projectile));
+        row.put("incarnation_ref", opaqueEntityRef("projectile_incarnation", projectile));
+        row.put(
+            "projectile_type_id",
+            String.valueOf(BuiltInRegistries.ENTITY_TYPE.getKey(projectile.getType()))
+        );
+        if (projectile.getOwner() != null) {
+            row.put(
+                "owner_ref",
+                opaqueEntityRef("projectile_owner", projectile.getOwner())
+            );
+        }
+        row.put("position", position(projectile.position()));
+        row.put("velocity", position(projectile.getDeltaMovement()));
+        row.put("acceleration", position(acceleration));
+        row.put("support_ticks", PROJECTILE_SUPPORT_TICKS);
+        if (forecast.predictedCollisionTick() != null) {
+            row.put("predicted_collision_tick", forecast.predictedCollisionTick());
+        }
+        if (forecast.predictedImpactPosition() != null) {
+            row.put(
+                "predicted_impact_position",
+                position(forecast.predictedImpactPosition())
+            );
+        }
+        row.put(
+            "threat_classification",
+            forecast.classification().name().toLowerCase(java.util.Locale.ROOT)
+        );
+        row.put("evidence_complete", forecast.evidenceComplete());
+        row.put("occluded", forecast.occluded());
+        return row;
+    }
+
+    private static ProjectileThreatForecaster.Input projectileInput(
+        Projectile projectile,
+        ServerPlayer actor,
+        Vec3 acceleration,
+        double drag,
+        boolean evidenceComplete,
+        Integer verifiedOcclusionTick
+    ) {
+        net.minecraft.world.phys.AABB box = actor.getBoundingBox();
+        return new ProjectileThreatForecaster.Input(
+            vector(projectile.position()),
+            vector(projectile.getDeltaMovement()),
+            vector(acceleration),
+            drag,
+            PROJECTILE_SUPPORT_TICKS,
+            new ProjectileThreatForecaster.Box(
+                box.minX,
+                box.minY,
+                box.minZ,
+                box.maxX,
+                box.maxY,
+                box.maxZ
+            ),
+            PROJECTILE_NEAR_MISS_MARGIN,
+            evidenceComplete,
+            verifiedOcclusionTick
+        );
+    }
+
+    private static TrajectoryCoverage trajectoryCoverage(
+        ServerLevel level,
+        ServerPlayer actor,
+        List<ProjectileThreatForecaster.Sample> samples
+    ) {
+        for (int index = 1; index < samples.size(); index++) {
+            Vec3 start = vector(samples.get(index - 1).position());
+            Vec3 end = vector(samples.get(index).position());
+            if (
+                !level.hasChunkAt(BlockPos.containing(start)) ||
+                !level.hasChunkAt(BlockPos.containing(end))
+            ) {
+                return new TrajectoryCoverage(false, null);
+            }
+            HitResult hit = level.clip(new ClipContext(
+                start,
+                end,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                actor
+            ));
+            if (hit.getType() != HitResult.Type.MISS) {
+                return new TrajectoryCoverage(true, index);
+            }
+        }
+        return new TrajectoryCoverage(true, null);
+    }
+
+    private static String opaqueEntityRef(String kind, Entity entity) {
+        return kind + ":" + SectionHasher.hash(Map.of(
+            "kind", kind,
+            "entity_uuid", entity.getUUID().toString(),
+            "entity_id", entity.getId()
+        ));
     }
 
     private static HazardCollection hazards(
@@ -579,6 +751,20 @@ final class FabricPerceptionSnapshot {
         return Map.of("x", round(value.x), "y", round(value.y), "z", round(value.z));
     }
 
+    private static Map<String, Object> position(
+        ProjectileThreatForecaster.Vector value
+    ) {
+        return Map.of("x", round(value.x()), "y", round(value.y()), "z", round(value.z()));
+    }
+
+    private static ProjectileThreatForecaster.Vector vector(Vec3 value) {
+        return new ProjectileThreatForecaster.Vector(value.x, value.y, value.z);
+    }
+
+    private static Vec3 vector(ProjectileThreatForecaster.Vector value) {
+        return new Vec3(value.x(), value.y(), value.z());
+    }
+
     private static Map<String, Object> position(BlockPos value) {
         return Map.of("x", value.getX(), "y", value.getY(), "z", value.getZ());
     }
@@ -600,6 +786,11 @@ final class FabricPerceptionSnapshot {
     }
 
     private record EntityCollection(List<Map<String, Object>> entities, boolean complete) {}
+    private record ProjectileCollection(
+        List<Map<String, Object>> projectiles,
+        boolean complete
+    ) {}
+    private record TrajectoryCoverage(boolean complete, Integer occlusionTick) {}
     private record HazardCollection(List<Map<String, Object>> hazards, boolean complete) {}
     private record Coverage(int unknownCells) {}
 }

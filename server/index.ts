@@ -35,6 +35,10 @@ import {
 import { installRuntimeProcessDiagnostics } from "./services/runtime/process-diagnostics";
 import { flushLocalDatabaseSnapshotIfEnabled } from "./db/client";
 import {
+  buildHelixLocalSupervisorStatus,
+  createHelixLocalSupervisorIdentity,
+} from "./services/local-supervisor/local-supervisor-identity";
+import {
   renderRootBootHtml,
   renderRootRedirectHtml,
   renderStartupRetryHtml,
@@ -129,6 +133,7 @@ const runtimeApprovalVerifierStatus =
   installRuntimeToolConfirmationVerifierFromEnvironmentV1();
 patchExpressAsyncHandlers();
 const app = express();
+const localSupervisorIdentity = createHelixLocalSupervisorIdentity();
 const desktopSessionConfig = resolveDesktopSessionConfig(process.env);
 app.use(createDesktopSessionGuard(desktopSessionConfig));
 
@@ -377,6 +382,16 @@ app.get("/api/ready", (_req, res) => {
 app.head("/api/ready", (_req, res) => {
   const ready = appReady;
   res.status(ready ? 200 : 503).end();
+});
+app.get("/api/local-supervisor/status", (_req, res) => {
+  const payload = buildHelixLocalSupervisorStatus({
+    identity: localSupervisorIdentity,
+    ready: appReady,
+  });
+  res.status(payload.ready ? 200 : 503).json(payload);
+});
+app.head("/api/local-supervisor/status", (_req, res) => {
+  res.status(appReady ? 200 : 503).end();
 });
 app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true });

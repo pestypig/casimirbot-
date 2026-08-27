@@ -185,6 +185,25 @@ their membership, consent and subject bindings. Mutation authority remains
 separate and explicit. Two proposals cannot race for the program: all mutations
 converge through one serialized execution lease.
 
+The projected multi-host form extends the same rule without turning a room into
+ambient device access. One installed node may serve several authenticated room
+members, so observers and authorized steering participants do not need their own
+harness merely to benefit from the host's normalized evidence and Runtime Codex
+reasoning. When a second member wants the room to observe or act through a
+program or player client physically owned by that member's computer, that
+computer contributes its own installed node or approved companion and an
+independently revocable capability grant.
+
+Multiple nodes in one room federate only advertised capabilities, normalized
+evidence, steering requests and supported products. Each connection retains its
+owner profile, node, environment, source/world, subject, connector epoch,
+credential, consent, and lease. Room membership never grants host shell,
+filesystem, process, credential-store, private-network, native-account, or
+arbitrary-program access, and it never unions member permissions into a room
+super-user. Cross-host reasoning still uses one principal Runtime Codex path,
+one execution arbiter, and one terminal writer. The exact projected acceptance
+contract is `docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md`.
+
 ### Phone continuation
 
 A user may continue steering or reviewing a durable goal from a phone while the

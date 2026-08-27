@@ -27,6 +27,7 @@ import {
   HELIX_SYSTEM_CLOCK_ADAPTER_PROFILE_ID,
 } from "@shared/helix-environment-adapter-profile";
 import { HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID } from "@shared/helix-environment-action-adapter-profile";
+import { HELIX_ENVIRONMENT_ACTION_RESULT_DELIVERY_GRACE_MS } from "@shared/helix-environment-action";
 import {
   HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
@@ -40,6 +41,7 @@ import {
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
@@ -281,6 +283,39 @@ const minecraftPerceptionSnapshotOutputSchema: HelixEnvironmentConstrainedJsonSc
         additionalProperties: false,
       },
     },
+    projectiles: {
+      type: "array",
+      maxItems: 128,
+      description:
+        "Bounded, actor-relative projectile trajectory forecasts. Absence means the producer predates projectile forecasting; consult coverage.projectiles_complete before treating an empty array as complete evidence.",
+      items: {
+        type: "object",
+        properties: {
+          projectile_ref: { type: "string", minLength: 1, maxLength: 240 },
+          incarnation_ref: { type: "string", minLength: 1, maxLength: 240 },
+          projectile_type_id: { type: "string", minLength: 1, maxLength: 160 },
+          owner_ref: { type: "string", minLength: 1, maxLength: 240 },
+          position: minecraftPositionSchema,
+          velocity: minecraftPositionSchema,
+          acceleration: minecraftPositionSchema,
+          support_ticks: { type: "integer", minimum: 1, maximum: 80 },
+          predicted_collision_tick: { type: "integer", minimum: 0, maximum: 80 },
+          predicted_impact_position: minecraftPositionSchema,
+          threat_classification: {
+            type: "string",
+            enum: ["collision", "near_miss", "safe", "unknown"],
+          },
+          evidence_complete: { type: "boolean" },
+          occluded: { type: "boolean" },
+        },
+        required: [
+          "projectile_ref", "incarnation_ref", "projectile_type_id",
+          "position", "velocity", "acceleration", "support_ticks",
+          "threat_classification", "evidence_complete", "occluded",
+        ],
+        additionalProperties: false,
+      },
+    },
     hazards: {
       type: "array",
       maxItems: 128,
@@ -440,6 +475,7 @@ const minecraftPerceptionSnapshotOutputSchema: HelixEnvironmentConstrainedJsonSc
         loaded_region_complete: { type: "boolean" },
         unknown_cell_count: { type: "integer", minimum: 0, maximum: 10_000 },
         entities_complete: { type: "boolean" },
+        projectiles_complete: { type: "boolean" },
         hazards_complete: { type: "boolean" },
         omitted_categories: {
           type: "array",
@@ -1769,6 +1805,80 @@ const minecraftCombatAttackInputSchema: HelixEnvironmentConstrainedJsonSchema = 
     "require_line_of_sight",
     "minimum_attack_cooldown",
     "max_attack_pulses",
+    "max_duration_ms",
+    "stop_below_health",
+    "friendly_fire",
+  ],
+  additionalProperties: false,
+};
+
+const minecraftCombatGuardInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["combat_guard"] },
+    hostile_entity_type_ids: {
+      type: "array",
+      items: { type: "string", minLength: 3, maxLength: 320 },
+      minItems: 1,
+      maxItems: 16,
+    },
+    max_acquisition_distance: { type: "number", minimum: 2, maximum: 32 },
+    require_line_of_sight: { type: "boolean", enum: [true] },
+    minimum_attack_cooldown: { type: "number", minimum: 0.1, maximum: 1 },
+    max_attack_pulses: { type: "integer", minimum: 1, maximum: 256 },
+    max_target_switches: { type: "integer", minimum: 0, maximum: 64 },
+    target_commit_ticks: { type: "integer", minimum: 0, maximum: 200 },
+    retreat_start_distance: { type: "number", minimum: 1, maximum: 6 },
+    retreat_stop_distance: { type: "number", minimum: 1, maximum: 8 },
+    retreat_when_hostile_count_at_least: {
+      type: "integer",
+      minimum: 1,
+      maximum: 16,
+    },
+    max_duration_ms: { type: "integer", minimum: 1_000, maximum: 120_000 },
+    stop_below_health: { type: "number", minimum: 1, maximum: 20 },
+    friendly_fire: { type: "boolean", enum: [false] },
+    approach_policy: {
+      type: "string",
+      enum: ["none", "direct_bounded", "local_reroute_bounded"],
+      description:
+        "Optional admitted closing-distance repertoire. direct_bounded permits collision-checked forward input; local_reroute_bounded may fall back to one collision-checked lateral direction and its alternate. Either requires max_approach_ticks.",
+    },
+    max_approach_ticks: { type: "integer", minimum: 0, maximum: 1_200 },
+    cover_policy: {
+      type: "string",
+      enum: ["none", "lateral_bounded"],
+      description:
+        "Optional cover-aware lateral movement. The resident controller admits a step only when its bounded lookahead finds collision-safe support and block occlusion from the projectile source.",
+    },
+    max_cover_ticks: { type: "integer", minimum: 0, maximum: 1_200 },
+    projectile_response: {
+      type: "string",
+      enum: ["none", "sidestep", "shield_or_sidestep"],
+      description:
+        "Optional local response to a bounded predicted collision. It does not authorize attacks on projectiles or non-hostile entities.",
+    },
+    projectile_evasion_horizon_ticks: {
+      type: "integer",
+      minimum: 1,
+      maximum: 20,
+    },
+    max_evasion_ticks: { type: "integer", minimum: 0, maximum: 1_200 },
+    shield_hand: { type: "string", enum: ["none", "off_hand"] },
+    max_shield_hold_ticks: { type: "integer", minimum: 0, maximum: 1_200 },
+  },
+  required: [
+    "action_kind",
+    "hostile_entity_type_ids",
+    "max_acquisition_distance",
+    "require_line_of_sight",
+    "minimum_attack_cooldown",
+    "max_attack_pulses",
+    "max_target_switches",
+    "target_commit_ticks",
+    "retreat_start_distance",
+    "retreat_stop_distance",
+    "retreat_when_hostile_count_at_least",
     "max_duration_ms",
     "stop_below_health",
     "friendly_fire",
@@ -3564,7 +3674,17 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
     description:
       "Use the normal vanilla client attack path against one previously locked hostile entity incarnation. Requires current line of sight, reach and cooldown; refuses substitutions and friendly fire; reports hurt, health and death transitions.",
     inputSchema: minecraftCombatAttackInputSchema,
-    timeoutCeilingMs: 60_000,
+    timeoutCeilingMs:
+      60_000 + HELIX_ENVIRONMENT_ACTION_RESULT_DELIVERY_GRACE_MS,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
+    label: "Guard the paired player from bounded hostile Minecraft mobs",
+    description:
+      "Run a short resident hostile-PvE control lease that deterministically retains or switches among allowlisted hostile entity types, tracks the selected target, and issues only vanilla cooldown- and reach-gated attacks. Optional explicitly admitted repertoires add collision-checked direct closing, short-horizon projectile sidesteps, and off-hand shield holding within separate tick budgets. Players and non-hostile entities are never eligible targets.",
+    inputSchema: minecraftCombatGuardInputSchema,
+    timeoutCeilingMs:
+      120_000 + HELIX_ENVIRONMENT_ACTION_RESULT_DELIVERY_GRACE_MS,
   }),
   actionDescriptor({
     capabilityId: HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,

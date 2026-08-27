@@ -70,7 +70,11 @@ public final class HelixFabricSensorMod implements ModInitializer {
             FabricServerPairingInbox.PollResult result =
                 FabricServerPairingInbox.consumeDefault(System.currentTimeMillis());
             if (result.code() != null) {
-                pairAsync(activeServer.createCommandSourceStack(), result.code());
+                pairAsync(
+                    activeServer.createCommandSourceStack(),
+                    result.code(),
+                    ConnectorPairingClient.LOCAL_PAIRING_ENDPOINT
+                );
             } else if (!result.failureCode().isBlank()) {
                 LOGGER.warning(
                     "The local Helix server pairing inbox was rejected: " +
@@ -85,6 +89,18 @@ public final class HelixFabricSensorMod implements ModInitializer {
     }
 
     void pairAsync(CommandSourceStack source, String code) {
+        pairAsync(
+            source,
+            code,
+            FabricSensorConfigLoader.loadPairingEndpoint(LOGGER)
+        );
+    }
+
+    private void pairAsync(
+        CommandSourceStack source,
+        String code,
+        String pairingEndpoint
+    ) {
         MinecraftServer activeServer = server;
         if (activeServer == null) {
             FabricConnectorCommands.failure(source, "The server is not ready.");
@@ -97,9 +113,6 @@ public final class HelixFabricSensorMod implements ModInitializer {
             );
             return;
         }
-        String pairingEndpoint = FabricSensorConfigLoader.loadPairingEndpoint(
-            LOGGER
-        );
         String nonce;
         try {
             nonce = FabricSensorConfigLoader.loadOrCreatePairingNonce(
@@ -143,6 +156,15 @@ public final class HelixFabricSensorMod implements ModInitializer {
                     connectorOperation.set(false);
                     Throwable cause = unwrap(error);
                     if (cause != null) {
+                        if (cause instanceof PairingOperationException failure) {
+                            LOGGER.warning(
+                                "Helix connector pairing failed: " + failure.code
+                            );
+                        } else {
+                            LOGGER.warning(
+                                "Helix connector pairing failed before a typed response was available."
+                            );
+                        }
                         String message = cause instanceof PairingOperationException failure
                             ? failure.safeMessage()
                             : "Connector pairing failed before Helix confirmed it.";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fixture from "../../scripts/fixtures/minecraft-combat-c0-zombie-baseline-v1.json";
+import c1Fixture from "../../scripts/fixtures/minecraft-combat-c1-projectile-calibration-v1.json";
 import {
   helixMinecraftCombatArenaManifestSchema,
   helixMinecraftProjectileForecastSchema,
@@ -39,6 +40,32 @@ describe("Minecraft combat v1 contracts", () => {
         admitted_attack_target: true,
       }),
     ]);
+  });
+
+  it("accepts the canonical projectile-only C1 arena manifest", () => {
+    const parsed = helixMinecraftCombatArenaManifestSchema.parse(c1Fixture);
+    expect(parsed.tier).toBe("C1");
+    expect(parsed.entities).toEqual([]);
+    expect(parsed.equipment).toEqual([]);
+  });
+
+  it("rejects mobs and player equipment in the C1 calibration fixture", () => {
+    expect(helixMinecraftCombatArenaManifestSchema.safeParse({
+      ...c1Fixture,
+      equipment: [{ item_id: "minecraft:shield", count: 1, slot: "off_hand" }],
+    }).success).toBe(false);
+    expect(helixMinecraftCombatArenaManifestSchema.safeParse({
+      ...c1Fixture,
+      entities: [{
+        label: "skeleton",
+        entity_type_id: "minecraft:skeleton",
+        classification: "hostile",
+        adult: true,
+        armored: false,
+        projectile_source: true,
+        admitted_attack_target: false,
+      }],
+    }).success).toBe(false);
   });
 
   it("rejects a C0 arena with a second or non-hostile target", () => {

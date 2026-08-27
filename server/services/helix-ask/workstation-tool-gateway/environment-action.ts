@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA,
+  HELIX_ENVIRONMENT_ACTION_RESULT_DELIVERY_GRACE_MS,
   helixEnvironmentActionRequestSchema,
   type HelixEnvironmentActionObservation,
 } from "@shared/helix-environment-action";
@@ -184,6 +185,8 @@ const syntheticFailure = (input: {
   actionKind: string;
   outcome: HelixEnvironmentActionObservation["outcome"];
   summary: string;
+  actionRequestRef?: string;
+  workflowRef?: string;
   repairDiagnosticEligibleForCurrentTurnReentry?: boolean;
 }): HelixEnvironmentActionObservation => {
   const hash = crypto
@@ -195,8 +198,12 @@ const syntheticFailure = (input: {
     .digest("hex");
   return {
     schema: HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA,
-    action_request_ref: `environment_action_request_uncreated:${hash.slice(0, 40)}`,
-    workflow_ref: `environment_action_workflow_uncreated:${hash.slice(0, 40)}`,
+    action_request_ref:
+      input.actionRequestRef ??
+      `environment_action_request_uncreated:${hash.slice(0, 40)}`,
+    workflow_ref:
+      input.workflowRef ??
+      `environment_action_workflow_uncreated:${hash.slice(0, 40)}`,
     action_execution_ref: null,
     capability_id: input.capabilityId,
     capability_version: 1,
@@ -266,6 +273,8 @@ const failed = (input: {
   outcome: HelixEnvironmentActionObservation["outcome"];
   summary: string;
   status?: "blocked" | "failed";
+  actionRequestRef?: string;
+  workflowRef?: string;
   repairDiagnosticEligibleForCurrentTurnReentry?: boolean;
 }): EnvironmentActionGatewayExecution => ({
   ok: false,
@@ -455,6 +464,8 @@ const contextErrorOutcome = (
       return "connector_offline";
     case "action_request_expired":
       return "action_outcome_unknown";
+    case "action_request_conflict":
+      return "duplicate_request";
     default:
       return "failed";
   }
@@ -564,6 +575,10 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
     });
   }
   let actionAdmissionReached = false;
+  let admittedActionRefs: {
+    actionRequestRef: string;
+    workflowRef: string;
+  } | null = null;
   try {
     const participantId = await selectedParticipantId({
       deps,
@@ -772,7 +787,8 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
     const now = new Date();
     const actionDurationMs =
       context.capability.actionKind === "follow" ||
-      context.capability.actionKind === "track_target"
+      context.capability.actionKind === "track_target" ||
+      context.capability.actionKind === "attack"
         ? positiveIntegerArgument(actionArguments, "max_duration_ms")
         : context.capability.actionKind === "execute_sequence" ||
             context.capability.actionKind === "execute_reactive_program"
@@ -784,9 +800,17 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
       descriptor.timeout_ceiling_ms,
       30 * 60_000,
     );
+    const executionDurationMs =
+      actionDurationMs > 0
+        ? Math.min(actionDurationMs, durationCeilingMs)
+        : durationCeilingMs;
     const maxDurationMs =
       actionDurationMs > 0
-        ? Math.min(actionDurationMs + 5_000, durationCeilingMs)
+        ? Math.min(
+            actionDurationMs +
+              HELIX_ENVIRONMENT_ACTION_RESULT_DELIVERY_GRACE_MS,
+            durationCeilingMs,
+          )
         : durationCeilingMs;
     const deadlineAt = new Date(now.getTime() + maxDurationMs).toISOString();
     const requestedEngine =
@@ -857,7 +881,10 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
       created_at: now.toISOString(),
       deadline_at: deadlineAt,
       constraints: {
-        max_duration_ms: maxDurationMs,
+        // Keep the connector's execution ceiling separate from the outer
+        // observation deadline so a terminal result has time to leave the
+        // durable delivery outbox before Helix declares an unknown outcome.
+        max_duration_ms: executionDurationMs,
         max_distance_blocks: 30_000_000,
         max_block_mutations: programMutationScope
           ? programMutationScope.max_block_mutations
@@ -900,7 +927,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
         world_mutation_allowed:
           context.capability.effectClass === "world_mutation" ||
           programMutationScope?.world_mutation_allowed === true,
-        combat_allowed: false,
+        combat_allowed: context.capability.actionKind === "attack",
         host_access_allowed: false,
         automatic_replay_allowed: false,
       },
@@ -915,6 +942,10 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
       requestingParticipantId: participantId,
       request,
     });
+    admittedActionRefs = {
+      actionRequestRef: queued.action_request_id,
+      workflowRef: queued.workflow_id,
+    };
     let abortCancellation: Promise<unknown> | null = null;
     const cancelOnAbort = (): void => {
       if (abortCancellation) return;
@@ -998,6 +1029,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
           ? error.message
           : "The Minecraft player-action lane failed before trustworthy observation re-entry.",
       status: actionAdmissionReached ? "failed" : "blocked",
+      ...(admittedActionRefs ?? {}),
     });
   }
 };

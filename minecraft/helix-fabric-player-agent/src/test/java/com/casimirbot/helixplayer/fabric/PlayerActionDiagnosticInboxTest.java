@@ -50,6 +50,142 @@ final class PlayerActionDiagnosticInboxTest {
     }
 
     @Test
+    void fullScopeAcceptsBoundedHostileCombatGuard() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-combat-guard",
+            "action_kind", "combat_guard",
+            "arguments", Map.ofEntries(
+                Map.entry("action_kind", "combat_guard"),
+                Map.entry("hostile_entity_type_ids", List.of("minecraft:zombie")),
+                Map.entry("max_acquisition_distance", 16),
+                Map.entry("require_line_of_sight", true),
+                Map.entry("minimum_attack_cooldown", 0.9),
+                Map.entry("max_attack_pulses", 32),
+                Map.entry("max_target_switches", 8),
+                Map.entry("target_commit_ticks", 10),
+                Map.entry("retreat_start_distance", 2.5),
+                Map.entry("retreat_stop_distance", 4.0),
+                Map.entry("retreat_when_hostile_count_at_least", 2),
+                Map.entry("max_duration_ms", 30_000),
+                Map.entry("stop_below_health", 4),
+                Map.entry("friendly_fire", false)
+            ),
+            "max_duration_ticks", 600,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertEquals("combat_guard", result.request().actionKind());
+        assertEquals(
+            List.of("minecraft:zombie"),
+            result.request().arguments().get("hostile_entity_type_ids")
+        );
+        assertEquals(false, result.request().arguments().get("friendly_fire"));
+        assertEquals("none", result.request().arguments().get("approach_policy"));
+        assertEquals("none", result.request().arguments().get("cover_policy"));
+        assertEquals("none", result.request().arguments().get("projectile_response"));
+    }
+
+    @Test
+    void fullScopeAcceptsExplicitRangedCombatRepertoire() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-ranged-combat-guard",
+            "action_kind", "combat_guard",
+            "arguments", Map.ofEntries(
+                Map.entry("action_kind", "combat_guard"),
+                Map.entry("hostile_entity_type_ids", List.of("minecraft:skeleton")),
+                Map.entry("max_acquisition_distance", 24),
+                Map.entry("require_line_of_sight", true),
+                Map.entry("minimum_attack_cooldown", 0.9),
+                Map.entry("max_attack_pulses", 48),
+                Map.entry("max_target_switches", 4),
+                Map.entry("target_commit_ticks", 10),
+                Map.entry("retreat_start_distance", 2.5),
+                Map.entry("retreat_stop_distance", 4.0),
+                Map.entry("retreat_when_hostile_count_at_least", 2),
+                Map.entry("max_duration_ms", 30_000),
+                Map.entry("stop_below_health", 12),
+                Map.entry("friendly_fire", false),
+                Map.entry("approach_policy", "local_reroute_bounded"),
+                Map.entry("max_approach_ticks", 300),
+                Map.entry("cover_policy", "lateral_bounded"),
+                Map.entry("max_cover_ticks", 120),
+                Map.entry("projectile_response", "shield_or_sidestep"),
+                Map.entry("projectile_evasion_horizon_ticks", 8),
+                Map.entry("max_evasion_ticks", 200),
+                Map.entry("shield_hand", "off_hand"),
+                Map.entry("max_shield_hold_ticks", 200)
+            ),
+            "max_duration_ticks", 600,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertEquals("local_reroute_bounded", result.request().arguments().get("approach_policy"));
+        assertEquals(300L, result.request().arguments().get("max_approach_ticks"));
+        assertEquals("lateral_bounded", result.request().arguments().get("cover_policy"));
+        assertEquals(120L, result.request().arguments().get("max_cover_ticks"));
+        assertEquals("shield_or_sidestep", result.request().arguments().get("projectile_response"));
+        assertEquals("off_hand", result.request().arguments().get("shield_hand"));
+    }
+
+    @Test
+    void fullScopeRejectsProjectileResponseWithoutEvasionBudget() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-invalid-ranged-combat-guard",
+            "action_kind", "combat_guard",
+            "arguments", Map.ofEntries(
+                Map.entry("action_kind", "combat_guard"),
+                Map.entry("hostile_entity_type_ids", List.of("minecraft:skeleton")),
+                Map.entry("max_acquisition_distance", 24),
+                Map.entry("require_line_of_sight", true),
+                Map.entry("minimum_attack_cooldown", 0.9),
+                Map.entry("max_attack_pulses", 48),
+                Map.entry("max_target_switches", 4),
+                Map.entry("target_commit_ticks", 10),
+                Map.entry("retreat_start_distance", 2.5),
+                Map.entry("retreat_stop_distance", 4.0),
+                Map.entry("retreat_when_hostile_count_at_least", 2),
+                Map.entry("max_duration_ms", 30_000),
+                Map.entry("stop_below_health", 12),
+                Map.entry("friendly_fire", false),
+                Map.entry("projectile_response", "sidestep"),
+                Map.entry("max_evasion_ticks", 0)
+            ),
+            "max_duration_ticks", 600,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertNull(result.request());
+        assertEquals(
+            "player_diagnostic_inbox_combat_guard_projectile_invalid",
+            result.failureCode()
+        );
+    }
+
+    @Test
     void fullScopeAcceptsTheExactResidentGuardianProfile() throws Exception {
         Path inbox = write(Map.of(
             "schema", PlayerActionDiagnosticInbox.SCHEMA,

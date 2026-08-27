@@ -2,6 +2,11 @@
 
 Status: operational instruction.
 
+The current dependency order, active gate, and advancement evidence for Codex
+parity and legacy detachment are governed by
+`docs/helix-ask-codex-parity-work-program-v1.md`. This file remains the
+patch-time procedure contract and must not become a second status roadmap.
+
 The canonical event sequence and runtime-versus-policy authority matrix are
 defined in `docs/architecture/helix-ask-canonical-turn-lifecycle.md`. Any new
 provider projection, continuation rule, or terminal shortcut must conform to

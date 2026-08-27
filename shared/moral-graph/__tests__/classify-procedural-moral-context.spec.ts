@@ -47,6 +47,7 @@ const nodeIds = [
   "need-before-allocation",
   "efficiency-without-erasure",
   "mandate-bounded-hierarchy",
+  "leadership-as-capacity-transfer",
   "legible-rules-bounded-confidentiality",
   "cooperation-without-assimilation",
   "specialization-without-caste",
@@ -373,5 +374,50 @@ describe("procedural Moral context classifier", () => {
       ]),
     );
     expect(JSON.stringify(classification)).not.toMatch(/best ideology|best civilization/i);
+  });
+
+  it("routes recurring leadership development through capacity transfer rather than total sovereignty", () => {
+    const classification = classify(
+      "A leader earned authority through hard-won knowledge, but leadership should become teachable: developing competence should produce decision rights, contestability, renewal, and succession so the mission survives beyond the leader.",
+    );
+    const lifecycle = classification.classifications.find(
+      (entry) => entry.moralRootId === "leadership-as-capacity-transfer",
+    );
+
+    expect(lifecycle).toMatchObject({
+      proceduralMove: "ask_for_concrete_evidence",
+      missingEvidence: expect.arrayContaining([
+        "originating_expertise",
+        "mandate_scope",
+        "knowledge_transfer_path",
+        "competence_to_decision_rights",
+        "succession_path",
+        "mission_continuity_without_leader",
+      ]),
+      warnings: expect.arrayContaining([
+        "avoid_expertise_as_total_sovereignty",
+        "avoid_indispensability_as_leadership",
+        "avoid_character_verdict",
+      ]),
+    });
+    expect(classification.authority).toMatchObject({ terminal_eligible: false, moral_finality: false });
+  });
+
+  it.each([
+    "The essay quoted 'make leadership teachable' without asking anyone to transfer authority.",
+    "Historically, succession did not occur and the mission did not survive the leader.",
+    "Do not treat an indispensable leader test as permission to remove anyone.",
+    "If competence later produces decision rights, review the mandate at that future time.",
+  ])("keeps contextual leadership-cycle language diagnostic and non-executable: %s", (text) => {
+    const classification = classify(text);
+
+    expect(validateProceduralMoralClassificationV1(classification)).toEqual([]);
+    expect(classification.authority).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      agent_executable: false,
+      character_verdict: false,
+      moral_finality: false,
+    });
   });
 });

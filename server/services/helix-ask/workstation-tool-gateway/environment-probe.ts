@@ -47,6 +47,10 @@ import {
 } from "../runtime/external-capability-policy";
 import type { HelixWorkstationGatewayAccountContext } from "./account-policy";
 import {
+  authorizeRoomReadGrant,
+  RoomReadGrantStoreError,
+} from "../../environment-connectors/profiles/room-read-grant-store";
+import {
   listLatestBoundRoomSourceCandidates,
   type BoundRoomEvidenceSourceCandidate,
 } from "./bound-room-evidence";
@@ -102,6 +106,7 @@ export type EnvironmentProbeGatewayDependencies = {
   resolveSubject: typeof resolveRoomEnvironmentSubjectForProbe;
   dispatchProbe: typeof dispatchDurableEnvironmentProbe;
   awaitProbe: typeof awaitDurableEnvironmentProbeObservation;
+  authorizeRoomRead: typeof authorizeRoomReadGrant;
   now: () => Date;
 };
 
@@ -123,6 +128,8 @@ const dependencies = (
     overrides.resolveSubject ?? resolveRoomEnvironmentSubjectForProbe,
   dispatchProbe: overrides.dispatchProbe ?? dispatchDurableEnvironmentProbe,
   awaitProbe: overrides.awaitProbe ?? awaitDurableEnvironmentProbeObservation,
+  authorizeRoomRead:
+    overrides.authorizeRoomRead ?? authorizeRoomReadGrant,
   now: overrides.now ?? (() => new Date()),
 });
 
@@ -1268,6 +1275,35 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       }
       requestingParticipantId = frozenParticipant.participant_id;
     }
+    try {
+      await deps.authorizeRoomRead({
+        roomId: source.roomId,
+        requestingProfileId: authority.accountProfileId,
+        requestingParticipantId,
+        connectionOwnerProfileId: connectorOwnerProfileId,
+        connectionRef: connector.environmentBindingId,
+        installedNodeRef: connector.installationId,
+        sourceRef: source.sourceId,
+        producerEpochRef: source.adapterAdmission.producer_epoch_ref,
+        capabilityId,
+        turnId,
+        toolCallId,
+        now,
+      });
+    } catch (error) {
+      if (error instanceof RoomReadGrantStoreError) {
+        return fail({
+          outcome: "permission_revoked",
+          summary: error.message,
+          result: {
+            room_grant_error: error.code,
+            connection_owner_profile_ref: connectorOwnerProfileId,
+            requesting_participant_ref: requestingParticipantId,
+          },
+        });
+      }
+      throw error;
+    }
     let resolvedSubject: Awaited<
       ReturnType<typeof resolveRoomEnvironmentSubjectForProbe>
     > = null;
@@ -1363,9 +1399,12 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
           observation.late_result_disposition ??
           "The authentic probe result is not eligible for this turn.",
         observation,
-        error:
-          observation.late_result_disposition ??
-          "current_turn_reentry_ineligible",
+        // Keep the transport disposition in the typed observation and public
+        // summary, but expose one stable gateway failure code. Terminal
+        // authority and the model-owned retry policy key off this code; using
+        // `late_after_supersession` here made a later successful same-turn read
+        // look like an unrelated hard failure.
+        error: "current_turn_reentry_ineligible",
       };
     }
     return {

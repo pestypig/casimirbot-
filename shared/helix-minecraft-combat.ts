@@ -207,6 +207,20 @@ export const helixMinecraftCombatArenaManifestSchema = z.object({
       });
     }
   }
+  if (value.tier === "C1") {
+    if (
+      value.acceptance_class !== "deterministic_fixture" ||
+      value.entities.length !== 0 ||
+      value.spawn_points.entities.length !== 0 ||
+      value.equipment.length !== 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["entities"],
+        message: "C1 is a deterministic projectile-only fixture with no mobs or player equipment.",
+      });
+    }
+  }
 });
 
 export type HelixMinecraftCombatFrame = z.infer<typeof helixMinecraftCombatFrameSchema>;

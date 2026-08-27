@@ -4,6 +4,7 @@ export const HELIX_ENVIRONMENT_ACTION_READ_SCOPE =
   "helix.environment_actions.read" as const;
 export const HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE =
   "helix.environment_actions.write" as const;
+export const HELIX_ENVIRONMENT_ACTION_RESULT_DELIVERY_GRACE_MS = 5_000;
 
 export const HELIX_ENVIRONMENT_ACTION_AUTHORITY_SCHEMA =
   "helix.environment_action.authority.v1" as const;

@@ -1,0 +1,65 @@
+{
+  "schema": "helix.minecraft_combat_arena.v1",
+  "arena_id": "EH-MC-C1-static-projectile-calibration",
+  "arena_version": 1,
+  "program_gate": "G8",
+  "tier": "C1",
+  "title": "Static projectile calibration lanes",
+  "acceptance_class": "deterministic_fixture",
+  "dimension_id": "minecraft:overworld",
+  "bounds": {
+    "min": {"x": -8, "y": 0, "z": -8},
+    "max": {"x": 8, "y": 6, "z": 8}
+  },
+  "structure_asset": "minecraft/helix-fabric-player-agent/src/gametest/resources/data/helix_fabric_player_agent/gametest/structure/c1_projectile_calibration.snbt",
+  "spawn_points": {
+    "player": {
+      "label": "player",
+      "offset": {"x": 0, "y": 1, "z": 0},
+      "yaw_degrees": 0,
+      "pitch_degrees": 0
+    },
+    "entities": []
+  },
+  "entities": [],
+  "equipment": [],
+  "rules": {
+    "game_mode": "survival",
+    "difficulty": "normal",
+    "keep_inventory": true,
+    "daylight_neutral": true,
+    "mob_spawning": false,
+    "world_authority_released_before_measurement": true,
+    "friendly_fire": false
+  },
+  "perturbations": [
+    "front rear left and right collision lanes",
+    "open-lane near miss at 0.8 block lateral offset",
+    "verified solid occlusion before the actor envelope",
+    "incomplete trajectory support"
+  ],
+  "success_thresholds": [
+    "collision threat recall is 100 percent across the frozen finite fixture set",
+    "incomplete projectile evidence is never labelled safe",
+    "verified occlusion is distinguished from an open collision lane",
+    "near misses are distinct from collisions",
+    "every terminal path releases controls"
+  ],
+  "failure_conditions": [
+    "any supported collision lane is labelled near miss safe or unknown",
+    "incomplete evidence is labelled safe",
+    "verified occlusion is ignored",
+    "projectile identity changes without a new incarnation reference",
+    "controls remain asserted at terminal state"
+  ],
+  "reset_recipe": {
+    "mode": "server_world_snapshot",
+    "pre_trial_snapshot_required": true,
+    "fresh_trial_identity_required": true
+  },
+  "screenshot_checkpoints": [
+    "pre_trial",
+    "first_defensive_intervention",
+    "terminal_released_controls"
+  ]
+}

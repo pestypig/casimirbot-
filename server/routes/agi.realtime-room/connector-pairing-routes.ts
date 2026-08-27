@@ -17,6 +17,7 @@ import {
   revokeConnectorBootstrapPairing,
 } from "../../services/environment-connectors/pairing";
 import { stageLocalMinecraftServerPairing } from "../../services/environment-connectors/pairing/local-server-pairing-handoff";
+import { stageLocalMinecraftPlayerPairing } from "../../services/environment-connectors/pairing/local-player-pairing-handoff";
 import {
   buildSharedLiveRoomControlActorFromAccountContext,
   sharedLiveRoomActorAllowsSourceIngress,
@@ -184,6 +185,53 @@ sharedRealtimeRoomConnectorPairingRouter.get(
 );
 
 sharedRealtimeRoomConnectorPairingRouter.post(
+  "/realtime/rooms/:roomId/connector-pairings/local-source-handoff",
+  route(async (req, res) => {
+    const parsed = helixConnectorPairingCreateRequestSchema.safeParse(req.body);
+    if (
+      !parsed.success ||
+      parsed.data.purpose !== "rotate" ||
+      !parsed.data.binding_id ||
+      parsed.data.command_credential_requested === true ||
+      parsed.data.action_credential_requested === true
+    ) {
+      res.status(400).json(
+        receipt({
+          ok: false,
+          error: "connector_pairing_invalid",
+          message: "A source-only rotation for an existing local server binding is required.",
+        }),
+      );
+      return;
+    }
+    const account = await ownerContext(req, res);
+    const created = await createConnectorBootstrapPairing({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      purpose: "rotate",
+      bindingId: parsed.data.binding_id,
+      worldId: parsed.data.world_id,
+      domainAdapter: parsed.data.domain_adapter,
+      sourceLabel: parsed.data.source_label,
+      credentialTtlMs: parsed.data.credential_ttl_ms,
+      commandCredentialRequested: false,
+      actionCredentialRequested: false,
+      idempotencyKey: idempotencyKey(req),
+    });
+    await stageLocalMinecraftServerPairing({
+      command: `/helix pair ${created.pairingCode}`,
+    });
+    res.status(201).json(
+      receipt({
+        ok: true,
+        message: "Local server sensing was staged without exposing the one-time code or enabling command access.",
+        pairing: created.pairing,
+      }),
+    );
+  }),
+);
+
+sharedRealtimeRoomConnectorPairingRouter.post(
   "/realtime/rooms/:roomId/connector-pairings/local-server-handoff",
   route(async (req, res) => {
     const parsed = helixConnectorPairingCreateRequestSchema.safeParse(req.body);
@@ -224,6 +272,55 @@ sharedRealtimeRoomConnectorPairingRouter.post(
       receipt({
         ok: true,
         message: "Local server command access was staged without exposing the one-time code.",
+        pairing: created.pairing,
+      }),
+    );
+  }),
+);
+
+sharedRealtimeRoomConnectorPairingRouter.post(
+  "/realtime/rooms/:roomId/connector-pairings/local-player-handoff",
+  route(async (req, res) => {
+    const parsed = helixConnectorPairingCreateRequestSchema.safeParse(req.body);
+    if (
+      !parsed.success ||
+      parsed.data.purpose !== "rotate" ||
+      !parsed.data.binding_id ||
+      parsed.data.action_credential_requested !== true ||
+      parsed.data.command_credential_requested === true ||
+      !parsed.data.action_authority_id
+    ) {
+      res.status(400).json(
+        receipt({
+          ok: false,
+          error: "connector_pairing_invalid",
+          message: "An action-only rotation for an existing local player binding and authority is required.",
+        }),
+      );
+      return;
+    }
+    const account = await ownerContext(req, res);
+    const created = await createConnectorBootstrapPairing({
+      roomId: req.params.roomId,
+      ownerProfileId: account.profileId,
+      purpose: "rotate",
+      bindingId: parsed.data.binding_id,
+      worldId: parsed.data.world_id,
+      domainAdapter: parsed.data.domain_adapter,
+      sourceLabel: parsed.data.source_label,
+      credentialTtlMs: parsed.data.credential_ttl_ms,
+      commandCredentialRequested: false,
+      actionCredentialRequested: true,
+      actionAuthorityId: parsed.data.action_authority_id,
+      idempotencyKey: idempotencyKey(req),
+    });
+    await stageLocalMinecraftPlayerPairing({
+      command: `/helix-player pair ${created.pairingCode}`,
+    });
+    res.status(201).json(
+      receipt({
+        ok: true,
+        message: "Local player action access was staged without exposing the one-time code.",
         pairing: created.pairing,
       }),
     );

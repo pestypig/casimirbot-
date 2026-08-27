@@ -711,6 +711,43 @@ final class PlayerActionControllerTest {
     }
 
     @Test
+    void cameraTrackerKeepsHistogramP95WithinTheExactObservedMaximum() {
+        FakeBridge bridge = new FakeBridge();
+        bridge.targetObservation = new TargetObservation(
+            true,
+            true,
+            true,
+            "target:0123456789abcdef0123456789abcdef01234567",
+            "minecraft:zombie",
+            0,
+            65.5,
+            10,
+            0,
+            0,
+            0,
+            10
+        );
+        List<WorkflowEvent> events = new ArrayList<>();
+        PlayerActionController controller = new PlayerActionController(bridge, events::add);
+        controller.start(request(
+            "track_target",
+            trackingArguments(1_000),
+            ManualOverridePolicy.CANCEL
+        ));
+
+        for (int tick = 0; tick < 20; tick++) controller.tick();
+
+        WorkflowEvent terminal = events.get(events.size() - 1);
+        double p95 = ((Number) terminal.measurements()
+            .get("p95_angular_error_degrees")).doubleValue();
+        double maximum = ((Number) terminal.measurements()
+            .get("max_angular_error_degrees")).doubleValue();
+        assertTrue(maximum > 0 && maximum < 1);
+        assertTrue(p95 <= maximum);
+        assertEquals(maximum, p95, 1e-9);
+    }
+
+    @Test
     void healthFloorSafelyInterruptsTrackingAndCompletesTheAdmittedGuard() {
         FakeBridge bridge = new FakeBridge();
         bridge.snapshot = new PlayerSnapshot(

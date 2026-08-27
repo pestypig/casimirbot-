@@ -610,6 +610,54 @@ export function SharedLiveRoomSourceBindingsPanel({
     }
   };
 
+  const pairLocalSource = async (
+    binding: HelixRoomSourceBinding,
+  ): Promise<void> => {
+    const sourceAdapter =
+      MINECRAFT_SOURCE_ADAPTERS.find(
+        (adapter) => adapter.id === binding.domain_adapter,
+      ) ?? MINECRAFT_SOURCE_ADAPTERS[0];
+    const action = `pairing-local-source:${binding.binding_id}`;
+    setBusy(action);
+    setMessage(null);
+    setPairingCommand(null);
+    setPairingCode(null);
+    setPairingExpiresAt(null);
+    setPairingCopyState("idle");
+    try {
+      const response = await fetch(`${pairingPath}/local-source-handoff`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `browser-local-source-pairing:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({
+          purpose: "rotate",
+          binding_id: binding.binding_id,
+          command_credential_requested: false,
+          action_credential_requested: false,
+          domain_adapter: sourceAdapter.id,
+          source_label: binding.source_label ?? sourceAdapter.sourceLabel,
+        }),
+      });
+      const created = await readPairingReceipt(response);
+      setMessage(
+        created.message ??
+          "Local server sensing was staged without exposing the one-time code or enabling command access.",
+      );
+      await load();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not stage local server sensing.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const revokePairing = async (
     pairing: HelixConnectorPairing,
   ): Promise<void> => {
@@ -1548,6 +1596,17 @@ export function SharedLiveRoomSourceBindingsPanel({
                     <RefreshCw className="h-2.5 w-2.5" />
                     Re-pair
                   </button>
+                  {binding.domain_adapter === "minecraft.fabric_mod.v1" ? (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      className="inline-flex items-center gap-1 rounded border border-cyan-300/25 px-1.5 py-1 text-[9px] text-cyan-100 disabled:opacity-50"
+                      onClick={() => void pairLocalSource(binding)}
+                    >
+                      <RefreshCw className="h-2.5 w-2.5" />
+                      Re-pair local sensing privately
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     disabled={busy !== null}

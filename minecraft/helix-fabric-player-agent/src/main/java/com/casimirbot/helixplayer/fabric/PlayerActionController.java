@@ -981,7 +981,13 @@ public final class PlayerActionController {
         long cumulative = 0;
         for (int error = 0; error < trackingErrorHistogram.length; error++) {
             cumulative += trackingErrorHistogram[error];
-            if (cumulative >= threshold) return error;
+            if (cumulative >= threshold) {
+                // Histogram buckets are upper bounds (ceil(error)). Keep the
+                // reported percentile inside the exact observed range so the
+                // evidence always preserves the mathematical p95 <= max
+                // invariant, including when every sample is sub-degree.
+                return Math.min(error, trackingMaxError);
+            }
         }
         return 180;
     }

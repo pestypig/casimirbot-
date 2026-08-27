@@ -1739,7 +1739,6 @@ describe("Helix Ask Console recrown boundary", () => {
         "pure_display_already_recrowned",
         "behavior_sensitive_recrowned_with_parity",
         "behavior_sensitive_quarantined",
-        "unknown_trap_door_quarantined",
       ]),
     );
     expect(HELIX_ASK_LEGACY_CONSOLE_SLICES.find((slice) => slice.key === "legacy_attached_context_chooser_retired")).toMatchObject({
@@ -1754,8 +1753,8 @@ describe("Helix Ask Console recrown boundary", () => {
       liveDayToDaySliceCount: 1,
       pureDisplayRecrownedSliceCount: 86,
       behaviorSensitiveRecrownedWithParitySliceCount: 69,
-      behaviorSensitiveQuarantinedSliceCount: 5,
-      unknownTrapDoorSliceCount: 1,
+      behaviorSensitiveQuarantinedSliceCount: 10,
+      unknownTrapDoorSliceCount: 0,
     });
     expect(legacyPillSource).toContain("<HelixAskLegacyConsoleView");
     expect(legacyPillSource).toContain("const legacyConsoleRootState = buildHelixAskLegacyConsoleRootState({");

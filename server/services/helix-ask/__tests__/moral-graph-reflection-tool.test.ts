@@ -7,6 +7,7 @@ import { validateProceduralMoralClassificationV1 } from "../../../../shared/proc
 import { validateCivicTrustTraversabilityV1 } from "../../../../shared/civic-trust-traversability";
 import { validateCivicOrderParticipationV1 } from "../../../../shared/civic-order-participation";
 import { validateCivilizationProvisioningNetworkV1 } from "../../../../shared/civilization-provisioning-network";
+import { validateSharedAuthoritySocialRenewalReflectionV1 } from "../../../../shared/contracts/shared-authority-social-renewal.v1";
 import { evaluateWorkstationToolReceipt } from "../workstation-tool-evaluator";
 import {
   HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME,
@@ -28,6 +29,7 @@ describe("Helix Ask MoralGraph reflection tool", () => {
     expect(validateProceduralMoralClassificationV1(output.proceduralClassification!)).toEqual([]);
     expect(output.locator).toBeDefined();
     expect(validateMoralBadgeLocatorV1(output.locator!)).toEqual([]);
+    expect(validateSharedAuthoritySocialRenewalReflectionV1(output.sharedAuthoritySocialRenewal)).toEqual([]);
     expect(output.fruition).toBeUndefined();
     expect(output.reflection.artifactId).toBe("ideology_context_reflection");
     expect(output.reflection.authority).toMatchObject({
@@ -122,6 +124,52 @@ describe("Helix Ask MoralGraph reflection tool", () => {
     );
     expect(output.proceduralClassification?.authority).toMatchObject({
       assistant_answer: false,
+      terminal_eligible: false,
+      agent_executable: false,
+      character_verdict: false,
+      moral_finality: false,
+    });
+  });
+
+  it("returns leadership capacity-transfer domains through the evidence-only reflection tool", async () => {
+    const output = await runHelixAskMoralGraphReflectionTool({
+      inputKind: "user_prompt",
+      text:
+        "Leadership as capacity transfer should make earned expertise teachable, give developing competence decision rights, preserve contestability, and let the mission survive succession.",
+      refs: ["turn:leadership-capacity-transfer"],
+    });
+    const lifecycle = output.proceduralClassification?.classifications.find(
+      (entry) => entry.moralRootId === "leadership-as-capacity-transfer",
+    );
+    const locatedIds = output.locator
+      ? [
+          ...output.locator.locatedBadges.exact,
+          ...output.locator.locatedBadges.likely,
+          ...output.locator.locatedBadges.inferred,
+        ].map((entry) => entry.nodeId)
+      : [];
+
+    expect(validateProceduralMoralClassificationV1(output.proceduralClassification!)).toEqual([]);
+    expect(lifecycle?.missingEvidence).toEqual(
+      expect.arrayContaining([
+        "originating_expertise",
+        "mandate_scope",
+        "knowledge_transfer_path",
+        "competence_to_decision_rights",
+        "succession_path",
+        "mission_continuity_without_leader",
+      ]),
+    );
+    expect(locatedIds).toContain("leadership-as-capacity-transfer");
+    expect(output.sharedAuthoritySocialRenewal?.domains.map((domain) => domain.id)).toEqual(
+      expect.arrayContaining([
+        "competence_and_mandate",
+        "shared_governance_and_decision_rights",
+        "leadership_lifecycle_and_succession",
+        "social_renewal_test",
+      ]),
+    );
+    expect(output.proceduralClassification?.authority).toMatchObject({
       terminal_eligible: false,
       agent_executable: false,
       character_verdict: false,

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "controlled-stellar-composition-transport-g1-runtime/1",
+  "status": "blocked_at_capacity_preflight",
+  "mesa": {
+    "release": "r24.03.1",
+    "gitTag": "24.03.1",
+    "gitCommit": "7ecf3dfa61d514c7b6f47645e02d968d3e3c28b7"
+  },
+  "runtime": {
+    "kind": "docker",
+    "architecture": "linux/amd64",
+    "image": "evbauer/mesa_lean:r24.03.1.01",
+    "imageConfigDigest": "sha256:4c961961858c808842c133662416f14b44faa191b6765c7ab9aaded6e65aeaf6",
+    "compressedLayerBytes": 4609897301,
+    "minimumFreeBytes": 25000000000,
+    "allowFixtureFallback": false,
+    "commandMode": "structured_executable_and_args_only"
+  },
+  "attempt": {
+    "observedAt": "2026-08-26",
+    "imageInstalled": false,
+    "freeBytes": 4283359232,
+    "decision": "INSUFFICIENT_DISK_FOR_MESA_IMAGE"
+  },
+  "sources": [
+    "https://github.com/MESAHub/mesa/tree/24.03.1",
+    "https://github.com/MESAHub/MESA-Docker",
+    "https://raw.githubusercontent.com/MESAHub/mesa/24.03.1/star/test_suite/simplex_solar_calibration/README.rst"
+  ],
+  "claimBoundary": "This freezes the attempted G1 runtime only. It is not a solver run, calibrated solar baseline, or observational acceptance vector."
+}

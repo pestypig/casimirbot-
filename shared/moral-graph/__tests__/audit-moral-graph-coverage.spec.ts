@@ -142,11 +142,11 @@ describe("MoralGraph coverage audit", () => {
     expect(audit.rootId).toBe("wisdom-first-principles");
     expect(audit.summary.total).toBe(audit.nodes.length);
     expect(audit.summary).toEqual({
-      mapped: 53,
+      mapped: 57,
       partial: 15,
       conceptual_only: 51,
       unmapped: 0,
-      total: 119,
+      total: 123,
     });
     expect(audit.nodes.find((entry) => entry.ideologyNodeId === "direct-observation-before-claim")?.coverageStatus).toBe(
       "mapped",
@@ -167,6 +167,10 @@ describe("MoralGraph coverage audit", () => {
       "financial-fog-warning",
       "flattery-laundering-detection",
       "capability-ambition-gradient",
+      "protection-without-possession",
+      "cost-to-power-conversion-ledger",
+      "autonomy-proven-equality",
+      "leadership-as-capacity-transfer",
     ]) {
       expect(byId.get(id)).toMatchObject({
         coverageStatus: "mapped",

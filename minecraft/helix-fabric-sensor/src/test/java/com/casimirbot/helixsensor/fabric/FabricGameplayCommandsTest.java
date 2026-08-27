@@ -56,5 +56,18 @@ final class FabricGameplayCommandsTest {
             ),
             FabricCommandClassifier.classify("helixgame fall_rescue arm 30")
         );
+        assertEquals(
+            new FabricCommandClassifier.Classification("query", "read_only"),
+            FabricCommandClassifier.classify("helixgame combat_watchdog status DatDamPig")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification(
+                "entity_control",
+                "world_mutation"
+            ),
+            FabricCommandClassifier.classify(
+                "helixgame combat_watchdog arm DatDamPig helix_c1 12 24 30"
+            )
+        );
     }
 }

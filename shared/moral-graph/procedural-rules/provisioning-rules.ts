@@ -41,6 +41,37 @@ export const PROVISIONING_PROCEDURAL_RULES: readonly ProceduralMoralPatternRule[
     reasonCodes: ["mandate_bounded_hierarchy", "delegation_review"],
   },
   {
+    id: "leadership-as-capacity-transfer",
+    cues: [
+      /\b(?:leadership as capacity transfer|personal expertise to shared capacity|make leadership teachable|mission survives the leader|indispensable leader test|competence should produce decision rights|leadership lifecycle)\b/i,
+      /\b(?:leader(?:ship)?|earned expertise|hard[-\s]?won knowledge|authority)\b[\s\S]{0,180}\b(?:teach(?:able|ing)?|distribut(?:e|ed|ion)|decision rights?|contest(?:able|ability)|renew(?:al|able)|succession|survive beyond)\b/i,
+    ],
+    observedPattern: "unclear_evidence",
+    moralRootId: "leadership-as-capacity-transfer",
+    proceduralMove: "ask_for_concrete_evidence",
+    explanation:
+      "Leadership is routed through emergence, entrustment, articulation, distribution, contestation, renewal, and succession without treating expertise as total sovereignty.",
+    missingEvidence: [
+      "originating_expertise",
+      "mandate_scope",
+      "reason_legibility",
+      "knowledge_transfer_path",
+      "developing_participants",
+      "competence_to_decision_rights",
+      "contestability_path",
+      "renewal_trigger",
+      "succession_path",
+      "mission_continuity_without_leader",
+    ],
+    warnings: [
+      "avoid_expertise_as_total_sovereignty",
+      "avoid_indispensability_as_leadership",
+      "avoid_forced_or_premature_delegation",
+      "avoid_character_verdict",
+    ],
+    reasonCodes: ["leadership_capacity_transfer", "dynamic_authority_lifecycle"],
+  },
+  {
     id: "legible-rules-bounded-confidentiality",
     cues: [/\b(?:legible rules|bounded confidentiality|secret privilege|confidentiality scope|opaque allocation)\b/i],
     observedPattern: "unclear_evidence",

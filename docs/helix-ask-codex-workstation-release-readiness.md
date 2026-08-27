@@ -2,6 +2,10 @@
 
 Status: working draft for Helix Ask provider parity.
 
+This matrix is a subordinate implementation checklist. Current gate status and
+advancement evidence are governed only by
+`docs/helix-ask-codex-parity-work-program-v1.md`.
+
 This matrix tracks which Workstation Mode surfaces are wired for provider agents
 and which gates remain before release. It is a contract checklist, not a runtime
 smoke script.

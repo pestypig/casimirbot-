@@ -28,6 +28,7 @@ import {
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
@@ -154,6 +155,12 @@ const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.
       HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
       "attack",
       "player_interaction",
+      ["long_running"],
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
+      "combat_guard",
+      "continuous_control",
       ["long_running"],
     ),
     capability(

@@ -99,6 +99,34 @@ final class FabricCommandClassifierTest {
     }
 
     @Test
+    void classifiesMutatingDataCommandsByTheirTargetKind() {
+        assertEquals(
+            new FabricCommandClassifier.Classification("entity_control", "world_mutation"),
+            FabricCommandClassifier.classify("data merge entity @s {NoAI:0b}")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("entity_control", "world_mutation"),
+            FabricCommandClassifier.classify(
+                "execute as @a run data modify entity @s Health set value 20f"
+            )
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("entity_control", "world_mutation"),
+            FabricCommandClassifier.classify("data remove entity @s NoGravity")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("world_build", "world_mutation"),
+            FabricCommandClassifier.classify("data merge block 0 80 0 {Lock:\"Helix\"}")
+        );
+        assertEquals(
+            new FabricCommandClassifier.Classification("world_build", "world_mutation"),
+            FabricCommandClassifier.classify(
+                "data modify storage helix:test value set value 1"
+            )
+        );
+    }
+
+    @Test
     void classifiesEveryControlledCourseCommandRootAcrossNestedExecuteForms() {
         assertEquals(
             new FabricCommandClassifier.Classification("world_build", "world_mutation"),

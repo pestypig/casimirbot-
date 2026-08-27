@@ -1,5 +1,10 @@
 # Helix Ask Route Extraction Ledger
 
+Current extraction priority and the gate that permits legacy removal are
+governed by `docs/helix-ask-codex-parity-work-program-v1.md`. This ledger is the
+detailed evidence record for backend slices; it is not a second program-status
+roadmap.
+
 ## Purpose
 This ledger is the source of truth for decomposing [server/routes/agi.plan.ts](/c:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/server/routes/agi.plan.ts) into stable service boundaries without relying on recollection or drifting line references.
 

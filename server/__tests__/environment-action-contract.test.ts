@@ -254,6 +254,62 @@ describe("provider-neutral environment player-action contract", () => {
     ).toBe(false);
   });
 
+  it("admits ranged combat repertoires only with explicit bounded budgets", () => {
+    const rangedGuard = {
+      action_kind: "combat_guard" as const,
+      hostile_entity_type_ids: ["minecraft:skeleton"],
+      max_acquisition_distance: 24,
+      require_line_of_sight: true as const,
+      minimum_attack_cooldown: 0.9,
+      max_attack_pulses: 48,
+      max_target_switches: 4,
+      target_commit_ticks: 10,
+      retreat_start_distance: 2.5,
+      retreat_stop_distance: 4,
+      retreat_when_hostile_count_at_least: 2,
+      max_duration_ms: 30_000,
+      stop_below_health: 12,
+      friendly_fire: false as const,
+      approach_policy: "local_reroute_bounded" as const,
+      max_approach_ticks: 300,
+      cover_policy: "lateral_bounded" as const,
+      max_cover_ticks: 120,
+      projectile_response: "shield_or_sidestep" as const,
+      projectile_evasion_horizon_ticks: 8,
+      max_evasion_ticks: 200,
+      shield_hand: "off_hand" as const,
+      max_shield_hold_ticks: 200,
+    };
+
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse(rangedGuard).success,
+    ).toBe(true);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...rangedGuard,
+        max_approach_ticks: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...rangedGuard,
+        max_cover_ticks: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...rangedGuard,
+        max_evasion_ticks: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      helixMinecraftPlayerActionArgumentsSchema.safeParse({
+        ...rangedGuard,
+        shield_hand: "none",
+      }).success,
+    ).toBe(false);
+  });
+
   it("requires an exact mine receipt to preserve the admitted coordinate", () => {
     const request = {
       ...baseActionRequest(),

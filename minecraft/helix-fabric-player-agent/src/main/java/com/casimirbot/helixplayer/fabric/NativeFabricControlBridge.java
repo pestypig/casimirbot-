@@ -9,6 +9,7 @@ import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.TargetObservation;
 import com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.WorkflowStep;
 import com.casimirbot.helixplayer.fabric.mixin.ParticleAccessor;
 import com.casimirbot.helixplayer.fabric.mixin.ParticleEngineAccessor;
+import com.casimirbot.helixsensor.combat.ProjectileThreatForecaster;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -36,9 +37,12 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.state.BlockState;
@@ -71,6 +75,7 @@ final class NativeFabricControlBridge implements ControlBridge {
     private final NativeFabricWorkflowEngine workflowEngine;
     private final FluidSequenceEngine fluidSequenceEngine;
     private final ConcurrentReactiveScheduler reactiveScheduler;
+    private final MinecraftCombatGuardian combatGuardian;
     private final MinecraftViabilityGuardian viabilityGuardian =
         new MinecraftViabilityGuardian();
     private final ReactiveRuntime reactiveRuntime = new ReactiveRuntime();
@@ -97,6 +102,7 @@ final class NativeFabricControlBridge implements ControlBridge {
         this.workflowEngine = new NativeFabricWorkflowEngine(minecraft, this, baritone);
         this.fluidSequenceEngine = new FluidSequenceEngine(this);
         this.reactiveScheduler = new ConcurrentReactiveScheduler(reactiveRuntime);
+        this.combatGuardian = new MinecraftCombatGuardian(new CombatRuntime());
     }
 
     @Override
@@ -908,6 +914,36 @@ final class NativeFabricControlBridge implements ControlBridge {
             fluidSequenceEngine.begin(arguments);
         } else if ("execute_reactive_program".equals(actionKind)) {
             reactiveScheduler.begin(arguments);
+        } else if ("combat_guard".equals(actionKind)) {
+            combatGuardian.begin(new MinecraftCombatGuardian.Profile(
+                strings(arguments.get("hostile_entity_type_ids")),
+                number(arguments.get("max_acquisition_distance"), 16),
+                number(arguments.get("minimum_attack_cooldown"), 0.9),
+                integer(arguments.get("max_attack_pulses"), 64),
+                integer(arguments.get("max_target_switches"), 16),
+                integer(arguments.get("target_commit_ticks"), 10),
+                number(arguments.get("retreat_start_distance"), 2.25),
+                number(arguments.get("retreat_stop_distance"), 3.5),
+                integer(arguments.get("retreat_when_hostile_count_at_least"), 2),
+                number(arguments.get("stop_below_health"), 4),
+                arguments.containsKey("approach_policy")
+                    ? string(arguments.get("approach_policy"))
+                    : "none",
+                integer(arguments.get("max_approach_ticks"), 0),
+                arguments.containsKey("cover_policy")
+                    ? string(arguments.get("cover_policy"))
+                    : "none",
+                integer(arguments.get("max_cover_ticks"), 0),
+                arguments.containsKey("projectile_response")
+                    ? string(arguments.get("projectile_response"))
+                    : "none",
+                integer(arguments.get("projectile_evasion_horizon_ticks"), 8),
+                integer(arguments.get("max_evasion_ticks"), 0),
+                arguments.containsKey("shield_hand")
+                    ? string(arguments.get("shield_hand"))
+                    : "none",
+                integer(arguments.get("max_shield_hold_ticks"), 0)
+            ));
         } else if ("arm_viability_guardian".equals(actionKind)) {
             viabilityGuardian.arm(new MinecraftViabilityGuardian.Profile(
                 (long) number(arguments.get("lease_expires_tick"), 0),
@@ -935,6 +971,7 @@ final class NativeFabricControlBridge implements ControlBridge {
             case "execute_reactive_program" -> reactiveScheduler.step(
                 reactiveTickIndex(actionTicks)
             );
+            case "combat_guard" -> combatGuardian.step(actionTicks);
             case "arm_viability_guardian" -> WorkflowStep.succeeded(
                 "The deterministic resident Minecraft guardian is armed across action boundaries.",
                 Map.ofEntries(
@@ -1615,6 +1652,7 @@ final class NativeFabricControlBridge implements ControlBridge {
     @Override
     public void releaseAll() {
         reactiveScheduler.cancelAll("global_control_release");
+        combatGuardian.cancel();
         releaseResources(Set.of(
             "camera",
             "locomotion",
@@ -1706,6 +1744,306 @@ final class NativeFabricControlBridge implements ControlBridge {
             }
             return null;
         }
+    }
+
+    private final class CombatRuntime implements MinecraftCombatGuardian.Runtime {
+        private String movementDenialReason = "none";
+        private String movementInput = "released";
+        private double desiredDirectionX;
+        private double desiredDirectionZ;
+
+        @Override
+        public double playerHealth() {
+            return minecraft.player == null ? 0 : minecraft.player.getHealth();
+        }
+
+        @Override
+        public List<MinecraftCombatGuardian.Target> eligibleTargets(
+            MinecraftCombatGuardian.Profile profile
+        ) {
+            LocalPlayer player = minecraft.player;
+            if (player == null || minecraft.level == null) return List.of();
+            AABB bounds = player.getBoundingBox().inflate(profile.maxAcquisitionDistance());
+            return minecraft.level.getEntitiesOfClass(Monster.class, bounds).stream()
+                .filter(Entity::isAlive)
+                .filter(entity -> player.distanceTo(entity) <= profile.maxAcquisitionDistance())
+                .filter(player::hasLineOfSight)
+                .map(entity -> {
+                    String typeId = BuiltInRegistries.ENTITY_TYPE
+                        .getKey(entity.getType()).toString();
+                    if (!profile.hostileEntityTypeIds().contains(typeId)) return null;
+                    String targetRef = opaqueTargetRef(entity);
+                    trackingTargets.put(targetRef, entity);
+                    double distance = player.distanceTo(entity);
+                    return new MinecraftCombatGuardian.Target(
+                        targetRef,
+                        typeId,
+                        entity.getX(),
+                        entity.getBoundingBox().getCenter().y,
+                        entity.getZ(),
+                        distance,
+                        true,
+                        distance <= player.entityInteractionRange(),
+                        entity.getTarget() == player,
+                        Mth.clamp(player.getAttackStrengthScale(0.0F), 0.0F, 1.0F)
+                    );
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        }
+
+        @Override
+        public List<MinecraftCombatGuardian.ProjectileThreat> collisionThreats(
+            MinecraftCombatGuardian.Profile profile
+        ) {
+            LocalPlayer player = minecraft.player;
+            if (player == null || minecraft.level == null) return List.of();
+            AABB actorBox = player.getBoundingBox();
+            ProjectileThreatForecaster.Box forecastActorBox =
+                new ProjectileThreatForecaster.Box(
+                    actorBox.minX,
+                    actorBox.minY,
+                    actorBox.minZ,
+                    actorBox.maxX,
+                    actorBox.maxY,
+                    actorBox.maxZ
+                );
+            AABB search = actorBox.inflate(profile.maxAcquisitionDistance());
+            return minecraft.level.getEntitiesOfClass(Projectile.class, search).stream()
+                .filter(Entity::isAlive)
+                .filter(projectile -> projectile.getOwner() != player)
+                .map(projectile -> {
+                    Vec3 velocity = projectile.getDeltaMovement();
+                    Entity owner = projectile.getOwner();
+                    Vec3 source = owner instanceof LivingEntity livingOwner
+                        ? livingOwner.getEyePosition()
+                        : projectile.position();
+                    if (!(projectile instanceof AbstractArrow)) {
+                        Vec3 towardActor = actorBox.getCenter().subtract(projectile.position());
+                        if (velocity.dot(towardActor) <= 0 || towardActor.lengthSqr() > 64) {
+                            return null;
+                        }
+                        return new MinecraftCombatGuardian.ProjectileThreat(
+                            opaqueTargetRef(projectile),
+                            1,
+                            velocity.x,
+                            velocity.z,
+                            source.x,
+                            source.y,
+                            source.z
+                        );
+                    }
+                    ProjectileThreatForecaster.Forecast forecast =
+                        ProjectileThreatForecaster.forecast(
+                            new ProjectileThreatForecaster.Input(
+                                new ProjectileThreatForecaster.Vector(
+                                    projectile.getX(), projectile.getY(), projectile.getZ()
+                                ),
+                                new ProjectileThreatForecaster.Vector(
+                                    velocity.x, velocity.y, velocity.z
+                                ),
+                                new ProjectileThreatForecaster.Vector(0, -0.05, 0),
+                                0.99,
+                                profile.projectileEvasionHorizonTicks(),
+                                forecastActorBox,
+                                0.75,
+                                true,
+                                null
+                            )
+                        );
+                    if (forecast.classification() !=
+                        ProjectileThreatForecaster.ThreatClassification.COLLISION ||
+                        forecast.predictedCollisionTick() == null) {
+                        return null;
+                    }
+                    return new MinecraftCombatGuardian.ProjectileThreat(
+                        opaqueTargetRef(projectile),
+                        forecast.predictedCollisionTick(),
+                        velocity.x,
+                        velocity.z,
+                        source.x,
+                        source.y,
+                        source.z
+                    );
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        }
+
+        @Override
+        public void track(MinecraftCombatGuardian.Target target) {
+            lookAt(target.x(), target.y(), target.z(), 30.0F);
+        }
+
+        @Override
+        public boolean move(
+            MinecraftCombatGuardian.MovementMode mode,
+            MinecraftCombatGuardian.ProjectileThreat threat,
+            MinecraftCombatGuardian.Target target
+        ) {
+            LocalPlayer player = minecraft.player;
+            if (player == null || minecraft.level == null) {
+                movementDenialReason = "player_or_level_unavailable";
+                movementInput = "released";
+                return false;
+            }
+            if (mode == MinecraftCombatGuardian.MovementMode.HOLD) {
+                applyMovement(MovementInput.released());
+                movementDenialReason = "none";
+                movementInput = "released";
+                desiredDirectionX = 0;
+                desiredDirectionZ = 0;
+                return true;
+            }
+            Vec3 forward = target == null
+                ? player.getViewVector(1.0F)
+                : new Vec3(target.x() - player.getX(), 0, target.z() - player.getZ());
+            forward = new Vec3(forward.x, 0, forward.z);
+            if (forward.lengthSqr() < 1.0e-8) {
+                movementDenialReason = "target_direction_degenerate";
+                movementInput = "released";
+                return false;
+            }
+            forward = forward.normalize();
+            Vec3 direction = switch (mode) {
+                case APPROACH -> forward;
+                case FLANK_LEFT -> new Vec3(forward.z, 0, -forward.x);
+                case FLANK_RIGHT -> new Vec3(-forward.z, 0, forward.x);
+                case RETREAT -> forward.scale(-1);
+                case COVER_LEFT, EVADE_LEFT -> new Vec3(forward.z, 0, -forward.x);
+                case COVER_RIGHT, EVADE_RIGHT -> new Vec3(-forward.z, 0, forward.x);
+                case HOLD -> Vec3.ZERO;
+            };
+            boolean coverMode = mode == MinecraftCombatGuardian.MovementMode.COVER_LEFT ||
+                mode == MinecraftCombatGuardian.MovementMode.COVER_RIGHT;
+            desiredDirectionX = direction.x;
+            desiredDirectionZ = direction.z;
+            if (coverMode) {
+                if (threat == null || !coverCheckedStepAvailable(player, direction, threat)) {
+                    movementDenialReason = threat == null
+                        ? "cover_threat_unavailable"
+                        : "cover_step_unavailable";
+                    movementInput = "released";
+                    return false;
+                }
+            } else {
+                StepCheck stepCheck = collisionCheckedStep(player, direction);
+                if (!stepCheck.available()) {
+                    movementDenialReason = stepCheck.reason();
+                    movementInput = "released";
+                    return false;
+                }
+            }
+            MovementInput resolvedInput = movementInputForWorldDirection(player, direction);
+            applyMovement(resolvedInput);
+            movementDenialReason = "none";
+            movementInput = movementInputLabel(resolvedInput);
+            return true;
+        }
+
+        @Override
+        public Map<String, Object> movementDiagnostics() {
+            return Map.of(
+                "movement_denial_reason", movementDenialReason,
+                "movement_input", movementInput,
+                "desired_world_direction_x", desiredDirectionX,
+                "desired_world_direction_z", desiredDirectionZ
+            );
+        }
+
+        @Override
+        public boolean shield(boolean active, String hand) {
+            LocalPlayer player = minecraft.player;
+            boolean available = player != null && "off_hand".equals(hand) &&
+                player.getOffhandItem().is(Items.SHIELD);
+            set(minecraft.options.keyUse, active && available);
+            return active && available;
+        }
+
+        @Override
+        public boolean attack(String targetRef) {
+            return attackCombatTarget(targetRef);
+        }
+
+        @Override
+        public void release() {
+            releaseResources(Set.of("camera", "locomotion", "main_hand", "off_hand"));
+        }
+    }
+
+    private record StepCheck(boolean available, String reason) {}
+
+    private StepCheck collisionCheckedStep(LocalPlayer player, Vec3 direction) {
+        Vec3 step = direction.scale(0.65);
+        AABB projected = player.getBoundingBox().move(step.x, 0, step.z);
+        if (!minecraft.level.noCollision(player, projected)) {
+            return new StepCheck(false, "projected_collision");
+        }
+        double centerX = (projected.minX + projected.maxX) * 0.5;
+        double centerZ = (projected.minZ + projected.maxZ) * 0.5;
+        int supportY = Mth.floor(projected.minY - 0.05);
+        BlockPos support = BlockPos.containing(centerX, supportY, centerZ);
+        BlockState state = minecraft.level.getBlockState(support);
+        if (state.isAir()) return new StepCheck(false, "support_air");
+        if (state.canBeReplaced()) return new StepCheck(false, "support_replaceable");
+        if (state.getCollisionShape(minecraft.level, support).isEmpty()) {
+            return new StepCheck(false, "support_collision_shape_empty");
+        }
+        return new StepCheck(true, "none");
+    }
+
+    private MovementInput movementInputForWorldDirection(LocalPlayer player, Vec3 direction) {
+        Vec3 desired = new Vec3(direction.x, 0, direction.z).normalize();
+        Vec3 cameraForward = player.getViewVector(1.0F);
+        cameraForward = new Vec3(cameraForward.x, 0, cameraForward.z).normalize();
+        Vec3 cameraLeft = new Vec3(cameraForward.z, 0, -cameraForward.x);
+        double longitudinal = desired.dot(cameraForward);
+        double lateral = desired.dot(cameraLeft);
+        if (Math.abs(longitudinal) >= Math.abs(lateral)) {
+            return longitudinal >= 0
+                ? new MovementInput(true, false, false, false, false, false)
+                : new MovementInput(false, true, false, false, false, false);
+        }
+        return lateral >= 0
+            ? new MovementInput(false, false, true, false, false, false)
+            : new MovementInput(false, false, false, true, false, false);
+    }
+
+    private String movementInputLabel(MovementInput input) {
+        if (input.forward()) return "forward";
+        if (input.back()) return "back";
+        if (input.left()) return "left";
+        if (input.right()) return "right";
+        return "released";
+    }
+
+    private boolean coverCheckedStepAvailable(
+        LocalPlayer player,
+        Vec3 direction,
+        MinecraftCombatGuardian.ProjectileThreat threat
+    ) {
+        Vec3 normalized = direction.normalize();
+        for (int stepIndex = 1; stepIndex <= 4; stepIndex++) {
+            Vec3 offset = normalized.scale(0.65 * stepIndex);
+            if (!collisionCheckedStep(player, normalized.scale(stepIndex)).available()) {
+                return false;
+            }
+            AABB projected = player.getBoundingBox().move(offset.x, 0, offset.z);
+            Vec3 projectedCenter = new Vec3(
+                (projected.minX + projected.maxX) * 0.5,
+                projected.minY + player.getEyeHeight(),
+                (projected.minZ + projected.maxZ) * 0.5
+            );
+            HitResult coverHit = minecraft.level.clip(new ClipContext(
+                new Vec3(threat.sourceX(), threat.sourceY(), threat.sourceZ()),
+                projectedCenter,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                player
+            ));
+            if (coverHit.getType() == HitResult.Type.BLOCK) return true;
+        }
+        return false;
     }
 
     private final class ReactiveLaneAction {

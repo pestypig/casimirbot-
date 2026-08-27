@@ -148,7 +148,7 @@ describe("Minecraft player-action workstation gateway", () => {
   });
 
   it("publishes the baseline and reusable bounded, nonterminal, host-free player tools", () => {
-    expect(environmentActionMinecraftManifests).toHaveLength(18);
+    expect(environmentActionMinecraftManifests).toHaveLength(19);
     expect(environmentActionMinecraftManifests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ capability_id: CAPABILITY_ID }),
@@ -178,6 +178,9 @@ describe("Minecraft player-action workstation gateway", () => {
         }),
         expect.objectContaining({
           capability_id: "com.casimirbot.minecraft.player.camera.track",
+        }),
+        expect.objectContaining({
+          capability_id: "com.casimirbot.minecraft.player.combat.attack",
         }),
         expect.objectContaining({
           capability_id: "com.casimirbot.minecraft.player.guardian.execute",
@@ -340,7 +343,7 @@ describe("Minecraft player-action workstation gateway", () => {
         },
         max_duration_ms: 30_000,
       },
-      constraints: { max_duration_ms: 35_000 },
+      constraints: { max_duration_ms: 30_000 },
       postconditions: [expect.objectContaining({
         condition_kind: "minecraft.player.camera_tracking_completed",
       })],
@@ -485,7 +488,7 @@ describe("Minecraft player-action workstation gateway", () => {
       requested_control_engine: "native_fabric",
       workflow_mode: "long_running",
       constraints: {
-        max_duration_ms: 15_000,
+        max_duration_ms: 10_000,
         max_block_mutations: 0,
         max_inventory_transfers: 0,
         world_mutation_allowed: false,
@@ -505,6 +508,69 @@ describe("Minecraft player-action workstation gateway", () => {
     });
     expect(JSON.stringify(request)).not.toContain("command_assisted_sandbox");
     expect(JSON.stringify(request)).not.toContain("host shell");
+  });
+
+  it("reserves delivery grace for an exact combat attack without extending its execution or denying combat", async () => {
+    const capabilityId = "com.casimirbot.minecraft.player.combat.attack";
+    const enqueueAction = vi.fn(async ({ request }) => request as never);
+    const attackObservation = {
+      ...observation,
+      capability_id: capabilityId,
+      action_kind: "attack",
+      summary: "The exact hostile target was defeated and controls were released.",
+    } satisfies HelixEnvironmentActionObservation;
+
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId,
+      turnId: "ask:player-action:exact-combat-attack",
+      toolCallId: "tool_call:player-action-exact-combat-attack",
+      providerExecutionId: "provider_execution:player-action-exact-combat-attack",
+      arguments: {
+        target_ref: `target:${"a".repeat(32)}`,
+        target_entity_type_id: "minecraft:zombie",
+        target_classification: "hostile",
+        max_acquisition_distance: 16,
+        require_line_of_sight: true,
+        minimum_attack_cooldown: 0.9,
+        max_attack_pulses: 8,
+        max_duration_ms: 60_000,
+        stop_below_health: 6,
+        friendly_fire: false,
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction,
+        resolveContext: vi.fn(async () => ({
+          ...context(),
+          capability: {
+            capabilityId,
+            capabilityVersion: 1,
+            actionKind: "attack",
+            effectClass: "world_mutation",
+            workflowModes: ["long_running"],
+            controlEngines: ["native_fabric"],
+          },
+        }) as never),
+        awaitObservation: vi.fn(async () => attackObservation),
+      }),
+    });
+
+    expect(result.ok).toBe(true);
+    const request = enqueueAction.mock.calls[0]?.[0]?.request;
+    expect(request).toMatchObject({
+      capability_id: capabilityId,
+      action_kind: "attack",
+      constraints: {
+        max_duration_ms: 60_000,
+        combat_allowed: true,
+        host_access_allowed: false,
+        automatic_replay_allowed: false,
+      },
+    });
+    expect(
+      Date.parse(request.deadline_at) - Date.parse(request.created_at),
+    ).toBe(65_000);
   });
 
   it("fails closed instead of converting an incomplete look request into current-focus success", async () => {
@@ -1139,7 +1205,53 @@ describe("Minecraft player-action workstation gateway", () => {
       ok: false,
       status: "failed",
       error: "action_outcome_unknown",
+      observation: {
+        action_request_ref: expect.stringContaining(
+          "environment_action_request:",
+        ),
+        workflow_ref: expect.stringContaining("environment_action_workflow:"),
+      },
     });
+  });
+
+  it("returns a typed duplicate when a physical action identity belongs to another authority epoch", async () => {
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:authority-epoch-conflict",
+      toolCallId: "tool_call:player-action-authority-epoch-conflict",
+      providerExecutionId:
+        "provider_execution:player-action-authority-epoch-conflict",
+      arguments: {
+        destination: { x: 2, y: 64, z: 0 },
+        arrival_radius: 0.5,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        enqueueAction: vi.fn(async () => {
+          throw new EnvironmentActionBrokerError(
+            "action_request_conflict",
+            409,
+            "This physical action identity already belongs to another admitted workflow.",
+          );
+        }),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "duplicate_request",
+      observation: {
+        outcome: "duplicate_request",
+        provenance_valid: false,
+      },
+    });
+    expect(result.summary).not.toContain("INSERT INTO");
   });
 
   it("keeps an executed manual cancellation admitted while requiring user repair", async () => {

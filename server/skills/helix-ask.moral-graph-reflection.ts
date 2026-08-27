@@ -11,6 +11,7 @@ import type { MoralBadgeLocatorV1 } from "@shared/moral-badge-locator";
 import type { CivicTrustTraversabilityV1 } from "@shared/civic-trust-traversability";
 import type { CivicOrderParticipationV1 } from "@shared/civic-order-participation";
 import type { CivilizationProvisioningNetworkV1 } from "@shared/civilization-provisioning-network";
+import type { SharedAuthoritySocialRenewalReflectionV1 } from "@shared/contracts/shared-authority-social-renewal.v1";
 import { buildCivicTrustTraversabilityV1 } from "@shared/moral-graph/build-civic-trust-traversability";
 import { buildCivicOrderParticipationV1 } from "@shared/civic-order/build-civic-order-participation";
 import { buildCivilizationProvisioningNetworkV1 } from "@shared/civilization/build-civilization-provisioning-network";
@@ -20,6 +21,7 @@ import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/moral
 import { locateMoralBadges } from "@shared/moral-graph/locate-moral-badges";
 import { calculateFruitionFromReflection } from "@shared/moral-graph/calculate-fruition";
 import { classifyProceduralMoralContext } from "@shared/moral-graph/classify-procedural-moral-context";
+import { buildSharedAuthoritySocialRenewalFromLocatorV1 } from "@shared/moral-graph/shared-authority-social-renewal";
 
 export const HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME = "helix_ask.reflect_ideology_context" as const;
 
@@ -45,6 +47,7 @@ const MoralGraphToolInputSchema = z.object({
       includeRecommendedActions: z.boolean().optional(),
       includeAdmissionArtifacts: z.boolean().optional(),
       includeLocator: z.boolean().optional(),
+      includeSharedAuthoritySocialRenewal: z.boolean().optional(),
       includeFruition: z.boolean().optional(),
       includeProceduralClassification: z.boolean().optional(),
       includeCivicTrustTraversability: z.boolean().optional(),
@@ -63,6 +66,7 @@ export type HelixAskMoralGraphReflectionToolInput = {
     includeRecommendedActions?: boolean;
     includeAdmissionArtifacts?: boolean;
     includeLocator?: boolean;
+    includeSharedAuthoritySocialRenewal?: boolean;
     includeFruition?: boolean;
     includeProceduralClassification?: boolean;
     includeCivicTrustTraversability?: boolean;
@@ -75,6 +79,7 @@ export type HelixAskMoralGraphReflectionToolOutput = {
   reflection: IdeologyContextReflectionV1;
   proceduralClassification?: ProceduralMoralClassificationV1;
   locator?: MoralBadgeLocatorV1;
+  sharedAuthoritySocialRenewal?: SharedAuthoritySocialRenewalReflectionV1;
   fruition?: FruitionProcedureExpressionV1;
   civicTrustTraversability?: CivicTrustTraversabilityV1;
   civicOrderParticipation?: CivicOrderParticipationV1;
@@ -116,13 +121,18 @@ export async function runHelixAskMoralGraphReflectionTool(
       ? []
       : [mapIdeologyReflectionToRecommendedActionAdmission(reflection)];
   const admission = admissions[0] ?? mapIdeologyReflectionToRecommendedActionAdmission(reflection);
-  const locator = input.options?.includeLocator === false
+  const resolvedLocator = locateMoralBadges(graph, {
+    kind: input.inputKind,
+    text: input.text,
+    refs: input.refs,
+    reflection,
+  });
+  const locator = input.options?.includeLocator === false ? undefined : resolvedLocator;
+  const sharedAuthoritySocialRenewal = input.options?.includeSharedAuthoritySocialRenewal === false
     ? undefined
-    : locateMoralBadges(graph, {
-        kind: input.inputKind,
-        text: input.text,
-        refs: input.refs,
-        reflection,
+    : buildSharedAuthoritySocialRenewalFromLocatorV1(resolvedLocator, {
+        reflectionId: reflection.reflectionId,
+        generatedAt: reflection.generatedAt,
       });
   const proceduralClassification = input.options?.includeProceduralClassification === false
     ? undefined
@@ -138,11 +148,11 @@ export async function runHelixAskMoralGraphReflectionTool(
         objective: reflection.input.summary,
       })
     : undefined;
-  const locatedBadgeIds = locator
-    ? [...locator.locatedBadges.exact, ...locator.locatedBadges.likely, ...locator.locatedBadges.inferred].map(
-        (badge) => badge.nodeId,
-      )
-    : [];
+  const locatedBadgeIds = [
+    ...resolvedLocator.locatedBadges.exact,
+    ...resolvedLocator.locatedBadges.likely,
+    ...resolvedLocator.locatedBadges.inferred,
+  ].map((badge) => badge.nodeId);
   const civicTrustTraversability = input.options?.includeCivicTrustTraversability === false
     ? null
     : buildCivicTrustTraversabilityV1({
@@ -169,6 +179,7 @@ export async function runHelixAskMoralGraphReflectionTool(
     reflection,
     ...(proceduralClassification ? { proceduralClassification } : {}),
     ...(locator ? { locator } : {}),
+    ...(sharedAuthoritySocialRenewal ? { sharedAuthoritySocialRenewal } : {}),
     ...(fruition ? { fruition } : {}),
     ...(civicTrustTraversability ? { civicTrustTraversability } : {}),
     ...(civicOrderParticipation ? { civicOrderParticipation } : {}),
@@ -193,6 +204,7 @@ export const moralGraphReflectionSpec: ToolSpecShape = {
           includeRecommendedActions: { type: "boolean" },
           includeAdmissionArtifacts: { type: "boolean" },
           includeLocator: { type: "boolean" },
+          includeSharedAuthoritySocialRenewal: { type: "boolean" },
           includeFruition: { type: "boolean" },
           includeProceduralClassification: { type: "boolean" },
           includeCivicTrustTraversability: { type: "boolean" },
@@ -209,6 +221,7 @@ export const moralGraphReflectionSpec: ToolSpecShape = {
       reflection: { type: "object" },
       proceduralClassification: { type: "object" },
       locator: { type: "object" },
+      sharedAuthoritySocialRenewal: { type: "object" },
       fruition: { type: "object" },
       civicTrustTraversability: { type: "object" },
       civicOrderParticipation: { type: "object" },

@@ -169,6 +169,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Second-domain harness transfer | integrated accepted | `docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md`; `docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md`; `artifacts/g7-second-domain-transfer/live-tripath-acceptance-2026-08-24.json` | Preserve the owner-private read-only Robinhood tripath, exact Ask evidence re-entry, terminal continuity, zero mutation authority, and secret exclusion as G8 regressions. |
 | User profile connection broker — Robinhood read slice | deterministically verified | `docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md`; `server/routes/__tests__/brokerage-connections.test.ts`; `client/src/components/workstation/__tests__/BrokerageConnectionsCard.spec.tsx`; `client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomBrokerageBindingsPanel.spec.tsx`; `apps/desktop/scripts/smoke-service-boundary.mjs` | Extend through trusted native model-provider enrollment, generic opaque handles, authorized multi-member room grants, and live installed-node acceptance without exposing raw secrets or enabling brokerage mutation for users. |
 | Installed multi-surface harness convergence | specified | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `apps/desktop/README.md` | G8 must package one self-starting CasimirBot node whose desktop UI and authenticated MCP clients project the same durable runs and evidence while provider, MCP-client, and connector credentials remain separate and outside model context. |
+| Installed-node agent presence and advisory coordination relay | specified | `docs/helix-environment-harness-work-program-v1.md`; `docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md` | Add a profile- and client-session-bound presence ledger plus bounded relay inbox so concurrent Codex tasks can see sanitized objectives, lifecycle state, resource claims, blockers and handoff requests; detect collisions before restart or mutation; and receive acknowledged advisory steering without exposing hidden reasoning, credentials or ambient authority. Prove that read-only work may overlap, mutations remain serialized by the existing execution lease, and disconnect cleans up only the caller's presence and claims. |
 | Profile-native MCP authorization and managed recovery | specified | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md`; `docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/helix-environment-harness-work-program-v1.md` | The deterministic Auth0 browser-session slice now resolves the already-linked MCP profile and sets only an HttpOnly Casimir session cookie; focused tests and the compiled client pass. The 2026-08-25 perception-parity run reproduced that an admitted new MCP capability remained absent from one active Codex task after both server reconnect and a later task turn. A bounded actor-status compatibility projection now returns the typed perception snapshot to that unrestarted task while explicitly preserving `catalog_refresh_required=true`; this is continuity mitigation, not catalog convergence or dedicated-tool discovery. Live exact-callback/profile/room convergence, branded consent, OS-protected renewal, managed MCP reconnect/catalog resynchronization, durable one-instance supervision, revocation and recovery remain required. This is a G8 release blocker. |
 | Profile-scoped semantic MCP monitoring and Codex task wake | deterministically verified | `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json`; `shared/helix-client-authorization-readiness.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `server/services/environment-connectors/monitoring/__tests__/environment-monitor-store.test.ts`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/architecture/helix-environment-agent-reasoning-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | The 2026-08-25 bounded installed-node trace repaired the exact Auth0 permission, proved the four-scope readiness projection, semantic delivery, a 264 ms fresh actor snapshot, cursor acknowledgement, bounded typed recovery, fresh-process reconnect without duplicate wake/effect, revocation and post-revocation `lease_inactive`. Complete the remaining M3 release evidence inside the unknown-world Nether course: operator-visible material replanning through the accepted arbiter, portal entry, safe-return-point evidence and cross-surface agreement. Native closed-task wake remains unsupported until the client supplies a continuation transport. |
 | Operator-visible Codex steering and action-reaction fidelity | specified | `docs/helix-environment-harness-work-program-v1.md`; `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Prove a bounded, evidence-linked sense-decide-act-observe loop in which an authenticated Codex task receives every admitted material change and action receipt needed for the next decision, the operator can inspect the same ordered trace, latency and gap states are explicit, and neither surface receives raw tick spam, credentials, hidden reasoning, or a second mutation authority. This is required before the full Nether journey is used as G8 release evidence. |
@@ -673,6 +674,30 @@ contracts are respected. Their work packets must not claim G7 closure or
 substitute deployment readiness for second-domain lifecycle evidence. Remaining
 delivery work converges during release evaluation after G7 closes.
 
+### Parallel post-G7 physical-device observer reservation
+
+`docs/work-packets/eh-nfo-0-network-field-observer-v1.md` specifies the
+projected Network Field Observer contract and deterministic Block 66 site-graph
+fixture. G7 is already closed through Robinhood shadow observation, so EH-NFO-0
+is not a replacement second-domain gate. It is a parallel G8 physical-device
+adapter candidate that may proceed through strict schemas, canonicalization,
+redaction, fixtures, mock drivers, conformance tests, and a developer-only local
+field-session surface without claiming live equipment access or G8 closure.
+The research basis, product topology, authentication boundary, deployment-form
+split, usability threshold, and initial field-market ranking are recorded in
+`docs/research/helix-local-first-harness-product-and-field-applicability-v1.md`;
+that research file does not replace this program's gate or maturity authority.
+
+The first genuine site read belongs to a separate EH-NFO-1 packet after the
+fixture contract is deterministically verified. Northbound clients must reach
+the profile-owned CasimirBot node through authenticated MCP or a narrowed room
+grant; the southbound field companion alone may resolve selected interfaces,
+private endpoints, device credentials, and reviewed local protocols. MCP must
+not become a VPN, arbitrary scanner, shell, or private-network route. Later
+monitor-only behavior must reuse the finite profile-scoped semantic monitor and
+retain its cursor, gap, reconnect, revocation, nonterminal, and secret-exclusion
+contracts.
+
 ### Installed-node convergence reservation
 
 The release target is one installed CasimirBot node with multiple northbound
@@ -682,6 +707,45 @@ voice may initiate, observe, steer, or present an authorized run, but they must
 share the same durable `run_id`, canonical lifecycle facts, evidence references,
 execution arbiter, cancellation state, and terminal product. They must not race
 through separate mutation authorities or manufacture surface-specific answers.
+
+`docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md`
+reserves the projected extension from one installed node with many northbound
+participants to two separately owned installed nodes contributing narrowed
+capability grants to one room. The room may federate capabilities and normalized
+evidence, not ambient device authority. Each node, profile connection, subject,
+credential, connector epoch, grant, and revocation remains separate; one
+principal Runtime Codex path, execution arbiter, and terminal writer remain.
+This capability is `projected` until its deterministic and signed-install
+multi-host evidence exists and must not be inferred from current single-host
+room or subject-binding contracts.
+
+The packet's ordered execution ledger defines M0 through M7. M0, the
+provider-neutral one-host/two-member read-only grant and deterministic lifecycle,
+is deterministically verified by the packet's 2026-08-26 evidence record. M1 is
+assigned and its UI, durable grant store, exact non-owner probe admission, and
+revocation isolation are deterministically verified by the packet's 2026-08-26
+implementation record. Its keyed one-host/two-member live acceptance remains
+open, so M2 through M7 remain blocked by their named prior phase evidence.
+Assigning a development task must
+name one exact phase; a broad
+request to continue multi-host or shared-room work does not authorize phase
+advancement, live authority, or later-stage catalog exposure.
+
+M1 must also close the installed-node coordination blind spot exposed by the
+concurrent C0 and federation tasks. The shared supervisor needs a sanitized,
+append-only presence ledger and bounded relay inbox keyed to the authenticated
+client session and conversation identity. Presence may publish an agent-authored
+objective summary, lifecycle state, freshness, resource claims, blockers,
+handoff requests and released claims. It must not publish raw prompts, hidden
+reasoning, credentials, private endpoints, host paths or process details.
+Relay messages may enter another Codex turn only as provenance-linked advisory
+context; they cannot execute a tool, change a goal, grant authority, reserve a
+mutation lease, write an answer or become terminal evidence. Verified resource
+identity and the existing execution arbiter—not the relay text—remain the only
+enforceable collision boundary. Concurrent read-only work may proceed under
+separate grants, while restart, connector rotation and mutation conflicts must
+produce a typed collision or handoff-needed state before either task interferes
+with the other.
 
 The present developer and packaged launch paths remain deliberately distinct:
 

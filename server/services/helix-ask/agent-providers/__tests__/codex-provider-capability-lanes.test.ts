@@ -3406,6 +3406,39 @@ describe("Codex provider capability lane adapter", () => {
     ).toContain("com.casimirbot.minecraft.player.emergency_stop");
   });
 
+  it("keeps affirmative combat as exact effect evidence after camera tracking", () => {
+    const body: Record<string, unknown> = {
+      source_target_intent: {
+        target_source: "live_environment",
+        strength: "hard",
+        explicit_cues: ["operative_minecraft_player_embodiment_action"],
+        reasons: ["player_action_capability_selection_owned_by_runtime"],
+      },
+    };
+
+    expect(
+      attachCodexMinecraftPlayerEmbodimentActionRequirement({
+        body,
+        turnId: "ask:test:zombie-combat-effect",
+        promptText:
+          "Use DatDamPig Player Embodiment to track the exact zombie, then use cooldown-aware combat attack actions against only that zombie until it is defeated. Do not attack friendly or neutral entities.",
+      }),
+    ).toBe(true);
+    expect(
+      (body.capability_itinerary as any).terminal_success_criteria,
+    ).toMatchObject({
+      required_capabilities: [
+        "com.casimirbot.minecraft.player.combat.attack",
+      ],
+    });
+    expect(body.minecraft_player_embodiment_action_contract).toMatchObject({
+      exact_capability_preselected: false,
+      required_effect_capability_ids: [
+        "com.casimirbot.minecraft.player.combat.attack",
+      ],
+    });
+  });
+
   it("requires exact reactive-program evidence for an operative resident physical recovery", () => {
     const body: Record<string, unknown> = {
       source_target_intent: {
@@ -3742,6 +3775,53 @@ describe("Codex provider capability lane adapter", () => {
         semanticPlayerEmbodimentActionRequired: true,
       }),
     ).toEqual(admitted);
+  });
+
+  it("continues from a pending compound combat rail when the itinerary projection is absent", () => {
+    const cameraTrack =
+      "com.casimirbot.minecraft.player.camera.track";
+    const combatAttack =
+      "com.casimirbot.minecraft.player.combat.attack";
+    const admitted = [cameraTrack, combatAttack];
+    const lastAttempt = {
+      capability_id: cameraTrack,
+      status: "succeeded",
+    };
+    const currentCompoundCapabilityLedger = {
+      schema: "helix.compound_capability_contract.v1",
+      subgoals: [
+        {
+          requested_capability: cameraTrack,
+          runtime_capability: cameraTrack,
+          satisfied: true,
+          satisfaction: "satisfied",
+        },
+        {
+          requested_capability: combatAttack,
+          runtime_capability: combatAttack,
+          satisfied: false,
+          satisfaction: "pending",
+        },
+      ],
+    };
+
+    expect(
+      shouldAllowCodexObservationDependentCapabilityProposal({
+        trigger: "post_attempt",
+        payload: {},
+        admittedCapabilityIds: admitted,
+        lastAttempt,
+        currentCompoundCapabilityLedger,
+      }),
+    ).toBe(true);
+    expect(
+      codexObservationDependentCapabilityProposalIds({
+        payload: {},
+        admittedCapabilityIds: admitted,
+        lastAttempt,
+        currentCompoundCapabilityLedger,
+      }),
+    ).toEqual([combatAttack]);
   });
 
   it("keeps native semantic Player Embodiment admission focused on Minecraft observations plus typed actions", () => {

@@ -785,6 +785,7 @@ export const getRuntimeTaskSnapshot = () => {
   const nowMs = Date.now();
   const classes = taskClasses().map((taskClass) => {
     const budget = resolveDefaultTaskBudget(taskClass);
+    const limits = readLimits(taskClass);
     const burst = readClassBurstBudget(taskClass);
     const starts = pruneBurstStarts(taskClass, nowMs, burst.windowMs);
     return {
@@ -797,7 +798,7 @@ export const getRuntimeTaskSnapshot = () => {
       burstLimit: burst.limit,
       burstWindowMs: burst.windowMs,
       burstUsed: starts.length,
-      estimatedBurstMiB: budget.estimatedBurstMiB ?? null,
+      estimatedBurstMiB: limits.estimatedBurstMiB ?? null,
     };
   });
   return {

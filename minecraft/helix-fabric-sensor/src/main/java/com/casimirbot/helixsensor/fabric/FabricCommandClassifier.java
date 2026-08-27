@@ -50,7 +50,7 @@ final class FabricCommandClassifier {
         }
         if ("helixgame".equals(root)) {
             if (
-                lower.matches("^helixgame\\s+(?:ping|checkpoint\\s+status|fall_rescue\\s+status)(?:\\s|$).*$")
+                lower.matches("^helixgame\\s+(?:ping|checkpoint\\s+status|fall_rescue\\s+status|combat_watchdog\\s+status)(?:\\s|$).*$")
             ) {
                 return new Classification("query", "read_only");
             }
@@ -61,6 +61,11 @@ final class FabricCommandClassifier {
                 lower.matches("^helixgame\\s+fall_rescue\\s+(?:arm|disarm)(?:\\s|$).*$")
             ) {
                 return new Classification("world_build", "world_mutation");
+            }
+            if (
+                lower.matches("^helixgame\\s+combat_watchdog\\s+(?:arm|disarm)(?:\\s|$).*$")
+            ) {
+                return new Classification("entity_control", "world_mutation");
             }
             if (
                 lower.matches("^helixgame\\s+checkpoint\\s+(?:capture(?:_box)?|discard)(?:\\s|$).*$")
@@ -106,6 +111,12 @@ final class FabricCommandClassifier {
         }
         if (WORLD_TIME_WEATHER.contains(root)) {
             return new Classification("world_time_weather", "world_mutation");
+        }
+        if (
+            "data".equals(root) &&
+            lower.matches("^data\\s+(?:merge|modify|remove)\\s+entity(?:\\s|$).*$")
+        ) {
+            return new Classification("entity_control", "world_mutation");
         }
         if (WORLD_BUILD.contains(root)) {
             return new Classification("world_build", "world_mutation");

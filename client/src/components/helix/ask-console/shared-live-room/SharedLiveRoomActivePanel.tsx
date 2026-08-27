@@ -5,6 +5,7 @@ import { SharedLiveRoomConsentPanel } from "./SharedLiveRoomConsentPanel";
 import { SharedLiveRoomDebugPanel } from "./SharedLiveRoomDebugPanel";
 import { SharedLiveRoomParticipantsPanel } from "./SharedLiveRoomParticipantsPanel";
 import { SharedLiveRoomRuntimePanel } from "./SharedLiveRoomRuntimePanel";
+import { SharedLiveRoomSetupPanel } from "./SharedLiveRoomSetupPanel";
 import { SharedLiveRoomVisualLanes } from "./SharedLiveRoomVisualLanes";
 import type { HelixSharedLiveRoomController } from "./useHelixSharedLiveRoom";
 
@@ -162,6 +163,22 @@ export function SharedLiveRoomActivePanel({
         onVisualSourceCaptureRequested={onVisualSourceCaptureRequested}
       />
       <SharedLiveRoomDebugPanel controller={controller} />
+
+      <details className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-slate-100">
+          Switch or create another room
+        </summary>
+        <p className="mt-2 text-[11px] leading-5 text-slate-400">
+          Opening or creating another room changes this browser&apos;s active room. It does not
+          close this room, revoke its grants, or remove your membership.
+        </p>
+        <div className="mt-3">
+          <SharedLiveRoomSetupPanel
+            controller={controller}
+            fieldIdPrefix={`${idPrefix}-room-switcher`}
+          />
+        </div>
+      </details>
 
       <div className="flex justify-end">
         <button

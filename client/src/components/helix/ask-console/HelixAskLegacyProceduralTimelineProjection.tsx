@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 
 import { readAgentLoopAuditArray, readAgentLoopAuditRecord } from "@/lib/helix/ask-runtime-authority-readers";
 import {
@@ -25,6 +25,48 @@ export type HelixAskLegacyProceduralTimelineProjectionOptions = {
     fallback?: string;
     extraSources?: unknown[];
   }) => string;
+};
+
+const buildRuntimeBudgetSummary = (limits: Record<string, unknown> | null): string | null => {
+  if (!limits) return null;
+  const fields: Array<[string, unknown]> = [
+    ["status", limits.budget_status],
+    ["turn_timeout_ms", limits.turn_timeout_ms],
+    ["process_timeout_ms", limits.process_timeout_ms],
+    ["output_max_bytes", limits.process_output_max_bytes],
+    ["protocol_max_bytes", limits.protocol_max_bytes],
+    ["continuation_steps", limits.continuation_step_limit],
+    ["max_iterations", limits.max_iterations],
+    ["max_tool_calls", limits.max_tool_calls],
+    ["max_model_decisions", limits.max_llm_decisions],
+    ["hard_max_iterations", limits.hard_max_iterations],
+    ["hard_max_tool_calls", limits.hard_max_tool_calls],
+    ["hard_max_model_decisions", limits.hard_max_llm_decisions],
+    ["exhaustion", limits.exhaustion_reason],
+  ];
+  const parts = fields
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([label, value]) => `${label}=${String(value)}`);
+  if (limits.continuation_step_limit === null && limits.continuation_step_limit_applies === false) {
+    parts.push("continuation_steps=no Helix-imposed step cap");
+  }
+  if (limits.runtime_started === false) parts.push("runtime_started=false");
+  if (limits.model_loop_started === false) parts.push("model_loop_started=false");
+  return parts.length > 0 ? parts.join(" | ") : null;
+};
+
+const buildModelPolicySummary = (policy: Record<string, unknown> | null): string | null => {
+  if (!policy) return null;
+  const parts = [
+    typeof policy.effective_model === "string" && policy.effective_model
+      ? `model=${policy.effective_model}`
+      : null,
+    typeof policy.effective_reasoning_effort === "string" && policy.effective_reasoning_effort
+      ? `reasoning=${policy.effective_reasoning_effort}`
+      : null,
+    typeof policy.source === "string" && policy.source ? `source=${policy.source}` : null,
+  ].filter((value): value is string => Boolean(value));
+  return parts.length > 0 ? parts.join(" | ") : null;
 };
 
 export function renderHelixAskLegacyProceduralTimeline(
@@ -55,6 +97,19 @@ export function renderHelixAskLegacyProceduralTimeline(
   );
   const runtimeStopReason =
     typeof agentRuntimeLoop?.stop_reason === "string" ? agentRuntimeLoop.stop_reason.trim() : "";
+  const runtimePathIdentity = readAgentLoopAuditRecord(
+    replyRecord?.runtime_path_identity ?? reply.debug?.runtime_path_identity,
+  );
+  const publicLifecycleProjection = readAgentLoopAuditRecord(
+    replyRecord?.public_lifecycle_projection ?? reply.debug?.public_lifecycle_projection,
+  );
+  const publicLifecyclePresentation = readAgentLoopAuditRecord(publicLifecycleProjection?.presentation);
+  const turnTranscriptEvents = readAgentLoopAuditArray(
+    replyRecord?.turn_transcript_events ?? reply.debug?.turn_transcript_events,
+  );
+  const runtimeDowngrade = readAgentLoopAuditRecord(runtimePathIdentity?.downgrade);
+  const runtimeLimits = readAgentLoopAuditRecord(runtimePathIdentity?.runtime_limits);
+  const runtimeModelPolicy = readAgentLoopAuditRecord(runtimePathIdentity?.model_policy);
   const visibleAnswer =
     typeof truthTable?.visible_answer_text === "string"
       ? truthTable.visible_answer_text
@@ -89,14 +144,32 @@ export function renderHelixAskLegacyProceduralTimeline(
     terminalKind: visibleTerminalKind,
   });
 
-  if (!truthTable && runtimeIterations.length === 0 && planItems.length === 0 && observations.length === 0 && !terminal) {
+  if (
+    turnTranscriptEvents.length === 0 &&
+    !truthTable &&
+    runtimeIterations.length === 0 &&
+    planItems.length === 0 &&
+    observations.length === 0 &&
+    !terminal
+  ) {
     return null;
   }
 
   const rows: HelixAskProceduralTimelineRow[] = [];
   const runtimeActionLabels: string[] = [];
 
-  runtimeIterations.slice(0, 12).forEach((item, index) => {
+  turnTranscriptEvents.forEach((item, index) => {
+    const event = readAgentLoopAuditRecord(item);
+    const label = String(event?.text ?? event?.type ?? event?.source_event_type ?? "Lifecycle event");
+    rows.push({
+      key: typeof event?.id === "string" && event.id.trim() ? event.id : `transcript-${index}`,
+      label: `${String(event?.type ?? event?.source_event_type ?? "event")}: ${clipText(label, 120)}`,
+      detail: clipText(String(event?.detail ?? event?.lane ?? event?.event_source ?? "public lifecycle"), 180),
+      status: String(event?.status ?? "completed"),
+    });
+  });
+
+  (turnTranscriptEvents.length === 0 ? runtimeIterations : []).forEach((item, index) => {
     const record = readAgentLoopAuditRecord(item);
     const chosenCapability = typeof record?.chosen_capability === "string" ? record.chosen_capability.trim() : "";
     const executedAction = typeof record?.executed_action_key === "string" ? record.executed_action_key.trim() : "";
@@ -119,8 +192,8 @@ export function renderHelixAskLegacyProceduralTimeline(
     });
   });
 
-  if (runtimeIterations.length === 0) {
-    planItems.slice(0, 8).forEach((item, index) => {
+  if (turnTranscriptEvents.length === 0 && runtimeIterations.length === 0) {
+    planItems.forEach((item, index) => {
       const record = readAgentLoopAuditRecord(item);
       const actionLabel = readProceduralActionLabel(record?.action);
       const lane = String(record?.lane ?? "step");
@@ -133,7 +206,7 @@ export function renderHelixAskLegacyProceduralTimeline(
     });
   }
 
-  appendedSteps.slice(0, 6).forEach((item, index) => {
+  (turnTranscriptEvents.length === 0 ? appendedSteps : []).forEach((item, index) => {
     const record = readAgentLoopAuditRecord(item);
     rows.push({
       key: `append-${index}`,
@@ -143,7 +216,7 @@ export function renderHelixAskLegacyProceduralTimeline(
     });
   });
 
-  observations.slice(-10).forEach((item, index) => {
+  (turnTranscriptEvents.length === 0 ? observations : []).forEach((item, index) => {
     const record = readAgentLoopAuditRecord(item);
     const artifact = readAgentLoopAuditRecord(record?.artifact);
     const actionLabel = readProceduralActionLabel(artifact);
@@ -169,7 +242,7 @@ export function renderHelixAskLegacyProceduralTimeline(
     });
   });
 
-  if (terminal) {
+  if (turnTranscriptEvents.length === 0 && terminal) {
     rows.push({
       key: "terminal",
       label: `Terminal: ${visibleTerminalKind}`,
@@ -199,6 +272,22 @@ export function renderHelixAskLegacyProceduralTimeline(
       route={route}
       toolLabel={runtimeActionLabels[0] ?? (selectedTool ? readProceduralActionLabel(selectedTool) : null)}
       runtimeStopReason={showRuntimeStopReason ? runtimeStopReason : null}
+      runtimePath={typeof runtimePathIdentity?.actual_path === "string" ? runtimePathIdentity.actual_path : null}
+      apiTransport={
+        typeof runtimePathIdentity?.api_transport === "string" ? runtimePathIdentity.api_transport : null
+      }
+      defaultVisibleLimit={
+        typeof publicLifecyclePresentation?.default_visible_limit === "number"
+          ? publicLifecyclePresentation.default_visible_limit
+          : null
+      }
+      runtimeBudgetSummary={buildRuntimeBudgetSummary(runtimeLimits)}
+      modelPolicySummary={buildModelPolicySummary(runtimeModelPolicy)}
+      runtimeDowngradeReason={
+        runtimeDowngrade?.occurred === true && typeof runtimeDowngrade.reason_code === "string"
+          ? runtimeDowngrade.reason_code
+          : null
+      }
     />
   );
 }

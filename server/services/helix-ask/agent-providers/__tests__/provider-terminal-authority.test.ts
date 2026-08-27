@@ -2,9 +2,52 @@ import { describe, expect, it } from "vitest";
 import { HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA } from "@shared/helix-agent-step-observation-packet";
 import {
   buildHelixProviderReasoningReentry,
+  buildTerminalLifecycleObservationProjection,
   hasCurrentTurnResidentSemanticReplanRecovery,
   hasSuccessfulLaterRetryForFailedGatewayCapability,
 } from "../provider-terminal-authority";
+
+describe("terminal lifecycle observation projection", () => {
+  it("projects gateway-only evidence as observed and re-entered", () => {
+    const packet = {
+      schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+      produced_artifact_refs: ["ask:minecraft:inventory:fresh"],
+    };
+
+    expect(
+      buildTerminalLifecycleObservationProjection({
+        providerEvidenceReentered: true,
+        gatewayObservationPackets: [packet as never],
+        capabilityLaneObservationPackets: [],
+      }),
+    ).toEqual({
+      lane_executed: true,
+      observation_reentered: true,
+      observation_ref: "ask:minecraft:inventory:fresh",
+      has_observation: true,
+    });
+  });
+
+  it("does not claim re-entry when evidence exists but provider re-entry failed", () => {
+    const packet = {
+      schema: HELIX_AGENT_STEP_OBSERVATION_PACKET_SCHEMA,
+      produced_artifact_refs: ["ask:minecraft:inventory:blocked"],
+    };
+
+    expect(
+      buildTerminalLifecycleObservationProjection({
+        providerEvidenceReentered: false,
+        gatewayObservationPackets: [],
+        capabilityLaneObservationPackets: [packet as never],
+      }),
+    ).toEqual({
+      lane_executed: true,
+      observation_reentered: false,
+      observation_ref: "ask:minecraft:inventory:blocked",
+      has_observation: true,
+    });
+  });
+});
 
 const buildResidentSemanticReplanResults = (manualOverride = false) => {
   const turnId = "turn-resident-semantic-replan";

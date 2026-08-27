@@ -3,8 +3,26 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { HelixSharedRealtimeRoom } from
+  "@shared/helix-shared-realtime-room";
 import { SharedLiveRoomDialog } from "../SharedLiveRoomDialog";
 import type { HelixSharedLiveRoomController } from "../useHelixSharedLiveRoom";
+
+vi.mock("../SharedLiveRoomConsentPanel", () => ({
+  SharedLiveRoomConsentPanel: () => null,
+}));
+vi.mock("../SharedLiveRoomDebugPanel", () => ({
+  SharedLiveRoomDebugPanel: () => null,
+}));
+vi.mock("../SharedLiveRoomParticipantsPanel", () => ({
+  SharedLiveRoomParticipantsPanel: () => null,
+}));
+vi.mock("../SharedLiveRoomRuntimePanel", () => ({
+  SharedLiveRoomRuntimePanel: () => null,
+}));
+vi.mock("../SharedLiveRoomVisualLanes", () => ({
+  SharedLiveRoomVisualLanes: () => null,
+}));
 
 const buildController = (): HelixSharedLiveRoomController => ({
   rooms: [],
@@ -64,6 +82,50 @@ afterEach(() => {
 });
 
 describe("Shared Live Room dialog plane", () => {
+  it("creates another room without leaving the active room", async () => {
+    const controller = buildController();
+    const room = {
+      room_id: "shared_realtime_room:active",
+      title: "Existing M1 room",
+      status: "ready",
+      readiness: {
+        ready: true,
+        missing_participant_count: 0,
+        missing_consent_by_participant: {},
+      },
+      runtime: {
+        state: "idle",
+        transport_owner: "none",
+        realtime_session_ref_hash: null,
+      },
+      participants: [],
+      participant_context_cards: [],
+      self_participant_id: null,
+    } as unknown as HelixSharedRealtimeRoom;
+    controller.room = room;
+
+    render(
+      <SharedLiveRoomDialog
+        room={room}
+        controller={controller}
+        titleId="room-title"
+        descriptionId="room-description"
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Switch or create another room"));
+    fireEvent.change(screen.getByLabelText("Create a room"), {
+      target: { value: "C0 combat testing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create room" }));
+
+    await waitFor(() =>
+      expect(controller.createRoom).toHaveBeenCalledWith("C0 combat testing"),
+    );
+    expect(controller.leaveRoom).not.toHaveBeenCalled();
+  });
+
   it("portals above the Ask plane with an opaque top-down viewport layout", async () => {
     const controller = buildController();
     const askPlaneClick = vi.fn();

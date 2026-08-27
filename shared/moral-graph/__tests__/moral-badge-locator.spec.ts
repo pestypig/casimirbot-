@@ -274,4 +274,59 @@ describe("Moral badge locator", () => {
       agent_executable: false,
     });
   });
+
+  it("locates protection, cost-to-power conversion, and autonomy through the relational geometry language", async () => {
+    const canonicalGraph = await loadIdeologyGraphFromFile();
+    const locator = locateMoralBadges(canonicalGraph, {
+      kind: "user_prompt",
+      text: [
+        "The protected person retains agency; protection is not possession.",
+        "The commander bears the human cost while victory becomes reputation and power.",
+        "Equality requires freedom to leave, and departure is not betrayal.",
+      ].join(" "),
+      refs: ["turn:return-cost-conversion-refusal"],
+      generatedAt: "2026-08-26T00:00:00.000Z",
+      locatorId: "moral-badge-locator:return-cost-conversion-refusal",
+    });
+    const locatedIds = [
+      ...locator.locatedBadges.exact,
+      ...locator.locatedBadges.likely,
+      ...locator.locatedBadges.inferred,
+    ].map((badge) => badge.nodeId);
+
+    expect(validateMoralBadgeLocatorV1(locator)).toEqual([]);
+    expect(locatedIds).toEqual(
+      expect.arrayContaining([
+        "protection-without-possession",
+        "cost-to-power-conversion-ledger",
+        "autonomy-proven-equality",
+      ]),
+    );
+  });
+
+  it("locates the leadership lifecycle without collapsing it into generic hierarchy", async () => {
+    const canonicalGraph = await loadIdeologyGraphFromFile();
+    const locator = locateMoralBadges(canonicalGraph, {
+      kind: "user_prompt",
+      text:
+        "Leadership as capacity transfer turns hard-won personal expertise into shared capacity, so competence produces decision rights and the mission survives the leader.",
+      refs: ["turn:leadership-capacity-transfer"],
+      generatedAt: "2026-08-26T00:00:00.000Z",
+      locatorId: "moral-badge-locator:leadership-capacity-transfer",
+    });
+    const located = [
+      ...locator.locatedBadges.exact,
+      ...locator.locatedBadges.likely,
+      ...locator.locatedBadges.inferred,
+    ].find((badge) => badge.nodeId === "leadership-as-capacity-transfer");
+
+    expect(validateMoralBadgeLocatorV1(locator)).toEqual([]);
+    expect(located).toMatchObject({ nodeId: "leadership-as-capacity-transfer" });
+    expect(located?.pathToBinding).toEqual([
+      "leadership-as-capacity-transfer",
+      "mandate-bounded-hierarchy",
+      "wisdom-first-principles",
+    ]);
+    expect(locator.authority).toMatchObject({ terminal_eligible: false, agent_executable: false });
+  });
 });

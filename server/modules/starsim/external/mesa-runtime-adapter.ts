@@ -1,11 +1,14 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
-import { buildMesaHashManifest } from "./mesa-hash-manifest";
+import { buildMesaHashManifest, sha256File } from "./mesa-hash-manifest";
 import { writeMesaRunLog } from "./mesa-run-log";
 
 export const starSimMesaRuntimePolicySchema = z.object({
   runtimeKind: z.enum(["disabled", "fixture_only", "local", "docker", "wsl"]),
+  mesaExecutable: z.string().min(1).optional(),
+  mesaArgs: z.array(z.string()).optional(),
   mesaCommand: z.string().optional(),
   dockerImage: z.string().optional(),
   dockerImageDigest: z.string().optional(),
@@ -56,6 +59,19 @@ export type StarSimMesaRuntimeAdapterResult = {
   status: "imported" | "reproduced";
 };
 
+type OutputSnapshot = { hash: string; mtimeMs: number } | undefined;
+
+function snapshotOutput(path: string | undefined): OutputSnapshot {
+  if (!path || !existsSync(path)) return undefined;
+  return { hash: sha256File(path), mtimeMs: statSync(path).mtimeMs };
+}
+
+function outputWasFresh(path: string | undefined, before: OutputSnapshot): boolean {
+  const after = snapshotOutput(path);
+  if (!after) return false;
+  return !before || before.hash !== after.hash || before.mtimeMs !== after.mtimeMs;
+}
+
 export function runStarSimMesaRuntimeAdapter(
   rawPolicy: StarSimMesaRuntimePolicy,
   outPath: string,
@@ -70,24 +86,70 @@ export function runStarSimMesaRuntimeAdapter(
   if (!existsSync(policy.inputs.inlistProjectPath)) {
     throw new Error("MESA inlist_project is missing.");
   }
+  const outputDir = policy.outputDirectory ?? dirname(outPath);
+  mkdirSync(outputDir, { recursive: true });
+  const runLogPath = join(outputDir, "starsim-solar-mesa-run.log");
+
+  let exitCode = 0;
+  let stdout = "";
+  let stderr = "";
+  let message = "Imported declared MESA outputs without executing solver.";
+  const profileBefore = snapshotOutput(policy.outputs.profilePath);
+  const historyBefore = snapshotOutput(policy.outputs.historyPath);
+  if (!policy.importOnly) {
+    if (!policy.mesaExecutable) {
+      throw new Error(
+        "A real MESA run requires mesaExecutable and mesaArgs; mesaCommand is display-only and is not executed.",
+      );
+    }
+    const execution = spawnSync(policy.mesaExecutable, policy.mesaArgs ?? [], {
+      cwd: policy.workingDirectory,
+      encoding: "utf8",
+      shell: false,
+      windowsHide: true,
+    });
+    stdout = execution.stdout ?? "";
+    stderr = execution.stderr ?? "";
+    exitCode = execution.status ?? 1;
+    if (execution.error) {
+      stderr = [stderr, execution.error.message].filter(Boolean).join("\n");
+    }
+    message =
+      exitCode === 0
+        ? "External MESA command executed successfully; declared outputs will now be verified."
+        : "External MESA command failed; no reproduction status was granted.";
+  }
+
+  const runLog = writeMesaRunLog({
+    path: runLogPath,
+    runtimeKind: policy.runtimeKind,
+    command:
+      policy.mesaCommand ??
+      [policy.mesaExecutable, ...(policy.mesaArgs ?? [])].filter(Boolean).join(" "),
+    exitCode,
+    stdout,
+    stderr,
+    message,
+  });
+  if (exitCode !== 0) {
+    throw new Error(`MESA command failed with exit code ${exitCode}; see ${runLogPath}.`);
+  }
   if (!existsSync(policy.outputs.profilePath)) {
     throw new Error("MESA profile output is missing.");
   }
   if (policy.requireHistoryHash && (!policy.outputs.historyPath || !existsSync(policy.outputs.historyPath))) {
     throw new Error("MESA history output is required.");
   }
-  const outputDir = policy.outputDirectory ?? dirname(outPath);
-  mkdirSync(outputDir, { recursive: true });
-  const runLogPath = join(outputDir, "starsim-solar-mesa-run.log");
-  const runLog = writeMesaRunLog({
-    path: runLogPath,
-    runtimeKind: policy.runtimeKind,
-    command: policy.mesaCommand,
-    exitCode: 0,
-    message: policy.importOnly
-      ? "Imported declared MESA outputs without executing solver."
-      : "External MESA execution adapter completed in integration/import mode.",
-  });
+  if (!policy.importOnly && !outputWasFresh(policy.outputs.profilePath, profileBefore)) {
+    throw new Error("MESA profile output was not created or refreshed by the executed command.");
+  }
+  if (
+    !policy.importOnly &&
+    policy.requireHistoryHash &&
+    !outputWasFresh(policy.outputs.historyPath, historyBefore)
+  ) {
+    throw new Error("MESA history output was not created or refreshed by the executed command.");
+  }
   const hashes = buildMesaHashManifest({
     inlistProject: policy.inputs.inlistProjectPath,
     inlistSolar: policy.inputs.inlistSolarPath,
@@ -109,7 +171,7 @@ export function runStarSimMesaRuntimeAdapter(
   }
   return {
     policy,
-    exitCode: 0,
+    exitCode,
     runLogPath,
     runLogHash: runLog.hash,
     hashes,

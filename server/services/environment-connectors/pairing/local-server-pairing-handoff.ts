@@ -22,6 +22,7 @@ export class LocalServerPairingHandoffError extends Error {
 export const stageLocalMinecraftServerPairing = async (input: {
   command: string;
   workspaceRoot?: string | null;
+  serverRunDirectory?: string | null;
 }): Promise<{ status: "server_pairing_inbox_staged" }> => {
   const command = input.command.trim();
   if (
@@ -43,23 +44,38 @@ export const stageLocalMinecraftServerPairing = async (input: {
       "The same-host Fabric server workspace is unavailable.",
     );
   }
-  const serverRoot = path.resolve(
+  const fixedRunRoot = path.resolve(
     workspaceRoot,
     "minecraft",
     "helix-fabric-sensor",
     "run",
   );
+  const configuredServerRoot =
+    input.serverRunDirectory?.trim() ||
+    process.env.HELIX_MINECRAFT_SERVER_RUN_DIR?.trim() ||
+    fixedRunRoot;
+  const serverRoot = path.isAbsolute(configuredServerRoot)
+    ? path.resolve(configuredServerRoot)
+    : path.resolve(workspaceRoot, configuredServerRoot);
+  const relativeServerRoot = path.relative(fixedRunRoot, serverRoot);
+  const relativeSegments = relativeServerRoot
+    .split(path.sep)
+    .filter(Boolean);
+  if (
+    relativeServerRoot.startsWith("..") ||
+    path.isAbsolute(relativeServerRoot) ||
+    relativeSegments.length > 1
+  ) {
+    throw new LocalServerPairingHandoffError(
+      "local_server_pairing_path_invalid",
+      "The selected local server profile must be the fixed Fabric run root or one direct child profile.",
+    );
+  }
   const configDirectory = path.resolve(serverRoot, "config");
   const relativeConfig = path.relative(workspaceRoot, configDirectory);
   if (
     relativeConfig.startsWith("..") ||
-    path.isAbsolute(relativeConfig) ||
-    relativeConfig !== path.join(
-      "minecraft",
-      "helix-fabric-sensor",
-      "run",
-      "config",
-    )
+    path.isAbsolute(relativeConfig)
   ) {
     throw new LocalServerPairingHandoffError(
       "local_server_pairing_path_invalid",

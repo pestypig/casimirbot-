@@ -1977,6 +1977,7 @@ const normalizeLegacyResult = (
       "actor",
       "focus",
       "entities",
+      "projectiles",
       "hazards",
       "movement_candidates",
       "navigation_frontier",

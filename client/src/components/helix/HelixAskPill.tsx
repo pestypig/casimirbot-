@@ -85,6 +85,8 @@ import {
   buildHelixAskSubmitBackendEntrypointRoutePlan,
   mergeHelixAskSubmitBackendEntrypointRunOptions,
 } from "@/components/helix/ask-console/HelixAskSubmitBackendEntrypointOptions";
+import { helixSharedLiveRoomApi } from "@/components/helix/ask-console/shared-live-room/SharedLiveRoomApi";
+import { resolveHelixAskSharedLiveRoomId } from "@/components/helix/ask-console/shared-live-room/SharedLiveRoomAskScope";
 import {
   buildHelixAskDocViewerDebugSnapshotBinding,
   readHelixAskDocViewerPathFromDesktopUrlForSnapshot,
@@ -19565,8 +19567,28 @@ export function HelixAskPill({
       });
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const sessionIdForTurn = getHelixAskSessionId();
-      const backendThreadIdForTurn = activeSharedRoomIdForAsk
-        ? `helix-ask:room:${activeSharedRoomIdForAsk}`
+      const sharedRealtimeRoomsAllowed =
+        accountCapabilityPolicy.feature_flags?.includes("shared_realtime_rooms") === true &&
+        accountCapabilityPolicy.locked_features?.includes("shared_realtime_rooms") !== true;
+      let verifiedSharedRoomId = activeSharedRoomIdForAsk;
+      if (sharedRealtimeRoomsAllowed) {
+        try {
+          verifiedSharedRoomId = await resolveHelixAskSharedLiveRoomId({
+            api: helixSharedLiveRoomApi,
+            selectedRoomId: activeSharedRoomIdForAsk,
+          });
+        } catch (error) {
+          setAskStatus(null);
+          setAskError(
+            `Shared GPT Live Room scope could not be verified. ${
+              error instanceof Error ? error.message : "Retry after the room service reconnects."
+            }`,
+          );
+          return;
+        }
+      }
+      const backendThreadIdForTurn = verifiedSharedRoomId
+        ? `helix-ask:room:${verifiedSharedRoomId}`
         : sessionIdForTurn ?? runAskTurnId;
       const pendingWorkflowQte = workflowQteBridge.takePending(runAskInputSource === "manual");
       workflowQteBridge.recordSubmitted({
@@ -21978,6 +22000,8 @@ export function HelixAskPill({
       applyGovernedActionEnvelope,
       applyWorkstationActionsFromPayload,
       activeSharedRoomIdForAsk,
+      accountCapabilityPolicy.feature_flags,
+      accountCapabilityPolicy.locked_features,
       appendSyntheticLiveEvent,
       askBusy,
       bumpVoiceTurnRevision,

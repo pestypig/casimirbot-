@@ -25,6 +25,7 @@ import {
   type HelixEnvironmentProbeObservation,
 } from "@shared/helix-environment-connector";
 import {
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_LOOK_CAPABILITY,
 } from
@@ -676,6 +677,36 @@ describe("Helix MCP Minecraft action boundary", () => {
         environmentActionResultRef: observation.evidence_ref,
         reentryObservationRef: observation.evidence_ref,
       });
+
+      const attackResult = await connection.client.callTool({
+        name: "helix_minecraft_player_action",
+        arguments: {
+          room_id: ROOM_ID,
+          idempotency_key: "mcp-minecraft-attack-once",
+          action: {
+            action_kind: "attack",
+            target_ref: "target:mcp-exact-zombie",
+            target_entity_type_id: "minecraft:zombie",
+            target_classification: "hostile",
+            max_acquisition_distance: 16,
+            require_line_of_sight: true,
+            minimum_attack_cooldown: 0.9,
+            max_attack_pulses: 1,
+            max_duration_ms: 1_000,
+            stop_below_health: 10,
+            friendly_fire: false,
+          },
+        },
+      });
+      expect(attackResult.isError, JSON.stringify(attackResult)).not.toBe(true);
+      expect(executeAction).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          capabilityId: HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+          arguments: expect.objectContaining({
+            target_ref: "target:mcp-exact-zombie",
+          }),
+        }),
+      );
 
       const guardedAction = {
         room_id: ROOM_ID,

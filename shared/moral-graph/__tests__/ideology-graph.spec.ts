@@ -104,6 +104,36 @@ describe("MoralGraph ideology loader and traversal", () => {
       "identity-view-and-non-attachment",
       "wisdom-first-principles",
     ]);
+    expect(getIdeologyPathToRoot(graph, "protection-without-possession")).toEqual([
+      "protection-without-possession",
+      "non-harm-and-compassionate-constraint",
+      "wisdom-first-principles",
+    ]);
+    expect(getIdeologyPathToRoot(graph, "autonomy-proven-equality")).toEqual([
+      "autonomy-proven-equality",
+      "love-without-projection",
+      "identity-view-and-non-attachment",
+      "wisdom-first-principles",
+    ]);
+    expect(getIdeologyPathToRoot(graph, "cost-to-power-conversion-ledger")).toEqual(
+      expect.arrayContaining(["cost-to-power-conversion-ledger", "stewardship-ledger", "bodhisattva-craft"]),
+    );
+    expect(getIdeologyPathToRoot(graph, "leadership-as-capacity-transfer")).toEqual([
+      "leadership-as-capacity-transfer",
+      "mandate-bounded-hierarchy",
+      "wisdom-first-principles",
+    ]);
+    const leadershipLifecycle = getIdeologyNodeById(graph, "leadership-as-capacity-transfer")
+      ?.leadershipLifecycle as Array<{ stage: string }>;
+    expect(leadershipLifecycle.map((entry) => entry.stage)).toEqual([
+      "emergence",
+      "entrustment",
+      "articulation",
+      "distribution",
+      "contestation",
+      "renewal",
+      "succession",
+    ]);
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(getIdeologyActionGatePolicy(graph)?.hard_fail_ids?.missing_legal_key).toBe("IDEOLOGY_MISSING_LEGAL_KEY");
   });

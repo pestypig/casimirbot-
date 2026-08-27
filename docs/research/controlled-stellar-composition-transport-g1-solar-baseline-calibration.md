@@ -15,24 +15,32 @@ This is the sole active packet. G1 must produce one externally executed,
 zero-transport, solar-age reference model before any controlled composition
 transport is implemented or evaluated.
 
+Attempt 1 is blocked at its runtime-capacity preflight. The bounded recovery
+sequence is maintained in
+[`controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md`](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md).
+That packet may make another G1 attempt possible; its archival, deletion, or
+window-state receipts cannot satisfy any calibration admission rule below.
+
 ## Ordered work
 
-1. Inventory the existing MESA import/reproduction adapter and identify the
+1. Satisfy the frozen runtime-capacity recovery condition and open a new
+   versioned G1 attempt without changing the science acceptance criteria.
+2. Inventory the existing MESA import/reproduction adapter and identify the
    exact gap between current `mesa_imported` artifacts and a real solver run.
-2. Select and freeze the MESA release/revision, runtime mode, container or WSL
+3. Select and freeze the MESA release/revision, runtime mode, container or WSL
    identity, compiler/toolchain, nuclear network, reaction rates, EOS, opacity,
    atmosphere, diffusion/settling, convection, and resolution policy.
-3. Replace placeholder reference URLs with authoritative, versioned calibration
+4. Replace placeholder reference URLs with authoritative, versioned calibration
    and uncertainty sources before freezing numerical tolerances.
-4. Freeze the joint solar-age calibration objective, covariance/multiple-test
+5. Freeze the joint solar-age calibration objective, covariance/multiple-test
    policy, convergence requirements, and G0 milestone thresholds.
-5. Freeze input hashes and a no-fixture-fallback execution policy.
-6. Execute the baseline, retaining inlists, logs, histories, profiles, photos,
+6. Freeze input hashes and a no-fixture-fallback execution policy.
+7. Execute the baseline, retaining inlists, logs, histories, profiles, photos,
    runtime identities, exit status, and hashes.
-7. Evaluate luminosity, radius, effective temperature, surface Z/X, surface
+8. Evaluate luminosity, radius, effective temperature, surface Z/X, surface
    helium, convection-zone depth, sound-speed and density residuals, and the
    declared neutrino vector.
-8. Stop at the first hard failure. Any revised calibration is a new versioned
+9. Stop at the first hard failure. Any revised calibration is a new versioned
    attempt, not an overwrite of the failed receipt.
 
 ## Admission rule
@@ -54,4 +62,3 @@ or `stage2_gate_mesa_reproduced` string cannot close G1.
   and G2 becomes eligible; or
 - `BLOCKED_BASELINE_CALIBRATION`: the first hard solver, provenance,
   convergence, or observational failure is preserved and G2 remains blocked.
-

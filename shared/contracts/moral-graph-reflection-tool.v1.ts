@@ -15,6 +15,14 @@ import {
 } from "./procedural-moral-classification.v1";
 import { type MoralObjectiveBindingV1, validateMoralObjectiveBindingV1 } from "./moral-objective-binding.v1";
 import { type MoralBadgeLocatorV1, validateMoralBadgeLocatorV1 } from "./moral-badge-locator.v1";
+import {
+  type ReturnCostConversionRefusalReflectionV1,
+  validateReturnCostConversionRefusalReflectionV1,
+} from "./return-cost-conversion-refusal.v1";
+import {
+  type SharedAuthoritySocialRenewalReflectionV1,
+  validateSharedAuthoritySocialRenewalReflectionV1,
+} from "./shared-authority-social-renewal.v1";
 
 export const MORAL_GRAPH_REFLECTION_TOOL_REQUEST_SCHEMA_VERSION = "moral_graph_reflection_tool_request/v1" as const;
 export const MORAL_GRAPH_REFLECTION_TOOL_RESPONSE_SCHEMA_VERSION = "moral_graph_reflection_tool_response/v1" as const;
@@ -73,6 +81,8 @@ export type MoralGraphReflectionToolResponseV1 = {
   reflection: IdeologyContextReflectionV1;
   proceduralClassification?: ProceduralMoralClassificationV1;
   locator?: MoralBadgeLocatorV1;
+  returnCostConversionRefusal: ReturnCostConversionRefusalReflectionV1;
+  sharedAuthoritySocialRenewal: SharedAuthoritySocialRenewalReflectionV1;
   objectiveBinding: MoralObjectiveBindingV1;
   presetOverlays?: MoralObjectiveBindingV1[];
   recommendedActions: MoralGraphRecommendedAction[];
@@ -238,6 +248,16 @@ export function validateMoralGraphReflectionToolResponseV1(value: unknown): stri
   if (value.locator !== undefined) {
     issues.push(...validateMoralBadgeLocatorV1(value.locator).map((issue) => `locator.${issue}`));
   }
+  issues.push(
+    ...validateReturnCostConversionRefusalReflectionV1(value.returnCostConversionRefusal).map(
+      (issue) => `returnCostConversionRefusal.${issue}`,
+    ),
+  );
+  issues.push(
+    ...validateSharedAuthoritySocialRenewalReflectionV1(value.sharedAuthoritySocialRenewal).map(
+      (issue) => `sharedAuthoritySocialRenewal.${issue}`,
+    ),
+  );
   issues.push(...validateMoralObjectiveBindingV1(value.objectiveBinding).map((issue) => `objectiveBinding.${issue}`));
 
   if (Array.isArray(value.presetOverlays)) {

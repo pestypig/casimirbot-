@@ -41,6 +41,7 @@ final class PlayerActionDiagnosticInbox {
     );
     private static final Set<String> FULL_ACTIONS = Set.of(
         "navigate_to", "look_at", "track_target", "walk", "jump", "interact", "attack",
+        "combat_guard",
         "hotbar_select", "equip", "follow", "collect", "mine", "place",
         "craft", "inventory_transfer", "execute_sequence",
         "execute_reactive_program", "arm_viability_guardian",
@@ -314,6 +315,7 @@ final class PlayerActionDiagnosticInbox {
             case "jump" -> jumpArguments(value);
             case "interact" -> interactArguments(value);
             case "attack" -> attackArguments(value);
+            case "combat_guard" -> combatGuardArguments(value);
             case "hotbar_select" -> hotbarArguments(value);
             case "equip" -> equipArguments(value);
             case "follow" -> followArguments(value);
@@ -680,6 +682,124 @@ final class PlayerActionDiagnosticInbox {
             Map.entry("stop_below_health", finite(value, "stop_below_health", 1, 20)),
             Map.entry("friendly_fire", false)
         );
+    }
+
+    private static Map<String, Object> combatGuardArguments(Map<String, Object> value) {
+        exactKeys(
+            value,
+            Set.of(
+                "hostile_entity_type_ids", "max_acquisition_distance",
+                "require_line_of_sight", "minimum_attack_cooldown",
+                "max_attack_pulses", "max_target_switches", "target_commit_ticks",
+                "retreat_start_distance", "retreat_stop_distance",
+                "retreat_when_hostile_count_at_least", "max_duration_ms",
+                "stop_below_health", "friendly_fire"
+            ),
+            Set.of(
+                "approach_policy", "max_approach_ticks", "cover_policy",
+                "max_cover_ticks", "projectile_response",
+                "projectile_evasion_horizon_ticks", "max_evasion_ticks",
+                "shield_hand", "max_shield_hold_ticks"
+            )
+        );
+        if (!bool(value, "require_line_of_sight") || bool(value, "friendly_fire")) {
+            throw invalid("player_diagnostic_inbox_combat_guard_safety_invalid");
+        }
+        List<Object> rawTypes = requiredList(value.get("hostile_entity_type_ids"));
+        if (rawTypes.isEmpty() || rawTypes.size() > 16) {
+            throw invalid("player_diagnostic_inbox_combat_guard_types_invalid");
+        }
+        List<String> hostileTypes = new ArrayList<>();
+        for (Object rawType : rawTypes) {
+            if (!(rawType instanceof String typeId) ||
+                !RESOURCE_LOCATION.matcher(typeId).matches()) {
+                throw invalid("player_diagnostic_inbox_combat_guard_types_invalid");
+            }
+            hostileTypes.add(typeId);
+        }
+        if (Set.copyOf(hostileTypes).size() != hostileTypes.size()) {
+            throw invalid("player_diagnostic_inbox_combat_guard_types_invalid");
+        }
+        double retreatStart = finite(value, "retreat_start_distance", 1, 6);
+        double retreatStop = finite(value, "retreat_stop_distance", 1, 8);
+        if (retreatStop <= retreatStart) {
+            throw invalid("player_diagnostic_inbox_combat_guard_retreat_invalid");
+        }
+        String approachPolicy = value.containsKey("approach_policy")
+            ? enumText(
+                value,
+                "approach_policy",
+                Set.of("none", "direct_bounded", "local_reroute_bounded")
+            )
+            : "none";
+        long maxApproachTicks = value.containsKey("max_approach_ticks")
+            ? integer(value, "max_approach_ticks", 0, 1_200)
+            : 0;
+        if (!"none".equals(approachPolicy) != (maxApproachTicks > 0)) {
+            throw invalid("player_diagnostic_inbox_combat_guard_approach_invalid");
+        }
+        String coverPolicy = value.containsKey("cover_policy")
+            ? enumText(value, "cover_policy", Set.of("none", "lateral_bounded"))
+            : "none";
+        long maxCoverTicks = value.containsKey("max_cover_ticks")
+            ? integer(value, "max_cover_ticks", 0, 1_200)
+            : 0;
+        if ("lateral_bounded".equals(coverPolicy) != (maxCoverTicks > 0)) {
+            throw invalid("player_diagnostic_inbox_combat_guard_cover_invalid");
+        }
+        String projectileResponse = value.containsKey("projectile_response")
+            ? enumText(
+                value,
+                "projectile_response",
+                Set.of("none", "sidestep", "shield_or_sidestep")
+            )
+            : "none";
+        long projectileHorizon = value.containsKey("projectile_evasion_horizon_ticks")
+            ? integer(value, "projectile_evasion_horizon_ticks", 1, 20)
+            : 8;
+        long maxEvasionTicks = value.containsKey("max_evasion_ticks")
+            ? integer(value, "max_evasion_ticks", 0, 1_200)
+            : 0;
+        String shieldHand = value.containsKey("shield_hand")
+            ? enumText(value, "shield_hand", Set.of("none", "off_hand"))
+            : "none";
+        long maxShieldHoldTicks = value.containsKey("max_shield_hold_ticks")
+            ? integer(value, "max_shield_hold_ticks", 0, 1_200)
+            : 0;
+        if (!"none".equals(projectileResponse) && maxEvasionTicks == 0) {
+            throw invalid("player_diagnostic_inbox_combat_guard_projectile_invalid");
+        }
+        if ("shield_or_sidestep".equals(projectileResponse)) {
+            if (!"off_hand".equals(shieldHand) || maxShieldHoldTicks == 0) {
+                throw invalid("player_diagnostic_inbox_combat_guard_shield_invalid");
+            }
+        } else if (!"none".equals(shieldHand) || maxShieldHoldTicks != 0) {
+            throw invalid("player_diagnostic_inbox_combat_guard_shield_invalid");
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("hostile_entity_type_ids", List.copyOf(hostileTypes));
+        normalized.put("max_acquisition_distance", finite(value, "max_acquisition_distance", 2, 32));
+        normalized.put("require_line_of_sight", true);
+        normalized.put("minimum_attack_cooldown", finite(value, "minimum_attack_cooldown", 0.1, 1));
+        normalized.put("max_attack_pulses", integer(value, "max_attack_pulses", 1, 256));
+        normalized.put("max_target_switches", integer(value, "max_target_switches", 0, 64));
+        normalized.put("target_commit_ticks", integer(value, "target_commit_ticks", 0, 200));
+        normalized.put("retreat_start_distance", retreatStart);
+        normalized.put("retreat_stop_distance", retreatStop);
+        normalized.put("retreat_when_hostile_count_at_least", integer(value, "retreat_when_hostile_count_at_least", 1, 16));
+        normalized.put("max_duration_ms", integer(value, "max_duration_ms", 1_000, 120_000));
+        normalized.put("stop_below_health", finite(value, "stop_below_health", 1, 20));
+        normalized.put("friendly_fire", false);
+        normalized.put("approach_policy", approachPolicy);
+        normalized.put("max_approach_ticks", maxApproachTicks);
+        normalized.put("cover_policy", coverPolicy);
+        normalized.put("max_cover_ticks", maxCoverTicks);
+        normalized.put("projectile_response", projectileResponse);
+        normalized.put("projectile_evasion_horizon_ticks", projectileHorizon);
+        normalized.put("max_evasion_ticks", maxEvasionTicks);
+        normalized.put("shield_hand", shieldHand);
+        normalized.put("max_shield_hold_ticks", maxShieldHoldTicks);
+        return Map.copyOf(normalized);
     }
 
     private static Map<String, Object> jumpArguments(Map<String, Object> value) {

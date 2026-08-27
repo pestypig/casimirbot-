@@ -47,6 +47,52 @@ export const PROVISIONING_MORAL_PRINCIPLES: readonly MoralWisdomPrinciple[] = [
     tags: ["provisioning", "hierarchy", "mandate", "role", "review", "action_gate"],
   },
   {
+    id: "leadership-as-capacity-transfer",
+    sourceIdeologyNodeId: "leadership-as-capacity-transfer",
+    label: "Leadership as Capacity Transfer",
+    glyph: "C",
+    summary:
+      "Leadership matures when earned, domain-bounded expertise becomes legible, contestable, distributed, renewable, and survivable beyond one leader.",
+    proceduralRole: "balancer",
+    procedureOperator: "routes_to",
+    proceduralRule:
+      "Locate the leadership lifecycle stage and route person-bound expertise toward legibility, knowledge transfer, competence-linked decision rights, contestability, renewal, and succession.",
+    traceBehavior:
+      "Trace originating expertise, mandate scope, reason legibility, knowledge transfer, developing participants, decision rights, contestability, renewal, succession, and mission continuity.",
+    actionEffect:
+      "Preserve justified domain expertise while making participant development and leadership continuity success conditions rather than threats.",
+    evidenceNeeds: [
+      "originating_expertise",
+      "mandate_scope",
+      "reason_legibility",
+      "knowledge_transfer_path",
+      "developing_participants",
+      "competence_to_decision_rights",
+      "contestability_path",
+      "renewal_trigger",
+      "succession_path",
+      "mission_continuity_without_leader",
+    ],
+    refusesAuthority: [
+      "expertise_as_total_sovereignty",
+      "indispensability_as_leadership",
+      "knowledge_hoarding_for_role_security",
+      "development_without_authority_growth",
+      "succession_as_betrayal",
+      "temporary_mandate_as_permanent_rule",
+    ],
+    tags: [
+      "leadership",
+      "capacity",
+      "knowledge_transfer",
+      "mandate",
+      "development",
+      "contestability",
+      "succession",
+      "renewal",
+    ],
+  },
+  {
     id: "legible-rules-bounded-confidentiality",
     sourceIdeologyNodeId: "legible-rules-bounded-confidentiality",
     label: "Legible Rules, Bounded Confidentiality",

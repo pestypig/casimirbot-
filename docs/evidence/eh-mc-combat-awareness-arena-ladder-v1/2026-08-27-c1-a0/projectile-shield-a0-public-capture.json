@@ -1,0 +1,128 @@
+{
+  "scenario_id": "eh-mc-c1-projectile-shield-a0-v1",
+  "lane": "direct_codex",
+  "action_kind": "combat_guard",
+  "prompt": "Defend against the incoming projectile, close with the bow skeleton, and clear the admitted hostile.",
+  "starting_state": {
+    "fixture_kind": "bounded_player_action",
+    "required_preconditions": [
+      "connected",
+      "on_ground"
+    ]
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.combat.guard",
+    "capability_version": 1,
+    "control_engine": "native_fabric",
+    "manual_override_required": true,
+    "postcondition_verification_required": true
+  },
+  "source_artifact_refs": [
+    "minecraft_client_log_sha256:e3caee6b38e874e60554dc34f77f2a3c770009e089c09bd252d6aa2852ac9081",
+    "direct_diagnostic_workflow:direct_player_action_workflow:d661caa5-bbfa-4e56-9402-f85078220ea6"
+  ],
+  "selected_capability_id": "com.casimirbot.minecraft.player.combat.guard",
+  "normalized_arguments": {
+    "approach_policy": "local_reroute_bounded",
+    "cover_policy": "lateral_bounded",
+    "friendly_fire": false,
+    "hostile_entity_type_ids": [
+      "minecraft:skeleton"
+    ],
+    "max_acquisition_distance": 24,
+    "max_approach_ticks": 500,
+    "max_attack_pulses": 48,
+    "max_cover_ticks": 160,
+    "max_duration_ms": 45000,
+    "max_evasion_ticks": 240,
+    "max_shield_hold_ticks": 240,
+    "max_target_switches": 4,
+    "minimum_attack_cooldown": 0.9,
+    "projectile_evasion_horizon_ticks": 8,
+    "projectile_response": "shield_or_sidestep",
+    "require_line_of_sight": true,
+    "retreat_start_distance": 2.5,
+    "retreat_stop_distance": 4,
+    "retreat_when_hostile_count_at_least": 2,
+    "shield_hand": "off_hand",
+    "stop_below_health": 12,
+    "target_commit_ticks": 10
+  },
+  "admission_status": "not_applicable",
+  "execution_outcome": "succeeded",
+  "normalized_progress": [
+    {
+      "sequence": 0,
+      "event_type": "workflow.started",
+      "workflow_state": "running",
+      "progress_fraction": 0,
+      "measurements": {},
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 1,
+      "event_type": "workflow.succeeded",
+      "workflow_state": "succeeded",
+      "progress_fraction": 1,
+      "measurements": {
+        "approach_policy": "local_reroute_bounded",
+        "approach_reroute_ticks": 0,
+        "approach_ticks": 98,
+        "approaching": false,
+        "artifact_version": "1.2.3",
+        "attack_pulses": 4,
+        "closest_collision_tick": -1,
+        "cover_policy": "lateral_bounded",
+        "cover_ticks": 0,
+        "covering": false,
+        "desired_world_direction_x": 0,
+        "desired_world_direction_z": 0,
+        "eligible_hostile_count": 0,
+        "evading": false,
+        "evasion_ticks": 0,
+        "friendly_fire": false,
+        "inventory_mutations_performed": 0,
+        "movement_denial_reason": "none",
+        "movement_input": "released",
+        "movement_target_frame": "selected_hostile_position",
+        "peak_hostile_count": 1,
+        "peak_projectile_threat_count": 1,
+        "player_health": 20,
+        "profile_id": "resident.minecraft.hostile-combat.v1",
+        "projectile_response": "shield_or_sidestep",
+        "projectile_threat_count": 0,
+        "reason_code": "hostiles_cleared",
+        "retreat_ticks": 0,
+        "retreating": false,
+        "selected_target_ref": "target:975a8c63067ef17510a29c6d2bd79b517aa03bdd",
+        "shield_active": false,
+        "shield_hand": "off_hand",
+        "shield_ticks": 132,
+        "target_classification": "hostile",
+        "target_switches": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": true
+    }
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "direct_diagnostic_observation:direct_player_action_workflow:d661caa5-bbfa-4e56-9402-f85078220ea6:10"
+  ],
+  "observation_reentered": false,
+  "final_candidate_text": null,
+  "final_candidate_support_refs": [],
+  "route_product_text": null,
+  "route_product_support_refs": [],
+  "terminal_outcome": "success",
+  "terminal_authority_status": "not_applicable",
+  "terminal_writer_text": null,
+  "terminal_writer_support_refs": [],
+  "visible_text": null,
+  "voice_projection_status": "not_applicable",
+  "voice_text": null,
+  "created_at": "2026-08-27T04:55:46.513014400Z",
+  "hidden_reasoning_included": false
+}

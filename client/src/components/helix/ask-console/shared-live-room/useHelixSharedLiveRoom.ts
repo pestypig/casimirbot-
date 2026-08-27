@@ -17,9 +17,13 @@ import {
 } from "./SharedLiveRoomDebugArtifact";
 import { readHelixSharedLiveRoomSelfParticipant } from "./SharedLiveRoomViewModel";
 import {
-  sortHelixSharedLiveRooms,
   useSharedLiveRoomSync,
 } from "./useSharedLiveRoomSync";
+import {
+  reconcileSharedLiveRoomCollection,
+  reconcileSharedLiveRoomSelection,
+  selectInitialSharedLiveRoom,
+} from "./SharedLiveRoomSelection";
 import {
   useSharedLiveRoomVisualIngress,
   type HelixSharedLiveRoomFrameUploadState,
@@ -104,11 +108,8 @@ export function useHelixSharedLiveRoom(
   const [error, setError] = useState<string | null>(null);
 
   const applyRoom = useCallback((nextRoom: HelixSharedRealtimeRoom): void => {
-    setRoom(nextRoom);
-    setRooms((current) => sortHelixSharedLiveRooms([
-      nextRoom,
-      ...current.filter((candidate) => candidate.room_id !== nextRoom.room_id),
-    ]));
+    setRoom((current) => reconcileSharedLiveRoomSelection(current, nextRoom));
+    setRooms((current) => reconcileSharedLiveRoomCollection(current, nextRoom));
   }, []);
 
   const runRoomAction = useCallback(async <T,>(
@@ -129,8 +130,7 @@ export function useHelixSharedLiveRoom(
 
   const handleInitialRooms = useCallback((availableRooms: HelixSharedRealtimeRoom[]): void => {
     setRooms(availableRooms);
-    const resumable = availableRooms.find((candidate) => candidate.status !== "closed") ?? null;
-    setRoom((current) => current ?? resumable);
+    setRoom((current) => selectInitialSharedLiveRoom(current, availableRooms));
   }, []);
   const handleSyncError = useCallback((syncError: unknown): void => {
     setError(safeErrorMessage(syncError));

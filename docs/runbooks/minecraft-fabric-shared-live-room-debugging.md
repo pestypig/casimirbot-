@@ -79,8 +79,29 @@ test to a Minecraft client on the same workstation.
 
 ## 1. Start or verify keyed CasimirBot
 
-If the keyed server is already healthy on port 1522, leave it running. When it
-must be started by Codex, the only approved invocation is:
+Before invoking the launcher, classify the fixed local endpoint without
+inspecting its process command line, environment, or credentials:
+
+```powershell
+npx tsx scripts/helix-local-supervisor-preflight.ts `
+  http://127.0.0.1:1522 `
+  'C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot'
+```
+
+The result has exactly three dispositions:
+
+- `attach`: the listener presented a ready receipt for this exact workspace;
+  leave it running and authenticate each client normally;
+- `start`: no listener responded, so one authorized caller may invoke the
+  opaque launcher; or
+- `fail_closed`: a listener exists but is unknown, stale, unready, or belongs
+  to another workspace. Do not inspect, terminate, or replace it.
+
+The status receipt is compatibility evidence only. It does not authenticate a
+profile, join a room, grant a capability, or authorize an environment action.
+
+If the keyed server is already healthy and the preflight says `attach`, leave
+it running. When it must be started by Codex, the only approved invocation is:
 
 ```powershell
 & 'C:\Users\dan\.local\bin\start-myapp-for-codex.cmd' `
@@ -91,6 +112,26 @@ Wait for `[express] app ready`, then verify the account session, Helix
 pipeline, and provider endpoints without printing credentials. Do not replace
 this keyed process with an ordinary unkeyed development server for GPT Live or
 provider-backed testing.
+
+Each concurrent agent must then use a distinct Helix chat or independently
+authenticated client surface. `New chat` creates a unique conversation context
+without copying credentials. Do not let two agents submit through the same
+default chat merely because they share one signed-in profile. Read-only calls
+may overlap when separately admitted; Minecraft mutations remain serialized by
+the exact environment execution lease.
+
+When the supervised Fabric server uses one direct child profile below
+`minecraft/helix-fabric-sensor/run` rather than the canonical run root, select
+that profile before starting keyed CasimirBot so private local sensor pairing
+lands in the same server that owns the test world. For the disposable C0 arena:
+
+```powershell
+$env:HELIX_MINECRAFT_SERVER_RUN_DIR = 'minecraft\helix-fabric-sensor\run\combat-c0-server'
+```
+
+The handoff resolves this value against the canonical workspace and rejects an
+outside path or a profile nested more than one level below the fixed run root.
+It does not broaden command authority or expose the one-time pairing code.
 
 ## 2. Start the dedicated Fabric server
 

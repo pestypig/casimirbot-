@@ -1,5 +1,5 @@
 import { Router } from "express";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -364,6 +364,16 @@ import {
 } from "../services/helix-ask/runtime/agent-continuation-state";
 import { summarizeHelixTerminalRejectionObservationForDebugExport } from "../services/helix-ask/runtime/terminal-rejection-debug-export";
 import { authoritativeTypedFailureRequiresNoContinuation } from "../services/helix-ask/runtime/typed-failure-lifecycle-reconciliation";
+import { attachHelixAskRuntimeTransparency } from "../services/helix-ask/runtime/runtime-path-identity";
+import {
+  claimHelixAskTurnTransportExecution,
+  readHelixAskTurnTransportReplay,
+  rememberHelixAskTurnTransportReplay,
+} from "../services/helix-ask/runtime/ask-turn-transport-replay";
+import {
+  readHelixAskPublicLifecycle,
+  rememberHelixAskPublicLifecycle,
+} from "../services/helix-ask/runtime/public-lifecycle-store";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
   appendHelixRuntimeGoalSatisfactionObservation,
@@ -94953,6 +94963,8 @@ type HelixDebugExportEnvelope = {
   debug_evidence_requirement_suppressed?: unknown;
   debug_evidence_requirement_suppression_reason?: unknown;
   agent_runtime?: unknown;
+  runtime_path_identity?: unknown;
+  public_lifecycle_projection?: unknown;
   agent_runtime_adapter_contract?: unknown;
   agent_runtime_selection_trace?: unknown;
   selected_agent_provider?: unknown;
@@ -96303,6 +96315,10 @@ export const boundHelixDebugExportEnvelopeForUi = <T extends Record<string, unkn
     "runtime_intent_packet",
     "runtime_authority_audit",
     "agent_runtime_loop",
+    "runtime_path_identity",
+    "public_lifecycle_projection",
+    "ask_api_transport",
+    "transport_replay",
     "observation_review",
     "calculator_plan_coverage",
     "provider_prompt_leak_guard",
@@ -96331,6 +96347,10 @@ export const boundHelixDebugExportEnvelopeForUi = <T extends Record<string, unkn
       envelope.language_model_debug_summary ?? compactDebugSource?.language_model_debug_summary ?? null,
     model_policy_debug_summary:
       envelope.model_policy_debug_summary ?? compactDebugSource?.model_policy_debug_summary ?? null,
+    runtime_path_identity:
+      envelope.runtime_path_identity ?? compactDebugSource?.runtime_path_identity ?? null,
+    public_lifecycle_projection:
+      envelope.public_lifecycle_projection ?? compactDebugSource?.public_lifecycle_projection ?? null,
   };
   const originalLedger = Array.isArray(envelope.current_turn_artifact_ledger)
     ? envelope.current_turn_artifact_ledger
@@ -96416,6 +96436,10 @@ export const boundHelixDebugExportEnvelopeForUi = <T extends Record<string, unkn
     "runtime_intent_packet",
     "runtime_authority_audit",
     "agent_runtime_loop",
+    "runtime_path_identity",
+    "public_lifecycle_projection",
+    "ask_api_transport",
+    "transport_replay",
     "observation_review",
     "calculator_plan_coverage",
     "provider_prompt_leak_guard",
@@ -96474,6 +96498,10 @@ export const boundHelixDebugExportEnvelopeForUi = <T extends Record<string, unkn
     terminal_error_code: sourceForMinimal.terminal_error_code ?? debug?.terminal_error_code ?? null,
     provider_prompt_leak_guard:
       sourceForMinimal.provider_prompt_leak_guard ?? debug?.provider_prompt_leak_guard ?? null,
+    runtime_path_identity:
+      sourceForMinimal.runtime_path_identity ?? debug?.runtime_path_identity ?? null,
+    public_lifecycle_projection:
+      sourceForMinimal.public_lifecycle_projection ?? debug?.public_lifecycle_projection ?? null,
     rail_fields_projected_at_top_level: true,
   };
   copyHelixRailCriticalDebugExportFields(minimal, sourceForMinimal, debug);
@@ -99493,6 +99521,7 @@ const buildHelixDebugExportEnvelope = (args: {
   sessionId: string | null;
 }): HelixDebugExportEnvelope | null => {
   const payload = args.payload;
+  attachHelixAskRuntimeTransparency(payload);
   const activeTurnId = readDebugExportString(payload.turn_id) ?? readDebugExportString(payload.turnId);
   if (!activeTurnId) return null;
   const authoritativeTerminalEnvelope = asDebugExportRecord(payload.terminal_answer_envelope);
@@ -101297,6 +101326,8 @@ const buildHelixDebugExportEnvelope = (args: {
         ? payload.turn_transcript_events
         : [],
     public_commentary_timeline: payload.public_commentary_timeline,
+    runtime_path_identity: payload.runtime_path_identity,
+    public_lifecycle_projection: payload.public_lifecycle_projection,
     turn_transcript_source: payload.turn_transcript_source,
     turn_transcript_live_event_count: payload.turn_transcript_live_event_count,
     turn_transcript_reconstructed_fallback_count: payload.turn_transcript_reconstructed_fallback_count,
@@ -101913,6 +101944,8 @@ const prepareHelixAskLiveResponsePayload = (
     payload: record,
     eventSource: "reconstructed",
   });
+  attachHelixAskRuntimeTransparency(record);
+  rememberHelixAskPublicLifecycle(record);
   if (options?.mode === "deep") return record;
   if (!record.debug || typeof record.debug !== "object") return record;
   const slimDebug = buildHelixAskLiveDebugSlim(record);
@@ -166693,6 +166726,55 @@ const handleAskTurnRequest = async (
   });
 };
 
+planRouter.get("/ask/turn/:turnId/lifecycle", (req, res) => {
+  const turnId = typeof req.params.turnId === "string" ? req.params.turnId.trim() : "";
+  if (!turnId) {
+    return res.status(400).json({
+      ok: false,
+      error: "public_lifecycle_bad_request",
+      terminal_error_code: "public_lifecycle_turn_id_missing",
+    });
+  }
+  const entry = readHelixAskPublicLifecycle(turnId);
+  const requestedSessionId =
+    typeof req.query.sessionId === "string" && req.query.sessionId.trim()
+      ? req.query.sessionId.trim()
+      : typeof req.query.session_id === "string" && req.query.session_id.trim()
+        ? req.query.session_id.trim()
+        : null;
+  if (!entry || (requestedSessionId && entry.session_id && requestedSessionId !== entry.session_id)) {
+    return res.status(404).json({
+      ok: false,
+      error: "public_lifecycle_not_found",
+      terminal_error_code: "public_lifecycle_not_found",
+      turn_id: turnId,
+    });
+  }
+  const offsetRaw = typeof req.query.offset === "string" ? Number(req.query.offset) : 0;
+  const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
+  const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.floor(offsetRaw)) : 0;
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.floor(limitRaw))) : 100;
+  const events = entry.events.slice(offset, offset + limit);
+  const nextOffset = offset + events.length;
+  return res.json({
+    ok: true,
+    schema: "helix.ask.public_lifecycle_page.v1",
+    turn_id: turnId,
+    source: entry.source,
+    event_count: entry.events.length,
+    offset,
+    limit,
+    returned_count: events.length,
+    has_more: nextOffset < entry.events.length,
+    next_offset: nextOffset < entry.events.length ? nextOffset : null,
+    events,
+    recorded_at_ms: entry.recorded_at_ms,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  });
+});
+
 planRouter.get("/ask/turn/:turnId/debug-export", (req, res) => {
   const turnId = typeof req.params.turnId === "string" ? req.params.turnId.trim() : "";
   if (!turnId) {
@@ -170543,6 +170625,80 @@ const enforceHelixSharedRoomAskSessionAccess = async (args: {
   return null;
 };
 
+const installHelixAskJsonTransparencyBoundary = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
+  const transport =
+    req.method === "POST" && req.path === "/ask/turn"
+      ? "ask_turn_json"
+      : req.method === "POST" && req.path === "/ask"
+        ? "legacy_ask_json"
+        : null;
+  if (!transport) {
+    next();
+    return;
+  }
+  const originalJson = res.json.bind(res);
+  res.json = ((body: unknown) => {
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const payload = body as Record<string, unknown>;
+      payload.ask_api_transport = transport;
+      ensureHelixAskTurnTranscriptScaffold({
+        payload,
+        eventSource: "reconstructed",
+      });
+      attachHelixAskRuntimeTransparency(payload);
+      const requestBody =
+        req.body && typeof req.body === "object" && !Array.isArray(req.body)
+          ? req.body as Record<string, unknown>
+          : {};
+      rememberHelixAskPublicLifecycle(payload, {
+        sessionId: readHelixAskRuntimeSessionId(requestBody),
+      });
+    }
+    return originalJson(body);
+  }) as Response["json"];
+  next();
+};
+
+planRouter.use(installHelixAskJsonTransparencyBoundary);
+
+const buildHelixAskTransportExecutionGuardPayload = (args: {
+  turnId: string;
+  status: "already_in_flight" | "identity_mismatch";
+  startedAtMs: number | null;
+}): Record<string, unknown> => ({
+  ok: false,
+  turn_id: args.turnId,
+  response_type: "transport_execution_guard",
+  final_status: args.status === "already_in_flight" ? "pending_input" : "final_failure",
+  error:
+    args.status === "already_in_flight"
+      ? "turn_execution_already_in_flight"
+      : "turn_transport_identity_mismatch",
+  terminal_error_code:
+    args.status === "already_in_flight"
+      ? "turn_execution_already_in_flight"
+      : "turn_transport_identity_mismatch",
+  transport_execution_guard: {
+    schema: "helix.ask.transport_execution_guard.v1",
+    status: args.status,
+    turn_id: args.turnId,
+    original_execution_started_at_ms: args.startedAtMs,
+    execution_started_by_this_request: false,
+    duplicate_execution_count: 0,
+    retryable: args.status === "already_in_flight",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  },
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 planRouter.post("/ask/turn", async (req, res) => {
   maybeRecordAskTurnSteering(req);
   const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
@@ -170570,6 +170726,40 @@ planRouter.post("/ask/turn", async (req, res) => {
     return res
       .status(sharedRoomAskGuard.statusCode)
       .json(sharedRoomAskGuard.payload);
+  }
+  const completedTransportReplay = readHelixAskTurnTransportReplay({
+    turnId: admissionTurnId,
+    sessionId: readHelixAskRuntimeSessionId(body),
+    prompt: readHelixAskRuntimePrompt(body),
+  });
+  if (completedTransportReplay) {
+    const replayPayload = completedTransportReplay.payload;
+    const runtimeIdentity = replayPayload.runtime_path_identity;
+    replayPayload.transport_replay = {
+      schema: "helix.ask.turn_transport_replay.v1",
+      turn_id: admissionTurnId,
+      source_transport: completedTransportReplay.source_transport,
+      replay_transport: "ask_turn_json",
+      execution_reused: true,
+      duplicate_execution_count: 0,
+      runtime_identity_hash:
+        runtimeIdentity && typeof runtimeIdentity === "object" && !Array.isArray(runtimeIdentity)
+          ? (runtimeIdentity as Record<string, unknown>).identity_hash ?? null
+          : null,
+      recorded_at_ms: completedTransportReplay.recorded_at_ms,
+      request_fingerprint: completedTransportReplay.request_fingerprint,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    if (replayPayload.debug && typeof replayPayload.debug === "object" && !Array.isArray(replayPayload.debug)) {
+      (replayPayload.debug as Record<string, unknown>).transport_replay = replayPayload.transport_replay;
+    }
+    return res.status(200).json(
+      prepareHelixAskLiveResponsePayload(replayPayload, {
+        mode: readHelixAskLiveDebugMode(body),
+      }),
+    );
   }
   const askTurnBoundaryPrompt = readHelixAskRuntimePrompt(body);
   const retainedScientificImageComparisonAtBoundary =
@@ -170644,6 +170834,25 @@ planRouter.post("/ask/turn", async (req, res) => {
           mode: readHelixAskLiveDebugMode(body),
         }),
       );
+    }
+    const transportExecutionClaim = claimHelixAskTurnTransportExecution({
+      turnId: admissionTurnId,
+      sessionId: readHelixAskRuntimeSessionId(body),
+      prompt: readHelixAskRuntimePrompt(body),
+    });
+    if (
+      transportExecutionClaim.status === "already_in_flight" ||
+      transportExecutionClaim.status === "identity_mismatch"
+    ) {
+      runtimeReleaseOutcome = "aborted";
+      const payload = buildHelixAskTransportExecutionGuardPayload({
+        turnId: admissionTurnId,
+        status: transportExecutionClaim.status,
+        startedAtMs: transportExecutionClaim.started_at_ms,
+      });
+      return res
+        .status(transportExecutionClaim.status === "already_in_flight" ? 202 : 409)
+        .json(payload);
     }
     const runtimeGoalCommand = await routeHelixRuntimeGoalCommand({
       body,
@@ -171791,6 +172000,23 @@ const recordHelixAskRuntimeCompletionCheckpoint = (args: {
     readAskTurnString(payload.trace_id) ??
     args.traceId ??
     readHelixAskRuntimeTurnTraceId(args.body);
+  if (Object.keys(payload).length > 0) {
+    payload.ask_api_transport =
+      args.route === "/ask/turn/stream"
+        ? "ask_turn_sse"
+        : args.route === "/ask"
+          ? "legacy_ask_json"
+          : "ask_turn_json";
+    attachHelixAskRuntimeTransparency(payload);
+    rememberHelixAskPublicLifecycle(payload, { sessionId });
+    rememberHelixAskTurnTransportReplay({
+      turnId,
+      sessionId,
+      prompt: readHelixAskRuntimePrompt(args.body),
+      sourceTransport: args.route === "/ask/turn/stream" ? "ask_turn_sse" : "ask_turn_json",
+      payload,
+    });
+  }
   recordHelixAskTurnCheckpoint({
     thread_id: threadId,
     turn_id: turnId,
@@ -172149,6 +172375,16 @@ const createAskTurnCaptureResponse = (): Response & { captured: CapturedAskTurnR
 };
 
 const writeAskTurnSse = (res: Response, event: string, data: unknown): void => {
+  if (event === "turn_final" && data && typeof data === "object" && !Array.isArray(data)) {
+    const payload = data as Record<string, unknown>;
+    payload.ask_api_transport = "ask_turn_sse";
+    ensureHelixAskTurnTranscriptScaffold({
+      payload,
+      eventSource: "reconstructed",
+    });
+    attachHelixAskRuntimeTransparency(payload);
+    rememberHelixAskPublicLifecycle(payload);
+  }
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 };
@@ -172505,6 +172741,24 @@ planRouter.post("/ask/turn/stream", async (req, res) => {
         traceId: streamTraceId,
       });
       writeAskTurnSse(res, "turn_admission", payload);
+      writeAskTurnSse(res, "turn_final", payload);
+      return;
+    }
+    const transportExecutionClaim = claimHelixAskTurnTransportExecution({
+      turnId: streamTurnId,
+      sessionId: readHelixAskRuntimeSessionId(req.body as Record<string, unknown>),
+      prompt: question,
+    });
+    if (
+      transportExecutionClaim.status === "already_in_flight" ||
+      transportExecutionClaim.status === "identity_mismatch"
+    ) {
+      runtimeReleaseOutcome = "aborted";
+      const payload = buildHelixAskTransportExecutionGuardPayload({
+        turnId: streamTurnId,
+        status: transportExecutionClaim.status,
+        startedAtMs: transportExecutionClaim.started_at_ms,
+      });
       writeAskTurnSse(res, "turn_final", payload);
       return;
     }

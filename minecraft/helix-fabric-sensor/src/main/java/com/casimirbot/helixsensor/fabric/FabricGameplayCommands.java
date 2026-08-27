@@ -1,10 +1,12 @@
 package com.casimirbot.helixsensor.fabric;
 
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -263,12 +265,96 @@ final class FabricGameplayCommands {
                                     })
                                 )
                         )
+                        .then(
+                            Commands.literal("combat_watchdog")
+                                .then(
+                                    Commands.literal("arm")
+                                        .then(
+                                            Commands.argument("player", EntityArgument.player())
+                                                .then(
+                                                    Commands.argument("mob_tag", StringArgumentType.word())
+                                                        .then(
+                                                            Commands.argument(
+                                                                "health_floor",
+                                                                DoubleArgumentType.doubleArg(1, 20)
+                                                            ).then(
+                                                                Commands.argument(
+                                                                    "horizontal_radius",
+                                                                    IntegerArgumentType.integer(
+                                                                        FabricCombatArenaWatchdog.MIN_RADIUS,
+                                                                        FabricCombatArenaWatchdog.MAX_RADIUS
+                                                                    )
+                                                                ).then(
+                                                                    Commands.argument(
+                                                                        "seconds",
+                                                                        IntegerArgumentType.integer(
+                                                                            FabricCombatArenaWatchdog.MIN_SECONDS,
+                                                                            FabricCombatArenaWatchdog.MAX_SECONDS
+                                                                        )
+                                                                    ).executes(context -> {
+                                                                        FabricCombatArenaWatchdog.Operation operation =
+                                                                            FabricCombatArenaWatchdog.arm(
+                                                                                EntityArgument.getPlayer(context, "player"),
+                                                                                StringArgumentType.getString(context, "mob_tag"),
+                                                                                DoubleArgumentType.getDouble(context, "health_floor"),
+                                                                                IntegerArgumentType.getInteger(context, "horizontal_radius"),
+                                                                                IntegerArgumentType.getInteger(context, "seconds")
+                                                                            );
+                                                                        return emit(
+                                                                            context.getSource(),
+                                                                            operation.ok(),
+                                                                            operation.message()
+                                                                        );
+                                                                    })
+                                                                )
+                                                            )
+                                                        )
+                                                )
+                                        )
+                                )
+                                .then(
+                                    Commands.literal("disarm")
+                                        .then(
+                                            Commands.argument("player", EntityArgument.player())
+                                                .executes(context -> {
+                                                    FabricCombatArenaWatchdog.Operation operation =
+                                                        FabricCombatArenaWatchdog.disarm(
+                                                            context.getSource().getServer(),
+                                                            EntityArgument.getPlayer(context, "player")
+                                                        );
+                                                    return emit(
+                                                        context.getSource(),
+                                                        operation.ok(),
+                                                        operation.message()
+                                                    );
+                                                })
+                                        )
+                                )
+                                .then(
+                                    Commands.literal("status")
+                                        .then(
+                                            Commands.argument("player", EntityArgument.player())
+                                                .executes(context -> {
+                                                    FabricCombatArenaWatchdog.Operation operation =
+                                                        FabricCombatArenaWatchdog.status(
+                                                            EntityArgument.getPlayer(context, "player")
+                                                        );
+                                                    return emit(
+                                                        context.getSource(),
+                                                        operation.ok(),
+                                                        operation.message()
+                                                    );
+                                                })
+                                        )
+                                )
+                        )
                 )
         );
     }
 
     static void tick(MinecraftServer server) {
         FabricFallRescueController.tick(server);
+        FabricCombatArenaWatchdog.tick(server);
         for (ServerLevel level : server.getAllLevels()) {
             FabricRegionCheckpointStore.tick(level);
         }
@@ -276,6 +362,7 @@ final class FabricGameplayCommands {
 
     static void clear(MinecraftServer server) {
         FabricFallRescueController.clear(server);
+        FabricCombatArenaWatchdog.clear(server);
         FabricRegionCheckpointStore.clear();
     }
 

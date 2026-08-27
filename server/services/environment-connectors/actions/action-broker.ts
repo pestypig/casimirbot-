@@ -1870,6 +1870,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
     "track_target",
     "walk",
     "jump",
+    "combat_guard",
     "follow",
     "collect",
     "mine",
@@ -1880,6 +1881,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
   const interactionKinds = new Set([
     "interact",
     "attack",
+    "combat_guard",
     "mine",
     "place",
     "craft",
@@ -2245,6 +2247,93 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
         wholeNonnegative(transitions) &&
         transitions >= 1 &&
         finiteMeasurement(measurements, "rejected_attack_pulses") === 0
+      );
+    }
+    case "combat_guard": {
+      const pulses = finiteMeasurement(measurements, "attack_pulses");
+      const maxPulses = finiteArgument(args, "max_attack_pulses");
+      const targetSwitches = finiteMeasurement(
+        measurements,
+        "target_switches",
+      );
+      const maxTargetSwitches = finiteArgument(args, "max_target_switches");
+      const peakHostileCount = finiteMeasurement(
+        measurements,
+        "peak_hostile_count",
+      );
+      const eligibleHostileCount = finiteMeasurement(
+        measurements,
+        "eligible_hostile_count",
+      );
+      const playerHealth = finiteMeasurement(measurements, "player_health");
+      const stopBelowHealth = finiteArgument(args, "stop_below_health");
+      const durationTicks = result.duration_ticks ?? null;
+      const maxDurationMs = finiteArgument(args, "max_duration_ms");
+      const boundedTickMeasurement = (
+        measurementKey: string,
+        argumentKey: string,
+      ): boolean => {
+        const measured = finiteMeasurement(measurements, measurementKey);
+        const admitted = finiteArgument(args, argumentKey);
+        return (
+          measured === null ||
+          (wholeNonnegative(measured) &&
+            (admitted === null || measured <= admitted))
+        );
+      };
+      const selectedTargetRef = measurements.selected_target_ref;
+      return (
+        measurements.reason_code === "hostiles_cleared" &&
+        measurements.target_classification === "hostile" &&
+        measurements.friendly_fire === false &&
+        typeof selectedTargetRef === "string" &&
+        /^target:[a-f0-9]{32,64}$/.test(selectedTargetRef) &&
+        wholeNonnegative(pulses) &&
+        pulses >= 1 &&
+        maxPulses !== null &&
+        pulses <= maxPulses &&
+        wholeNonnegative(targetSwitches) &&
+        maxTargetSwitches !== null &&
+        targetSwitches <= maxTargetSwitches &&
+        wholeNonnegative(peakHostileCount) &&
+        peakHostileCount >= 1 &&
+        eligibleHostileCount === 0 &&
+        playerHealth !== null &&
+        stopBelowHealth !== null &&
+        playerHealth >= stopBelowHealth &&
+        wholeNonnegative(durationTicks) &&
+        maxDurationMs !== null &&
+        durationTicks <= Math.ceil(maxDurationMs / 50) &&
+        finiteMeasurement(measurements, "world_mutations_performed") === 0 &&
+        finiteMeasurement(measurements, "inventory_mutations_performed") === 0 &&
+        stringMeasurementMatches(
+          measurements,
+          "approach_policy",
+          args,
+          "approach_policy",
+        ) &&
+        stringMeasurementMatches(
+          measurements,
+          "cover_policy",
+          args,
+          "cover_policy",
+        ) &&
+        stringMeasurementMatches(
+          measurements,
+          "projectile_response",
+          args,
+          "projectile_response",
+        ) &&
+        stringMeasurementMatches(
+          measurements,
+          "shield_hand",
+          args,
+          "shield_hand",
+        ) &&
+        boundedTickMeasurement("approach_ticks", "max_approach_ticks") &&
+        boundedTickMeasurement("cover_ticks", "max_cover_ticks") &&
+        boundedTickMeasurement("evasion_ticks", "max_evasion_ticks") &&
+        boundedTickMeasurement("shield_ticks", "max_shield_hold_ticks")
       );
     }
     case "hotbar_select":
@@ -3071,6 +3160,31 @@ export const enqueueEnvironmentAction = async (input: {
   }
   const requestHash = hashEnvironmentActionIdempotencyContent(request);
   return withSharedRealtimeRoomTransaction(async (tx) => {
+    const physicalIdentityDuplicate = await tx.query<ActionRequestRow>(
+      `SELECT * FROM helix_environment_action_requests
+       WHERE run_id = $1 AND turn_id = $2 AND tool_call_id = $3
+       LIMIT 1;`,
+      [request.run_id, request.turn_id, request.tool_call_id],
+    );
+    if (physicalIdentityDuplicate.rows[0]) {
+      const existing = physicalIdentityDuplicate.rows[0];
+      if (
+        existing.action_authority_id === request.action_authority_id &&
+        existing.idempotency_key === request.idempotency_key &&
+        storedEnvironmentActionMatchesIdempotencyContent({
+          storedPayload: existing.request_payload,
+          storedRequestHash: existing.request_hash,
+          request,
+        })
+      ) {
+        return requestProjection(existing);
+      }
+      throw new EnvironmentActionBrokerError(
+        "action_request_conflict",
+        409,
+        "This physical action identity already belongs to another admitted workflow. Observe fresh state and compose a new bounded action; the prior workflow will not be replayed.",
+      );
+    }
     const duplicate = await tx.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
        WHERE action_authority_id = $1 AND idempotency_key = $2 LIMIT 1;`,

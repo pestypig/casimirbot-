@@ -23,6 +23,10 @@ import type { HelixAgentApiService } from "../../services/helix-agent-api/servic
 import type { HelixAgentApiPrincipal } from "../../services/helix-agent-api/types";
 import type { SharedLiveRoomBindingStore } from "../../services/shared-live-room-control/binding-store";
 import type { SharedLiveRoomControlService } from "../../services/shared-live-room-control/service";
+import { EnvironmentActionAuthorityError } from
+  "../../services/environment-connectors/actions/authority-store";
+import { ConnectorBootstrapPairingError } from
+  "../../services/environment-connectors/pairing/bootstrap-service";
 
 const ROOM_ID = "shared_realtime_room:g6-mcp";
 const PARTICIPANT_ID = "participant:g6-mcp";
@@ -93,7 +97,10 @@ const projection = {
   terminal_eligible: false,
 } as HelixEnvironmentReasoningRoleProjection;
 
-const connect = async () => {
+const connect = async (input?: {
+  authorityError?: EnvironmentActionAuthorityError;
+  playerPairingError?: ConnectorBootstrapPairingError;
+}) => {
   const roleStore = {
     recordOutput: vi.fn(async () => projection),
     inspect: vi.fn(async () => projection),
@@ -108,7 +115,9 @@ const connect = async () => {
     authorities: [],
     connectorReadiness: [],
   }));
-  const authorityConfigurator = vi.fn(async () => ({
+  const authorityConfigurator = vi.fn(async () => {
+    if (input?.authorityError) throw input.authorityError;
+    return {
     schema: "helix.environment_action.authority.v1" as const,
     action_authority_id: "environment_action_authority:g6-mcp",
     environment_binding_id: "environment_binding:g6-mcp",
@@ -134,15 +143,19 @@ const connect = async () => {
     assistant_answer: false as const,
     terminal_eligible: false as const,
     raw_content_included: false as const,
-  }));
-  const playerPairLocalHandoff = vi.fn(async () => ({
-    pairing: {
-      schema: "helix.connector_pairing.v1",
-      pairing_id: "connector_pairing:g6-mcp",
-      status: "pending",
-    },
-    status: "player_pairing_inbox_staged" as const,
-  }));
+    };
+  });
+  const playerPairLocalHandoff = vi.fn(async () => {
+    if (input?.playerPairingError) throw input.playerPairingError;
+    return {
+      pairing: {
+        schema: "helix.connector_pairing.v1",
+        pairing_id: "connector_pairing:g6-mcp",
+        status: "pending",
+      },
+      status: "player_pairing_inbox_staged" as const,
+    };
+  });
   const serverPairLocalHandoff = vi.fn(async () => ({
     pairing: {
       schema: "helix.connector_pairing.v1",
@@ -195,6 +208,84 @@ const connect = async () => {
 };
 
 describe("Helix MCP G6 environment reasoning roles", () => {
+  it("returns the owner-only action-authority boundary as a typed MCP error", async () => {
+    const connection = await connect({
+      authorityError: new EnvironmentActionAuthorityError(
+        "action_authority_forbidden",
+        404,
+        "Player-action settings are unavailable to this account.",
+      ),
+    });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_environment_action_authority_configure",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: "environment_binding:g6-mcp",
+          settings: {
+            participant_id: PARTICIPANT_ID,
+            domain_adapter: "minecraft.fabric_client.v1",
+            allowed_capability_ids: [
+              "com.casimirbot.minecraft.player.look",
+            ],
+            autonomy_mode: "approved_capabilities",
+            manual_override_policy: "cancel",
+            expires_at: "2026-08-23T13:00:00.000Z",
+          },
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        schema: "helix.environment_action_authority_error.v1",
+        error: "action_authority_forbidden",
+        retryable: false,
+        credential_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(JSON.stringify(result)).not.toContain("internal_error");
+    } finally {
+      await connection.close();
+    }
+  });
+
+  it("returns connector pairing failures as credential-free typed MCP errors", async () => {
+    const connection = await connect({
+      playerPairingError: new ConnectorBootstrapPairingError(
+        "connector_pairing_unavailable",
+        409,
+        "The selected Minecraft player authority is not active for this room environment.",
+      ),
+    });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_environment_player_pair_local",
+        arguments: {
+          room_id: ROOM_ID,
+          binding_id: "room_source_binding:g6-mcp",
+          action_authority_id: "environment_action_authority:g6-mcp",
+          credential_ttl_ms: 3_600_000,
+          idempotency_key: "g6-mcp-local-pairing-error",
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        schema: "helix.environment_connector_pairing_error.v1",
+        error: "connector_pairing_unavailable",
+        retryable: false,
+        credential_included: false,
+        pairing_code_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(JSON.stringify(result)).not.toContain("internal_error");
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("rejects a prospective action alias before it enters the canonical ledger", async () => {
     const connection = await connect();
     try {

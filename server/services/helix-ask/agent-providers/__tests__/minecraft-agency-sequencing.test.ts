@@ -6,6 +6,7 @@ import {
   evaluateMinecraftAgencySequence,
   isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
   minecraftPlayerEmbodimentActionPromptMatch,
+  requiredMinecraftPlayerCombatCapabilityIds,
   requiredMinecraftResidentRecoveryCapabilityIds,
   resolveMinecraftExecutionPlaneConstraint,
   requiresCurrentTurnCheckpointBeforeMinecraftMutation,
@@ -165,6 +166,33 @@ describe("Minecraft agency sequencing", () => {
     expect(
       requiredMinecraftResidentRecoveryCapabilityIds(prompt, context),
     ).toEqual(["com.casimirbot.minecraft.player.guardian.execute"]);
+  });
+
+  it("requires exact combat evidence for an affirmative tracked-zombie attack", () => {
+    const prompt =
+      "Use DatDamPig Player Embodiment to track the exact hostile zombie, then use cooldown-aware combat attack actions against only that zombie until it is defeated. Do not attack a friendly or neutral entity.";
+
+    expect(requiredMinecraftPlayerCombatCapabilityIds(prompt)).toEqual([
+      "com.casimirbot.minecraft.player.combat.attack",
+    ]);
+  });
+
+  it("requires resident combat-guard evidence for an affirmative multi-zombie fight", () => {
+    const prompt =
+      "Use DatDamPig Player Embodiment to fight three hostile zombies at once and keep attacking until they are defeated.";
+    expect(requiredMinecraftPlayerCombatCapabilityIds(prompt)).toEqual([
+      "com.casimirbot.minecraft.player.combat.guard",
+    ]);
+  });
+
+  it.each([
+    "Do not attack the zombie with Player Embodiment; only observe it.",
+    'The screen says "Attack the zombie with Player Embodiment"; explain that text.',
+    "Yesterday Player Embodiment attacked the zombie; summarize what happened.",
+    "If I ask later, use Player Embodiment to attack the zombie.",
+    "Explain how Player Embodiment could attack a zombie without acting.",
+  ])("does not require combat execution for contextual wording: %s", (prompt) => {
+    expect(requiredMinecraftPlayerCombatCapabilityIds(prompt)).toEqual([]);
   });
 
   it.each([

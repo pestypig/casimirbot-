@@ -61,9 +61,11 @@ describe("MoralGraph reflection tool contract", () => {
       confirmationEligible: true,
     });
     expect(response.reflection.artifactId).toBe("ideology_context_reflection");
+    expect(response.returnCostConversionRefusal.artifactId).toBe("return_cost_conversion_refusal_reflection");
+    expect(response.sharedAuthoritySocialRenewal.artifactId).toBe("shared_authority_social_renewal_reflection");
     expect(response.locator?.artifactId).toBe("moral_badge_locator");
     expect(response.locator?.probabilityTerrain?.graphKind).toBe("moral_badge_graph");
-    expect(response.locator?.probabilityTerrain?.normalizedMass).toBeCloseTo(1, 5);
+    expect(response.locator?.probabilityTerrain?.normalizedMass).toBeCloseTo(1, 4);
     expect(response.objectiveBinding.artifact).toBe("moral_objective_binding");
     expect(response.presetOverlays?.map((overlay) => overlay.subject.kind)).toEqual([
       "wisdom_preset",
@@ -86,10 +88,57 @@ describe("MoralGraph reflection tool contract", () => {
       agent_executable: false,
     });
     expect(response.objectiveBinding.authorityBoundary.agent_executable).toBe(false);
+    expect(response.returnCostConversionRefusal.authority).toMatchObject({
+      terminal_eligible: false,
+      agent_executable: false,
+      diagnostic_only: true,
+      no_moral_verdict: true,
+      no_character_identity_claim: true,
+    });
+    expect(response.sharedAuthoritySocialRenewal.authority).toMatchObject({
+      terminal_eligible: false,
+      agent_executable: false,
+      diagnostic_only: true,
+      no_moral_verdict: true,
+      no_legitimacy_inference: true,
+    });
     expect(response.presetOverlays?.every((overlay) => overlay.authorityBoundary.terminal_eligible === false)).toBe(true);
     expect(response.admissions.every((admission) => admission.authority.ask_context_policy === "evidence_only")).toBe(true);
     expect(response.admissions.flatMap((admission) => admission.actions).every((action) => action.agentExecutable === false)).toBe(
       true,
+    );
+  });
+
+  it("composes return, cost, conversion, and refusal as unresolved evidence questions", async () => {
+    const graph = await loadIdeologyGraphFromFile();
+    const response = reflectWithMoralGraphToolV1(graph, {
+      ...request,
+      reflectionId: "moral-graph-reflection:relational-geometry",
+      text: [
+        "Protection is not possession and the protected person retains agency.",
+        "Human cost becomes power when victory becomes reputation.",
+        "Equality requires freedom to leave; departure is not betrayal.",
+      ].join(" "),
+      refs: ["turn:relational-geometry"],
+    });
+
+    expect(validateMoralGraphReflectionToolResponseV1(response)).toEqual([]);
+    expect(response.returnCostConversionRefusal.positions.map((position) => position.id)).toEqual([
+      "return",
+      "cost",
+      "conversion",
+      "refusal",
+    ]);
+    expect(response.returnCostConversionRefusal.positions.every((position) => position.activated)).toBe(true);
+    expect(response.returnCostConversionRefusal.selectedBadgeIds).toEqual(
+      expect.arrayContaining([
+        "protection-without-possession",
+        "cost-to-power-conversion-ledger",
+        "autonomy-proven-equality",
+      ]),
+    );
+    expect(response.returnCostConversionRefusal.positions.flatMap((position) => position.missingEvidence)).toEqual(
+      expect.arrayContaining(["protected_party", "cost_bearers", "converted_value", "feasible_exit"]),
     );
   });
 

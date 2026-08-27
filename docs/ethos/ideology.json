@@ -704,7 +704,9 @@
         "open mind upon yourself",
         "handling the unknown"
       ],
-      "children": [],
+      "children": [
+        "autonomy-proven-equality"
+      ],
       "links": [
         {
           "rel": "parent",
@@ -729,6 +731,10 @@
         {
           "rel": "see-also",
           "to": "beginners-mind"
+        },
+        {
+          "rel": "child",
+          "to": "autonomy-proven-equality"
         }
       ],
       "references": [
@@ -795,6 +801,121 @@
         "move": "Separate observation, assumption, desire, fear, and care; preserve compassion while leaving the interpretation revisable.",
         "missingCheck": "What is actually observed, what has the affected party freely expressed, and what part of the view belongs to the observer's hope or fear?",
         "antiPattern": "Withholding care in the name of openness, or using love, affection, or projection as proof, consent, possession, or a character verdict."
+      }
+    },
+    {
+      "id": "autonomy-proven-equality",
+      "slug": "autonomy-proven-equality",
+      "title": "Autonomy-Proven Equality",
+      "excerpt": "Test claimed equality by whether independent purpose, dissent, refusal, and departure remain survivable.",
+      "bodyMD": "Equality is not established by affectionate language, admiration, service, or proximity. A relationship demonstrates equality when each person can form an independent purpose, disagree, refuse an assigned role, or leave without being converted into a traitor, failure, possession, or disposable obstacle.\n\nThis does not treat every departure as wise or every commitment as domination. It asks whether staying is meaningfully chosen and whether the relationship can continue to recognize the person after refusal.\n\nProcedural rule: trace independent purpose, the available dissent path, the practical feasibility of exit, retaliation risk, and the relationship's posture after refusal. Downgrade an equality claim when autonomy is praised in theory but punished in practice.\n\nAnti-patterns: loyalty as ownership; service as identity; departure as moral failure; equality without exit; or treating separation itself as betrayal.\n\nMinimal artifact: Autonomy Test Note with independent purpose, dissent path, feasible exit, retaliation risk, and post-refusal recognition.\n\nSee [[node:love-without-projection]], [[node:voice-exit-contestability]], and [[node:participation-consent-separation]].",
+      "tags": ["agency", "equality", "autonomy", "dissent", "refusal", "exit", "non-possession"],
+      "aliases": ["equality requires freedom to leave", "freedom to leave", "survivable refusal", "independent purpose", "departure is not betrayal", "loyalty is not ownership"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "love-without-projection" },
+        { "rel": "see-also", "to": "voice-exit-contestability" },
+        { "rel": "see-also", "to": "participation-consent-separation" }
+      ],
+      "references": [{ "kind": "doc", "title": "Ideology Graph", "path": "docs/ethos/ideology.json" }],
+      "summary": "Treat equality as procedurally credible only when independent purpose, dissent, refusal, and exit remain feasible without identity punishment.",
+      "nodeType": "concept",
+      "inputs": ["independent_purpose", "dissent_path", "feasible_exit", "retaliation_risk", "post_refusal_relationship"],
+      "outputs": ["equality_claim_posture", "autonomy_constraints", "recognition_after_refusal"],
+      "assumptions": ["Departure does not by itself establish betrayal, disloyalty, or moral failure.", "Commitment can be meaningful when refusal and exit remain genuinely available.", "This procedure evaluates conditions, not a person's total character."],
+      "validity": { "claim_tier": "diagnostic", "requires_user_confirmation": true, "avoid_character_judgment": true },
+      "deterministic": false,
+      "tolerance": null,
+      "environment": "Applies when friendship, leadership, service, love, membership, or loyalty is described as equal while dissent or departure may carry identity punishment.",
+      "dependencies": ["love-without-projection", "voice-exit-contestability", "participation-consent-separation"],
+      "evidence": [
+        { "type": "doc", "path": "docs/ethos/ideology.json", "contains": "autonomy-proven-equality" },
+        { "type": "code", "path": "shared/moral-graph/wisdom-principles.ts" },
+        { "type": "code", "path": "shared/moral-graph/return-cost-conversion-refusal.ts" }
+      ],
+      "predictability": { "status": "partial", "missing": ["unexpressed_intent", "future_retaliation", "future_relationship_outcome"] },
+      "proceduralLanguage": {
+        "pattern": "Equality or loyalty is claimed while independent purpose, dissent, refusal, or departure may be punished.",
+        "move": "Trace whether the person can disagree, refuse the assigned role, or leave and remain recognized as a person rather than a betrayal.",
+        "missingCheck": "What happens materially and relationally when this person says no or pursues an independent purpose?",
+        "antiPattern": "Loyalty as ownership, service as identity, departure as moral failure, or equality without feasible exit."
+      }
+    },
+    {
+      "id": "protection-without-possession",
+      "slug": "protection-without-possession",
+      "title": "Protection Without Possession",
+      "excerpt": "A protected person must retain voice, choice, decision access, and contestability rather than becoming an emblem owned by the protector.",
+      "bodyMD": "Protection becomes morally unstable when the person said to be protected is preserved as a symbol while being excluded from decisions about their own life. Preciousness is not personhood, and care does not create ownership.\n\nProcedural rule: name the protected good and the protected party separately, then trace affected agency, decision access, voice, choice, contestability, feasible exit, and the justification for any restriction. Protection must remain answerable to the humanity of the person it invokes.\n\nThis does not prohibit urgent protective restraint. It requires proportionality, review, and restoration of agency rather than allowing emergency care to harden into possession.\n\nAnti-patterns: protection as control; preciousness as confinement; symbolic value as personhood; or invoking someone's safety while removing their voice.\n\nMinimal artifact: Protection Agency Note with protected good, protected party, affected agency, decision access, contestability, exit conditions, and restriction justification.\n\nSee [[node:non-harm-and-compassionate-constraint]], [[node:agency-preserving-disclosure]], and [[node:voice-exit-contestability]].",
+      "tags": ["non-harm", "protection", "agency", "voice", "choice", "contestability", "non-possession"],
+      "aliases": ["protection without control", "protected person retains agency", "preciousness is not personhood", "protection is not possession", "what the battle claims to protect"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "non-harm-and-compassionate-constraint" },
+        { "rel": "see-also", "to": "agency-preserving-disclosure" },
+        { "rel": "see-also", "to": "voice-exit-contestability" }
+      ],
+      "references": [{ "kind": "doc", "title": "Ideology Graph", "path": "docs/ethos/ideology.json" }],
+      "summary": "Require protection to preserve the protected person's voice, choice, decision access, and contestability.",
+      "nodeType": "concept",
+      "inputs": ["protected_good", "protected_party", "affected_agency", "decision_access", "contestability_and_exit", "restriction_justification"],
+      "outputs": ["agency_preserving_protection_posture", "restriction_review", "restoration_path"],
+      "assumptions": ["Symbolic importance does not replace personhood or consent.", "Urgent restraint requires proportionality, review, and an agency-restoration path.", "This procedure evaluates protection conditions rather than total character."],
+      "validity": { "claim_tier": "diagnostic", "requires_user_confirmation": true, "avoid_character_judgment": true },
+      "deterministic": false,
+      "tolerance": null,
+      "environment": "Applies when a person, community, home, future, or value is invoked as the reason for protective action while the protected party's agency may be constrained.",
+      "dependencies": ["non-harm-and-compassionate-constraint", "agency-preserving-disclosure", "voice-exit-contestability"],
+      "evidence": [
+        { "type": "doc", "path": "docs/ethos/ideology.json", "contains": "protection-without-possession" },
+        { "type": "code", "path": "shared/moral-graph/wisdom-principles.ts" },
+        { "type": "code", "path": "shared/moral-graph/return-cost-conversion-refusal.ts" }
+      ],
+      "predictability": { "status": "partial", "missing": ["unexpressed_preferences", "unobserved_coercion", "future_restriction_effects"] },
+      "proceduralLanguage": {
+        "pattern": "A person is invoked as what action protects while their voice, choice, or decision access is reduced.",
+        "move": "Separate the protected good from the protected party and test whether protection preserves agency, contestability, and restoration.",
+        "missingCheck": "Can the protected person participate in, contest, or leave the arrangement, and what justifies any temporary restriction?",
+        "antiPattern": "Protection as control, preciousness as confinement, symbolic value as personhood, or care as possession."
+      }
+    },
+    {
+      "id": "cost-to-power-conversion-ledger",
+      "slug": "cost-to-power-conversion-ledger",
+      "title": "Cost-to-Power Conversion Ledger",
+      "excerpt": "Trace how human danger, labor, exclusion, or sacrifice is converted into victory, reputation, access, legitimacy, or authority.",
+      "bodyMD": "Power often arrives through a conversion chain: people bear danger, labor, wounds, exclusion, or sacrifice; the result becomes victory; victory becomes reputation; reputation becomes access; and access becomes authority. A moral account must keep the cost-bearing people visible through every conversion.\n\nProcedural rule: identify cost bearers, burdens, beneficiaries, converted value, consent conditions, recognition, decision rights, reciprocal return, and review. Do not treat the final victory or institution as self-justifying evidence that its costs were legitimate.\n\nThis ledger does not assume that unequal roles or sacrifice are always wrong. It asks whether burdens were knowingly accepted where possible, whether avoidable costs were constrained, whether benefits and authority flow back to cost bearers, and whether repair remains available.\n\nAnti-patterns: sacrifice as a blank check; victory as legitimacy; service as disposability; hidden cost as glory; or converting another person's risk into private authority without reciprocal accountability.\n\nMinimal artifact: Cost-to-Power Ledger tracing cost bearers, burdens, beneficiary, converted value, consent, reciprocity, decision rights, and review.\n\nSee [[node:stewardship-ledger]], [[node:reciprocity-contract]], [[node:restorative-harm-repair]], and [[node:adherence-legitimacy-separation]].",
+      "tags": ["stewardship", "cost", "power", "sacrifice", "legitimacy", "reciprocity", "accountability"],
+      "aliases": ["cost becomes power", "blood into legitimacy", "sacrifice into authority", "victory becomes reputation", "human cost ledger", "who bears the cost who gains the power"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "stewardship-ledger" },
+        { "rel": "see-also", "to": "reciprocity-contract" },
+        { "rel": "see-also", "to": "restorative-harm-repair" },
+        { "rel": "see-also", "to": "adherence-legitimacy-separation" }
+      ],
+      "references": [{ "kind": "doc", "title": "Ideology Graph", "path": "docs/ethos/ideology.json" }],
+      "summary": "Keep cost bearers visible while tracing how their burdens become another party's victory, legitimacy, access, or authority.",
+      "nodeType": "concept",
+      "inputs": ["cost_bearers", "burden_map", "beneficiary", "converted_value", "consent_conditions", "reciprocal_return", "decision_rights", "review_path"],
+      "outputs": ["conversion_chain", "reciprocity_gap", "authority_constraint", "repair_or_review_trigger"],
+      "assumptions": ["Victory, popularity, or stability does not by itself establish legitimacy.", "Unequal roles do not erase the standing of cost-bearing parties.", "This ledger evaluates a conversion process rather than total character."],
+      "validity": { "claim_tier": "diagnostic", "requires_user_confirmation": true, "avoid_character_judgment": true },
+      "deterministic": false,
+      "tolerance": null,
+      "environment": "Applies when danger, labor, sacrifice, exclusion, or service produces victory, reputation, access, legitimacy, wealth, or authority for another party.",
+      "dependencies": ["stewardship-ledger", "reciprocity-contract", "restorative-harm-repair", "adherence-legitimacy-separation"],
+      "evidence": [
+        { "type": "doc", "path": "docs/ethos/ideology.json", "contains": "cost-to-power-conversion-ledger" },
+        { "type": "code", "path": "shared/moral-graph/wisdom-principles.ts" },
+        { "type": "code", "path": "shared/moral-graph/return-cost-conversion-refusal.ts" }
+      ],
+      "predictability": { "status": "partial", "missing": ["unrecorded_burdens", "informal_benefits", "future_power_use"] },
+      "proceduralLanguage": {
+        "pattern": "Human danger, labor, exclusion, or sacrifice is converted into victory, reputation, access, legitimacy, or authority while cost bearers disappear from the account.",
+        "move": "Trace each conversion step and ask what recognition, benefit, consent, decision rights, repair, and authority return to the people who bore the cost.",
+        "missingCheck": "Who bore which burden, who received the converted value, and what reciprocal authority or repair returned to cost bearers?",
+        "antiPattern": "Sacrifice as a blank check, victory as legitimacy, service as disposability, or hidden cost as glory."
       }
     },
     {
@@ -2169,7 +2290,8 @@
         "repair"
       ],
       "children": [
-        "agency-preserving-disclosure"
+        "agency-preserving-disclosure",
+        "protection-without-possession"
       ],
       "links": [
         {
@@ -2183,6 +2305,10 @@
         {
           "rel": "see-also",
           "to": "lawful-interface-protocol"
+        },
+        {
+          "rel": "child",
+          "to": "protection-without-possession"
         }
       ],
       "references": [
@@ -5963,7 +6089,8 @@
         "discipline"
       ],
       "children": [
-        "reciprocity-contract"
+        "reciprocity-contract",
+        "cost-to-power-conversion-ledger"
       ],
       "links": [
         {
@@ -5973,6 +6100,10 @@
         {
           "rel": "child",
           "to": "reciprocity-contract"
+        },
+        {
+          "rel": "child",
+          "to": "cost-to-power-conversion-ledger"
         }
       ],
       "references": [
@@ -10156,14 +10287,98 @@
       "bodyMD": "Specialization can support continuity without granting unbounded authority. The role, demand, assignment, safety, compensation, mobility, and review lifecycle remain explicit.",
       "tags": ["provisioning", "hierarchy", "mandate", "role", "review", "action_gate"],
       "aliases": ["delegated authority", "bounded mandate", "role delegation", "authority scope"],
-      "children": [],
-      "links": [{ "rel": "parent", "to": "wisdom-first-principles" }],
+      "children": ["leadership-as-capacity-transfer"],
+      "links": [
+        { "rel": "parent", "to": "wisdom-first-principles" },
+        { "rel": "child", "to": "leadership-as-capacity-transfer" }
+      ],
       "summary": "Bound delegated role authority to an evidenced function and review lifecycle.",
       "proceduralLanguage": {
         "pattern": "A specialized role is being used to justify open-ended authority.",
         "move": "Trace demand, assignment, authority scope, safety, compensation, exit, retraining, and review.",
         "missingCheck": "What ends, revises, or contests the mandate?",
         "antiPattern": "Treating specialization as unbounded power or personal worth."
+      }
+    },
+    {
+      "id": "leadership-as-capacity-transfer",
+      "slug": "leadership-as-capacity-transfer",
+      "title": "Leadership as Capacity Transfer",
+      "excerpt": "Leadership matures when hard-won personal expertise becomes legible, contestable, distributed, renewable, and survivable beyond the leader.",
+      "bodyMD": "Leadership may begin with a real asymmetry of experience, discipline, judgment, or situational knowledge. That asymmetry can justify bounded authority within the domain where the competence is relevant. It does not establish exclusive sovereignty or permanent ownership of the shared purpose.\n\nThe recurring developmental cycle is emergence, entrustment, articulation, distribution, contestation, renewal, and succession. The leader first demonstrates competence; receives a bounded mandate; makes reasons, evidence, limits, and uncertainty legible; develops other participants; accepts independent judgment and challenge; revises roles as competence changes; and leaves the purpose able to survive personal weakness, error, absence, or departure.\n\nProcedural rule: trace the originating expertise and mandate scope, then ask whether knowledge is becoming teachable, developing competence produces decision rights, dissent remains usable, review changes the authority arrangement, and a succession or continuity path exists. Domain-specific expertise may retain domain-specific authority, but it cannot silently expand into total authority.\n\nThis principle does not require identical roles, forced consensus, premature delegation, or abandonment of responsibility during a crisis. Temporary concentration of authority requires an explicit scope, review trigger, capability-development path, and conditions for redistribution.\n\nAnti-patterns: expertise as total sovereignty; personal indispensability as proof of leadership; knowledge hoarding for role security; developing people without increasing their decision rights; treating succession as betrayal; or allowing a temporary mandate to become permanent through inertia.\n\nMinimal artifact: Leadership Capacity Lifecycle with originating expertise, mandate scope, reason legibility, knowledge-transfer path, developing participants, competence-to-decision-rights map, contestability path, renewal trigger, succession path, and mission continuity test.\n\nSee [[node:mandate-bounded-hierarchy]], [[node:transformation-window-stewardship]], [[node:autonomy-proven-equality]], [[node:cost-to-power-conversion-ledger]], [[node:impermanence-entropy-and-revision]], and [[node:legible-rules-bounded-confidentiality]].",
+      "tags": ["leadership", "capacity", "knowledge_transfer", "mandate", "development", "contestability", "succession", "renewal"],
+      "aliases": [
+        "leadership as capacity transfer",
+        "from personal expertise to shared capacity",
+        "make leadership teachable",
+        "mission survives the leader",
+        "indispensable leader test",
+        "competence should produce decision rights",
+        "leadership lifecycle"
+      ],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "mandate-bounded-hierarchy" },
+        { "rel": "see-also", "to": "transformation-window-stewardship" },
+        { "rel": "see-also", "to": "autonomy-proven-equality" },
+        { "rel": "see-also", "to": "cost-to-power-conversion-ledger" },
+        { "rel": "see-also", "to": "impermanence-entropy-and-revision" },
+        { "rel": "see-also", "to": "legible-rules-bounded-confidentiality" }
+      ],
+      "references": [{ "kind": "doc", "title": "Ideology Graph", "path": "docs/ethos/ideology.json" }],
+      "summary": "Convert earned, domain-bounded expertise into shared capacity that can be questioned, renewed, transferred, and sustained beyond one leader.",
+      "nodeType": "concept",
+      "inputs": [
+        "originating_expertise",
+        "mandate_scope",
+        "reason_legibility",
+        "knowledge_transfer_path",
+        "developing_participants",
+        "competence_to_decision_rights",
+        "contestability_path",
+        "renewal_trigger",
+        "succession_path",
+        "mission_continuity_without_leader"
+      ],
+      "outputs": ["leadership_lifecycle_stage", "capacity_distribution_gap", "authority_renewal_posture", "succession_readiness"],
+      "leadershipLifecycle": [
+        { "stage": "emergence", "question": "What demonstrated experience or competence created the initial authority asymmetry?" },
+        { "stage": "entrustment", "question": "What bounded mandate was granted, by whom, for which domain, and until what review?" },
+        { "stage": "articulation", "question": "Which reasons, evidence, limits, and uncertainties have become legible to others?" },
+        { "stage": "distribution", "question": "Who is gaining knowledge, practice, access, and decision rights as competence develops?" },
+        { "stage": "contestation", "question": "Can participants challenge the leader or exercise independent judgment without retaliation?" },
+        { "stage": "renewal", "question": "How do changed competence and conditions revise roles, authority, and review intervals?" },
+        { "stage": "succession", "question": "Can the shared purpose survive the leader's weakness, error, absence, or departure?" }
+      ],
+      "assumptions": [
+        "Unequal expertise can justify bounded and reviewable authority within a relevant domain.",
+        "Shared capacity does not require identical roles, knowledge, or responsibility.",
+        "Participant development should be reflected in access and decision rights when competence and safety permit.",
+        "This procedure evaluates a leadership arrangement rather than a person's total character."
+      ],
+      "validity": { "claim_tier": "diagnostic", "requires_user_confirmation": true, "avoid_character_judgment": true },
+      "deterministic": false,
+      "tolerance": null,
+      "environment": "Applies to founders, commanders, teachers, technical experts, caregivers, institutions, movements, and coming-of-age transitions where person-bound expertise may need to become shared capacity.",
+      "dependencies": [
+        "mandate-bounded-hierarchy",
+        "transformation-window-stewardship",
+        "autonomy-proven-equality",
+        "cost-to-power-conversion-ledger",
+        "impermanence-entropy-and-revision",
+        "legible-rules-bounded-confidentiality"
+      ],
+      "evidence": [
+        { "type": "doc", "path": "docs/ethos/ideology.json", "contains": "leadership-as-capacity-transfer" },
+        { "type": "code", "path": "shared/moral-graph/principles/provisioning-principles.ts" },
+        { "type": "code", "path": "shared/moral-graph/procedural-rules/provisioning-rules.ts" }
+      ],
+      "predictability": { "status": "partial", "missing": ["unexpressed_intent", "future_competence", "future_authority_use", "future_succession_outcome"] },
+      "proceduralLanguage": {
+        "pattern": "Earned expertise remains person-bound while increasing participant competence does not produce legibility, contestability, decision rights, renewal, or succession capacity.",
+        "move": "Locate the leadership lifecycle stage and trace how expertise, mandate, knowledge, competence, decision rights, review, and succession should change together.",
+        "missingCheck": "What demonstrated the original expertise, what has become teachable, who is developing, and can the purpose survive without preserving the leader's supremacy?",
+        "antiPattern": "Expertise as total sovereignty, indispensability as leadership, knowledge hoarding, development without authority growth, or succession as betrayal."
       }
     },
     {

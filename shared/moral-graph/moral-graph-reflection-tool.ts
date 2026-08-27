@@ -17,6 +17,8 @@ import {
   type MoralGraphObjectivePresetV1,
 } from "./moral-objective-presets";
 import { buildSituationObjectiveBindingFromLocatorV1 } from "./moral-objective-bindings";
+import { buildReturnCostConversionRefusalFromLocatorV1 } from "./return-cost-conversion-refusal";
+import { buildSharedAuthoritySocialRenewalFromLocatorV1 } from "./shared-authority-social-renewal";
 
 const PRESETS: readonly MoralGraphObjectivePresetV1[] = [
   DEFAULT_MORAL_WISDOM_PRESET,
@@ -164,6 +166,14 @@ export function reflectWithMoralGraphToolV1(
     refs: request.refs,
     locatorId: `moral-badge-locator:${reflection.reflectionId}`,
   });
+  const returnCostConversionRefusal = buildReturnCostConversionRefusalFromLocatorV1(locator, {
+    reflectionId: provenance.reflectionId,
+    generatedAt: reflection.generatedAt,
+  });
+  const sharedAuthoritySocialRenewal = buildSharedAuthoritySocialRenewalFromLocatorV1(locator, {
+    reflectionId: provenance.reflectionId,
+    generatedAt: reflection.generatedAt,
+  });
   const includeTrace = request.options?.includeTrace;
   const objectiveBinding = withTraceOption(
     capObjectiveBindingConfidence(buildSituationObjectiveBindingFromLocatorV1(locator), provenance),
@@ -179,6 +189,8 @@ export function reflectWithMoralGraphToolV1(
     provenance,
     reflection,
     locator,
+    returnCostConversionRefusal,
+    sharedAuthoritySocialRenewal,
     objectiveBinding,
     ...(presetOverlays.length > 0 ? { presetOverlays } : {}),
     recommendedActions:

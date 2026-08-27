@@ -1,4 +1,6 @@
 import {
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
@@ -260,6 +262,48 @@ const RESIDENT_RECOVERY_HAZARD_RE =
   /\b(?:lava|on\s+fire|catch(?:ing)?\s+fire|burn(?:ing)?|unsafe\s+landing|fall\s+damage|dangerous\s+(?:fall|descent))\b/iu;
 const RESIDENT_RECOVERY_PHYSICAL_RESPONSE_RE =
   /\b(?:jump|sprint|walk|move|swim|place|use|land|escape|recover|rescue|save)\b/iu;
+
+const PLAYER_COMBAT_EFFECT_RE =
+  /\b(?:attack|fight|strike|hit|defeat|kill|engage(?:\s+in)?\s+combat)\b/iu;
+const MULTI_HOSTILE_COMBAT_SCOPE_RE =
+  /\b(?:multiple|several|all|two|three|four|five|six|seven|eight)\s+(?:hostile\s+)?(?:mobs?|zombies?|skeletons?|enemies)\b|\b(?:hostile\s+mobs|zombies|skeletons|enemies)\b/iu;
+
+/**
+ * Carries an affirmatively requested combat effect into terminal evidence.
+ * This does not author an attack request or its target arguments; it prevents
+ * a different successful player action (for example, camera tracking) from
+ * satisfying a prompt that still explicitly requires combat.
+ */
+export const requiredMinecraftPlayerCombatCapabilityIds = (
+  promptText: string,
+  context?: MinecraftExecutionPlaneContext | null,
+): string[] => {
+  const prompt = stripQuotedMinecraftPlaneExamples(promptText).trim();
+  if (!prompt || !minecraftPlayerEmbodimentActionPromptMatch(prompt, context)) {
+    return [];
+  }
+  for (const clause of prompt.split(/[.!?;\n]+/u)) {
+    const match = PLAYER_COMBAT_EFFECT_RE.exec(clause);
+    PLAYER_COMBAT_EFFECT_RE.lastIndex = 0;
+    if (
+      match &&
+      typeof match.index === "number" &&
+      playerEmbodimentActionClauseIsOperative({
+        prompt: clause,
+        actionIndex: match.index,
+      })
+    ) {
+      const requiresResidentGuard = MULTI_HOSTILE_COMBAT_SCOPE_RE.test(clause);
+      MULTI_HOSTILE_COMBAT_SCOPE_RE.lastIndex = 0;
+      return [
+        requiresResidentGuard
+          ? HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY
+          : HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+      ];
+    }
+  }
+  return [];
+};
 
 /**
  * Narrows terminal evidence for an affirmative resident-response request only

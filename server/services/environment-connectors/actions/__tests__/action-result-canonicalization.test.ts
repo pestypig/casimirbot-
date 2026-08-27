@@ -251,6 +251,55 @@ describe("environment action result canonicalization", () => {
       },
     },
     {
+      actionKind: "combat_guard",
+      arguments: {
+        action_kind: "combat_guard",
+        hostile_entity_type_ids: ["minecraft:skeleton"],
+        max_acquisition_distance: 24,
+        require_line_of_sight: true,
+        minimum_attack_cooldown: 0.9,
+        max_attack_pulses: 48,
+        max_target_switches: 4,
+        target_commit_ticks: 10,
+        retreat_start_distance: 2.5,
+        retreat_stop_distance: 4,
+        retreat_when_hostile_count_at_least: 2,
+        max_duration_ms: 45_000,
+        stop_below_health: 12,
+        friendly_fire: false,
+        approach_policy: "local_reroute_bounded",
+        max_approach_ticks: 500,
+        cover_policy: "lateral_bounded",
+        max_cover_ticks: 160,
+        projectile_response: "shield_or_sidestep",
+        projectile_evasion_horizon_ticks: 8,
+        max_evasion_ticks: 240,
+        shield_hand: "off_hand",
+        max_shield_hold_ticks: 240,
+      },
+      measurements: {
+        reason_code: "hostiles_cleared",
+        target_classification: "hostile",
+        selected_target_ref: `target:${"a".repeat(32)}`,
+        friendly_fire: false,
+        attack_pulses: 4,
+        target_switches: 0,
+        peak_hostile_count: 1,
+        eligible_hostile_count: 0,
+        player_health: 20,
+        approach_policy: "local_reroute_bounded",
+        approach_ticks: 53,
+        cover_policy: "lateral_bounded",
+        cover_ticks: 0,
+        projectile_response: "shield_or_sidestep",
+        evasion_ticks: 0,
+        shield_hand: "off_hand",
+        shield_ticks: 0,
+        world_mutations_performed: 0,
+        inventory_mutations_performed: 0,
+      },
+    },
+    {
       actionKind: "hotbar_select",
       arguments: { action_kind: "hotbar_select", slot: 2 },
       measurements: { selection_matches: true, selected_slot: 2 },
@@ -311,10 +360,10 @@ describe("environment action result canonicalization", () => {
   for (const scenario of measurementScenarios) {
     it(`requires action-specific terminal measurements for ${scenario.actionKind}`, () => {
       const motionKinds = new Set([
-        "navigate_to", "look_at", "walk", "jump", "follow", "collect", "mine", "place",
+        "navigate_to", "look_at", "walk", "jump", "combat_guard", "follow", "collect", "mine", "place",
       ]);
       const interactionKinds = new Set([
-        "interact", "attack", "mine", "place", "craft", "inventory_transfer",
+        "interact", "attack", "combat_guard", "mine", "place", "craft", "inventory_transfer",
       ]);
       const inventoryKinds = new Set([
         "hotbar_select", "equip", "collect", "mine", "place", "craft", "inventory_transfer",
@@ -369,6 +418,29 @@ describe("environment action result canonicalization", () => {
         player_interaction_performed: interactionKinds.has(scenario.actionKind),
         inventory_mutation_performed: inventoryKinds.has(scenario.actionKind),
         world_mutation_performed: worldMutationKinds.has(scenario.actionKind),
+        ...(scenario.actionKind === "combat_guard" ? {
+          started_clock: {
+            schema: HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
+            clock_id: "minecraft_client_tick_clock:combat-guard",
+            clock_kind: "minecraft_game_tick",
+            tick_rate_hz: 20,
+            tick_index: 1_000,
+            world_tick_index: 50_000,
+            synchronization: "server_synchronized",
+            observed_at: startedAt,
+          },
+          completed_clock: {
+            schema: HELIX_ENVIRONMENT_CLOCK_SNAPSHOT_SCHEMA,
+            clock_id: "minecraft_client_tick_clock:combat-guard",
+            clock_kind: "minecraft_game_tick",
+            tick_rate_hz: 20,
+            tick_index: 1_090,
+            world_tick_index: 50_090,
+            synchronization: "server_synchronized",
+            observed_at: completedAt,
+          },
+          duration_ticks: 90,
+        } : {}),
       });
       expect(environmentActionWorkflowMeasurementsValid({
         request: matrixRequest,

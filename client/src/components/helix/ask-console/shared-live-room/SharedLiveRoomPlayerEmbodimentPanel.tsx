@@ -349,6 +349,50 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     }
   };
 
+  const pairLocalPlayer = async (): Promise<void> => {
+    if (!authority || !sourceBinding) return;
+    setBusy("pair-local");
+    setMessage(null);
+    setPairingCommand(null);
+    setPairingCode(null);
+    setPairingExpiresAt(null);
+    setCopyState("idle");
+    try {
+      const receipt = await readPairingReceipt(
+        await fetch(`${pairingPath}/local-player-handoff`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": `browser-local-player-action-pairing:${crypto.randomUUID()}`,
+          },
+          body: JSON.stringify({
+            purpose: "rotate",
+            binding_id: sourceBinding.binding_id,
+            domain_adapter: sourceBinding.domain_adapter,
+            source_label: sourceBinding.source_label,
+            action_credential_requested: true,
+            action_authority_id: authority.action_authority_id,
+            credential_ttl_ms: leaseMs,
+          }),
+        }),
+      );
+      setMessage(
+        receipt.message ??
+          "Local player action access was staged without exposing the one-time code.",
+      );
+      await load();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not stage local Player Embodiment pairing.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const emergencyStop = async (): Promise<void> => {
     if (!authority) return;
     if (!stopArmed) {
@@ -584,6 +628,17 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               >
                 <KeyRound className="h-2.5 w-2.5" />
                 Pair player client in game
+              </button>
+            ) : null}
+            {authority?.status === "active" ? (
+              <button
+                type="button"
+                disabled={busy !== null || !sourceBinding}
+                className="inline-flex items-center gap-1 rounded border border-emerald-300/30 px-2 py-1 text-[9px] font-semibold text-emerald-100 disabled:opacity-50"
+                onClick={() => void pairLocalPlayer()}
+              >
+                <KeyRound className="h-2.5 w-2.5" />
+                Pair local player privately
               </button>
             ) : null}
             {authority?.status === "active" ? (

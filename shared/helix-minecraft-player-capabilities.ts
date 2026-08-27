@@ -16,6 +16,8 @@ export const HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY =
   "com.casimirbot.minecraft.player.interact" as const;
 export const HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY =
   "com.casimirbot.minecraft.player.combat.attack" as const;
+export const HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY =
+  "com.casimirbot.minecraft.player.combat.guard" as const;
 export const HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY =
   "com.casimirbot.minecraft.player.hotbar.select" as const;
 export const HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY =
@@ -57,6 +59,7 @@ export const HELIX_MINECRAFT_PLAYER_MVP_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
@@ -81,6 +84,7 @@ export const HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
@@ -107,6 +111,7 @@ export const HELIX_MINECRAFT_PLAYER_ACTION_KINDS = [
   "jump",
   "interact",
   "attack",
+  "combat_guard",
   "hotbar_select",
   "equip",
   "follow",
@@ -309,6 +314,45 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
       .strict(),
     z
       .object({
+        action_kind: z.literal("combat_guard"),
+        hostile_entity_type_ids: z
+          .array(resourceLocationSchema)
+          .min(1)
+          .max(16),
+        max_acquisition_distance: z.number().finite().min(2).max(32),
+        require_line_of_sight: z.literal(true),
+        minimum_attack_cooldown: z.number().finite().min(0.1).max(1),
+        max_attack_pulses: z.number().int().min(1).max(256),
+        max_target_switches: z.number().int().min(0).max(64),
+        target_commit_ticks: z.number().int().min(0).max(200),
+        retreat_start_distance: z.number().finite().min(1).max(6),
+        retreat_stop_distance: z.number().finite().min(1).max(8),
+        retreat_when_hostile_count_at_least: z.number().int().min(1).max(16),
+        max_duration_ms: z.number().int().min(1_000).max(120_000),
+        stop_below_health: z.number().finite().min(1).max(20),
+        friendly_fire: z.literal(false),
+        approach_policy: z
+          .enum(["none", "direct_bounded", "local_reroute_bounded"])
+          .optional(),
+        max_approach_ticks: z.number().int().min(0).max(1_200).optional(),
+        cover_policy: z.enum(["none", "lateral_bounded"]).optional(),
+        max_cover_ticks: z.number().int().min(0).max(1_200).optional(),
+        projectile_response: z
+          .enum(["none", "sidestep", "shield_or_sidestep"])
+          .optional(),
+        projectile_evasion_horizon_ticks: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .optional(),
+        max_evasion_ticks: z.number().int().min(0).max(1_200).optional(),
+        shield_hand: z.enum(["none", "off_hand"]).optional(),
+        max_shield_hold_ticks: z.number().int().min(0).max(1_200).optional(),
+      })
+      .strict(),
+    z
+      .object({
         action_kind: z.literal("hotbar_select"),
         slot: z.number().int().min(0).max(8),
       })
@@ -413,6 +457,65 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
       .strict(),
   ])
   .superRefine((value, context) => {
+    if (value.action_kind === "combat_guard") {
+      if (value.retreat_stop_distance <= value.retreat_start_distance) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["retreat_stop_distance"],
+          message: "retreat_stop_distance must exceed retreat_start_distance",
+        });
+      }
+      const approachPolicy = value.approach_policy ?? "none";
+      const maxApproachTicks = value.max_approach_ticks ?? 0;
+      if (
+        (approachPolicy !== "none") !==
+        (maxApproachTicks > 0)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max_approach_ticks"],
+          message:
+            "an approach policy requires a positive max_approach_ticks budget",
+        });
+      }
+      const coverPolicy = value.cover_policy ?? "none";
+      const maxCoverTicks = value.max_cover_ticks ?? 0;
+      if (
+        (coverPolicy === "lateral_bounded") !==
+        (maxCoverTicks > 0)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max_cover_ticks"],
+          message:
+            "lateral_bounded requires a positive max_cover_ticks budget",
+        });
+      }
+      const projectileResponse = value.projectile_response ?? "none";
+      const maxEvasionTicks = value.max_evasion_ticks ?? 0;
+      const shieldHand = value.shield_hand ?? "none";
+      const maxShieldHoldTicks = value.max_shield_hold_ticks ?? 0;
+      if (projectileResponse !== "none" && maxEvasionTicks === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max_evasion_ticks"],
+          message: "projectile response requires a positive evasion budget",
+        });
+      }
+      if (
+        projectileResponse === "shield_or_sidestep"
+          ? shieldHand !== "off_hand" || maxShieldHoldTicks === 0
+          : shieldHand !== "none" || maxShieldHoldTicks !== 0
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["shield_hand"],
+          message:
+            "shield authority requires shield_or_sidestep, off_hand, and a positive hold budget",
+        });
+      }
+      return;
+    }
     if (
       value.action_kind === "mine" &&
       value.target_position &&
@@ -527,6 +630,8 @@ export const minecraftPlayerCapabilityForActionKind = (
       return HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY;
     case "attack":
       return HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY;
+    case "combat_guard":
+      return HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY;
     case "hotbar_select":
       return HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY;
     case "equip":

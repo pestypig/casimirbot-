@@ -655,6 +655,97 @@ export const MORAL_WISDOM_PRINCIPLES: readonly MoralWisdomPrinciple[] = [
     ],
     tags: ["inner_practice", "not_knowing", "love", "compassion", "non-attachment", "projection", "agency", "consent"],
   },
+  {
+    id: "protection-without-possession",
+    sourceIdeologyNodeId: "protection-without-possession",
+    label: "Protection Without Possession",
+    glyph: "P",
+    summary: "Protection remains answerable to the protected person's voice, choice, decision access, and contestability.",
+    proceduralRole: "constraint",
+    procedureOperator: "constrains",
+    proceduralRule:
+      "Separate the protected good from the protected party and constrain protection that removes agency without proportionality, review, and restoration.",
+    traceBehavior:
+      "Trace the protected good, protected party, affected agency, decision access, contestability, feasible exit, and restriction justification.",
+    actionEffect:
+      "Keep protective action accountable to the protected person's personhood instead of converting preciousness into control.",
+    evidenceNeeds: [
+      "protected_good",
+      "protected_party",
+      "affected_agency",
+      "decision_access",
+      "contestability_and_exit",
+      "restriction_justification",
+    ],
+    refusesAuthority: [
+      "protection_as_control",
+      "preciousness_as_confinement",
+      "symbolic_value_as_personhood",
+      "care_as_possession",
+    ],
+    tags: ["non-harm", "protection", "agency", "voice", "choice", "contestability", "non-possession"],
+  },
+  {
+    id: "cost-to-power-conversion-ledger",
+    sourceIdeologyNodeId: "cost-to-power-conversion-ledger",
+    label: "Cost-to-Power Conversion Ledger",
+    glyph: "$",
+    summary: "Trace how human burdens become another party's victory, reputation, access, legitimacy, or authority.",
+    proceduralRole: "evidence_requirement",
+    procedureOperator: "requires",
+    proceduralRule:
+      "Require a visible conversion chain from cost bearers and burdens through beneficiaries and converted value to reciprocal return, decision rights, repair, and review.",
+    traceBehavior:
+      "Trace cost bearers, burdens, beneficiaries, converted value, consent conditions, reciprocal return, decision rights, and review paths.",
+    actionEffect:
+      "Keep cost-bearing parties visible and prevent victory or accumulated power from self-authorizing its own costs.",
+    evidenceNeeds: [
+      "cost_bearers",
+      "burden_map",
+      "beneficiary",
+      "converted_value",
+      "consent_conditions",
+      "reciprocal_return",
+      "decision_rights",
+      "review_path",
+    ],
+    refusesAuthority: [
+      "sacrifice_as_blank_check",
+      "victory_as_legitimacy",
+      "service_as_disposability",
+      "hidden_cost_as_glory",
+    ],
+    tags: ["stewardship", "cost", "power", "sacrifice", "legitimacy", "reciprocity", "accountability"],
+  },
+  {
+    id: "autonomy-proven-equality",
+    sourceIdeologyNodeId: "autonomy-proven-equality",
+    label: "Autonomy-Proven Equality",
+    glyph: "=",
+    summary: "Test equality by whether independent purpose, dissent, refusal, and departure remain survivable.",
+    proceduralRole: "action_gate",
+    procedureOperator: "requires",
+    proceduralRule:
+      "Require independent purpose, a usable dissent path, feasible exit, bounded retaliation risk, and continued recognition after refusal before strengthening an equality claim.",
+    traceBehavior:
+      "Trace independent purpose, dissent options, exit feasibility, retaliation risk, and the relationship's posture after refusal or departure.",
+    actionEffect:
+      "Downgrade equality and voluntary-loyalty claims when autonomy is praised in theory but punished in practice.",
+    evidenceNeeds: [
+      "independent_purpose",
+      "dissent_path",
+      "feasible_exit",
+      "retaliation_risk",
+      "post_refusal_relationship",
+    ],
+    refusesAuthority: [
+      "loyalty_as_ownership",
+      "service_as_identity",
+      "departure_as_moral_failure",
+      "equality_without_exit",
+    ],
+    tags: ["agency", "equality", "autonomy", "dissent", "refusal", "exit", "non-possession"],
+  },
   ...CIVIC_ORDER_MORAL_PRINCIPLES,
   ...PROVISIONING_MORAL_PRINCIPLES,
 ] as const;

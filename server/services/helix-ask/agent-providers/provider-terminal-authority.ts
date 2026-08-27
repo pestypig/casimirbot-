@@ -32,6 +32,34 @@ const readArray = (value: unknown): unknown[] =>
 const readStringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter(Boolean);
 
+export const buildTerminalLifecycleObservationProjection = (input: {
+  providerEvidenceReentered: boolean;
+  gatewayObservationPackets: HelixAgentStepObservationPacket[];
+  capabilityLaneObservationPackets: HelixAgentStepObservationPacket[];
+}): {
+  lane_executed: boolean;
+  observation_reentered: boolean;
+  observation_ref: string | null;
+  has_observation: boolean;
+} => {
+  const observationPackets = [
+    ...input.gatewayObservationPackets,
+    ...input.capabilityLaneObservationPackets,
+  ];
+  const observationRef = observationPackets
+    .flatMap((packet) => packet.produced_artifact_refs)
+    .map(readString)
+    .find(Boolean);
+  const hasObservation = observationPackets.length > 0;
+  return {
+    lane_executed: hasObservation,
+    observation_reentered:
+      hasObservation && input.providerEvidenceReentered === true,
+    observation_ref: observationRef ?? null,
+    has_observation: hasObservation,
+  };
+};
+
 const committedSubgoalsAreSatisfied = (value: unknown): boolean => {
   const contract = readRecord(value);
   if (

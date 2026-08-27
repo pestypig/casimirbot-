@@ -12,7 +12,7 @@ const VAGUE_RULE_PATTERNS = [
 
 describe("Moral wisdom procedural principle catalog", () => {
   it("requires every principle mapping to carry procedural source, rule, trace, and boundaries", () => {
-    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(53);
+    expect(MORAL_WISDOM_PRINCIPLES.length).toBe(57);
 
     for (const principle of MORAL_WISDOM_PRINCIPLES) {
       expect(principle.sourceIdeologyNodeId).toBe(principle.id);
@@ -128,6 +128,22 @@ describe("Moral wisdom procedural principle catalog", () => {
         "uncertainty_as_indifference",
       ]),
     });
+    expect(getMoralWisdomPrinciple("protection-without-possession")).toMatchObject({
+      proceduralRole: "constraint",
+      procedureOperator: "constrains",
+      evidenceNeeds: expect.arrayContaining(["protected_party", "affected_agency", "decision_access"]),
+      refusesAuthority: expect.arrayContaining(["protection_as_control", "care_as_possession"]),
+    });
+    expect(getMoralWisdomPrinciple("cost-to-power-conversion-ledger")).toMatchObject({
+      proceduralRole: "evidence_requirement",
+      evidenceNeeds: expect.arrayContaining(["cost_bearers", "beneficiary", "converted_value", "reciprocal_return"]),
+      refusesAuthority: expect.arrayContaining(["sacrifice_as_blank_check", "victory_as_legitimacy"]),
+    });
+    expect(getMoralWisdomPrinciple("autonomy-proven-equality")).toMatchObject({
+      proceduralRole: "action_gate",
+      evidenceNeeds: expect.arrayContaining(["independent_purpose", "feasible_exit", "retaliation_risk"]),
+      refusesAuthority: expect.arrayContaining(["loyalty_as_ownership", "departure_as_moral_failure"]),
+    });
   });
 
   it("models dependency failure badges as repairable procedural gates", () => {
@@ -201,6 +217,21 @@ describe("Moral wisdom procedural principle catalog", () => {
     expect(getMoralWisdomPrinciple("mandate-bounded-hierarchy")).toMatchObject({
       proceduralRole: "action_gate",
       evidenceNeeds: expect.arrayContaining(["authority_scope", "review_path"]),
+    });
+    expect(getMoralWisdomPrinciple("leadership-as-capacity-transfer")).toMatchObject({
+      proceduralRole: "balancer",
+      procedureOperator: "routes_to",
+      evidenceNeeds: expect.arrayContaining([
+        "originating_expertise",
+        "knowledge_transfer_path",
+        "competence_to_decision_rights",
+        "succession_path",
+      ]),
+      refusesAuthority: expect.arrayContaining([
+        "expertise_as_total_sovereignty",
+        "indispensability_as_leadership",
+        "development_without_authority_growth",
+      ]),
     });
     expect(getMoralWisdomPrinciple("cooperation-without-assimilation")?.refusesAuthority).toContain(
       "cooperation_as_assimilation",

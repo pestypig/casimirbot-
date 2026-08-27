@@ -116,6 +116,7 @@ import type {
 import { buildWorkstationGatewayObservationPacket } from "../workstation-tool-gateway/observation-packet";
 import {
   buildHelixProviderReasoningReentry,
+  buildTerminalLifecycleObservationProjection,
   hasCurrentTurnResidentSemanticReplanRecovery,
   hasSuccessfulLaterRetryForFailedGatewayCapability,
   providerRequestUserInputBoundaryObservationRefs,
@@ -257,6 +258,7 @@ import {
   affirmativeMinecraftPlayerControlCapabilityIds,
   isAffirmativeMinecraftPlayerEmbodimentActionPrompt,
   minecraftPlayerEmbodimentActionPromptMatch,
+  requiredMinecraftPlayerCombatCapabilityIds,
   requiredMinecraftResidentRecoveryCapabilityIds,
   sourceTargetIntentRequiresMinecraftPlayerEmbodimentAction,
 } from "../minecraft-execution-plane-intent";
@@ -11817,6 +11819,13 @@ export const attachCodexMinecraftPlayerEmbodimentActionRequirement = (input: {
         HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
       ],
     });
+  const requiredCombatCapabilityIds =
+    requiredMinecraftPlayerCombatCapabilityIds(input.promptText ?? "", {
+      trusted_environment_domain:
+        input.trustedEnvironmentContext?.trusted_environment_domain ?? null,
+      authorized_player_action_capability_ids:
+        HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+    });
   const actionRequirement = {
     group_id: MINECRAFT_PLAYER_EMBODIMENT_ACTION_REQUIREMENT_ID,
     semantic_requirement:
@@ -12016,6 +12025,10 @@ export const attachCodexMinecraftPlayerEmbodimentActionRequirement = (input: {
     }),
     terminal_success_criteria: {
       ...(existingTerminalCriteria ?? {}),
+      required_capabilities: uniqueStrings([
+        ...readStringArray(existingTerminalCriteria?.required_capabilities),
+        ...requiredCombatCapabilityIds,
+      ]),
       required_observation_families: uniqueStrings([
         ...readStringArray(
           existingTerminalCriteria?.required_observation_families,
@@ -12048,6 +12061,7 @@ export const attachCodexMinecraftPlayerEmbodimentActionRequirement = (input: {
     capability_selection_authority: "codex_runtime",
     admitted_execution_authority: "helix",
     exact_capability_preselected: false,
+    required_effect_capability_ids: requiredCombatCapabilityIds,
     terminal_requires_successful_action_observation: true,
     post_action_observation_capabilities: readArray(
       constrainedCompoundContract?.subgoals,
@@ -16667,6 +16681,7 @@ export const shouldAllowCodexObservationDependentCapabilityProposal = (input: {
   payload: Record<string, unknown>;
   admittedCapabilityIds: string[];
   lastAttempt: Record<string, unknown> | null | undefined;
+  currentCompoundCapabilityLedger?: Record<string, unknown> | null;
 }): boolean => {
   if (
     input.trigger !== "post_attempt" &&
@@ -16682,9 +16697,24 @@ export const shouldAllowCodexObservationDependentCapabilityProposal = (input: {
     input.payload.capability_itinerary_execution_state,
   );
   const missingRequiredCapabilities = uniqueStrings(
-    readArray(executionState?.missing_required_capabilities)
-      .map(readString)
-      .filter((entry): entry is string => Boolean(entry)),
+    [
+      ...readArray(executionState?.missing_required_capabilities).map(
+        readString,
+      ),
+      ...readArray(input.currentCompoundCapabilityLedger?.subgoals)
+        .map(readRecord)
+        .filter(
+          (subgoal): subgoal is Record<string, unknown> =>
+            Boolean(subgoal) &&
+            subgoal?.satisfied !== true &&
+            readString(subgoal?.satisfaction) !== "satisfied",
+        )
+        .map(
+          (subgoal) =>
+            readString(subgoal.runtime_capability) ??
+            readString(subgoal.requested_capability),
+        ),
+    ].filter((entry): entry is string => Boolean(entry)),
   );
   const admittedCapabilityIds = new Set(
     uniqueStrings(input.admittedCapabilityIds),
@@ -16706,6 +16736,7 @@ export const codexObservationDependentCapabilityProposalIds = (input: {
   payload: Record<string, unknown>;
   admittedCapabilityIds: string[];
   lastAttempt: Record<string, unknown> | null | undefined;
+  currentCompoundCapabilityLedger?: Record<string, unknown> | null;
 }): string[] => {
   const executionState = readRecord(
     input.payload.capability_itinerary_execution_state,
@@ -16722,6 +16753,19 @@ export const codexObservationDependentCapabilityProposalIds = (input: {
       ...readArray(executionState?.missing_required_capabilities).map(
         readString,
       ),
+      ...readArray(input.currentCompoundCapabilityLedger?.subgoals)
+        .map(readRecord)
+        .filter(
+          (subgoal): subgoal is Record<string, unknown> =>
+            Boolean(subgoal) &&
+            subgoal?.satisfied !== true &&
+            readString(subgoal?.satisfaction) !== "satisfied",
+        )
+        .map(
+          (subgoal) =>
+            readString(subgoal.runtime_capability) ??
+            readString(subgoal.requested_capability),
+        ),
       ...runtimeProviderMissingCapabilityAnyOfGroupIdsFromBody(input.payload),
     ].filter(
       (capabilityId): capabilityId is string =>
@@ -22230,6 +22274,36 @@ const emitCodexProviderProgressTranscriptEvents = (input: {
   }
 };
 
+export const mergeCodexNativeTranscriptEvents = (input: {
+  reconstructedEvents: Record<string, unknown>[];
+  nativeEvents: Record<string, unknown>[];
+}): Record<string, unknown>[] => {
+  const seenIds = new Set<string>();
+  const unique = (events: Record<string, unknown>[]) =>
+    events.filter((event) => {
+      const eventId = readString(event.id);
+      if (!eventId) return true;
+      if (seenIds.has(eventId)) return false;
+      seenIds.add(eventId);
+      return true;
+    });
+  const reconstructedNonTerminal = input.reconstructedEvents.filter(
+    (event) =>
+      readString(event.source_event_type) !== "terminal_answer" &&
+      readString(event.type) !== "final_answer",
+  );
+  const reconstructedTerminal = input.reconstructedEvents.filter(
+    (event) =>
+      readString(event.source_event_type) === "terminal_answer" ||
+      readString(event.type) === "final_answer",
+  );
+  return unique([
+    ...reconstructedNonTerminal,
+    ...input.nativeEvents,
+    ...reconstructedTerminal,
+  ]);
+};
+
 export const runExplicitCodexWorkstationGatewayCalls = async (input: {
   body: Record<string, unknown>;
   turnId?: string | null;
@@ -24594,10 +24668,12 @@ export const codexProvider: HelixAgentProvider = {
       request.body,
     );
     const emittedLiveTranscriptEventIds = new Set<string>();
+    const capturedNativeTranscriptEvents: Record<string, unknown>[] = [];
     const emitCodexNativeRuntimeEvent = (
       _event: HelixAgentRuntimeEvent,
       transcriptEvent: Record<string, unknown>,
     ): void => {
+      capturedNativeTranscriptEvents.push({ ...transcriptEvent });
       emitCodexProviderProgressTranscriptEvents({
         emit: request.onTranscriptEvent,
         events: [transcriptEvent],
@@ -26136,6 +26212,7 @@ export const codexProvider: HelixAgentProvider = {
           payload: request.body,
           admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
           lastAttempt: providerLastAttempt,
+          currentCompoundCapabilityLedger: codexCompoundSubgoalLedger,
         });
       const observationDependentCapabilityProposalIds =
         allowObservationDependentCapabilityProposal
@@ -26143,6 +26220,7 @@ export const codexProvider: HelixAgentProvider = {
               payload: request.body,
               admittedCapabilityIds: runtimeProviderAdmittedCapabilityIds,
               lastAttempt: providerLastAttempt,
+              currentCompoundCapabilityLedger: codexCompoundSubgoalLedger,
             })
           : [];
       const missingSemanticPlayerActionCapabilityIds =
@@ -32966,12 +33044,16 @@ export const codexProvider: HelixAgentProvider = {
         timeline: capabilityLaneDebugProjection.capability_lane_turn_timeline,
         reenteredObservationRefs: capabilityLaneReenteredObservationRefs,
       });
-    const capabilityLaneReentryRows = reconciledCapabilityLaneTimeline.filter(
-      (event) => event.stage === "lane_reentered",
-    );
-    const capabilityLaneObservationsReentered =
-      capabilityLaneReentryRows.length > 0 &&
-      capabilityLaneReentryRows.every((event) => event.observation_reentered);
+    const terminalLifecycleObservationProjection =
+      buildTerminalLifecycleObservationProjection({
+        providerEvidenceReentered:
+          readBoolean(
+            providerReentry.providerReasoningReentry.evidence_reentered,
+          ) === true,
+        gatewayObservationPackets,
+        capabilityLaneObservationPackets:
+          capabilityLaneContext.observation_packets,
+      });
     const capabilityLaneTerminalTimelineEvent = {
       schema: "helix.capability_lane.provider_timeline_event.v1",
       seq: reconciledCapabilityLaneTimeline.length,
@@ -32983,17 +33065,15 @@ export const codexProvider: HelixAgentProvider = {
       lane_visible: false,
       lane_requested:
         capabilityLaneDebugProjection.capability_lane_call_results.length > 0,
-      lane_executed: capabilityLaneContext.observation_packets.length > 0,
-      observation_reentered: capabilityLaneObservationsReentered,
+      lane_executed: terminalLifecycleObservationProjection.lane_executed,
+      observation_reentered:
+        terminalLifecycleObservationProjection.observation_reentered,
       selected_backend_provider: null,
-      observation_ref:
-        capabilityLaneContext.observation_packets[0]?.produced_artifact_refs.find(
-          (ref) => readString(ref),
-        ) ?? null,
+      observation_ref: terminalLifecycleObservationProjection.observation_ref,
       receipt_ref:
         capabilityLaneContext.projection_receipts[0]?.receipt_ref ?? null,
       latest_event_id: null,
-      has_observation: capabilityLaneContext.observation_packets.length > 0,
+      has_observation: terminalLifecycleObservationProjection.has_observation,
       terminal_authority_status: terminalAuthorityStatus,
       reentry_required: true,
       terminal_eligible: false,
@@ -34849,6 +34929,10 @@ export const codexProvider: HelixAgentProvider = {
     ) {
       providerWriterText = scientificImageRetryTerminalText;
     }
+    responsePayload.turn_transcript_events = mergeCodexNativeTranscriptEvents({
+      reconstructedEvents: responsePayload.turn_transcript_events ?? [],
+      nativeEvents: capturedNativeTranscriptEvents,
+    });
     if (
       providerWriterText &&
       providerWriterKind &&
@@ -34921,13 +35005,21 @@ export const codexProvider: HelixAgentProvider = {
             }
           : event,
       );
-      responsePayload.turn_transcript_event_count =
-        responsePayload.turn_transcript_events.length;
-      if (debug) {
-        debug.turn_transcript_events = responsePayload.turn_transcript_events;
-        debug.turn_transcript_event_count =
-          responsePayload.turn_transcript_event_count;
-      }
+    }
+    responsePayload.turn_transcript_event_count =
+      responsePayload.turn_transcript_events.length;
+    responsePayload.turn_transcript_native_event_count =
+      capturedNativeTranscriptEvents.length;
+    responsePayload.turn_transcript_complete_public_lifecycle = true;
+    const transcriptDebug = readRecord(responsePayload.debug);
+    if (transcriptDebug) {
+      transcriptDebug.turn_transcript_events =
+        responsePayload.turn_transcript_events;
+      transcriptDebug.turn_transcript_event_count =
+        responsePayload.turn_transcript_event_count;
+      transcriptDebug.turn_transcript_native_event_count =
+        responsePayload.turn_transcript_native_event_count;
+      transcriptDebug.turn_transcript_complete_public_lifecycle = true;
     }
     const responseRecord = responsePayload as Record<string, unknown>;
     const responseDebug = readRecord(responseRecord.debug);

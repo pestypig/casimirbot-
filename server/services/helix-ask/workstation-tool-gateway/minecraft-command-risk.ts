@@ -127,6 +127,9 @@ export const classifyKnownMinecraftCommand = (
   if (WORLD_TIME_WEATHER_ROOTS.has(root)) {
     return { category: "world_time_weather", effect: "world_mutation" };
   }
+  if (/^data\s+(?:merge|modify|remove)\s+entity(?:\s|$)/u.test(command)) {
+    return { category: "entity_control", effect: "world_mutation" };
+  }
   if (WORLD_BUILD_ROOTS.has(root) || root === "data" || root === "scoreboard") {
     return { category: "world_build", effect: "world_mutation" };
   }

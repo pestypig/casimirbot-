@@ -139,6 +139,8 @@ import {
   HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
@@ -222,15 +224,22 @@ import {
   isEnvironmentReasoningRoleError,
   type EnvironmentReasoningRoleStore,
 } from "../services/environment-connectors/reasoning-roles/environment-reasoning-role-store";
-import { createConnectorBootstrapPairing } from
+import {
+  ConnectorBootstrapPairingError,
+  createConnectorBootstrapPairing,
+} from
   "../services/environment-connectors/pairing/bootstrap-service";
-import { stageLocalMinecraftPlayerPairing } from
+import {
+  LocalPlayerPairingHandoffError,
+  stageLocalMinecraftPlayerPairing,
+} from
   "../services/environment-connectors/pairing/local-player-pairing-handoff";
 import { stageLocalMinecraftServerPairing } from
   "../services/environment-connectors/pairing/local-server-pairing-handoff";
 import {
   configureEnvironmentActionAuthority,
   extendEnvironmentActionAuthorityLease,
+  isEnvironmentActionAuthorityError,
   readEnvironmentActionAuthorities,
   readEnvironmentActionConnectorReadiness,
 } from "../services/environment-connectors/actions/authority-store";
@@ -1242,6 +1251,8 @@ const minecraftCapabilityIdForActionKind = (
     case "walk": return HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY;
     case "jump": return HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY;
     case "interact": return HELIX_MINECRAFT_PLAYER_INTERACT_CAPABILITY;
+    case "attack": return HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY;
+    case "combat_guard": return HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY;
     case "hotbar_select": return HELIX_MINECRAFT_PLAYER_HOTBAR_SELECT_CAPABILITY;
     case "equip": return HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY;
     case "follow": return HELIX_MINECRAFT_PLAYER_FOLLOW_CAPABILITY;
@@ -1457,6 +1468,53 @@ const toolError = (
 };
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+  if (
+    error instanceof ConnectorBootstrapPairingError ||
+    error instanceof LocalPlayerPairingHandoffError
+  ) {
+    const value = {
+      schema: "helix.environment_connector_pairing_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable:
+        error instanceof ConnectorBootstrapPairingError
+          ? error.statusCode >= 500
+          : false,
+      credential_included: false,
+      pairing_code_included: false,
+      content_role:
+        "environment_connector_pairing_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
+  if (isEnvironmentActionAuthorityError(error)) {
+    const value = {
+      schema: "helix.environment_action_authority_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable: error.statusCode >= 500,
+      credential_included: false,
+      content_role:
+        "environment_action_authority_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
   if (
     error instanceof EnvironmentMonitorStoreError ||
     error instanceof HelixEnvironmentMonitorContractError
