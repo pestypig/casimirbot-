@@ -59,6 +59,7 @@ $listenerCount = 0
 $userDataFileCount = 0
 $processCount = 0
 $readyReceiptValid = $false
+$serviceListenerVerified = $false
 $readyReceiptPath = Join-Path $testRoot "state\desktop-service-ready.json"
 $providerCredentialKeyVaultPath = Join-Path $testRoot (
   "brokerage\provider-credential-key.dpapi"
@@ -90,12 +91,12 @@ try {
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
     Start-Sleep -Milliseconds 500
-    $ids = Get-ProcessTreeIds ([uint32]$rootProcess.Id)
+    $ids = @(Get-ProcessTreeIds ([uint32]$rootProcess.Id))
     $processCount = $ids.Count
     $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
       Where-Object {
         $_.LocalAddress -eq "127.0.0.1" -and
-        $ids.Contains([uint32]$_.OwningProcess)
+        $ids -contains [uint32]$_.OwningProcess
       })
     $listenerCount = $listeners.Count
     $userDataFiles = @(Get-ChildItem `
@@ -105,15 +106,28 @@ try {
       -ErrorAction SilentlyContinue)
     $userDataFileCount = $userDataFiles.Count
     $readyReceiptValid = $false
+    $serviceListenerVerified = $false
     if (Test-Path -LiteralPath $readyReceiptPath) {
       try {
         $receiptFile = Get-Item -LiteralPath $readyReceiptPath
         $receipt = Get-Content -LiteralPath $readyReceiptPath -Raw |
           ConvertFrom-Json
+        $receiptOrigin = [Uri]$receipt.origin
         $readyReceiptValid =
           $receipt.schema -eq "casimir_desktop_service_ready_receipt/1" -and
           $receipt.ready -eq $true -and
+          $receiptOrigin.Scheme -eq "http" -and
+          $receiptOrigin.Host -eq "127.0.0.1" -and
+          $receiptOrigin.Port -ge 1024 -and
+          ($receipt.serviceProcessId -is [int] -or
+            $receipt.serviceProcessId -is [long]) -and
           $receiptFile.LastWriteTimeUtc -ge $launchStartedUtc
+        if ($readyReceiptValid) {
+          $serviceListenerVerified = @($listeners | Where-Object {
+            $_.LocalPort -eq $receiptOrigin.Port -and
+            $_.OwningProcess -eq $receipt.serviceProcessId
+          }).Count -eq 1
+        }
       }
       catch {
         $readyReceiptValid = $false
@@ -134,9 +148,10 @@ try {
     }
   } until (
     (
-      $listenerCount -eq 1 -and
+      $listenerCount -eq 2 -and
       $userDataFileCount -gt 0 -and
-      $readyReceiptValid
+      $readyReceiptValid -and
+      $serviceListenerVerified
     ) -or
     [DateTime]::UtcNow -ge $deadline -or
     $rootProcess.HasExited
@@ -145,14 +160,20 @@ try {
   if ($rootProcess.HasExited) {
     throw "Packaged application exited before verification completed."
   }
-  if ($listenerCount -ne 1) {
-    throw "Expected one packaged loopback listener, found $listenerCount."
+  if ($listenerCount -ne 2) {
+    throw (
+      "Expected the service and credential-broker loopback listeners, " +
+      "found $listenerCount."
+    )
   }
   if ($userDataFileCount -eq 0) {
     throw "The packaged application did not use the isolated user-data root."
   }
   if (-not $readyReceiptValid) {
     throw "The packaged application did not reach full API readiness."
+  }
+  if (-not $serviceListenerVerified) {
+    throw "The ready receipt did not identify exactly one service listener."
   }
   if (
     -not (Test-Path -LiteralPath $providerCredentialKeyVaultPath) -or
@@ -180,6 +201,7 @@ try {
     LoopbackListeners = $listenerCount
     IsolatedUserDataFiles = $userDataFileCount
     FullReadinessReceipt = "PASS"
+    ServiceListenerReceipt = "PASS"
     ProviderCredentialKeyVault = "PASS"
     ProtocolRegistrationPreserved = "PASS"
     MinFreePhysicalGiB = [math]::Round($minFreePhysicalGiB, 2)
@@ -188,11 +210,20 @@ try {
 }
 finally {
   if ($rootProcess) {
-    $ids = Get-ProcessTreeIds ([uint32]$rootProcess.Id)
+    $ids = @(Get-ProcessTreeIds ([uint32]$rootProcess.Id))
     foreach ($processId in @($ids)) {
       Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
     }
-    Start-Sleep -Milliseconds 750
+    $processDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+      Start-Sleep -Milliseconds 250
+      $remainingProcesses = @($ids | Where-Object {
+        Get-Process -Id $_ -ErrorAction SilentlyContinue
+      })
+    } until (
+      $remainingProcesses.Count -eq 0 -or
+      [DateTime]::UtcNow -ge $processDeadline
+    )
   }
 
   if (Test-Path -LiteralPath $testRoot) {
@@ -206,6 +237,14 @@ finally {
     ) {
       throw "Refused to remove an unvalidated launch root."
     }
-    Remove-Item -LiteralPath $validatedRoot -Recurse -Force
+    $removeDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+      try {
+        Remove-Item -LiteralPath $validatedRoot -Recurse -Force
+      } catch {
+        if ([DateTime]::UtcNow -ge $removeDeadline) { throw }
+        Start-Sleep -Milliseconds 250
+      }
+    } while (Test-Path -LiteralPath $validatedRoot)
   }
 }

@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   decryptProviderCredential,
+  decryptStoredProviderCredential,
   encryptProviderCredential,
+  readProviderCredentialEncryptionKeyId,
 } from "../provider-credential-vault";
 
 describe("provider credential vault", () => {
@@ -43,5 +45,43 @@ describe("provider credential vault", () => {
     vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY", "short-secret");
     expect(() => encryptProviderCredential({ token: "secret" }, "owner"))
       .toThrow("provider_credential_encryption_key_invalid");
+  });
+
+  it("rotates an explicitly identified local-development envelope", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY", "");
+    const aad = "robinhood-connection\nconnection:test\nprofile:owner";
+    const bundle = { access_token: "legacy-local-token" };
+    const legacy = encryptProviderCredential(bundle, aad);
+    expect(legacy.keyId).toBe("dev-local");
+
+    vi.stubEnv(
+      "HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY",
+      crypto.randomBytes(32).toString("base64url"),
+    );
+    expect(readProviderCredentialEncryptionKeyId()).toMatch(/^env:/u);
+    expect(decryptStoredProviderCredential(
+      legacy.encryptedValue,
+      aad,
+      legacy.keyId,
+    )).toEqual(bundle);
+  });
+
+  it("never admits the local-development fallback in production", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY", "");
+    const aad = "robinhood-connection\nconnection:test\nprofile:owner";
+    const legacy = encryptProviderCredential({ token: "legacy" }, aad);
+
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv(
+      "HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY",
+      crypto.randomBytes(32).toString("base64url"),
+    );
+    expect(() => decryptStoredProviderCredential(
+      legacy.encryptedValue,
+      aad,
+      legacy.keyId,
+    )).toThrow("provider_credential_key_id_mismatch");
   });
 });

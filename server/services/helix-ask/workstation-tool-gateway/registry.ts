@@ -139,6 +139,11 @@ import {
   livePipelineControlManifest,
 } from "./live-pipeline-control";
 import {
+  executeRealtimeTexturePackHarnessGatewayCapability,
+  REALTIME_TEXTURE_PACK_HARNESS_CAPABILITIES,
+  realtimeTexturePackHarnessManifests,
+} from "./realtime-texture-pack-harness";
+import {
   boundRoomEvidenceManifest,
   executeBoundRoomEvidenceCapability,
   HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
@@ -5810,6 +5815,9 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   ),
   [boundRoomEvidenceManifest.capability_id, boundRoomEvidenceManifest],
   [livePipelineControlManifest.capability_id, livePipelineControlManifest],
+  ...realtimeTexturePackHarnessManifests.map(
+    (manifest) => [manifest.capability_id, manifest] as const,
+  ),
   ...environmentProbeMinecraftManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
@@ -7212,6 +7220,52 @@ export const callWorkstationGatewayCapability = async (
       error: "error" in gatewayResult ? gatewayResult.error : undefined,
       terminalEligible: false,
     });
+    return {
+      schema: "helix.workstation_tool_gateway.call_result.v1",
+      manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,
+      ok: gatewayResult.ok,
+      agent_runtime: agentRuntime,
+      capability_id: manifest.capability_id,
+      mode,
+      gateway_admission: admission,
+      observation_packet: observationPacket,
+      tool_lifecycle_trace: trace.tool_lifecycle_trace,
+      tool_followup_decision: trace.tool_followup_decision,
+      observation: gatewayResult.observation,
+      artifact_refs: observationPacket.produced_artifact_refs,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      ...("error" in gatewayResult ? { error: gatewayResult.error } : {}),
+    };
+  }
+
+  if (REALTIME_TEXTURE_PACK_HARNESS_CAPABILITIES.has(manifest.capability_id)) {
+    const gatewayResult = executeRealtimeTexturePackHarnessGatewayCapability({
+      capabilityId: manifest.capability_id,
+      profileId: input.profileId,
+    });
+    const admission = buildAdmission({
+      capabilityId: manifest.capability_id,
+      agentRuntime,
+      permissionProfile: manifest.permission_profile_required,
+      status: gatewayResult.ok ? "admitted" : "blocked",
+      reason: gatewayResult.ok ? "user_leased_visual_projection_control_admitted" : "user_leased_visual_projection_control_blocked",
+      blockedReason: "error" in gatewayResult ? gatewayResult.error : undefined,
+    });
+    const observationPacket = buildWorkstationGatewayObservationPacket({
+      turnId,
+      iteration,
+      capabilityId: manifest.capability_id,
+      panelId: manifest.panel_id ?? "image-lens",
+      action: manifest.action_id,
+      status: gatewayResult.ok ? (gatewayResult.status === "queued" ? "client_pending" : "succeeded") : "blocked",
+      summary: gatewayResult.summary,
+      observation: gatewayResult.observation,
+      ...(!gatewayResult.ok ? { missingRequirements: [{ code: gatewayResult.error, message: gatewayResult.summary, repair_action: "ask_user" as const }] } : {}),
+    });
+    const trace = buildGatewayTrace({ turnId, capabilityId: manifest.capability_id, agentRuntime, admission, observationPacket, error: "error" in gatewayResult ? gatewayResult.error : undefined, terminalEligible: false });
     return {
       schema: "helix.workstation_tool_gateway.call_result.v1",
       manifest_version: WORKSTATION_GATEWAY_MANIFEST_VERSION,

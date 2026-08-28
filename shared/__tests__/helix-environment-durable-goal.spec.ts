@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHelixEnvironmentDurableGoalEvent,
+  helixEnvironmentDurableGoalObjectiveSchema,
   reduceHelixEnvironmentDurableGoalEvents,
   type HelixEnvironmentDurableGoalEvent,
   type HelixEnvironmentDurableGoalEventPayload,
@@ -70,6 +71,26 @@ const genesis = (): HelixEnvironmentDurableGoalEvent[] => append([], {
 });
 
 describe("Helix environment durable goal reducer", () => {
+  it("admits a brokerage-native monitor-only objective without Minecraft fields", () => {
+    const parsed = helixEnvironmentDurableGoalObjectiveSchema.parse({
+      objective_text: "Prove the read-only Robinhood paper observer lifecycle.",
+      goal_kind: "robinhood_shadow_observation",
+      domain: "brokerage",
+      provider: "robinhood",
+      controller_profile_id: "resident.brokerage.market_observer.v1",
+      reaction_requirement: "monitor_only",
+      milestones: [{
+        milestone_id: "brokerage_observer:identity_bound",
+        description: "Bind the exact profile-owned observer identity.",
+        dependency_milestone_ids: [],
+        required_postcondition_ids: ["brokerage_observer:identity_verified"],
+      }],
+    });
+    expect(parsed.domain).toBe("brokerage");
+    expect(parsed).not.toHaveProperty("game_version");
+    expect(parsed).not.toHaveProperty("mechanics_collection_ref");
+  });
+
   it("retains failed attempts while later verified evidence completes the same milestone", () => {
     let events = genesis();
     events = append(events, {

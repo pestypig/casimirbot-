@@ -21,6 +21,7 @@ public final class PlayerActionController {
     private int confirmedJumps;
     private long lastJumpPulseTick;
     private double jumpStartY;
+    private boolean walkJumpArcOwned;
     private Double actionStartX;
     private Double actionStartY;
     private Double actionStartZ;
@@ -86,6 +87,7 @@ public final class PlayerActionController {
         confirmedJumps = 0;
         lastJumpPulseTick = -1;
         jumpStartY = 0;
+        walkJumpArcOwned = false;
         actionStartX = null;
         actionStartY = null;
         actionStartZ = null;
@@ -263,7 +265,7 @@ public final class PlayerActionController {
             case "attack" -> attack(snapshot);
             case "hotbar_select" -> selectHotbar();
             case "equip" -> equip();
-            case "follow", "collect", "mine", "place", "craft", "inventory_transfer" ->
+            case "follow", "collect", "mine", "place", "craft", "consume", "inventory_transfer" ->
                 reusableWorkflow();
             default -> reusableWorkflow();
         }
@@ -334,7 +336,8 @@ public final class PlayerActionController {
             LocomotionSafetyEnvelope.Check safety = bridge.checkLocomotionSafety(
                 x,
                 z,
-                6.0
+                6.0,
+                false
             );
             if (!safety.decision().admitted()) {
                 lastMeasurements = safety.measurements();
@@ -1068,10 +1071,15 @@ public final class PlayerActionController {
         });
         double targetX = snapshot.x() - Math.sin(heading);
         double targetZ = snapshot.z() + Math.cos(heading);
+        boolean jumpRequested = Boolean.TRUE.equals(active.arguments().get("jump"));
+        if (jumpRequested && snapshot.onGround()) {
+            walkJumpArcOwned = true;
+        }
         LocomotionSafetyEnvelope.Check safety = bridge.checkLocomotionSafety(
             targetX,
             targetZ,
-            6.0
+            6.0,
+            jumpRequested && walkJumpArcOwned
         );
         if (!safety.decision().admitted()) {
             lastMeasurements = safety.measurements();
@@ -1087,7 +1095,7 @@ public final class PlayerActionController {
             "back".equals(direction),
             "left".equals(direction),
             "right".equals(direction),
-            Boolean.TRUE.equals(active.arguments().get("jump")),
+            jumpRequested,
             bool(active.arguments(), "sprint")
         ));
     }

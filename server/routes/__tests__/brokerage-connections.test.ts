@@ -18,6 +18,7 @@ import {
   setPaperTradingKillSwitch,
 } from "../../services/trading/paper-trading-store";
 import {
+  cancelOpenPaperEntry,
   listPaperTradingLifecycle,
   processPaperQuoteObservation,
   submitAcceptedPaperEntry,
@@ -50,12 +51,33 @@ import {
 import { runLiveTradingSupervisorCycle } from
   "../../services/trading/live-trading-supervisor";
 import {
+  processBrokerageReactiveControllerObservation,
+  readBrokerageReactiveController,
+  runBrokerageReactiveControllerWatchdogCycle,
+  startBrokerageReactiveController,
+  tripBrokerageReactiveControllerSource,
+} from "../../services/trading/brokerage-reactive-controller-store";
+import {
+  readBrokerageReactiveLiveShadow,
+  recoverInterruptedBrokerageReactiveLiveShadowPolls,
+  runBrokerageReactiveLiveShadowPoll,
+  startBrokerageReactiveLiveShadow,
+} from "../../services/trading/brokerage-reactive-live-shadow-store";
+import {
+  archiveBrokerageReactiveLiveShadowAcceptance,
+  getLatestBrokerageReactiveLiveShadowAcceptance,
+  readBrokerageReactiveLiveShadowEvidence,
+} from
+  "../../services/trading/brokerage-reactive-live-shadow-evidence-store";
+import {
   hasFreshRobinhoodLiveProviderContractAcceptance,
   runRobinhoodLiveProviderContractPreflight,
 } from
   "../../services/trading/live-provider-contract-preflight-store";
 import { readRobinhoodLiveAcceptanceReadiness } from
   "../../services/trading/live-acceptance-readiness";
+import { runDeterministicBrokerageReactiveReplay } from
+  "@shared/trading/brokerage-reactive-simulation";
 
 const SAME_ORIGIN_HEADERS = {
   Host: "casimirbot.test",
@@ -652,6 +674,894 @@ describe("Robinhood brokerage connection boundary", () => {
         },
       }),
     });
+    const earningsObservation = await executeRobinhoodPrivateRoomRead({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      toolName: "get_earnings_results",
+      arguments: { symbols: ["TEST"] },
+      fetchImpl: fetchMock,
+      now: paperNow,
+      mcpCall: async () => ({
+        structuredContent: { data: { results: [], not_found: [] } },
+      }),
+    });
+    const reactiveManifest = {
+      schema: "helix.brokerage_reactive_simulation.v1" as const,
+      strategy_manifest_id: "brokerage_strategy:route-r1",
+      strategy_artifact_hash: `sha256:${"1".repeat(64)}` as const,
+      controller_profile_id: "resident.brokerage.simulated_execution.v1" as const,
+      controller_profile_hash: `sha256:${"2".repeat(64)}` as const,
+      owner_profile_id: "profile:brokerage-owner",
+      room_id: roomId,
+      environment_binding_id: "environment_binding:route-r1",
+      connection_id: completed.body.connection.connection_id,
+      paper_account_id: paperAccount.body.account_id,
+      producer_epoch_ref: entryObservation.producer_epoch_ref,
+      allowed_symbols: ["TEST"],
+      required_quote_fields: [
+        "bid_micros", "ask_micros", "last_micros", "prior_close_micros",
+        "market_session",
+      ] as const,
+      observation_schedule: {
+        mode: "bounded_poll" as const,
+        minimum_interval_ms: 100,
+        maximum_interval_ms: 1_000,
+      },
+      maximum_quote_age_ms: 30_000,
+      entry_predicates: {
+        minimum_decline_from_prior_close_bps: 100,
+        maximum_spread_bps: 100,
+        require_regular_session: true as const,
+        require_no_open_position: true as const,
+        require_no_open_order: true as const,
+      },
+      candidate_ranking: "manifest_symbol_order" as const,
+      entry_limit_policy: {
+        kind: "ask_capped_limit" as const,
+        maximum_entry_above_ask_bps: 0 as const,
+      },
+      protective_exit_policy: {
+        kind: "fixed_stop_bps" as const,
+        stop_distance_bps: 100,
+      },
+      simulation_model: {
+        kind: "quote_touch_v1" as const,
+        deterministic_latency_ms: 100,
+        deterministic_slippage_bps: 0,
+        partial_fill_policy: {
+          kind: "deterministic_fraction_bps" as const,
+          fill_fraction_bps: 5_000,
+        },
+      },
+      maximum_notional_cents: 500,
+      maximum_estimated_risk_cents: 10,
+      maximum_open_positions: 1 as const,
+      daily_loss_limit_cents: 300,
+      regular_session_only: true as const,
+      manifest_created_at: "2026-08-12T14:59:00.000Z",
+      manifest_expires_at: "2026-08-14T15:30:00.000Z",
+      reset_policy: {
+        on_lease_expiry: "release_and_require_fresh_manifest" as const,
+        on_producer_epoch_change: "trip_and_require_fresh_snapshot" as const,
+        on_retention_gap: "trip_and_require_fresh_snapshot" as const,
+      },
+      simulated: true as const,
+      provider_mutation_attempted: false as const,
+      live_order_execution_enabled: false as const,
+      credential_included: false as const,
+      account_numbers_included: false as const,
+      raw_provider_payload_included: false as const,
+      answer_authority: false as const,
+      assistant_answer: false as const,
+      terminal_eligible: false as const,
+    };
+    const reactiveReplay = runDeterministicBrokerageReactiveReplay({
+      manifest: reactiveManifest,
+      observations: [{
+        schema: "helix.brokerage_reactive_simulation.v1",
+        observation_id: entryObservation.observation_id,
+        observation_revision: 1,
+        sequence: 1,
+        owner_profile_id: "profile:brokerage-owner",
+        room_id: roomId,
+        environment_binding_id: "environment_binding:route-r1",
+        connection_id: completed.body.connection.connection_id,
+        paper_account_id: paperAccount.body.account_id,
+        producer_epoch_ref: entryObservation.producer_epoch_ref,
+        symbol: "TEST",
+        bid_micros: 10_000_000,
+        ask_micros: 10_010_000,
+        last_micros: 10_005_000,
+        prior_close_micros: 10_500_000,
+        market_session: "regular",
+        event_time: entryObservation.observed_at,
+        provider_observed_at: entryObservation.observed_at,
+        arrived_at: entryObservation.observed_at,
+        processed_at: entryObservation.observed_at,
+        source_output_hash: entryObservation.output_hash,
+        authoritative_snapshot: true,
+        retention_gap_after_sequence: null,
+        source_read_only: true,
+        simulation_input_only: true,
+        provider_mutation_attempted: false,
+        live_order_execution_enabled: false,
+        credential_included: false,
+        account_numbers_included: false,
+        raw_provider_payload_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      }],
+    });
+    const reactiveAdmission = await owner.post(
+      `/api/agi/brokerage-connections/${completed.body.connection.connection_id}` +
+      `/rooms/${roomId}/reactive-simulation/proposals/admit`,
+    ).set(SAME_ORIGIN_HEADERS).send({
+      manifest: reactiveManifest,
+      decision_receipt: reactiveReplay.receipts[0],
+      earnings_observation_id: earningsObservation.observation_id,
+    });
+    expect(
+      reactiveAdmission.status,
+      JSON.stringify(reactiveAdmission.body),
+    ).toBe(201);
+    expect(reactiveAdmission.body).toMatchObject({
+      operation: "brokerage.reactive_simulation.admit_proposal",
+      disposition: "simulated_entry_reserved",
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+      live_order_execution_enabled: false,
+      answer_authority: false,
+      terminal_eligible: false,
+      order: {
+        status: "open",
+        fill_state: "unfilled",
+        execution_model: {
+          partial_fill_policy: { fill_fraction_bps: 5_000 },
+        },
+      },
+    });
+    await cancelOpenPaperEntry({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      orderId: reactiveAdmission.body.order.order_id,
+      now: new Date("2026-08-12T15:00:00.100Z"),
+    });
+    const controllerBase =
+      `/api/agi/brokerage-connections/${completed.body.connection.connection_id}` +
+      `/rooms/${roomId}/reactive-simulation/controllers`;
+    const controllerStart = await owner.post(controllerBase)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        client_controller_id: "client_controller:route-r2-manual",
+        manifest: reactiveManifest,
+        maximum_cycles: 2,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:00:10.000Z",
+        lease_expires_at: "2026-08-12T15:00:15.000Z",
+      });
+    expect(controllerStart.status, JSON.stringify(controllerStart.body)).toBe(201);
+    expect(controllerStart.body).toMatchObject({
+      status: "active",
+      finite_scheduler: true,
+      independent_watchdog: true,
+      private_model_loop_present: false,
+      controller_lease_released: false,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+    });
+    const r2Observation = {
+      schema: "helix.brokerage_reactive_simulation.v1" as const,
+      observation_id: entryObservation.observation_id,
+      observation_revision: 10,
+      sequence: 10,
+      owner_profile_id: "profile:brokerage-owner",
+      room_id: roomId,
+      environment_binding_id: "environment_binding:route-r1",
+      connection_id: completed.body.connection.connection_id,
+      paper_account_id: paperAccount.body.account_id,
+      producer_epoch_ref: entryObservation.producer_epoch_ref,
+      symbol: "TEST",
+      bid_micros: 10_000_000,
+      ask_micros: 10_010_000,
+      last_micros: 10_005_000,
+      prior_close_micros: 10_500_000,
+      market_session: "regular" as const,
+      event_time: entryObservation.observed_at,
+      provider_observed_at: entryObservation.observed_at,
+      arrived_at: entryObservation.observed_at,
+      processed_at: entryObservation.observed_at,
+      source_output_hash: entryObservation.output_hash,
+      authoritative_snapshot: true,
+      retention_gap_after_sequence: null,
+      source_read_only: true as const,
+      simulation_input_only: true as const,
+      provider_mutation_attempted: false as const,
+      live_order_execution_enabled: false as const,
+      credential_included: false as const,
+      account_numbers_included: false as const,
+      raw_provider_payload_included: false as const,
+      answer_authority: false as const,
+      assistant_answer: false as const,
+      terminal_eligible: false as const,
+    };
+    const controllerCycleUrl = `${controllerBase}/` +
+      `${controllerStart.body.controller_run_id}/observations/process`;
+    const firstControllerCycle = await owner.post(controllerCycleUrl)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        observation: r2Observation,
+        earnings_observation_id: earningsObservation.observation_id,
+      });
+    expect(firstControllerCycle.status,
+      JSON.stringify(firstControllerCycle.body)).toBe(201);
+    expect(firstControllerCycle.body).toMatchObject({
+      operation: "brokerage.reactive_controller.process_observation",
+      duplicate_replay: false,
+      effect_resolved: true,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+      live_order_execution_enabled: false,
+      arbiter_receipt: {
+        disposition: "simulated_entry_reserved",
+        provider_order_tool_calls_made: 0,
+      },
+      controller_run: {
+        status: "active",
+        processed_cycles: 1,
+        controller_lease_released: false,
+      },
+    });
+    const duplicateControllerCycle = await owner.post(controllerCycleUrl)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        observation: r2Observation,
+        earnings_observation_id: earningsObservation.observation_id,
+      })
+      .expect(201);
+    expect(duplicateControllerCycle.body).toMatchObject({
+      duplicate_replay: true,
+      arbiter_receipt: {
+        effect_idempotency_key:
+          firstControllerCycle.body.arbiter_receipt.effect_idempotency_key,
+      },
+    });
+    const manualOverride = await owner
+      .post(`${controllerBase}/${controllerStart.body.controller_run_id}/control`)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ action: "manual_override", reason: "operator moved controls" })
+      .expect(200);
+    expect(manualOverride.body).toMatchObject({
+      status: "manual_override",
+      terminal_reason: "manual_override",
+      new_simulated_risk_locked: true,
+      controller_lease_released: true,
+      released_simulated_order_count: 1,
+      released_reservation_cents: 500,
+      provider_order_tool_calls_made: 0,
+    });
+    const persistedManualOverride = await owner
+      .get(`${controllerBase}/${controllerStart.body.controller_run_id}`)
+      .set(SAME_ORIGIN_HEADERS)
+      .expect(200);
+    expect(persistedManualOverride.body).toMatchObject({
+      status: "manual_override",
+      controller_lease_released: true,
+      terminal_eligible: false,
+    });
+    await cancelOpenPaperEntry({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      orderId: firstControllerCycle.body.arbiter_receipt.order.order_id,
+      now: new Date("2026-08-12T15:00:00.200Z"),
+    });
+    await setPaperTradingKillSwitch({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      active: false,
+      reason: "reset after R2 manual override fixture",
+      now: paperNow,
+    });
+    const gapController = await owner.post(controllerBase)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        client_controller_id: "client_controller:route-r2-gap",
+        manifest: reactiveManifest,
+        maximum_cycles: 3,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:00:10.000Z",
+        lease_expires_at: "2026-08-12T15:00:15.000Z",
+      }).expect(201);
+    const gapCycle = await owner.post(`${controllerBase}/` +
+      `${gapController.body.controller_run_id}/observations/process`)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        observation: {
+          ...r2Observation,
+          observation_id: "brokerage_observation:r2-gap",
+          observation_revision: 11,
+          sequence: 11,
+          retention_gap_after_sequence: 9,
+        },
+        earnings_observation_id: null,
+      }).expect(201);
+    expect(gapCycle.body).toMatchObject({
+      arbiter_receipt: null,
+      provider_order_tool_calls_made: 0,
+      controller_run: {
+        status: "watchdog_tripped",
+        terminal_reason: "retention_gap",
+        fresh_snapshot_required: true,
+        controller_lease_released: true,
+      },
+    });
+    await setPaperTradingKillSwitch({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      active: false,
+      reason: "reset after R2 gap fixture",
+      now: paperNow,
+    });
+    const emergencyController = await owner.post(controllerBase)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        client_controller_id: "client_controller:route-r2-emergency",
+        manifest: reactiveManifest,
+        maximum_cycles: 3,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:00:10.000Z",
+        lease_expires_at: "2026-08-12T15:00:15.000Z",
+      }).expect(201);
+    const emergencyStop = await owner.post(`${controllerBase}/` +
+      `${emergencyController.body.controller_run_id}/control`)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ action: "emergency_stop", reason: "operator Emergency Stop" })
+      .expect(200);
+    expect(emergencyStop.body).toMatchObject({
+      status: "emergency_stopped",
+      terminal_reason: "emergency_stop",
+      controller_lease_released: true,
+      provider_mutation_attempted: false,
+    });
+    await setPaperTradingKillSwitch({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      active: false,
+      reason: "reset after R2 Emergency Stop fixture",
+      now: paperNow,
+    });
+    const deadlineController = await owner.post(controllerBase)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        client_controller_id: "client_controller:route-r2-deadline",
+        manifest: reactiveManifest,
+        maximum_cycles: 3,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:00:00.500Z",
+        lease_expires_at: "2026-08-12T15:00:01.000Z",
+      }).expect(201);
+    const watchdogCycle = await runBrokerageReactiveControllerWatchdogCycle({
+      now: new Date("2026-08-12T15:00:00.600Z"),
+    });
+    expect(watchdogCycle).toMatchObject({
+      controllers_checked: 1,
+      controllers_tripped: 1,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+    });
+    const deadlineStatus = await owner
+      .get(`${controllerBase}/${deadlineController.body.controller_run_id}`)
+      .set(SAME_ORIGIN_HEADERS)
+      .expect(200);
+    expect(deadlineStatus.body).toMatchObject({
+      status: "watchdog_tripped",
+      terminal_reason: "controller_deadline_reached",
+      controller_lease_released: true,
+    });
+    await setPaperTradingKillSwitch({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      active: false,
+      reason: "reset after R2 deadline fixture",
+      now: paperNow,
+    });
+    const shadowController = await owner.post(controllerBase)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({
+        client_controller_id: "client_controller:route-r3-shadow",
+        manifest: reactiveManifest,
+        maximum_cycles: 1,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:00:10.000Z",
+        lease_expires_at: "2026-08-12T15:00:15.000Z",
+      }).expect(201);
+    const shadowStart = await owner.post(
+      `${controllerBase}/${shadowController.body.controller_run_id}/live-shadow`,
+    ).set(SAME_ORIGIN_HEADERS).send({
+      client_shadow_session_id: "client_shadow:route-r3",
+      symbol: "TEST",
+      poll_interval_ms: 1_000,
+      maximum_polls: 1,
+      maximum_consecutive_failures: 1,
+      earnings_observation_id: null,
+      session_expires_at: "2026-08-12T15:00:09.000Z",
+    }).expect(201);
+    expect(shadowStart.body).toMatchObject({
+      status: "active",
+      bounded_polling: true,
+      private_model_loop_present: false,
+      owner_private_source: true,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+      live_order_execution_enabled: false,
+    });
+    const shadowClock = [
+      "2026-08-12T15:00:00.020Z",
+      "2026-08-12T15:00:00.025Z",
+      "2026-08-12T15:00:00.035Z",
+    ];
+    const shadowReceipt = await runBrokerageReactiveLiveShadowPoll({
+      shadowSessionId: shadowStart.body.shadow_session_id,
+      now: new Date("2026-08-12T15:00:00.000Z"),
+    }, {
+      executeRead: async () => ({
+        schema: "helix.brokerage_observation.v1",
+        ok: true,
+        observation_id: "brokerage_observation:r3-live-shadow",
+        connection_id: completed.body.connection.connection_id,
+        room_id: roomId,
+        provider: "robinhood",
+        environment_domain: "brokerage",
+        upstream_tool: "get_equity_quotes",
+        capability_id: "brokerage.robinhood.market_data.read",
+        producer_epoch_ref: entryObservation.producer_epoch_ref,
+        observed_at: "2026-08-12T15:00:00.000Z",
+        freshness_state: "fresh",
+        data: { quotes: [{
+          symbol: "TEST",
+          bid_price: "10.000000",
+          ask_price: "10.010000",
+          last_trade_price: "10.005000",
+          previous_close: "10.000000",
+          market_session: "regular",
+          updated_at: "2026-08-12T15:00:00.010Z",
+        }] },
+        input_hash: `sha256:${"8".repeat(64)}`,
+        output_hash: `sha256:${"9".repeat(64)}`,
+        redaction_count: 0,
+        truncated: false,
+        read_only: true,
+        live_order_execution_enabled: false,
+        credential_included: false,
+        account_numbers_included: false,
+        raw_provider_payload_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+      processController: processBrokerageReactiveControllerObservation,
+      tripController: tripBrokerageReactiveControllerSource,
+      clock: () => new Date(shadowClock.shift() ??
+        "2026-08-12T15:00:00.035Z"),
+    });
+    expect(shadowReceipt).toMatchObject({
+      disposition: "processed",
+      poll_sequence: 1,
+      provider_time_basis: "provider_payload",
+      poll_duration_ms: 20,
+      provider_to_arrival_ms: 10,
+      arrival_to_decision_ms: 15,
+      end_to_end_ms: 25,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+      live_order_execution_enabled: false,
+      normalized_observation: {
+        market_session: "regular",
+        simulation_input_only: true,
+      },
+      controller_receipt: {
+        arbiter_receipt: null,
+        controller_run: {
+          status: "completed",
+          terminal_reason: "cycle_budget_exhausted",
+        },
+      },
+      shadow_session: {
+        status: "controller_terminal",
+        terminal_reason: "controller_terminal",
+        polls_attempted: 1,
+        polls_succeeded: 1,
+        regular_session_observations: 1,
+      },
+    });
+    await expect(readBrokerageReactiveLiveShadow({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      shadowSessionId: shadowStart.body.shadow_session_id,
+    })).resolves.toMatchObject({
+      status: "controller_terminal",
+      polls_succeeded: 1,
+      provider_mutation_attempted: false,
+    });
+    const nextDayNow = new Date("2026-08-13T15:00:00.000Z");
+    const nextDayController = await startBrokerageReactiveController({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      request: {
+        client_controller_id: "client_controller:route-r3-next-day",
+        manifest: reactiveManifest,
+        maximum_cycles: 1,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-13T15:00:10.000Z",
+        lease_expires_at: "2026-08-13T15:00:15.000Z",
+      },
+      now: nextDayNow,
+    });
+    const nextDayShadow = await startBrokerageReactiveLiveShadow({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controllerRunId: nextDayController.controller_run_id,
+      request: {
+        client_shadow_session_id: "client_shadow:route-r3-next-day",
+        symbol: "TEST",
+        poll_interval_ms: 1_000,
+        maximum_polls: 1,
+        maximum_consecutive_failures: 1,
+        earnings_observation_id: null,
+        session_expires_at: "2026-08-13T15:00:09.000Z",
+      },
+      now: nextDayNow,
+    });
+    const nextDayClock = [
+      "2026-08-13T15:00:00.020Z",
+      "2026-08-13T15:00:00.025Z",
+      "2026-08-13T15:00:00.035Z",
+    ];
+    await expect(runBrokerageReactiveLiveShadowPoll({
+      shadowSessionId: nextDayShadow.shadow_session_id,
+      now: nextDayNow,
+    }, {
+      executeRead: async () => ({
+        schema: "helix.brokerage_observation.v1",
+        ok: true,
+        observation_id: "brokerage_observation:r3-live-shadow-next-day",
+        connection_id: completed.body.connection.connection_id,
+        room_id: roomId,
+        provider: "robinhood",
+        environment_domain: "brokerage",
+        upstream_tool: "get_equity_quotes",
+        capability_id: "brokerage.robinhood.market_data.read",
+        producer_epoch_ref: entryObservation.producer_epoch_ref,
+        observed_at: "2026-08-13T15:00:00.000Z",
+        freshness_state: "fresh",
+        data: { quotes: [{
+          symbol: "TEST", bid: "10.000000", ask: "10.010000",
+          last: "10.005000", prior_close: "10.000000",
+          market_session: "regular",
+          updated_at: "2026-08-13T15:00:00.010Z",
+        }] },
+        input_hash: `sha256:${"a".repeat(64)}`,
+        output_hash: `sha256:${"b".repeat(64)}`,
+        redaction_count: 0,
+        truncated: false,
+        read_only: true,
+        live_order_execution_enabled: false,
+        credential_included: false,
+        account_numbers_included: false,
+        raw_provider_payload_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+      processController: processBrokerageReactiveControllerObservation,
+      tripController: tripBrokerageReactiveControllerSource,
+      clock: () => new Date(nextDayClock.shift() ??
+        "2026-08-13T15:00:00.035Z"),
+    })).resolves.toMatchObject({
+      disposition: "processed",
+      shadow_session: { status: "controller_terminal" },
+    });
+    const firstEvidence = await readBrokerageReactiveLiveShadowEvidence({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      shadowSessionId: shadowStart.body.shadow_session_id,
+    });
+    expect(firstEvidence).toMatchObject({
+      complete: true,
+      settled_poll_count: 1,
+      regular_market_dates: ["2026-08-12"],
+      restart_safe_persistence: true,
+      maturity_authority: false,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+    });
+    expect(firstEvidence.receipt_hashes).toHaveLength(1);
+    const acceptanceRequest = {
+      shadow_session_ids: [
+        nextDayShadow.shadow_session_id,
+        shadowStart.body.shadow_session_id,
+      ],
+    };
+    const acceptance = await archiveBrokerageReactiveLiveShadowAcceptance({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      request: acceptanceRequest,
+      now: new Date("2026-08-13T15:01:00.000Z"),
+    });
+    expect(acceptance).toMatchObject({
+      status: "qualified",
+      regular_market_dates: ["2026-08-12", "2026-08-13"],
+      terminal_session_count: 2,
+      settled_poll_count: 2,
+      processed_poll_count: 2,
+      regular_session_observation_count: 2,
+      all_sessions_complete: true,
+      multiple_regular_hours_sessions: true,
+      latency_measured: true,
+      restart_safe_persistence: true,
+      ready_for_maturity_review: true,
+      canonical_maturity_updated: false,
+      maturity_authority: false,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+      arrival_to_decision: { samples: 2 },
+    });
+    const replayedAcceptance =
+      await archiveBrokerageReactiveLiveShadowAcceptance({
+        ownerProfileId: "profile:brokerage-owner",
+        connectionId: completed.body.connection.connection_id,
+        roomId,
+        request: acceptanceRequest,
+        now: new Date("2026-08-13T15:02:00.000Z"),
+      });
+    expect(replayedAcceptance.evidence_hash).toBe(acceptance.evidence_hash);
+    expect(replayedAcceptance.archive_id).toBe(acceptance.archive_id);
+    await expect(getLatestBrokerageReactiveLiveShadowAcceptance({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+    })).resolves.toMatchObject({ archive_id: acceptance.archive_id });
+    const gapShadowController = await startBrokerageReactiveController({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      request: {
+        client_controller_id: "client_controller:route-r3-source-gap",
+        manifest: reactiveManifest,
+        maximum_cycles: 3,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:00:10.000Z",
+        lease_expires_at: "2026-08-12T15:00:15.000Z",
+      },
+      now: paperNow,
+    });
+    const gapShadowStart = await startBrokerageReactiveLiveShadow({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controllerRunId: gapShadowController.controller_run_id,
+      request: {
+        client_shadow_session_id: "client_shadow:route-r3-source-gap",
+        symbol: "TEST",
+        poll_interval_ms: 1_000,
+        maximum_polls: 3,
+        maximum_consecutive_failures: 2,
+        earnings_observation_id: null,
+        session_expires_at: "2026-08-12T15:00:09.000Z",
+      },
+      now: paperNow,
+    });
+    const shadowSource = (id: string, updatedAt: string) => ({
+      schema: "helix.brokerage_observation.v1" as const,
+      ok: true as const,
+      observation_id: id,
+      connection_id: completed.body.connection.connection_id,
+      room_id: roomId,
+      provider: "robinhood" as const,
+      environment_domain: "brokerage" as const,
+      upstream_tool: "get_equity_quotes" as const,
+      capability_id: "brokerage.robinhood.market_data.read" as const,
+      producer_epoch_ref: entryObservation.producer_epoch_ref,
+      observed_at: updatedAt,
+      freshness_state: "fresh" as const,
+      data: { quotes: [{
+        symbol: "TEST", bid: "10.000000", ask: "10.010000",
+        last: "10.005000", prior_close: "10.000000",
+        market_session: "regular", updated_at: updatedAt,
+      }] },
+      input_hash: `sha256:${"6".repeat(64)}`,
+      output_hash: `sha256:${crypto.createHash("sha256").update(id).digest("hex")}`,
+      redaction_count: 0,
+      truncated: false,
+      read_only: true as const,
+      live_order_execution_enabled: false as const,
+      credential_included: false as const,
+      account_numbers_included: false as const,
+      raw_provider_payload_included: false as const,
+      answer_authority: false as const,
+      assistant_answer: false as const,
+      terminal_eligible: false as const,
+      raw_content_included: false as const,
+    });
+    const shadowDependencies = (input: {
+      source?: ReturnType<typeof shadowSource>;
+      failure?: Error;
+      clocks: string[];
+    }) => ({
+      executeRead: async () => {
+        if (input.failure) throw input.failure;
+        return input.source!;
+      },
+      processController: processBrokerageReactiveControllerObservation,
+      tripController: tripBrokerageReactiveControllerSource,
+      clock: () => new Date(input.clocks.shift() ?? input.clocks.at(-1) ??
+        "2026-08-12T15:00:03.035Z"),
+    });
+    await expect(runBrokerageReactiveLiveShadowPoll({
+      shadowSessionId: gapShadowStart.shadow_session_id,
+      now: new Date("2026-08-12T15:00:00.000Z"),
+    }, shadowDependencies({
+      source: shadowSource(
+        "brokerage_observation:r3-gap-one",
+        "2026-08-12T15:00:00.010Z",
+      ),
+      clocks: ["2026-08-12T15:00:00.020Z",
+        "2026-08-12T15:00:00.025Z", "2026-08-12T15:00:00.035Z"],
+    }))).resolves.toMatchObject({ disposition: "processed", poll_sequence: 1 });
+    await expect(runBrokerageReactiveLiveShadowPoll({
+      shadowSessionId: gapShadowStart.shadow_session_id,
+      now: new Date("2026-08-12T15:00:01.000Z"),
+    }, shadowDependencies({
+      failure: new Error("bounded provider outage"),
+      clocks: ["2026-08-12T15:00:01.020Z"],
+    }))).resolves.toMatchObject({
+      disposition: "source_failed",
+      poll_sequence: 2,
+      source_observation_id: null,
+      shadow_session: { status: "active", consecutive_failures: 1 },
+      provider_mutation_attempted: false,
+    });
+    const gapShadowReceipt = await runBrokerageReactiveLiveShadowPoll({
+      shadowSessionId: gapShadowStart.shadow_session_id,
+      now: new Date("2026-08-12T15:00:02.000Z"),
+    }, shadowDependencies({
+      source: shadowSource(
+        "brokerage_observation:r3-gap-three",
+        "2026-08-12T15:00:02.010Z",
+      ),
+      clocks: ["2026-08-12T15:00:02.020Z",
+        "2026-08-12T15:00:02.025Z", "2026-08-12T15:00:02.035Z"],
+    }));
+    expect(gapShadowReceipt).toMatchObject({
+      disposition: "controller_rejected",
+      poll_sequence: 3,
+      provider_order_tool_calls_made: 0,
+      provider_mutation_attempted: false,
+      controller_receipt: null,
+      controller_run: {
+        status: "watchdog_tripped",
+        terminal_reason: "observation_deadline_missed",
+        controller_lease_released: true,
+      },
+      shadow_session: {
+        status: "controller_terminal",
+        polls_attempted: 3,
+        polls_succeeded: 1,
+      },
+    });
+    await setPaperTradingKillSwitch({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      active: false,
+      reason: "reset after R3 source-gap fixture",
+      now: paperNow,
+    });
+    const recoveryController = await startBrokerageReactiveController({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      request: {
+        client_controller_id: "client_controller:route-r3-recovery",
+        manifest: reactiveManifest,
+        maximum_cycles: 1,
+        unresolved_effect_timeout_ms: 1_000,
+        controller_deadline_at: "2026-08-12T15:01:00.000Z",
+        lease_expires_at: "2026-08-12T15:01:05.000Z",
+      },
+      now: paperNow,
+    });
+    const recoveryShadow = await startBrokerageReactiveLiveShadow({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controllerRunId: recoveryController.controller_run_id,
+      request: {
+        client_shadow_session_id: "client_shadow:route-r3-recovery",
+        symbol: "TEST",
+        poll_interval_ms: 1_000,
+        maximum_polls: 1,
+        maximum_consecutive_failures: 1,
+        earnings_observation_id: null,
+        session_expires_at: "2026-08-12T15:00:59.000Z",
+      },
+      now: paperNow,
+    });
+    const interruptedProjection = {
+      ...recoveryShadow,
+      polls_attempted: 1,
+      poll_in_flight: true,
+      next_poll_at: "2026-08-12T15:00:01.000Z",
+      updated_at: "2026-08-12T15:00:00.000Z",
+    };
+    const pool = getPool();
+    await pool.query(
+      `UPDATE helix_brokerage_reactive_shadow_sessions
+          SET polls_attempted=1, in_flight_token=$2,
+              in_flight_started_at=$3, projection_json=$4::jsonb
+        WHERE shadow_session_id=$1;`,
+      [recoveryShadow.shadow_session_id, "shadow_poll:interrupted",
+        "2026-08-12T15:00:00.000Z", JSON.stringify(interruptedProjection)],
+    );
+    await pool.query(
+      `INSERT INTO helix_brokerage_reactive_shadow_polls(
+         shadow_session_id, poll_sequence, in_flight_token, disposition,
+         read_started_at, created_at
+       ) VALUES ($1,1,$2,'in_flight',$3,$3);`,
+      [recoveryShadow.shadow_session_id, "shadow_poll:interrupted",
+        "2026-08-12T15:00:00.000Z"],
+    );
+    expect(await recoverInterruptedBrokerageReactiveLiveShadowPolls({
+      now: new Date("2026-08-12T15:00:31.000Z"),
+    })).toBe(1);
+    await expect(readBrokerageReactiveLiveShadow({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      shadowSessionId: recoveryShadow.shadow_session_id,
+    })).resolves.toMatchObject({
+      status: "source_failed",
+      terminal_reason: "source_failure_budget_exhausted",
+      last_error_code: "reactive_shadow_poll_interrupted",
+      poll_in_flight: false,
+      provider_mutation_attempted: false,
+    });
+    await expect(readBrokerageReactiveController({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controllerRunId: recoveryController.controller_run_id,
+    })).resolves.toMatchObject({
+      status: "watchdog_tripped",
+      terminal_reason: "source_poll_failed",
+      controller_lease_released: true,
+    });
+    await setPaperTradingKillSwitch({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      active: false,
+      reason: "reset after R3 interrupted-poll recovery fixture",
+      now: paperNow,
+    });
     const paperCandidate = {
       ...candidate,
       candidate_id: "candidate:paper-execution",
@@ -913,11 +1823,49 @@ describe("Robinhood brokerage connection boundary", () => {
       placed_orders: 0,
       cancelled_orders: 0,
     });
+    await recordLiveTradingOperatorPresence({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controlId: liveControl.control_id,
+      attendanceId: "live_attendance:explicit-end-fixture",
+      action: "start",
+      now: new Date("2026-08-12T15:00:06.300Z"),
+      deploymentEnabled: true,
+    });
+    expect(await recordLiveTradingOperatorPresence({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controlId: liveControl.control_id,
+      attendanceId: "live_attendance:explicit-end-fixture",
+      action: "end",
+      now: new Date("2026-08-12T15:00:06.310Z"),
+      deploymentEnabled: true,
+    })).toMatchObject({
+      operator_armed: false,
+      operator_present: false,
+      kill_switch_active: true,
+    });
+    await expect(recordLiveTradingOperatorPresence({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controlId: liveControl.control_id,
+      attendanceId: "live_attendance:explicit-end-fixture",
+      action: "heartbeat",
+      now: new Date("2026-08-12T15:00:06.320Z"),
+      deploymentEnabled: true,
+    })).rejects.toMatchObject({
+      message: "The attended generation ended or was replaced.",
+    });
     const attendedControl = await recordLiveTradingOperatorPresence({
       ownerProfileId: "profile:brokerage-owner",
       connectionId: completed.body.connection.connection_id,
       roomId,
       controlId: liveControl.control_id,
+      attendanceId: "live_attendance:fixture",
+      action: "start",
       now: new Date("2026-08-12T15:00:06.350Z"),
       deploymentEnabled: true,
     });
@@ -947,29 +1895,48 @@ describe("Robinhood brokerage connection boundary", () => {
       deploymentEnabled: true,
     });
     expect(armedLiveControl.live_order_execution_enabled).toBe(true);
+    const acceptedEntryPreflight = {
+      schema: "helix.live_account_preflight.v1" as const,
+      buying_power_cents: 34_000,
+      daily_pnl_cents: 0,
+      open_position_count: 0,
+      open_order_count: 0,
+      symbol_position_open: false,
+      bid_micros: 10_000_000,
+      ask_micros: 10_010_000,
+      quote_observation_id: entryObservation.observation_id,
+      observed_at: paperNow.toISOString(),
+      observation_ids: [entryObservation.observation_id],
+      snapshot_hash: `sha256:${"d".repeat(64)}` as const,
+    };
+    let crossSessionEntryCalls = 0;
+    await expect(executeApprovedLiveEquityEntry({
+      ownerProfileId: "profile:brokerage-owner",
+      sessionId: "different-developer-session",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      approvalId: liveApproval.approval_id,
+      clientOrderId: "live_client_order:cross-session-must-fail",
+      now: new Date("2026-08-12T15:00:06.900Z"),
+      deploymentEnabled: true,
+      preflight: acceptedEntryPreflight,
+      placeOrder: async () => {
+        crossSessionEntryCalls += 1;
+        throw new Error("cross-session approval must not reach placement");
+      },
+    })).rejects.toMatchObject({ code: "paper_risk_decision_not_accepted" });
+    expect(crossSessionEntryCalls).toBe(0);
     let placementAdmissionCalls = 0;
     const ambiguousLiveExecution = await executeApprovedLiveEquityEntry({
       ownerProfileId: "profile:brokerage-owner",
+      sessionId: "developer-session-fixture",
       connectionId: completed.body.connection.connection_id,
       roomId,
       approvalId: liveApproval.approval_id,
       clientOrderId: "live_client_order:ambiguous-fixture",
       now: new Date("2026-08-12T15:00:07.000Z"),
       deploymentEnabled: true,
-      preflight: {
-        schema: "helix.live_account_preflight.v1",
-        buying_power_cents: 34_000,
-        daily_pnl_cents: 0,
-        open_position_count: 0,
-        open_order_count: 0,
-        symbol_position_open: false,
-        bid_micros: 10_000_000,
-        ask_micros: 10_010_000,
-        quote_observation_id: entryObservation.observation_id,
-        observed_at: paperNow.toISOString(),
-        observation_ids: [entryObservation.observation_id],
-        snapshot_hash: `sha256:${"d".repeat(64)}`,
-      },
+      preflight: acceptedEntryPreflight,
       placeOrder: async () => {
         placementAdmissionCalls += 1;
         if (placementAdmissionCalls === 1) {
@@ -1176,13 +2143,47 @@ describe("Robinhood brokerage connection boundary", () => {
       one_time: true,
       consumed_at: null,
     });
+    let rejectedProtectivePlacementCalls = 0;
+    await expect(executeApprovedProtectiveExit({
+      ownerProfileId: "profile:brokerage-owner",
+      sessionId: "different-developer-session",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      exitApprovalId: protectiveApproval.exit_approval_id,
+      clientOrderId: "protective_exit_order:cross-session-must-fail",
+      now: new Date("2026-08-12T15:00:09.250Z"),
+      deploymentEnabled: true,
+      preflight: protectivePreflight,
+      placeExit: async () => {
+        rejectedProtectivePlacementCalls += 1;
+        throw new Error("cross-session exit approval must not reach placement");
+      },
+    })).rejects.toMatchObject({ code: "paper_risk_decision_not_accepted" });
+    await expect(executeApprovedProtectiveExit({
+      ownerProfileId: "profile:brokerage-owner",
+      sessionId: "developer-session-fixture",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      exitApprovalId: protectiveApproval.exit_approval_id,
+      clientOrderId: "protective_exit_order:stale-presence-must-fail",
+      now: new Date("2026-08-12T15:00:16.400Z"),
+      deploymentEnabled: true,
+      preflight: protectivePreflight,
+      placeExit: async () => {
+        rejectedProtectivePlacementCalls += 1;
+        throw new Error("stale attended presence must not reach placement");
+      },
+    })).rejects.toMatchObject({ code: "paper_risk_decision_not_accepted" });
+    expect(rejectedProtectivePlacementCalls).toBe(0);
     const protectiveExecution = await executeApprovedProtectiveExit({
       ownerProfileId: "profile:brokerage-owner",
+      sessionId: "developer-session-fixture",
       connectionId: completed.body.connection.connection_id,
       roomId,
       exitApprovalId: protectiveApproval.exit_approval_id,
       clientOrderId: "protective_exit_order:fixture",
       now: new Date("2026-08-12T15:00:09.300Z"),
+      deploymentEnabled: true,
       preflight: protectivePreflight,
       placeExit: async ({ intent, providerReview }) => {
         expect(intent.side).toBe("sell");
@@ -1216,12 +2217,27 @@ describe("Robinhood brokerage connection boundary", () => {
       }] },
     });
     expect(protectiveOpen.state).toBe("reconciled_open");
+    let stalePresenceCancellationCalls = 0;
+    await expect(cancelProtectiveExitExecution({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      exitExecutionId: protectiveExecution.exit_execution_id,
+      now: new Date("2026-08-12T15:00:16.400Z"),
+      deploymentEnabled: true,
+      cancelOrder: async () => {
+        stalePresenceCancellationCalls += 1;
+        throw new Error("stale presence must not cancel a protective stop");
+      },
+    })).rejects.toMatchObject({ code: "paper_risk_decision_not_accepted" });
+    expect(stalePresenceCancellationCalls).toBe(0);
     const protectiveCancellation = await cancelProtectiveExitExecution({
       ownerProfileId: "profile:brokerage-owner",
       connectionId: completed.body.connection.connection_id,
       roomId,
       exitExecutionId: protectiveExecution.exit_execution_id,
       now: new Date("2026-08-12T15:00:09.450Z"),
+      deploymentEnabled: true,
       cancelOrder: async ({ providerOrderRef }) => {
         expect(providerOrderRef).toBe("protective-provider-order-secret");
         return {
@@ -1242,6 +2258,7 @@ describe("Robinhood brokerage connection boundary", () => {
       roomId,
       exitExecutionId: protectiveExecution.exit_execution_id,
       now: new Date("2026-08-12T15:00:09.460Z"),
+      deploymentEnabled: true,
       cancelOrder: async () => {
         throw new Error("protective cancellation must be at-most-once");
       },
@@ -1299,11 +2316,13 @@ describe("Robinhood brokerage connection boundary", () => {
     });
     const marketCloseExecution = await executeApprovedProtectiveExit({
       ownerProfileId: "profile:brokerage-owner",
+      sessionId: "developer-session-fixture",
       connectionId: completed.body.connection.connection_id,
       roomId,
       exitApprovalId: marketCloseApproval.exit_approval_id,
       clientOrderId: "market_close_order:fixture",
       now: new Date("2026-08-12T15:00:09.700Z"),
+      deploymentEnabled: true,
       preflight: protectivePreflight,
       placeExit: async ({ intent }) => {
         expect(intent.order_type).toBe("market");
@@ -1370,13 +2389,82 @@ describe("Robinhood brokerage connection boundary", () => {
       unresolved_live_exposure_count: 0,
       live_order_tool_calls_made: 0,
     });
+    vi.setSystemTime(new Date("2026-08-12T15:00:10.000Z"));
+    vi.stubEnv("ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION", "1");
+    vi.stubEnv("ENABLE_ROBINHOOD_LIVE_SUPERVISOR", "0");
+    const archivePath =
+      `/api/agi/brokerage-connections/${completed.body.connection.connection_id}` +
+      `/rooms/${roomId}/live-acceptance-archives`;
+    const archiveConfirmation =
+      `ARCHIVE ROBINHOOD LIVE ACCEPTANCE ${completed.body.connection.connection_id} ${roomId}`;
+    const providerCallsBeforeArchive = fetchMock.mock.calls.length;
+    const enabledArchive = await owner.post(archivePath)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ confirmation_text: archiveConfirmation })
+      .expect(409);
+    expect(enabledArchive.body.message).toContain("Disable both");
+    expect(Number((await getPool().query(
+      "SELECT count(*) AS count FROM helix_live_acceptance_archives;",
+    )).rows[0].count)).toBe(0);
+
+    vi.stubEnv("ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION", "0");
+    const archived = await owner.post(archivePath)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ confirmation_text: archiveConfirmation })
+      .expect(201);
+    expect(archived.body).toMatchObject({
+      schema: "helix.live_acceptance_archive.v1",
+      status: "accepted",
+      reconciled_filled_entry_count: 1,
+      reconciled_filled_exit_count: 1,
+      unresolved_live_exposure_count: 0,
+      live_flags_enabled: false,
+      provider_order_tool_calls_made_by_archive: 0,
+      credential_included: false,
+      account_numbers_included: false,
+      raw_provider_payload_included: false,
+      terminal_eligible: false,
+    });
+    const replayedArchive = await owner.post(archivePath)
+      .set(SAME_ORIGIN_HEADERS)
+      .send({ confirmation_text: archiveConfirmation })
+      .expect(201);
+    expect(replayedArchive.body.archive_id).toBe(archived.body.archive_id);
+    expect(replayedArchive.body.evidence_hash).toBe(archived.body.evidence_hash);
+    const latestArchive = await owner.get(`${archivePath}/latest`).expect(200);
+    expect(latestArchive.body.archive_id).toBe(archived.body.archive_id);
+    expect(fetchMock.mock.calls.length).toBe(providerCallsBeforeArchive);
+    expect(JSON.stringify(archived.body)).not.toContain("provider-order-secret");
+    expect(JSON.stringify(archived.body)).not.toContain("access-token-secret");
+    const storedArchive = await getPool().query<{ evidence_json: unknown }>(
+      `SELECT evidence_json FROM helix_live_acceptance_archives
+       WHERE archive_id = $1;`,
+      [archived.body.archive_id],
+    );
+    expect(storedArchive.rows[0]?.evidence_json).toMatchObject({
+      schema: "helix.live_acceptance_archive_evidence.v1",
+      acceptance_complete: true,
+      live_flags_enabled: false,
+      provider_order_tool_calls_made_by_archive: 0,
+      credential_included: false,
+      account_numbers_included: false,
+      raw_provider_payload_included: false,
+    });
+    const serializedArchiveEvidence = JSON.stringify(
+      storedArchive.rows[0]?.evidence_json,
+    );
+    expect(serializedArchiveEvidence).not.toContain("provider-order-secret");
+    expect(serializedArchiveEvidence).not.toContain("access-token-secret");
+    expect(serializedArchiveEvidence).not.toContain("account-secret-ref");
     await expect(executeApprovedProtectiveExit({
       ownerProfileId: "profile:brokerage-owner",
+      sessionId: "developer-session-fixture",
       connectionId: completed.body.connection.connection_id,
       roomId,
       exitApprovalId: protectiveApproval.exit_approval_id,
       clientOrderId: "protective_exit_order:must-not-retry",
       now: new Date("2026-08-12T15:00:09.700Z"),
+      deploymentEnabled: true,
       preflight: protectivePreflight,
       placeExit: async () => {
         throw new Error("consumed protective approval must not reach provider");
@@ -1384,6 +2472,7 @@ describe("Robinhood brokerage connection boundary", () => {
     })).rejects.toMatchObject({ code: "paper_risk_decision_not_accepted" });
     await expect(executeApprovedLiveEquityEntry({
       ownerProfileId: "profile:brokerage-owner",
+      sessionId: "developer-session-fixture",
       connectionId: completed.body.connection.connection_id,
       roomId,
       approvalId: liveApproval.approval_id,
@@ -1444,6 +2533,15 @@ describe("Robinhood brokerage connection boundary", () => {
       accountId: paperAccount.body.account_id,
       riskDecisionId: acceptedDecision.decision_id,
       clientOrderId: "client_order:paper-entry-test",
+      executionModel: {
+        kind: "quote_touch_v1",
+        deterministic_latency_ms: 0,
+        deterministic_slippage_bps: 0,
+        partial_fill_policy: {
+          kind: "deterministic_fraction_bps",
+          fill_fraction_bps: 5_000,
+        },
+      },
       now: new Date("2026-08-12T15:00:05.000Z"),
     });
     expect(paperOrder).toMatchObject({
@@ -1462,11 +2560,53 @@ describe("Robinhood brokerage connection boundary", () => {
       now: new Date("2026-08-12T15:00:05.000Z"),
     });
     expect(entryReceipt).toMatchObject({
-      filled_order_ids: [paperOrder.order_id],
+      filled_order_ids: [],
       simulated: true,
       live_order_execution_enabled: false,
     });
     let lifecycle = await listPaperTradingLifecycle({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+    });
+    expect(lifecycle.positions).toHaveLength(0);
+    expect(lifecycle.fills).toHaveLength(0);
+    expect(lifecycle.orders[0]).toMatchObject({
+      order_id: paperOrder.order_id,
+      status: "open",
+      filled_quantity_micros: 0,
+    });
+
+    const partialNow = new Date("2026-08-12T15:00:05.500Z");
+    const partialObservation = await executeRobinhoodPrivateRoomRead({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      toolName: "get_equity_quotes",
+      arguments: { symbols: ["TEST"] },
+      fetchImpl: fetchMock,
+      now: partialNow,
+      mcpCall: async () => ({
+        structuredContent: {
+          quotes: [{ symbol: "TEST", bid_price: "10.00", ask_price: "10.01" }],
+        },
+      }),
+    });
+    const partialReceipt = await processPaperQuoteObservation({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      observationId: partialObservation.observation_id,
+      symbol: "TEST",
+      now: partialNow,
+    });
+    expect(partialReceipt.filled_order_ids).toEqual([]);
+    expect(await processPaperQuoteObservation({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      observationId: partialObservation.observation_id,
+      symbol: "TEST",
+      now: new Date("2026-08-12T15:00:05.900Z"),
+    })).toEqual(partialReceipt);
+    lifecycle = await listPaperTradingLifecycle({
       ownerProfileId: "profile:brokerage-owner",
       accountId: paperAccount.body.account_id,
     });
@@ -1476,6 +2616,54 @@ describe("Robinhood brokerage connection boundary", () => {
       stop_price_micros: 9_950_000,
     });
     expect(lifecycle.fills).toHaveLength(1);
+    expect(lifecycle.orders[0]).toMatchObject({
+      order_id: paperOrder.order_id,
+      status: "open",
+      fill_state: "partially_filled",
+      filled_quantity_micros: Math.floor(paperOrder.quantity_micros / 2),
+      execution_model: {
+        partial_fill_policy: { fill_fraction_bps: 5_000 },
+      },
+    });
+
+    const completionNow = new Date("2026-08-12T15:00:06.000Z");
+    const completionObservation = await executeRobinhoodPrivateRoomRead({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      toolName: "get_equity_quotes",
+      arguments: { symbols: ["TEST"] },
+      fetchImpl: fetchMock,
+      now: completionNow,
+      mcpCall: async () => ({
+        structuredContent: {
+          quotes: [{ symbol: "TEST", bid_price: "10.00", ask_price: "10.01" }],
+        },
+      }),
+    });
+    const completionReceipt = await processPaperQuoteObservation({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      observationId: completionObservation.observation_id,
+      symbol: "TEST",
+      now: completionNow,
+    });
+    expect(completionReceipt.filled_order_ids).toEqual([paperOrder.order_id]);
+    lifecycle = await listPaperTradingLifecycle({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+    });
+    expect(lifecycle.orders[0]).toMatchObject({
+      status: "filled",
+      filled_quantity_micros: paperOrder.quantity_micros,
+    });
+    expect(lifecycle.fills).toHaveLength(2);
+    expect(await cancelOpenPaperEntry({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      orderId: paperOrder.order_id,
+      now: new Date("2026-08-12T15:00:06.100Z"),
+    })).toMatchObject({ status: "filled", fill_state: "filled" });
 
     const stopNow = new Date("2026-08-12T15:00:10.000Z");
     const stopObservation = await executeRobinhoodPrivateRoomRead({
@@ -1505,7 +2693,7 @@ describe("Robinhood brokerage connection boundary", () => {
       accountId: paperAccount.body.account_id,
       observationId: stopObservation.observation_id,
       symbol: "TEST",
-      now: stopNow,
+      now: new Date(stopNow.getTime() + 10 * 60_000),
     });
     expect(replayedStop).toEqual(stopReceipt);
     lifecycle = await listPaperTradingLifecycle({
@@ -1513,7 +2701,7 @@ describe("Robinhood brokerage connection boundary", () => {
       accountId: paperAccount.body.account_id,
     });
     expect(lifecycle.positions[0]).toMatchObject({ status: "closed" });
-    expect(lifecycle.fills).toHaveLength(2);
+    expect(lifecycle.fills).toHaveLength(3);
     expect(lifecycle.journal.map((event) => event.event_type)).toEqual(
       expect.arrayContaining([
         "entry_submitted",
@@ -1568,14 +2756,68 @@ describe("Robinhood brokerage connection boundary", () => {
       clientOrderId: "client_order:paper-entry-test-2",
       now: secondEntryNow,
     });
-    await processPaperQuoteObservation({
+    expect(await cancelOpenPaperEntry({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      orderId: secondOrder.order_id,
+      now: new Date("2026-08-12T15:00:15.100Z"),
+    })).toMatchObject({
+      status: "cancelled",
+      fill_state: "cancelled",
+      filled_quantity_micros: 0,
+    });
+    const cancelledObservationReceipt = await processPaperQuoteObservation({
       ownerProfileId: "profile:brokerage-owner",
       accountId: paperAccount.body.account_id,
       observationId: secondEntryObservation.observation_id,
       symbol: "TEST",
-      now: secondEntryNow,
+      now: new Date("2026-08-12T15:00:15.200Z"),
     });
     expect(secondOrder.status).toBe("open");
+    expect(cancelledObservationReceipt.filled_order_ids).toEqual([]);
+
+    const thirdEntryNow = new Date("2026-08-12T15:00:16.000Z");
+    const thirdEntryObservation = await executeRobinhoodPrivateRoomRead({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      toolName: "get_equity_quotes",
+      arguments: { symbols: ["TEST"] },
+      fetchImpl: fetchMock,
+      now: thirdEntryNow,
+      mcpCall: async () => ({
+        structuredContent: {
+          quotes: [{ symbol: "TEST", bid_price: "10.00", ask_price: "10.01" }],
+        },
+      }),
+    });
+    const thirdDecision = await evaluateAndRecordPaperTradeCandidate({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      candidate: {
+        ...paperCandidate,
+        candidate_id: "candidate:paper-execution-3",
+        quote_observed_at: thirdEntryObservation.observed_at,
+        source_observation_ids: [thirdEntryObservation.observation_id],
+      },
+      now: thirdEntryNow,
+    });
+    expect(thirdDecision.verdict).toBe("accepted");
+    const thirdOrder = await submitAcceptedPaperEntry({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      riskDecisionId: thirdDecision.decision_id,
+      clientOrderId: "client_order:paper-entry-test-3",
+      now: thirdEntryNow,
+    });
+    const thirdEntryReceipt = await processPaperQuoteObservation({
+      ownerProfileId: "profile:brokerage-owner",
+      accountId: paperAccount.body.account_id,
+      observationId: thirdEntryObservation.observation_id,
+      symbol: "TEST",
+      now: thirdEntryNow,
+    });
+    expect(thirdEntryReceipt.filled_order_ids).toEqual([thirdOrder.order_id]);
     const secondStopNow = new Date("2026-08-12T15:00:20.000Z");
     const secondStopObservation = await executeRobinhoodPrivateRoomRead({
       ownerProfileId: "profile:brokerage-owner",
@@ -1620,6 +2862,8 @@ describe("Robinhood brokerage connection boundary", () => {
       connectionId: completed.body.connection.connection_id,
       roomId,
       controlId: liveControl.control_id,
+      attendanceId: "live_attendance:deadman-fixture",
+      action: "start",
       now: new Date("2026-08-12T15:00:20.100Z"),
       deploymentEnabled: true,
     });
@@ -1654,13 +2898,26 @@ describe("Robinhood brokerage connection boundary", () => {
       kill_switch_reason:
         "Attended operator presence expired; live placement relocked.",
     });
+    await expect(recordLiveTradingOperatorPresence({
+      ownerProfileId: "profile:brokerage-owner",
+      connectionId: completed.body.connection.connection_id,
+      roomId,
+      controlId: liveControl.control_id,
+      attendanceId: "live_attendance:deadman-fixture",
+      action: "heartbeat",
+      now: new Date("2026-08-12T15:00:30.260Z"),
+      deploymentEnabled: true,
+    })).rejects.toMatchObject({
+      code: "paper_trading_unavailable",
+      message: "The attended generation ended or was replaced.",
+    });
     const deadmanEvents = await getPool().query<{ event_type: string }>(
       `SELECT event_type FROM helix_live_equity_execution_events
        WHERE control_id = $1 AND event_type =
          'operator_presence_expired_relocked';`,
       [liveControl.control_id],
     );
-    expect(deadmanEvents.rows).toHaveLength(1);
+    expect(deadmanEvents.rows).toHaveLength(2);
     const lifecycleRoute = await owner
       .get(
         `/api/agi/brokerage-connections/${completed.body.connection.connection_id}/rooms/${roomId}/paper-lifecycle`,
@@ -1675,7 +2932,7 @@ describe("Robinhood brokerage connection boundary", () => {
       account_numbers_included: false,
       answer_authority: false,
     });
-    expect(lifecycleRoute.body.fills).toHaveLength(4);
+    expect(lifecycleRoute.body.fills).toHaveLength(5);
 
     const mutationAttempt = await owner
       .post(

@@ -689,7 +689,7 @@ export default function ScientificCalculatorPanel() {
 
       <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label={t("scientificCalculator.tabs.ariaLabel")}>
         {WORKBENCH_SECTIONS.map((section) => (
-          <Button
+          <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.promote-workbench-section-section-id"
             key={section.id}
             type="button"
             size="sm"
@@ -797,23 +797,23 @@ export default function ScientificCalculatorPanel() {
           </div>
           {activeTheoryRun ? (
             <div className="mb-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => handleRunTheoryCompoundRun("scalar_only")}>
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-run-theory-compound-run-scalar-only" size="sm" variant="secondary" onClick={() => handleRunTheoryCompoundRun("scalar_only")}>
                 {t("scientificCalculator.action.solveScalarRows")}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("runtime_trace_only")}>
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-run-theory-compound-run-runtime-trace-only" size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("runtime_trace_only")}>
                 {t("scientificCalculator.action.buildRuntimeTraces")}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("all_available")}>
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-run-theory-compound-run-all-available" size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("all_available")}>
                 {t("scientificCalculator.action.solveAvailable")}
               </Button>
             </div>
           ) : null}
           {!activeTheoryRun && lastTheoryLoadout ? (
             <div className="mb-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={handleSolveTheoryLoadout}>
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-solve-theory-loadout" size="sm" variant="secondary" onClick={handleSolveTheoryLoadout}>
                 {t("scientificCalculator.action.solveAllScalar")}
               </Button>
-              <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadoutWithRuntime}>
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-solve-theory-loadout-with-runtime" size="sm" variant="outline" onClick={handleSolveTheoryLoadoutWithRuntime}>
                 {t("scientificCalculator.action.solveRuntime")}
               </Button>
             </div>
@@ -824,7 +824,7 @@ export default function ScientificCalculatorPanel() {
                 .slice()
                 .sort((left, right) => left.index - right.index)
                 .map((row) => (
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.select-theory-run-row-row-id"
                     key={row.id}
                     ref={selectedTheoryRunRowId === row.id ? selectedTheoryRunRowElementRef : null}
                     type="button"
@@ -994,7 +994,7 @@ export default function ScientificCalculatorPanel() {
           ) : lastTheoryLoadout ? (
             <div className="space-y-2">
               {lastTheoryLoadout.items.map((item) => (
-                <button
+                <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-load-theory-loadout-item-item-index"
                   key={item.id}
                   type="button"
                   onClick={() => handleLoadTheoryLoadoutItem(item.index)}
@@ -1133,7 +1133,7 @@ export default function ScientificCalculatorPanel() {
                                 {scalarCutExpression(cut)}
                               </div>
                             </div>
-                            <Button size="sm" variant="outline" onClick={() => handleLoadScalarCut(cut, step.id)}>
+                            <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-load-scalar-cut-cut-step-id" size="sm" variant="outline" onClick={() => handleLoadScalarCut(cut, step.id)}>
                               {t("scientificCalculator.action.loadScalarCut")}
                             </Button>
                           </div>
@@ -1186,7 +1186,7 @@ export default function ScientificCalculatorPanel() {
             {t("scientificCalculator.input.staleWarning")}
           </div>
         ) : null}
-        <Textarea
+        <Textarea data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.textarea" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
           className="min-h-[130px] border-slate-700 bg-slate-900/70 font-mono text-xs text-slate-100"
           value={input}
           onChange={(event) => handleInputChange(event.target.value)}
@@ -1372,26 +1372,26 @@ export default function ScientificCalculatorPanel() {
           </div>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={handlePasteClipboard}>
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-paste-clipboard" size="sm" variant="secondary" onClick={handlePasteClipboard}>
             {t("scientificCalculator.action.pasteClipboard")}
           </Button>
-          <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => solve(false)}>
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.solve-false" size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => solve(false)}>
             {t("scientificCalculator.action.solve")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => solve(true)}>
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.solve-true" size="sm" variant="outline" onClick={() => solve(true)}>
             {t("scientificCalculator.action.solveSteps")}
           </Button>
-          <Button
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-copy-result"
             size="sm"
             variant="outline"
             onClick={handleCopyResult}
           >
             {t("scientificCalculator.action.copyResult")}
           </Button>
-          <Button size="sm" variant="outline" onClick={handleCopyDebugLog}>
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-copy-debug-log" size="sm" variant="outline" onClick={handleCopyDebugLog}>
             {t("scientificCalculator.action.copyDebugLog")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={handleClear}>
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.handle-clear" size="sm" variant="ghost" onClick={handleClear}>
             {t("scientificCalculator.action.clear")}
           </Button>
         </div>
@@ -1499,7 +1499,7 @@ export default function ScientificCalculatorPanel() {
               <details className="space-y-3 rounded-md border border-slate-800 bg-slate-950/50 p-3 text-xs">
                 <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-400">
                   <span>{t("scientificCalculator.result.evidenceTrace")}</span>
-                  <Button size="sm" variant="outline" onClick={(event) => {
+                  <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-panel.event-event-prevent-default-handle-copy-steps-markdown" size="sm" variant="outline" onClick={(event) => {
                     event.preventDefault();
                     handleCopyStepsMarkdown();
                   }}>

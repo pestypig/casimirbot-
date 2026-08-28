@@ -294,6 +294,10 @@ import {
   resolveCodexBinary,
 } from "./codex-native/codex-binary";
 import {
+  resolveHelixCodexAuth,
+  type HelixCodexAuthResolution,
+} from "./codex-native/auth-mode";
+import {
   resolveCodexNativeProviderBridgeAvailability,
   runCodexNativeProviderBridge,
 } from "./codex-native/provider-bridge";
@@ -23752,6 +23756,7 @@ type CodexProcessResult = {
   failReason: string | null;
   bin: string | null;
   args: string[];
+  auth_resolution?: HelixCodexAuthResolution;
   prompt_diagnostics: {
     char_count: number;
     prompt_hash: string;
@@ -24228,9 +24233,27 @@ export async function runCodexProcess(input: {
     };
   }
 
-  const compatibilityHome = resolveCodexCompatibilityHome();
+  const authResolution = resolveHelixCodexAuth();
+  if (authResolution.status !== "available" || !authResolution.selected_mode) {
+    return {
+      stdout: "",
+      stderr: "Codex authentication is unavailable for the selected Helix auth mode.",
+      exitCode: null,
+      timedOut: false,
+      killed: false,
+      failReason: authResolution.reason ?? "codex_authentication_unavailable",
+      bin: binary.resolved_bin,
+      args: binary.args,
+      auth_resolution: authResolution,
+      prompt_diagnostics: promptDiagnostics,
+    };
+  }
+  const compatibilityHome =
+    authResolution.selected_mode === "api_key"
+      ? resolveCodexCompatibilityHome()
+      : null;
   try {
-    fs.mkdirSync(compatibilityHome, { recursive: true });
+    if (compatibilityHome) fs.mkdirSync(compatibilityHome, { recursive: true });
   } catch {
     return {
       stdout: "",
@@ -24242,6 +24265,7 @@ export async function runCodexProcess(input: {
       failReason: "codex_compatibility_home_unavailable",
       bin: binary.resolved_bin,
       args: binary.args,
+      auth_resolution: authResolution,
       prompt_diagnostics: promptDiagnostics,
     };
   }
@@ -24249,21 +24273,25 @@ export async function runCodexProcess(input: {
     binary.resolved_bin,
     appendCodexCompatibilityIsolationArgs(
       appendCodexModelPolicyArgs(binary.args, input),
+      authResolution.selected_mode,
     ),
   );
   const bin = command.bin;
   const args = command.args;
+  const childEnv: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH,
+    Path: process.env.Path,
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    SystemRoot: process.env.SystemRoot,
+  };
+  if (authResolution.selected_mode === "api_key") {
+    childEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    childEnv.CODEX_HOME = compatibilityHome ?? undefined;
+  }
   const child = spawn(bin, args, {
     stdio: ["pipe", "pipe", "pipe"],
-    env: {
-      PATH: process.env.PATH,
-      Path: process.env.Path,
-      HOME: process.env.HOME,
-      USERPROFILE: process.env.USERPROFILE,
-      SystemRoot: process.env.SystemRoot,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      CODEX_HOME: compatibilityHome,
-    },
+    env: childEnv,
   });
 
   let killed = false;
@@ -24397,6 +24425,7 @@ export async function runCodexProcess(input: {
           failReason: null,
           bin,
           args,
+          auth_resolution: authResolution,
           prompt_diagnostics: promptDiagnostics,
         });
       }, 250);
@@ -24418,6 +24447,7 @@ export async function runCodexProcess(input: {
         failReason: "codex_process_timeout",
         bin,
         args,
+        auth_resolution: authResolution,
         prompt_diagnostics: promptDiagnostics,
       });
     }, timeoutMs);
@@ -24432,6 +24462,7 @@ export async function runCodexProcess(input: {
         failReason: aborted ? "codex_process_aborted" : "codex_process_failed",
         bin,
         args,
+        auth_resolution: authResolution,
         prompt_diagnostics: promptDiagnostics,
       });
     });
@@ -24455,6 +24486,7 @@ export async function runCodexProcess(input: {
             : "codex_process_failed",
         bin,
         args,
+        auth_resolution: authResolution,
         prompt_diagnostics: promptDiagnostics,
       });
     });
@@ -24477,7 +24509,10 @@ export const codexProvider: HelixAgentProvider = {
     },
   },
   enabled,
-  runtimeStatus: resolveCodexBinary,
+  runtimeStatus: () => ({
+    ...resolveCodexBinary(),
+    authentication: resolveHelixCodexAuth(),
+  }),
   supports: {
     streaming: true,
     workstationTools: true,
@@ -33648,6 +33683,9 @@ export const codexProvider: HelixAgentProvider = {
       ...(nativeTurnLifecycle ? { turn_lifecycle: nativeTurnLifecycle } : {}),
       codex_native_provider_bridge: nativeProviderBridgeAttempt.debug,
       codex_native_compatibility_fallback: codexNativeCompatibilityFallback,
+      codex_provider_authentication:
+        result.auth_resolution ??
+        nativeProviderBridgeAttempt.debug.provider_authentication,
       provider_prompt_diagnostics: result.prompt_diagnostics,
       provider_prompt_leak_guard: providerPromptLeakDetected
         ? {

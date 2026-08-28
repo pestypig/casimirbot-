@@ -60,7 +60,7 @@ export const helixEnvironmentDurableGoalMilestoneSchema = z
   })
   .strict();
 
-export const helixEnvironmentDurableGoalObjectiveSchema = z
+const minecraftDurableGoalObjectiveSchema = z
   .object({
     objective_text: boundedTextSchema,
     goal_kind: z.enum(["all_advancements_survival", "custom_survival"]),
@@ -72,7 +72,28 @@ export const helixEnvironmentDurableGoalObjectiveSchema = z
       .min(1)
       .max(256),
   })
-  .strict()
+  .strict();
+
+const brokerageDurableGoalObjectiveSchema = z
+  .object({
+    objective_text: boundedTextSchema,
+    goal_kind: z.literal("robinhood_shadow_observation"),
+    domain: z.literal("brokerage"),
+    provider: z.literal("robinhood"),
+    controller_profile_id: z.literal("resident.brokerage.market_observer.v1"),
+    reaction_requirement: z.literal("monitor_only"),
+    milestones: z
+      .array(helixEnvironmentDurableGoalMilestoneSchema)
+      .min(1)
+      .max(256),
+  })
+  .strict();
+
+export const helixEnvironmentDurableGoalObjectiveSchema = z
+  .discriminatedUnion("domain", [
+    minecraftDurableGoalObjectiveSchema,
+    brokerageDurableGoalObjectiveSchema,
+  ])
   .superRefine((objective, context) => {
     const ids = new Set(objective.milestones.map((entry) => entry.milestone_id));
     if (ids.size !== objective.milestones.length) {

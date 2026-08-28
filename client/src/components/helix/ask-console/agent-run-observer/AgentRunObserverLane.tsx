@@ -184,7 +184,7 @@ export function AgentRunObserverLane({
             </span>
           ) : null}
           {onDisconnect ? (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.agent-run-observer-lane.void-on-disconnect"
               className="rounded border border-rose-800 px-2 py-1 text-[11px] text-rose-200 disabled:opacity-40"
               disabled={disconnecting}
               onClick={() => void onDisconnect()}
@@ -202,7 +202,7 @@ export function AgentRunObserverLane({
           <code className="mt-1 block break-all text-[10px] text-cyan-300">
             {claimHandle}
           </code>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.agent-run-observer-lane.void-copy-claim-handle"
             className="mt-2 rounded border border-cyan-700 px-2 py-1 text-[11px] text-cyan-100"
             onClick={() => void copyClaimHandle()}
             type="button"

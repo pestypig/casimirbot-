@@ -45,7 +45,7 @@ export function HelixAskPathLinkedTextSurface({
         continue;
       }
       parts.push(
-        <button
+        <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-path-linked-text-surface.on-open-panel-panel-id"
           key={`${keyPrefix}-${segment.text}-${segment.start}`}
           className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
           onClick={() => onOpenPanel(panelId)}

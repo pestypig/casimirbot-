@@ -86,6 +86,14 @@ bool selected_model_bounds(const ledger::LedgerView &ledger_view,
         && arb_is_finite(remainder_magnitude);
 }
 
+unsigned maximum_order(const ledger::LedgerView &ledger_view,
+                       const std::vector<std::size_t> &ordinals) {
+    unsigned result = 0U;
+    for (const std::size_t ordinal : ordinals)
+        result = std::max(result, ledger_view.models[ordinal].order);
+    return result;
+}
+
 bool affine_radius_bound(arb_ptr output, const bivariate::Output &elementary) {
     arb_t radius, power, term, sum, next;
     arb_init(radius); arb_init(power); arb_init(term); arb_init(sum);
@@ -167,6 +175,7 @@ bool add_elementary(const Input &input, std::size_t f_jet,
                     std::size_t g_jet, std::size_t destination_jet,
                     const std::vector<std::size_t> &f_ordinals,
                     const std::vector<std::size_t> &g_ordinals,
+                    const bivariate::PreparedMoments *prepared,
                     Output &output, Result &result) {
     bivariate::Input predecessor{input.f_ledger, input.gprime_ledger,
         input.target_left, input.target_right, input.target_order,
@@ -174,7 +183,11 @@ bool add_elementary(const Input &input, std::size_t f_jet,
         input.g_at_zero_jets + g_jet};
     bivariate::Output elementary;
     bivariate::Result predecessor_result{};
-    if (!bivariate::evaluate(predecessor, &elementary, &predecessor_result))
+    const bool predecessor_accepted = prepared == nullptr
+        ? bivariate::evaluate(predecessor, &elementary, &predecessor_result)
+        : bivariate::evaluate_prepared(predecessor, *prepared, &elementary,
+                                       &predecessor_result);
+    if (!predecessor_accepted)
         return false;
     if (result.elementary_convolutions == 0U) {
         output.retained_order = elementary.retained_order;
@@ -249,7 +262,8 @@ arb_srcptr Output::remainder(std::size_t jet) const {
     return uniform_remainder_bounds.data() + jet;
 }
 
-bool evaluate(const Input &input, Output *output, Result *result) {
+bool evaluate_impl(const Input &input, bool use_prepared_moments,
+                   Output *output, Result *result) {
     if (result == nullptr) return false;
     *result = Result{};
     if (output == nullptr) {
@@ -286,8 +300,24 @@ bool evaluate(const Input &input, Output *output, Result *result) {
     const auto &f_ordinals = coverage_f.direct_intersecting_ordinals;
     const auto &g_ordinals = coverage_g.reflected_intersecting_ordinals;
 
+    bivariate::PreparedMoments prepared_storage;
+    const bivariate::PreparedMoments *prepared = nullptr;
+    if (use_prepared_moments) {
+        const unsigned maximum_f_order = maximum_order(input.f_ledger,
+                                                        f_ordinals);
+        const unsigned maximum_g_order = maximum_order(input.gprime_ledger,
+                                                        g_ordinals);
+        if (!bivariate::prepare_moments(input.u_left, input.u_right,
+                                        maximum_f_order, maximum_g_order,
+                                        &prepared_storage)) {
+            fail(result, FailureDetail::bivariate_predecessor);
+            return false;
+        }
+        prepared = &prepared_storage;
+    }
+
     if (!add_elementary(input, value_jet(), value_jet(), value_jet(),
-                        f_ordinals, g_ordinals, *output, *result)) {
+                        f_ordinals, g_ordinals, prepared, *output, *result)) {
         fail(result, FailureDetail::bivariate_predecessor);
         return false;
     }
@@ -295,9 +325,10 @@ bool evaluate(const Input &input, Output *output, Result *result) {
     for (std::size_t a = 0U; a < kParameterCount; ++a) {
         const std::size_t first = first_jet(a);
         if (!add_elementary(input, first, value_jet(), first,
-                            f_ordinals, g_ordinals, *output, *result)
+                            f_ordinals, g_ordinals, prepared, *output, *result)
             || !add_elementary(input, value_jet(), first, first,
-                               f_ordinals, g_ordinals, *output, *result)) {
+                               f_ordinals, g_ordinals, prepared, *output,
+                               *result)) {
             fail(result, FailureDetail::nonfinite_remainder_or_assembly);
             return false;
         }
@@ -307,16 +338,17 @@ bool evaluate(const Input &input, Output *output, Result *result) {
         for (std::size_t b = 0U; b < kParameterCount; ++b) {
             const std::size_t destination = second_jet(a, b);
             if (!add_elementary(input, destination, value_jet(), destination,
-                                f_ordinals, g_ordinals, *output, *result)
+                                f_ordinals, g_ordinals, prepared, *output,
+                                *result)
                 || !add_elementary(input, first_jet(a), first_jet(b),
                                    destination, f_ordinals, g_ordinals,
-                                   *output, *result)
+                                   prepared, *output, *result)
                 || !add_elementary(input, first_jet(b), first_jet(a),
                                    destination, f_ordinals, g_ordinals,
-                                   *output, *result)
+                                   prepared, *output, *result)
                 || !add_elementary(input, value_jet(), destination,
                                    destination, f_ordinals, g_ordinals,
-                                   *output, *result)) {
+                                   prepared, *output, *result)) {
                 fail(result, FailureDetail::nonfinite_remainder_or_assembly);
                 return false;
             }
@@ -349,6 +381,14 @@ bool evaluate(const Input &input, Output *output, Result *result) {
     result->midpoint_selection_used = false;
     result->point_sampling_used = false;
     return true;
+}
+
+bool evaluate(const Input &input, Output *output, Result *result) {
+    return evaluate_impl(input, false, output, result);
+}
+
+bool evaluate_prepared(const Input &input, Output *output, Result *result) {
+    return evaluate_impl(input, true, output, result);
 }
 
 const char *failure_detail_name(FailureDetail detail) {

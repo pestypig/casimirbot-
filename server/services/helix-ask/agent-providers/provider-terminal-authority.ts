@@ -734,13 +734,25 @@ export const buildHelixProviderReasoningReentry = (input: {
     (result) => result.artifact_refs,
   );
   const gatewayObservationRefSet = new Set(gatewayObservationRefs);
+  const gatewayObservationPackets = input.gatewayCallResults.map(
+    (result) => result.observation_packet,
+  );
   const capabilityLaneObservationPackets = (
     input.capabilityLaneObservationPackets ?? []
   ).filter((packet) => {
     const refs = packet.produced_artifact_refs.filter(Boolean);
+    const alreadyProjectedByGateway = gatewayObservationPackets.some(
+      (gatewayPacket) =>
+        gatewayPacket.turn_id === packet.turn_id &&
+        gatewayPacket.call_id === packet.call_id &&
+        gatewayPacket.decision_id === packet.decision_id &&
+        gatewayPacket.capability_key === packet.capability_key &&
+        gatewayPacket.status === packet.status,
+    );
     return (
-      refs.length === 0 ||
-      !refs.every((ref) => gatewayObservationRefSet.has(ref))
+      !alreadyProjectedByGateway &&
+      (refs.length === 0 ||
+        !refs.every((ref) => gatewayObservationRefSet.has(ref)))
     );
   });
   const priorEvidenceObservationPackets =

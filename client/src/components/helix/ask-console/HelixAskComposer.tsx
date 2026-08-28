@@ -103,7 +103,7 @@ export const HelixAskComposerTextarea = forwardRef<HTMLTextAreaElement, HelixAsk
     };
 
     return (
-      <textarea
+      <textarea data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-composer.ask-helix"
         aria-label="Ask Helix"
         aria-disabled={ariaDisabled}
         className={className}
@@ -132,6 +132,9 @@ export function HelixAskComposerSubmitButton({
 }: HelixAskComposerSubmitButtonProps) {
   return (
     <button
+      data-helix-control-id="helix.ask.composer.primary_action"
+      data-helix-interaction-kind="act"
+      data-helix-authority-state="client_local"
       data-helix-ask-action-item="true"
       aria-label={viewModel.submitAriaLabel}
       title={viewModel.submitTitle}
@@ -167,6 +170,9 @@ export function HelixAskComposer({
   });
   return (
     <form
+      data-helix-control-id="helix.ask.composer.form_submit"
+      data-helix-interaction-kind="act"
+      data-helix-authority-state="client_local"
       className="flex min-w-0 items-end gap-2"
       onSubmit={(event) => {
         event.preventDefault();
@@ -174,6 +180,9 @@ export function HelixAskComposer({
       }}
     >
       <textarea
+        data-helix-control-id="helix.ask.composer.prompt_input"
+        data-helix-interaction-kind="configure"
+        data-helix-authority-state="client_local"
         aria-label="Ask Helix"
         className="min-h-10 flex-1 resize-none rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-100"
         disabled={disabled}
@@ -182,6 +191,9 @@ export function HelixAskComposer({
         onChange={(event) => onChange(event.currentTarget.value)}
       />
       <button
+        data-helix-control-id="helix.ask.composer.prompt_submit"
+        data-helix-interaction-kind="act"
+        data-helix-authority-state="client_local"
         aria-label="Submit prompt"
         className="inline-flex h-10 shrink-0 items-center rounded border border-cyan-300/35 bg-cyan-400/10 px-3 text-xs uppercase tracking-[0.14em] text-cyan-100 disabled:opacity-50"
         disabled={disabled || !value.trim()}

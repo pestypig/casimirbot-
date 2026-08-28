@@ -1885,6 +1885,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
     "mine",
     "place",
     "craft",
+    "consume",
     "inventory_transfer",
     "execute_sequence",
     "execute_reactive_program",
@@ -1896,6 +1897,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
     "mine",
     "place",
     "craft",
+    "consume",
     "inventory_transfer",
     "execute_sequence",
     "execute_reactive_program",
@@ -1942,6 +1944,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
   for (const key of [
     "collected_count",
     "produced_count",
+    "consumed_count",
     "transferred_count",
   ]) {
     const count = finiteMeasurement(measurements, key);
@@ -2444,6 +2447,53 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
         produced >= requested
       );
     }
+    case "consume": {
+      const consumed = finiteMeasurement(measurements, "consumed_count");
+      const requested = finiteArgument(args, "count");
+      const foodBefore = finiteMeasurement(measurements, "food_before");
+      const foodAfter = finiteMeasurement(measurements, "food_after");
+      const foodGain = finiteMeasurement(measurements, "food_gain");
+      const minimumFoodGain = finiteArgument(args, "minimum_food_gain");
+      const healthBefore = finiteMeasurement(measurements, "health_before");
+      const healthAfter = finiteMeasurement(measurements, "health_after");
+      const stopBelowHealth = finiteArgument(args, "stop_below_health");
+      const useTicks = finiteMeasurement(measurements, "use_ticks");
+      const remainderDelta = finiteMeasurement(
+        measurements,
+        "remainder_item_delta",
+      );
+      const expectedRemainder = args.expected_remainder_item_id;
+      return (
+        measurements.reason_code === "consume_postconditions_satisfied" &&
+        stringMeasurementMatches(measurements, "item_id", args, "item_id") &&
+        measurements.hand === "main_hand" &&
+        args.hand === "main_hand" &&
+        wholeNonnegative(consumed) &&
+        wholeNonnegative(requested) &&
+        consumed >= requested &&
+        foodBefore !== null &&
+        foodAfter !== null &&
+        foodBefore >= 0 &&
+        foodBefore <= 20 &&
+        foodAfter >= 0 &&
+        foodAfter <= 20 &&
+        wholeNonnegative(foodGain) &&
+        foodGain === Math.max(0, foodAfter - foodBefore) &&
+        wholeNonnegative(minimumFoodGain) &&
+        foodGain >= minimumFoodGain &&
+        healthBefore !== null &&
+        healthAfter !== null &&
+        stopBelowHealth !== null &&
+        healthAfter > stopBelowHealth &&
+        wholeNonnegative(useTicks) &&
+        useTicks >= 1 &&
+        finiteMeasurement(measurements, "world_mutations_performed") === 0 &&
+        (typeof expectedRemainder !== "string" ||
+          (measurements.expected_remainder_item_id === expectedRemainder &&
+            wholeNonnegative(remainderDelta) &&
+            remainderDelta >= consumed))
+      );
+    }
     case "inventory_transfer": {
       const transferred = finiteMeasurement(measurements, "transferred_count");
       const requested = finiteArgument(args, "count");
@@ -2866,6 +2916,98 @@ export type EnvironmentActionWorkflowControlContext = {
   roomId: string;
   participantId: string;
   workflowId: string;
+};
+
+export type EnvironmentActionExecutionLeaseClaim = Readonly<{
+  actionRequestId: string;
+  workflowId: string;
+  actionAuthorityId: string;
+  roomId: string;
+  environmentBindingId: string;
+  sourceId: string;
+  participantId: string;
+  runId: string;
+  status: "leased" | "running" | "paused_manual_override" | "cancel_requested";
+  leaseExpiresAt: string;
+}>;
+
+export type EnvironmentActionExecutionLeaseClaimRow = Pick<ActionRequestRow,
+  "action_request_id" | "workflow_id" | "action_authority_id" | "room_id" |
+  "environment_binding_id" | "source_id" | "participant_id" | "run_id" |
+  "status" | "lease_expires_at" | "deadline_at"
+>;
+
+export const projectEnvironmentActionExecutionLeaseClaim = (input: {
+  row: EnvironmentActionExecutionLeaseClaimRow | null;
+  expectedActionRequestId: string;
+  expectedRoomId: string;
+  expectedParticipantId: string;
+  now?: Date;
+}): EnvironmentActionExecutionLeaseClaim | null => {
+  const row = input.row;
+  const nowMs = (input.now ?? new Date()).getTime();
+  if (!row || row.action_request_id !== input.expectedActionRequestId ||
+      row.room_id !== input.expectedRoomId ||
+      row.participant_id !== input.expectedParticipantId ||
+      !["leased", "running", "paused_manual_override", "cancel_requested"]
+        .includes(row.status) || !row.lease_expires_at ||
+      Date.parse(iso(row.lease_expires_at)) <= nowMs ||
+      Date.parse(iso(row.deadline_at)) <= nowMs) return null;
+  return Object.freeze({
+    actionRequestId: row.action_request_id,
+    workflowId: row.workflow_id,
+    actionAuthorityId: row.action_authority_id,
+    roomId: row.room_id,
+    environmentBindingId: row.environment_binding_id,
+    sourceId: row.source_id,
+    participantId: row.participant_id,
+    runId: row.run_id,
+    status: row.status as EnvironmentActionExecutionLeaseClaim["status"],
+    leaseExpiresAt: iso(row.lease_expires_at),
+  });
+};
+
+/**
+ * Resolves collision authority from the real one-shot action lease. This is a
+ * read-only internal verifier; callers cannot manufacture a lease by declaring
+ * the same opaque action-request reference.
+ */
+export const readEnvironmentActionExecutionLeaseClaim = async (input: {
+  roomId: string;
+  profileId: string;
+  actionRequestId: string;
+}): Promise<EnvironmentActionExecutionLeaseClaim | null> => {
+  const membership = await readSharedRealtimeRoomMembership({
+    roomId: input.roomId,
+    profileId: input.profileId,
+  });
+  if (!membership || membership.roomStatus === "closed") return null;
+  const db = await readSharedRealtimeRoomDatabase();
+  const selected = await db.query<ActionRequestRow>(
+    `SELECT request.*
+     FROM helix_environment_action_requests request
+     JOIN helix_environment_action_authorities authority
+       ON authority.action_authority_id = request.action_authority_id
+     WHERE request.action_request_id = $1
+       AND request.room_id = $2
+       AND request.participant_id = $3
+       AND request.status IN (
+         'leased', 'running', 'paused_manual_override', 'cancel_requested'
+       )
+       AND request.lease_expires_at IS NOT NULL
+       AND request.lease_expires_at > now()
+       AND request.deadline_at > now()
+       AND authority.status = 'active'
+       AND (authority.expires_at IS NULL OR authority.expires_at > now())
+     LIMIT 1;`,
+    [input.actionRequestId, input.roomId, membership.participantId],
+  );
+  return projectEnvironmentActionExecutionLeaseClaim({
+    row: selected.rows[0] ?? null,
+    expectedActionRequestId: input.actionRequestId,
+    expectedRoomId: input.roomId,
+    expectedParticipantId: membership.participantId,
+  });
 };
 
 export const resolveEnvironmentActionWorkflowControlContext = async (input: {

@@ -62,7 +62,7 @@ export function HelixAskAttachmentStrip({ items, onRemove }: HelixAskAttachmentS
                       : "text needs reattach"}
               </div>
             </div>
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-attachment-strip.on-remove-attachment-id"
               type="button"
               aria-label={`Remove ${attachment.fileName}`}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"

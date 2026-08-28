@@ -40,7 +40,7 @@ export default function TheoryAtlasRail({
       className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
     >
       {hasLiveReflection ? (
-        <button
+        <button data-helix-control-id="workstation.panel.theory-badge-graph.theory-atlas-rail.there4" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
           type="button"
           aria-label={tx("Live answer theory context")}
           title={tx("Latest Ask-level theory reflection. Evidence only, not a solved answer.")}
@@ -59,7 +59,7 @@ export default function TheoryAtlasRail({
         const planned = block.status === "planned";
         const seed = block.status === "seed";
         return (
-          <button
+          <button data-helix-control-id="workstation.panel.theory-badge-graph.theory-atlas-rail.on-select-lens-block-id" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
             key={block.id}
             type="button"
             aria-label={`${tx(block.title)} ${tx("atlas lens")}`}

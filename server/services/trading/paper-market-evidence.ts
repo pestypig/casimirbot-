@@ -9,6 +9,7 @@ export type PaperQuoteEvidence = {
   askMicros: number;
   observedAt: string;
   outputHash: string;
+  producerEpochRef: string;
 };
 
 type EvidenceRow = {
@@ -20,6 +21,7 @@ type EvidenceRow = {
   evidence_output_hash: string;
   normalized_data: unknown;
   observed_at: string | Date;
+  producer_epoch_ref: string;
 };
 
 const normalizedKey = (value: string): string =>
@@ -111,19 +113,17 @@ export const extractPaperQuote = (input: {
   );
 };
 
-export const readPaperQuoteEvidence = async (input: {
+export const readPaperQuoteEvidenceRecord = async (input: {
   ownerProfileId: string;
   connectionId: string;
   roomId: string;
   observationId: string;
   symbol: string;
-  now: Date;
-  maxAgeMs: number;
-  maxFutureSkewMs: number;
 }): Promise<PaperQuoteEvidence> => {
   const db = await readSharedRealtimeRoomDatabase();
   const { rows } = await db.query<EvidenceRow>(
     `SELECT a.observation_id, a.upstream_tool, a.capability_id, a.status,
+            a.producer_epoch_ref,
             a.output_hash AS audit_output_hash,
             e.output_hash AS evidence_output_hash, e.normalized_data,
             e.observed_at
@@ -147,15 +147,6 @@ export const readPaperQuoteEvidence = async (input: {
     );
   }
   const observedAt = new Date(row.observed_at);
-  const ageMs = input.now.getTime() - observedAt.getTime();
-  if (!Number.isFinite(ageMs) || ageMs > input.maxAgeMs ||
-      ageMs < -input.maxFutureSkewMs) {
-    throw new PaperTradingError(
-      "paper_quote_evidence_stale",
-      409,
-      "The Robinhood quote observation is stale or has invalid clock ordering.",
-    );
-  }
   const quote = extractPaperQuote({ data: row.normalized_data, symbol: input.symbol });
   return {
     observationId: row.observation_id,
@@ -164,5 +155,29 @@ export const readPaperQuoteEvidence = async (input: {
     askMicros: quote.askMicros,
     observedAt: observedAt.toISOString(),
     outputHash: row.evidence_output_hash,
+    producerEpochRef: row.producer_epoch_ref,
   };
+};
+
+export const readPaperQuoteEvidence = async (input: {
+  ownerProfileId: string;
+  connectionId: string;
+  roomId: string;
+  observationId: string;
+  symbol: string;
+  now: Date;
+  maxAgeMs: number;
+  maxFutureSkewMs: number;
+}): Promise<PaperQuoteEvidence> => {
+  const evidence = await readPaperQuoteEvidenceRecord(input);
+  const ageMs = input.now.getTime() - Date.parse(evidence.observedAt);
+  if (!Number.isFinite(ageMs) || ageMs > input.maxAgeMs ||
+      ageMs < -input.maxFutureSkewMs) {
+    throw new PaperTradingError(
+      "paper_quote_evidence_stale",
+      409,
+      "The Robinhood quote observation is stale or has invalid clock ordering.",
+    );
+  }
+  return evidence;
 };

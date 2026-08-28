@@ -43,6 +43,7 @@ export type HelixAccountPolicyAccessState = "available" | "locked" | "hidden";
 
 export const HELIX_USER_WORKSTATION_PANEL_IDS = [
   "account-session",
+  "local-harness",
   "agent-access",
   "workstation-clipboard-history",
   "docs-viewer",
@@ -90,6 +91,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   feature_flags: [
     "advanced_helix_ask_controls",
     "brokerage_environment",
+    "installed_service_management",
     "profile_connections",
     "developer_workstation_panels",
     "docs_viewer_print_pdf_export",
@@ -118,6 +120,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "brokerage_environment",
     "developer_workstation_panels",
     "experimental_panels",
+    "installed_service_management",
     "live_answer_visual_capture_controls",
     "room_source_ingress",
     "shared_realtime_rooms",

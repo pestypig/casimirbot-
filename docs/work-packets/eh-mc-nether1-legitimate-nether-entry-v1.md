@@ -141,6 +141,118 @@ repertoire. It cannot invent the next semantic milestone. Meaningful deviation,
 repertoire exhaustion, checkpoint completion, or changed goal viability becomes
 a compact G4-style wake for Codex. Repeated unchanged ticks do not.
 
+## Continuous-play readiness and measurement contract
+
+For this packet, **continuous** or **seamless** play does not mean that Runtime
+Codex samples the world or emits an action on every game tick. It means that
+model deliberation never creates an unexplained or unsafe control vacuum. At
+every measured interval the selected player must be in exactly one evidenced
+state:
+
+1. an admitted finite action or controller mode is advancing verified work;
+2. an admitted resident response is preserving viability or reacting to an
+   imminent hazard;
+3. the player is deliberately stabilized with controls released while a
+   semantic decision, authority repair, or required observation is pending; or
+4. the run is accurately paused, blocked, canceled, or complete.
+
+An absent action with no deliberate stabilized/terminal state is
+`nonproductive_dead_time`. A long model call is therefore not automatically a
+failure, but it is a continuity failure when no admitted controller is making
+progress and no current evidence proves a deliberate safe hold. This distinction
+prevents both raw keypress activity and a motionless but unexplained player from
+being presented as fluent play.
+
+### Control and priority ownership
+
+The continuing control stack is deliberately split:
+
+| Layer | Decision horizon | Responsibility |
+| --- | --- | --- |
+| Runtime Codex | semantic milestones over seconds to minutes | choose the current objective, authorize a finite contingency repertoire, set resource/risk budgets, interpret outcomes, and materially replan |
+| Resident priority arbiter | one to four client ticks | select among already-admitted combat, evasion, stabilization, recovery, navigation, interaction, and control-release modes using current sensor evidence |
+| Safety watchdog and trusted local arbiter | every client tick | enforce authority, identity, health/control invariants, manual override, Emergency Stop, resource locks, effect ceilings, deadlines, and safe release |
+
+The watchdog is not a strategic planner. The resident priority arbiter cannot
+invent a recipe, target, milestone, or mutation. Runtime Codex may admit a
+finite contingency graph such as:
+
+```text
+engage or advance objective
+  -> health/resource threshold crossed
+  -> disengage and obtain safe distance or cover
+  -> confirm no imminent impact and required inventory/recipe facts
+  -> consume an available recovery item, or execute an already-admitted craft
+  -> reassess from a fresh revision
+  -> resume, escape, abstain, or request semantic replanning
+```
+
+Resident arbitration uses this safety order unless a stricter admitted profile
+requires one:
+
+```text
+Emergency Stop / authority loss / genuine manual override
+  > imminent lethal or projectile impact
+  > immediate stabilization and control release
+  > admitted recovery
+  > admitted combat or hazard clearing
+  > current strategic objective
+  > speculative read-only preparation
+```
+
+Each mode is a finite priority lease with an activation condition, minimum and
+maximum duration, preemption rule, completion and failure postconditions,
+cooldown/hysteresis, resource locks, evidence fields, and forced release path.
+Only the existing execution arbiter may activate an effect.
+
+### Required continuity scorecard
+
+Every N0-N4 stage records the following measures from the same canonical run
+and labels retention gaps or unavailable measurements explicitly:
+
+| Measure | Acceptance interpretation |
+| --- | --- |
+| Sensor and derivation cost | p95 at or below 4 ms per client tick and no N0 fixture tick above 10 ms |
+| Local reaction latency | applicable guardian or resident response begins no later than one client tick after the fresh triggering frame |
+| Admitted handoff gap | no unintended idle control gap longer than one tick between already-admitted compatible nodes |
+| Critical semantic ordering | every admitted decision-relevant transition is visible to the monitor/operator trace before the next strategy-changing mutation |
+| Dispatch-to-observation latency | p95 at or below 2 seconds in the controlled authenticated course; connector, monitor, model, and terminal intervals are reported separately |
+| Consecutive causality | every mutation binds the snapshot and durable-goal revision that justified it; its receipt, cancellation, or postcondition is consumed before an incompatible next effect |
+| Effect uniqueness | zero duplicate physical effects across retry, wake, reconnect, connector restart, or surface replay |
+| Human gameplay dependence | zero gameplay intervention after the accepted stage begins; manual override is a valid interruption, never hidden assistance |
+| Control safety | 100% release on completion, failure, timeout, cancellation, lease loss, disconnect, manual override, and Emergency Stop |
+| Critical perception | 100% recall for the finite labelled deep-drop, lava/fire-contact, and admitted-hostile benchmark; missing coverage never becomes `safe` |
+| Goal durability | the same durable goal and verified checkpoint chain survives semantic turns, disconnect/reconnect, connector epoch change, and the stage's declared recovery perturbation |
+| Nonproductive dead time | total and longest interval in which no admitted progress, resident protection, deliberate stabilized hold, or terminal state is evidenced |
+| Progress efficiency | wall time and admitted action count per verified milestone, failed/repeated-action rate, and ratio against a recorded human baseline from the same starting fixture |
+
+The existing numeric local-control and authenticated observation budgets are
+frozen. N0 must establish the baseline distribution for nonproductive dead time
+and progress efficiency before N1 begins. The N1 record then freezes the
+controlled-world continuity envelope used for N2 parity; N2 may not hide a
+regression behind matching terminal success. N3 and N4 must report the same
+scorecard so increased world uncertainty is distinguishable from connector,
+provider, or lifecycle latency.
+
+### Operational continuity evidence levels
+
+These labels are packet-local evaluation descriptions, not replacements for
+the work program's capability-maturity vocabulary:
+
+- **continuous local control:** N0 proves tick budgets, bounded priority
+  arbitration, consecutive handoff, stabilization, release, and exact evidence;
+- **controlled seamless play:** N1 direct and N2 keyed runs complete the same
+  controlled objective with no unexplained control vacuum or user gameplay;
+- **ordinary-world sustained play:** N3 preserves the loop while resource
+  search, hazards, route changes, and inventory pressure alter the plan; and
+- **unknown-world durable autonomy:** N4 completes the recorded legitimate
+  portal-entry and safe-return objective from an unencoded ordinary world.
+
+The harness may be described as ready for controlled seamless Nether play only
+after N1 and N2 pass. General unknown-world Nether autonomy requires N4. A
+successful combat round, portal action, direct trace, or terminal answer alone
+does not promote either claim.
+
 ## Capability-readiness increment
 
 Before the first controlled live attempt, inventory the current provider-visible
@@ -171,6 +283,29 @@ Use fixtures and a controlled survival world to prove the required observation,
 crafting, inventory, navigation, construction, portal, guardian, checkpoint,
 and recovery primitives independently. This is deterministic verification, not
 goal acceptance.
+
+The next executable increment is **N0-CONT**, the controlled continuous-play
+integration course. It is an N0 increment, not a new program gate or permission
+to begin N1. Run it in this order:
+
+1. `N0-CONT-A`: live direct micro-courses for furnace transfer/smelting,
+   controlled portal ignition, dimension transition, viable arrival and return
+   observation, with post-transition guardian behavior and complete control
+   release;
+2. `N0-CONT-B`: one recorded integration course containing at least three
+   consecutive sense-decide-act-observe cycles, one resident intervention, one
+   changed-affordance replan, one deliberate stabilized model-delay interval,
+   and one disconnect/reconnect from the acknowledged durable checkpoint; and
+3. `N0-CONT-C`: restore equivalent state and prove authenticated A1
+   Codex-through-MCP plus keyed B Helix re-entry, operator-trace correlation,
+   zero duplicate effects, and first-divergence parity.
+
+`N0-CONT` is GO only when identity, Survival ruleset, source/world/player
+binding, finite Player Embodiment authority, fresh monitor cursor, host memory
+budget, fixture snapshot, artifact hash, and Emergency Stop are all verified.
+Failure preserves the current checkpoint and identifies the first capability,
+execution, observation, re-entry, or authority boundary. N1 remains NO-GO until
+all three increments pass and the continuity scorecard is complete.
 
 ### N1 — Controlled-world direct Codex
 

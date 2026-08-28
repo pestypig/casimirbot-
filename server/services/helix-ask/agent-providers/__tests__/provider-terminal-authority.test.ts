@@ -1199,6 +1199,85 @@ describe("provider terminal authority for capability lanes", () => {
       terminal_kind: "answer",
       final_answer_source: "agent_provider_terminal_candidate",
     });
+
+    const duplicatedZeroArtifactFailure = {
+      ...failed.observation_packet,
+      produced_artifact_refs: [],
+    };
+    const failedWithoutArtifact = {
+      ...failed,
+      observation_packet: duplicatedZeroArtifactFailure,
+      artifact_refs: [],
+    };
+    const repairedDuplicateProjection = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-minecraft-current-reentry-repaired",
+      threadId: "thread-minecraft-current-reentry-repaired",
+      route: "/ask/turn",
+      gatewayCallResults: [
+        failedWithoutArtifact as never,
+        succeeded as never,
+      ],
+      capabilityLaneObservationPackets: [
+        duplicatedZeroArtifactFailure as never,
+      ],
+      normalizedObservationPackets: [
+        duplicatedZeroArtifactFailure as never,
+        succeeded.observation_packet as never,
+      ],
+      providerText:
+        "Fresh verification confirmed the one requested cell is minecraft:fire.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      currentTurnEvidenceRequired: true,
+    });
+
+    expect(repairedDuplicateProjection.providerReasoningReentry).toMatchObject({
+      status: "completed",
+      evidence_reentered: true,
+      capability_lane_observation_packet_count: 0,
+    });
+    expect(
+      repairedDuplicateProjection.providerTerminalAuthorityBridge,
+    ).toMatchObject({
+      all_gateway_calls_succeeded: true,
+      all_capability_lane_observations_reentry_compatible: true,
+      all_observations_reentry_compatible: true,
+      terminal_authority_granted: true,
+    });
+
+    const permissionFailure = {
+      ...failedWithoutArtifact,
+      error: "permission_revoked",
+      observation: { error_code: "permission_revoked" },
+    };
+    const blockedDuplicateProjection = buildHelixProviderReasoningReentry({
+      runtime: "codex",
+      providerLabel: "Codex Workstation Mode",
+      turnId: "turn-minecraft-current-reentry-repaired",
+      threadId: "thread-minecraft-current-reentry-repaired",
+      route: "/ask/turn",
+      gatewayCallResults: [permissionFailure as never, succeeded as never],
+      capabilityLaneObservationPackets: [
+        duplicatedZeroArtifactFailure as never,
+      ],
+      normalizedObservationPackets: [
+        duplicatedZeroArtifactFailure as never,
+        succeeded.observation_packet as never,
+      ],
+      providerText: "The operation succeeded.",
+      ok: true,
+      solverCompleted: true,
+      goalSatisfied: true,
+      currentTurnEvidenceRequired: true,
+    });
+    expect(blockedDuplicateProjection.providerTerminalAuthorityBridge).toMatchObject({
+      all_gateway_calls_succeeded: false,
+      all_observations_reentry_compatible: false,
+      terminal_authority_granted: false,
+    });
   });
 
   it("authorizes a same-turn action after wrong-environment selection is repaired without superseding permission failures", () => {

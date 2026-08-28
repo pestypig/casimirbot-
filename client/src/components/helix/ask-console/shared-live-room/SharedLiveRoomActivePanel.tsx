@@ -4,6 +4,7 @@ import { describeHelixSharedLiveRoomReadiness } from "./SharedLiveRoomViewModel"
 import { SharedLiveRoomConsentPanel } from "./SharedLiveRoomConsentPanel";
 import { SharedLiveRoomDebugPanel } from "./SharedLiveRoomDebugPanel";
 import { SharedLiveRoomParticipantsPanel } from "./SharedLiveRoomParticipantsPanel";
+import { SharedLiveRoomPublicResultsPanel } from "./SharedLiveRoomPublicResultsPanel";
 import { SharedLiveRoomRuntimePanel } from "./SharedLiveRoomRuntimePanel";
 import { SharedLiveRoomSetupPanel } from "./SharedLiveRoomSetupPanel";
 import { SharedLiveRoomVisualLanes } from "./SharedLiveRoomVisualLanes";
@@ -75,7 +76,7 @@ export function SharedLiveRoomActivePanel({
           {controller.mediaBridge.state === "idle" ||
           controller.mediaBridge.state === "closed" ||
           controller.mediaBridge.state === "error" ? (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-active-panel.connect-room-audio"
               type="button"
               disabled={!canStartRoomAudio || controller.busyAction !== null}
               title={!room.readiness.ready
@@ -91,7 +92,7 @@ export function SharedLiveRoomActivePanel({
               Connect room audio
             </button>
           ) : (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-active-panel.disconnect-audio"
               type="button"
               className="rounded-lg border border-white/15 px-3 py-2 text-xs text-slate-200"
               onClick={() => void controller.stopMediaBridge()}
@@ -116,7 +117,7 @@ export function SharedLiveRoomActivePanel({
           </p>
         ) : null}
         {controller.mediaBridge.failure === "remote_audio_playback_blocked" ? (
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-active-panel.resume-room-playback"
             type="button"
             className="mt-2 rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[10px] font-semibold text-amber-100"
             onClick={() => void controller.resumeMediaPlayback()}
@@ -143,6 +144,7 @@ export function SharedLiveRoomActivePanel({
         controller={controller}
         sectionId={`${idPrefix}-participants`}
       />
+      <SharedLiveRoomPublicResultsPanel room={room} />
       {controller.selfParticipant ? (
         <SharedLiveRoomConsentPanel
           participant={controller.selfParticipant}
@@ -181,7 +183,7 @@ export function SharedLiveRoomActivePanel({
       </details>
 
       <div className="flex justify-end">
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-active-panel.void-leave"
           type="button"
           disabled={controller.busyAction !== null}
           className="rounded-lg border border-rose-300/25 px-3 py-2 text-xs text-rose-100 disabled:opacity-50"

@@ -5,6 +5,8 @@ import {
   helixLocalSupervisorStatusSchema,
   type HelixLocalSupervisorStatus,
 } from "@shared/helix-local-supervisor";
+import { verifyHelixLocalSupervisorOwnershipReceipt } from
+  "./local-supervisor-ownership-receipt";
 
 const normalizeWorkspace = (workspacePath: string): string =>
   path.resolve(workspacePath).replaceAll("\\", "/").toLowerCase();
@@ -17,11 +19,20 @@ export const helixWorkspaceRefFor = (workspacePath: string): string =>
 
 export const resolveHelixLocalSupervisorMode = (
   environment: NodeJS.ProcessEnv,
+  workspacePath = process.cwd(),
+  now?: Date,
 ): HelixLocalSupervisorStatus["supervisor_mode"] => {
   if (environment.CASIMIR_DESKTOP_HOST === "1") {
     return "desktop_single_instance";
   }
-  if (environment.CASIMIR_KEYED_LAUNCHER_SUPERVISED === "1") {
+  if (verifyHelixLocalSupervisorOwnershipReceipt({
+    encodedReceipt: environment.CASIMIR_LOCAL_SUPERVISOR_OWNERSHIP_RECEIPT,
+    trustedPublicKeysPem: environment.CASIMIR_LOCAL_SUPERVISOR_TRUSTED_PUBLIC_KEYS,
+    trustedPublicKeysSpkiBase64Url:
+      environment.CASIMIR_LOCAL_SUPERVISOR_TRUSTED_PUBLIC_KEYS_SPKI_B64URL,
+    expectedWorkspaceRef: helixWorkspaceRefFor(workspacePath),
+    now,
+  })) {
     return "external_keyed_launcher";
   }
   return "external_process";
@@ -50,7 +61,11 @@ export const createHelixLocalSupervisorIdentity = (input?: {
     ).slice(0, 32)}`,
     workspaceRef: helixWorkspaceRefFor(workspacePath),
     startedAt,
-    supervisorMode: resolveHelixLocalSupervisorMode(environment),
+    supervisorMode: resolveHelixLocalSupervisorMode(
+      environment,
+      workspacePath,
+      new Date(startedAt),
+    ),
   });
 };
 
@@ -89,4 +104,3 @@ export const buildHelixLocalSupervisorStatus = (input: {
     answer_authority: false,
     terminal_eligible: false,
   });
-

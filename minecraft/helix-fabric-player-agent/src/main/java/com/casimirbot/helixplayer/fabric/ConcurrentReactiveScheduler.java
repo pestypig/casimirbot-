@@ -1297,6 +1297,9 @@ final class ConcurrentReactiveScheduler {
             );
             case "place" -> placementResources(action);
             case "craft", "inventory_transfer" -> Set.of("inventory", "native_workflow");
+            case "consume" -> Set.of(
+                "hotbar", "main_hand", "inventory", "native_workflow"
+            );
             default -> throw new IllegalArgumentException("Unsupported reactive action kind " + kind);
         };
     }

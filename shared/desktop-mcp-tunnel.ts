@@ -1,5 +1,5 @@
 export const DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION =
-  "casimir_desktop_mcp_tunnel/1" as const;
+  "casimir_desktop_mcp_tunnel/2" as const;
 
 export const DESKTOP_MCP_TUNNEL_FAILURE_CODES = [
   "binary_missing",
@@ -28,7 +28,7 @@ export type DesktopMcpTunnelState = Readonly<{
   schemaVersion: typeof DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION;
   transport: "openai_secure_mcp_tunnel";
   access: "developer_private";
-  scope: "device_check_read_only";
+  scope: "local_supervisor_coordination_and_device_check";
   status: DesktopMcpTunnelStatus;
   configured: boolean;
   vaultAvailable: boolean;
@@ -77,7 +77,7 @@ export function parseDesktopMcpTunnelState(
     value.schemaVersion !== DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION ||
     value.transport !== "openai_secure_mcp_tunnel" ||
     value.access !== "developer_private" ||
-    value.scope !== "device_check_read_only" ||
+    value.scope !== "local_supervisor_coordination_and_device_check" ||
     !validStatuses.includes(value.status as DesktopMcpTunnelStatus) ||
     typeof value.configured !== "boolean" ||
     typeof value.vaultAvailable !== "boolean" ||

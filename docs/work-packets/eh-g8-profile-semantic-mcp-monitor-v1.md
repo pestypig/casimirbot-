@@ -232,7 +232,9 @@ admit that permission and requires a sanitized run-start probe after login.
 The authenticated MCP catalog also exposes
 `helix_client_authorization_status`. It is callable with the already-required
 room-read scope and compares only the signed token's grants relevant to either
-the `g2-action` or `g8-monitor` profile. Its projection contains the required,
+the `g2-action` or `g8-monitor` profile. The G8 profile also requires the
+separately admitted `helix.brokerage.paper_observer.process` permission before
+it can report ready. Its projection contains the required,
 granted-required and missing scope names, verified expiry and one stable
 recovery action; bearer material, subject, OAuth client identity, unrelated
 grants and raw claims are invariantly absent. It grants no scope and carries no
@@ -254,6 +256,15 @@ The loopback Auth0 API now defines `helix.agent_runs.write`. A fresh Google-back
 consent granted the exact four-scope `g8-monitor` bundle, and the sanitized
 authorization-status tool reported `ready=true`, no missing scopes and no bearer,
 subject, client identity or raw claims. No Codex application restart was needed.
+
+## Brokerage observer authorization checkpoint — 2026-08-27
+
+The `g8-monitor` readiness profile now includes
+`helix.brokerage.paper_observer.process` in addition to its earlier four scopes.
+This keeps the sanitized readiness verdict fail-closed for the resident
+brokerage paper observer instead of allowing an older monitor-only grant to
+report ready. Auth0 consent was refreshed against the exact five-scope profile;
+this adds no Robinhood provider-mutation or live-order authority.
 
 A fresh external Codex process then created one durable run, one
 `custom_survival` goal and one finite monitor for the exact installed Minecraft

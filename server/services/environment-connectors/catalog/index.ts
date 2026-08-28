@@ -32,6 +32,7 @@ import {
   HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
@@ -2062,6 +2063,34 @@ const minecraftCraftInputSchema: HelixEnvironmentConstrainedJsonSchema = {
   additionalProperties: false,
 };
 
+const minecraftConsumeInputSchema: HelixEnvironmentConstrainedJsonSchema = {
+  type: "object",
+  properties: {
+    action_kind: { type: "string", enum: ["consume"] },
+    item_id: { type: "string", minLength: 3, maxLength: 320 },
+    count: { type: "integer", minimum: 1, maximum: 64 },
+    hand: { type: "string", enum: ["main_hand"] },
+    max_duration_ms: { type: "integer", minimum: 1_000, maximum: 60_000 },
+    stop_below_health: { type: "number", minimum: 1, maximum: 20 },
+    minimum_food_gain: { type: "integer", minimum: 0, maximum: 20 },
+    expected_remainder_item_id: {
+      type: "string",
+      minLength: 3,
+      maxLength: 320,
+    },
+  },
+  required: [
+    "action_kind",
+    "item_id",
+    "count",
+    "hand",
+    "max_duration_ms",
+    "stop_below_health",
+    "minimum_food_gain",
+  ],
+  additionalProperties: false,
+};
+
 const minecraftInventoryTransferInputSchema: HelixEnvironmentConstrainedJsonSchema =
   {
     type: "object",
@@ -3741,6 +3770,14 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
       "Select a known craftable client recipe in the active inventory or crafting-table grid, take server-presented results, and verify the output inventory increase.",
     inputSchema: minecraftCraftInputSchema,
     timeoutCeilingMs: 10 * 60_000,
+  }),
+  actionDescriptor({
+    capabilityId: HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
+    label: "Consume a Minecraft inventory item",
+    description:
+      "Equip and continuously use an exact admitted main-hand consumable, then verify item/remainder inventory deltas, food, saturation, health and released controls. It never infers direct healing from food use.",
+    inputSchema: minecraftConsumeInputSchema,
+    timeoutCeilingMs: 60_000,
   }),
   actionDescriptor({
     capabilityId: HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,

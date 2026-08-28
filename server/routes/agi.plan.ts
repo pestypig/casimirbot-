@@ -374,6 +374,11 @@ import {
   readHelixAskPublicLifecycle,
   rememberHelixAskPublicLifecycle,
 } from "../services/helix-ask/runtime/public-lifecycle-store";
+import {
+  publishSharedRealtimeRoomPublicTerminalResult,
+  rememberSharedRealtimeRoomVerifiedTurnAccess,
+} from
+  "../services/helix-ask/realtime-room/public-terminal-results";
 import type { HelixAgentContinuationState } from "@shared/helix-agent-continuation-state";
 import {
   appendHelixRuntimeGoalSatisfactionObservation,
@@ -170610,6 +170615,14 @@ const enforceHelixSharedRoomAskSessionAccess = async (args: {
     terminal_eligible: false,
     raw_content_included: false,
   };
+  const verifiedRoomId = readHelixSharedRoomIdFromAskSession(askSessionId);
+  if (verifiedRoomId && access.participantId) {
+    rememberSharedRealtimeRoomVerifiedTurnAccess({
+      roomId: verifiedRoomId,
+      turnId: args.turnId,
+      participantId: access.participantId,
+    });
+  }
   if (
     trustedInteraction &&
     (access.participantId !== trustedInteraction.participantId ||
@@ -172009,6 +172022,10 @@ const recordHelixAskRuntimeCompletionCheckpoint = (args: {
           : "ask_turn_json";
     attachHelixAskRuntimeTransparency(payload);
     rememberHelixAskPublicLifecycle(payload, { sessionId });
+    publishSharedRealtimeRoomPublicTerminalResult({
+      askBody: args.body,
+      payload,
+    });
     rememberHelixAskTurnTransportReplay({
       turnId,
       sessionId,

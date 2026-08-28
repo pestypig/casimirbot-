@@ -24,8 +24,20 @@ type DesktopRuntimeBridge = Readonly<{
   clearMcpTunnel?: () => Promise<unknown>;
   openMcpTunnelAdmin?: () => Promise<unknown>;
   openAuth0AccountLink?: (authorizationUrl: unknown) => Promise<unknown>;
+  openAuth0StepUp?: (authorizationUrl: unknown) => Promise<unknown>;
   openRobinhoodOAuth?: (authorizationUrl: unknown) => Promise<unknown>;
+  getRealtimeTexturePackState?: () => Promise<unknown>;
+  showRealtimeTexturePackOverlay?: (config: unknown) => Promise<unknown>;
+  updateRealtimeTexturePackFrame?: (frame: unknown) => Promise<unknown>;
+  revealRealtimeTexturePackOriginal?: (reveal: boolean) => Promise<unknown>;
+  stopRealtimeTexturePackOverlay?: () => Promise<unknown>;
+  onRealtimeTexturePackState?: (
+    listener: (state: unknown) => void,
+  ) => () => void;
   onAuth0AccountLinkCompletion?: (
+    listener: (state: unknown) => void,
+  ) => () => void;
+  onAuth0StepUpCompletion?: (
     listener: (state: unknown) => void,
   ) => () => void;
   onMcpTunnelState?: (listener: (state: unknown) => void) => () => void;

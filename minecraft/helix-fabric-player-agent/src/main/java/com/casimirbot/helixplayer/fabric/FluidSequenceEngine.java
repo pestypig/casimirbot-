@@ -30,6 +30,7 @@ final class FluidSequenceEngine {
     private Map<String, Map<String, Object>> nodes = Map.of();
     private String currentNodeId;
     private long nodeEnteredAt = -1;
+    private boolean inputJumpArcOwned;
     private long startedNanos;
     private final Set<String> enteredNodes = new LinkedHashSet<>();
     private final Set<String> satisfiedCheckpoints = new LinkedHashSet<>();
@@ -71,6 +72,7 @@ final class FluidSequenceEngine {
         nodes = Map.copyOf(indexed);
         currentNodeId = text(candidate, "start_node_id");
         nodeEnteredAt = -1;
+        inputJumpArcOwned = false;
         startedNanos = System.nanoTime();
         enteredNodes.clear();
         satisfiedCheckpoints.clear();
@@ -212,10 +214,15 @@ final class FluidSequenceEngine {
             double rightZ = Math.cos(heading + Math.PI / 2.0);
             double targetX = lookSnapshot.x() + forwardX * forward + rightX * strafe;
             double targetZ = lookSnapshot.z() + forwardZ * forward + rightZ * strafe;
+            boolean jumpHeld = "hold".equals(jump);
+            if (jumpHeld && lookSnapshot.onGround()) {
+                inputJumpArcOwned = true;
+            }
             LocomotionSafetyEnvelope.Check safety = bridge.checkLocomotionSafety(
                 targetX,
                 targetZ,
-                6.0
+                6.0,
+                jumpHeld && inputJumpArcOwned
             );
             if (!safety.decision().admitted()) {
                 bridge.releaseAll();
@@ -545,6 +552,7 @@ final class FluidSequenceEngine {
         nodeOutcomes.put(currentNodeId, outcome);
         currentNodeId = targetNodeId;
         nodeEnteredAt = -1;
+        inputJumpArcOwned = false;
     }
 
     private void markDeclaredEffects(String actionKind) {

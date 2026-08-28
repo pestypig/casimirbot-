@@ -45,13 +45,13 @@ export function SharedLiveRoomDialog({
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div
+    <div data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-dialog.shared-live-room-overlay"
       className="fixed inset-0 z-[2147483000] isolate flex items-start justify-center overflow-y-auto overscroll-contain p-3 sm:p-6"
       data-testid="shared-live-room-overlay"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <button
+      <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-dialog.close-shared-gpt-live-room-dialog"
         type="button"
         tabIndex={-1}
         aria-label="Close Shared GPT Live Room dialog"
@@ -75,7 +75,7 @@ export function SharedLiveRoomDialog({
               with one host-owned GPT Live call, then receive the same GPT audio and transcripts.
             </p>
           </div>
-          <button
+          <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-dialog.close-shared-gpt-live-room"
             ref={closeButtonRef}
             type="button"
             aria-label="Close Shared GPT Live Room"
@@ -90,7 +90,7 @@ export function SharedLiveRoomDialog({
           {controller.error ? (
             <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">
               <span>{controller.error}</span>
-              <button type="button" className="underline" onClick={controller.clearError}>Dismiss</button>
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-dialog.dismiss" type="button" className="underline" onClick={controller.clearError}>Dismiss</button>
             </div>
           ) : null}
 

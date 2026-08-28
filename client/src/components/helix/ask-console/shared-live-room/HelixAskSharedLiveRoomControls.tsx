@@ -98,6 +98,9 @@ export function HelixAskSharedLiveRoomControls({
   return (
     <>
       <button
+        data-helix-control-id="helix.ask.shared_live_room.open_dialog"
+        data-helix-interaction-kind="navigate"
+        data-helix-authority-state="blocked_pending_contract"
         ref={triggerButtonRef}
         type="button"
         data-helix-ask-action-item="true"

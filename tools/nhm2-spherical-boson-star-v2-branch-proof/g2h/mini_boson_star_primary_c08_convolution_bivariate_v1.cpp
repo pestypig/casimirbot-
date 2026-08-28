@@ -247,7 +247,69 @@ arb_srcptr Output::coefficient(unsigned degree) const {
     return retained_xi_coefficients.data() + degree;
 }
 
-bool evaluate(const Input &input, Output *output, Result *result) {
+PreparedMoments::PreparedMoments() {
+    arb_init(u_left);
+    arb_init(u_right);
+    arb_zero(u_left);
+    arb_zero(u_right);
+}
+
+PreparedMoments::~PreparedMoments() {
+    for (auto &value : values) arb_clear(&value);
+    arb_clear(u_right);
+    arb_clear(u_left);
+}
+
+arb_srcptr PreparedMoments::moment(unsigned a, unsigned b) const {
+    return values.data() + static_cast<std::size_t>(a)
+        * (static_cast<std::size_t>(maximum_g_order) + 1U) + b;
+}
+
+bool prepare_moments(arb_srcptr u_left_value, arb_srcptr u_right_value,
+                     unsigned maximum_f_order_value,
+                     unsigned maximum_g_order_value,
+                     PreparedMoments *prepared) {
+    if (prepared == nullptr || prepared->ready || !prepared->values.empty()
+        || !exact_finite(u_left_value) || !exact_finite(u_right_value)
+        || maximum_f_order_value > kMaximumSourceOrder
+        || maximum_g_order_value > kMaximumSourceOrder) {
+        return false;
+    }
+    const unsigned maximum_u_power = maximum_f_order_value
+        + maximum_g_order_value + 1U;
+    BallVector left_powers(static_cast<std::size_t>(maximum_u_power) + 1U);
+    BallVector right_powers(static_cast<std::size_t>(maximum_u_power) + 1U);
+    fill_powers(left_powers, u_left_value);
+    fill_powers(right_powers, u_right_value);
+    const std::size_t count =
+        (static_cast<std::size_t>(maximum_f_order_value) + 1U)
+        * (static_cast<std::size_t>(maximum_g_order_value) + 1U);
+    BallVector computed(count);
+    for (unsigned a = 0U; a <= maximum_f_order_value; ++a) {
+        for (unsigned b = 0U; b <= maximum_g_order_value; ++b) {
+            const std::size_t index = static_cast<std::size_t>(a)
+                * (static_cast<std::size_t>(maximum_g_order_value) + 1U) + b;
+            if (!beta_moment(computed.at(index), a, b, left_powers,
+                             right_powers)) {
+                return false;
+            }
+        }
+    }
+    prepared->values.resize(count);
+    for (std::size_t index = 0U; index < count; ++index) {
+        arb_init(prepared->values.data() + index);
+        arb_set(prepared->values.data() + index, computed.at(index));
+    }
+    arb_set(prepared->u_left, u_left_value);
+    arb_set(prepared->u_right, u_right_value);
+    prepared->maximum_f_order = maximum_f_order_value;
+    prepared->maximum_g_order = maximum_g_order_value;
+    prepared->ready = true;
+    return true;
+}
+
+bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
+                   Output *output, Result *result) {
     if (result == nullptr) return false;
     *result = Result{};
     if (output == nullptr) {
@@ -299,6 +361,15 @@ bool evaluate(const Input &input, Output *output, Result *result) {
         fail(result, FailureDetail::invalid_component_order_or_boundary);
         return false;
     }
+    if (prepared != nullptr
+        && (!prepared->ready
+            || prepared->maximum_f_order != max_f_order
+            || prepared->maximum_g_order != max_g_order
+            || !arb_equal(prepared->u_left, input.u_left)
+            || !arb_equal(prepared->u_right, input.u_right))) {
+        fail(result, FailureDetail::invalid_component_order_or_boundary);
+        return false;
+    }
     BallVector f_hull(static_cast<std::size_t>(max_f_order) + 1U);
     BallVector g_hull(static_cast<std::size_t>(max_g_order) + 1U);
     if (!translated_source_hull(input.f_ledger, f_ordinals, input.f_jet,
@@ -315,18 +386,27 @@ bool evaluate(const Input &input, Output *output, Result *result) {
     }
 
     const unsigned maximum_u_power = max_f_order + max_g_order + 1U;
-    BallVector left_powers(static_cast<std::size_t>(maximum_u_power) + 1U);
-    BallVector right_powers(static_cast<std::size_t>(maximum_u_power) + 1U);
-    fill_powers(left_powers, input.u_left);
-    fill_powers(right_powers, input.u_right);
+    const std::size_t power_count = prepared == nullptr
+        ? static_cast<std::size_t>(maximum_u_power) + 1U : 0U;
+    BallVector left_powers(power_count);
+    BallVector right_powers(power_count);
+    if (prepared == nullptr) {
+        fill_powers(left_powers, input.u_left);
+        fill_powers(right_powers, input.u_right);
+    }
     BallVector global_t(static_cast<std::size_t>(maximum_u_power) + 1U);
     arb_t moment, product, term, next;
     arb_init(moment); arb_init(product); arb_init(term); arb_init(next);
     bool algebra_ok = true;
     for (unsigned a = 0U; a <= max_f_order && algebra_ok; ++a) {
         for (unsigned b = 0U; b <= max_g_order; ++b) {
-            if (!beta_moment(moment, a, b, left_powers, right_powers)) {
-                algebra_ok = false; break;
+            if (prepared == nullptr) {
+                if (!beta_moment(moment, a, b, left_powers, right_powers)) {
+                    algebra_ok = false; break;
+                }
+            } else {
+                arb_set(moment, prepared->moment(a, b));
+                if (!arb_is_finite(moment)) { algebra_ok = false; break; }
             }
             ++result->beta_moments_evaluated;
             arb_mul(product, f_hull.at(a), g_hull.at(b), kPrecisionBits);
@@ -447,6 +527,15 @@ bool evaluate(const Input &input, Output *output, Result *result) {
     result->midpoint_selection_used = false;
     result->point_sampling_used = false;
     return true;
+}
+
+bool evaluate(const Input &input, Output *output, Result *result) {
+    return evaluate_impl(input, nullptr, output, result);
+}
+
+bool evaluate_prepared(const Input &input, const PreparedMoments &prepared,
+                       Output *output, Result *result) {
+    return evaluate_impl(input, &prepared, output, result);
 }
 
 const char *failure_detail_name(FailureDetail detail) {

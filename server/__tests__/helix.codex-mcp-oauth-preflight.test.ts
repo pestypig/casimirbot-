@@ -6,6 +6,7 @@ const metadata = (scopes = [
   "helix.environment_actions.read",
   "helix.environment_actions.write",
   "helix.agent_runs.write",
+  "helix.brokerage.paper_observer.process",
 ]) => ({
   resource: "http://127.0.0.1:1522/mcp",
   authorization_servers: ["https://tenant.example.auth0.com/"],
@@ -109,7 +110,7 @@ describe("Codex MCP OAuth preflight", () => {
     );
   });
 
-  it("requires run-write admission for the G8 monitor profile", async () => {
+  it("requires run-write and paper-observer admission for the G8 monitor profile", async () => {
     await expect(inspectCodexMcpOAuthReadiness({
       oauthClientId: "public-client-id",
       capabilityProfile: "g8-monitor",
@@ -119,7 +120,7 @@ describe("Codex MCP OAuth preflight", () => {
         "helix.environment_actions.write",
       ])),
     })).rejects.toThrow(
-      /codex_mcp_required_scopes_missing:helix\.agent_runs\.write/,
+      /codex_mcp_required_scopes_missing:helix\.agent_runs\.write,helix\.brokerage\.paper_observer\.process/,
     );
 
     const result = await inspectCodexMcpOAuthReadiness({
@@ -131,6 +132,9 @@ describe("Codex MCP OAuth preflight", () => {
     });
     expect(result.capability_profile).toBe("g8-monitor");
     expect(result.required_scopes).toContain("helix.agent_runs.write");
+    expect(result.required_scopes).toContain(
+      "helix.brokerage.paper_observer.process",
+    );
   });
 
   it("fails before login when PKCE S256 is unavailable", async () => {

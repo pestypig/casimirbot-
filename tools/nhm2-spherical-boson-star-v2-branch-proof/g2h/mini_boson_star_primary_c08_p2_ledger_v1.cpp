@@ -39,6 +39,7 @@ void translate_result(const h2::Result &source, Result *target) {
     target->p2_models_after = source.h2_models_after;
     target->models_appended = source.models_appended;
     target->selector_calls = source.selector_calls;
+    target->selector_thread_count = source.selector_thread_count;
     target->selector_refinement_candidates_visited =
         source.selector_refinement_candidates_visited;
     target->selector_subpanels_accumulated =

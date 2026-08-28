@@ -261,6 +261,31 @@ describe("Shared Realtime room environment command authority", () => {
       })
       .expect(404);
 
+    await expect(
+      createConnectorBootstrapPairing({
+        roomId,
+        ownerProfileId: owner.profileId,
+        purpose: "rotate",
+        bindingId,
+        domainAdapter,
+        sourceLabel: "Local Fabric",
+        commandCredentialRequested: true,
+        idempotencyKey: "command-route-preflight-without-authority",
+      }),
+    ).rejects.toMatchObject({
+      code: "connector_pairing_unavailable",
+      statusCode: 409,
+    });
+    expect(
+      (
+        await db.query<{ count: number }>(
+          `SELECT count(*)::int AS count
+           FROM helix_connector_pairing_codes
+           WHERE create_idempotency_key_hash IS NOT NULL;`,
+        )
+      ).rows[0]?.count,
+    ).toBe(0);
+
     const configured = await owner.agent
       .put(authorityPath)
       .set(SAME_ORIGIN_HEADERS)

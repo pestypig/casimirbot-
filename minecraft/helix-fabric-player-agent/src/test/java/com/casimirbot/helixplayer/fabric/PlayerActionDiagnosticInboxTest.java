@@ -306,6 +306,67 @@ final class PlayerActionDiagnosticInboxTest {
     }
 
     @Test
+    void fullScopeAcceptsBoundedMushroomStewConsumption() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-consume-stew",
+            "action_kind", "consume",
+            "arguments", Map.of(
+                "item_id", "minecraft:mushroom_stew",
+                "count", 1,
+                "hand", "main_hand",
+                "max_duration_ms", 8_000,
+                "stop_below_health", 8,
+                "minimum_food_gain", 6,
+                "expected_remainder_item_id", "minecraft:bowl"
+            ),
+            "max_duration_ticks", 200,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertEquals("consume", result.request().actionKind());
+        assertEquals("minecraft:mushroom_stew", result.request().arguments().get("item_id"));
+        assertEquals("main_hand", result.request().arguments().get("hand"));
+        assertEquals("minecraft:bowl", result.request().arguments().get("expected_remainder_item_id"));
+    }
+
+    @Test
+    void fullScopeRejectsOffHandConsumption() throws Exception {
+        Path inbox = write(Map.of(
+            "schema", PlayerActionDiagnosticInbox.SCHEMA,
+            "request_id", "direct_diagnostic_request:test-consume-off-hand",
+            "action_kind", "consume",
+            "arguments", Map.of(
+                "item_id", "minecraft:mushroom_stew",
+                "count", 1,
+                "hand", "off_hand",
+                "max_duration_ms", 8_000,
+                "stop_below_health", 8,
+                "minimum_food_gain", 6
+            ),
+            "max_duration_ticks", 200,
+            "control_engine", "native_fabric"
+        ));
+
+        PlayerActionDiagnosticInbox.PollResult result =
+            PlayerActionDiagnosticInbox.consume(
+                inbox,
+                System.currentTimeMillis(),
+                PlayerActionDiagnosticInbox.Scope.FULL
+            );
+
+        assertNull(result.request());
+        assertEquals("player_diagnostic_inbox_enum_invalid", result.failureCode());
+    }
+
+    @Test
     void fullScopeRejectsExactMiningWithMultipleRequestedBlocks() throws Exception {
         Path inbox = write(Map.of(
             "schema", PlayerActionDiagnosticInbox.SCHEMA,

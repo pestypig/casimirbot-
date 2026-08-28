@@ -26,6 +26,16 @@ const localPersistenceTables = [
   // row must never make an otherwise valid guest session look absent.
   "helix_account_linked_providers",
   "helix_account_sessions",
+  // Installed-device registration, revocation, and recovery are durable
+  // owner-security state. Restore them after their profile root so restarting
+  // the EXE cannot silently turn a revoked device back into "unregistered".
+  "helix_installed_devices",
+  // Stripe sandbox entitlement and ledger evidence are durable owner billing
+  // state. Restore parent entitlement and admitted events before immutable
+  // ledger entries so restart cannot duplicate or erase settled credit.
+  "helix_billing_entitlements",
+  "helix_billing_webhook_events",
+  "helix_billing_ledger_entries",
   "helix_account_profile_storage",
   "helix_account_events",
   "helix_account_credentials",
@@ -51,6 +61,13 @@ const localPersistenceTables = [
   "helix_paper_fills",
   "helix_paper_journal_events",
   "helix_paper_processed_observations",
+  "helix_brokerage_reactive_controller_runs",
+  "helix_brokerage_reactive_controller_events",
+  "helix_brokerage_reactive_controller_cycles",
+  "helix_brokerage_reactive_controller_effects",
+  "helix_brokerage_reactive_shadow_sessions",
+  "helix_brokerage_reactive_shadow_polls",
+  "helix_brokerage_reactive_shadow_acceptance_archives",
   "helix_live_equity_order_previews",
   "helix_live_equity_order_approvals",
   "helix_live_trading_controls",
@@ -61,6 +78,7 @@ const localPersistenceTables = [
   "helix_live_protective_exit_executions",
   "helix_live_protective_exit_events",
   "helix_live_provider_contract_acceptances",
+  "helix_live_acceptance_archives",
   "helix_room_source_bindings",
   "helix_room_source_credentials",
   "helix_room_source_ingress_requests",
@@ -210,6 +228,15 @@ const localPersistenceJsonColumns = new Set([
   "helix_paper_risk_decisions.decision_json",
   "helix_paper_journal_events.payload",
   "helix_paper_processed_observations.receipt_json",
+  "helix_brokerage_reactive_controller_runs.manifest_json",
+  "helix_brokerage_reactive_controller_runs.projection_json",
+  "helix_brokerage_reactive_controller_events.event_payload",
+  "helix_brokerage_reactive_controller_cycles.decision_json",
+  "helix_brokerage_reactive_controller_cycles.arbiter_json",
+  "helix_brokerage_reactive_controller_cycles.receipt_json",
+  "helix_brokerage_reactive_shadow_sessions.projection_json",
+  "helix_brokerage_reactive_shadow_polls.receipt_json",
+  "helix_brokerage_reactive_shadow_acceptance_archives.evidence_json",
   "helix_live_equity_order_previews.intent_json",
   "helix_live_equity_order_previews.provider_review_public_json",
   "helix_live_equity_order_previews.provider_warnings",
@@ -221,6 +248,7 @@ const localPersistenceJsonColumns = new Set([
   "helix_live_protective_exit_executions.intent_json",
   "helix_live_protective_exit_events.detail_json",
   "helix_live_provider_contract_acceptances.gates_json",
+  "helix_live_acceptance_archives.evidence_json",
   "helix_research_library_documents.metadata",
   "casimir_theory_execution_state.payload",
 ]);

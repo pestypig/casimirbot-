@@ -36,7 +36,7 @@ export function SharedLiveRoomParticipantsPanel({
           Participants and readiness
         </p>
         {isOwner ? (
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-participants-panel.create-invite"
             type="button"
             disabled={controller.busyAction !== null}
             className="rounded-lg border border-fuchsia-300/30 px-2 py-1 text-[10px] font-semibold text-fuchsia-100 disabled:opacity-50"
@@ -52,7 +52,7 @@ export function SharedLiveRoomParticipantsPanel({
             <code className="min-w-0 flex-1 select-all break-all text-xs text-fuchsia-100">
               {controller.inviteCode}
             </code>
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-participants-panel.copy-shared-live-room-invite-code"
               type="button"
               aria-label="Copy Shared Live Room invite code"
               className="inline-flex items-center gap-1 rounded border border-fuchsia-300/30 px-2 py-1 text-[10px] text-fuchsia-100"

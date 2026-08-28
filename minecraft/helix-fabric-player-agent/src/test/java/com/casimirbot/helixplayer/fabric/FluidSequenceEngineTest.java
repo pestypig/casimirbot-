@@ -591,7 +591,8 @@ final class FluidSequenceEngineTest {
         public LocomotionSafetyEnvelope.Check checkLocomotionSafety(
             double targetX,
             double targetZ,
-            double minimumHealth
+            double minimumHealth,
+            boolean controlledJumpArc
         ) {
             return locomotionSafety;
         }

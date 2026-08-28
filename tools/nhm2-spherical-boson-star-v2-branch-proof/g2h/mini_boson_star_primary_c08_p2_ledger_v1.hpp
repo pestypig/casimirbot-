@@ -42,6 +42,7 @@ struct Result {
     std::size_t p2_models_after = 0U;
     std::size_t models_appended = 0U;
     std::size_t selector_calls = 0U;
+    std::size_t selector_thread_count = 0U;
     std::size_t selector_refinement_candidates_visited = 0U;
     std::size_t selector_subpanels_accumulated = 0U;
     std::size_t source_prefix_digests_checked = 0U;

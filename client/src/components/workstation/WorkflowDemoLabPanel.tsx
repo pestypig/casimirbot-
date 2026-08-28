@@ -244,20 +244,20 @@ export default function WorkflowDemoLabPanel() {
           </div>
           <div className="flex flex-wrap gap-2">
             {!session ? (
-              <button type="button" onClick={handleStart} disabled={!canEnableDemo} className="inline-flex items-center gap-1.5 rounded border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.enable-demo" type="button" onClick={handleStart} disabled={!canEnableDemo} className="inline-flex items-center gap-1.5 rounded border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
                 <Play className="h-3.5 w-3.5" /> Enable demo
               </button>
             ) : session.status === "paused" ? (
-              <button type="button" onClick={resumeDemo} className="inline-flex items-center gap-1.5 rounded border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-400/20">
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.resume" type="button" onClick={resumeDemo} className="inline-flex items-center gap-1.5 rounded border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-400/20">
                 <Play className="h-3.5 w-3.5" /> Resume
               </button>
             ) : session.status === "active" ? (
-              <button type="button" onClick={pauseDemo} className="inline-flex items-center gap-1.5 rounded border border-amber-300/35 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-400/20">
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.pause" type="button" onClick={pauseDemo} className="inline-flex items-center gap-1.5 rounded border border-amber-300/35 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-400/20">
                 <Pause className="h-3.5 w-3.5" /> Pause
               </button>
             ) : null}
             {session ? (
-              <button type="button" onClick={handleReset} className="inline-flex items-center gap-1.5 rounded border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10">
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.reset" type="button" onClick={handleReset} className="inline-flex items-center gap-1.5 rounded border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10">
                 <RotateCcw className="h-3.5 w-3.5" /> Reset
               </button>
             ) : null}
@@ -284,7 +284,7 @@ export default function WorkflowDemoLabPanel() {
                 </p>
               </div>
               {isDeveloper ? (
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.prepare-in-ask"
                   type="button"
                   onClick={handlePrepareTheoryExperiment}
                   disabled={!activeChatId || !theoryBadgeIds.trim() || !theoryTarget.trim()}
@@ -300,7 +300,7 @@ export default function WorkflowDemoLabPanel() {
                 <label className="text-[10px] uppercase tracking-[0.12em] text-slate-500" htmlFor="theory-experiment-target">
                   Comparison or proposal target
                 </label>
-                <textarea
+                <textarea data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.theory-experiment-target"
                   id="theory-experiment-target"
                   value={theoryTarget}
                   onChange={(event) => setTheoryTarget(event.currentTarget.value)}
@@ -312,14 +312,14 @@ export default function WorkflowDemoLabPanel() {
                 <label className="text-[10px] uppercase tracking-[0.12em] text-slate-500" htmlFor="theory-experiment-badges">
                   Registered badge ids
                 </label>
-                <input
+                <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.theory-experiment-badges"
                   id="theory-experiment-badges"
                   value={theoryBadgeIds}
                   onChange={(event) => setTheoryBadgeIds(event.currentTarget.value)}
                   className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-slate-100 outline-none focus:border-violet-300/50"
                 />
                 <label className="mt-3 flex items-center gap-2 text-xs text-slate-300">
-                  <input
+                  <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.input"
                     type="checkbox"
                     checked={requestLanyon}
                     onChange={(event) => setRequestLanyon(event.currentTarget.checked)}
@@ -375,7 +375,7 @@ export default function WorkflowDemoLabPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono">{theoryExperimentSession.procedureId}</span>
                   {isDeveloper ? (
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.reset-projection"
                       type="button"
                       onClick={resetTheoryExperiment}
                       className="text-violet-200 underline decoration-violet-300/30 underline-offset-4"
@@ -399,7 +399,7 @@ export default function WorkflowDemoLabPanel() {
                   </p>
                 ) : null}
                 {isDeveloper && theoryExperimentSession.procedureSha256 ? (
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.continue-execution-closure-in-ask"
                     type="button"
                     onClick={handleContinueTheoryExecutionClosure}
                     disabled={
@@ -558,7 +558,7 @@ export default function WorkflowDemoLabPanel() {
                 {session.contextBinding.sourceTraceId ? <span className="font-mono">turn {session.contextBinding.sourceTraceId}</span> : null}
               </div>
               {contextCandidate && projection.completedStepCount === 0 ? (
-                <button type="button" onClick={handleRebaseFromCurrentChat} className="mt-3 rounded border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs text-cyan-100 hover:bg-cyan-400/20">
+                <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.rebase-from-latest-chat" type="button" onClick={handleRebaseFromCurrentChat} className="mt-3 rounded border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-xs text-cyan-100 hover:bg-cyan-400/20">
                   Rebase from latest chat
                 </button>
               ) : projection.completedStepCount > 0 ? (
@@ -568,7 +568,7 @@ export default function WorkflowDemoLabPanel() {
           ) : (
             <div className="mt-3 space-y-3">
               <div className="flex flex-wrap gap-2" role="group" aria-label="Workflow context source">
-                <button
+                <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.current-chat"
                   type="button"
                   onClick={() => setContextMode("current_chat")}
                   disabled={!contextCandidate}
@@ -576,14 +576,14 @@ export default function WorkflowDemoLabPanel() {
                 >
                   Current chat
                 </button>
-                <button
+                <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.custom-topic"
                   type="button"
                   onClick={() => setContextMode("custom")}
                   className={`rounded border px-2.5 py-1 text-xs ${contextMode === "custom" ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100" : "border-white/15 bg-white/5 text-slate-300"}`}
                 >
                   Custom topic
                 </button>
-                <button
+                <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.blank-placeholder"
                   type="button"
                   onClick={() => setContextMode("blank")}
                   className={`rounded border px-2.5 py-1 text-xs ${contextMode === "blank" ? "border-cyan-300/40 bg-cyan-400/15 text-cyan-100" : "border-white/15 bg-white/5 text-slate-300"}`}
@@ -598,7 +598,7 @@ export default function WorkflowDemoLabPanel() {
                   <p className="mt-2 text-[10px] text-slate-500">{contextCandidate.reason} Confidence: {contextCandidate.confidence}.</p>
                 </div>
               ) : contextMode === "custom" ? (
-                <textarea
+                <textarea data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.custom-workflow-objective"
                   value={customObjective}
                   onChange={(event) => setCustomObjective(event.currentTarget.value)}
                   rows={4}
@@ -613,7 +613,7 @@ export default function WorkflowDemoLabPanel() {
               )}
 
               {session ? (
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.bind-objective"
                   type="button"
                   onClick={handleBindSelectedContext}
                   disabled={contextMode === "blank" || (contextMode === "custom" && !customObjective.trim()) || (contextMode === "current_chat" && !contextCandidate)}
@@ -636,10 +636,10 @@ export default function WorkflowDemoLabPanel() {
               Its objective and Step {projection.completedStepCount + 1} progress are preserved, but replies in this chat cannot advance it. Continue explicitly here, or reset and derive a fresh objective from this chat.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={handleContinueInActiveChat} className="rounded border border-amber-200/35 bg-amber-300/10 px-3 py-1.5 text-xs text-amber-50 hover:bg-amber-300/20">
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.continue-this-run-here" type="button" onClick={handleContinueInActiveChat} className="rounded border border-amber-200/35 bg-amber-300/10 px-3 py-1.5 text-xs text-amber-50 hover:bg-amber-300/20">
                 Continue this run here
               </button>
-              <button type="button" onClick={handleResetForActiveChat} className="rounded border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10">
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.reset-for-this-chat" type="button" onClick={handleResetForActiveChat} className="rounded border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10">
                 Reset for this chat
               </button>
             </div>
@@ -690,7 +690,7 @@ export default function WorkflowDemoLabPanel() {
         </section>
 
         {session?.dismissedStepId ? (
-          <button type="button" onClick={restoreSuggestion} className="mt-4 text-xs text-cyan-200 underline decoration-cyan-300/30 underline-offset-4">
+          <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workflow-demo-lab.workflow-demo-lab-panel.restore-dismissed-next-step-suggestion" type="button" onClick={restoreSuggestion} className="mt-4 text-xs text-cyan-200 underline decoration-cyan-300/30 underline-offset-4">
             Restore dismissed next-step suggestion
           </button>
         ) : null}

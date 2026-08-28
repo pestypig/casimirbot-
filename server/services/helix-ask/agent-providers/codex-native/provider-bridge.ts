@@ -17,6 +17,10 @@ import {
   type CodexNativeWorkstationTurnResult,
 } from "./workstation-turn";
 import type { CodexNativeRuntimeApprovalContextV1 } from "./runtime-approval-host";
+import {
+  resolveHelixCodexAuth,
+  type HelixCodexAuthResolution,
+} from "./auth-mode";
 
 const readBooleanEnv = (
   value: string | undefined,
@@ -342,6 +346,7 @@ export type CodexNativeProviderBridgeAttempt = {
     model_policy_source: string;
     effective_model: string | null;
     effective_reasoning_effort: string | null;
+    provider_authentication: HelixCodexAuthResolution;
     trusted_goal_account_binding_required: boolean;
     allowed_workstation_tools: string[] | null;
     native_workstation_turn: CodexNativeWorkstationTurnResult["debug"] | null;
@@ -366,6 +371,7 @@ export const resolveCodexNativeProviderBridgeAvailability = (): {
     process.env.HELIX_CODEX_NATIVE_APP_SERVER_TEST_ENABLED,
     false,
   );
+  const auth = resolveHelixCodexAuth();
   const unavailableReason = !enabled
     ? "native_app_server_disabled"
     : process.env.CODEX_AGENT_FAKE_STDOUT !== undefined ||
@@ -373,8 +379,8 @@ export const resolveCodexNativeProviderBridgeAvailability = (): {
       ? "legacy_fake_runtime_configured"
       : runningUnderTest && !nativeTestOptIn
         ? "native_app_server_disabled_in_test"
-        : !readString(process.env.OPENAI_API_KEY)
-          ? "openai_api_key_missing"
+        : auth.status !== "available"
+          ? auth.reason ?? "codex_authentication_unavailable"
           : null;
   return {
     enabled,
@@ -399,6 +405,7 @@ export const runCodexNativeProviderBridge = async (input: {
   onNativeEvent?: (method: string, params: unknown) => void;
 }): Promise<CodexNativeProviderBridgeAttempt> => {
   const availability = resolveCodexNativeProviderBridgeAvailability();
+  const auth = resolveHelixCodexAuth();
   const enabled = availability.enabled;
   const modelPolicy = resolveCodexNativeModelPolicy(input.body);
   const runtimeGoal = readRecord(input.body.runtime_goal_session);
@@ -422,6 +429,7 @@ export const runCodexNativeProviderBridge = async (input: {
     model_policy_source: modelPolicy.source,
     effective_model: modelPolicy.model,
     effective_reasoning_effort: modelPolicy.reasoningEffort,
+    provider_authentication: auth,
     trusted_goal_account_binding_required: trustedGoalAccountBindingRequired,
     allowed_workstation_tools: allowedWorkstationTools,
     native_workstation_turn: null,
@@ -493,6 +501,7 @@ export const runCodexNativeProviderBridge = async (input: {
     requestedMode: "act",
     model: modelPolicy.model,
     reasoningEffort: modelPolicy.reasoningEffort,
+    auth,
     allowedWorkstationTools,
     authoritativeEvidenceArtifacts: input.authoritativeEvidenceArtifacts,
     trustedCurrentTurnGatewayCallResults: input.preexecutedGatewayCallResults,

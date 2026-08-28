@@ -1,12 +1,14 @@
 import crypto from "node:crypto";
 import {
   helixPaperFillSchema,
+  helixPaperExecutionModelSchema,
   helixPaperJournalEventSchema,
   helixPaperLifecycleProjectionSchema,
   helixPaperOrderSchema,
   helixPaperPositionSchema,
   helixPaperProcessObservationReceiptSchema,
   type HelixPaperFill,
+  type HelixPaperExecutionModel,
   type HelixPaperJournalEvent,
   type HelixPaperLifecycleProjection,
   type HelixPaperOrder,
@@ -65,6 +67,9 @@ type OrderRow = {
   limit_price_micros: number | string;
   stop_price_micros: number | string | null;
   reserved_cents: number | string;
+  filled_quantity_micros: number | string;
+  filled_notional_cents: number | string;
+  execution_model_json: unknown | null;
   status: "open" | "filled" | "cancelled";
   source_observation_id: string;
   created_at: string | Date;
@@ -176,7 +181,17 @@ const projectOrder = (row: OrderRow): HelixPaperOrder =>
       ? null
       : integer(row.stop_price_micros),
     reserved_cents: integer(row.reserved_cents),
+    filled_quantity_micros: integer(row.filled_quantity_micros),
+    filled_notional_cents: integer(row.filled_notional_cents),
+    execution_model: row.execution_model_json === null
+      ? null
+      : helixPaperExecutionModelSchema.parse(row.execution_model_json),
     status: row.status,
+    fill_state: row.status === "open"
+      ? integer(row.filled_quantity_micros) === 0
+        ? "unfilled"
+        : "partially_filled"
+      : row.status,
     source_observation_id: row.source_observation_id,
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
@@ -339,6 +354,8 @@ export const submitAcceptedPaperEntry = async (input: {
   accountId: string;
   riskDecisionId: string;
   clientOrderId: string;
+  executionModel?: HelixPaperExecutionModel | null;
+  reactiveControllerRunId?: string;
   now?: Date;
 }): Promise<HelixPaperOrder> => {
   const now = input.now ?? new Date();
@@ -373,6 +390,27 @@ export const submitAcceptedPaperEntry = async (input: {
   });
   assertRegularSession(quote);
   return withSharedRealtimeRoomTransaction(async (client) => {
+    if (input.reactiveControllerRunId) {
+      const controller = await client.query<{
+        owner_profile_id: string;
+        paper_account_id: string;
+        status: string;
+      }>(
+        `SELECT owner_profile_id, paper_account_id, status
+           FROM helix_brokerage_reactive_controller_runs
+          WHERE controller_run_id=$1 LIMIT 1 FOR UPDATE;`,
+        [input.reactiveControllerRunId],
+      );
+      const active = controller.rows[0];
+      if (!active || active.owner_profile_id !== input.ownerProfileId ||
+          active.paper_account_id !== input.accountId ||
+          active.status !== "active") {
+        throw new PaperTradingError(
+          "reactive_controller_not_active", 409,
+          "The reactive controller lease was released before simulated entry reservation.",
+        );
+      }
+    }
     const account = await loadAccount(
       client, input.ownerProfileId, input.accountId, true,
     );
@@ -387,6 +425,30 @@ export const submitAcceptedPaperEntry = async (input: {
           "paper_order_replay_conflict", 409,
           "This client paper-order identity was already used for another decision.",
         );
+      }
+      if (input.reactiveControllerRunId) {
+        const linked = await client.query<{ controller_run_id: string }>(
+          `SELECT controller_run_id
+             FROM helix_brokerage_reactive_controller_effects
+            WHERE order_id=$1 LIMIT 1;`,
+          [existingRows[0].order_id],
+        );
+        if (linked.rows[0] && linked.rows[0].controller_run_id !==
+            input.reactiveControllerRunId) {
+          throw new PaperTradingError(
+            "paper_order_replay_conflict", 409,
+            "The replayed paper order belongs to a different controller lease.",
+          );
+        }
+        if (!linked.rows[0]) {
+          await client.query(
+            `INSERT INTO helix_brokerage_reactive_controller_effects(
+               controller_run_id, order_id, source_observation_id, created_at
+             ) VALUES ($1,$2,$3,$4);`,
+            [input.reactiveControllerRunId, existingRows[0].order_id,
+              quote.observationId, now.toISOString()],
+          );
+        }
       }
       return projectOrder(existingRows[0]);
     }
@@ -424,20 +486,26 @@ export const submitAcceptedPaperEntry = async (input: {
     );
     const orderId = `paper_order:${crypto.randomUUID()}`;
     const at = now.toISOString();
+    const executionModel = input.executionModel === undefined
+      ? null
+      : helixPaperExecutionModelSchema.nullable().parse(input.executionModel);
     const { rows } = await client.query<OrderRow>(
       `INSERT INTO helix_paper_orders (
          order_id, client_order_id, account_id, owner_profile_id,
          connection_id, room_id, risk_decision_id, intent, symbol, side,
          order_type, notional_cents, quantity_micros, limit_price_micros,
-         stop_price_micros, reserved_cents, status, source_observation_id,
-         created_at, updated_at
+         stop_price_micros, reserved_cents, filled_quantity_micros,
+         filled_notional_cents, execution_model_json, status,
+         source_observation_id, created_at, updated_at
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'entry', $8, 'buy',
-         'limit', $9, $10, $11, $12, $9, 'open', $13, $14, $14)
+         'limit', $9, $10, $11, $12, $9, 0, 0, $13::jsonb,
+         'open', $14, $15, $15)
        RETURNING *;`,
       [orderId, input.clientOrderId, input.accountId, input.ownerProfileId,
         account.connection_id, account.room_id, input.riskDecisionId,
         candidate.symbol, candidate.notional_cents, quantityMicros,
         candidate.entry_limit_micros, candidate.stop_price_micros,
+        executionModel === null ? null : JSON.stringify(executionModel),
         quote.observationId, at],
     );
     await client.query(
@@ -447,6 +515,14 @@ export const submitAcceptedPaperEntry = async (input: {
       [input.accountId, input.ownerProfileId,
         integer(account.buying_power_cents) - candidate.notional_cents, at],
     );
+    if (input.reactiveControllerRunId) {
+      await client.query(
+        `INSERT INTO helix_brokerage_reactive_controller_effects(
+           controller_run_id, order_id, source_observation_id, created_at
+         ) VALUES ($1,$2,$3,$4);`,
+        [input.reactiveControllerRunId, orderId, quote.observationId, at],
+      );
+    }
     await writeJournal(client, {
       account,
       type: "entry_submitted",
@@ -480,7 +556,8 @@ const recalculateAccount = async (
   if (!account) return;
   const { rows: reserves } = await db.query<{ total: number | string | null }>(
     `SELECT COALESCE(sum(reserved_cents), 0) AS total
-     FROM helix_paper_orders WHERE account_id = $1 AND status = 'open';`,
+     FROM helix_paper_orders
+     WHERE account_id = $1 AND status = 'open';`,
     [accountId],
   );
   const { rows: positions } = await db.query<{
@@ -549,36 +626,158 @@ const activateAutomaticKillSwitchIfNeeded = async (
   );
 };
 
-const fillEntry = async (input: {
+export const derivePaperEntryFillTerms = (input: {
+  orderQuantityMicros: number;
+  filledQuantityMicros: number;
+  limitPriceMicros: number;
+  orderCreatedAt: string;
+  executionModel: HelixPaperExecutionModel | null;
+  quoteAskMicros: number;
+  quoteObservedAt: string;
+}): { quantityMicros: number; priceMicros: number } | null => {
+  const model = helixPaperExecutionModelSchema.nullable().parse(
+    input.executionModel,
+  );
+  const remaining = input.orderQuantityMicros - input.filledQuantityMicros;
+  if (remaining <= 0 || input.quoteAskMicros > input.limitPriceMicros) {
+    return null;
+  }
+  if (model) {
+    const eligibleAt = new Date(input.orderCreatedAt).getTime() +
+      model.deterministic_latency_ms;
+    if (new Date(input.quoteObservedAt).getTime() < eligibleAt) return null;
+  }
+  const fractionBps = model?.partial_fill_policy.fill_fraction_bps ?? 10_000;
+  const scheduledQuantity = Math.max(1, Number(
+    (BigInt(input.orderQuantityMicros) * BigInt(fractionBps)) / 10_000n,
+  ));
+  const quantityMicros = Math.min(remaining, scheduledQuantity);
+  const slipped = model
+    ? Number(
+      (BigInt(input.quoteAskMicros) *
+        BigInt(10_000 + model.deterministic_slippage_bps) + 9_999n) /
+        10_000n,
+    )
+    : input.quoteAskMicros;
+  const priceMicros = Math.min(
+    input.limitPriceMicros,
+    slipped,
+  );
+  return { quantityMicros, priceMicros };
+};
+
+const entryFillTerms = (input: {
+  order: OrderRow;
+  quote: PaperQuoteEvidence;
+}): { quantityMicros: number; priceMicros: number } | null =>
+  derivePaperEntryFillTerms({
+    orderQuantityMicros: integer(input.order.quantity_micros),
+    filledQuantityMicros: integer(input.order.filled_quantity_micros),
+    limitPriceMicros: integer(input.order.limit_price_micros),
+    orderCreatedAt: toIso(input.order.created_at),
+    executionModel: input.order.execution_model_json === null
+      ? null
+      : helixPaperExecutionModelSchema.parse(input.order.execution_model_json),
+    quoteAskMicros: input.quote.askMicros,
+    quoteObservedAt: input.quote.observedAt,
+  });
+
+const applyEntryFill = async (input: {
   db: Queryable;
   account: AccountRow;
   order: OrderRow;
   quote: PaperQuoteEvidence;
+  quantityMicros: number;
+  priceMicros: number;
   at: string;
-}): Promise<{ orderId: string; position: PositionRow }> => {
-  const quantity = integer(input.order.quantity_micros);
+}): Promise<{
+  orderId: string;
+  position: PositionRow;
+  completed: boolean;
+}> => {
+  const orderQuantity = integer(input.order.quantity_micros);
+  const priorQuantity = integer(input.order.filled_quantity_micros);
+  const nextQuantity = priorQuantity + input.quantityMicros;
+  if (nextQuantity > orderQuantity) {
+    throw new Error("paper entry fill exceeded order quantity");
+  }
   const reserved = integer(input.order.reserved_cents);
-  const gross = grossCents(quantity, input.quote.askMicros, "ceil");
-  if (gross > reserved) throw new Error("paper entry exceeded reserved cash");
-  const marketValue = grossCents(quantity, input.quote.bidMicros, "floor");
-  const positionId = `paper_position:${crypto.randomUUID()}`;
-  const fillId = `paper_fill:${crypto.randomUUID()}`;
-  const { rows: positions } = await input.db.query<PositionRow>(
-    `INSERT INTO helix_paper_positions (
-       position_id, account_id, owner_profile_id, connection_id, room_id,
-       symbol, quantity_micros, average_entry_price_micros,
-       stop_price_micros, cost_basis_cents, last_price_micros,
-       market_value_cents, unrealized_pnl_cents, entry_order_id,
-       status, opened_at, updated_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-       $11, $12, $13, $14, 'open', $15, $15)
-     RETURNING *;`,
-    [positionId, input.account.account_id, input.account.owner_profile_id,
-      input.account.connection_id, input.account.room_id, input.order.symbol,
-      quantity, input.quote.askMicros, input.order.stop_price_micros, gross,
-      input.quote.bidMicros, marketValue, marketValue - gross,
-      input.order.order_id, input.at],
+  const gross = grossCents(
+    input.quantityMicros,
+    input.priceMicros,
+    "ceil",
   );
+  const remainingQuantity = orderQuantity - nextQuantity;
+  const nextReserved = remainingQuantity === 0
+    ? 0
+    : grossCents(
+      remainingQuantity,
+      integer(input.order.limit_price_micros),
+      "ceil",
+    );
+  const refund = reserved - gross - nextReserved;
+  if (refund < 0) throw new Error("paper entry exceeded reserved cash");
+  const { rows: existingPositions } = await input.db.query<PositionRow>(
+    `SELECT * FROM helix_paper_positions
+     WHERE entry_order_id = $1 LIMIT 1 FOR UPDATE;`,
+    [input.order.order_id],
+  );
+  const existingPosition = existingPositions[0];
+  const positionId = existingPosition?.position_id ??
+    `paper_position:${crypto.randomUUID()}`;
+  const fillId = `paper_fill:${crypto.randomUUID()}`;
+  let position: PositionRow;
+  if (existingPosition) {
+    const positionQuantity = integer(existingPosition.quantity_micros);
+    const updatedQuantity = positionQuantity + input.quantityMicros;
+    const updatedCost = integer(existingPosition.cost_basis_cents) + gross;
+    const weightedPrice = Number(
+      (BigInt(integer(existingPosition.average_entry_price_micros)) *
+        BigInt(positionQuantity) +
+        BigInt(input.priceMicros) * BigInt(input.quantityMicros)) /
+        BigInt(updatedQuantity),
+    );
+    const marketValue = grossCents(
+      updatedQuantity,
+      input.quote.bidMicros,
+      "floor",
+    );
+    const { rows } = await input.db.query<PositionRow>(
+      `UPDATE helix_paper_positions
+       SET quantity_micros = $2, average_entry_price_micros = $3,
+           cost_basis_cents = $4, last_price_micros = $5,
+           market_value_cents = $6, unrealized_pnl_cents = $7,
+           updated_at = $8
+       WHERE position_id = $1 RETURNING *;`,
+      [positionId, updatedQuantity, weightedPrice, updatedCost,
+        input.quote.bidMicros, marketValue, marketValue - updatedCost,
+        input.at],
+    );
+    position = rows[0];
+  } else {
+    const marketValue = grossCents(
+      input.quantityMicros,
+      input.quote.bidMicros,
+      "floor",
+    );
+    const { rows } = await input.db.query<PositionRow>(
+      `INSERT INTO helix_paper_positions (
+         position_id, account_id, owner_profile_id, connection_id, room_id,
+         symbol, quantity_micros, average_entry_price_micros,
+         stop_price_micros, cost_basis_cents, last_price_micros,
+         market_value_cents, unrealized_pnl_cents, entry_order_id,
+         status, opened_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+         $11, $12, $13, $14, 'open', $15, $15)
+       RETURNING *;`,
+      [positionId, input.account.account_id, input.account.owner_profile_id,
+        input.account.connection_id, input.account.room_id,
+        input.order.symbol, input.quantityMicros, input.priceMicros,
+        input.order.stop_price_micros, gross, input.quote.bidMicros,
+        marketValue, marketValue - gross, input.order.order_id, input.at],
+    );
+    position = rows[0];
+  }
   await input.db.query(
     `INSERT INTO helix_paper_fills (
        fill_id, order_id, account_id, position_id, side, symbol,
@@ -586,14 +785,20 @@ const fillEntry = async (input: {
        market_observed_at, filled_at
      ) VALUES ($1, $2, $3, $4, 'buy', $5, $6, $7, $8, $9, $10, $11);`,
     [fillId, input.order.order_id, input.account.account_id, positionId,
-      input.order.symbol, quantity, input.quote.askMicros, gross,
+      input.order.symbol, input.quantityMicros, input.priceMicros, gross,
       input.quote.observationId, input.quote.observedAt, input.at],
   );
   await input.db.query(
     `UPDATE helix_paper_orders
-     SET status = 'filled', reserved_cents = 0, filled_at = $2, updated_at = $2
+     SET status = $2, reserved_cents = $3,
+         filled_quantity_micros = $4,
+         filled_notional_cents = filled_notional_cents + $5,
+         filled_at = $6, updated_at = $7
      WHERE order_id = $1;`,
-    [input.order.order_id, input.at],
+    [input.order.order_id,
+      nextQuantity === orderQuantity ? "filled" : "open",
+      nextReserved, nextQuantity, gross,
+      nextQuantity === orderQuantity ? input.at : null, input.at],
   );
   const nextSymbols = Array.from(new Set([
     ...stringArray(input.account.open_symbols),
@@ -602,11 +807,11 @@ const fillEntry = async (input: {
   await input.db.query(
     `UPDATE helix_paper_trading_accounts
      SET buying_power_cents = buying_power_cents + $3,
-         new_trades_today = new_trades_today + 1,
-         open_symbols = $4::jsonb, updated_at = $5
+         new_trades_today = new_trades_today + $4,
+         open_symbols = $5::jsonb, updated_at = $6
      WHERE account_id = $1 AND owner_profile_id = $2;`,
-    [input.account.account_id, input.account.owner_profile_id,
-      reserved - gross, JSON.stringify(nextSymbols), input.at],
+    [input.account.account_id, input.account.owner_profile_id, refund,
+      priorQuantity === 0 ? 1 : 0, JSON.stringify(nextSymbols), input.at],
   );
   await writeJournal(input.db, {
     account: input.account,
@@ -616,14 +821,21 @@ const fillEntry = async (input: {
       fill_id: fillId,
       position_id: positionId,
       symbol: input.order.symbol,
-      quantity_micros: quantity,
-      price_micros: input.quote.askMicros,
+      quantity_micros: input.quantityMicros,
+      cumulative_quantity_micros: nextQuantity,
+      order_quantity_micros: orderQuantity,
+      completed: nextQuantity === orderQuantity,
+      price_micros: input.priceMicros,
       gross_cents: gross,
       observation_id: input.quote.observationId,
     },
     at: input.at,
   });
-  return { orderId: input.order.order_id, position: positions[0] };
+  return {
+    orderId: input.order.order_id,
+    position,
+    completed: nextQuantity === orderQuantity,
+  };
 };
 
 const closePosition = async (input: {
@@ -645,10 +857,12 @@ const closePosition = async (input: {
        order_id, client_order_id, account_id, owner_profile_id,
        connection_id, room_id, risk_decision_id, intent, symbol, side,
        order_type, notional_cents, quantity_micros, limit_price_micros,
-       stop_price_micros, reserved_cents, status, source_observation_id,
-       created_at, updated_at, filled_at
+       stop_price_micros, reserved_cents, filled_quantity_micros,
+       filled_notional_cents, execution_model_json, status,
+       source_observation_id, created_at, updated_at, filled_at
      ) VALUES ($1, $2, $3, $4, $5, $6, NULL, 'exit', $7, 'sell',
-       'limit', $8, $9, $10, NULL, 0, 'filled', $11, $12, $12, $12);`,
+       'limit', $8, $9, $10, NULL, 0, $9, $8, NULL,
+       'filled', $11, $12, $12, $12);`,
     [orderId, input.clientOrderId, input.account.account_id,
       input.account.owner_profile_id, input.account.connection_id,
       input.account.room_id, input.position.symbol, proceeds, quantity,
@@ -726,45 +940,79 @@ export const processPaperQuoteObservation = async (input: {
   now?: Date;
 }): Promise<HelixPaperProcessObservationReceipt> => {
   const now = input.now ?? new Date();
+  const symbol = input.symbol.toUpperCase();
   const db = await readSharedRealtimeRoomDatabase();
   const initial = await loadAccount(db, input.ownerProfileId, input.accountId);
   await assertAccountAccess(initial);
-  const quote = await readQuoteForAccount({
-    account: initial,
-    observationId: input.observationId,
-    symbol: input.symbol.toUpperCase(),
-    now,
-  });
+  const readProcessedReceipt = async (
+    queryable: Queryable,
+  ): Promise<HelixPaperProcessObservationReceipt | null> => {
+    const { rows } = await queryable.query<{ receipt_json: unknown }>(
+      `SELECT receipt_json FROM helix_paper_processed_observations
+       WHERE account_id = $1 AND observation_id = $2 LIMIT 1;`,
+      [input.accountId, input.observationId],
+    );
+    if (!rows[0]) return null;
+    const receipt = helixPaperProcessObservationReceiptSchema.parse(
+      rows[0].receipt_json,
+    );
+    if (receipt.account_id !== input.accountId ||
+        receipt.observation_id !== input.observationId ||
+        receipt.symbol !== symbol) {
+      throw new PaperTradingError(
+        "paper_observation_replay_conflict",
+        409,
+        "The processed paper observation does not match this replay identity.",
+      );
+    }
+    return receipt;
+  };
+  const existingReceipt = await readProcessedReceipt(db);
+  if (existingReceipt) return existingReceipt;
+  let quote: PaperQuoteEvidence;
+  try {
+    quote = await readQuoteForAccount({
+      account: initial,
+      observationId: input.observationId,
+      symbol,
+      now,
+    });
+  } catch (error) {
+    // A concurrent first delivery may have committed while this invocation was
+    // validating freshness. Exact replay remains safe; new stale evidence does not.
+    const concurrentReceipt = await readProcessedReceipt(db);
+    if (concurrentReceipt) return concurrentReceipt;
+    throw error;
+  }
   assertRegularSession(quote);
   return withSharedRealtimeRoomTransaction(async (client) => {
     const account = await loadAccount(
       client, input.ownerProfileId, input.accountId, true,
     );
-    const { rows: processed } = await client.query<{ receipt_json: unknown }>(
-      `SELECT receipt_json FROM helix_paper_processed_observations
-       WHERE account_id = $1 AND observation_id = $2 LIMIT 1;`,
-      [input.accountId, input.observationId],
-    );
-    if (processed[0]) {
-      return helixPaperProcessObservationReceiptSchema.parse(
-        processed[0].receipt_json,
-      );
-    }
+    const processedReceipt = await readProcessedReceipt(client);
+    if (processedReceipt) return processedReceipt;
     const filledOrderIds: string[] = [];
     const markedPositionIds: string[] = [];
     const stopExitOrderIds: string[] = [];
     const { rows: orders } = await client.query<OrderRow>(
       `SELECT * FROM helix_paper_orders
-       WHERE account_id = $1 AND symbol = $2 AND status = 'open'
+       WHERE account_id = $1 AND symbol = $2
+         AND status = 'open'
          AND intent = 'entry' ORDER BY created_at FOR UPDATE;`,
       [input.accountId, quote.symbol],
     );
     for (const order of orders) {
-      if (quote.askMicros <= integer(order.limit_price_micros)) {
-        const filled = await fillEntry({ db: client, account, order, quote,
-          at: now.toISOString() });
-        filledOrderIds.push(filled.orderId);
-      }
+      const terms = entryFillTerms({ order, quote });
+      if (!terms) continue;
+      const filled = await applyEntryFill({
+        db: client,
+        account,
+        order,
+        quote,
+        ...terms,
+        at: now.toISOString(),
+      });
+      if (filled.completed) filledOrderIds.push(filled.orderId);
     }
     const { rows: positions } = await client.query<PositionRow>(
       `SELECT * FROM helix_paper_positions
@@ -937,7 +1185,9 @@ export const cancelOpenPaperEntry = async (input: {
     if (!order) throw new PaperTradingError(
       "paper_order_not_found", 404, "The paper entry order was not found.",
     );
-    if (order.status !== "open") return projectOrder(order);
+    if (order.status !== "open") {
+      return projectOrder(order);
+    }
     const at = now.toISOString();
     await client.query(
       `UPDATE helix_paper_orders

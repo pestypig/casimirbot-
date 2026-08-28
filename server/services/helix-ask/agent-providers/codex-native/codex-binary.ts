@@ -250,10 +250,17 @@ const CODEX_COMPATIBILITY_ISOLATION_ARGS = [
  */
 export const appendCodexCompatibilityIsolationArgs = (
   args: readonly string[],
+  authMode: "api_key" | "chatgpt_session" = "api_key",
 ): string[] => {
   const next = [...args];
   if (!next.includes("--ignore-user-config")) {
     next.push("--ignore-user-config");
+  }
+  if (authMode === "chatgpt_session") {
+    for (const value of ["features.remote_plugin=false", "features.apps=false"]) {
+      if (!next.includes(value)) next.push("-c", value);
+    }
+    return next;
   }
   for (
     let index = 1;

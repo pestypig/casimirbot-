@@ -9,6 +9,7 @@ import {
   type CodexAppServerJsonRpcMessage,
   type CodexAppServerTransport,
 } from "./protocol";
+import type { HelixCodexAuthResolution } from "./auth-mode";
 
 const DEFAULT_MAX_PROTOCOL_BYTES = 2_000_000;
 
@@ -77,7 +78,8 @@ const killChildTree = (child: ChildProcessWithoutNullStreams): void => {
 
 export const createCodexAppServerProcessTransport = (input: {
   cwd: string;
-  codexHome: string;
+  codexHome?: string;
+  auth: HelixCodexAuthResolution;
 }): CodexAppServerTransport => {
   const binary = resolveCodexBinary();
   if (!binary.launchable || !binary.resolved_bin) {
@@ -91,22 +93,25 @@ export const createCodexAppServerProcessTransport = (input: {
     binary.resolved_bin,
     buildCodexNativeAppServerArgs(),
   );
+  const childEnv: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH,
+    Path: process.env.Path,
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    SystemRoot: process.env.SystemRoot,
+    TEMP: process.env.TEMP,
+    TMP: process.env.TMP,
+    RUST_LOG: process.env.HELIX_CODEX_NATIVE_RUST_LOG,
+  };
+  if (input.auth.selected_mode === "api_key") {
+    childEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    childEnv.CODEX_HOME = input.codexHome;
+  }
   const child = spawn(command.bin, command.args, {
     cwd: input.cwd,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
-    env: {
-      PATH: process.env.PATH,
-      Path: process.env.Path,
-      HOME: process.env.HOME,
-      USERPROFILE: process.env.USERPROFILE,
-      SystemRoot: process.env.SystemRoot,
-      TEMP: process.env.TEMP,
-      TMP: process.env.TMP,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      CODEX_HOME: input.codexHome,
-      RUST_LOG: process.env.HELIX_CODEX_NATIVE_RUST_LOG,
-    },
+    env: childEnv,
   });
 
   let messageHandler: (message: CodexAppServerJsonRpcMessage) => void = () => undefined;

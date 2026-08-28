@@ -41,6 +41,39 @@ tenant administration credentials, client secrets, authorization codes, or
 bearer tokens in Git, the desktop package, updater metadata, logs, or the
 plugin.
 
+### Native fresh-MFA step-up Action
+
+SPB-3 uses the reviewed Action source at
+`auth0/actions/casimirbot-post-login.cjs`. Its public tenant and Native-client
+identifiers must exactly match the deployment profile. Enable exactly the
+approved owner factor, deploy the Action in the post-login flow, and retain the
+existing signed tenant claim behavior. The Action forces MFA only when the
+exact Native/public client requests exactly the multi-factor ACR. It disables
+remembered-browser bypass for that ceremony. Ordinary MCP and website logins
+do not trigger this branch. These pinned identifiers are not credentials; do
+not add a client secret to the Native/public application.
+
+The Auth0 tenant must actually issue `acr` equal to
+`http://schemas.openid.net/pape/policies/2007/06/multi-factor` and `amr`
+containing `mfa`. A successful password or social login, an `acr_values`
+request, or an enabled dashboard checkbox alone is not acceptance evidence.
+Verify the installed EXE receives a fresh token with those claims and a valid
+`auth_time`, then complete device register, restart, revoke, recovery, and
+other-session revoke as separate one-purpose ceremonies.
+
+The native authorization request uses a bounded `max_age` (five minutes by
+default, configurable only from 60 through 900 seconds) and does not send
+`prompt=login`. Auth0 may therefore reuse a primary SSO authentication only
+while its signed `auth_time` remains inside that window. The exact-client Action
+still forces a new MFA challenge with remembered-browser bypass disabled for
+every one-purpose request. This avoids asking for the password before every
+TOTP without treating an old primary login or a prior MFA receipt as fresh.
+
+Factor-plan labels are a deployment dependency. If the chosen TOTP, WebAuthn,
+or passkey factor is available only during a trial or on a paid Auth0 tier,
+record that as a production deployment blocker; do not silently fall back to
+SMS, disable MFA, or broaden the Action to every client.
+
 ## G2 local Codex CLI full-action client
 
 The environment-harness A1 route is distinct from Device Check and desktop

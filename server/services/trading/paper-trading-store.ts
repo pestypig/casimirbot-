@@ -206,6 +206,21 @@ export const getPaperTradingAccount = async (input: {
   return row ? projectAccount(row) : null;
 };
 
+export const getPaperTradingAccountById = async (input: {
+  ownerProfileId: string;
+  accountId: string;
+}): Promise<PaperTradingAccountProjection | null> => {
+  const row = await readAccount(input);
+  if (!row) return null;
+  await assertRobinhoodPrivateRoomReadCapability({
+    ownerProfileId: input.ownerProfileId,
+    connectionId: row.connection_id,
+    roomId: row.room_id,
+    capabilityId: "brokerage.robinhood.market_data.read",
+  });
+  return projectAccount(row);
+};
+
 export const evaluateAndRecordPaperTradeCandidate = async (input: {
   ownerProfileId: string;
   accountId: string;

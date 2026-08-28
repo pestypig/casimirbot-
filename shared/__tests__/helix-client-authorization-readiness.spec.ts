@@ -4,6 +4,8 @@ import {
   buildHelixClientAuthorizationReadiness,
   requiredHelixClientAuthorizationScopes,
 } from "../helix-client-authorization-readiness";
+import { HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE } from
+  "../trading/brokerage-market-observer";
 
 const G2 = new Set([
   "helix.rooms.read",
@@ -21,7 +23,10 @@ describe("Helix client authorization readiness", () => {
 
     expect(readiness).toMatchObject({
       ready: false,
-      missing_scopes: [HELIX_AGENT_RUN_WRITE_SCOPE],
+      missing_scopes: [
+        HELIX_AGENT_RUN_WRITE_SCOPE,
+        HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
+      ],
       granted_required_scopes: [...G2],
       recovery_action: "authorize_missing_scopes",
       credential_included: false,

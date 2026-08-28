@@ -345,6 +345,35 @@ describe("environment action result canonicalization", () => {
       measurements: { output_item_id: "minecraft:stick", produced_count: 4 },
     },
     {
+      actionKind: "consume",
+      arguments: {
+        action_kind: "consume",
+        item_id: "minecraft:mushroom_stew",
+        count: 1,
+        hand: "main_hand",
+        max_duration_ms: 8_000,
+        stop_below_health: 8,
+        minimum_food_gain: 6,
+        expected_remainder_item_id: "minecraft:bowl",
+      },
+      measurements: {
+        reason_code: "consume_postconditions_satisfied",
+        item_id: "minecraft:mushroom_stew",
+        consumed_count: 1,
+        hand: "main_hand",
+        food_before: 8,
+        food_after: 14,
+        food_gain: 6,
+        health_before: 12,
+        health_after: 12,
+        health_delta: 0,
+        use_ticks: 33,
+        expected_remainder_item_id: "minecraft:bowl",
+        remainder_item_delta: 1,
+        world_mutations_performed: 0,
+      },
+    },
+    {
       actionKind: "inventory_transfer",
       arguments: {
         action_kind: "inventory_transfer",
@@ -363,10 +392,10 @@ describe("environment action result canonicalization", () => {
         "navigate_to", "look_at", "walk", "jump", "combat_guard", "follow", "collect", "mine", "place",
       ]);
       const interactionKinds = new Set([
-        "interact", "attack", "combat_guard", "mine", "place", "craft", "inventory_transfer",
+        "interact", "attack", "combat_guard", "mine", "place", "craft", "consume", "inventory_transfer",
       ]);
       const inventoryKinds = new Set([
-        "hotbar_select", "equip", "collect", "mine", "place", "craft", "inventory_transfer",
+        "hotbar_select", "equip", "collect", "mine", "place", "craft", "consume", "inventory_transfer",
       ]);
       const worldMutationKinds = new Set(["mine", "place"]);
       const matrixRequest = helixEnvironmentActionRequestSchema.parse({

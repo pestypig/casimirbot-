@@ -268,7 +268,7 @@ function HelixAskVisibleLiveRuntimeControls({
   };
   return (
     <>
-      <button
+      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-live-runtime-controls.live-runtime-agent-mode"
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Live runtime agent mode"
@@ -280,7 +280,7 @@ function HelixAskVisibleLiveRuntimeControls({
         <Radio className="h-4 w-4" />
         <span>{labelForMode(mode)}</span>
       </button>
-      {model.authoritySelectorVisible ? <button
+      {model.authoritySelectorVisible ? <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-live-runtime-controls.live-runtime-agent-authority"
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Live runtime agent authority"
@@ -292,7 +292,7 @@ function HelixAskVisibleLiveRuntimeControls({
         <ShieldCheck className="h-4 w-4" />
         <span>{labelForAuthority(authority)}</span>
       </button> : null}
-      <button
+      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-live-runtime-controls.live-runtime-agent-lifecycle"
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Live runtime agent lifecycle"
@@ -336,7 +336,7 @@ function HelixAskVisibleLiveRuntimeControls({
       ) : null}
       {runtime.active ? (
         <>
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-live-runtime-controls.runtime-set-microphone-enabled-runtime-microphone-enabled"
             type="button"
             data-helix-ask-action-item="true"
             aria-label={runtime.microphoneEnabled
@@ -357,7 +357,7 @@ function HelixAskVisibleLiveRuntimeControls({
             <Mic className={`h-4 w-4 ${runtime.microphoneEnabled ? "animate-pulse" : ""}`} />
             <span>{runtime.microphoneEnabled ? "Mic On" : "Mic Off"}</span>
           </button>
-          {model.visualInputAllowed ? <button
+          {model.visualInputAllowed ? <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-live-runtime-controls.toggle-visual-input"
             type="button"
             data-helix-ask-action-item="true"
             data-live-visual-input-enabled={runtime.visualInputEnabled ? "true" : "false"}

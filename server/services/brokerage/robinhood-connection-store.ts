@@ -23,8 +23,9 @@ import {
 import type { Queryable } from
   "../helix-ask/realtime-room/room-store/types";
 import {
-  decryptProviderCredential,
-  encryptProviderCredential,
+  decryptStoredProviderCredentialForStorage,
+  encryptProviderCredentialForStorage,
+  readProviderCredentialEncryptionKeyIdForStorage,
 } from "./provider-credential-vault";
 
 const ROBINHOOD_RESOURCE_METADATA_URL =
@@ -78,6 +79,7 @@ type OAuthTransactionRow = {
   owner_profile_id: string;
   state_hash: string;
   encrypted_code_verifier: string;
+  encryption_key_id: string;
   oauth_client_id: string;
   resource_url: string;
   authorization_endpoint: string;
@@ -100,6 +102,7 @@ type BrokerageConnectionRow = {
   connected_at: Date | string;
   updated_at: Date | string;
   encrypted_credential_bundle: string;
+  encryption_key_id: string;
   oauth_client_id: string;
   resource_url: string;
   producer_epoch_ref: string;
@@ -436,7 +439,7 @@ export const startRobinhoodOAuth = async (input: {
     .update(codeVerifier, "ascii")
     .digest("base64url");
   const expiresAt = new Date(Date.now() + OAUTH_TRANSACTION_TTL_MS);
-  const verifierEnvelope = encryptProviderCredential(
+  const verifierEnvelope = await encryptProviderCredentialForStorage(
     { code_verifier: codeVerifier },
     `robinhood-oauth-transaction\n${transactionId}\n${ownerProfileId}`,
   );
@@ -575,9 +578,12 @@ export const completeRobinhoodOAuth = async (input: {
       "The Robinhood authorization state is invalid or already used.",
     );
   }
-  const verifier = decryptProviderCredential<{ code_verifier: string }>(
+  const verifier = await decryptStoredProviderCredentialForStorage<{
+    code_verifier: string;
+  }>(
     transaction.encrypted_code_verifier,
     `robinhood-oauth-transaction\n${transaction.transaction_id}\n${ownerProfileId}`,
+    transaction.encryption_key_id,
   );
   if (!verifier.code_verifier) {
     throw new RobinhoodConnectionError(
@@ -633,7 +639,7 @@ export const completeRobinhoodOAuth = async (input: {
     expires_at: expiresAt,
     resource: HELIX_ROBINHOOD_TRADING_MCP_RESOURCE,
   };
-  const credentialEnvelope = encryptProviderCredential(
+  const credentialEnvelope = await encryptProviderCredentialForStorage(
     bundle,
     `robinhood-connection\n${connectionId}\n${ownerProfileId}`,
   );
@@ -692,10 +698,10 @@ export const completeRobinhoodOAuth = async (input: {
       [
         transaction.transaction_id,
         now.toISOString(),
-        encryptProviderCredential(
+        (await encryptProviderCredentialForStorage(
           { code_verifier_destroyed: true },
           `robinhood-oauth-transaction\n${transaction.transaction_id}\n${ownerProfileId}`,
-        ).encryptedValue,
+        )).encryptedValue,
       ],
     );
     return projectConnection(rows[0]);
@@ -817,7 +823,7 @@ export const assertRobinhoodPrivateRoomReadCapability = async (input: {
   connectionId: string;
   roomId: string;
   capabilityId: string;
-}): Promise<{ producerEpochRef: string }> => {
+}): Promise<{ producerEpochRef: string; environmentBindingId: string }> => {
   const db = await readSharedRealtimeRoomDatabase();
   await assertOwnerPrivateRoom({
     db,
@@ -826,11 +832,12 @@ export const assertRobinhoodPrivateRoomReadCapability = async (input: {
   });
   const capabilityId = selectedCapabilities([input.capabilityId])[0];
   const { rows } = await db.query<{
+    binding_id: string;
     consent_capability_ids: unknown;
     producer_epoch_ref: string;
   }>(
     `
-      SELECT b.consent_capability_ids, c.producer_epoch_ref
+      SELECT b.binding_id, b.consent_capability_ids, c.producer_epoch_ref
       FROM helix_brokerage_connections c
       JOIN helix_brokerage_room_bindings b
         ON b.connection_id = c.connection_id
@@ -859,7 +866,10 @@ export const assertRobinhoodPrivateRoomReadCapability = async (input: {
       "The private room has not consented to this Robinhood read capability.",
     );
   }
-  return { producerEpochRef: rows[0].producer_epoch_ref };
+  return {
+    producerEpochRef: rows[0].producer_epoch_ref,
+    environmentBindingId: rows[0].binding_id,
+  };
 };
 
 export const attachRobinhoodConnectionToPrivateRoom = async (input: {
@@ -1092,9 +1102,12 @@ export const readRobinhoodCredentialBundleForPrivateRoomAdapter = async (input: 
         "An active owner-scoped Robinhood connection is required.",
       );
     }
-    const current = decryptProviderCredential<RobinhoodCredentialBundle>(
+    const current = await decryptStoredProviderCredentialForStorage<
+      RobinhoodCredentialBundle
+    >(
       row.encrypted_credential_bundle,
       `robinhood-connection\n${row.connection_id}\n${row.owner_profile_id}`,
+      row.encryption_key_id,
     );
     const now = input.now ?? new Date();
     const expiryMs = current.expires_at
@@ -1103,6 +1116,24 @@ export const readRobinhoodCredentialBundleForPrivateRoomAdapter = async (input: 
     const refreshRequired = input.forceRefresh === true ||
       expiryMs <= now.getTime() + TOKEN_REFRESH_SKEW_MS;
     if (!refreshRequired) {
+      const activeKeyId =
+        await readProviderCredentialEncryptionKeyIdForStorage();
+      if (row.encryption_key_id !== activeKeyId) {
+        const rotated = await encryptProviderCredentialForStorage(
+          current,
+          `robinhood-connection\n${row.connection_id}\n${row.owner_profile_id}`,
+        );
+        await client.query(
+          `UPDATE helix_brokerage_connections
+           SET encrypted_credential_bundle = $2,
+               encryption_key_id = $3,
+               encryption_algorithm = $4,
+               updated_at = $5
+           WHERE connection_id = $1;`,
+          [row.connection_id, rotated.encryptedValue, rotated.keyId,
+            rotated.algorithm, now.toISOString()],
+        );
+      }
       return {
         credentials: current,
         producerEpochRef: row.producer_epoch_ref,
@@ -1159,7 +1190,7 @@ export const readRobinhoodCredentialBundleForPrivateRoomAdapter = async (input: 
         : current.scope,
       expires_at: refreshedExpiresAt,
     };
-    const envelope = encryptProviderCredential(
+    const envelope = await encryptProviderCredentialForStorage(
       next,
       `robinhood-connection\n${row.connection_id}\n${row.owner_profile_id}`,
     );
@@ -1229,9 +1260,12 @@ export const persistRobinhoodAgenticAccountSelectionForPrivateRoom = async (
         "An active owner-scoped Robinhood connection is required.",
       );
     }
-    const current = decryptProviderCredential<RobinhoodCredentialBundle>(
+    const current = await decryptStoredProviderCredentialForStorage<
+      RobinhoodCredentialBundle
+    >(
       row.encrypted_credential_bundle,
       `robinhood-connection\n${row.connection_id}\n${row.owner_profile_id}`,
+      row.encryption_key_id,
     );
     if (current.agentic_account_ref &&
         current.agentic_account_ref !== providerAccountRef) {
@@ -1244,7 +1278,7 @@ export const persistRobinhoodAgenticAccountSelectionForPrivateRoom = async (
       ...current,
       agentic_account_ref: providerAccountRef,
     };
-    const envelope = encryptProviderCredential(
+    const envelope = await encryptProviderCredentialForStorage(
       next,
       `robinhood-connection\n${row.connection_id}\n${row.owner_profile_id}`,
     );

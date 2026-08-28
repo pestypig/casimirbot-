@@ -100,7 +100,10 @@ export function buildMcpTunnelEnvironment(input: {
     const value = input.processEnv[key];
     if (typeof value === "string" && value.length > 0) env[key] = value;
   }
-  const mcpUrl = new URL("/mcp/device-check", input.runtimeOrigin).toString();
+  const mcpUrl = new URL(
+    "/mcp/local-supervisor-coordination",
+    input.runtimeOrigin,
+  ).toString();
   const protectedHeader = `${DESKTOP_SESSION_HEADER}: env:${DESKTOP_SESSION_ENV}`;
   return {
     ...env,
@@ -213,7 +216,7 @@ export class DesktopMcpTunnelController {
       schemaVersion: DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
       transport: "openai_secure_mcp_tunnel",
       access: "developer_private",
-      scope: "device_check_read_only",
+      scope: "local_supervisor_coordination_and_device_check",
       status: input.status,
       configured: input.configured,
       vaultAvailable: input.vaultAvailable,

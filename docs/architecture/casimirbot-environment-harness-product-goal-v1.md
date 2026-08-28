@@ -140,6 +140,15 @@ The product must keep these credentials distinct:
 | CasimirBot MCP client authorization | Allows Codex or another client to call the user's CasimirBot node | Short-lived, least-scope OAuth/PKCE or device authorization; never substitutes for a provider or connector credential |
 | Environment/provider authorization | Connects Minecraft, brokerage, a device, or another adapter to its environment | Owned only by the corresponding connector boundary; results are normalized and credential-free before model re-entry |
 
+Payment entitlement is a fourth, non-credential class. It may grant Casimir
+features or bounded managed-provider credit, but it never substitutes for
+profile identity, MCP client authorization, provider authorization, device
+trust, a capability grant, or a billable-session lease. Likewise, a ChatGPT or
+Codex login is not an OpenAI API credential or API billing balance. The staged
+EXE-first subscription, bring-your-own-provider, MFA, metering, and public-pilot
+plan is governed by
+`docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md`.
+
 An ordinary user installs the signed application, creates or links a profile,
 enrolls a provider through the application, connects an MCP client through an
 authorization flow, and approves individual environment scopes. The user must
@@ -269,6 +278,16 @@ current. It cannot reserve mutation authority or become an answer on its own.
 The shared harness remains domain-neutral; each adapter supplies its own
 observations, mechanics, actions, invariants and consequence policy.
 
+CasimirBot scales this responsiveness as **one generic governed
+resident-controller protocol with unique versioned controller profiles for each
+environment and capability**. The protocol is the common Codex-to-tool
+lifecycle: identity, consent, leases, observation freshness, bounded response
+admission, local arbitration, receipts, interruption, reset and semantic
+re-entry. A profile is the environment-specific implementation: sensors,
+timing, allowed responses, effect ceilings and proof of outcome. Sharing the
+protocol never lets a Minecraft, browser, DAW, server or brokerage profile
+inherit another profile's actions or authority.
+
 | Environment | Representative use | Consequence boundary |
 | --- | --- | --- |
 | Minecraft | Explore, gather, craft, build, survive, recover from unexpected hazards and pursue a durable goal such as all advancements | Broad reversible experimentation is possible, but player/world identity, mutation ceilings, manual override and Emergency Stop remain enforced |
@@ -281,6 +300,12 @@ observations, mechanics, actions, invariants and consequence policy.
 Browser, DAW, CAD, generic server and physical-device adapters in this table are
 product projections unless a separate adapter contract and acceptance artifact
 says otherwise.
+
+Terminology is environment-specific: Minecraft's accepted Player Embodiment
+execution lane is Fabric. A brokerage `paper` account is only CasimirBot's
+local simulated cash/order/fill/position ledger; it is unrelated to the
+Minecraft Paper server adapter. Both can reuse the governed lifecycle without
+sharing actions, credentials or authority.
 
 Minecraft may eventually offer two separately governed embodiments. A
 `player_proxy` acts through the selected user's player body; an optional
@@ -361,6 +386,18 @@ then required to prove that the harness is portable rather than Minecraft
 automation packaged as a platform.
 
 ## Release ladder
+
+### One installed node, multiple Codex clients
+
+The installed product exposes one supervised loopback service, not one server
+per Codex chat. Authenticated browser and MCP clients may attach concurrently
+while retaining separate profile, OAuth-client, conversation, room participant,
+run turn, source epoch, and execution-lease identity. The server may relay
+bounded advisory status between those clients, but clients do not receive one
+another's credentials, hidden reasoning, or ambient device access. Shared reads
+remain grant-scoped and all mutations continue through one serialized execution
+lease. A signed launcher receipt—not a port number, listener, client vote, or
+model statement—establishes ownership of the installed service.
 
 1. **Installed diagnostic bridge.** Finish public OAuth and Codex acceptance for
    the read-only Device Check plugin and secure tunnel.

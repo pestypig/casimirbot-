@@ -58,6 +58,23 @@ describe("WorkstationPanelHost account policy", () => {
     expect(screen.queryByText(/reserved for developer mode/i)).toBeNull();
   });
 
+  it("renders the safe local harness status surface for public users", async () => {
+    vi.stubGlobal("React", React);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ account_policy: HELIX_USER_ACCOUNT_POLICY }),
+      })),
+    );
+    await fetchAccountCapabilityPolicy();
+
+    render(<WorkstationPanelHost panelId="local-harness" />);
+
+    expect(await screen.findByText("Installed app required")).toBeTruthy();
+    expect(screen.queryByText(/reserved for developer mode/i)).toBeNull();
+  });
+
   it("renders locked panel chrome through the selected interface language", async () => {
     testState.interfaceLanguage = "haw";
     vi.stubGlobal(
@@ -71,7 +88,27 @@ describe("WorkstationPanelHost account policy", () => {
 
     render(<WorkstationPanelHost panelId="code-admin" />);
 
-    expect(screen.getByText("Ua laka \u02bbia \u02bbo Luna Ho\u02bbokele Code")).toBeTruthy();
-    expect(screen.getByText(/M\u0101lama \u02bbia k\u0113ia hi\u02bbohi\u02bbona workstation/)).toBeTruthy();
+    expect(await screen.findByText(
+      "Ua laka \u02bbia \u02bbo Luna Ho\u02bbokele Code",
+    )).toBeTruthy();
+    expect(await screen.findByText(
+      /M\u0101lama \u02bbia k\u0113ia hi\u02bbohi\u02bbona workstation/,
+    )).toBeTruthy();
+  });
+
+  it("fails closed for direct public-user links to installed service management", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ account_policy: HELIX_USER_ACCOUNT_POLICY }),
+      })),
+    );
+    await fetchAccountCapabilityPolicy();
+
+    render(<WorkstationPanelHost panelId="connections-billing-security" />);
+
+    expect(screen.getByText("Connections, Billing & Security is locked")).toBeTruthy();
+    expect(screen.getByText(/reserved for developer mode/i)).toBeTruthy();
   });
 });

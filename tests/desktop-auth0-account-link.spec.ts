@@ -7,8 +7,10 @@ import {
 import {
   extractDesktopAuth0Callback,
   isAllowedDesktopAuth0AuthorizationUrl,
+  isAllowedDesktopAuth0StepUpAuthorizationUrl,
   shouldRegisterDesktopProtocol,
 } from "../apps/desktop/src/auth0-account-link";
+import { AUTH0_MFA_ACR } from "../shared/desktop-auth0-step-up";
 
 const issuer = "https://tenant.auth0.com/";
 const clientId = "nativeClientId_123456";
@@ -22,6 +24,14 @@ const authorizationUrl = (): string => {
   value.searchParams.set("state", "s".repeat(43));
   value.searchParams.set("code_challenge", "c".repeat(43));
   value.searchParams.set("code_challenge_method", "S256");
+  return value.toString();
+};
+
+const stepUpAuthorizationUrl = (): string => {
+  const value = new URL(authorizationUrl());
+  value.searchParams.set("nonce", "n".repeat(43));
+  value.searchParams.set("acr_values", AUTH0_MFA_ACR);
+  value.searchParams.set("max_age", "300");
   return value.toString();
 };
 
@@ -64,6 +74,29 @@ describe("desktop Auth0 account-link host boundary", () => {
         callback.replace("casimirbot://oauth", "casimirbot://attacker"),
       ]),
     ).toBeNull();
+  });
+
+  it("admits only an exact fresh MFA request for the step-up browser handoff", () => {
+    const input = { issuer, clientId };
+    expect(isAllowedDesktopAuth0StepUpAuthorizationUrl(
+      stepUpAuthorizationUrl(), input,
+    )).toBe(true);
+    for (const [name, value] of [
+      ["acr_values", "urn:not-mfa"],
+      ["max_age", "0"],
+      ["nonce", "short"],
+    ]) {
+      const changed = new URL(stepUpAuthorizationUrl());
+      changed.searchParams.set(name, value);
+      expect(isAllowedDesktopAuth0StepUpAuthorizationUrl(
+        changed.toString(), input,
+      )).toBe(false);
+    }
+    for (const suffix of ["&max_age=300", "&max_age=901", "&prompt=login"]) {
+      expect(isAllowedDesktopAuth0StepUpAuthorizationUrl(
+        `${stepUpAuthorizationUrl()}${suffix}`, input,
+      )).toBe(false);
+    }
   });
 
   it("parses only sanitized renderer receipts", () => {

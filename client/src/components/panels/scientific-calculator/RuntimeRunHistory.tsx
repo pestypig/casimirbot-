@@ -21,7 +21,7 @@ export function RuntimeRunHistory({
         {recentRequestIds.map((requestId) => {
           const job = jobsByRequestId[requestId];
           if (!job) return null;
-          return <Button key={requestId} size="sm" variant={selectedRequestId === requestId ? "secondary" : "outline"} className="shrink-0" onClick={() => onSelect(requestId)} title={requestId}>{job.snapshot.request.runtimeId} · {job.snapshot.request.status}</Button>;
+          return <Button data-helix-control-id="workstation.panel.scientific-calculator.runtime-run-history.button" data-helix-interaction-kind="act" data-helix-authority-state="client_local" key={requestId} size="sm" variant={selectedRequestId === requestId ? "secondary" : "outline"} className="shrink-0" onClick={() => onSelect(requestId)} title={requestId}>{job.snapshot.request.runtimeId} · {job.snapshot.request.status}</Button>;
         })}
       </div>
     </div>

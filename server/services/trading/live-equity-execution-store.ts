@@ -60,6 +60,8 @@ type ControlRow = {
   supervisor_heartbeat_at: Date | string | null;
   supervisor_status: "disabled" | "healthy" | "degraded";
   operator_presence_at: Date | string | null;
+  operator_attendance_id_hash: string | null;
+  operator_attendance_status: "active" | "inactive";
   attention_required: boolean;
   attention_reason: string | null;
   trading_day: Date | string;
@@ -101,6 +103,7 @@ type AdmissionRow = {
   provider_contract_hash: string;
   encrypted_provider_review: string;
   approval_id: string;
+  approval_session_hash: string;
   approval_expires_at: Date | string;
   approval_consumed_at: Date | string | null;
   paper_account_id: string;
@@ -161,6 +164,7 @@ const projectControl = (
   supervisor_status: row.supervisor_status,
   operator_presence_at: isoOrNull(row.operator_presence_at),
   operator_present: row.operator_presence_at !== null &&
+    row.operator_attendance_status === "active" &&
     now.getTime() - new Date(row.operator_presence_at).getTime() >= 0 &&
     now.getTime() - new Date(row.operator_presence_at).getTime() <=
       OPERATOR_PRESENCE_FRESH_MS,
@@ -179,6 +183,7 @@ const projectControl = (
     now.getTime() - new Date(row.supervisor_heartbeat_at).getTime() >= 0 &&
     now.getTime() - new Date(row.supervisor_heartbeat_at).getTime() <=
       SUPERVISOR_FRESH_MS && row.operator_presence_at !== null &&
+    row.operator_attendance_status === "active" &&
     now.getTime() - new Date(row.operator_presence_at).getTime() >= 0 &&
     now.getTime() - new Date(row.operator_presence_at).getTime() <=
       OPERATOR_PRESENCE_FRESH_MS && !row.attention_required,
@@ -302,6 +307,8 @@ export const getOrCreateLiveTradingControl = async (input: {
          SET trading_day = $2, new_entries_today = 0,
              operator_armed = false, kill_switch_active = true,
              operator_presence_at = NULL,
+             operator_attendance_id_hash = NULL,
+             operator_attendance_status = 'inactive',
              kill_switch_reason = 'New trading day requires explicit re-arming',
              updated_at = $3
          WHERE control_id = $1 RETURNING *;`,
@@ -374,7 +381,8 @@ export const setLiveTradingControl = async (input: {
       const operatorAge = row.operator_presence_at === null
         ? Number.POSITIVE_INFINITY
         : now.getTime() - new Date(row.operator_presence_at).getTime();
-      if (operatorAge < 0 || operatorAge > OPERATOR_PRESENCE_FRESH_MS ||
+      if (row.operator_attendance_status !== "active" ||
+          operatorAge < 0 || operatorAge > OPERATOR_PRESENCE_FRESH_MS ||
           row.attention_required) throw new PaperTradingError(
         "paper_trading_unavailable", 409,
         row.attention_required
@@ -421,6 +429,8 @@ export const recordLiveTradingOperatorPresence = async (input: {
   connectionId: string;
   roomId: string;
   controlId: string;
+  attendanceId: string;
+  action: "start" | "heartbeat" | "end";
   now?: Date;
   deploymentEnabled?: boolean;
 }): Promise<HelixLiveTradingControl> => {
@@ -435,18 +445,70 @@ export const recordLiveTradingOperatorPresence = async (input: {
   }
   return withSharedRealtimeRoomTransaction(async (client: Queryable) => {
     const row = await readControl({ client, ...input, forUpdate: true });
-    if (!row || row.control_id !== input.controlId ||
-        !row.protective_exit_ready || row.supervisor_status !== "healthy") {
+    if (!row || row.control_id !== input.controlId) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 409,
+        "The attended live control identity changed.",
+      );
+    }
+    const attendanceHash = hash(
+      "helix-live-attendance/v1", input.attendanceId,
+    );
+    if (input.action === "end") {
+      if (row.operator_attendance_status === "active" &&
+          row.operator_attendance_id_hash !== attendanceHash) {
+        throw new PaperTradingError(
+          "paper_trading_unavailable", 409,
+          "A different attended generation owns the live control.",
+        );
+      }
+      const { rows } = await client.query<ControlRow>(
+        `UPDATE helix_live_trading_controls
+         SET operator_presence_at = NULL,
+             operator_attendance_id_hash = NULL,
+             operator_attendance_status = 'inactive',
+             operator_armed = false, kill_switch_active = true,
+             kill_switch_reason = 'Attended live session ended',
+             updated_at = $2 WHERE control_id = $1 RETURNING *;`,
+        [row.control_id, now.toISOString()],
+      );
+      await appendEvent({ client, controlId: row.control_id,
+        ownerProfileId: input.ownerProfileId,
+        eventType: "operator_attendance_ended", now });
+      return projectControl(rows[0], enabled, now);
+    }
+    if (!row.protective_exit_ready || row.supervisor_status !== "healthy") {
       throw new PaperTradingError(
         "paper_trading_unavailable", 409,
         "The live supervisor is not ready for an attended session.",
       );
     }
+    if (input.action === "heartbeat" &&
+        (row.operator_attendance_status !== "active" ||
+         row.operator_attendance_id_hash !== attendanceHash)) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 409,
+        "The attended generation ended or was replaced.",
+      );
+    }
+    if (input.action === "start" &&
+        row.operator_attendance_status === "active" &&
+        row.operator_attendance_id_hash !== attendanceHash) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 409,
+        "Another attended generation is already active.",
+      );
+    }
     const { rows } = await client.query<ControlRow>(
       `UPDATE helix_live_trading_controls SET operator_presence_at = $2,
-         updated_at = $2 WHERE control_id = $1 RETURNING *;`,
-      [row.control_id, now.toISOString()],
+         operator_attendance_id_hash = $3,
+         operator_attendance_status = 'active', updated_at = $2
+       WHERE control_id = $1 RETURNING *;`,
+      [row.control_id, now.toISOString(), attendanceHash],
     );
+    if (input.action === "start") await appendEvent({ client,
+      controlId: row.control_id, ownerProfileId: input.ownerProfileId,
+      eventType: "operator_attendance_started", now });
     return projectControl(rows[0], enabled, now);
   });
 };
@@ -478,6 +540,7 @@ const loadAdmission = async (input: {
             p.provider_contract_hash, p.encrypted_provider_review,
             p.paper_account_id, p.risk_decision_id,
             a.approval_id, a.expires_at AS approval_expires_at,
+            a.session_hash AS approval_session_hash,
             a.consumed_at AS approval_consumed_at,
             d.verdict AS risk_verdict, d.candidate_json,
             pa.kill_switch_active AS paper_kill_switch_active
@@ -495,6 +558,7 @@ const loadAdmission = async (input: {
 
 export const executeApprovedLiveEquityEntry = async (input: {
   ownerProfileId: string;
+  sessionId: string;
   connectionId: string;
   roomId: string;
   approvalId: string;
@@ -513,6 +577,72 @@ export const executeApprovedLiveEquityEntry = async (input: {
     "paper_trading_unavailable", 409,
     "Live equity entries are limited to the regular U.S. market session.",
   );
+  const initial = await withSharedRealtimeRoomTransaction((client: Queryable) =>
+    loadAdmission({ client, ...input }));
+  if (!initial) throw new PaperTradingError(
+    "paper_order_not_found", 404, "The explicit live-order approval was not found.",
+  );
+  if (initial.approval_session_hash !==
+      hash("helix-live-equity-order-session/v1", input.sessionId)) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The live-order approval belongs to a different authenticated session.",
+    );
+  }
+  const policy = helixLiveExecutionPolicySchema.parse(
+    DEFAULT_HELIX_LIVE_EXECUTION_POLICY,
+  );
+  if (initial.preview_status !== "approved" ||
+      initial.approval_consumed_at !== null ||
+      initial.risk_verdict !== "accepted" || initial.paper_kill_switch_active ||
+      now.getTime() >= new Date(initial.approval_expires_at).getTime() ||
+      now.getTime() - new Date(initial.preview_reviewed_at).getTime() >
+        policy.max_preview_age_ms) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The one-time live approval is stale, consumed, or no longer admitted.",
+    );
+  }
+  const initialControlGate = await withSharedRealtimeRoomTransaction(
+    async (client: Queryable) => ({
+      control: await readControl({ client, ...input }),
+      providerContractAccepted:
+        await hasFreshRobinhoodLiveProviderContractAcceptance({
+          client,
+          ownerProfileId: input.ownerProfileId,
+          connectionId: input.connectionId,
+          roomId: input.roomId,
+          now,
+        }),
+    }),
+  );
+  const initialSupervisorAge =
+    initialControlGate.control?.supervisor_heartbeat_at == null
+      ? Number.POSITIVE_INFINITY
+      : now.getTime() - new Date(
+        initialControlGate.control.supervisor_heartbeat_at,
+      ).getTime();
+  const initialOperatorAge =
+    initialControlGate.control?.operator_presence_at == null
+      ? Number.POSITIVE_INFINITY
+      : now.getTime() - new Date(
+        initialControlGate.control.operator_presence_at,
+      ).getTime();
+  if (!initialControlGate.providerContractAccepted ||
+      !initialControlGate.control || !initialControlGate.control.operator_armed ||
+      initialControlGate.control.kill_switch_active ||
+      !initialControlGate.control.protective_exit_ready ||
+      initialControlGate.control.supervisor_status !== "healthy" ||
+      initialSupervisorAge < 0 || initialSupervisorAge > SUPERVISOR_FRESH_MS ||
+      initialOperatorAge < 0 ||
+      initialOperatorAge > OPERATOR_PRESENCE_FRESH_MS ||
+      initialControlGate.control.operator_attendance_status !== "active" ||
+      initialControlGate.control.attention_required) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The attended live control does not admit provider access for placement.",
+    );
+  }
   let lease = await readRobinhoodCredentialBundleForPrivateRoomAdapter({
     ownerProfileId: input.ownerProfileId,
     connectionId: input.connectionId,
@@ -525,15 +655,7 @@ export const executeApprovedLiveEquityEntry = async (input: {
     "paper_trading_unavailable", 409,
     "A uniquely selected Robinhood Agentic account is required.",
   );
-  const initial = await withSharedRealtimeRoomTransaction((client: Queryable) =>
-    loadAdmission({ client, ...input }));
-  if (!initial) throw new PaperTradingError(
-    "paper_order_not_found", 404, "The explicit live-order approval was not found.",
-  );
   const intent = helixLiveEquityOrderIntentSchema.parse(initial.intent_json);
-  const policy = helixLiveExecutionPolicySchema.parse(
-    DEFAULT_HELIX_LIVE_EXECUTION_POLICY,
-  );
   const preflight = input.preflight ?? await readLiveAccountPreflight({
     ownerProfileId: input.ownerProfileId,
     connectionId: input.connectionId,
@@ -582,8 +704,11 @@ export const executeApprovedLiveEquityEntry = async (input: {
         supervisorAge < 0 ||
         supervisorAge > SUPERVISOR_FRESH_MS || operatorAge < 0 ||
         operatorAge > OPERATOR_PRESENCE_FRESH_MS ||
+        control.operator_attendance_status !== "active" ||
         control.attention_required ||
         !admission || admission.preview_status !== "approved" ||
+        admission.approval_session_hash !==
+          hash("helix-live-equity-order-session/v1", input.sessionId) ||
         admission.approval_consumed_at !== null ||
         admission.risk_verdict !== "accepted" ||
         admission.paper_kill_switch_active ||

@@ -14,7 +14,8 @@ record LocomotionSafetyEnvelope(double minimumHealth, double maximumDropBlocks) 
         boolean onFire,
         boolean landingGeometryKnown,
         double predictedDropBlocks,
-        boolean predictedLandingLava
+        boolean predictedLandingLava,
+        boolean controlledJumpArc
     ) {}
 
     record Decision(boolean admitted, String reasonCode) {
@@ -58,7 +59,8 @@ record LocomotionSafetyEnvelope(double minimumHealth, double maximumDropBlocks) 
         if (observation.onFire()) return Decision.refuse("locomotion_fire_contact");
         if (!observation.onGround() &&
             observation.verticalVelocity() < -0.35 &&
-            observation.fallDistance() > maximumDropBlocks) {
+            observation.fallDistance() > maximumDropBlocks &&
+            !observation.controlledJumpArc()) {
             return Decision.refuse("locomotion_active_fall");
         }
         if (!observation.landingGeometryKnown()) {

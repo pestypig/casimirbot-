@@ -57,10 +57,10 @@ export function HelixAskWorkflowSuggestionRuntime({
           The active run is pinned to another chat, so this chat&apos;s replies cannot advance Step {projection.completedStepCount + 1}.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" onClick={() => pinDemoToChat(activeChatId)} className="rounded border border-amber-200/35 bg-amber-300/10 px-2.5 py-1 text-xs text-amber-50 hover:bg-amber-300/20">
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-workflow-suggestion-runtime.continue-this-run-here" type="button" onClick={() => pinDemoToChat(activeChatId)} className="rounded border border-amber-200/35 bg-amber-300/10 px-2.5 py-1 text-xs text-amber-50 hover:bg-amber-300/20">
             Continue this run here
           </button>
-          <button
+          <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-workflow-suggestion-runtime.open-demo-lab"
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "workflow-demo-lab" } }))}
             className="rounded border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200 hover:bg-white/10"
@@ -132,7 +132,7 @@ export function HelixAskWorkflowSuggestionRuntime({
           <h3 className="mt-2 text-sm font-semibold text-slate-100">{qte.title}</h3>
           <p className="mt-1 text-[11px] leading-5 text-slate-400">{qte.reason}</p>
         </div>
-        <button
+        <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-workflow-suggestion-runtime.dismiss-workflow-suggestion"
           type="button"
           onClick={() => dismissSuggestion(qte.stepId)}
           className="rounded p-1 text-slate-500 hover:bg-white/5 hover:text-slate-200"
@@ -142,7 +142,7 @@ export function HelixAskWorkflowSuggestionRuntime({
           <X className="h-4 w-4" />
         </button>
       </div>
-      <textarea
+      <textarea data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-workflow-suggestion-runtime.editable-next-workflow-prompt"
         value={draft}
         onChange={(event) => setDraft(event.currentTarget.value)}
         rows={variant === "panel" ? 6 : 3}
@@ -151,7 +151,7 @@ export function HelixAskWorkflowSuggestionRuntime({
       />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <span className="text-[10px] text-slate-500">Editable · inserts into composer · never auto-sends</span>
-        <button
+        <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-workflow-suggestion-runtime.use-next-prompt"
           type="button"
           onClick={usePrompt}
           disabled={!draft.trim()}

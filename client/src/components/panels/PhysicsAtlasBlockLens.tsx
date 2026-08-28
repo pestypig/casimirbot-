@@ -75,7 +75,7 @@ export default function PhysicsAtlasBlockLens({
           <div className="space-y-1">
             {shownBadges.length > 0 ? (
               shownBadges.map((badge: TheoryBadgeV1) => (
-                <button
+                <button data-helix-control-id="workstation.panel.theory-badge-graph.physics-atlas-block-lens.on-select-badge-badge-id" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                   key={badge.id}
                   type="button"
                   aria-label={`${tx("Select")} ${tx(badge.title)}`}
@@ -101,7 +101,7 @@ export default function PhysicsAtlasBlockLens({
           <div className="space-y-1">
             {scalarPayloads.length > 0 ? (
               scalarPayloads.slice(0, 8).map(({ badge, payload }) => (
-                <button
+                <button data-helix-control-id="workstation.panel.theory-badge-graph.physics-atlas-block-lens.on-load-payload-badge-id-payload-id" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                   key={`${badge.id}-${payload.id}`}
                   type="button"
                   onClick={() => onLoadPayload(badge.id, payload.id)}

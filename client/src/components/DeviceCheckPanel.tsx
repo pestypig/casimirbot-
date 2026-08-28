@@ -286,7 +286,7 @@ export default function DeviceCheckPanel() {
                   Local Desktop MCP tunnel
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">
-                  Outbound-only developer connection to OpenAI Secure MCP Tunnel. It exposes only the owner-scoped, read-only Device Check MCP endpoint; the desktop session secret and runtime key stay outside the web service and Codex.
+              Outbound-only developer connection to OpenAI Secure MCP Tunnel. It exposes only owner-scoped Device Check plus bounded local-supervisor presence and advisory coordination. Environment actions and general MCP tools remain unavailable; the desktop session secret and runtime key stay outside the web service and Codex.
                 </p>
                 <p className="mt-2 text-xs text-slate-300" data-testid="device-check-tunnel-status">
                   Status: <span className="font-medium text-emerald-200">{tunnel ? label(tunnel.status) : "Inspecting"}</span>

@@ -56,7 +56,7 @@ export function HelixAskGoalPill({
       data-expanded={expanded ? "true" : "false"}
     >
       <div className="flex items-center gap-2">
-        <button
+        <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-goal-pill.on-toggle-expanded"
           type="button"
           aria-expanded={expanded}
           aria-controls="helix-ask-goal-pill-details"
@@ -74,7 +74,7 @@ export function HelixAskGoalPill({
           </span>
         </button>
         <div className="flex shrink-0 items-center gap-1">
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-goal-pill.edit-goal-prompt"
             type="button"
             aria-label="Edit goal prompt"
             title="Edit goal prompt"
@@ -84,7 +84,7 @@ export function HelixAskGoalPill({
           >
             <Pencil className="h-3.5 w-3.5" aria-hidden />
           </button>
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-goal-pill.on-action-is-paused-resume-pause"
             type="button"
             aria-label={isPaused ? "Resume goal" : "Pause goal"}
             title={isPaused ? "Resume goal" : "Pause goal"}
@@ -94,7 +94,7 @@ export function HelixAskGoalPill({
           >
             {isPaused ? <PlayCircle className="h-3.5 w-3.5" aria-hidden /> : <PauseCircle className="h-3.5 w-3.5" aria-hidden />}
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-goal-pill.archive-goal"
             type="button"
             aria-label="Archive goal"
             title="Archive goal"
@@ -104,7 +104,7 @@ export function HelixAskGoalPill({
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
           </button>
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-goal-pill.on-toggle-expanded.2"
             type="button"
             aria-label={expanded ? "Collapse goal details" : "Expand goal details"}
             title={expanded ? "Collapse goal details" : "Expand goal details"}

@@ -7,6 +7,8 @@ export type HelixLocalSupervisorAttachmentDecision = Readonly<{
     | "compatible_workspace_service"
     | "no_listener"
     | "supervisor_not_ready"
+    | "supervisor_not_enforcing"
+    | "status_exposure_violation"
     | "workspace_mismatch"
     | "invalid_status";
 }>;
@@ -27,6 +29,20 @@ export const decideHelixLocalSupervisorAttachment = (input: {
   }
   if (!input.status.ready) {
     return { decision: "fail_closed", reason: "supervisor_not_ready" };
+  }
+  if (!input.status.one_instance_enforced ||
+      (input.status.supervisor_mode !== "desktop_single_instance" &&
+       input.status.supervisor_mode !== "external_keyed_launcher")) {
+    return { decision: "fail_closed", reason: "supervisor_not_enforcing" };
+  }
+  if (
+    input.status.credential_included ||
+    input.status.private_endpoint_included ||
+    input.status.workspace_path_included ||
+    input.status.process_identity_included ||
+    input.status.account_identity_included
+  ) {
+    return { decision: "fail_closed", reason: "status_exposure_violation" };
   }
   return { decision: "attach", reason: "compatible_workspace_service" };
 };

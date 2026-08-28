@@ -98,7 +98,7 @@ export function HelixAskLanguageModelPicker({
 }: HelixAskLanguageModelPickerProps) {
   return (
     <>
-      <button
+      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-language-model-picker.choose-ask-ai-mode"
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Choose Ask AI mode"
@@ -117,7 +117,7 @@ export function HelixAskLanguageModelPicker({
           className="absolute right-24 top-12 z-30 min-w-48 rounded-lg border border-white/10 bg-slate-950/95 p-1.5 text-xs text-slate-100 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur"
         >
           {model.items.map((item) => (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-language-model-picker.event-event-prevent-default-event-stop-propagation-on-select-item-select"
               key={item.id}
               type="button"
               role="menuitemradio"

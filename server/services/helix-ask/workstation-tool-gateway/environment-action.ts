@@ -411,6 +411,7 @@ const postconditionFor = (
       mine: "minecraft.world.matching_blocks_removed",
       place: "minecraft.world.exact_positions_match_block",
       craft: "minecraft.player.crafted_output_increased_by_requested_count",
+      consume: "minecraft.player.consumable_postconditions_satisfied",
       inventory_transfer: "minecraft.player.container_transfer_delta_matches",
       execute_sequence: "minecraft.player.sequence_checkpoints_satisfied",
       execute_reactive_program: "minecraft.player.reactive_program_completed",
@@ -902,6 +903,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
           "mine",
           "place",
           "craft",
+          "consume",
           "inventory_transfer",
         ].includes(context.capability.actionKind)
           ? Math.min(

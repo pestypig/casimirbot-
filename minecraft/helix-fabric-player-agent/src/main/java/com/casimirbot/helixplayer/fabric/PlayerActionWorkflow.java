@@ -408,7 +408,8 @@ public final class PlayerActionWorkflow {
         default LocomotionSafetyEnvelope.Check checkLocomotionSafety(
             double targetX,
             double targetZ,
-            double minimumHealth
+            double minimumHealth,
+            boolean controlledJumpArc
         ) {
             return new LocomotionSafetyEnvelope.Check(
                 LocomotionSafetyEnvelope.Decision.admit(),

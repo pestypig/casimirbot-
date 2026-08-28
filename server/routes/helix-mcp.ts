@@ -17,6 +17,8 @@ import { createRateLimiter } from "../middleware/rate-limit";
 import { HelixAgentApiService } from "../services/helix-agent-api/service";
 import { sharedLiveRoomAgentApiService } from "../services/shared-live-room-control/agent-api-service";
 import type { HelixAgentApiPrincipal } from "../services/helix-agent-api/types";
+import type { HelixLocalSupervisorCoordinationStore } from
+  "../services/local-supervisor/local-supervisor-coordination";
 import {
   containsSharedLiveRoomSensitiveText,
   containsSharedLiveRoomSensitiveValue,
@@ -34,6 +36,7 @@ type McpLocals = {
 export type HelixMcpServerFactory = (input: {
   principal: HelixAgentApiPrincipal;
   service: HelixAgentApiService;
+  localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
 }) => McpServer;
 
 type McpRouterDependencies = {
@@ -44,6 +47,7 @@ type McpRouterDependencies = {
   rateLimit?: boolean;
   enforceTransportSecurity?: boolean;
   resourceMetadataPath?: string;
+  localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
 };
 
 const MCP_RESOURCE_METADATA_PATH =
@@ -222,6 +226,8 @@ export const createHelixMcpRouter = (
       const server = createServer({
         principal,
         service,
+        localSupervisorCoordinationStore:
+          dependencies.localSupervisorCoordinationStore,
       });
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,

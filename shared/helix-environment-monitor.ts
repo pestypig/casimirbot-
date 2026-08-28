@@ -43,6 +43,11 @@ export const HELIX_ENVIRONMENT_MONITOR_EVENT_FAMILIES = [
   "workflow",
   "authority",
   "durable_goal",
+  "market",
+  "portfolio",
+  "orders",
+  "risk_control",
+  "paper_simulation",
 ] as const;
 
 export const helixEnvironmentMonitorIdentitySchema = z

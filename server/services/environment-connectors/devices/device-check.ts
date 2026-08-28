@@ -228,8 +228,8 @@ export async function listEnvironmentConnectorDeviceChecks(input: {
         a.domain_adapter,
         i.granted_capability_ids,
         eb.consent_capability_ids,
-        c.status AS credential_status,
-        c.expires_at AS credential_expires_at
+        COALESCE(device_credential.status, source_credential.status) AS credential_status,
+        COALESCE(device_credential.expires_at, source_credential.expires_at) AS credential_expires_at
       FROM helix_environment_connector_devices d
       JOIN helix_environment_connector_installations i
         ON i.installation_id = d.installation_id
@@ -239,8 +239,11 @@ export async function listEnvironmentConnectorDeviceChecks(input: {
         ON eb.device_id = d.device_id
       LEFT JOIN helix_environment_adapter_admissions a
         ON a.admission_id = eb.adapter_admission_id
-      LEFT JOIN helix_environment_connector_device_credentials c
-        ON c.device_credential_id = d.credential_ref
+      LEFT JOIN helix_environment_connector_device_credentials device_credential
+        ON device_credential.device_credential_id = d.credential_ref
+      LEFT JOIN helix_room_source_credentials source_credential
+        ON source_credential.credential_id = d.credential_ref
+       AND source_credential.binding_id = eb.room_source_binding_id
       WHERE i.owner_profile_id = $1
         ${roomFilter}
       ORDER BY d.paired_at DESC, d.device_id ASC, eb.created_at DESC;

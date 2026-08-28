@@ -346,8 +346,10 @@ bool extend_impl(const Input &input, Context::Impl &impl, Result *result,
         selector::Output selector_output;
         selector::Result selector_result{};
         ++result->selector_calls;
-        const bool selector_passed = selector::evaluate(
-            selector_input, &selector_output, &selector_result);
+        result->selector_thread_count = kSelectorThreadCount;
+        const bool selector_passed = selector::evaluate_prepared_parallel(
+            selector_input, kSelectorThreadCount, &selector_output,
+            &selector_result);
         result->selector_refinement_candidates_visited +=
             selector_result.refinement_candidates_visited;
         result->selector_subpanels_accumulated +=

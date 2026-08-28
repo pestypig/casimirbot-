@@ -1,4 +1,7 @@
 #include "mini_boson_star_primary_c08_convolution_jet_v1.hpp"
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+#include "mini_boson_star_primary_c08_convolution_selector_v1.hpp"
+#endif
 #include "mini_boson_star_primary_c08_identity_v1.hpp"
 #include "mini_boson_star_primary_c08_margins_v1.hpp"
 #include "mini_boson_star_primary_c08_scalar_ledger_provider_v1.hpp"
@@ -15,6 +18,10 @@
 #include <vector>
 
 namespace jet = nhm2::g2h_e_s5::primary_c08_convolution_jet_v1;
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+namespace selector =
+    nhm2::g2h_e_s5::primary_c08_convolution_selector_v1;
+#endif
 namespace ledger = nhm2::g2h_e_s5::primary_c08_convolution_ledger_v1;
 namespace identity = nhm2::g2h_e_s5::primary_c08_identity_v1;
 namespace margins = nhm2::g2h_e_s5::primary_c08_margins_v1;
@@ -95,6 +102,77 @@ bool parse_exponent(const char *text, unsigned *value) {
     return true;
 }
 
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+bool parse_threads(const char *text, std::size_t *value) {
+    if (text == nullptr || value == nullptr || *text == '\0') return false;
+    char *end = nullptr;
+    const unsigned long parsed = std::strtoul(text, &end, 10);
+    if (end == text || *end != '\0' || parsed == 0UL
+        || parsed > selector::kMaximumParallelThreads) return false;
+    *value = static_cast<std::size_t>(parsed);
+    return true;
+}
+
+bool same_selector_output(const selector::Output &left,
+                          const selector::Output &right) {
+    if (left.retained_order != right.retained_order
+        || left.selected_u_panels != right.selected_u_panels
+        || !arb_equal(left.target_left, right.target_left)
+        || !arb_equal(left.target_right, right.target_right)
+        || !arb_equal(left.target_center, right.target_center)
+        || !arb_equal(left.target_half_width, right.target_half_width)
+        || left.direct_coverage_offsets != right.direct_coverage_offsets
+        || left.direct_coverage_ordinals != right.direct_coverage_ordinals
+        || left.reflected_coverage_offsets != right.reflected_coverage_offsets
+        || left.reflected_coverage_ordinals
+            != right.reflected_coverage_ordinals) return false;
+    for (unsigned degree = 0U; degree <= left.retained_order; ++degree) {
+        for (std::size_t component = 0U; component < jet::kJetCount;
+             ++component) {
+            if (!arb_equal(left.coefficient(degree, component),
+                           right.coefficient(degree, component))
+                || !arb_equal(left.coefficient_margin(degree, component),
+                              right.coefficient_margin(degree, component)))
+                return false;
+        }
+    }
+    for (std::size_t component = 0U; component < jet::kJetCount;
+         ++component) {
+        if (!arb_equal(left.remainder(component), right.remainder(component))
+            || !arb_equal(left.remainder_margin(component),
+                          right.remainder_margin(component))) return false;
+    }
+    return true;
+}
+
+bool same_selector_result(const selector::Result &left,
+                          const selector::Result &right) {
+    return left.accepted == right.accepted && left.detail == right.detail
+        && left.refinement_candidates_visited
+            == right.refinement_candidates_visited
+        && left.subpanels_accumulated == right.subpanels_accumulated
+        && left.jet_predecessor_calls == right.jet_predecessor_calls
+        && left.elementary_convolutions == right.elementary_convolutions
+        && left.numerical_width_checks == right.numerical_width_checks
+        && left.fixed_candidate_schedule == right.fixed_candidate_schedule
+        && left.increasing_subpanel_order == right.increasing_subpanel_order
+        && left.first_passing_candidate_selected
+            == right.first_passing_candidate_selected
+        && left.boundary_applied_once == right.boundary_applied_once
+        && left.exhaustion_retuned == right.exhaustion_retuned
+        && left.signed_remainder_cancellation_used
+            == right.signed_remainder_cancellation_used
+        && left.midpoint_selection_used == right.midpoint_selection_used
+        && left.point_sampling_used == right.point_sampling_used
+        && left.state_coefficients_read == right.state_coefficients_read
+        && left.candidate_evaluations == right.candidate_evaluations
+        && left.positive_parameter_samples == right.positive_parameter_samples
+        && left.candidate_root_created == right.candidate_root_created
+        && left.scientific_handler_linked == right.scientific_handler_linked
+        && left.authority_promoted == right.authority_promoted;
+}
+#endif
+
 void emit_description() {
     std::cout
         << "{\"schema\":\"nhm2.g2h_e_s5.c08_h2_timing_calibration.v1\""
@@ -138,13 +216,26 @@ int main(int argc, char **argv) {
         emit_description();
         return 0;
     }
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+    if (argc != 5 || std::string(argv[1]) != "--max-exponent"
+        || std::string(argv[3]) != "--threads") {
+        return emit_failure("arguments", 0U, 0U);
+    }
+#else
     if (argc != 3 || std::string(argv[1]) != "--max-exponent") {
         return emit_failure("arguments", 0U, 0U);
     }
+#endif
     unsigned maximum_exponent = 0U;
     if (!parse_exponent(argv[2], &maximum_exponent)) {
         return emit_failure("arguments", 0U, 0U);
     }
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+    std::size_t thread_count = 0U;
+    if (!parse_threads(argv[4], &thread_count)) {
+        return emit_failure("arguments", 0U, 0U);
+    }
+#endif
 
     Storage storage(514U);
     auto input_identity = make_identity(storage);
@@ -179,8 +270,39 @@ int main(int argc, char **argv) {
     std::size_t cumulative_elementary = 0U;
     for (unsigned exponent = 0U; exponent <= maximum_exponent; ++exponent) {
         const std::size_t panel_count = std::size_t{1U} << exponent;
-        const auto candidate_start = Clock::now();
         std::size_t candidate_elementary = 0U;
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+        selector::Input selector_input{b->ledger, v->ledger,
+            target.left_endpoint, target.right_endpoint, target.order,
+            jet::kJetCount, target.coefficients};
+        selector::Output serial_output;
+        selector::Result serial_result{};
+        if (thread_count > 1U
+            && !selector::evaluate_prepared_candidate(
+                selector_input, panel_count, 1U, &serial_output,
+                &serial_result)) {
+            return emit_failure("serial_oracle", exponent,
+                                cumulative_subpanels);
+        }
+        const auto candidate_start = Clock::now();
+        selector::Output selector_output;
+        selector::Result selector_result{};
+        if (!selector::evaluate_prepared_candidate(
+                selector_input, panel_count, thread_count, &selector_output,
+                &selector_result)) {
+            return emit_failure("parallel_candidate", exponent,
+                                cumulative_subpanels);
+        }
+        if (thread_count > 1U
+            && (!same_selector_output(serial_output, selector_output)
+                || !same_selector_result(serial_result, selector_result))) {
+            return emit_failure("parallel_equivalence", exponent,
+                                cumulative_subpanels);
+        }
+        candidate_elementary = selector_result.elementary_convolutions;
+        cumulative_subpanels += selector_result.subpanels_accumulated;
+#else
+        const auto candidate_start = Clock::now();
         for (std::size_t ordinal = 0U; ordinal < panel_count; ++ordinal) {
             Ball u_left, u_right;
             arb_set_ui(u_left.value, static_cast<ulong>(ordinal));
@@ -210,7 +332,14 @@ int main(int argc, char **argv) {
                 target.coefficients};
             jet::Output jet_output;
             jet::Result jet_result{};
-            if (!jet::evaluate(jet_input, &jet_output, &jet_result)
+#if defined(NHM2_H2_PREPARED_MOMENTS_V2)
+            const bool jet_accepted = jet::evaluate_prepared(
+                jet_input, &jet_output, &jet_result);
+#else
+            const bool jet_accepted = jet::evaluate(
+                jet_input, &jet_output, &jet_result);
+#endif
+            if (!jet_accepted
                 || jet_result.elementary_convolutions
                     != jet::kElementaryConvolutions) {
                 return emit_failure("jet", exponent, cumulative_subpanels);
@@ -218,6 +347,7 @@ int main(int argc, char **argv) {
             candidate_elementary += jet_result.elementary_convolutions;
             ++cumulative_subpanels;
         }
+#endif
         cumulative_elementary += candidate_elementary;
         const auto candidate_end = Clock::now();
         const auto candidate_ms = std::chrono::duration_cast<
@@ -227,6 +357,9 @@ int main(int argc, char **argv) {
         std::cout
             << "{\"schema\":\"nhm2.g2h_e_s5.c08_h2_timing_calibration.v1\""
             << ",\"status\":\"PROGRESS\",\"exponent\":" << exponent
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+            << ",\"threads\":" << thread_count
+#endif
             << ",\"u_panels\":" << panel_count
             << ",\"candidate_milliseconds\":" << candidate_ms
             << ",\"cumulative_milliseconds\":" << cumulative_ms
@@ -245,6 +378,9 @@ int main(int argc, char **argv) {
         << "{\"schema\":\"nhm2.g2h_e_s5.c08_h2_timing_calibration.v1\""
         << ",\"status\":\"CALIBRATION_COMPLETE\""
         << ",\"maximum_exponent\":" << maximum_exponent
+#if defined(NHM2_H2_PARALLEL_SELECTOR_V3)
+        << ",\"threads\":" << thread_count
+#endif
         << ",\"cumulative_subpanels\":" << cumulative_subpanels
         << ",\"cumulative_elementary_convolutions\":"
         << cumulative_elementary

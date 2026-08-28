@@ -24,6 +24,7 @@ import {
 } from "@shared/helix-environment-event-stream";
 import {
   HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS,
+  HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_NAVIGATE_CAPABILITY,
   helixMinecraftPlayerActionArgumentsSchema,
@@ -213,6 +214,43 @@ describe("provider-neutral environment player-action contract", () => {
     expect(minecraftPlayerCapabilityForActionKind("craft")).toBe(
       "com.casimirbot.minecraft.player.craft",
     );
+    expect(HELIX_MINECRAFT_PLAYER_CAPABILITY_IDS).toContain(
+      HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
+    );
+    expect(minecraftPlayerCapabilityForActionKind("consume")).toBe(
+      "com.casimirbot.minecraft.player.consume",
+    );
+  });
+
+  it("admits exact main-hand mushroom-stew recovery without hidden escalation", () => {
+    const consume = {
+      action_kind: "consume" as const,
+      item_id: "minecraft:mushroom_stew",
+      count: 1,
+      hand: "main_hand" as const,
+      max_duration_ms: 8_000,
+      stop_below_health: 8,
+      minimum_food_gain: 6,
+      expected_remainder_item_id: "minecraft:bowl",
+    };
+
+    expect(helixMinecraftPlayerActionArgumentsSchema.safeParse(consume).success).toBe(true);
+    expect(helixMinecraftPlayerActionArgumentsSchema.safeParse({
+      ...consume,
+      hand: "off_hand",
+    }).success).toBe(false);
+    expect(helixMinecraftPlayerActionArgumentsSchema.safeParse({
+      ...consume,
+      max_duration_ms: 999,
+    }).success).toBe(false);
+    expect(helixMinecraftPlayerActionArgumentsSchema.safeParse({
+      ...consume,
+      stop_below_health: 0,
+    }).success).toBe(false);
+    expect(helixMinecraftPlayerActionArgumentsSchema.safeParse({
+      ...consume,
+      allow_attack: true,
+    }).success).toBe(false);
   });
 
   it("accepts bounded navigation and forbids hidden dig/place escalation", () => {

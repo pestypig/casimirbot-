@@ -363,7 +363,7 @@ export function AgentAccountBindingReadiness() {
           >
             {copy.badge}
           </span>
-          <button
+          <button data-helix-control-id="workstation.panel.agent-access.agent-account-binding-readiness.refresh-binding-status" data-helix-interaction-kind="observe" data-helix-authority-state="client_local"
             type="button"
             onClick={refresh}
             disabled={state.kind === "loading"}
@@ -379,7 +379,7 @@ export function AgentAccountBindingReadiness() {
             Refresh
           </button>
           {canStartLink ? (
-            <button
+            <button data-helix-control-id="workstation.panel.agent-access.agent-account-binding-readiness.void-start-account-link" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
               type="button"
               onClick={() => void startAccountLink()}
               disabled={linkBusy}

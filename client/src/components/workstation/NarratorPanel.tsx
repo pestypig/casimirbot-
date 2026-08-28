@@ -280,7 +280,7 @@ export default function NarratorPanel() {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.publish-debug-probe"
             type="button"
             onClick={publishDebugProbe}
             className="inline-flex h-8 w-8 items-center justify-center rounded border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
@@ -289,7 +289,7 @@ export default function NarratorPanel() {
           >
             <Bug className="h-4 w-4" />
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.reset-policies"
             type="button"
             onClick={resetPolicies}
             className="inline-flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10"
@@ -298,7 +298,7 @@ export default function NarratorPanel() {
           >
             <RotateCcw className="h-4 w-4" />
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.clear-feed"
             type="button"
             onClick={clearFeed}
             className="inline-flex h-8 w-8 items-center justify-center rounded border border-rose-400/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
@@ -323,14 +323,14 @@ export default function NarratorPanel() {
                 <div key={sourceKind} className="rounded border border-white/10 bg-white/[0.03] p-2">
                   <label className="flex items-center justify-between gap-2 text-xs font-medium">
                     <span className="truncate">{NARRATOR_SOURCE_LABELS[sourceKind]}</span>
-                    <input
+                    <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.input"
                       type="checkbox"
                       checked={policy.enabled}
                       onChange={(event) => setSourcePolicy(sourceKind, { enabled: event.target.checked })}
                       aria-label={`${NARRATOR_SOURCE_LABELS[sourceKind]} enabled`}
                     />
                   </label>
-                  <select
+                  <select data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.select"
                     value={policy.deliveryMode}
                     onChange={(event) => setSourcePolicy(sourceKind, { deliveryMode: event.target.value as NarratorDeliveryMode })}
                     className="mt-2 w-full rounded border border-white/10 bg-zinc-900 px-2 py-1 text-xs text-zinc-100"
@@ -404,7 +404,7 @@ export default function NarratorPanel() {
                       </div>
                     ) : null}
                     <div className="mt-2 flex items-center gap-1">
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.void-speak-event-event"
                         type="button"
                         disabled={!canSpeak || speakingEventId === event.eventId}
                         onClick={() => void speakEvent(event)}
@@ -414,7 +414,7 @@ export default function NarratorPanel() {
                       >
                         {speakingEventId === event.eventId ? <Pause className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
                       </button>
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.narrator.narrator-panel.void-copy-narrator-event-text-event-text"
                         type="button"
                         onClick={() => void copyNarratorEventText(event.text)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded border border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"

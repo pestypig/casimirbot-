@@ -19,6 +19,7 @@ namespace ledger = primary_c08_convolution_ledger_v1;
 inline constexpr slong kPrecisionBits = 512;
 inline constexpr std::size_t kJetCount = 13U;
 inline constexpr std::size_t kScalarStateCount = 4U;
+inline constexpr std::size_t kSelectorThreadCount = 16U;
 
 enum class FailureDetail : std::uint8_t {
     none = 0,
@@ -47,6 +48,7 @@ struct Result {
     std::size_t h2_models_after = 0U;
     std::size_t models_appended = 0U;
     std::size_t selector_calls = 0U;
+    std::size_t selector_thread_count = 0U;
     std::size_t selector_u_panels_total = 0U;
     std::size_t selector_refinement_candidates_visited = 0U;
     std::size_t selector_subpanels_accumulated = 0U;

@@ -683,7 +683,7 @@ export default function AccountSessionPanel() {
               {t("account.header.description")}
             </p>
           </div>
-          <button
+          <button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.refresh"
             type="button"
             onClick={refresh}
             aria-busy={refreshing}
@@ -697,7 +697,7 @@ export default function AccountSessionPanel() {
         <label className="mt-3 flex min-w-0 items-center gap-2 rounded border border-white/10 bg-slate-900/70 px-2 py-1.5 text-xs text-slate-300">
           <Languages className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
           <span className="shrink-0 whitespace-nowrap">{interfaceText.t("account.language.interfaceLabel")}</span>
-          <select
+          <select data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.select"
             value={interfaceLanguage.code}
             onChange={(event) => {
               const nextLanguage = getInterfaceLanguageOption(event.target.value).code;
@@ -745,7 +745,7 @@ export default function AccountSessionPanel() {
                       {session.profile.email_verified_at ? t("account.profile.emailVerified") : t("account.profile.emailNotVerified")}
                     </div>
                     {!session.profile.email_verified_at ? (
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.request-email-verification"
                         type="button"
                         onClick={requestEmailVerification}
                         disabled={loading}
@@ -779,7 +779,7 @@ export default function AccountSessionPanel() {
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">{t("account.session.agentPasswordsOff")}</span>
                 </div>
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.sign-out"
                   type="button"
                   onClick={signOut}
                   className="mt-2 inline-flex items-center gap-2 rounded border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-100 hover:bg-rose-500/20"
@@ -796,14 +796,14 @@ export default function AccountSessionPanel() {
                     {t("account.profile.saveToProfile")}
                   </div>
                   <div className="mb-3 grid grid-cols-2 gap-1 rounded border border-white/10 bg-slate-950/60 p-1 text-xs">
-                    <button
+                    <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.set-account-mode-sign-in"
                       type="button"
                       onClick={() => setAccountMode("sign-in")}
                       className={`rounded px-2 py-1 ${accountMode === "sign-in" ? "bg-cyan-500/20 text-cyan-100" : "text-slate-300 hover:bg-white/10"}`}
                     >
                       {t("account.signIn.submit")}
                     </button>
-                    <button
+                    <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.set-account-mode-sign-up"
                       type="button"
                       onClick={() => setAccountMode("sign-up")}
                       className={`rounded px-2 py-1 ${accountMode === "sign-up" ? "bg-cyan-500/20 text-cyan-100" : "text-slate-300 hover:bg-white/10"}`}
@@ -814,7 +814,7 @@ export default function AccountSessionPanel() {
                   <div className="space-y-2">
                     <label className="block text-xs text-slate-300">
                       {t("account.profile.email")}
-                      <input
+                      <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.input"
                         type="email"
                         value={accountEmail}
                         onChange={(event) => setAccountEmail(event.target.value)}
@@ -825,7 +825,7 @@ export default function AccountSessionPanel() {
                     {accountMode === "sign-up" ? (
                       <label className="block text-xs text-slate-300">
                         {t("account.profile.displayName")}
-                        <input
+                        <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.input.2"
                           value={accountDisplayName}
                           onChange={(event) => setAccountDisplayName(event.target.value)}
                           autoComplete="name"
@@ -835,7 +835,7 @@ export default function AccountSessionPanel() {
                     ) : null}
                     <label className="block text-xs text-slate-300">
                       {t("account.signIn.password")}
-                      <input
+                      <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.input.3"
                         type="password"
                         value={accountPassword}
                         onChange={(event) => setAccountPassword(event.target.value)}
@@ -843,7 +843,7 @@ export default function AccountSessionPanel() {
                         className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
                       />
                     </label>
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.submit-password-account"
                       type="button"
                       onClick={submitPasswordAccount}
                       disabled={!accountEmail.trim() || !accountPassword || loading}
@@ -855,7 +855,7 @@ export default function AccountSessionPanel() {
                     {showPasswordResetHint && accountMode === "sign-in" ? (
                       <div className="rounded border border-amber-300/30 bg-amber-400/10 p-2 text-xs text-amber-100">
                         <div className="font-medium">{t("account.signIn.trouble")}</div>
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.request-password-reset"
                           type="button"
                           onClick={requestPasswordReset}
                           disabled={!accountEmail.trim() || loading}
@@ -877,14 +877,14 @@ export default function AccountSessionPanel() {
                       </div>
                       <label className="block text-xs text-slate-300">
                         {t("account.profile.token")}
-                        <input
+                        <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.input.4"
                           value={resetToken}
                           onChange={(event) => setResetToken(event.target.value)}
                           className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
                         />
                       </label>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.request-password-reset.2"
                           type="button"
                           onClick={requestPasswordReset}
                           disabled={!accountEmail.trim() || loading}
@@ -892,7 +892,7 @@ export default function AccountSessionPanel() {
                         >
                           {t("account.profile.requestReset")}
                         </button>
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.confirm-password-reset"
                           type="button"
                           onClick={confirmPasswordReset}
                           disabled={!resetToken.trim() || !accountPassword || loading}
@@ -900,7 +900,7 @@ export default function AccountSessionPanel() {
                         >
                           {t("account.profile.resetPassword")}
                         </button>
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.confirm-email-verification"
                           type="button"
                           onClick={confirmEmailVerification}
                           disabled={!resetToken.trim() || loading}
@@ -989,7 +989,7 @@ export default function AccountSessionPanel() {
               {t("account.memory.title")}
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.export-profile-storage"
                 type="button"
                 onClick={exportProfileStorage}
                 disabled={!session || loading}
@@ -997,7 +997,7 @@ export default function AccountSessionPanel() {
               >
                 {t("account.memory.export")}
               </button>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.delete-profile-storage"
                 type="button"
                 onClick={deleteProfileStorage}
                 disabled={!session || loading}
@@ -1005,7 +1005,7 @@ export default function AccountSessionPanel() {
               >
                 {t("account.memory.deleteSaves")}
               </button>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.delete-profile"
                 type="button"
                 onClick={deleteProfile}
                 disabled={!session || loading}
@@ -1056,7 +1056,7 @@ export default function AccountSessionPanel() {
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.attach-this-browser"
                   type="button"
                   onClick={attachThisBrowser}
                   disabled={profileAttachConsentGranted || loading}
@@ -1064,7 +1064,7 @@ export default function AccountSessionPanel() {
                 >
                   {t("account.memory.attachThisBrowser")}
                 </button>
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.detach-this-browser"
                   type="button"
                   onClick={detachThisBrowser}
                   disabled={!profileAttachConsentGranted || loading}
@@ -1162,7 +1162,7 @@ export default function AccountSessionPanel() {
                         ? t("account.postulateReceipts.credits", { credits: receipt.rewardTokens.toLocaleString() })
                         : t("account.postulateReceipts.receiptOnly")}
                     </span>
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.void-claim-postulate-credit-receipt"
                       type="button"
                       onClick={() => void claimPostulateCredit(receipt)}
                       disabled={!session || claimed || loading || claimingPostulateId === receipt.proposalId}
@@ -1338,14 +1338,14 @@ export default function AccountSessionPanel() {
             {t("account.ingress.description")}
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
-            <input
+            <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.input.5"
               value={ingressLabel}
               onChange={(event) => setIngressLabel(event.target.value)}
               disabled={!session}
               className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-50"
               placeholder={t("account.ingress.defaultLabel")}
             />
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.create-ingress-token"
               type="button"
               onClick={createIngressToken}
               disabled={!session || loading}
@@ -1390,7 +1390,7 @@ export default function AccountSessionPanel() {
                   <div className="text-slate-300">
                     {t("account.ingress.requestsValue", { count: token.request_count })}
                   </div>
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.revoke-ingress-token-token-token-id"
                     type="button"
                     onClick={() => revokeIngressToken(token.token_id)}
                     disabled={token.status !== "active" || loading}
@@ -1421,7 +1421,7 @@ export default function AccountSessionPanel() {
                   a temporary Xbox-style guest name and session instead.
                 </p>
               </div>
-              <button
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.account-session.account-session-panel.shared-live-rooms"
                 type="button"
                 role="switch"
                 aria-checked={sharedRoomsEnabled}

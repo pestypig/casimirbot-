@@ -76,10 +76,22 @@ The exact current pointer is:
 S5-A / A4
   -> preserve the completed 23-binding Borel definition audit
   -> preserve the exact-byte independent acknowledgement decision (A3 complete)
-  -> implement and fixture-audit the C08 producer (A4 active)
+  -> preserve both stopped serial H2 executions as immutable partial evidence
+  -> preserve the H2-P1 exact-equivalence profile PASS
+  -> preserve the H2-P2 prepared-moment exact-equivalence/performance PASS
+  -> preserve the local H2-P3 1/2-thread exact-equivalence PASS
+  -> complete H2-P3/P4 exact 4/8/16-thread replay and scaling only after a bounded cloud authorization
+  -> finish and independently audit H2/P2
+  -> implement and fixture-audit the remaining C08 producer (A4 active)
   -> wire C08 as complete-unexecuted (A5)
   -> advance to S5-B
 ```
+
+The nested H2 sequence is defined in the
+[`H2 performance-successor handoff`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-performance-successor-handoff.md).
+It does not add an active stage: S5-A/A4 remains the sole active row, and the
+successor is eligible only as a candidate-neutral implementation correction for
+the runtime blocker inside that row.
 
 Progress is counted only by closed exit conditions:
 
@@ -153,8 +165,35 @@ exists.
 | A4 | Implement the flat-remainder producer and all C08 `Y`, `Z1`, `Z2` contributions | **active**; C08-001 through C08-009 remain independently audited; the generic C08-010 kernel passes 23/23 fixtures plus an 87/87 audit; C08-011a passes 26/26 plus 81/81; C08-011b passes 23/23 plus 92/92; partial C08-011c1 passes 25/25 plus 86/86; C08-011c2 passes 17/17 plus 57/57; C08-011c3 passes 13/13 plus 48/48; C08-011c4 stable scalar ledger extension passes 17/17 plus 51/51 while explicitly retaining C08-010 false; exact internal `kappa`, `mu`, `beta+1` analytic jets pass 10/10 plus a 37/37 audit, the analytic degree-one model product passes 9/9 plus a 38/38 audit, paired `P/Pprime` persistence passes 14/14 plus a 52/52 recursive audit, per-panel analytic `F/E1/E2` models pass 11/11 plus a 43/43 audit, persistent factor ledgers pass 13/13 plus a 45/45 recursive audit, exact per-panel `Fprime/E1prime/E2prime` models pass 11/11 plus a 36/36 recursive audit, and their persistent ledgers pass 15/15 plus a 45/45 recursive audit. H2 fixture evaluation is active. The P2 adapter passes an 11/11 exact manufactured fixture but is provisional until its H2 parent and independent audit pass; derivative-convolution ledgers are absent, so C08-011c and C08-011d through C08-015 and C08-021 remain incomplete/absent | candidate-neutral manufactured, corruption and resource-bound fixtures PASS for the complete C08 producer | finish and audit H2/P2, then realize derivative-convolution ledgers without selected-member evaluation |
 | A5 | Wire and close the C08 scientific handler | pending | dispatch matrix marks C08 `complete_unexecuted`; receipt and chronology audits PASS | return to the first missing field, rejection path or producer proof |
 
+The A4 timing handoff records 82.373 seconds for seven calibration subpanels,
+about 11.7676 seconds per subpanel, and a structural projection of about 17.85
+serial days per selector. Both serial executions remain evidence and are not
+targets of the successor work. H2-P1 profiling and H2-P2 prepared-moment reuse
+are complete. H2-P2 is exact-equivalent at order 128 and measures 10.21x
+same-process speedup, but its serial projection remains about 4.27 days per
+selector. H2-P3 now closes exact equivalence across 1/2/4/8/16 threads,
+including the required repeated 16-thread semantics. H2-P4 independently audits
+40/40 and measures 3.354--3.381 seconds for seven subpanels at 4/8/16 threads.
+H2-P5 audit 19/19 proves that exponent-2 exposes at most four independent
+outer-subpanel tasks, so the plateau cannot bind large-workload scaling. Both
+serial executions are now stopped with available partial evidence preserved.
+H2-P5A-R2 now supplies the missing representative-width evidence. The exact
+1/4/8/16/16 `P=1024` sequence completed once with semantic agreement and empty
+stderr; the slower 16-thread measurement is 157,550 ms. Its frozen
+two-selector projection is 22.406940158 hours, below the 24-hour boundary, and
+independent result audit passes 50/50. The immediate resume point is the
+candidate-neutral H2 parent closure and remaining derivative-convolution
+ledgers. H2-P6 now binds the exact-equivalent 16-thread selector into H2/P2 and
+passes an 11/11 manufactured fixture plus 33/33 independent audit. No long
+parent selector ran. The next eligible boundary is a separately frozen
+candidate-neutral parent-execution proposal. H2-P7 now freezes that proposal
+at `3f15f387...fdc3` under producer 12/12 and independent 27/27 audits, with
+zero cloud or numerical action. The immediate boundary is a separate exact
+authorization decision. No selected-member evaluation or scientific
+authorization is eligible.
+
 C08-011b current-head verification is math `323/323`, WARP `179/179`, and
-Casimir run `2512` `PASS/GREEN` with certificate integrity true. The dispatch
+Casimir run `2541` `PASS/GREEN` with certificate integrity true. The dispatch
 matrix remains correctly unchanged at `0/19` complete because component source
 closure is not scientific-handler linkage.
 

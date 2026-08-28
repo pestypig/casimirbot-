@@ -19,7 +19,7 @@ export default function WorkstationClipboardHistoryPanel() {
           <ClipboardList className="h-4 w-4" />
           Clipboard History
         </div>
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-clipboard-history.workstation-clipboard-history-panel.clear"
           type="button"
           onClick={clearReceipts}
           className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-xs text-rose-200 hover:bg-rose-500/20"

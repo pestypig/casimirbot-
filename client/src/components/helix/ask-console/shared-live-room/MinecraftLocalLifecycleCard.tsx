@@ -70,7 +70,7 @@ export function MinecraftLocalLifecycleCard() {
             The browser and desktop app call the same loopback-only Fabric lifecycle adapter.
           </p>
         </div>
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.minecraft-local-lifecycle-card.void-launch-and-join"
           type="button"
           disabled={busy}
           onClick={() => void launchAndJoin()}

@@ -40,7 +40,7 @@ export function SharedLiveRoomVisualLanes({
         </span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-visual-lanes.start-selected-screen-camera-capture"
           type="button"
           disabled={
             !visualRouteAuthorized ||

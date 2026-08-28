@@ -76,6 +76,10 @@ import { createConcurrencyGuard } from "./middleware/concurrency-guard";
 import { startStagePlayLiveSourceMailWakeService } from "./services/stage-play/stage-play-live-source-mail-wake-service";
 import { startLiveTradingSupervisor } from
   "./services/trading/live-trading-supervisor";
+import { startBrokerageReactiveControllerScheduler } from
+  "./services/trading/brokerage-reactive-controller-store";
+import { startBrokerageReactiveLiveShadowScheduler } from
+  "./services/trading/brokerage-reactive-live-shadow-store";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -217,6 +221,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { discordLinkRouter } = await import("./routes/discord-link");
   app.use(discordLinkRouter);
   const { accountSessionRouter } = await import("./routes/account-session");
+  const { createInstalledAccountServicesRouter } = await import(
+    "./routes/installed-account-services"
+  );
+  const { createDesktopAuth0StepUpRouter } = await import(
+    "./routes/desktop-auth0-step-up"
+  );
   const { desktopReleaseRouter } = await import("./routes/desktop-release");
   const { docsPrintPdfRouter } = await import("./routes/docs-print-pdf");
   const { docsTranslationRouter } = await import("./routes/docs-translation");
@@ -230,6 +240,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/auth", googleAuthRouter);
   app.use("/api/auth", auth0WebAuthRouter);
   app.use("/api/account", accountSessionRouter);
+  app.use("/api/account", createInstalledAccountServicesRouter());
+  app.use("/api/account", createDesktopAuth0StepUpRouter());
   app.use("/api", desktopReleaseRouter);
   app.use("/api/docs", docsPrintPdfRouter);
   app.use("/api/docs", docsTranslationRouter);
@@ -1323,6 +1335,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix", constraintPacksRouter);
   startStagePlayLiveSourceMailWakeService();
   startLiveTradingSupervisor();
+  startBrokerageReactiveControllerScheduler();
+  startBrokerageReactiveLiveShadowScheduler();
 
   app.get("/api/qisnap/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");

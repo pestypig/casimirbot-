@@ -80,12 +80,41 @@ struct Result {
     bool authority_promoted = false;
 };
 
+// Additive H2-P2 cache. The stored values are produced by the unchanged v1
+// endpoint-power and finite-binomial moment loops. They are immutable after a
+// successful prepare_moments call and are bound to one exact subpanel.
+struct PreparedMoments {
+    arb_t u_left;
+    arb_t u_right;
+    std::vector<arb_struct> values;
+    unsigned maximum_f_order = 0U;
+    unsigned maximum_g_order = 0U;
+    bool ready = false;
+
+    PreparedMoments();
+    ~PreparedMoments();
+    PreparedMoments(const PreparedMoments &) = delete;
+    PreparedMoments &operator=(const PreparedMoments &) = delete;
+
+    arb_srcptr moment(unsigned a, unsigned b) const;
+};
+
+bool prepare_moments(arb_srcptr u_left, arb_srcptr u_right,
+                     unsigned maximum_f_order, unsigned maximum_g_order,
+                     PreparedMoments *prepared);
+
 // Candidate-neutral C08-010b kernel. It composes and hulls every model selected
 // by C08-010a, eliminates the exact factorized bivariate monomials by directed
 // dyadic beta moments, multiplies by the full t Jacobian, adds F(t)*G(0), and
 // moves every centered-xi degree above rC to a positive magnitude bound. Input
 // model remainders and 13-jet product assembly remain C08-010c duties.
 bool evaluate(const Input &input, Output *output, Result *result);
+
+// H2-P2 successor entrypoint. All non-moment operations and logical counters
+// remain those of evaluate(); prepared values merely replace identical repeated
+// beta_moment constructions.
+bool evaluate_prepared(const Input &input, const PreparedMoments &prepared,
+                       Output *output, Result *result);
 
 const char *failure_detail_name(FailureDetail detail);
 

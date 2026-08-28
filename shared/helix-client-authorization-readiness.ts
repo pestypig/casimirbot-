@@ -6,6 +6,8 @@ import {
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
 } from "./helix-environment-action";
+import { HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE } from
+  "./trading/brokerage-market-observer";
 
 export const HELIX_CLIENT_AUTHORIZATION_READINESS_SCHEMA =
   "helix.client_authorization_readiness.v1" as const;
@@ -32,6 +34,7 @@ const G2_ACTION_SCOPES = [
 const G8_MONITOR_SCOPES = [
   ...G2_ACTION_SCOPES,
   HELIX_AGENT_RUN_WRITE_SCOPE,
+  HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
 ] as const;
 
 export const requiredHelixClientAuthorizationScopes = (

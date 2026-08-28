@@ -18,6 +18,10 @@ import {
   readProfileStorageSnapshot,
   writeProfileStorageSnapshot,
 } from "../services/helix-account/profile-storage-store";
+import { InstalledSecurityStore } from
+  "../services/helix-account/installed-security-store";
+import { BillingEntitlementStore } from
+  "../services/helix-account/billing-entitlement-store";
 
 describe("local pg-mem persistence", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "casimirbot-local-db-"));
@@ -95,6 +99,123 @@ describe("local pg-mem persistence", () => {
     expect(restored.entries).toHaveLength(1);
     expect(JSON.parse(restored.entries[0]?.value ?? "{}")).toMatchObject({ title: "Restart proof" });
     expect(restored.artifacts[0]?.sync_status).toBe("profile_synced");
+  });
+
+  it("retains installed-device revoke and recovery state across EXE restarts", async () => {
+    const signUp = await signUpPasswordAccountSession({
+      email: "installed-security-persistence@example.com",
+      password: "CorrectHorseInstalledSecurity123!",
+      display_name: "Installed Security Persistence Owner",
+    });
+    expect(signUp.ok).toBe(true);
+    const session = {
+      sessionId: signUp.session!.session_id,
+      profileId: signUp.session!.profile.profile_id,
+    };
+    const deviceId = "desktop_device_restart_persistence";
+    let store = new InstalledSecurityStore();
+
+    await store.registerDevice({ session, deviceId });
+    await store.revokeDevice({ session, deviceId });
+    await flushLocalDatabaseSnapshotIfEnabled();
+    await resetDbClient();
+
+    store = new InstalledSecurityStore();
+    let status = await store.status({
+      session,
+      deviceId,
+      auth0Configured: true,
+      maximumAgeSeconds: 300,
+    });
+    expect(status.current_device).toMatchObject({
+      status: "revoked",
+      recovery_generation: 0,
+    });
+    expect(status.recent_events.map((event) => event.event_type)).toEqual([
+      "installed_device_revoked",
+      "installed_device_registered",
+    ]);
+
+    await store.recoverDevice({ session, deviceId });
+    await flushLocalDatabaseSnapshotIfEnabled();
+    await resetDbClient();
+
+    store = new InstalledSecurityStore();
+    status = await store.status({
+      session,
+      deviceId,
+      auth0Configured: true,
+      maximumAgeSeconds: 300,
+    });
+    expect(status.current_device).toMatchObject({
+      status: "active",
+      recovery_generation: 1,
+    });
+    expect(status.recent_events.map((event) => event.event_type)).toEqual([
+      "installed_device_recovered",
+      "installed_device_revoked",
+      "installed_device_registered",
+    ]);
+  });
+
+  it("retains Stripe sandbox entitlement, idempotency, and credit across EXE restarts", async () => {
+    const signUp = await signUpPasswordAccountSession({
+      email: "billing-persistence@example.com",
+      password: "CorrectHorseBillingPersistence123!",
+      display_name: "Billing Persistence Owner",
+    });
+    expect(signUp.ok).toBe(true);
+    const profileId = signUp.session!.profile.profile_id;
+    let billing = new BillingEntitlementStore({ sandboxConfigured: () => true });
+    const accepted = await billing.applyStripeEvent({
+      event_id: "evt_restart_plan_1",
+      event_type: "checkout.session.completed",
+      object_id: "cs_restart_plan_1",
+      created_at: "2026-08-28T12:00:00.000Z",
+      profile_id: profileId,
+      action: "plan_activated",
+      plan_id: "starter_monthly",
+      amount_minor: 1200,
+      currency: "usd",
+      status: "active",
+      period_starts_at: "2026-08-28T12:00:00.000Z",
+      period_ends_at: "2026-09-28T12:00:00.000Z",
+      customer_id: "cus_restart1",
+      subscription_id: "sub_restart1",
+      reference_object_id: null,
+      payload_sha256: "b".repeat(64),
+    });
+    expect(accepted.outcome).toBe("processed");
+    await flushLocalDatabaseSnapshotIfEnabled();
+    await resetDbClient();
+
+    billing = new BillingEntitlementStore({ sandboxConfigured: () => true });
+    const restored = await billing.status(profileId);
+    expect(restored).toMatchObject({
+      status: "active",
+      plan_id: "starter_monthly",
+      balance: { included_credit_minor: 1200, available_credit_minor: 1200 },
+    });
+    const replay = await billing.applyStripeEvent({
+      event_id: "evt_restart_plan_1",
+      event_type: "checkout.session.completed",
+      object_id: "cs_restart_plan_1",
+      created_at: "2026-08-28T12:00:00.000Z",
+      profile_id: profileId,
+      action: "plan_activated",
+      plan_id: "starter_monthly",
+      amount_minor: 1200,
+      currency: "usd",
+      status: "active",
+      period_starts_at: "2026-08-28T12:00:00.000Z",
+      period_ends_at: "2026-09-28T12:00:00.000Z",
+      customer_id: "cus_restart1",
+      subscription_id: "sub_restart1",
+      reference_object_id: null,
+      payload_sha256: "b".repeat(64),
+    });
+    expect(replay.outcome).toBe("duplicate");
+    expect((await billing.status(profileId)).balance.available_credit_minor).toBe(1200);
   });
 
   it("defers and coalesces local snapshots until an explicit flush", async () => {

@@ -27,6 +27,8 @@ import { EnvironmentActionAuthorityError } from
   "../../services/environment-connectors/actions/authority-store";
 import { ConnectorBootstrapPairingError } from
   "../../services/environment-connectors/pairing/bootstrap-service";
+import { EnvironmentCommandAuthorityError } from
+  "../../services/environment-connectors/commands";
 
 const ROOM_ID = "shared_realtime_room:g6-mcp";
 const PARTICIPANT_ID = "participant:g6-mcp";
@@ -99,7 +101,9 @@ const projection = {
 
 const connect = async (input?: {
   authorityError?: EnvironmentActionAuthorityError;
+  commandAuthorityError?: EnvironmentCommandAuthorityError;
   playerPairingError?: ConnectorBootstrapPairingError;
+  sourcePairingError?: ConnectorBootstrapPairingError;
 }) => {
   const roleStore = {
     recordOutput: vi.fn(async () => projection),
@@ -156,6 +160,55 @@ const connect = async (input?: {
       status: "player_pairing_inbox_staged" as const,
     };
   });
+  const commandAuthorityConfigurator = vi.fn(async () => {
+    if (input?.commandAuthorityError) throw input.commandAuthorityError;
+    return {
+      authority: {
+        schema: "helix.environment_command.authority.v1" as const,
+        command_authority_id: "command_authority:g6-mcp",
+        environment_binding_id: "environment_binding:g6-mcp",
+        room_source_binding_id: "room_source_binding:g6-mcp",
+        room_id: ROOM_ID,
+        source_id: "source:g6-mcp",
+        world_id: "minecraft:g6-mcp",
+        adapter_profile_id: "game.minecraft.fabric.v1",
+        authority_profile: "world_operator" as const,
+        autonomy_mode: "approved_categories" as const,
+        approved_categories: ["player_state", "player_inventory"] as const,
+        status: "active" as const,
+        policy_version: 3,
+        issued_at: "2026-08-23T12:00:00.000Z",
+        expires_at: "2026-08-23T13:00:00.000Z",
+        revoked_at: null,
+        credential_included: false as const,
+        content_role: "environment_command_authority_not_assistant_answer" as const,
+        answer_authority: false as const,
+        assistant_answer: false as const,
+        terminal_eligible: false as const,
+        raw_content_included: false as const,
+      },
+      ownerGrant: {
+        schema: "helix.environment_command.member_grant.v1" as const,
+        command_grant_id: "command_grant:g6-mcp",
+        command_authority_id: "command_authority:g6-mcp",
+        room_id: ROOM_ID,
+        participant_id: PARTICIPANT_ID,
+        environment_binding_id: "environment_binding:g6-mcp",
+        subject_binding_id: "environment_subject_binding:g6-mcp",
+        max_authority_profile: "world_operator" as const,
+        autonomy_override: "approved_categories" as const,
+        status: "active" as const,
+        issued_at: "2026-08-23T12:00:00.000Z",
+        expires_at: "2026-08-23T13:00:00.000Z",
+        revoked_at: null,
+        content_role: "environment_command_member_grant_not_assistant_answer" as const,
+        answer_authority: false as const,
+        assistant_answer: false as const,
+        terminal_eligible: false as const,
+        raw_content_included: false as const,
+      },
+    };
+  });
   const serverPairLocalHandoff = vi.fn(async () => ({
     pairing: {
       schema: "helix.connector_pairing.v1",
@@ -164,6 +217,17 @@ const connect = async (input?: {
     },
     status: "server_pairing_inbox_staged" as const,
   }));
+  const sourcePairLocalHandoff = vi.fn(async () => {
+    if (input?.sourcePairingError) throw input.sourcePairingError;
+    return {
+      pairing: {
+        schema: "helix.connector_pairing.v1",
+        pairing_id: "connector_pairing:source-g6-mcp",
+        status: "pending",
+      },
+      status: "server_pairing_inbox_staged" as const,
+    };
+  });
   const server = createHelixMcpServer({
     principal: principal(),
     service: {} as HelixAgentApiService,
@@ -183,7 +247,9 @@ const connect = async (input?: {
     environmentReasoningRoleService: roleStore,
     environmentActionAuthorityInspector: authorityInspector,
     environmentActionAuthorityConfigurator: authorityConfigurator,
+    environmentCommandAuthorityConfigurator: commandAuthorityConfigurator,
     environmentPlayerPairLocalHandoff: playerPairLocalHandoff,
+    environmentSourcePairLocalHandoff: sourcePairLocalHandoff,
     environmentServerPairLocalHandoff: serverPairLocalHandoff,
   });
   const client = new Client(
@@ -198,7 +264,9 @@ const connect = async (input?: {
     roleStore,
     authorityInspector,
     authorityConfigurator,
+    commandAuthorityConfigurator,
     playerPairLocalHandoff,
+    sourcePairLocalHandoff,
     serverPairLocalHandoff,
     close: async () => {
       await client.close();
@@ -286,6 +354,44 @@ describe("Helix MCP G6 environment reasoning roles", () => {
     }
   });
 
+  it("preserves the owner-only World Authority boundary as a typed MCP error", async () => {
+    const connection = await connect({
+      commandAuthorityError: new EnvironmentCommandAuthorityError(
+        "command_authority_forbidden",
+        403,
+        "Only the environment owner may configure command authority.",
+      ),
+    });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_environment_command_authority_configure",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: "environment_binding:g6-mcp",
+          settings: {
+            authority_profile: "world_operator",
+            autonomy_mode: "approved_categories",
+            approved_categories: ["player_inventory"],
+            expires_at: "2026-08-23T13:00:00.000Z",
+          },
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        schema: "helix.environment_command_authority_error.v1",
+        error: "command_authority_forbidden",
+        retryable: false,
+        credential_included: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(JSON.stringify(result)).not.toContain("internal_error");
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("rejects a prospective action alias before it enters the canonical ledger", async () => {
     const connection = await connect();
     try {
@@ -341,7 +447,9 @@ describe("Helix MCP G6 environment reasoning roles", () => {
         "helix_environment_reasoning_role_arbitrate",
         "helix_environment_action_authority_inspect",
         "helix_environment_action_authority_configure",
+        "helix_environment_command_authority_configure",
         "helix_environment_player_pair_local",
+        "helix_environment_source_pair_local",
         "helix_environment_server_pair_local",
       ]));
 
@@ -401,6 +509,43 @@ describe("Helix MCP G6 environment reasoning roles", () => {
         }),
       );
 
+      const commandAuthority = await connection.client.callTool({
+        name: "helix_environment_command_authority_configure",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: "environment_binding:g6-mcp",
+          settings: {
+            authority_profile: "world_operator",
+            autonomy_mode: "approved_categories",
+            approved_categories: ["player_state", "player_inventory"],
+            expires_at: "2026-08-23T13:00:00.000Z",
+          },
+        },
+      });
+      expect(commandAuthority.isError, JSON.stringify(commandAuthority)).not.toBe(true);
+      expect(commandAuthority.structuredContent).toMatchObject({
+        operation: "environment.command_authority.configure",
+        authority: {
+          command_authority_id: "command_authority:g6-mcp",
+          authority_profile: "world_operator",
+        },
+        member_grant: {
+          participant_id: PARTICIPANT_ID,
+          max_authority_profile: "world_operator",
+        },
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(connection.commandAuthorityConfigurator).toHaveBeenCalledWith({
+        roomId: ROOM_ID,
+        ownerProfileId: PROFILE_ID,
+        environmentBindingId: "environment_binding:g6-mcp",
+        authorityProfile: "world_operator",
+        autonomyMode: "approved_categories",
+        approvedCategories: ["player_state", "player_inventory"],
+        expiresAt: "2026-08-23T13:00:00.000Z",
+      });
+
       const paired = await connection.client.callTool({
         name: "helix_environment_player_pair_local",
         arguments: {
@@ -428,6 +573,36 @@ describe("Helix MCP G6 environment reasoning roles", () => {
         actionAuthorityId: "environment_action_authority:g6-mcp",
         credentialTtlMs: 3_600_000,
         idempotencyKey: "g6-mcp-local-pairing",
+      });
+
+      const sourcePaired = await connection.client.callTool({
+        name: "helix_environment_source_pair_local",
+        arguments: {
+          room_id: ROOM_ID,
+          binding_id: "room_source_binding:g6-mcp",
+          credential_ttl_ms: 3_600_000,
+          idempotency_key: "g6-mcp-local-source-pairing",
+        },
+      });
+      expect(sourcePaired.isError, JSON.stringify(sourcePaired)).not.toBe(true);
+      expect(sourcePaired.structuredContent).toMatchObject({
+        operation: "environment.source_pair.local_handoff",
+        binding_id: "room_source_binding:g6-mcp",
+        handoff_status: "server_pairing_inbox_staged",
+        credential_included: false,
+        pairing_code_included: false,
+        command_authority_granted: false,
+        player_embodiment_granted: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(JSON.stringify(sourcePaired)).not.toContain("Z4ZD-X2JJ");
+      expect(connection.sourcePairLocalHandoff).toHaveBeenCalledWith({
+        roomId: ROOM_ID,
+        ownerProfileId: PROFILE_ID,
+        bindingId: "room_source_binding:g6-mcp",
+        credentialTtlMs: 3_600_000,
+        idempotencyKey: "g6-mcp-local-source-pairing",
       });
 
       const serverPaired = await connection.client.callTool({

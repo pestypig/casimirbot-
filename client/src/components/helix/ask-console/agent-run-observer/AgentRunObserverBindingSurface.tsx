@@ -526,7 +526,7 @@ export function AgentRunObserverBindingSurface({
       </p>
       {activeChatSession ? (
         <label className="mt-3 flex items-start gap-2 text-xs text-slate-300">
-          <input
+          <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.agent-run-observer-binding-surface.input"
             checked={includeContext}
             className="mt-0.5"
             onChange={(event) => setIncludeContext(event.target.checked)}
@@ -546,7 +546,7 @@ export function AgentRunObserverBindingSurface({
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.agent-run-observer-binding-surface.if-active-chat-session-id-void-authorize-chat-active-chat-session-id-inc"
           className="rounded border border-cyan-700 px-2 py-1 text-xs text-cyan-100 disabled:opacity-40"
           disabled={!activeChatSessionId || creating}
           onClick={() => {
@@ -558,7 +558,7 @@ export function AgentRunObserverBindingSurface({
         >
           {creating ? "Authorizing…" : "Authorize selected chat"}
         </button>
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.agent-run-observer-binding-surface.create-dedicated-room-chat"
           className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 disabled:opacity-40"
           disabled={creating}
           onClick={authorizeDedicatedChat}

@@ -36,7 +36,7 @@ export function HelixAskDebugDrawer({
           >
             Download JSON
           </a>
-          <button
+          <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-debug-drawer.close"
             type="button"
             onClick={onClose}
             className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-300"
@@ -45,7 +45,7 @@ export function HelixAskDebugDrawer({
           </button>
         </div>
       </div>
-      <textarea
+      <textarea data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-debug-drawer.helix-debug-export-json"
         readOnly
         value={payload}
         className="mt-3 h-48 w-full resize-y rounded border border-slate-700 bg-black/40 p-2 font-mono text-[10px] leading-4 text-cyan-50"

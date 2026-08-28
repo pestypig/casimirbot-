@@ -527,7 +527,7 @@ export default function MobileStartPage() {
             className="sticky top-0 z-20 flex items-center justify-between border-b border-primary/25 bg-background/85 px-4 pb-3 backdrop-blur sm:px-5 sm:pb-4"
             style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
           >
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.if-press-triggered-current-go-home"
               className={`inline-flex ${navButtonClass}`}
               onPointerDown={startLongPress}
               onPointerUp={endLongPress}
@@ -544,7 +544,7 @@ export default function MobileStartPage() {
             </button>
             <div className="flex items-center gap-2">
               {mobileWorkstationEnabled ? (
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.set-show-switcher-true"
                   type="button"
                   className={`inline-flex ${navButtonClass}`}
                   onClick={() => setShowSwitcher(true)}
@@ -553,7 +553,7 @@ export default function MobileStartPage() {
                   {t("mobileStart.nav.panels")}
                 </button>
               ) : null}
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.open-settings-preferences"
                 type="button"
                 className={`inline-flex ${navButtonClass}`}
                 onClick={() => openSettings("preferences")}
@@ -561,7 +561,7 @@ export default function MobileStartPage() {
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("mobileStart.nav.settings")}</span>
               </button>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.if-mobile-workstation-enabled-toggle-mobile-drawer-return-close-app-view"
                 className={`inline-flex ${navPrimaryButtonClass}`}
                 onClick={() => {
                   if (mobileWorkstationEnabled) {
@@ -602,7 +602,7 @@ export default function MobileStartPage() {
                     {pinnedPanels.map((panel) => {
                       const Icon = panel.icon ?? PanelsTopLeft;
                       return (
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.handle-tile-press-panel-id"
                           key={panel.id}
                           className={`${tileButtonClass} h-28`}
                           onClick={() => handleTilePress(panel.id)}
@@ -641,7 +641,7 @@ export default function MobileStartPage() {
                         : t("mobileStart.panelPicker.help.fullscreen")}
                     </p>
                   </div>
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.set-location-desktop-desktop-1"
                     className={`hidden md:inline-flex ${navButtonClass}`}
                     onClick={() => setLocation("/desktop?desktop=1")}
                   >
@@ -652,7 +652,7 @@ export default function MobileStartPage() {
                   {gridPanels.map((panel) => {
                     const Icon = panel.icon ?? PanelsTopLeft;
                   return (
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.handle-tile-press-panel-id.2"
                       key={panel.id}
                       className={`${tileButtonClass} h-32`}
                       onClick={() => handleTilePress(panel.id)}
@@ -705,7 +705,7 @@ export default function MobileStartPage() {
                   </div>
                   <div className="mt-3 space-y-3">
                     {recents.map((entry) => (
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.handle-tile-press-entry-panel-id"
                         key={entry.panelId}
                         className={recentButtonClass}
                         onClick={() => handleTilePress(entry.panelId)}
@@ -755,7 +755,7 @@ export default function MobileStartPage() {
           />
         ) : null}
 
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.open-settings-preferences.2"
           type="button"
           className="pointer-events-auto fixed right-5 top-4 z-30 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-primary/45 bg-card/74 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           onClick={() => openSettings("preferences")}
@@ -765,7 +765,7 @@ export default function MobileStartPage() {
         </button>
 
         {!mobileWorkstationEnabled && !appViewerOpen && (
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.open-app-viewer"
             className="pointer-events-auto fixed bottom-6 left-5 z-20 flex min-h-[48px] items-center gap-2 rounded-full border border-primary/45 bg-primary/18 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary shadow-[0_0_26px_hsl(var(--primary)/0.32)] transition hover:bg-primary/26 active:scale-[0.99] active:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={openAppViewer}
             type="button"
@@ -791,7 +791,7 @@ export default function MobileStartPage() {
                   {mobileWorkstationEnabled ? t("mobileStart.nav.panels") : t("mobileStart.switcher.taskSwitcher")}
                 </p>
               </div>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.set-show-switcher-false"
                 className="rounded-full p-1 text-foreground/85 transition hover:bg-primary/18 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 onClick={() => setShowSwitcher(false)}
               >
@@ -805,7 +805,7 @@ export default function MobileStartPage() {
                   <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
                     {t("mobileStart.switcher.launchPanel")}
                   </p>
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.open-settings-preferences-set-show-switcher-false"
                     type="button"
                     className="mb-2 flex w-full min-h-[38px] items-center justify-between rounded-lg border border-sky-300/30 bg-sky-500/10 px-3 py-2 text-left text-xs text-sky-100 transition hover:bg-sky-500/20"
                     onClick={() => {
@@ -821,7 +821,7 @@ export default function MobileStartPage() {
                       const panelAccess = resolveHelixAccountPanelAccess(accountPolicy, String(panel.id));
                       const locked = panelAccess.state === "locked";
                       return (
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.handle-tile-press-panel-id-set-show-switcher-false"
                           key={`launch-${panel.id}`}
                           className="flex w-full min-h-[38px] items-center justify-between rounded-lg border border-primary/25 bg-card/68 px-3 py-2 text-left text-xs text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary"
                           onClick={() => {
@@ -876,7 +876,7 @@ export default function MobileStartPage() {
                         })}
                       </p>
                     </div>
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.activate-entry-panel-id-set-show-switcher-false"
                       className={`min-h-[44px] rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99] ${
                         isActive
                           ? "border border-primary/60 bg-primary/88 text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.32)]"
@@ -889,7 +889,7 @@ export default function MobileStartPage() {
                     >
                       {isActive ? t("mobileStart.switcher.active") : t("mobileStart.switcher.activate")}
                     </button>
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.record-panel-activity-entry-panel-id-close-mobile-close-entry-panel-id"
                       className="min-h-[44px] rounded-full p-2 text-foreground/85 transition hover:bg-primary/18 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       onClick={() => {
                         recordPanelActivity(entry.panelId, "closeMobile");
@@ -905,7 +905,7 @@ export default function MobileStartPage() {
 
             {stack.length > 0 && (
               <div className="mt-5 flex items-center justify-between gap-3">
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.record-panel-activity-mobile-shell-close-all-close-all-go-home-set-show"
                   className="min-h-[44px] rounded-lg border border-primary/35 bg-card/74 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/55 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => {
                     recordPanelActivity("mobile-shell", "close-all");
@@ -916,7 +916,7 @@ export default function MobileStartPage() {
                 >
                   {t("mobileStart.switcher.closeAll")}
                 </button>
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.mobile_launcher.mobile-start.set-show-switcher-false.2"
                   className="min-h-[44px] rounded-lg border border-primary/60 bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition hover:bg-primary active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => setShowSwitcher(false)}
                 >

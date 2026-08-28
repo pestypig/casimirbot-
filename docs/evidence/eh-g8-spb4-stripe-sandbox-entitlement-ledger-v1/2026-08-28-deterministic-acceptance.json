@@ -1,0 +1,68 @@
+{
+  "schema": "casimirbot.spb4_stripe_sandbox_acceptance_evidence.v1",
+  "generated_at": "2026-08-28T05:22:49.795Z",
+  "maturity": "deterministically verified",
+  "live_accepted": false,
+  "environment": "sandbox_fixture",
+  "production_charging_enabled": false,
+  "provider_traffic_enabled": false,
+  "public_mcp_grant_enabled": false,
+  "billable_runtime_authority_enabled": false,
+  "command": "npx vitest run server/routes/__tests__/stripe-sandbox-acceptance.test.ts --pool=forks",
+  "result": {
+    "verdict": "PASS",
+    "test_files_passed": 1,
+    "tests_passed": 1,
+    "duration_seconds": 11.48
+  },
+  "journey": [
+    "signed_plan_checkout_webhook_processed",
+    "exact_plan_webhook_replay_deduplicated",
+    "signed_prepaid_checkout_webhook_processed",
+    "hard_ceiling_excess_rejected_and_rolled_back",
+    "cumulative_partial_refund_200_then_500_settled_as_500_total",
+    "signed_subscription_cancellation_processed",
+    "reference_bound_operator_adjustment_processed_once",
+    "store_restart_preserved_balance_status_and_idempotency",
+    "sanitized_projection_excluded_processor_and_secret_material"
+  ],
+  "settled_projection": {
+    "status": "canceled",
+    "plan_id": "starter_monthly",
+    "included_credit_minor": 1000,
+    "prepaid_credit_minor": 500,
+    "adjustments_minor": -600,
+    "available_credit_minor": 900,
+    "hard_account_ceiling_minor": 2500,
+    "currency": "usd"
+  },
+  "authority_assertions": {
+    "agent_may_purchase": false,
+    "agent_may_refund": false,
+    "agent_may_adjust": false,
+    "agent_may_raise_ceiling": false,
+    "provider_traffic_enabled": false,
+    "billable_lease_enabled": false
+  },
+  "disclosure_assertions": {
+    "stripe_customer_included": false,
+    "stripe_subscription_included": false,
+    "payment_instrument_included": false,
+    "webhook_secret_included": false,
+    "raw_processor_object_included": false
+  },
+  "source_hashes": {
+    "server/routes/__tests__/stripe-sandbox-acceptance.test.ts": "329b06bc0e69aee598e4ab975589e80f113f2995a43c393fa895b0400fe6c274",
+    "server/services/helix-account/billing-entitlement-store.ts": "82ecd2751826e9f0f5fb4ce457d9e0608ab8ec205ba0f6ec955c7cca3886e9db",
+    "server/routes/stripe-sandbox-webhook.ts": "f70d2171f663907e08362ce22af824ad930b526ea1c1e4454122b3930f64e3ff",
+    "shared/helix-billing-entitlement.ts": "4d6c41e756d6f433fedacec5f25504c426e25cf2e8cfce9126c5b6f98cf55185"
+  },
+  "remaining_live_evidence": [
+    "hosted_stripe_test_configuration",
+    "owner_attended_checkout",
+    "owner_attended_billing_portal_cancellation",
+    "owner_attended_partial_refund",
+    "signed_webhook_replay_against_deployed_endpoint",
+    "deployed_restart_persistence"
+  ]
+}

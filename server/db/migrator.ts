@@ -63,6 +63,15 @@ import { migration061 } from "./migrations/061_durable_goal_connector_identity_h
 import { migration062 } from "./migrations/062_environment_reasoning_roles";
 import { migration063 } from "./migrations/063_environment_monitor_leases";
 import { migration064 } from "./migrations/064_room_environment_capability_grants";
+import { migration065 } from "./migrations/065_environment_monitor_provider_neutral_identity";
+import { migration066 } from "./migrations/066_live_attendance_generation";
+import { migration067 } from "./migrations/067_live_acceptance_archives";
+import { migration068 } from "./migrations/068_paper_reactive_partial_fills";
+import { migration069 } from "./migrations/069_brokerage_reactive_controller_runs";
+import { migration070 } from "./migrations/070_installed_security_devices";
+import { migration071 } from "./migrations/071_brokerage_reactive_live_shadow";
+import { migration072 } from "./migrations/072_brokerage_reactive_shadow_acceptance";
+import { migration073 } from "./migrations/073_billing_entitlement_ledger";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -130,6 +139,15 @@ const MIGRATIONS = [
   migration062,
   migration063,
   migration064,
+  migration065,
+  migration066,
+  migration067,
+  migration068,
+  migration069,
+  migration070,
+  migration071,
+  migration072,
+  migration073,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

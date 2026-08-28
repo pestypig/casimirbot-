@@ -151,7 +151,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
             const isActive = panelId === group.activePanelId;
             const panelTitle = getInterfacePanelTitle(t, panelId, panelDef?.title ?? panelId);
             return (
-              <button
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.shell.workstation-panel-tabs.set-active-panel-group-id-panel-id"
                 key={panelId}
                 type="button"
                 onClick={() => setActivePanel(groupId, panelId)}
@@ -162,7 +162,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
                 }`}
               >
                 <span>{panelTitle}</span>
-                <span
+                <span data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.shell.workstation-panel-tabs.x"
                   className="rounded px-1 text-[10px] text-slate-400 hover:bg-white/10"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -178,7 +178,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
       </div>
 
       <div className="relative flex shrink-0 items-center gap-1">
-        <button
+        <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.shell.workstation-panel-tabs.button"
           type="button"
           className={`rounded border px-2 py-1 text-xs text-slate-200 hover:bg-white/10 ${
             plusPulseActive
@@ -203,7 +203,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
                 const publicLaunchPanel = isUserLaunchPanel(String(panel.id));
                 const locked = panelAccess.state === "locked" && !publicLaunchPanel;
                 return (
-                  <button
+                  <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.shell.workstation-panel-tabs.open-panel-in-group-group-id-panel-id-focus-group-group-id-set-picker-op"
                     key={panel.id}
                     type="button"
                     onClick={() => {

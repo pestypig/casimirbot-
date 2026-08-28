@@ -24,7 +24,7 @@ export function HelixAskSurfaceFrame({
   children,
 }: HelixAskSurfaceFrameProps) {
   return (
-    <form
+    <form data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-surface-frame.on-submit"
       className={`w-full ${maxWidthClassName} transition-[max-width] duration-300 ease-out`}
       style={maxWidthStyle}
       onSubmit={onSubmit}

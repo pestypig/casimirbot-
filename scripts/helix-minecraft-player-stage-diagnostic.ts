@@ -73,6 +73,8 @@ const ceilingMsFor = (
       return Math.min(action.max_duration_ms + 5_000, 5 * 60_000);
     case "attack":
       return Math.min(action.max_duration_ms + 5_000, 60_000);
+    case "consume":
+      return Math.min(action.max_duration_ms + 5_000, 60_000);
     case "combat_guard":
       return Math.min(action.max_duration_ms + 5_000, 5 * 60_000);
     case "hotbar_select":

@@ -537,6 +537,41 @@ export const createConnectorBootstrapPairing = async (input: {
     }
   }
 
+  if (input.commandCredentialRequested === true) {
+    const db = await readSharedRealtimeRoomDatabase();
+    const commandAuthority = await db.query<{ command_authority_id: string }>(
+      `
+        SELECT a.command_authority_id
+        FROM helix_environment_command_authorities a
+        JOIN helix_environment_connector_bindings e
+          ON e.environment_binding_id = a.environment_binding_id
+        WHERE a.owner_profile_id = $1
+          AND a.room_id = $2
+          AND a.room_source_binding_id = $3
+          AND a.status = 'active'
+          AND (a.expires_at IS NULL OR a.expires_at > $4)
+          AND e.room_id = $2
+          AND e.room_source_binding_id = $3
+          AND e.status = 'active'
+        ORDER BY a.policy_version DESC
+        LIMIT 1;
+      `,
+      [
+        input.ownerProfileId,
+        input.roomId,
+        binding.binding_id,
+        now.toISOString(),
+      ],
+    );
+    if (!commandAuthority.rows[0]) {
+      throw new ConnectorBootstrapPairingError(
+        "connector_pairing_unavailable",
+        409,
+        "Configure active World Authority for this room environment before pairing server command access.",
+      );
+    }
+  }
+
   const pairingId = `connector_pairing:${crypto.randomUUID()}`;
   const actionConnectorInstallationId = input.actionCredentialRequested === true
     ? `environment_action_connector_installation:${crypto.randomUUID()}`

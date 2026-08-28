@@ -2639,7 +2639,7 @@ export function DocViewerPanel() {
                 <p className="text-sm text-amber-300">{t("docsViewer.error.load")}</p>
                 <p className="text-xs text-slate-400">{error}</p>
                 {currentEntry && (
-                  <Button
+                  <Button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.view-doc-current-entry-route-anchor"
                     variant="outline"
                     size="sm"
                     onClick={() => viewDoc(currentEntry.route, anchor)}
@@ -2649,7 +2649,7 @@ export function DocViewerPanel() {
                 )}
               </div>
             ) : displayEntry ? (
-              <article
+              <article data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.handle-doc-math-click"
                 className="prose prose-invert max-w-none overflow-x-hidden px-6 py-6 [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto"
                 onClick={handleDocMathClick}
                 dangerouslySetInnerHTML={{ __html: activeHtml }}
@@ -2789,7 +2789,7 @@ export function DirectoryRail({
       <div className="border-b border-white/10 p-3">
         <div className="flex items-center gap-2 rounded-lg border border-white/10 px-2">
           <Search className="h-4 w-4 text-slate-400" />
-          <Input
+          <Input data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.input" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={t("docsViewer.search.placeholder")}
@@ -2804,7 +2804,7 @@ export function DirectoryRail({
             const active = option.key === docClassFilter;
             const count = taxonomyCounts[option.key] ?? 0;
             return (
-              <button
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-doc-class-filter-change-option-key"
                 key={option.key}
                 type="button"
                 className={cn(
@@ -2826,7 +2826,7 @@ export function DirectoryRail({
           <label htmlFor="docs-directory-sort" className="text-xs font-medium text-slate-300">
             {t("docsViewer.sort.label")}
           </label>
-          <select
+          <select data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.docs-directory-sort"
             id="docs-directory-sort"
             value={sort}
             onChange={(event) => onSortChange?.(event.target.value as DocDirectorySort)}
@@ -2872,7 +2872,7 @@ export function DirectoryRail({
                   const deleting = deletingResearchDocumentId === document.document_id;
                   return (
                     <li key={document.document_id} className="group flex items-start gap-1 rounded-lg transition-colors hover:bg-violet-400/10">
-                      <button
+                      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-select-research-document-document-document-id"
                         type="button"
                         className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-slate-200 disabled:opacity-50"
                         onClick={() => onSelectResearchDocument?.(document.document_id)}
@@ -2884,7 +2884,7 @@ export function DirectoryRail({
                         </p>
                         <p className="truncate text-[11px] text-slate-400">{document.source_url ?? document.source_pdf_ref ?? document.document_id}</p>
                       </button>
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.delete-saved-extraction"
                         type="button"
                         className="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rose-300 disabled:cursor-wait disabled:opacity-60"
                         aria-label={`Delete ${document.title} from My Research Library`}
@@ -2914,7 +2914,7 @@ export function DirectoryRail({
                 const badges = getDocBadges(entry, t);
                 return (
                   <li key={entry.id}>
-                    <button
+                    <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-select-entry-route"
                       ref={(node) => {
                         entryRefs.current[entry.route] = node;
                       }}
@@ -3172,7 +3172,7 @@ export function PanelHeader({
 
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-      <Button
+      <Button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-show-directory"
         variant="ghost"
         size="icon"
         onClick={onShowDirectory}
@@ -3567,7 +3567,7 @@ export function PanelHeader({
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {canExportPrintPdf && onExportPrintPdf ? (
-          <Button
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.docs-print-pdf-button"
             variant="outline"
             size="sm"
             onClick={onExportPrintPdf}
@@ -3587,7 +3587,7 @@ export function PanelHeader({
         ) : null}
         {translationEligible ? (
           <>
-            <Button
+            <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-toggle-inline-translation"
               ref={inlineTranslationButtonRegionRef}
               variant="outline"
               size="sm"
@@ -3632,7 +3632,7 @@ export function PanelHeader({
               </span>
             </Button>
             {hasControllableTranslationLaneSession ? (
-              <Button
+              <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-toggle-inline-translation-session-pause"
                 variant="outline"
                 size="icon"
                 onClick={onToggleInlineTranslationSessionPause}
@@ -3676,12 +3676,12 @@ export function PanelHeader({
           </>
         ) : null}
         {isAutoReading ? (
-          <Button variant="destructive" size="sm" onClick={onStopAutoRead}>
+          <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-stop-auto-read" variant="destructive" size="sm" onClick={onStopAutoRead}>
             {t("docsViewer.action.stopReading")}
           </Button>
         ) : null}
         {canRejoinLiveRead ? (
-          <Button variant="outline" size="sm" onClick={onRejoinLiveRead}>
+          <Button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.docs-viewer.doc-viewer-panel.on-rejoin-live-read" variant="outline" size="sm" onClick={onRejoinLiveRead}>
             {t("docsViewer.action.rejoinLiveRead")}
           </Button>
         ) : null}

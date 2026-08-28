@@ -166,7 +166,7 @@ export function HelixAskActionToolbar({
 
   return (
     <div className="relative min-w-0 flex-1">
-      <button
+      <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.scroll-ask-controls-left"
         type="button"
         aria-label="Scroll Ask controls left"
         className={`absolute inset-y-0 left-0 z-10 flex w-12 items-center justify-center rounded-l-full bg-gradient-to-r from-slate-950/95 via-slate-950/50 to-transparent text-cyan-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${
@@ -190,7 +190,7 @@ export function HelixAskActionToolbar({
           data-testid="helix-ask-action-carousel-track"
           className="flex w-max min-w-full items-center justify-end gap-2 px-12"
         >
-          <input
+          <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.input"
             ref={imageInputRef}
             type="file"
             accept="image/*"
@@ -200,7 +200,7 @@ export function HelixAskActionToolbar({
           />
           {liveRuntimeControls}
           {runtimePicker}
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.attach-image"
             type="button"
             data-helix-ask-action-item="true"
             aria-label="Attach image"
@@ -217,7 +217,7 @@ export function HelixAskActionToolbar({
             <Plus className="h-4 w-4" />
           </button>
           {showMicButton ? (
-            <button
+            <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.on-toggle-mic"
               type="button"
               data-helix-ask-action-item="true"
               aria-label={micTitle}
@@ -239,7 +239,7 @@ export function HelixAskActionToolbar({
             </button>
           ) : null}
           {showRetryVoiceSample ? (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.retry-saved-voice-sample"
               type="button"
               data-helix-ask-action-item="true"
               aria-label="Retry saved voice sample"
@@ -253,7 +253,7 @@ export function HelixAskActionToolbar({
           ) : null}
           {showVisualCaptureControls ? (
             <>
-              <button
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.on-toggle-visual-source-kind"
                 type="button"
                 data-helix-ask-action-item="true"
                 data-visual-source-kind={visualSourceKind}
@@ -275,7 +275,7 @@ export function HelixAskActionToolbar({
                 )}
                 <span>{visualSourceLabel}</span>
               </button>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.on-capture-visual-source"
                 type="button"
                 data-helix-ask-action-item="true"
                 aria-label={visualCaptureAriaLabel}
@@ -289,7 +289,7 @@ export function HelixAskActionToolbar({
                 />
               </button>
               {visualSourceKind === "screen" ? (
-                <button
+                <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.on-toggle-visual-audio"
                   type="button"
                   data-helix-ask-action-item="true"
                   aria-label={visualAudioTitle}
@@ -319,7 +319,7 @@ export function HelixAskActionToolbar({
           {submitButton}
         </div>
       </div>
-      <button
+      <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-action-toolbar.scroll-ask-controls-right"
         type="button"
         aria-label="Scroll Ask controls right"
         className={`absolute inset-y-0 right-0 z-10 flex w-12 items-center justify-center rounded-r-full bg-gradient-to-l from-slate-950/95 via-slate-950/50 to-transparent text-cyan-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${

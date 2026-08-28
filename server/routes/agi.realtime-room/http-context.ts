@@ -25,6 +25,8 @@ import { projectSharedRealtimeRoomParticipantContext } from
   "../../services/helix-ask/realtime-room/participant-context";
 import { isGuestSharedRealtimeRoomHostingEnabled } from
   "../../services/helix-account/account-session-store";
+import { listSharedRealtimeRoomPublicTerminalResults } from
+  "../../services/helix-ask/realtime-room/public-terminal-results";
 import { SharedLiveRoomControlError } from
   "../../services/shared-live-room-control/service";
 
@@ -48,11 +50,15 @@ export const withRuntimeProjection = (
 ): HelixSharedRealtimeRoom => {
   const runtime = readSharedRealtimeRoomRuntime({ roomId: room.room_id });
   const active = runtime?.state === "host_transport_active" || runtime?.state === "bridge_active";
-  return projectSharedRealtimeRoomParticipantContext(runtime ? {
+  const projected = projectSharedRealtimeRoomParticipantContext(runtime ? {
       ...room,
       status: room.status === "closed" ? "closed" : active ? "active" : room.status,
       runtime,
     } : room);
+  return {
+    ...projected,
+    public_terminal_results: listSharedRealtimeRoomPublicTerminalResults(room.room_id),
+  };
 };
 
 export const requireSharedRoomAccount = async (

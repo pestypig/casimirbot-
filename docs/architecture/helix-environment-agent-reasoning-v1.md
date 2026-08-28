@@ -211,6 +211,14 @@ profile, authors a bounded response repertoire, interprets summaries and
 replans. Compiled local code continuously senses and responds while Codex is
 delayed, absent, or reasoning.
 
+The governing invariant is **one generic resident-controller protocol with
+unique versioned controller profiles for each environment and capability**.
+Runtime Codex uses the same governed lifecycle to select, arm, interrupt and
+receive evidence from every profile; it does not use one universal controller
+policy. Each profile defines the exact domain sensors, timing, finite response
+vocabulary, resource ownership, effect ceilings and verification rules that
+make that lifecycle meaningful for its environment.
+
 The resident controller is not another Codex mind, a background answer writer,
 or an authority-expanding planner. It may only select or propose responses
 inside an already admitted program, lease, resource envelope and effect scope.

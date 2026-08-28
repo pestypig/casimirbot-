@@ -11,7 +11,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   isValidDesktopProviderCredentialKey,
   loadOrCreateDesktopProviderCredentialKey,
+  loadOrCreateDesktopProviderCredentialKeyring,
   resolveProviderCredentialKeyVaultPath,
+  rotateDesktopProviderCredentialKey,
   type ProviderCredentialKeyStoragePort,
 } from "../apps/desktop/src/provider-credential-key";
 import { buildDesktopServiceEnvironment } from
@@ -74,6 +76,36 @@ describe("desktop provider credential key", () => {
       .not.toContain(configuredKey);
   });
 
+  it("migrates the legacy protected key file to the bounded keyring schema", () => {
+    const root = createRoot();
+    const storage = createStorage();
+    const legacyKey = Buffer.alloc(32, 8).toString("base64url");
+    const vaultPath = resolveProviderCredentialKeyVaultPath(root);
+    mkdirSync(path.dirname(vaultPath), { recursive: true });
+    writeFileSync(
+      vaultPath,
+      storage.encryptString(JSON.stringify({
+        schemaVersion: "casimir_desktop_provider_credential_key/1",
+        key: legacyKey,
+      })),
+      { flag: "wx" },
+    );
+
+    const keyring = loadOrCreateDesktopProviderCredentialKeyring({
+      userDataPath: root,
+      storage,
+    });
+    const migrated = JSON.parse(
+      storage.decryptString(readFileSync(vaultPath)).toString(),
+    ) as Record<string, unknown>;
+
+    expect(keyring).toEqual({ activeKey: legacyKey, retiredKeys: [] });
+    expect(migrated.schemaVersion).toBe(
+      "casimir_desktop_provider_credential_keyring/2",
+    );
+    expect(readFileSync(vaultPath, "utf8")).not.toContain(legacyKey);
+  });
+
   it("fails closed when secure storage is unavailable or corrupt", () => {
     const unavailable = createRoot();
     expect(() => loadOrCreateDesktopProviderCredentialKey({
@@ -103,8 +135,8 @@ describe("desktop provider credential key", () => {
     })).toThrow("desktop_provider_credential_key_configured_invalid");
   });
 
-  it("passes only the explicit protected key to the service", () => {
-    const key = Buffer.alloc(32, 3).toString("base64url");
+  it("passes only an ephemeral broker session to the service", () => {
+    const token = Buffer.alloc(32, 3).toString("base64url");
     const environment = buildDesktopServiceEnvironment({
       processEnv: {
         SystemRoot: "C:\\Windows",
@@ -113,9 +145,38 @@ describe("desktop provider credential key", () => {
       },
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:32123",
-      providerCredentialEncryptionKey: key,
+      providerCredentialBroker: {
+        origin: "http://127.0.0.1:32124",
+        token,
+      },
+      deviceId: `desktop_device_${Buffer.alloc(16, 2).toString("base64url")}`,
     });
 
-    expect(environment.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY).toBe(key);
+    expect(environment.HELIX_PROVIDER_CREDENTIAL_BROKER_ORIGIN).toBe(
+      "http://127.0.0.1:32124",
+    );
+    expect(environment.HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN).toBe(token);
+    expect(environment.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY).toBeUndefined();
+  });
+
+  it("rotates the active key while retaining bounded migration keys", () => {
+    const root = createRoot();
+    const storage = createStorage();
+    const original = loadOrCreateDesktopProviderCredentialKeyring({
+      userDataPath: root,
+      storage,
+    });
+    const rotated = rotateDesktopProviderCredentialKey({
+      userDataPath: root,
+      storage,
+    });
+    const reloaded = loadOrCreateDesktopProviderCredentialKeyring({
+      userDataPath: root,
+      storage,
+    });
+
+    expect(rotated.activeKey).not.toBe(original.activeKey);
+    expect(rotated.retiredKeys).toContain(original.activeKey);
+    expect(reloaded).toEqual(rotated);
   });
 });

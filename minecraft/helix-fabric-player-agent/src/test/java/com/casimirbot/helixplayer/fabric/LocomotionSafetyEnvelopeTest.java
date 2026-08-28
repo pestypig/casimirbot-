@@ -53,6 +53,31 @@ final class LocomotionSafetyEnvelopeTest {
         assertEquals("locomotion_active_fall", decision.reasonCode());
     }
 
+    @Test
+    void admitsAnOwnedJumpDescentOnlyWithSafeLandingGeometry() {
+        assertTrue(envelope.assess(
+            observation(20, false, -0.45, 1.2, true, 0, false, true)
+        ).admitted());
+        assertEquals(
+            "locomotion_landing_geometry_unknown",
+            envelope.assess(
+                observation(20, false, -0.45, 1.2, false, 0, false, true)
+            ).reasonCode()
+        );
+        assertEquals(
+            "locomotion_predicted_lava",
+            envelope.assess(
+                observation(20, false, -0.45, 1.2, true, 0, true, true)
+            ).reasonCode()
+        );
+        assertEquals(
+            "locomotion_predicted_drop_exceeded",
+            envelope.assess(
+                observation(20, false, -0.45, 1.2, true, 3, false, true)
+            ).reasonCode()
+        );
+    }
+
     private static LocomotionSafetyEnvelope.Observation observation(
         double health,
         boolean onGround,
@@ -62,9 +87,32 @@ final class LocomotionSafetyEnvelopeTest {
         double dropBlocks,
         boolean landingLava
     ) {
+        return observation(
+            health,
+            onGround,
+            verticalVelocity,
+            fallDistance,
+            geometryKnown,
+            dropBlocks,
+            landingLava,
+            false
+        );
+    }
+
+    private static LocomotionSafetyEnvelope.Observation observation(
+        double health,
+        boolean onGround,
+        double verticalVelocity,
+        double fallDistance,
+        boolean geometryKnown,
+        double dropBlocks,
+        boolean landingLava,
+        boolean controlledJumpArc
+    ) {
         return new LocomotionSafetyEnvelope.Observation(
             health, onGround, verticalVelocity, fallDistance,
-            false, false, geometryKnown, dropBlocks, landingLava
+            false, false, geometryKnown, dropBlocks, landingLava,
+            controlledJumpArc
         );
     }
 }

@@ -96,11 +96,18 @@ final class NativeFabricWorkflowEngine {
     private boolean landingCleanupEligible;
     private boolean landingCleanupIssued;
     private int landingCleanupPendingTicks;
+    private boolean consumeBaselineCaptured;
+    private int initialFoodLevel;
+    private float initialSaturationLevel;
+    private float initialHealth;
+    private int initialRemainderCount;
+    private int consumeUseTicks;
+    private int consumeStartWaitTicks;
     private final Set<Long> completedBlockTargets = new HashSet<>();
 
     static boolean usesReusableWorkflowEngine(String actionKind) {
         return Set.of(
-            "navigate_to", "follow", "collect", "mine", "place", "craft",
+            "navigate_to", "follow", "collect", "mine", "place", "craft", "consume",
             "inventory_transfer"
         ).contains(actionKind);
     }
@@ -123,6 +130,7 @@ final class NativeFabricWorkflowEngine {
         String countedItem = switch (actionKind) {
             case "collect" -> text(arguments, "item_or_block_id");
             case "craft" -> text(arguments, "output_item_id");
+            case "consume" -> text(arguments, "item_id");
             case "inventory_transfer" -> text(arguments, "item_id");
             default -> "";
         };
@@ -143,6 +151,7 @@ final class NativeFabricWorkflowEngine {
             case "mine" -> mine(actionTicks);
             case "place" -> place(actionTicks);
             case "craft" -> craft(actionTicks);
+            case "consume" -> consume(actionTicks);
             case "inventory_transfer" -> inventoryTransfer(actionTicks);
             default -> WorkflowStep.failed(
                 "The client companion does not advertise action kind " + requestedKind + ".",
@@ -1420,6 +1429,128 @@ final class NativeFabricWorkflowEngine {
         );
     }
 
+    private WorkflowStep consume(long actionTicks) {
+        LocalPlayer player = requirePlayer();
+        String itemId = text(arguments, "item_id");
+        int requested = integer(arguments, "count");
+        double stopBelowHealth = number(arguments, "stop_below_health");
+        int minimumFoodGain = integer(arguments, "minimum_food_gain");
+        String expectedRemainder = arguments.get("expected_remainder_item_id") instanceof String value
+            ? value
+            : "";
+        if (!consumeBaselineCaptured) {
+            consumeBaselineCaptured = true;
+            initialFoodLevel = player.getFoodData().getFoodLevel();
+            initialSaturationLevel = player.getFoodData().getSaturationLevel();
+            initialHealth = player.getHealth();
+            initialRemainderCount = expectedRemainder.isBlank()
+                ? 0
+                : inventoryCount(expectedRemainder);
+        }
+        int currentItemCount = inventoryCount(itemId);
+        int consumed = Math.max(0, initialInventoryCount - currentItemCount);
+        int foodAfter = player.getFoodData().getFoodLevel();
+        float saturationAfter = player.getFoodData().getSaturationLevel();
+        float healthAfter = player.getHealth();
+        int remainderDelta = expectedRemainder.isBlank()
+            ? 0
+            : Math.max(0, inventoryCount(expectedRemainder) - initialRemainderCount);
+        LinkedHashMap<String, Object> measured = new LinkedHashMap<>();
+        measured.put("item_id", itemId);
+        measured.put("requested_count", requested);
+        measured.put("consumed_count", consumed);
+        measured.put("hand", "main_hand");
+        measured.put("food_before", initialFoodLevel);
+        measured.put("food_after", foodAfter);
+        measured.put("food_gain", Math.max(0, foodAfter - initialFoodLevel));
+        measured.put("saturation_before", initialSaturationLevel);
+        measured.put("saturation_after", saturationAfter);
+        measured.put("health_before", initialHealth);
+        measured.put("health_after", healthAfter);
+        measured.put("health_delta", healthAfter - initialHealth);
+        measured.put("use_ticks", consumeUseTicks);
+        measured.put("expected_remainder_item_id", expectedRemainder.isBlank() ? "none" : expectedRemainder);
+        measured.put("remainder_item_delta", remainderDelta);
+        measured.put("world_mutations_performed", 0);
+        measured.put("inventory_mutations_performed", consumed);
+
+        if (healthAfter <= stopBelowHealth) {
+            bridge.releaseItemUse();
+            measured.put("reason_code", "consume_health_floor_reached");
+            return WorkflowStep.failed(
+                "Consumption stopped because measured health crossed the admitted hard floor.",
+                measured
+            );
+        }
+        if (consumed >= requested) {
+            bridge.releaseItemUse();
+            if (foodAfter - initialFoodLevel < minimumFoodGain) {
+                measured.put("reason_code", "minimum_food_gain_not_met");
+                return WorkflowStep.failed(
+                    "The admitted item was consumed, but the measured food gain did not meet the requested postcondition.",
+                    measured
+                );
+            }
+            if (!expectedRemainder.isBlank() && remainderDelta < consumed) {
+                measured.put("reason_code", "expected_remainder_not_observed");
+                return WorkflowStep.failed(
+                    "The consumed item did not produce the admitted remainder-item postcondition.",
+                    measured
+                );
+            }
+            measured.put("reason_code", "consume_postconditions_satisfied");
+            return WorkflowStep.succeeded(
+                "The exact admitted consumable and its food/inventory postconditions were measured.",
+                measured
+            );
+        }
+        if (currentItemCount < 1) {
+            bridge.releaseItemUse();
+            measured.put("reason_code", "consume_item_unavailable");
+            return WorkflowStep.failed(
+                "The admitted consumable is not available in the player inventory.",
+                measured
+            );
+        }
+        if (!bridge.equipmentMatches(itemId, "main_hand") &&
+            !bridge.equip(itemId, "main_hand")) {
+            bridge.releaseItemUse();
+            measured.put("reason_code", "consume_equip_failed");
+            return WorkflowStep.failed(
+                "The admitted consumable could not be equipped in the main hand.",
+                measured
+            );
+        }
+        if (!bridge.holdItemUse(itemId, "main_hand")) {
+            bridge.releaseItemUse();
+            measured.put("reason_code", "consume_use_rejected");
+            return WorkflowStep.failed(
+                "The native client rejected continuous use of the admitted main-hand item.",
+                measured
+            );
+        }
+        if (player.isUsingItem()) {
+            consumeUseTicks++;
+            consumeStartWaitTicks = 0;
+        } else if (++consumeStartWaitTicks > 20) {
+            bridge.releaseItemUse();
+            measured.put("reason_code", "consume_use_not_started");
+            return WorkflowStep.failed(
+                "The admitted item did not enter vanilla continuous-use state within the bounded start window.",
+                measured
+            );
+        }
+        measured.put("use_ticks", consumeUseTicks);
+        measured.put("reason_code", player.isUsingItem()
+            ? "consume_in_progress"
+            : "consume_waiting_for_use_start");
+        return WorkflowStep.running(
+            Math.min(0.99, (double) consumed / requested),
+            "The client is maintaining the admitted item-use input and awaiting measured consumption.",
+            measured
+        );
+    }
+
     private WorkflowStep inventoryTransfer(long actionTicks) {
         LocalPlayer player = requirePlayer();
         String itemId = text(arguments, "item_id");
@@ -1814,7 +1945,12 @@ final class NativeFabricWorkflowEngine {
         double healthFloor = arguments.get("stop_below_health") instanceof Number value
             ? value.doubleValue()
             : 6.0;
-        LocomotionSafetyEnvelope.Check safety = locomotionSafetyCheck(x, z, healthFloor);
+        LocomotionSafetyEnvelope.Check safety = locomotionSafetyCheck(
+            x,
+            z,
+            healthFloor,
+            false
+        );
         if (!safety.decision().admitted()) {
             bridge.applyMovement(MovementInput.released());
             return WorkflowStep.failed(
@@ -1837,7 +1973,8 @@ final class NativeFabricWorkflowEngine {
     LocomotionSafetyEnvelope.Check locomotionSafetyCheck(
         double targetX,
         double targetZ,
-        double minimumHealth
+        double minimumHealth,
+        boolean controlledJumpArc
     ) {
         LocalPlayer player = requirePlayer();
         PlayerSensorFrame frame = bridge.sensorFrame();
@@ -1866,12 +2003,20 @@ final class NativeFabricWorkflowEngine {
             new LocomotionSafetyEnvelope.Observation(
                 frame.health(), frame.onGround(), frame.velocityY(), player.fallDistance,
                 player.isInLava(), player.isOnFire(), geometryKnown,
-                predictedDrop, predictedLava
+                predictedDrop, predictedLava, controlledJumpArc
             )
         );
         return new LocomotionSafetyEnvelope.Check(
             decision,
-            movementSafetyMeasurements(frame, predictedFeet, geometryKnown, predictedDrop, decision, minimumHealth)
+            movementSafetyMeasurements(
+                frame,
+                predictedFeet,
+                geometryKnown,
+                predictedDrop,
+                decision,
+                minimumHealth,
+                controlledJumpArc
+            )
         );
     }
 
@@ -1881,7 +2026,8 @@ final class NativeFabricWorkflowEngine {
         boolean geometryKnown,
         double predictedDrop,
         LocomotionSafetyEnvelope.Decision decision,
-        double minimumHealth
+        double minimumHealth,
+        boolean controlledJumpArc
     ) {
         LocalPlayer player = requirePlayer();
         return Map.ofEntries(
@@ -1896,6 +2042,7 @@ final class NativeFabricWorkflowEngine {
             Map.entry("fall_distance_blocks", (double) player.fallDistance),
             Map.entry("landing_geometry_known", geometryKnown),
             Map.entry("predicted_drop_blocks", predictedDrop),
+            Map.entry("controlled_jump_arc", controlledJumpArc),
             Map.entry("predicted_landing_position", position(predictedFeet)),
             Map.entry("controls_released", true)
         );
@@ -2061,6 +2208,13 @@ final class NativeFabricWorkflowEngine {
         landingCleanupEligible = false;
         landingCleanupIssued = false;
         landingCleanupPendingTicks = 0;
+        consumeBaselineCaptured = false;
+        initialFoodLevel = 0;
+        initialSaturationLevel = 0;
+        initialHealth = 0;
+        initialRemainderCount = 0;
+        consumeUseTicks = 0;
+        consumeStartWaitTicks = 0;
         completedBlockTargets.clear();
     }
 

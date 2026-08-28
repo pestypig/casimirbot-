@@ -121,7 +121,7 @@ export function SharedLiveRoomCapabilitiesPanel({
             Members receive normalized read evidence, never the host credential, endpoint, or device access.
           </p>
         </div>
-        <button
+        <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-capabilities-panel.refresh"
           type="button"
           disabled={busy}
           onClick={() => void refresh()}
@@ -154,7 +154,7 @@ export function SharedLiveRoomCapabilitiesPanel({
             <p className="mt-1 text-emerald-200">Ready for a fresh governed room read</p>
           )}
           {grant.owner_controls_visible && grant.status === "active" ? (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-capabilities-panel.revoke-shared-read-access"
               type="button"
               disabled={busy || roomClosed}
               onClick={() => void revoke(grant)}
@@ -172,7 +172,7 @@ export function SharedLiveRoomCapabilitiesPanel({
 
       {isOwner && projection ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <select
+          <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-capabilities-panel.profile-connection-to-share"
             aria-label="Profile connection to share"
             value={selectedConnection}
             disabled={busy || roomClosed || projection.available_connections.length === 0}
@@ -188,7 +188,7 @@ export function SharedLiveRoomCapabilitiesPanel({
               </option>
             ))}
           </select>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-capabilities-panel.share-reads-for-1-hour"
             type="button"
             disabled={busy || roomClosed || !selectedConnection}
             onClick={() => void createGrant()}

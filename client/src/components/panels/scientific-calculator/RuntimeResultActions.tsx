@@ -25,10 +25,10 @@ export function RuntimeResultActions({ job, receipt }: { job: TheoryRuntimeJobSn
   };
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="outline" onClick={() => void copy(formatTheoryRuntimeReportMarkdown({ job, receipt }), "Report copied.")}>Copy report</Button>
-      <Button size="sm" variant="outline" onClick={() => void copy(formatTheoryRuntimeReportJson({ job, receipt }), "JSON copied.")}>Copy JSON</Button>
-      <Button size="sm" variant="outline" onClick={bind}>Use as context</Button>
-      <Button size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={() => { const context = bind(); if (context) launchTheoryRuntimeResultExplanation(context); }}>Explain result</Button>
+      <Button data-helix-control-id="workstation.panel.scientific-calculator.runtime-result-actions.copy-report" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" variant="outline" onClick={() => void copy(formatTheoryRuntimeReportMarkdown({ job, receipt }), "Report copied.")}>Copy report</Button>
+      <Button data-helix-control-id="workstation.panel.scientific-calculator.runtime-result-actions.copy-json" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" variant="outline" onClick={() => void copy(formatTheoryRuntimeReportJson({ job, receipt }), "JSON copied.")}>Copy JSON</Button>
+      <Button data-helix-control-id="workstation.panel.scientific-calculator.runtime-result-actions.use-as-context" data-helix-interaction-kind="configure" data-helix-authority-state="client_local" size="sm" variant="outline" onClick={bind}>Use as context</Button>
+      <Button data-helix-control-id="workstation.panel.scientific-calculator.runtime-result-actions.explain-result" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={() => { const context = bind(); if (context) launchTheoryRuntimeResultExplanation(context); }}>Explain result</Button>
       {message ? <span className="text-[11px] text-slate-300" role="status">{message}</span> : null}
     </div>
   );

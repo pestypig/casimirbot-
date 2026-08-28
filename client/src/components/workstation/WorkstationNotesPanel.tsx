@@ -389,7 +389,7 @@ export default function WorkstationNotesPanel() {
                 <FileText className="h-4 w-4 text-cyan-300" />
                 Workstation Notes
               </div>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.new-note"
                 type="button"
                 onClick={handleCreateNote}
                 className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20"
@@ -406,7 +406,7 @@ export default function WorkstationNotesPanel() {
             {noteList.length === 0 ? (
               <div className="rounded-lg border border-dashed border-white/15 bg-black/20 p-4 text-xs text-slate-400">
                 <p>No notes yet.</p>
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.start-a-note"
                   type="button"
                   onClick={handleCreateNote}
                   className="mt-3 inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20"
@@ -429,7 +429,7 @@ export default function WorkstationNotesPanel() {
                           : "text-slate-200 hover:bg-white/5",
                       )}
                     >
-                      <button
+                      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.handle-select-note-note-id"
                         ref={(node) => {
                           noteRefs.current[note.id] = node;
                         }}
@@ -443,7 +443,7 @@ export default function WorkstationNotesPanel() {
                         <p className="mt-1 break-words text-[11px] text-slate-400">{note.topic}</p>
                         <p className="mt-1 text-[10px] text-slate-500">{formatWhen(note.updated_at)}</p>
                       </button>
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.handle-delete-note-note-id"
                         type="button"
                         aria-label={`Delete ${note.title.trim() || "Untitled note"}`}
                         onClick={() => handleDeleteNote(note.id)}
@@ -463,7 +463,7 @@ export default function WorkstationNotesPanel() {
           {!activeNote ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-slate-400">
               <p>Select a note from the list to open the reader.</p>
-              <button
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.back-to-notes"
                 type="button"
                 onClick={() => setViewMode("list")}
                 className="rounded border border-white/15 bg-black/25 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
@@ -474,7 +474,7 @@ export default function WorkstationNotesPanel() {
           ) : (
             <>
               <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-                <button
+                <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.back-to-workstation-notes"
                   type="button"
                   onClick={() => setViewMode("list")}
                   aria-label="Back to workstation notes"
@@ -482,13 +482,13 @@ export default function WorkstationNotesPanel() {
                 >
                   <ArrowLeft className="mx-auto h-4 w-4" />
                 </button>
-                <input
+                <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.untitled-note"
                   value={activeNoteTitle}
                   onChange={(event) => handleRenameNote(event.target.value)}
                   placeholder="Untitled note"
                   className="min-w-0 flex-1 rounded border border-white/20 bg-slate-900 px-2 py-1 text-sm text-slate-100"
                 />
-                <button
+                <button data-helix-interaction-kind="human_only" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.button"
                   type="button"
                   disabled
                   aria-label={saveState === "saving" ? "Saving session" : "Session saved"}
@@ -521,7 +521,7 @@ export default function WorkstationNotesPanel() {
                         {group.map((command) => {
                           const Icon = command.icon;
                           return (
-                            <button
+                            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-notes.workstation-notes-panel.run-editor-command-command"
                               key={command.id}
                               type="button"
                               title={command.label}

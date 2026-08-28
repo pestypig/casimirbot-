@@ -2,6 +2,13 @@ import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { REALTIME_TEXTURE_PACK_HARNESS_ACTIONS } from "@shared/realtime-texture-pack-harness";
+import {
+  HELIX_PUBLIC_UI_SURFACE_CATALOG,
+  type HelixPublicUiAuthorityState,
+  type HelixPublicUiInteractionKind,
+} from "@shared/helix-public-ui-affordance";
+import { realtimeTexturePackHarnessStore } from "../services/helix-ask/workstation-tool-gateway/realtime-texture-pack-harness-store";
 import {
   HELIX_AGENT_RUN_READ_SCOPE,
   HELIX_AGENT_RUN_WRITE_SCOPE,
@@ -72,6 +79,11 @@ import {
   type HelixEnvironmentActionConnectorReadiness,
 } from "@shared/helix-environment-action";
 import {
+  helixEnvironmentCommandAuthoritySchema,
+  helixEnvironmentCommandAuthoritySettingsSchema,
+  helixEnvironmentCommandMemberGrantSchema,
+} from "@shared/helix-environment-command";
+import {
   HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
   HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY,
   HELIX_ENVIRONMENT_DURABLE_GOAL_INSPECT_CAPABILITY,
@@ -120,9 +132,17 @@ import {
 } from "@shared/helix-environment-connector";
 import {
   HELIX_BROKERAGE_READ_GATEWAY_ERROR_SCHEMA,
+  HELIX_ROBINHOOD_READ_CAPABILITY_IDS,
   HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS,
   helixBrokerageObservationSchema,
+  helixBrokerageRoomBindingSchema,
+  type HelixBrokerageRoomBinding,
 } from "@shared/helix-brokerage-environment";
+import {
+  HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
+  helixBrokerageMarketObserverReceiptSchema,
+  type HelixBrokerageMarketObserverReceipt,
+} from "@shared/trading/brokerage-market-observer";
 import {
   helixRoomEnvironmentSelfBindingRequestSchema,
   helixRoomEnvironmentsReceiptSchema,
@@ -142,6 +162,7 @@ import {
   HELIX_MINECRAFT_PLAYER_COMBAT_ATTACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COMBAT_GUARD_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EMERGENCY_STOP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
@@ -192,6 +213,8 @@ import {
   executeEnvironmentActionGatewayCapability,
   type EnvironmentActionGatewayExecution,
 } from "../services/helix-ask/workstation-tool-gateway/environment-action";
+import { buildHelixPublicUiAgentCatalog } from
+  "../services/helix-ask/public-ui-capability-audit";
 import {
   executeEnvironmentActionControlGatewayCapability,
   type EnvironmentActionControlGatewayExecution,
@@ -204,6 +227,17 @@ import {
   executeBrokerageReadGatewayCapability,
   type BrokerageReadGatewayExecution,
 } from "../services/helix-ask/workstation-tool-gateway/brokerage-read";
+import {
+  attachRobinhoodConnectionToPrivateRoom,
+  RobinhoodConnectionError,
+} from "../services/brokerage/robinhood-connection-store";
+import {
+  bootstrapBrokerageResidentObserver,
+  type BrokerageResidentBootstrapResult,
+} from
+  "../services/environment-connectors/brokerage/brokerage-resident-bootstrap";
+import { PaperTradingError } from
+  "../services/trading/paper-trading-errors";
 import {
   environmentDurableGoalStore,
   isEnvironmentDurableGoalError,
@@ -244,6 +278,10 @@ import {
   readEnvironmentActionConnectorReadiness,
 } from "../services/environment-connectors/actions/authority-store";
 import {
+  configureEnvironmentCommandAuthority,
+  isEnvironmentCommandAuthorityError,
+} from "../services/environment-connectors/commands";
+import {
   bindOwnRoomEnvironmentSubject,
   isRoomEnvironmentSubjectError,
   listRoomEnvironmentProjections,
@@ -253,6 +291,38 @@ import {
   listStagePlayLiveSourceMailItems,
 } from
   "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  runBrokerageMarketObserverCycle,
+} from "../services/trading/brokerage-market-observer";
+import {
+  runRobinhoodReadAcceptance,
+  type RobinhoodReadAcceptanceReceipt,
+} from "../services/trading/robinhood-read-acceptance";
+import {
+  readRobinhoodLiveAcceptanceReadiness,
+} from "../services/trading/live-acceptance-readiness";
+import {
+  helixLiveAcceptanceReadinessSchema,
+  type HelixLiveAcceptanceReadiness,
+} from "@shared/trading/live-acceptance-readiness";
+import {
+  brokerageMarketObserverSemanticSource,
+  type BrokerageMarketObserverSemanticSource,
+} from
+  "../services/environment-connectors/monitoring/brokerage-market-observer-semantic-source";
+import {
+  helixLocalSupervisorLifecycleStateSchema,
+  helixLocalSupervisorRelayTypeSchema,
+  helixLocalSupervisorResourceClaimInputSchema,
+} from "@shared/helix-local-supervisor-coordination";
+import {
+  HelixLocalSupervisorCoordinationError,
+  type HelixLocalSupervisorCoordinationStore,
+} from "../services/local-supervisor/local-supervisor-coordination";
+import {
+  readEnvironmentActionExecutionLeaseClaim,
+  type EnvironmentActionExecutionLeaseClaim,
+} from "../services/environment-connectors/actions/action-broker";
 
 type RecordLike = Record<string, unknown>;
 
@@ -268,9 +338,37 @@ const HELIX_MINECRAFT_STATUS_MCP_SCOPES = [
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
 ] as const;
+const HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+] as const;
 const HELIX_BROKERAGE_READ_MCP_SCOPES = [
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+] as const;
+const HELIX_BROKERAGE_ROOM_BIND_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+] as const;
+const HELIX_BROKERAGE_PAPER_OBSERVER_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+  HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
+] as const;
+const HELIX_BROKERAGE_RESIDENT_BOOTSTRAP_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+  HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+  HELIX_AGENT_RUN_WRITE_SCOPE,
+  HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
+] as const;
+export const HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+] as const;
+export const HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES = [
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
 ] as const;
 
 type HelixRunStartToolArguments = {
@@ -525,6 +623,12 @@ type HelixEnvironmentActionAuthorityConfigureToolArguments = {
   settings: z.infer<typeof helixEnvironmentActionAuthoritySettingsSchema>;
 };
 
+type HelixEnvironmentCommandAuthorityConfigureToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  settings: z.infer<typeof helixEnvironmentCommandAuthoritySettingsSchema>;
+};
+
 type HelixEnvironmentPlayerPairLocalToolArguments = {
   room_id: string;
   binding_id: string;
@@ -540,11 +644,49 @@ type HelixEnvironmentServerPairLocalToolArguments = {
   idempotency_key: string;
 };
 
+type HelixEnvironmentSourcePairLocalToolArguments =
+  HelixEnvironmentServerPairLocalToolArguments;
+
 type HelixBrokerageReadToolArguments = {
   room_id: string;
   connection_id?: string;
   upstream_tool: (typeof HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS)[number];
   upstream_arguments?: RecordLike;
+};
+
+type HelixBrokerageReadAcceptanceToolArguments = {
+  room_id: string;
+  connection_id: string;
+  quote_probe_symbol: string;
+};
+
+type HelixBrokerageRoomBindToolArguments = {
+  room_id: string;
+  connection_id: string;
+  capability_ids?: Array<(typeof HELIX_ROBINHOOD_READ_CAPABILITY_IDS)[number]>;
+};
+
+type HelixBrokerageLiveAcceptanceReadinessToolArguments = {
+  room_id: string;
+  connection_id: string;
+};
+
+type HelixBrokeragePaperObserverToolArguments = {
+  room_id: string;
+  connection_id: string;
+  paper_account_id: string;
+  monitor_id: string;
+  client_continuation_ref: string;
+  observation_id: string;
+  symbol: string;
+};
+
+type HelixBrokerageResidentBootstrapToolArguments = {
+  room_id: string;
+  connection_id: string;
+  run_id: string;
+  turn_id: string;
+  starting_equity_cents: number;
 };
 
 export type HelixEnvironmentActionMcpExecutor =
@@ -555,6 +697,38 @@ export type HelixEnvironmentProbeMcpExecutor =
   typeof executeEnvironmentProbeGatewayCapability;
 export type HelixBrokerageReadMcpExecutor =
   typeof executeBrokerageReadGatewayCapability;
+export type HelixBrokerageReadAcceptanceRunner = (input: {
+  ownerProfileId: string;
+  connectionId: string;
+  roomId: string;
+  quoteProbeSymbol: string;
+}) => Promise<RobinhoodReadAcceptanceReceipt>;
+export type HelixBrokerageLiveAcceptanceReadinessReader = (input: {
+  ownerProfileId: string;
+  connectionId: string;
+  roomId: string;
+}) => Promise<HelixLiveAcceptanceReadiness>;
+export type HelixBrokerageRoomBinder = (input: {
+  ownerProfileId: string;
+  connectionId: string;
+  roomId: string;
+  capabilityIds?: string[];
+}) => Promise<HelixBrokerageRoomBinding>;
+export type HelixBrokerageMarketObserverMcpRunner =
+  typeof runBrokerageMarketObserverCycle;
+export type HelixBrokerageResidentBootstrapper = (input: {
+  ownerProfileId: string;
+  roomId: string;
+  participantId: string;
+  connectionId: string;
+  runId: string;
+  turnId: string;
+  startingEquityCents: number;
+}) => Promise<BrokerageResidentBootstrapResult>;
+export type HelixBrokerageMarketObserverSemanticSourcePort = Pick<
+  BrokerageMarketObserverSemanticSource,
+  "deliver"
+>;
 export type HelixEnvironmentDurableGoalMcpStore = Pick<
   EnvironmentDurableGoalStore,
   "create" | "inspect" | "append"
@@ -587,6 +761,8 @@ export type HelixEnvironmentActionAuthorityLeaseExtender =
   typeof extendEnvironmentActionAuthorityLease;
 export type HelixEnvironmentActionAuthorityConfigurator =
   typeof configureEnvironmentActionAuthority;
+export type HelixEnvironmentCommandAuthorityConfigurator =
+  typeof configureEnvironmentCommandAuthority;
 export type HelixEnvironmentActionAuthorityInspector = (input: {
   roomId: string;
   profileId: string;
@@ -618,10 +794,18 @@ export type HelixEnvironmentServerPairLocalHandoff = (input: {
   status: "server_pairing_inbox_staged";
 }>;
 
+export type HelixEnvironmentSourcePairLocalHandoff =
+  HelixEnvironmentServerPairLocalHandoff;
+
 export type HelixEnvironmentDeviceCheckServicePort = (input: {
   ownerProfileId: string;
   roomId?: string;
 }) => Promise<HelixEnvironmentDeviceCheckList>;
+export type HelixLocalSupervisorExecutionLeaseClaimReader = (input: {
+  roomId: string;
+  profileId: string;
+  actionRequestId: string;
+}) => Promise<EnvironmentActionExecutionLeaseClaim | null>;
 
 type HelixRoomSourceCreateToolArguments = HelixRoomIdToolArguments & {
   idempotency_key: string;
@@ -658,6 +842,10 @@ const DEFAULT_MCP_RESOURCE_METADATA_PATH =
 export const HELIX_DEVICE_CHECK_MCP_PATH = "/mcp/device-check";
 export const HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH =
   "/.well-known/oauth-protected-resource/mcp/device-check";
+export const HELIX_LOCAL_SUPERVISOR_COORDINATION_MCP_PATH =
+  "/mcp/local-supervisor-coordination";
+export const HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH =
+  "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination";
 
 type McpToolDefinitionLike = RecordLike & {
   name: string;
@@ -986,6 +1174,104 @@ const brokerageReadOutputSchema = z.object({
   terminal_eligible: z.literal(false),
 }).strict();
 
+const brokerageReadAcceptanceReceiptSchema = z.object({
+  schema: z.literal("helix.robinhood_read_acceptance.v1"),
+  ok: z.literal(true),
+  connection_id: z.string().trim().min(1).max(320),
+  room_id: helixSharedLiveRoomIdSchema,
+  quote_probe_symbol: z.string().trim().min(1).max(10),
+  account_selection_status: z.literal("agentic_selected"),
+  receipts: z.array(z.object({
+    upstream_tool: z.enum(HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS),
+    observation_id: z.string().trim().min(1).max(320),
+    output_hash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    observed_at: z.string().datetime({ offset: true }),
+  }).strict()).length(5),
+  provider_order_tool_calls_made: z.literal(0),
+  live_order_execution_enabled: z.literal(false),
+  credential_included: z.literal(false),
+  account_numbers_included: z.literal(false),
+  raw_provider_payload_included: z.literal(false),
+}).strict();
+
+const brokerageReadAcceptanceOutputSchema = z.object({
+  operation: z.literal("brokerage.robinhood.read_acceptance"),
+  receipt: brokerageReadAcceptanceReceiptSchema,
+  content_role: z.literal(
+    "brokerage_read_acceptance_receipt_not_assistant_answer",
+  ),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
+
+const brokerageLiveAcceptanceReadinessOutputSchema = z.object({
+  operation: z.literal("brokerage.robinhood.live_acceptance_readiness"),
+  readiness: helixLiveAcceptanceReadinessSchema,
+  content_role: z.literal(
+    "brokerage_live_acceptance_readiness_not_assistant_answer",
+  ),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
+
+const brokerageRoomBindOutputSchema = z.object({
+  operation: z.literal("brokerage.robinhood.room_bind"),
+  binding: helixBrokerageRoomBindingSchema,
+  credential_included: z.literal(false),
+  provider_mutation_attempted: z.literal(false),
+  live_order_execution_enabled: z.literal(false),
+  content_role: z.literal(
+    "brokerage_room_binding_receipt_not_assistant_answer",
+  ),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
+
+const brokeragePaperObserverOutputSchema = z.object({
+  operation: z.literal("brokerage.paper_observer.process"),
+  room_id: helixSharedLiveRoomIdSchema,
+  receipt: helixBrokerageMarketObserverReceiptSchema,
+  monitor_projection: z.object({
+    disposition: z.enum(["no_material_change", "delivered", "duplicate"]),
+    delivery: helixEnvironmentMonitorDeliverySchema.nullable(),
+    duplicate_evidence_refs: z.array(z.string().trim().min(1).max(320)),
+  }).strict(),
+  credential_included: z.literal(false),
+  provider_mutation_attempted: z.literal(false),
+  live_order_execution_enabled: z.literal(false),
+  content_role: z.literal(
+    "brokerage_paper_observer_receipt_not_assistant_answer",
+  ),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
+
+const brokerageResidentBootstrapOutputSchema = z.object({
+  operation: z.literal("brokerage.resident_observer.bootstrap"),
+  room_id: helixSharedLiveRoomIdSchema,
+  idempotency_replayed: z.boolean(),
+  paper_account: jsonObjectSchema,
+  goal: jsonObjectSchema,
+  credential_included: z.literal(false),
+  provider_mutation_attempted: z.literal(false),
+  live_order_execution_enabled: z.literal(false),
+  content_role: z.literal(
+    "brokerage_resident_bootstrap_receipt_not_assistant_answer",
+  ),
+  reentry_required: z.literal(true),
+  answer_authority: z.literal(false),
+  assistant_answer: z.literal(false),
+  terminal_eligible: z.literal(false),
+}).strict();
+
 const environmentSemanticWakeReadOutputSchema = z
   .object({
     operation: z.literal("environment.semantic_wake.read"),
@@ -1145,6 +1431,22 @@ const environmentActionAuthorityConfigureOutputSchema = z
   })
   .strict();
 
+const environmentCommandAuthorityConfigureOutputSchema = z
+  .object({
+    operation: z.literal("environment.command_authority.configure"),
+    room_id: helixSharedLiveRoomIdSchema,
+    authority: helixEnvironmentCommandAuthoritySchema,
+    member_grant: helixEnvironmentCommandMemberGrantSchema,
+    content_role: z.literal(
+      "environment_command_authority_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
 const environmentActionAuthorityInspectOutputSchema = z
   .object({
     operation: z.literal("environment.action_authority.inspect"),
@@ -1194,6 +1496,27 @@ const environmentServerPairLocalOutputSchema = z
     pairing_code_included: z.literal(false),
     content_role: z.literal(
       "environment_server_pairing_handoff_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentSourcePairLocalOutputSchema = z
+  .object({
+    operation: z.literal("environment.source_pair.local_handoff"),
+    room_id: helixSharedLiveRoomIdSchema,
+    binding_id: z.string().trim().min(1).max(320),
+    pairing: jsonObjectSchema,
+    handoff_status: z.literal("server_pairing_inbox_staged"),
+    credential_included: z.literal(false),
+    pairing_code_included: z.literal(false),
+    command_authority_granted: z.literal(false),
+    player_embodiment_granted: z.literal(false),
+    content_role: z.literal(
+      "environment_source_pairing_handoff_receipt_not_assistant_answer",
     ),
     reentry_required: z.literal(true),
     answer_authority: z.literal(false),
@@ -1260,6 +1583,7 @@ const minecraftCapabilityIdForActionKind = (
     case "mine": return HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY;
     case "place": return HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY;
     case "craft": return HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY;
+    case "consume": return HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY;
     case "inventory_transfer":
       return HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY;
     case "execute_sequence":
@@ -1469,6 +1793,33 @@ const toolError = (
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
   if (
+    error instanceof RobinhoodConnectionError ||
+    error instanceof PaperTradingError
+  ) {
+    const statusCode = error instanceof RobinhoodConnectionError
+      ? error.statusCode
+      : error.status;
+    const value = {
+      schema: "helix.brokerage_environment_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable: statusCode >= 500,
+      credential_included: false,
+      account_numbers_included: false,
+      raw_provider_payload_included: false,
+      content_role: "brokerage_environment_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
+  if (
     error instanceof ConnectorBootstrapPairingError ||
     error instanceof LocalPlayerPairingHandoffError
   ) {
@@ -1504,6 +1855,26 @@ const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
       credential_included: false,
       content_role:
         "environment_action_authority_error_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    return {
+      isError: true,
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value,
+    };
+  }
+  if (isEnvironmentCommandAuthorityError(error)) {
+    const value = {
+      schema: "helix.environment_command_authority_error.v1",
+      error: error.code,
+      message: error.message,
+      retryable: error.statusCode >= 500,
+      credential_included: false,
+      content_role:
+        "environment_command_authority_error_not_assistant_answer",
       reentry_required: true,
       answer_authority: false,
       assistant_answer: false,
@@ -1795,7 +2166,11 @@ export type HelixEnvironmentSubjectMcpService = {
 
 export const createHelixMcpServer = (input: {
   principal: HelixAgentApiPrincipal;
+  surface?: "full" | "local_supervisor_coordination";
   service?: HelixAgentApiService;
+  localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  localSupervisorExecutionLeaseClaimReader?:
+    HelixLocalSupervisorExecutionLeaseClaimReader;
   roomControlService?: SharedLiveRoomControlService;
   roomBindingStore?: Pick<
     SharedLiveRoomBindingStore,
@@ -1810,14 +2185,23 @@ export const createHelixMcpServer = (input: {
   environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
   environmentProbeExecutor?: HelixEnvironmentProbeMcpExecutor;
   brokerageReadExecutor?: HelixBrokerageReadMcpExecutor;
+  brokerageReadAcceptanceRunner?: HelixBrokerageReadAcceptanceRunner;
+  brokerageLiveAcceptanceReadinessReader?:
+    HelixBrokerageLiveAcceptanceReadinessReader;
+  brokerageRoomBinder?: HelixBrokerageRoomBinder;
+  brokerageResidentBootstrapper?: HelixBrokerageResidentBootstrapper;
+  brokerageMarketObserverRunner?: HelixBrokerageMarketObserverMcpRunner;
+  brokerageMarketObserverSemanticSource?: HelixBrokerageMarketObserverSemanticSourcePort;
   environmentDurableGoalService?: HelixEnvironmentDurableGoalMcpStore;
   environmentReasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
   environmentMonitorService?: HelixEnvironmentMonitorMcpStore;
   environmentMonitorSemanticSource?: HelixEnvironmentMonitorSemanticSourcePort;
   environmentActionAuthorityInspector?: HelixEnvironmentActionAuthorityInspector;
   environmentActionAuthorityConfigurator?: HelixEnvironmentActionAuthorityConfigurator;
+  environmentCommandAuthorityConfigurator?: HelixEnvironmentCommandAuthorityConfigurator;
   environmentActionAuthorityLeaseExtender?: HelixEnvironmentActionAuthorityLeaseExtender;
   environmentPlayerPairLocalHandoff?: HelixEnvironmentPlayerPairLocalHandoff;
+  environmentSourcePairLocalHandoff?: HelixEnvironmentSourcePairLocalHandoff;
   environmentServerPairLocalHandoff?: HelixEnvironmentServerPairLocalHandoff;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
@@ -1830,6 +2214,9 @@ export const createHelixMcpServer = (input: {
   );
   const deviceCheckService =
     input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList;
+  const executionLeaseClaimReader =
+    input.localSupervisorExecutionLeaseClaimReader ??
+      readEnvironmentActionExecutionLeaseClaim;
   const environmentSubjectService = input.environmentSubjectService ?? {
     list: listRoomEnvironmentProjections,
     select: bindOwnRoomEnvironmentSubject,
@@ -1843,6 +2230,20 @@ export const createHelixMcpServer = (input: {
     input.environmentProbeExecutor ?? executeEnvironmentProbeGatewayCapability;
   const brokerageReadExecutor =
     input.brokerageReadExecutor ?? executeBrokerageReadGatewayCapability;
+  const brokerageReadAcceptanceRunner =
+    input.brokerageReadAcceptanceRunner ?? runRobinhoodReadAcceptance;
+  const brokerageLiveAcceptanceReadinessReader =
+    input.brokerageLiveAcceptanceReadinessReader ??
+      readRobinhoodLiveAcceptanceReadiness;
+  const brokerageRoomBinder =
+    input.brokerageRoomBinder ?? attachRobinhoodConnectionToPrivateRoom;
+  const brokerageResidentBootstrapper =
+    input.brokerageResidentBootstrapper ?? bootstrapBrokerageResidentObserver;
+  const brokerageObserverRunner =
+    input.brokerageMarketObserverRunner ?? runBrokerageMarketObserverCycle;
+  const brokerageObserverSemanticSource =
+    input.brokerageMarketObserverSemanticSource ??
+      brokerageMarketObserverSemanticSource;
   const durableGoalService =
     input.environmentDurableGoalService ?? environmentDurableGoalStore;
   const reasoningRoleService =
@@ -1862,6 +2263,9 @@ export const createHelixMcpServer = (input: {
   const actionAuthorityConfigurator =
     input.environmentActionAuthorityConfigurator ??
       configureEnvironmentActionAuthority;
+  const commandAuthorityConfigurator =
+    input.environmentCommandAuthorityConfigurator ??
+      configureEnvironmentCommandAuthority;
   const actionAuthorityLeaseExtender =
     input.environmentActionAuthorityLeaseExtender ??
       extendEnvironmentActionAuthorityLease;
@@ -1899,6 +2303,28 @@ export const createHelixMcpServer = (input: {
         domainAdapter: "minecraft.fabric_mod.v1",
         credentialTtlMs: request.credentialTtlMs,
         commandCredentialRequested: true,
+        actionCredentialRequested: false,
+        idempotencyKey: request.idempotencyKey,
+      });
+      const staged = await stageLocalMinecraftServerPairing({
+        command: `/helix pair ${created.pairingCode}`,
+      });
+      return {
+        pairing: created.pairing as unknown as RecordLike,
+        status: staged.status,
+      };
+    });
+  const sourcePairLocalHandoff =
+    input.environmentSourcePairLocalHandoff ??
+    (async (request) => {
+      const created = await createConnectorBootstrapPairing({
+        roomId: request.roomId,
+        ownerProfileId: request.ownerProfileId,
+        purpose: "rotate",
+        bindingId: request.bindingId,
+        domainAdapter: "minecraft.fabric_mod.v1",
+        credentialTtlMs: request.credentialTtlMs,
+        commandCredentialRequested: false,
         actionCredentialRequested: false,
         idempotencyKey: request.idempotencyKey,
       });
@@ -1956,6 +2382,52 @@ export const createHelixMcpServer = (input: {
       "The signed access token does not identify its OAuth client.",
     );
   };
+  const requireLocalSupervisorClientRef = (): string => {
+    const ref = input.principal.oauthClientRef?.trim();
+    if (ref) return ref;
+    throw new HelixAgentApiServiceError(
+      403,
+      "mcp_client_identity_required",
+      "The signed access token does not identify its OAuth client.",
+      false,
+    );
+  };
+  const localSupervisorIdentity = (continuationRef: string) => {
+    const oauthClientRef = requireLocalSupervisorClientRef();
+    const binding = [
+      input.principal.issuer,
+      input.principal.subjectId,
+      input.principal.accountProfileId,
+      oauthClientRef,
+      continuationRef,
+    ].join("\n");
+    return {
+      clientSessionRef: `supervisor_client:${crypto.createHash("sha256").update(
+        `${input.localSupervisorCoordinationStore?.serviceInstanceRef ?? "missing"}\n${binding}`,
+        "utf8",
+      ).digest("hex").slice(0, 32)}`,
+      conversationThreadRef: continuationRef,
+      accountSessionId: `mcp:${crypto.createHash("sha256").update(binding, "utf8").digest("hex")}`,
+    };
+  };
+  const callLocalSupervisorTool = async (
+    requiredScopes: RequiredOAuthScopes,
+    operation: () => Promise<RecordLike> | RecordLike,
+  ) => {
+    try {
+      return toolSuccess(await operation());
+    } catch (error) {
+      if (error instanceof HelixLocalSupervisorCoordinationError) {
+        return toolError(new HelixAgentApiServiceError(
+          error.status,
+          error.code,
+          "The local-supervisor coordination request was rejected.",
+          error.status >= 500,
+        ), requiredScopes);
+      }
+      return toolError(error, requiredScopes);
+    }
+  };
   const monitorAccess = (
     argumentsValue: HelixEnvironmentMonitorAccessToolArguments,
   ) => ({
@@ -1983,13 +2455,23 @@ export const createHelixMcpServer = (input: {
     assistant_answer: false as const,
     terminal_eligible: false as const,
   });
+  const coordinationOnly = input.surface === "local_supervisor_coordination";
+  if (coordinationOnly && !input.localSupervisorCoordinationStore) {
+    throw new Error("local_supervisor_coordination_store_required");
+  }
   const server = new McpServer(
     {
-      name: "casimirbot-helix-agent",
+      name: coordinationOnly
+        ? "casimirbot-local-supervisor-coordination"
+        : "casimirbot-helix-agent",
       version: "1.0.0",
     },
     {
-      instructions: [
+      instructions: coordinationOnly ? [
+        "This MCP resource exposes only authenticated local-supervisor presence and advisory coordination for one installed node.",
+        "Relay text is inert and cannot execute commands, transfer authority, restart a process, satisfy evidence, or become an assistant answer.",
+        "Use one stable client_continuation_ref per Codex conversation and revalidate after a service-epoch change.",
+      ].join(" ") : [
         "Use the durable run_id returned by helix_run_start for all later calls.",
         "Mutations require a caller-stable idempotency_key and continuations require expected_version.",
         "completion_status and terminal_authority_status are separate. Evidence and MCP tool output are not assistant answers.",
@@ -1997,10 +2479,413 @@ export const createHelixMcpServer = (input: {
         "Raw Shared Live Room server-command execution is disabled. Typed Minecraft player actions use a separately paired action authority; sensor credentials are never action credentials.",
         "Minecraft action and workflow-control results are observations for Codex re-entry, never assistant answers or terminal authority.",
         "Durable environment-goal projections are checkpoint context for Codex re-entry; they never choose strategy, write an answer, or grant terminal authority.",
+        "One installed node serves many authenticated clients on one MCP origin. Do not start, stop, or replace a server to obtain a separate chat session.",
+        "For local multi-client coordination, register or refresh presence with one stable client_continuation_ref, read coordination before waiting on a contested resource, acknowledge only relays addressed to this derived client, and disconnect presence when finished.",
+        "Concurrent reads remain grant-scoped. Mutations remain serialized by the existing server-owned execution lease; presence claims and relay text cannot create, transfer, or release mutation authority.",
+        "After the service epoch changes, reconnect and revalidate room membership, connector state, retained runs, and execution authority before continuing.",
         "Continue only while progress is possible and within the declared run budget.",
       ].join(" "),
     },
   );
+
+  const localSupervisorContinuationSchema = z.string().trim().min(3).max(320)
+    .refine((value) => !/[\r\n\t]/u.test(value))
+    .refine((value) => !/(?:https?:\/\/|bearer\s|token=|password=|community=)/iu.test(value));
+  const localSupervisorOptionalRefSchema = localSupervisorContinuationSchema.nullable().optional();
+  const localSupervisorFlags = {
+    credential_included: false as const,
+    private_endpoint_included: false as const,
+    hidden_reasoning_included: false as const,
+    answer_authority: false as const,
+    assistant_answer: false as const,
+    terminal_eligible: false as const,
+    raw_content_included: false as const,
+  };
+
+  if (coordinationOnly) {
+    registerEnvironmentDeviceCheckTool({
+      server,
+      principal: input.principal,
+      deviceCheckService,
+      resourceMetadataPath:
+        HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+    });
+  }
+
+  const publicUiSurfaceIds = new Set(
+    HELIX_PUBLIC_UI_SURFACE_CATALOG.map((surface) => surface.surface_id),
+  );
+  const publicUiCatalogQuerySchema = z.object({
+    surface_id: z.string().trim().min(1).max(160)
+      .refine((value) => publicUiSurfaceIds.has(value), "Unknown public UI surface.")
+      .optional(),
+    interaction_kind: z.enum(["observe", "navigate", "configure", "act", "human_only"])
+      .optional(),
+    authority_state: z.enum([
+      "shared_gateway",
+      "route_owned",
+      "client_local",
+      "blocked_pending_contract",
+      "not_applicable",
+    ]).optional(),
+    include_capabilities: z.boolean().default(true),
+  }).strict();
+
+  if (!coordinationOnly) {
+  server.registerTool(
+    "helix_public_ui_catalog",
+    {
+      title: "Inspect the public Helix UI catalog",
+      description: "Returns the public-user UI surfaces, stable control IDs, interaction classifications, and policy-audited capability projections. It never controls the DOM, grants authority, exposes handlers, or returns private UI state.",
+      inputSchema: publicUiCatalogQuerySchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async (query) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
+      requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_READ_SCOPE);
+      const catalog = buildHelixPublicUiAgentCatalog();
+      const controls = catalog.controls.filter((control) =>
+        (!query.surface_id || control.surface_id === query.surface_id) &&
+        (!query.interaction_kind || control.interaction_kind === query.interaction_kind) &&
+        (!query.authority_state || control.authority_state === query.authority_state),
+      );
+      const capabilities = query.include_capabilities
+        ? catalog.capabilities.filter((capability) =>
+            (!query.surface_id || capability.projection_surface_id === query.surface_id) &&
+            (!query.interaction_kind || capability.interaction_kind === query.interaction_kind) &&
+            (!query.authority_state || capability.authority_state === query.authority_state),
+          )
+        : [];
+      return {
+        ...catalog,
+        surfaces: query.surface_id
+          ? catalog.surfaces.filter((surface) => surface.surface_id === query.surface_id)
+          : catalog.surfaces,
+        controls,
+        capabilities,
+        query: {
+          surface_id: query.surface_id ?? null,
+          interaction_kind: (query.interaction_kind ?? null) as HelixPublicUiInteractionKind | null,
+          authority_state: (query.authority_state ?? null) as Exclude<HelixPublicUiAuthorityState, "unmapped"> | null,
+          include_capabilities: query.include_capabilities,
+        },
+        totals: {
+          public_surface_count: catalog.surfaces.length,
+          public_control_count: catalog.controls.length,
+          public_capability_count: catalog.capabilities.length,
+          matched_surface_count: query.surface_id ? 1 : catalog.surfaces.length,
+          matched_control_count: controls.length,
+          matched_capability_count: capabilities.length,
+        },
+      };
+    }),
+  );
+
+  server.registerTool(
+    "helix_realtime_texture_pack_inspect",
+    {
+      title: "Inspect Realtime Texture Pack harness control",
+      description: "Reads the sanitized state of the developer-enabled Image Lens control lease. It returns no screen pixels, prompt text, credentials, or answer authority.",
+      inputSchema: z.object({}).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async () => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
+      requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_READ_SCOPE);
+      if (input.principal.accountType !== "developer") {
+        throw new HelixAgentApiServiceError(403, "developer_account_required", "Realtime Texture Pack harness control is restricted to developer accounts.", false);
+      }
+      return realtimeTexturePackHarnessStore.inspect(input.principal.accountProfileId);
+    }),
+  );
+
+  server.registerTool(
+    "helix_realtime_texture_pack_control",
+    {
+      title: "Control an enabled Realtime Texture Pack overlay",
+      description: "Queues show, reveal-original, or stop for an existing user-selected capture. Image Lens must hold an active user-enabled lease; this tool cannot start capture or select a source.",
+      inputSchema: z.object({ action: z.enum(REALTIME_TEXTURE_PACK_HARNESS_ACTIONS) }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+    },
+    async ({ action }) => callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+      requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_WRITE_SCOPE);
+      if (input.principal.accountType !== "developer") {
+        throw new HelixAgentApiServiceError(403, "developer_account_required", "Realtime Texture Pack harness control is restricted to developer accounts.", false);
+      }
+      const result = realtimeTexturePackHarnessStore.enqueue(input.principal.accountProfileId, action);
+      return {
+        ...result,
+        queued_receipt_not_execution_proof: result.ok,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      };
+    }),
+  );
+  }
+
+  if (input.localSupervisorCoordinationStore) {
+    const coordinationStore = input.localSupervisorCoordinationStore;
+    server.registerTool(
+      "helix_local_supervisor_presence_update",
+      {
+        title: "Update this Codex client's local-supervisor presence",
+        description: "Registers or refreshes this authenticated OAuth client and declared Codex continuation on the installed node. Objective text and unverified resource claims remain inert advisory data.",
+        inputSchema: z.object({
+          client_continuation_ref: localSupervisorContinuationSchema,
+          declared_objective_summary: z.string().trim().min(1).max(360),
+          lifecycle_state: helixLocalSupervisorLifecycleStateSchema,
+          resource_claims: z.array(helixLocalSupervisorResourceClaimInputSchema).max(24).default([]),
+          room_ref: localSupervisorOptionalRefSchema,
+          environment_ref: localSupervisorOptionalRefSchema,
+          run_ref: localSupervisorOptionalRefSchema,
+          blocker_summary: z.string().trim().max(240).nullable().optional(),
+          heartbeat_ttl_seconds: z.number().int().min(15).max(180).default(60),
+        }).strict(),
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
+      },
+      async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        const verifiedClaims = new Map<string, string>();
+        const verificationRef = (kind: string, value: string): string =>
+          `supervisor_verification:${kind}:${crypto.createHash("sha256").update(
+            `${coordinationStore.serviceInstanceRef}\n${input.principal.accountProfileId}\n${value}`,
+            "utf8",
+          ).digest("hex").slice(0, 32)}`;
+        if (args.room_ref && args.resource_claims.some((claim) =>
+          claim.claim_class === "read" && claim.resource_ref === args.room_ref)) {
+          await roomControlService.inspectRoom({ actor: roomActor, roomId: args.room_ref });
+          verifiedClaims.set(
+            `read\n${args.room_ref}`,
+            verificationRef("room_membership", args.room_ref),
+          );
+        }
+        if (args.room_ref && args.environment_ref && args.resource_claims.some((claim) =>
+          claim.claim_class === "read" && claim.resource_ref === args.environment_ref)) {
+          const deviceList = await deviceCheckService({
+            ownerProfileId: input.principal.accountProfileId,
+            roomId: args.room_ref,
+          });
+          if (deviceList.devices.some((device) =>
+            device.environment_binding_id === args.environment_ref &&
+            device.room_id === args.room_ref)) {
+            verifiedClaims.set(
+              `read\n${args.environment_ref}`,
+              verificationRef("environment_binding", args.environment_ref),
+            );
+          }
+        }
+        if (args.run_ref && input.principal.scopes.has(HELIX_AGENT_RUN_READ_SCOPE) &&
+            args.resource_claims.some((claim) =>
+              claim.claim_class === "retained_runtime" && claim.resource_ref === args.run_ref)) {
+          const run = await service.inspectRun({
+            principal: input.principal,
+            runId: args.run_ref,
+          });
+          if (["queued", "running", "waiting"].includes(run.lifecycle_status)) {
+            verifiedClaims.set(
+              `retained_runtime\n${args.run_ref}`,
+              verificationRef("agent_run", `${run.run_id}:${run.version}:${run.lifecycle_status}`),
+            );
+          }
+        }
+        const mutationClaim = args.resource_claims.find((claim) =>
+          claim.claim_class === "mutation_lease_active");
+        if (mutationClaim && args.room_ref && args.environment_ref && args.run_ref &&
+            input.principal.scopes.has(HELIX_ENVIRONMENT_ACTION_READ_SCOPE)) {
+          const lease = await executionLeaseClaimReader({
+            roomId: args.room_ref,
+            profileId: input.principal.accountProfileId,
+            actionRequestId: mutationClaim.resource_ref,
+          });
+          if (lease && lease.roomId === args.room_ref &&
+              lease.environmentBindingId === args.environment_ref &&
+              lease.runId === args.run_ref) {
+            verifiedClaims.set(
+              `mutation_lease_active\n${mutationClaim.resource_ref}`,
+              verificationRef(
+                "execution_lease",
+                [lease.actionRequestId, lease.workflowId, lease.actionAuthorityId,
+                  lease.sourceId, lease.participantId, lease.status,
+                  lease.leaseExpiresAt].join(":"),
+              ),
+            );
+          }
+        }
+        const presence = coordinationStore.registerOrHeartbeat({
+          profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId,
+          presence: {
+            client_session_ref: identity.clientSessionRef,
+            conversation_thread_ref: identity.conversationThreadRef,
+            declared_objective_summary: args.declared_objective_summary,
+            lifecycle_state: args.lifecycle_state,
+            resource_claims: args.resource_claims,
+            room_ref: args.room_ref,
+            environment_ref: args.environment_ref,
+            run_ref: args.run_ref,
+            blocker_summary: args.blocker_summary,
+            heartbeat_ttl_seconds: args.heartbeat_ttl_seconds,
+          },
+          verifiedResourceClaims: verifiedClaims,
+        });
+        return { ok: true, presence, identity_basis: {
+          authenticated_profile: "server_verified",
+          oauth_client: "server_verified",
+          conversation_thread: "client_declared",
+          client_session: "server_derived",
+        }, ...localSupervisorFlags };
+      }),
+    );
+
+    server.registerTool(
+      "helix_local_supervisor_coordination_read",
+      {
+        title: "Read local multi-agent coordination",
+        description: "Returns bounded presence, relays involving this exact derived client, and inert handoff/collision recommendations for one installed node.",
+        inputSchema: z.object({
+          client_continuation_ref: localSupervisorContinuationSchema,
+          after_cursor: z.number().int().nonnegative().default(0),
+        }).strict(),
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
+      },
+      async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, () => {
+        requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        coordinationStore.authenticateClient({
+          profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId,
+          clientSessionRef: identity.clientSessionRef,
+        });
+        return {
+          ok: true,
+          schema: "helix.local_supervisor_mcp_coordination.v1",
+          service_instance_ref: coordinationStore.serviceInstanceRef,
+          requesting_client_session_ref: identity.clientSessionRef,
+          presence: coordinationStore.listPresence(),
+          relays: coordinationStore.listRelays({
+            profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId,
+            clientSessionRef: identity.clientSessionRef,
+            afterCursor: args.after_cursor,
+          }),
+          relay_recommendations: coordinationStore.listRecommendations(),
+          ...localSupervisorFlags,
+        };
+      }),
+    );
+
+    server.registerTool(
+      "helix_local_supervisor_relay_publish",
+      {
+        title: "Publish an advisory relay to another local client",
+        description: "Publishes bounded inert coordination text from this exact derived client. It cannot execute commands, transfer authority, restart a process, or satisfy evidence.",
+        inputSchema: z.object({
+          client_continuation_ref: localSupervisorContinuationSchema,
+          client_message_ref: localSupervisorContinuationSchema,
+          target_client_session_ref: localSupervisorContinuationSchema,
+          relay_type: helixLocalSupervisorRelayTypeSchema,
+          summary: z.string().trim().min(1).max(360),
+          resource_ref: localSupervisorOptionalRefSchema,
+          room_ref: localSupervisorOptionalRefSchema,
+          run_ref: localSupervisorOptionalRefSchema,
+          expires_in_seconds: z.number().int().min(15).max(600).default(180),
+        }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      },
+      async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, () => {
+        requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        const relay = coordinationStore.publishRelay({
+          profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId,
+          relay: {
+            client_message_ref: args.client_message_ref,
+            sender_client_session_ref: identity.clientSessionRef,
+            target_client_session_ref: args.target_client_session_ref,
+            relay_type: args.relay_type,
+            summary: args.summary,
+            resource_ref: args.resource_ref,
+            room_ref: args.room_ref,
+            run_ref: args.run_ref,
+            expires_in_seconds: args.expires_in_seconds,
+          },
+        });
+        return { ok: true, relay, ...localSupervisorFlags };
+      }),
+    );
+
+    server.registerTool(
+      "helix_local_supervisor_relay_acknowledge",
+      {
+        title: "Acknowledge an advisory local-client relay",
+        description: "Acknowledges one relay only when this exact derived client is its target; acknowledgement grants no authority.",
+        inputSchema: z.object({
+          client_continuation_ref: localSupervisorContinuationSchema,
+          message_ref: localSupervisorContinuationSchema,
+        }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      },
+      async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, () => {
+        requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        const relay = coordinationStore.acknowledgeRelay({
+          profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId,
+          messageRef: args.message_ref,
+          acknowledgement: { client_session_ref: identity.clientSessionRef },
+        });
+        return { ok: true, relay, ...localSupervisorFlags };
+      }),
+    );
+
+    server.registerTool(
+      "helix_local_supervisor_presence_disconnect",
+      {
+        title: "Disconnect this local Codex client presence",
+        description: "Releases this exact derived client's advisory presence and client-declared claims. It does not stop a process or release an independently governed execution lease.",
+        inputSchema: z.object({ client_continuation_ref: localSupervisorContinuationSchema }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      },
+      async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, () => {
+        requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        const presence = coordinationStore.disconnect({
+          profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId,
+          clientSessionRef: identity.clientSessionRef,
+        });
+        return { ok: true, presence, ...localSupervisorFlags };
+      }),
+    );
+  }
+
+  if (coordinationOnly) {
+    installOAuthToolCatalogAugmentation(
+      server,
+      new Map<string, RequiredOAuthScopes>([
+        ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+        ["helix_local_supervisor_presence_update", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+        ["helix_local_supervisor_coordination_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+        ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ]),
+    );
+    return server;
+  }
 
   server.registerTool(
     "helix_client_authorization_status",
@@ -2883,6 +3768,60 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_environment_command_authority_configure",
+    {
+      title: "Configure current world command authority",
+      description:
+        "Lets the authenticated room owner configure the same finite Minecraft World Authority lease exposed by the owner UI. Authority profile, autonomy mode, approved command categories, environment ownership, and expiry remain server validated. This tool does not execute a command, issue a connector credential, expose pairing material, or grant host access.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        settings: helixEnvironmentCommandAuthoritySettingsSchema,
+      }).strict(),
+      outputSchema: environmentCommandAuthorityConfigureOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentCommandAuthorityConfigureToolArguments) =>
+      callRoomObservationTool(
+        HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES);
+          requireCurrentRoomFeature();
+          const configured = await commandAuthorityConfigurator({
+            roomId: argumentsValue.room_id,
+            ownerProfileId: input.principal.accountProfileId,
+            environmentBindingId: argumentsValue.environment_binding_id,
+            authorityProfile: argumentsValue.settings.authority_profile,
+            autonomyMode: argumentsValue.settings.autonomy_mode,
+            approvedCategories: argumentsValue.settings.approved_categories,
+            expiresAt: argumentsValue.settings.expires_at,
+          });
+          return {
+            ok: true,
+            value: {
+              operation: "environment.command_authority.configure",
+              room_id: argumentsValue.room_id,
+              authority: configured.authority,
+              member_grant: configured.ownerGrant,
+              content_role:
+                "environment_command_authority_receipt_not_assistant_answer",
+              reentry_required: true,
+              answer_authority: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+            },
+          };
+        },
+      ),
+  );
+
+  server.registerTool(
     "helix_environment_player_pair_local",
     {
       title: "Pair the same-host Minecraft player companion",
@@ -2935,6 +3874,67 @@ export const createHelixMcpServer = (input: {
           },
         };
       }),
+  );
+
+  server.registerTool(
+    "helix_environment_source_pair_local",
+    {
+      title: "Re-pair same-host Minecraft read-only sensing",
+      description:
+        "Rotates only the read-only source credential for the authenticated owner's exact existing Fabric room-source binding and stages it into the fixed repository server inbox. Pairing material and connector credentials never enter MCP output, model context, chat, or debug projections. This tool grants neither World Authority nor Player Embodiment.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        binding_id: z.string().trim().min(1).max(320),
+        credential_ttl_ms: z.number().int().min(60_000).max(30 * 24 * 60 * 60 * 1_000),
+        idempotency_key: idempotencyKeySchema,
+      }).strict(),
+      outputSchema: environmentSourcePairLocalOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE),
+    },
+    async (argumentsValue: HelixEnvironmentSourcePairLocalToolArguments) =>
+      callRoomObservationTool(
+        HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+        async () => {
+          requireHelixAgentApiScope(
+            input.principal,
+            HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+          );
+          requireCurrentRoomFeature();
+          const handoff = await sourcePairLocalHandoff({
+            roomId: argumentsValue.room_id,
+            ownerProfileId: input.principal.accountProfileId,
+            bindingId: argumentsValue.binding_id,
+            credentialTtlMs: argumentsValue.credential_ttl_ms,
+            idempotencyKey: argumentsValue.idempotency_key,
+          });
+          return {
+            ok: true,
+            value: {
+              operation: "environment.source_pair.local_handoff",
+              room_id: argumentsValue.room_id,
+              binding_id: argumentsValue.binding_id,
+              pairing: handoff.pairing,
+              handoff_status: handoff.status,
+              credential_included: false,
+              pairing_code_included: false,
+              command_authority_granted: false,
+              player_embodiment_granted: false,
+              content_role:
+                "environment_source_pairing_handoff_receipt_not_assistant_answer",
+              reentry_required: true,
+              answer_authority: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+            },
+          };
+        },
+      ),
   );
 
   server.registerTool(
@@ -3801,6 +4801,283 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_brokerage_robinhood_read_acceptance",
+    {
+      title: "Verify the private-room Robinhood read connection",
+      description:
+        "Runs the fixed five-read Robinhood acceptance set for the exact profile-owned connection and private room. The server resolves the encrypted Agentic account reference internally and returns only observation IDs and hashes. It calls no provider order tool, grants no live authority, and exposes no account number, credential, or raw provider payload.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        connection_id: z.string().trim().min(1).max(320),
+        quote_probe_symbol: z.string().trim().toUpperCase()
+          .regex(/^[A-Z][A-Z0-9.-]{0,9}$/u),
+      }).strict(),
+      outputSchema: brokerageReadAcceptanceOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: oauthToolMeta(HELIX_BROKERAGE_READ_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixBrokerageReadAcceptanceToolArguments) =>
+      callRoomObservationTool(HELIX_BROKERAGE_READ_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_BROKERAGE_READ_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const receipt = await brokerageReadAcceptanceRunner({
+          ownerProfileId: input.principal.accountProfileId,
+          connectionId: argumentsValue.connection_id,
+          roomId: argumentsValue.room_id,
+          quoteProbeSymbol: argumentsValue.quote_probe_symbol,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "brokerage.robinhood.read_acceptance",
+            receipt,
+            content_role:
+              "brokerage_read_acceptance_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_brokerage_live_acceptance_readiness",
+    {
+      title: "Inspect Robinhood attended-live acceptance readiness",
+      description:
+        "Reads the exact profile-owned private-room qualification gates for the production-gated tiny-live cash-equity path. This tool is local and read-only: it never calls a Robinhood order tool, never enables live flags, never arms trading, and never exposes credentials, account numbers, or raw provider payloads.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        connection_id: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: brokerageLiveAcceptanceReadinessOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_BROKERAGE_READ_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixBrokerageLiveAcceptanceReadinessToolArguments) =>
+      callRoomObservationTool(HELIX_BROKERAGE_READ_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_BROKERAGE_READ_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const readiness = await brokerageLiveAcceptanceReadinessReader({
+          ownerProfileId: input.principal.accountProfileId,
+          connectionId: argumentsValue.connection_id,
+          roomId: argumentsValue.room_id,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "brokerage.robinhood.live_acceptance_readiness",
+            readiness,
+            content_role:
+              "brokerage_live_acceptance_readiness_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_brokerage_robinhood_room_bind",
+    {
+      title: "Attach Robinhood read capabilities to a private room",
+      description:
+        "Idempotently attaches the authenticated profile's existing Robinhood connection and selected read-only capabilities to one account-owned private room. It cannot add provider mutation capabilities, place or cancel an order, or expose credentials or account numbers.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        connection_id: z.string().trim().min(1).max(320),
+        capability_ids: z.array(
+          z.enum(HELIX_ROBINHOOD_READ_CAPABILITY_IDS),
+        ).min(1).max(HELIX_ROBINHOOD_READ_CAPABILITY_IDS.length).optional(),
+      }).strict(),
+      outputSchema: brokerageRoomBindOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_BROKERAGE_ROOM_BIND_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixBrokerageRoomBindToolArguments) =>
+      callRoomTool(HELIX_BROKERAGE_ROOM_BIND_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_BROKERAGE_ROOM_BIND_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const binding = await brokerageRoomBinder({
+          ownerProfileId: input.principal.accountProfileId,
+          connectionId: argumentsValue.connection_id,
+          roomId: argumentsValue.room_id,
+          ...(argumentsValue.capability_ids
+            ? { capabilityIds: [...argumentsValue.capability_ids] }
+            : {}),
+        });
+        return {
+          operation: "brokerage.robinhood.room_bind",
+          binding,
+          credential_included: false,
+          provider_mutation_attempted: false,
+          live_order_execution_enabled: false,
+          content_role:
+            "brokerage_room_binding_receipt_not_assistant_answer",
+          reentry_required: true,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_brokerage_resident_observer_bootstrap",
+    {
+      title: "Bootstrap a Robinhood resident paper observer",
+      description:
+        "Idempotently creates or reuses one room-scoped paper account and one brokerage-native durable monitor goal bound to the authenticated profile, private Robinhood read binding, connection producer epoch, owner-scoped durable run, and paper account. It performs no provider mutation, creates no live order, and grants no live-trading authority.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        connection_id: z.string().trim().min(1).max(320),
+        run_id: z.string().trim().min(1).max(320),
+        turn_id: z.string().trim().min(1).max(320),
+        starting_equity_cents: z.number().int().min(1).max(100_000_000),
+      }).strict(),
+      outputSchema: brokerageResidentBootstrapOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_BROKERAGE_RESIDENT_BOOTSTRAP_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixBrokerageResidentBootstrapToolArguments) =>
+      callRoomTool(
+        HELIX_BROKERAGE_RESIDENT_BOOTSTRAP_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(
+            HELIX_BROKERAGE_RESIDENT_BOOTSTRAP_MCP_SCOPES,
+          );
+          requireCurrentRoomFeature();
+          const participantId = await resolveSelfParticipantId(
+            argumentsValue.room_id,
+          );
+          const result = await brokerageResidentBootstrapper({
+            ownerProfileId: input.principal.accountProfileId,
+            roomId: argumentsValue.room_id,
+            participantId,
+            connectionId: argumentsValue.connection_id,
+            runId: argumentsValue.run_id,
+            turnId: argumentsValue.turn_id,
+            startingEquityCents: argumentsValue.starting_equity_cents,
+          });
+          return {
+            operation: "brokerage.resident_observer.bootstrap",
+            room_id: argumentsValue.room_id,
+            idempotency_replayed: result.idempotencyReplayed,
+            paper_account: result.paperAccount,
+            goal: result.goal,
+            credential_included: false,
+            provider_mutation_attempted: false,
+            live_order_execution_enabled: false,
+            content_role:
+              "brokerage_resident_bootstrap_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          };
+        },
+      ),
+  );
+
+  server.registerTool(
+    "helix_brokerage_paper_observer_process",
+    {
+      title: "Process one admitted Robinhood quote in the paper observer",
+      description:
+        "Processes one already-stored fresh quote through the exact profile-owned paper account and projects only material simulated state into an existing durable semantic monitor. This locally mutates paper simulation state, never calls a Robinhood mutation tool, never places or cancels a live order, and never has answer or terminal authority.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        connection_id: z.string().trim().min(1).max(320),
+        paper_account_id: z.string().trim().min(1).max(320),
+        monitor_id: z.string().trim().min(1).max(320),
+        client_continuation_ref: z.string().trim().min(1).max(320)
+          .regex(/^[a-zA-Z0-9:._/-]+$/u),
+        observation_id: z.string().trim().min(1).max(320),
+        symbol: z.string().trim().toUpperCase()
+          .regex(/^[A-Z][A-Z0-9.-]{0,9}$/u),
+      }).strict(),
+      outputSchema: brokeragePaperObserverOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_BROKERAGE_PAPER_OBSERVER_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixBrokeragePaperObserverToolArguments) =>
+      callRoomTool(HELIX_BROKERAGE_PAPER_OBSERVER_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_BROKERAGE_PAPER_OBSERVER_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const clientRef = requireMonitorClientRef();
+        const receipt: HelixBrokerageMarketObserverReceipt =
+          await brokerageObserverRunner({
+            ownerProfileId: input.principal.accountProfileId,
+            connectionId: argumentsValue.connection_id,
+            roomId: argumentsValue.room_id,
+            paperAccountId: argumentsValue.paper_account_id,
+            monitorLeaseId: argumentsValue.monitor_id,
+            observationId: argumentsValue.observation_id,
+            symbol: argumentsValue.symbol,
+          });
+        const projected = await brokerageObserverSemanticSource.deliver({
+          profileId: input.principal.accountProfileId,
+          mcpClientId: clientRef,
+          clientContinuationRef: argumentsValue.client_continuation_ref,
+          receipt,
+        });
+        const disposition = projected.delivery
+          ? projected.duplicate_evidence_refs.includes(receipt.observer_cycle_id)
+            ? "duplicate"
+            : "delivered"
+          : "no_material_change";
+        return {
+          operation: "brokerage.paper_observer.process",
+          room_id: argumentsValue.room_id,
+          receipt,
+          monitor_projection: {
+            disposition,
+            delivery: projected.delivery,
+            duplicate_evidence_refs: projected.duplicate_evidence_refs,
+          },
+          credential_included: false,
+          provider_mutation_attempted: false,
+          live_order_execution_enabled: false,
+          content_role:
+            "brokerage_paper_observer_receipt_not_assistant_answer",
+          reentry_required: true,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        };
+      }),
+  );
+
+  server.registerTool(
     "helix_minecraft_player_action",
     {
       title: "Execute a typed Minecraft player action",
@@ -4404,6 +5681,9 @@ export const createHelixMcpServer = (input: {
     server,
     new Map<string, RequiredOAuthScopes>([
       ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_public_ui_catalog", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_realtime_texture_pack_inspect", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_realtime_texture_pack_control", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_client_authorization_status", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_run_continue", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_run_cancel", HELIX_AGENT_RUN_WRITE_SCOPE],
@@ -4419,7 +5699,9 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_command_authority_configure", HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES],
       ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_source_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_environment_server_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_environment_action_authority_extend", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_minecraft_actor_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
@@ -4432,6 +5714,11 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_monitor_revoke", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_environment_semantic_wake_read", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_brokerage_robinhood_read", HELIX_BROKERAGE_READ_MCP_SCOPES],
+      ["helix_brokerage_robinhood_read_acceptance", HELIX_BROKERAGE_READ_MCP_SCOPES],
+      ["helix_brokerage_live_acceptance_readiness", HELIX_BROKERAGE_READ_MCP_SCOPES],
+      ["helix_brokerage_robinhood_room_bind", HELIX_BROKERAGE_ROOM_BIND_MCP_SCOPES],
+      ["helix_brokerage_resident_observer_bootstrap", HELIX_BROKERAGE_RESIDENT_BOOTSTRAP_MCP_SCOPES],
+      ["helix_brokerage_paper_observer_process", HELIX_BROKERAGE_PAPER_OBSERVER_MCP_SCOPES],
       ["helix_minecraft_player_action", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_minecraft_workflow_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_minecraft_workflow_control", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
@@ -4445,6 +5732,11 @@ export const createHelixMcpServer = (input: {
       ["helix_room_command_request", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
       ["helix_room_source_list", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_room_source_create", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
+      ["helix_local_supervisor_presence_update", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+      ["helix_local_supervisor_coordination_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+      ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
     ]),
   );
   return server;

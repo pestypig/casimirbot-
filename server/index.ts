@@ -56,6 +56,10 @@ import {
   createHelixDeviceCheckMcpServer,
   HELIX_DEVICE_CHECK_MCP_PATH,
   HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+  HELIX_LOCAL_SUPERVISOR_COORDINATION_MCP_PATH,
+  HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+  HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+  HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
 } from "./mcp/helix-mcp-server";
 import { createHelixSharedLiveRoomRouter } from
   "./routes/helix-shared-live-rooms";
@@ -68,6 +72,8 @@ import {
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
 } from "@shared/helix-environment-action";
+import { HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE } from
+  "@shared/trading/brokerage-market-observer";
 import { agentRunObserverRouter } from "./routes/agent-run-observer";
 import { createHelixAgentAccountBindingsRouter } from
   "./routes/helix-agent-account-bindings";
@@ -84,6 +90,10 @@ import {
 } from "./routes/environment-connector-platform";
 import { brokerageConnectionsRouter } from
   "./routes/brokerage-connections";
+import { createLocalSupervisorCoordinationRouter } from
+  "./routes/local-supervisor-coordination";
+import { HelixLocalSupervisorCoordinationStore } from
+  "./services/local-supervisor/local-supervisor-coordination";
 import {
   installRuntimeToolConfirmationVerifierFromEnvironmentV1,
 } from
@@ -92,6 +102,8 @@ import {
   createDesktopSessionGuard,
   resolveDesktopSessionConfig,
 } from "./security/desktop-session";
+import { createStripeSandboxWebhookRouter } from
+  "./routes/stripe-sandbox-webhook";
 
 type LatticeWatcherHandle = {
   close(): Promise<void>;
@@ -134,6 +146,10 @@ const runtimeApprovalVerifierStatus =
 patchExpressAsyncHandlers();
 const app = express();
 const localSupervisorIdentity = createHelixLocalSupervisorIdentity();
+const localSupervisorCoordinationStore =
+  new HelixLocalSupervisorCoordinationStore(
+    localSupervisorIdentity.serviceInstanceRef,
+  );
 const desktopSessionConfig = resolveDesktopSessionConfig(process.env);
 app.use(createDesktopSessionGuard(desktopSessionConfig));
 
@@ -540,6 +556,14 @@ app.use(createHelixAgentProtectedResourceMetadataRouter({
   useLoopbackRequestResource: true,
 }));
 app.use(createHelixAgentProtectedResourceMetadataRouter({
+  resourcePaths: [HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH],
+  scopes: Array.from(new Set([
+    ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+    ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+  ])),
+  useLoopbackRequestResource: true,
+}));
+app.use(createHelixAgentProtectedResourceMetadataRouter({
   additionalResourcePaths: [
     "/.well-known/oauth-protected-resource/api/v1/rooms",
   ],
@@ -549,6 +573,7 @@ app.use(createHelixAgentProtectedResourceMetadataRouter({
     HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
     HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
     HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+    HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
   ],
   useLoopbackRequestResource: true,
 }));
@@ -562,7 +587,23 @@ app.use(
     resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
   }),
 );
-app.use("/mcp", createHelixMcpRouter());
+app.use(
+  HELIX_LOCAL_SUPERVISOR_COORDINATION_MCP_PATH,
+  createHelixMcpRouter({
+    createServer: ({ principal, localSupervisorCoordinationStore: store }) =>
+      createHelixMcpServer({
+        principal,
+        surface: "local_supervisor_coordination",
+        localSupervisorCoordinationStore: store,
+      }),
+    resourceMetadataPath:
+      HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+    localSupervisorCoordinationStore,
+  }),
+);
+app.use("/mcp", createHelixMcpRouter({
+  localSupervisorCoordinationStore,
+}));
 // First-party browser observation is deliberately cookie-authenticated and
 // remains separate from both external OAuth and the optional global bearer
 // middleware.
@@ -581,6 +622,10 @@ app.use("/api/agi", sharedRealtimeRoomSourceCredentialClaimRouter);
 app.use(environmentConnectorPublicRouter);
 app.use("/api/agi", environmentConnectorBrowserRouter);
 app.use("/api/agi", brokerageConnectionsRouter);
+app.use("/api/local-supervisor", createLocalSupervisorCoordinationRouter({
+  serviceInstanceRef: localSupervisorIdentity.serviceInstanceRef,
+  store: localSupervisorCoordinationStore,
+}));
 // Agent-binding readiness and revocation are first-party account-session
 // operations. Mount them before the optional legacy bearer middleware so
 // ENABLE_AUTH does not silently replace their documented cookie boundary.
@@ -591,6 +636,13 @@ app.use("/api/account", createHelixAgentAccountBindingsRouter());
 app.use("/api/account", createDesktopAuth0AccountLinkRouter({
   desktopSession: desktopSessionConfig,
 }));
+// Stripe signs the exact raw bytes. This route must remain before express.json
+// and admits sandbox events only; it is never an account or agent authority.
+app.use(
+  "/api/billing/stripe/webhook",
+  express.raw({ type: "application/json", limit: "256kb" }),
+  createStripeSandboxWebhookRouter(),
+);
 app.use(express.json({
   limit: jsonBodyLimit,
   verify: (req, _res, buf) => {

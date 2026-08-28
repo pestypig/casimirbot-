@@ -170,6 +170,8 @@ int main() {
     const bool p2_initialized = p2::initialize(input, &context, &initial);
     checks.push_back(p2_initialized
                      && initial.accepted && initial.models_appended == 1U
+                     && initial.selector_thread_count
+                        == p2::h2::kSelectorThreadCount
                      && initial.exact_p2_orientation
                      && initial.p2_c08_010_passed && neutral(initial));
     if (!p2_initialized) {

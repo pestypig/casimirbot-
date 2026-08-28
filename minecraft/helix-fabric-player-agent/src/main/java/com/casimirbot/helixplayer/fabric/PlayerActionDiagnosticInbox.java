@@ -43,7 +43,7 @@ final class PlayerActionDiagnosticInbox {
         "navigate_to", "look_at", "track_target", "walk", "jump", "interact", "attack",
         "combat_guard",
         "hotbar_select", "equip", "follow", "collect", "mine", "place",
-        "craft", "inventory_transfer", "execute_sequence",
+        "craft", "consume", "inventory_transfer", "execute_sequence",
         "execute_reactive_program", "arm_viability_guardian",
         "disarm_viability_guardian"
     );
@@ -323,6 +323,7 @@ final class PlayerActionDiagnosticInbox {
             case "mine" -> mineArguments(value);
             case "place" -> placeArguments(value);
             case "craft" -> craftArguments(value);
+            case "consume" -> consumeArguments(value);
             case "inventory_transfer" -> transferArguments(value);
             case "execute_sequence" -> sequenceArguments(value);
             case "execute_reactive_program" -> reactiveProgramArguments(value);
@@ -1008,6 +1009,31 @@ final class PlayerActionDiagnosticInbox {
         normalized.put("count", integer(value, "count", 1, 2_304));
         if (value.get("recipe_id") != null) {
             normalized.put("recipe_id", resource(value, "recipe_id"));
+        }
+        return Map.copyOf(normalized);
+    }
+
+    private static Map<String, Object> consumeArguments(Map<String, Object> value) {
+        exactKeys(
+            value,
+            Set.of(
+                "item_id", "count", "hand", "max_duration_ms",
+                "stop_below_health", "minimum_food_gain"
+            ),
+            Set.of("expected_remainder_item_id")
+        );
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("item_id", resource(value, "item_id"));
+        normalized.put("count", integer(value, "count", 1, 64));
+        normalized.put("hand", enumText(value, "hand", Set.of("main_hand")));
+        normalized.put("max_duration_ms", integer(value, "max_duration_ms", 1_000, 60_000));
+        normalized.put("stop_below_health", finite(value, "stop_below_health", 1, 20));
+        normalized.put("minimum_food_gain", integer(value, "minimum_food_gain", 0, 20));
+        if (value.get("expected_remainder_item_id") != null) {
+            normalized.put(
+                "expected_remainder_item_id",
+                resource(value, "expected_remainder_item_id")
+            );
         }
         return Map.copyOf(normalized);
     }

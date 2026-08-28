@@ -68,7 +68,7 @@ export function HelixAskSituationRoomSourcePanel({
         )}
         {displayAudioActive ? (
           <div className="mt-2">
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-situation-room-source-panel.stop-source"
               type="button"
               className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
               onClick={onStopDisplayAudio}

@@ -31,7 +31,7 @@ export function HelixAskEnvelopeSupplementSurface({
     <>
       {extension?.available ? (
         <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-envelope-supplement-surface.extension-on-toggle"
             type="button"
             className="text-[10px] uppercase tracking-[0.22em] text-slate-400 hover:text-slate-200"
             onClick={extension.onToggle}

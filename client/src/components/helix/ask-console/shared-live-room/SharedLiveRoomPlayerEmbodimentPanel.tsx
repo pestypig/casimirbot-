@@ -477,7 +477,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                 : "checking client"}
             </span>
           ) : null}
-          <button
+          <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.refresh-player-embodiment-authority"
             type="button"
             aria-label="Refresh Player Embodiment authority"
             disabled={busy !== null}
@@ -495,7 +495,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-[9px] text-emerald-100/70">
               Approval mode
-              <select
+              <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select"
                 aria-label={`Player action approval mode for ${environment.source_label}`}
                 value={autonomyMode}
                 disabled={busy !== null}
@@ -513,7 +513,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
             </label>
             <label className="text-[9px] text-emerald-100/70">
               Manual input
-              <select
+              <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select.2"
                 aria-label={`Player manual override for ${environment.source_label}`}
                 value={manualOverridePolicy}
                 disabled={busy !== null}
@@ -531,7 +531,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
             </label>
             <label className="text-[9px] text-emerald-100/70">
               Lease duration
-              <select
+              <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select.3"
                 aria-label={`Player action lease duration for ${environment.source_label}`}
                 value={leaseMs}
                 disabled={busy !== null}
@@ -566,7 +566,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                   key={capability.id}
                   className="flex items-center gap-1.5 text-[9px] text-slate-300"
                 >
-                  <input
+                  <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.input"
                     type="checkbox"
                     checked={selectedCapabilities.includes(capability.id)}
                     disabled={busy !== null}
@@ -587,7 +587,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
 
           {warningRequired ? (
             <label className="flex items-start gap-2 rounded border border-amber-300/25 bg-amber-950/20 p-2 text-[9px] text-amber-100">
-              <input
+              <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.input.2"
                 type="checkbox"
                 aria-label={`Acknowledge Minecraft player control for ${environment.source_label}`}
                 checked={acknowledged}
@@ -606,7 +606,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.save-player-authority"
               type="button"
               disabled={
                 busy !== null ||
@@ -620,7 +620,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               Save player authority
             </button>
             {authority?.status === "active" ? (
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.pair-player-client-in-game"
                 type="button"
                 disabled={busy !== null || !sourceBinding}
                 className="inline-flex items-center gap-1 rounded border border-cyan-300/30 px-2 py-1 text-[9px] font-semibold text-cyan-100 disabled:opacity-50"
@@ -631,7 +631,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               </button>
             ) : null}
             {authority?.status === "active" ? (
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.pair-local-player-privately"
                 type="button"
                 disabled={busy !== null || !sourceBinding}
                 className="inline-flex items-center gap-1 rounded border border-emerald-300/30 px-2 py-1 text-[9px] font-semibold text-emerald-100 disabled:opacity-50"
@@ -642,7 +642,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               </button>
             ) : null}
             {authority?.status === "active" ? (
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop"
                 type="button"
                 disabled={busy !== null}
                 className="inline-flex items-center gap-1 rounded border border-red-300/30 px-2 py-1 text-[9px] font-semibold text-red-200 disabled:opacity-50"
@@ -724,7 +724,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-copy-pairing-command"
                 type="button"
                 className="inline-flex items-center gap-1 rounded border border-cyan-200/30 px-2 py-1 text-[10px] text-cyan-50"
                 onClick={() => void copyPairingCommand()}
@@ -736,7 +736,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                     ? "Select"
                     : "Copy player command"}
               </button>
-              <button
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.hide-player-embodiment-pairing-code"
                 type="button"
                 aria-label="Hide Player Embodiment pairing code"
                 className="rounded border border-cyan-200/30 p-1 text-cyan-50"

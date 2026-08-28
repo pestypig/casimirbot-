@@ -37,6 +37,7 @@ import {
   readActiveScientificEvidenceWorkflowStatus,
   useScientificEvidenceWorkflowStore,
 } from "@/store/useScientificEvidenceWorkflowStore";
+import RealtimeTexturePackControls from "./RealtimeTexturePackControls";
 
 type DragState = {
   pointerId: number;
@@ -191,6 +192,7 @@ export default function ImageLensPanel() {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [lastSentFrame, setLastSentFrame] = useState<SentFrameState | null>(null);
   const [statusMessage, setStatusMessage] = useState(initialStatusMessage);
+  const [workspaceMode, setWorkspaceMode] = useState<"inspect" | "realtime_texture_pack">("inspect");
   const source = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.source);
   const naturalSize = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.naturalSize);
   const cropDraft = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.cropDraft);
@@ -507,8 +509,25 @@ export default function ImageLensPanel() {
           <div className="mr-auto flex min-w-0 items-center gap-2 text-sm font-semibold">
             <FileImage className="h-4 w-4 shrink-0 text-cyan-200" />
             <span className="truncate">{t("imageLens.header.title")}</span>
+            <div className="ml-2 flex rounded border border-white/10 bg-black/20 p-0.5 text-[11px] font-normal">
+              <button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.inspect"
+                type="button"
+                onClick={() => setWorkspaceMode("inspect")}
+                className={`rounded px-2 py-1 ${workspaceMode === "inspect" ? "bg-cyan-500/20 text-cyan-100" : "text-slate-400"}`}
+              >
+                Inspect
+              </button>
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.realtime-texture-pack"
+                type="button"
+                onClick={() => setWorkspaceMode("realtime_texture_pack")}
+                className={`rounded px-2 py-1 ${workspaceMode === "realtime_texture_pack" ? "bg-fuchsia-500/20 text-fuchsia-100" : "text-slate-400"}`}
+              >
+                Realtime Texture Pack
+              </button>
+            </div>
           </div>
-          <button
+          {workspaceMode === "inspect" ? <>
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.file-input-ref-current-click"
             type="button"
             onClick={() => fileInputRef.current?.click()}
             aria-label={t("imageLens.action.chooseFile")}
@@ -518,7 +537,7 @@ export default function ImageLensPanel() {
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t("imageLens.action.chooseFile")}</span>
           </button>
-          <input
+          <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.input"
             ref={fileInputRef}
             type="file"
             accept="image/*"
@@ -526,7 +545,7 @@ export default function ImageLensPanel() {
             className="sr-only"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => loadFile(event.currentTarget.files?.[0] ?? null)}
           />
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.send-frame-to-live-answer"
             type="button"
             onClick={sendFrameToLiveAnswer}
             disabled={!hasVisualInput || !naturalSize}
@@ -537,7 +556,7 @@ export default function ImageLensPanel() {
             <Scissors className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t("imageLens.action.sendCropFrame")}</span>
           </button>
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.use-full-image"
             type="button"
             onClick={useFullImage}
             disabled={!naturalSize}
@@ -548,7 +567,7 @@ export default function ImageLensPanel() {
             <RotateCcw className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t("imageLens.action.fullImage")}</span>
           </button>
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.set-advanced-open-value-boolean-value"
             type="button"
             onClick={() => setAdvancedOpen((value: boolean) => !value)}
             aria-label={t("imageLens.action.advanced")}
@@ -558,7 +577,7 @@ export default function ImageLensPanel() {
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
             <span className="hidden md:inline">{t("imageLens.action.advanced")}</span>
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.clear-receipts"
             type="button"
             onClick={clearReceipts}
             aria-label={t("imageLens.action.clear")}
@@ -568,7 +587,9 @@ export default function ImageLensPanel() {
             <Trash2 className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t("imageLens.action.clear")}</span>
           </button>
+          </> : null}
         </div>
+        {workspaceMode === "inspect" ? <>
         <div className="mt-1 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-5">
           <span className="min-w-0 flex-1 truncate text-slate-400">{statusMessage}</span>
           {liveSourceActive ? (
@@ -588,7 +609,7 @@ export default function ImageLensPanel() {
             <span className="inline-flex min-w-0 items-center gap-2 truncate rounded border border-emerald-400/30 bg-emerald-500/10 px-2 text-emerald-100">
               {t("imageLens.sent.source", { sourceId: lastSentFrame.sourceId })}
               {lastSentFrame.evidenceId ? t("imageLens.sent.evidence", { evidenceId: lastSentFrame.evidenceId }) : ""}
-              <button
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.open-live-answer-panel"
                 type="button"
                 onClick={openLiveAnswerPanel}
                 title={t("imageLens.action.openLiveAnswer")}
@@ -617,8 +638,12 @@ export default function ImageLensPanel() {
             {t("imageLens.workflow.postulateRefs", { count: Object.values(scientificWorkflowStatus.postulateReadyRefs).flat().length })}
           </span>
         </div>
+        </> : null}
       </div>
 
+      {workspaceMode === "realtime_texture_pack" ? (
+        <RealtimeTexturePackControls />
+      ) : (
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-auto bg-slate-950 p-4">
           <div className="relative flex min-h-[420px] items-center justify-center rounded border border-white/10 bg-[linear-gradient(45deg,rgba(255,255,255,0.04)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.04)_75%),linear-gradient(45deg,rgba(255,255,255,0.04)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.04)_75%)] bg-[length:24px_24px] bg-[position:0_0,12px_12px]">
@@ -674,7 +699,7 @@ export default function ImageLensPanel() {
                 />
               </div>
             ) : (
-              <button
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.file-input-ref-current-click.2"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex h-40 w-40 flex-col items-center justify-center rounded border border-dashed border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
@@ -695,7 +720,7 @@ export default function ImageLensPanel() {
                 <div className="grid grid-cols-[1fr_92px] gap-2">
                   <label className="block text-xs text-slate-300">
                     {t("imageLens.advanced.sourceKind")}
-                    <select
+                    <select data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.select"
                       value={sourceKind}
                       onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setSourceKind(event.target.value as DocumentImageSourceKindV1)}
                       className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1.5 text-xs"
@@ -707,7 +732,7 @@ export default function ImageLensPanel() {
                   </label>
                   <label className="block text-xs text-slate-300">
                     {t("imageLens.advanced.page")}
-                    <input
+                    <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.image-lens-page-input"
                       type="number"
                       min={1}
                       max={source?.pageCount ?? undefined}
@@ -732,7 +757,7 @@ export default function ImageLensPanel() {
                   {(["x", "y", "width", "height"] as const).map((key: keyof DocumentImageBboxPxV1) => (
                     <label key={key} className="block text-xs text-slate-300">
                       {key}
-                      <input
+                      <input data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.input.2"
                         type="number"
                         min={key === "width" || key === "height" ? 1 : 0}
                         value={Math.round(cropDraft[key])}
@@ -752,7 +777,7 @@ export default function ImageLensPanel() {
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">{t("imageLens.advanced.frameReceipt")}</div>
                 <label className="block text-xs text-slate-300">
                   {t("imageLens.advanced.regionKind")}
-                  <select
+                  <select data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.image-lens.image-lens-panel.select.2"
                     value={kind}
                     onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setKind(event.target.value as DocumentImageRegionKindV1)}
                     className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1.5 text-xs"
@@ -800,6 +825,7 @@ export default function ImageLensPanel() {
           )}
         </div>
       </main>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ inline constexpr std::array<std::size_t, kUPanelCandidateCount>
                          512U, 1024U, 2048U, 4096U, 8192U, 16384U, 32768U,
                          65536U};
 inline constexpr long kNumericalWidthExponent = -180L;
+inline constexpr std::size_t kMaximumParallelThreads = 64U;
 
 struct Input {
     ledger::LedgerView f_ledger;
@@ -37,6 +38,7 @@ enum class FailureDetail : std::uint8_t {
     invalid_input_or_predecessor,
     nonfinite_accumulation,
     volterra_convolution_or_u_refinement_exhaustion,
+    parallel_resource,
 };
 
 struct Output {
@@ -114,6 +116,18 @@ PolicyDecision replay_width_decisions(
 // and publishes only the first complete output satisfying the fixed width
 // rule. It performs no file I/O, selected-member ingress or handler dispatch.
 bool evaluate(const Input &input, Output *output, Result *result);
+
+// Additive H2-P3 path. Refinement candidates remain sequential. Independent
+// subpanels are evaluated in bounded batches, stored by ordinal, and reduced
+// serially in the original order using the H2-P2 prepared-moment kernel.
+bool evaluate_prepared_parallel(const Input &input, std::size_t thread_count,
+                                Output *output, Result *result);
+
+// Candidate-neutral H2-P3 fixture/calibration surface. This evaluates exactly
+// one named dyadic refinement candidate and performs no width selection.
+bool evaluate_prepared_candidate(const Input &input, std::size_t panel_count,
+                                 std::size_t thread_count, Output *output,
+                                 Result *result);
 
 const char *failure_detail_name(FailureDetail detail);
 

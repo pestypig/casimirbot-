@@ -169,7 +169,7 @@ export default function PostulateBoardPanel() {
               </p>
             </div>
           </div>
-          <button
+          <button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.postulate-board.postulate-board-panel.void-load-board"
             type="button"
             onClick={() => void loadBoard()}
             disabled={loading}
@@ -375,7 +375,7 @@ export default function PostulateBoardPanel() {
                                 Developer review packet only. Graph mutation is not authorized from this board.
                               </div>
                             </div>
-                            <button
+                            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.postulate-board.postulate-board-panel.void-copy-graph-review-packet-proposal-postulate"
                               type="button"
                               onClick={() => void copyGraphReviewPacket(proposal, postulate)}
                               className="inline-flex shrink-0 items-center gap-2 rounded-md border border-violet-200/30 px-2.5 py-1.5 text-xs font-semibold text-violet-50 hover:bg-violet-200/10"

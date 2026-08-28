@@ -1156,14 +1156,15 @@ final class PlayerActionRuntime implements AutoCloseable {
         ).contains(actionKind) ||
             (programKind && Boolean.TRUE.equals(measurements.get("player_motion_performed")));
         boolean interactionKind = List.of(
-            "interact", "attack", "combat_guard", "mine", "place", "craft", "inventory_transfer"
+            "interact", "attack", "combat_guard", "mine", "place", "craft", "consume", "inventory_transfer"
         ).contains(actionKind) ||
             (programKind && Boolean.TRUE.equals(measurements.get("player_interaction_performed")));
-        boolean directInventoryKind = List.of("hotbar_select", "equip").contains(actionKind) ||
+        boolean directInventoryKind = List.of("hotbar_select", "equip", "consume").contains(actionKind) ||
             (programKind && Boolean.TRUE.equals(measurements.get("inventory_mutation_performed")));
         boolean measuredInventoryMutation =
             positiveMeasurement(measurements, "collected_count") ||
             positiveMeasurement(measurements, "produced_count") ||
+            positiveMeasurement(measurements, "consumed_count") ||
             positiveMeasurement(measurements, "transferred_count") ||
             positiveMeasurement(measurements, "inventory_mutations_performed");
         boolean measuredWorldMutation = positiveMeasurement(
@@ -1375,6 +1376,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             capability("com.casimirbot.minecraft.player.mine", "mine", "world_mutation", List.of("long_running"), List.of("native_fabric"), true),
             capability("com.casimirbot.minecraft.player.place", "place", "world_mutation", List.of("long_running"), List.of("native_fabric"), true),
             capability("com.casimirbot.minecraft.player.craft", "craft", "player_inventory", List.of("long_running")),
+            capability("com.casimirbot.minecraft.player.consume", "consume", "player_inventory", List.of("long_running")),
             capability("com.casimirbot.minecraft.player.inventory.transfer", "inventory_transfer", "player_inventory", List.of("long_running")),
             capability(
                 "com.casimirbot.minecraft.player.sequence.execute",
@@ -1512,7 +1514,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         return List.of(
             "navigate_to", "look_at", "track_target", "walk", "jump", "interact",
             "attack", "combat_guard", "hotbar_select", "equip", "follow", "collect", "mine", "place",
-            "craft", "inventory_transfer", "execute_sequence",
+            "craft", "consume", "inventory_transfer", "execute_sequence",
             "execute_reactive_program", "arm_viability_guardian",
             "disarm_viability_guardian"
         ).contains(actionKind);

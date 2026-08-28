@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newDb } from "pg-mem";
 import { migration063 } from "../../../../db/migrations/063_environment_monitor_leases";
+import { migration065 } from "../../../../db/migrations/065_environment_monitor_provider_neutral_identity";
 import {
   EnvironmentMonitorStore,
   EnvironmentMonitorStoreError,
@@ -9,6 +10,10 @@ import {
 } from "../environment-monitor-store";
 import { EnvironmentMonitorSemanticSource } from
   "../environment-monitor-semantic-source";
+import { BrokerageMarketObserverSemanticSource } from
+  "../brokerage-market-observer-semantic-source";
+import type { HelixBrokerageMarketObserverReceipt } from
+  "@shared/trading/brokerage-market-observer";
 import type {
   HelixEnvironmentMonitorIdentity,
   HelixEnvironmentMonitorItem,
@@ -148,6 +153,7 @@ describe("EnvironmentMonitorStore", () => {
       CREATE TABLE helix_room_environment_subject_bindings (subject_binding_id text PRIMARY KEY);
     `);
     await migration063.run(client, { enablePgvector: false });
+    await migration065.run(client, { enablePgvector: false });
     await client.query(`
       INSERT INTO helix_accounts VALUES ('profile:owner');
       INSERT INTO helix_accounts VALUES ('profile:member');
@@ -207,9 +213,20 @@ describe("EnvironmentMonitorStore", () => {
       maxEventAgeMs: 60_000,
       wakeBudgetTotal: 8,
       now: "2026-08-24T22:00:01.000Z",
-      expiresAt: "2098-01-01T00:00:00.000Z",
+      expiresAt: "2097-12-31T23:59:00.000Z",
     });
     expect(reconnected.monitor_id).toBe(created.monitor_id);
+    expect(reconnected.expires_at).toBe(created.expires_at);
+    await expect(store.create({
+      identity,
+      eventFamilies: ["actor", "hazard"],
+      maxEventAgeMs: 60_000,
+      wakeBudgetTotal: 8,
+      now: "2026-08-24T22:00:01.000Z",
+      expiresAt: "2098-01-01T00:01:00.000Z",
+    })).rejects.toMatchObject<Partial<EnvironmentMonitorStoreError>>({
+      code: "monitor_identity_mismatch",
+    });
     await expect(store.inspect({
       monitorId: created.monitor_id,
       ...access,
@@ -334,6 +351,163 @@ describe("EnvironmentMonitorStore", () => {
     expect(events.rows.slice(1).every((row: any, index: number) =>
       row.previous_event_hash === events.rows[index].event_hash,
     )).toBe(true);
+  });
+
+  it("persists the brokerage semantic lifecycle across reconnect and fails closed on epoch drift", async () => {
+    const brokerageIdentity: HelixEnvironmentMonitorIdentity = {
+      owner_profile_id: "profile:owner",
+      mcp_client_id: "mcp_client:brokerage",
+      client_continuation_ref: "codex_task:brokerage",
+      run_id: "agent_run:brokerage",
+      goal_id: "environment_goal:brokerage",
+      room_id: "room:nether",
+      participant_id: "participant:owner",
+      environment_binding_id: "brokerage_room_binding:one",
+      source_id: "brokerage_connection:one",
+      world_id: "paper_account:one",
+      subject_ref: "paper_account:one",
+      producer_epoch_ref: "brokerage_epoch:one",
+      policy_revision: 1,
+    };
+    await client.query(`
+      INSERT INTO helix_agent_runs VALUES (
+        'agent_run:brokerage', 'profile:owner', '2099-01-01T00:00:00.000Z'
+      );
+      INSERT INTO helix_environment_durable_goals VALUES (
+        'environment_goal:brokerage', 'profile:owner', 'room:nether',
+        'participant:owner', 'brokerage_room_binding:one',
+        'brokerage_connection:one', 'paper_account:one',
+        'paper_account:one', 'active'
+      );
+      INSERT INTO helix_environment_durable_goal_participants VALUES (
+        'environment_goal:brokerage', 'profile:owner', 'participant:owner',
+        'active', '["read"]'
+      );
+      INSERT INTO helix_environment_durable_goal_events VALUES (
+        'environment_goal:brokerage', 1, 'brokerage_epoch:one', 1,
+        'agent_run:brokerage'
+      );
+    `);
+    const createInput = {
+      identity: brokerageIdentity,
+      eventFamilies: [
+        "market", "portfolio", "orders", "risk_control", "paper_simulation",
+      ] as const,
+      maxEventAgeMs: 60_000,
+      wakeBudgetTotal: 4,
+      now: "2026-08-27T14:00:00.000Z",
+      expiresAt: "2098-01-01T00:00:00.000Z",
+    };
+    const created = await store.create(createInput);
+    expect((await store.create({
+      ...createInput,
+      now: "2026-08-27T14:00:01.000Z",
+    })).monitor_id).toBe(created.monitor_id);
+
+    const access = {
+      profileId: brokerageIdentity.owner_profile_id,
+      mcpClientId: brokerageIdentity.mcp_client_id,
+      clientContinuationRef: brokerageIdentity.client_continuation_ref,
+    };
+    const receipt: HelixBrokerageMarketObserverReceipt = {
+      schema: "helix.brokerage_market_observer.v1",
+      ok: true,
+      observer_cycle_id: "brokerage_observer_cycle:persistent-one",
+      profile_id: "resident.brokerage.market_observer.v1",
+      profile_artifact_hash: `sha256:${"a".repeat(64)}`,
+      reaction_requirement: "monitor_only",
+      monitor_lease_id: created.monitor_id,
+      owner_profile_id: brokerageIdentity.owner_profile_id,
+      connection_id: brokerageIdentity.source_id,
+      room_id: brokerageIdentity.room_id!,
+      environment_binding_id: brokerageIdentity.environment_binding_id,
+      paper_account_id: brokerageIdentity.world_id,
+      producer_epoch_ref: brokerageIdentity.producer_epoch_ref,
+      source_observation_id: "brokerage_observation:persistent-one",
+      source_output_hash: `sha256:${"b".repeat(64)}`,
+      source_observed_at: "2026-08-27T14:00:02.000Z",
+      observation_revision: Date.parse("2026-08-27T14:00:02.000Z"),
+      symbol: "TEST",
+      event_types: ["paper_position_marked"],
+      disposition: "paper_state_changed",
+      semantic_wake_eligible: true,
+      paper_receipt: {
+        schema: "helix.paper_trading.v1",
+        ok: true,
+        account_id: brokerageIdentity.world_id,
+        observation_id: "brokerage_observation:persistent-one",
+        symbol: "TEST",
+        filled_order_ids: [],
+        marked_position_ids: ["paper_position:persistent-one"],
+        stop_exit_order_ids: [],
+        simulated: true,
+        live_order_execution_enabled: false,
+        answer_authority: false,
+      },
+      kill_switch_active_before: false,
+      kill_switch_active_after: false,
+      simulated: true,
+      provider_mutation_attempted: false,
+      live_order_execution_enabled: false,
+      credential_included: false,
+      account_numbers_included: false,
+      raw_provider_payload_included: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    const source = new BrokerageMarketObserverSemanticSource(store);
+    const delivered = await source.deliver({
+      ...access,
+      receipt,
+      now: "2026-08-27T14:00:03.000Z",
+    });
+    expect(delivered.delivery?.cursor_after).toBe(1);
+    expect(delivered.lease.wakes_delivered).toBe(1);
+
+    const reconnectedSource = new BrokerageMarketObserverSemanticSource(store);
+    const duplicate = await reconnectedSource.deliver({
+      ...access,
+      receipt,
+      now: "2026-08-27T14:00:04.000Z",
+    });
+    expect(duplicate.delivery).toBeNull();
+    expect(duplicate.duplicate_evidence_refs).toEqual([
+      receipt.observer_cycle_id,
+    ]);
+    expect(duplicate.lease.delivered_cursor).toBe(1);
+    expect(duplicate.lease.wakes_delivered).toBe(1);
+
+    await expect(reconnectedSource.deliver({
+      ...access,
+      receipt: { ...receipt, producer_epoch_ref: "brokerage_epoch:stale" },
+      now: "2026-08-27T14:00:05.000Z",
+    })).rejects.toThrow(
+      /brokerage_monitor_identity_mismatch:producer_epoch_ref/u,
+    );
+    await store.acknowledge({
+      monitorId: created.monitor_id,
+      ...access,
+      cursor: 1,
+      now: "2026-08-27T14:00:06.000Z",
+    });
+    expect((await store.readPendingDeliveries({
+      monitorId: created.monitor_id,
+      ...access,
+    })).deliveries).toEqual([]);
+    await store.revoke({
+      monitorId: created.monitor_id,
+      ...access,
+      now: "2026-08-27T14:00:07.000Z",
+    });
+    await expect(reconnectedSource.deliver({
+      ...access,
+      receipt: {
+        ...receipt,
+        observer_cycle_id: "brokerage_observer_cycle:after-revocation",
+      },
+      now: "2026-08-27T14:00:08.000Z",
+    })).rejects.toMatchObject({ code: "monitor_inactive" });
   });
 
   it("projects one exact semantic batch and replays it until acknowledgement", async () => {

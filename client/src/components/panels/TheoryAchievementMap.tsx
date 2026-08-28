@@ -561,7 +561,7 @@ export default function TheoryAchievementMap({
           });
         }}
       >
-        <div
+        <div data-helix-control-id="workstation.panel.theory-badge-graph.theory-achievement-map.event-react-mouse-event-htmldiv-element-if-event-target-event-current-ta" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
           className="relative"
           onClick={(event: React.MouseEvent<HTMLDivElement>) => {
             if (event.target === event.currentTarget) onClearSelection();
@@ -571,7 +571,7 @@ export default function TheoryAchievementMap({
             height: layout.height * zoom,
           }}
         >
-          <div
+          <div data-helix-control-id="workstation.panel.theory-badge-graph.theory-achievement-map.event-react-mouse-event-htmldiv-element-if-event-target-event-current-ta.2" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
             className="relative"
             onClick={(event: React.MouseEvent<HTMLDivElement>) => {
               if (event.target === event.currentTarget) onClearSelection();
@@ -998,7 +998,7 @@ export default function TheoryAchievementMap({
               routeBlocked: routeLabel?.tone === "rose",
             });
             return (
-              <button
+              <button data-helix-control-id="workstation.panel.theory-badge-graph.theory-achievement-map.event-react-mouse-event-htmlbutton-element-event-stop-propagation-if-vis" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
                 key={node.badgeId}
                 type="button"
                 className={`${theoryBadgeButtonClass(visualState)} group`}
@@ -1096,7 +1096,7 @@ export default function TheoryAchievementMap({
         className="pointer-events-auto absolute bottom-4 right-4 z-20 grid gap-2"
         aria-label={tx("Theory badge graph zoom controls")}
       >
-        <button
+        <button data-helix-control-id="workstation.panel.theory-badge-graph.theory-achievement-map.button" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
           type="button"
           aria-label={tx("Zoom in")}
           title={tx("Zoom in (+)")}
@@ -1106,7 +1106,7 @@ export default function TheoryAchievementMap({
         >
           +
         </button>
-        <button
+        <button data-helix-control-id="workstation.panel.theory-badge-graph.theory-achievement-map.button.2" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
           type="button"
           aria-label={tx("Zoom out")}
           title={tx("Zoom out (-)")}

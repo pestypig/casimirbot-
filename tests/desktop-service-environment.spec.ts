@@ -7,6 +7,11 @@ import {
 } from "../apps/desktop/src/service-environment";
 
 const TEST_PROVIDER_CREDENTIAL_KEY = Buffer.alloc(32, 7).toString("base64url");
+const TEST_PROVIDER_CREDENTIAL_BROKER = Object.freeze({
+  origin: "http://127.0.0.1:43122",
+  token: TEST_PROVIDER_CREDENTIAL_KEY,
+});
+const TEST_DEVICE_ID = `desktop_device_${Buffer.alloc(16, 3).toString("base64url")}`;
 
 describe("desktop service environment", () => {
   it("inherits only the Windows process allowlist", () => {
@@ -16,18 +21,22 @@ describe("desktop service environment", () => {
         PATH: "C:\\Windows\\System32",
         DATABASE_URL: "postgres://must-not-cross-the-boundary",
         OPENAI_API_KEY: "must-not-cross-the-boundary",
+        HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY:
+          Buffer.alloc(32, 9).toString("base64url"),
         NODE_OPTIONS: "--require=must-not-cross-the-boundary",
         HELIX_LOCAL_DB_PATH: "C:\\untrusted\\override.json",
       },
       userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
-      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+      providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      deviceId: TEST_DEVICE_ID,
     });
 
     expect(environment.SystemRoot).toBe("C:\\Windows");
     expect(environment.PATH).toBe("C:\\Windows\\System32");
     expect(environment.DATABASE_URL).toBeUndefined();
     expect(environment.OPENAI_API_KEY).toBeUndefined();
+    expect(environment.HELIX_PROVIDER_CREDENTIAL_ENCRYPTION_KEY).toBeUndefined();
     expect(environment.NODE_OPTIONS).toBeUndefined();
     expect(environment.HELIX_LOCAL_DB_PATH).not.toBe(
       "C:\\untrusted\\override.json",
@@ -44,7 +53,8 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
-      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+      providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      deviceId: TEST_DEVICE_ID,
     });
 
     expect(environment.HELIX_DEVELOPER_PROFILE_IDS).toBe(
@@ -60,7 +70,8 @@ describe("desktop service environment", () => {
       processEnv: {},
       userDataPath,
       serviceOrigin: "http://127.0.0.1:43121",
-      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+      providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      deviceId: TEST_DEVICE_ID,
     });
     const databasePath = environment.HELIX_LOCAL_DB_PATH!;
     const relative = path.relative(userDataPath, databasePath);
@@ -93,7 +104,8 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
-      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+      providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      deviceId: TEST_DEVICE_ID,
     });
     expect(environment).toMatchObject({
       HELIX_AGENT_OAUTH_ISSUER: "https://tenant.auth0.com/",
@@ -117,7 +129,8 @@ describe("desktop service environment", () => {
       },
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
-      providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+      providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      deviceId: TEST_DEVICE_ID,
     });
 
     expect(environment.CASIMIR_PUBLIC_BASE_URL).toBe(
@@ -128,7 +141,8 @@ describe("desktop service environment", () => {
         processEnv: {},
         userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
         serviceOrigin: "https://casimirbot.com",
-        providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+        providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+        deviceId: TEST_DEVICE_ID,
       }),
     ).toThrow(/exact HTTP 127\.0\.0\.1 origin/);
   });
@@ -139,7 +153,8 @@ describe("desktop service environment", () => {
         processEnv: {},
         userDataPath: "  ",
         serviceOrigin: "http://127.0.0.1:43121",
-        providerCredentialEncryptionKey: TEST_PROVIDER_CREDENTIAL_KEY,
+        providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+        deviceId: TEST_DEVICE_ID,
       }),
     ).toThrow(/userData path is required/);
   });

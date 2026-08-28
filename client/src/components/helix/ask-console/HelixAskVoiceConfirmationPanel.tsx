@@ -37,14 +37,14 @@ export function HelixAskVoiceCommandConfirmationPanel({
           </p>
         ) : null}
         <div className="mt-2 flex items-center gap-1.5">
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-voice-confirmation-panel.execute"
             type="button"
             className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
             onClick={onAccept}
           >
             Execute
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-voice-confirmation-panel.cancel"
             type="button"
             className="inline-flex items-center rounded-md border border-slate-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-200 transition hover:bg-black/35"
             onClick={onCancel}
@@ -106,14 +106,14 @@ export function HelixAskTranscriptConfirmationPanel({
           </p>
         ) : null}
         <div className="mt-2 flex items-center gap-1.5">
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-voice-confirmation-panel.confirm"
             type="button"
             className="inline-flex items-center rounded-md border border-emerald-300/40 bg-emerald-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-emerald-100 transition hover:bg-emerald-500/25"
             onClick={onAccept}
           >
             Confirm
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-voice-confirmation-panel.retry"
             type="button"
             className="inline-flex items-center rounded-md border border-amber-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-amber-100 transition hover:bg-black/35"
             onClick={onRetry}

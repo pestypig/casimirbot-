@@ -14,6 +14,9 @@ export function SharedLiveRoomSetupPanel({
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <form
+        data-helix-control-id="helix.ask.shared_live_room.create_room_form"
+        data-helix-interaction-kind="act"
+        data-helix-authority-state="blocked_pending_contract"
         className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
         onSubmit={(event) => {
           event.preventDefault();
@@ -26,6 +29,9 @@ export function SharedLiveRoomSetupPanel({
           Create a room
         </label>
         <input
+          data-helix-control-id="helix.ask.shared_live_room.room_title_input"
+          data-helix-interaction-kind="configure"
+          data-helix-authority-state="blocked_pending_contract"
           id={`${fieldIdPrefix}-room-title`}
           value={roomTitle}
           onChange={(event) => setRoomTitle(event.target.value)}
@@ -34,6 +40,9 @@ export function SharedLiveRoomSetupPanel({
           className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-slate-100 outline-none focus:border-fuchsia-300/50"
         />
         <button
+          data-helix-control-id="helix.ask.shared_live_room.create_room"
+          data-helix-interaction-kind="act"
+          data-helix-authority-state="blocked_pending_contract"
           type="submit"
           disabled={controller.busyAction !== null}
           className="mt-2 inline-flex items-center gap-2 rounded-lg border border-fuchsia-300/35 bg-fuchsia-400/10 px-3 py-2 text-xs font-semibold text-fuchsia-100 disabled:opacity-50"
@@ -48,6 +57,9 @@ export function SharedLiveRoomSetupPanel({
       </form>
 
       <form
+        data-helix-control-id="helix.ask.shared_live_room.join_room_form"
+        data-helix-interaction-kind="act"
+        data-helix-authority-state="blocked_pending_contract"
         className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
         onSubmit={(event) => {
           event.preventDefault();
@@ -60,6 +72,9 @@ export function SharedLiveRoomSetupPanel({
           Join with invite
         </label>
         <input
+          data-helix-control-id="helix.ask.shared_live_room.invite_code_input"
+          data-helix-interaction-kind="configure"
+          data-helix-authority-state="blocked_pending_contract"
           id={`${fieldIdPrefix}-join-code`}
           value={joinCode}
           onChange={(event) => setJoinCode(event.target.value)}
@@ -68,6 +83,9 @@ export function SharedLiveRoomSetupPanel({
           className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-fuchsia-300/50"
         />
         <button
+          data-helix-control-id="helix.ask.shared_live_room.join_room"
+          data-helix-interaction-kind="act"
+          data-helix-authority-state="blocked_pending_contract"
           type="submit"
           disabled={controller.busyAction !== null || !joinCode.trim()}
           className="mt-2 inline-flex items-center gap-2 rounded-lg border border-sky-300/35 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-100 disabled:opacity-50"
@@ -89,6 +107,9 @@ export function SharedLiveRoomSetupPanel({
               .filter((candidate) => candidate.status !== "closed")
               .map((candidate) => (
                 <button
+                  data-helix-control-id="helix.ask.shared_live_room.open_existing_room"
+                  data-helix-interaction-kind="navigate"
+                  data-helix-authority-state="blocked_pending_contract"
                   key={candidate.room_id}
                   type="button"
                   className="rounded-lg border border-white/10 px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/5"

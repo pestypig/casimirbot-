@@ -30,6 +30,7 @@ import {
   type CodexNativeRuntimeApprovalContextV1,
   type CodexNativeRuntimeApprovalHostOutcomeV1,
 } from "./runtime-approval-host";
+import type { HelixCodexAuthResolution } from "./auth-mode";
 
 type NativeTurnRunner = (
   input: RunCodexNativeAppServerTurnInput,
@@ -188,6 +189,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
   requestedMode?: string | null;
   model?: string | null;
   reasoningEffort?: string | null;
+  auth?: HelixCodexAuthResolution;
   allowedWorkstationTools?: string[] | null;
   authoritativeEvidenceArtifacts?: unknown[];
   trustedCurrentTurnGatewayCallResults?: readonly HelixWorkstationGatewayCallResult[];
@@ -427,6 +429,7 @@ export const runCodexNativeWorkstationTurn = async (input: {
     cwd: input.cwd,
     model: input.model,
     reasoningEffort: input.reasoningEffort,
+    auth: input.auth,
     capabilities,
     signal: input.signal,
     timeoutMs: input.timeoutMs,

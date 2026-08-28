@@ -149,6 +149,8 @@ int main() {
         h2_initial_input, &h2_context, &h2_initial);
     checks.push_back(h2_initialized && h2_initial.accepted
                      && h2_initial.models_appended == 1U
+                     && h2_initial.selector_thread_count
+                        == h2::kSelectorThreadCount
                      && h2_initial.h2_c08_010_passed
                      && h2_initial.exact_h2_orientation
                      && h2_initial.centered_to_left_exact_binomial
@@ -179,6 +181,8 @@ int main() {
         h2_after_input, &h2_context, &h2_extension);
     checks.push_back(h2_extended && h2_extension.accepted
                      && h2_extension.models_appended == 1U
+                     && h2_extension.selector_thread_count
+                        == h2::kSelectorThreadCount
                      && h2_extension.source_prefix_digests_checked == 4U
                      && h2_extension.h2_c08_010_passed
                      && neutral(h2_extension));

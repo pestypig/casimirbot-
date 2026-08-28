@@ -150,7 +150,7 @@ export function MoralGraphBiomeMap({
   onHoverNode: (id: string | null) => void;
 }) {
   return (
-    <div
+    <div data-helix-control-id="workstation.panel.moral-graph.moral-graph-biome-map.moral-graph-biome-map" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
       className="relative"
       data-testid="moral-graph-biome-map"
       onClick={() => onClearSelection?.()}
@@ -232,7 +232,7 @@ export function MoralGraphBiomeMap({
         const idle = !hasFocus && !selected && !highlightedNode && !candidate && !traceActive && !conflict;
         const placementProbability = probabilityByNodeId?.[node.id] ?? 0;
         return (
-          <button
+          <button data-helix-control-id="workstation.panel.moral-graph.moral-graph-biome-map.moral-graph-badge-node" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
             key={node.id}
             type="button"
             className={nodeClasses({ node, selected, highlighted: highlightedNode || traceActive, candidate, blocked, conflict, dimmed, idle })}

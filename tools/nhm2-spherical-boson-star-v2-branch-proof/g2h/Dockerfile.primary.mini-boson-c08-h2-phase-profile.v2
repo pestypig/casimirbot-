@@ -1,0 +1,7 @@
+ARG PROFILE_BASE=nhm2-g2h-e-s5-c08-h2-phase-profile:v1@sha256:a1c4cb0017b09e50af62b0dc10b8b2fa5c367aaf28f8e5ce688cf621ffb91c7b
+FROM ${PROFILE_BASE}
+USER 0:0
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_phase_profile_wrapper_v2.sh /usr/local/bin/
+RUN chmod 0555 /usr/local/bin/mini_boson_star_primary_c08_h2_phase_profile_wrapper_v2.sh
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/mini_boson_star_primary_c08_h2_phase_profile_wrapper_v2.sh"]

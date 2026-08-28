@@ -134,7 +134,7 @@ export function BrokerageConnectionsCard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <button data-helix-control-id="workstation.panel.account-session.brokerage-connections-card.refresh" data-helix-interaction-kind="observe" data-helix-authority-state="client_local"
             type="button"
             disabled={busy}
             onClick={() => void refresh()}
@@ -142,7 +142,7 @@ export function BrokerageConnectionsCard() {
           >
             <RefreshCw className="h-3 w-3" /> Refresh
           </button>
-          <button
+          <button data-helix-control-id="workstation.panel.account-session.brokerage-connections-card.void-connect" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
             type="button"
             disabled={busy || pendingOAuth}
             onClick={() => void connect()}
@@ -155,7 +155,7 @@ export function BrokerageConnectionsCard() {
       </div>
 
       {authorizationUrl ? (
-        <a
+        <a data-helix-control-id="workstation.panel.account-session.brokerage-connections-card.continue-secure-authorization" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
           href={authorizationUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -191,7 +191,7 @@ export function BrokerageConnectionsCard() {
                   : ""}
               </p>
             </div>
-            <button
+            <button data-helix-control-id="workstation.panel.account-session.brokerage-connections-card.void-disconnect-connection-connection-id" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
               type="button"
               disabled={busy}
               onClick={() => void disconnect(connection.connection_id)}

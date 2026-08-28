@@ -92,6 +92,10 @@ struct Result {
 // bounds. Both ordered mixed Hessian orientations are evaluated explicitly.
 bool evaluate(const Input &input, Output *output, Result *result);
 
+// Additive H2-P2 path: prepares the unchanged beta moments once per subpanel
+// and reuses them across the frozen 43 elementary convolutions.
+bool evaluate_prepared(const Input &input, Output *output, Result *result);
+
 const char *failure_detail_name(FailureDetail detail);
 
 }  // namespace nhm2::g2h_e_s5::primary_c08_convolution_jet_v1

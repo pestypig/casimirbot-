@@ -70,7 +70,7 @@ export function HelixAskSlashCommandMenu({
           state.items.map((item, index) => {
             const selected = index === state.selectedIndex;
             return (
-              <button
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-slash-command-menu.button"
                 key={item.id}
                 type="button"
                 role="option"

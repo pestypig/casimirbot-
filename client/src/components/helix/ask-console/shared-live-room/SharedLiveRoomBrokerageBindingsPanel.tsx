@@ -137,7 +137,7 @@ export function SharedLiveRoomBrokerageBindingsPanel({
             Owner-private, sanitized reads only. Adding another participant suspends brokerage capabilities automatically.
           </p>
         </div>
-        <button
+        <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-brokerage-bindings-panel.refresh"
           type="button"
           disabled={busy}
           onClick={() => void refresh()}
@@ -156,7 +156,7 @@ export function SharedLiveRoomBrokerageBindingsPanel({
               : "Privacy invalidated · all room capabilities suspended"}
           </p>
           {binding.status === "active" ? (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-brokerage-bindings-panel.revoke-room-access"
               type="button"
               disabled={busy || roomClosed}
               onClick={() => void revoke(binding)}
@@ -178,7 +178,7 @@ export function SharedLiveRoomBrokerageBindingsPanel({
 
       {bindings.length === 0 ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <select
+          <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-brokerage-bindings-panel.robinhood-connection-for-this-room"
             aria-label="Robinhood connection for this room"
             value={selectedConnectionId}
             disabled={busy || roomClosed || connections.length === 0}
@@ -192,7 +192,7 @@ export function SharedLiveRoomBrokerageBindingsPanel({
               </option>
             ))}
           </select>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-brokerage-bindings-panel.attach-read-access"
             type="button"
             disabled={busy || roomClosed || !selectedConnectionId}
             onClick={() => void attach()}

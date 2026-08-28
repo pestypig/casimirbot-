@@ -94,7 +94,7 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
+            <Button data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.set-source-mode-current-equation-set-max-1" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
               size="sm"
               variant={sourceMode === "current_equation" ? "default" : "outline"}
               className={sourceMode === "current_equation" ? "bg-cyan-600 hover:bg-cyan-700" : ""}
@@ -105,7 +105,7 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
             >
               {t("scientificCalculator.live.currentEquation")}
             </Button>
-            <Button
+            <Button data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.set-source-mode-prime-trial-division-set-max-100" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
               size="sm"
               variant={sourceMode === "prime_trial_division" ? "default" : "outline"}
               className={sourceMode === "prime_trial_division" ? "bg-cyan-600 hover:bg-cyan-700" : ""}
@@ -124,7 +124,7 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
           <Label className="text-[11px] text-slate-300">
             {sourceMode === "prime_trial_division" ? t("scientificCalculator.live.candidateStart") : t("scientificCalculator.live.repeats")}
           </Label>
-          <Input
+          <Input data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.input" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
             value={sourceMode === "prime_trial_division" ? start : max}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               if (sourceMode === "prime_trial_division") setStart(event.target.value);
@@ -135,11 +135,11 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
         </div>
         <div>
           <Label className="text-[11px] text-slate-300">{t("scientificCalculator.live.tickRateMs")}</Label>
-          <Input value={rate} onChange={(event: ChangeEvent<HTMLInputElement>) => setRate(event.target.value)} className="h-8 border-slate-700 bg-slate-950 text-xs text-slate-100" />
+          <Input data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.input.2" data-helix-interaction-kind="configure" data-helix-authority-state="client_local" value={rate} onChange={(event: ChangeEvent<HTMLInputElement>) => setRate(event.target.value)} className="h-8 border-slate-700 bg-slate-950 text-xs text-slate-100" />
         </div>
         <div>
           <Label className="text-[11px] text-slate-300">{t("scientificCalculator.live.maxTicks")}</Label>
-          <Input
+          <Input data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.input.3" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
             value={max}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setMax(event.target.value)}
             className="h-8 border-slate-700 bg-slate-950 text-xs text-slate-100"
@@ -149,7 +149,7 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
       {sourceMode === "current_equation" ? (
         <div className="mt-3">
           <Label className="text-[11px] text-slate-300">{t("scientificCalculator.live.interpretationContext")}</Label>
-          <Input
+          <Input data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.input.4" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
             value={equationContext}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setEquationContext(event.target.value)}
             className="mt-1 h-8 border-slate-700 bg-slate-950 text-xs text-slate-100"
@@ -158,10 +158,10 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
         </div>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={startStream} disabled={missingCurrentEquation}>{t("scientificCalculator.live.start")}</Button>
-        <Button size="sm" variant="outline" onClick={stopPrimeStream}>{t("scientificCalculator.live.stop")}</Button>
-        <Button size="sm" variant="outline" onClick={() => void restartPrimeStream()}>{t("scientificCalculator.live.restart")}</Button>
-        <Button size="sm" variant="outline" onClick={copyLog}>{t("scientificCalculator.live.copyDebugLog")}</Button>
+        <Button data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.start-stream" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={startStream} disabled={missingCurrentEquation}>{t("scientificCalculator.live.start")}</Button>
+        <Button data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.stop-prime-stream" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" variant="outline" onClick={stopPrimeStream}>{t("scientificCalculator.live.stop")}</Button>
+        <Button data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.void-restart-prime-stream" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" variant="outline" onClick={() => void restartPrimeStream()}>{t("scientificCalculator.live.restart")}</Button>
+        <Button data-helix-control-id="workstation.panel.scientific-calculator.scientific-calculator-live-source-controls.copy-log" data-helix-interaction-kind="act" data-helix-authority-state="client_local" size="sm" variant="outline" onClick={copyLog}>{t("scientificCalculator.live.copyDebugLog")}</Button>
       </div>
       <div className="mt-3 grid gap-2 text-[11px] text-slate-300 lg:grid-cols-2">
         <div className="rounded border border-slate-800 bg-slate-950/50 p-2">

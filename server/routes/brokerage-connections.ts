@@ -12,6 +12,20 @@ import {
 import { helixPaperTradeCandidateSchema } from
   "@shared/trading/risk-contract";
 import {
+  helixBrokerageReactiveDecisionReceiptSchema,
+  helixBrokerageReactiveStrategyManifestSchema,
+} from "@shared/trading/brokerage-reactive-simulation";
+import {
+  helixBrokerageReactiveControllerControlSchema,
+  helixBrokerageReactiveControllerCycleRequestSchema,
+  helixBrokerageReactiveControllerStartSchema,
+} from "@shared/trading/brokerage-reactive-controller";
+import {
+  helixBrokerageReactiveLiveShadowControlSchema,
+  helixBrokerageReactiveLiveShadowAcceptanceRequestSchema,
+  helixBrokerageReactiveLiveShadowStartSchema,
+} from "@shared/trading/brokerage-reactive-live-shadow";
+import {
   FirstPartyCookieBoundary,
   FirstPartyCookieBoundaryError,
 } from "../middleware/first-party-cookie-boundary";
@@ -79,8 +93,34 @@ import {
 } from "../services/trading/live-provider-contract-preflight-store";
 import { readRobinhoodLiveAcceptanceReadiness } from
   "../services/trading/live-acceptance-readiness";
+import {
+  archiveRobinhoodLiveAcceptance,
+  getLatestRobinhoodLiveAcceptanceArchive,
+} from "../services/trading/live-acceptance-archive-store";
 import { runRobinhoodReadAcceptance } from
   "../services/trading/robinhood-read-acceptance";
+import { stagePaperObserverCanary } from
+  "../services/trading/paper-observer-canary-stage";
+import { admitBrokerageReactiveSimulationProposal } from
+  "../services/trading/brokerage-reactive-simulation-arbiter";
+import {
+  controlBrokerageReactiveController,
+  processBrokerageReactiveControllerObservation,
+  readBrokerageReactiveController,
+  startBrokerageReactiveController,
+} from "../services/trading/brokerage-reactive-controller-store";
+import {
+  controlBrokerageReactiveLiveShadow,
+  readBrokerageReactiveLiveShadow,
+  runBrokerageReactiveLiveShadowPoll,
+  startBrokerageReactiveLiveShadow,
+} from "../services/trading/brokerage-reactive-live-shadow-store";
+import {
+  archiveBrokerageReactiveLiveShadowAcceptance,
+  getLatestBrokerageReactiveLiveShadowAcceptance,
+  readBrokerageReactiveLiveShadowEvidence,
+} from
+  "../services/trading/brokerage-reactive-live-shadow-evidence-store";
 
 const identifier = z
   .string()
@@ -125,6 +165,17 @@ const paperRiskRequestSchema = z.object({
   candidate: helixPaperTradeCandidateSchema,
 }).strict();
 
+const paperObserverCanaryStageSchema = z.object({
+  account_id: identifier,
+  symbol: z.string().trim().toUpperCase()
+    .regex(/^[A-Z][A-Z0-9.-]{0,9}$/u),
+  notional_cents: z.number().int().min(100).max(2_500),
+  quote_observation_id: identifier,
+  earnings_observation_id: identifier,
+  client_canary_id: z.string().trim().min(8).max(120)
+    .regex(/^[a-zA-Z0-9._/-]+$/u),
+}).strict();
+
 const paperKillSwitchSchema = z.object({
   account_id: identifier,
   active: z.boolean(),
@@ -147,6 +198,24 @@ const paperCancelSchema = z.object({
   account_id: identifier,
   order_id: identifier,
 }).strict();
+
+const reactiveSimulationAdmissionSchema = z.object({
+  manifest: helixBrokerageReactiveStrategyManifestSchema,
+  decision_receipt: helixBrokerageReactiveDecisionReceiptSchema,
+  earnings_observation_id: identifier,
+}).strict();
+
+const reactiveControllerStartSchema = helixBrokerageReactiveControllerStartSchema;
+const reactiveControllerCycleSchema =
+  helixBrokerageReactiveControllerCycleRequestSchema;
+const reactiveControllerControlSchema =
+  helixBrokerageReactiveControllerControlSchema;
+const reactiveLiveShadowStartSchema =
+  helixBrokerageReactiveLiveShadowStartSchema;
+const reactiveLiveShadowControlSchema =
+  helixBrokerageReactiveLiveShadowControlSchema;
+const reactiveLiveShadowAcceptanceRequestSchema =
+  helixBrokerageReactiveLiveShadowAcceptanceRequestSchema;
 
 const paperCloseSchema = z.object({
   account_id: identifier,
@@ -173,10 +242,16 @@ const liveControlSchema = z.object({
 
 const livePresenceSchema = z.object({
   control_id: identifier,
+  attendance_id: identifier,
+  action: z.enum(["start", "heartbeat", "end"]),
 }).strict();
 
 const liveContractPreflightSchema = z.object({
   confirmation_text: z.literal("CHECK ROBINHOOD LIVE CONTRACTS"),
+}).strict();
+
+const liveAcceptanceArchiveSchema = z.object({
+  confirmation_text: z.string().trim().min(1).max(800),
 }).strict();
 
 const liveExecutionSchema = z.object({
@@ -541,6 +616,7 @@ brokerageConnectionsRouter.post(
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.status(201).json(await executeApprovedProtectiveExit({
       ownerProfileId: context.profile_id!,
+      sessionId: context.session_id!,
       connectionId: connectionId.data,
       roomId: roomId.data,
       exitApprovalId: body.data.exit_approval_id,
@@ -649,6 +725,58 @@ brokerageConnectionsRouter.get(
       ownerProfileId: context.profile_id!,
       connectionId: connectionId.data,
       roomId: roomId.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-archives/latest",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    if (!connectionId.success || !roomId.success) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 400,
+        "The live-acceptance archive request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    const archive = await getLatestRobinhoodLiveAcceptanceArchive({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+    });
+    if (!archive) {
+      res.status(404).json(errorPayload({
+        code: "live_acceptance_archive_not_found",
+        message: "No completed Robinhood live-acceptance archive is recorded.",
+      }));
+      return;
+    }
+    res.json(archive);
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-archives",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = liveAcceptanceArchiveSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 400,
+        "The live-acceptance archive request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await archiveRobinhoodLiveAcceptance({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      confirmationText: body.data.confirmation_text,
     }));
   }),
 );
@@ -769,6 +897,8 @@ brokerageConnectionsRouter.post(
       connectionId: connectionId.data,
       roomId: roomId.data,
       controlId: body.data.control_id,
+      attendanceId: body.data.attendance_id,
+      action: body.data.action,
     }));
   }),
 );
@@ -791,6 +921,7 @@ brokerageConnectionsRouter.post(
     boundary.enforceAccountRateLimit(res, context.profile_id!);
     res.status(201).json(await executeApprovedLiveEquityEntry({
       ownerProfileId: context.profile_id!,
+      sessionId: context.session_id!,
       connectionId: connectionId.data,
       roomId: roomId.data,
       approvalId: body.data.approval_id,
@@ -1047,6 +1178,34 @@ brokerageConnectionsRouter.get(
 );
 
 brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/paper-observer-canaries/stage",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = paperObserverCanaryStageSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success) {
+      throw new PaperTradingError(
+        "paper_trading_unavailable", 400,
+        "The paper observer canary request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await stagePaperObserverCanary({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      accountId: body.data.account_id,
+      symbol: body.data.symbol,
+      notionalCents: body.data.notional_cents,
+      quoteObservationId: body.data.quote_observation_id,
+      earningsObservationId: body.data.earnings_observation_id,
+      clientCanaryId: body.data.client_canary_id,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
   "/brokerage-connections/:connectionId/rooms/:roomId/paper-risk-decisions",
   route(async (req, res) => {
     const connectionId = identifier.safeParse(req.params.connectionId);
@@ -1093,6 +1252,336 @@ brokerageConnectionsRouter.post(
       reason: body.data.reason,
     });
     res.json(account);
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/proposals/admit",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = reactiveSimulationAdmissionSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success ||
+        body.data.manifest.connection_id !== connectionId.data ||
+        body.data.manifest.room_id !== roomId.data) {
+      throw new PaperTradingError(
+        "paper_candidate_identity_mismatch", 400,
+        "The reactive simulation admission identities do not match.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    if (body.data.manifest.owner_profile_id !== context.profile_id) {
+      throw new PaperTradingError(
+        "paper_candidate_identity_mismatch", 403,
+        "The reactive simulation manifest owner is not the signed-in developer.",
+      );
+    }
+    const account = await getPaperTradingAccount({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+    });
+    if (!account || account.account_id !==
+        body.data.manifest.paper_account_id) {
+      throw new PaperTradingError(
+        "paper_account_not_found", 404,
+        "The reactive simulation account does not belong to this connection and room.",
+      );
+    }
+    res.status(201).json(await admitBrokerageReactiveSimulationProposal({
+      manifest: body.data.manifest,
+      decisionReceipt: body.data.decision_receipt,
+      earningsObservationId: body.data.earnings_observation_id,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/controllers",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = reactiveControllerStartSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success ||
+        body.data.manifest.connection_id !== connectionId.data ||
+        body.data.manifest.room_id !== roomId.data) {
+      throw new PaperTradingError(
+        "reactive_controller_identity_mismatch", 400,
+        "The reactive controller start request is invalid for this route.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await startBrokerageReactiveController({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      request: body.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/controllers/:controllerRunId",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const controllerRunId = identifier.safeParse(req.params.controllerRunId);
+    if (!connectionId.success || !roomId.success || !controllerRunId.success) {
+      throw new PaperTradingError(
+        "reactive_controller_identity_mismatch", 400,
+        "The reactive controller status route identity is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.json(await readBrokerageReactiveController({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      controllerRunId: controllerRunId.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/controllers/:controllerRunId/observations/process",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const controllerRunId = identifier.safeParse(req.params.controllerRunId);
+    const body = reactiveControllerCycleSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success ||
+        !controllerRunId.success || !body.success) {
+      throw new PaperTradingError(
+        "reactive_controller_identity_mismatch", 400,
+        "The reactive controller observation request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await processBrokerageReactiveControllerObservation({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      controllerRunId: controllerRunId.data,
+      request: body.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/controllers/:controllerRunId/control",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const controllerRunId = identifier.safeParse(req.params.controllerRunId);
+    const body = reactiveControllerControlSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success ||
+        !controllerRunId.success || !body.success) {
+      throw new PaperTradingError(
+        "reactive_controller_identity_mismatch", 400,
+        "The reactive controller control request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.json(await controlBrokerageReactiveController({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      controllerRunId: controllerRunId.data,
+      control: body.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/controllers/:controllerRunId/live-shadow",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const controllerRunId = identifier.safeParse(req.params.controllerRunId);
+    const body = reactiveLiveShadowStartSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success ||
+        !controllerRunId.success || !body.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The owner-private live-input shadow request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await startBrokerageReactiveLiveShadow({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      controllerRunId: controllerRunId.data,
+      request: body.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/live-shadow/:shadowSessionId",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const shadowSessionId = identifier.safeParse(req.params.shadowSessionId);
+    if (!connectionId.success || !roomId.success || !shadowSessionId.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The live-input shadow status identity is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.json(await readBrokerageReactiveLiveShadow({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      shadowSessionId: shadowSessionId.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/live-shadow/:shadowSessionId/evidence",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const shadowSessionId = identifier.safeParse(req.params.shadowSessionId);
+    if (!connectionId.success || !roomId.success || !shadowSessionId.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The live-input shadow evidence identity is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.json(await readBrokerageReactiveLiveShadowEvidence({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      shadowSessionId: shadowSessionId.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.get(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/live-shadow-acceptance-archives/latest",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    if (!connectionId.success || !roomId.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The R3 acceptance archive identity is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    const archive = await getLatestBrokerageReactiveLiveShadowAcceptance({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+    });
+    if (!archive) {
+      throw new PaperTradingError(
+        "reactive_shadow_evidence_incomplete", 404,
+        "No qualified R3 live-shadow acceptance archive is recorded.",
+      );
+    }
+    res.json(archive);
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/live-shadow-acceptance-archives",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const body = reactiveLiveShadowAcceptanceRequestSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success || !body.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The R3 acceptance evidence request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.status(201).json(await archiveBrokerageReactiveLiveShadowAcceptance({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      request: body.data,
+    }));
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/live-shadow/:shadowSessionId/poll",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const shadowSessionId = identifier.safeParse(req.params.shadowSessionId);
+    if (!connectionId.success || !roomId.success || !shadowSessionId.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The live-input shadow poll identity is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    const shadow = await readBrokerageReactiveLiveShadow({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      shadowSessionId: shadowSessionId.data,
+    });
+    if (shadow.status !== "active") {
+      throw new PaperTradingError(
+        "reactive_controller_not_active", 409,
+        "The live-input shadow session is not active.",
+      );
+    }
+    const receipt = await runBrokerageReactiveLiveShadowPoll({
+      shadowSessionId: shadowSessionId.data,
+    });
+    if (!receipt) {
+      throw new PaperTradingError(
+        "reactive_controller_effect_unresolved", 409,
+        "The finite poll is not due or another poll is already in flight.",
+      );
+    }
+    res.status(201).json(receipt);
+  }),
+);
+
+brokerageConnectionsRouter.post(
+  "/brokerage-connections/:connectionId/rooms/:roomId/reactive-simulation/live-shadow/:shadowSessionId/control",
+  route(async (req, res) => {
+    const connectionId = identifier.safeParse(req.params.connectionId);
+    const roomId = identifier.safeParse(req.params.roomId);
+    const shadowSessionId = identifier.safeParse(req.params.shadowSessionId);
+    const body = reactiveLiveShadowControlSchema.safeParse(req.body);
+    if (!connectionId.success || !roomId.success ||
+        !shadowSessionId.success || !body.success) {
+      throw new PaperTradingError(
+        "reactive_shadow_contract_invalid", 400,
+        "The live-input shadow control request is invalid.",
+      );
+    }
+    const context = await requireDeveloperBrokerageAccount(req);
+    boundary.enforceAccountRateLimit(res, context.profile_id!);
+    res.json(await controlBrokerageReactiveLiveShadow({
+      ownerProfileId: context.profile_id!,
+      connectionId: connectionId.data,
+      roomId: roomId.data,
+      shadowSessionId: shadowSessionId.data,
+      control: body.data,
+    }));
   }),
 );
 

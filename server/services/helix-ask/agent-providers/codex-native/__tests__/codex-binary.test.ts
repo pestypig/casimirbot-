@@ -84,6 +84,25 @@ describe("Codex binary resolution", () => {
     ]);
   });
 
+  it("reuses ChatGPT authentication without enabling personal integrations", () => {
+    const args = appendCodexCompatibilityIsolationArgs(
+      ["exec", "--sandbox", "read-only"],
+      "chatgpt_session",
+    );
+    expect(args).toEqual([
+      "exec",
+      "--sandbox",
+      "read-only",
+      "--ignore-user-config",
+      "-c",
+      "features.remote_plugin=false",
+      "-c",
+      "features.apps=false",
+    ]);
+    expect(args.join(" ")).not.toContain("helix_openai_api");
+    expect(args.join(" ")).not.toContain("OPENAI_API_KEY");
+  });
+
   it("uses a provider-only Codex home under ignored local runtime state", () => {
     const workingDirectory = path.join("C:\\", "workspace");
     expect(resolveCodexCompatibilityHome({ workingDirectory })).toBe(

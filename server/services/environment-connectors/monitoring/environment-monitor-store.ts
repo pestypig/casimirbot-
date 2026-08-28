@@ -313,7 +313,14 @@ export class EnvironmentMonitorStore {
           createdAt: lease.created_at,
           expiresAt: input.expiresAt,
         });
+        const requestedExpiryMs = Date.parse(requested.expires_at);
+        const existingExpiryMs = Date.parse(lease.expires_at);
+        const requestsExtension =
+          !Number.isFinite(requestedExpiryMs) ||
+          !Number.isFinite(existingExpiryMs) ||
+          requestedExpiryMs > existingExpiryMs;
         if (
+          requestsExtension ||
           helixEnvironmentMonitorSha256({
             identity: lease.identity,
             event_families: lease.event_families,
@@ -326,7 +333,11 @@ export class EnvironmentMonitorStore {
             event_families: requested.event_families,
             max_event_age_ms: requested.max_event_age_ms,
             wake_budget_total: requested.wake_budget_total,
-            expires_at: requested.expires_at,
+            // A reconnect supplies a relative duration, so its derived expiry
+            // cannot equal the original timestamp. Compare the immutable
+            // identity and bounds at the existing expiry, then separately
+            // reject any attempted extension above.
+            expires_at: lease.expires_at,
           })
         ) {
           throw new EnvironmentMonitorStoreError(

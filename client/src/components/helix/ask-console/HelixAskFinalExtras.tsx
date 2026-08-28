@@ -165,7 +165,7 @@ export function HelixAskJobReadyLinkStrip({ links, onRun }: HelixAskJobReadyLink
               ? link.source
               : "artifact";
         return (
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-final-extras.on-run-link"
             key={`${String(link.type ?? "link")}-${String(link.panel_id)}-${String(link.action_id)}-${linkIndex}`}
             type="button"
             className="rounded-full border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100 hover:border-cyan-200/60 hover:bg-cyan-300/15"
@@ -271,7 +271,7 @@ export function HelixAskStagePlayActionButtons({
   return (
     <div className="mt-2 flex flex-wrap gap-1">
       {actions.map((action) => (
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-final-extras.use-the-stage-play-graph-checkpoint-controls-for-this-v1-action"
           key={`${rowKey}-${action}`}
           type="button"
           disabled

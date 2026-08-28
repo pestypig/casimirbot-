@@ -103,6 +103,8 @@ export const minecraftReactiveResourcesForAction = (
           ];
     case "craft":
       return ["inventory", "native_workflow"];
+    case "consume":
+      return ["hotbar", "main_hand", "inventory", "native_workflow"];
     case "inventory_transfer":
       return ["inventory", "native_workflow"];
   }
@@ -732,6 +734,7 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
           } else if (
             action.action_kind === "collect" ||
             action.action_kind === "craft" ||
+            action.action_kind === "consume" ||
             action.action_kind === "inventory_transfer"
           ) {
             declaredInventoryTransfers += action.count * multiplier;

@@ -673,7 +673,7 @@ function BindingBox({
       {activeNodeIds?.length ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {Array.from(new Set(activeNodeIds)).map((id) => (
-            <button
+            <button data-helix-control-id="workstation.panel.moral-graph.moral-graph-panel.on-select-node-id" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
               key={id}
               type="button"
               onClick={() => onSelectNode?.(id)}
@@ -770,7 +770,7 @@ function ObjectiveBindingRail({
             <BindingBox title={mg("Objective state")} label={labelize(fruition.result.posture)} tone="violet">
               <div className="space-y-1">
                 <div className="text-[11px] opacity-80">{fruition.result.label}</div>
-                <button
+                <button data-helix-control-id="workstation.panel.moral-graph.moral-graph-panel.on-load-fruition" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
                   type="button"
                   onClick={onLoadFruition}
                   className="mt-2 w-full rounded border border-violet-500/70 bg-violet-950/70 px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-violet-100 hover:border-violet-200"
@@ -1253,7 +1253,7 @@ export function MoralGraphPanel({
             {MORAL_OBJECTIVE_LENSES.map((lens) => {
               const active = objectiveBindingsOpen && activeObjectiveLensId === lens.id;
               return (
-                <button
+                <button data-helix-control-id="workstation.panel.moral-graph.moral-graph-panel.set-active-objective-lens-id-lens-id-set-objective-bindings-open-open-ac" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                   key={lens.id}
                   type="button"
                   aria-label={mg(lens.title)}
@@ -1376,7 +1376,7 @@ export function MoralGraphPanel({
             aria-label={mg("Moral graph zoom controls")}
             className="pointer-events-auto absolute bottom-4 right-4 z-50 flex gap-2"
           >
-            <button
+            <button data-helix-control-id="workstation.panel.moral-graph.moral-graph-panel.button" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
               type="button"
               aria-label={mg("Zoom out")}
               title={mg("Zoom out")}
@@ -1386,7 +1386,7 @@ export function MoralGraphPanel({
             >
               -
             </button>
-            <button
+            <button data-helix-control-id="workstation.panel.moral-graph.moral-graph-panel.button.2" data-helix-interaction-kind="navigate" data-helix-authority-state="client_local"
               type="button"
               aria-label={mg("Zoom in")}
               title={mg("Zoom in")}

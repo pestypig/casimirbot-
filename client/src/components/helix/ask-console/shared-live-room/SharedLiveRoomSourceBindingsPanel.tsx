@@ -936,7 +936,7 @@ export function SharedLiveRoomSourceBindingsPanel({
           <label className="sr-only" htmlFor={`minecraft-source-adapter-${roomId}`}>
             Minecraft environment adapter
           </label>
-          <select
+          <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.select"
             id={`minecraft-source-adapter-${roomId}`}
             value={sourceAdapterId}
             disabled={busy !== null || available === null}
@@ -951,7 +951,7 @@ export function SharedLiveRoomSourceBindingsPanel({
               </option>
             ))}
           </select>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.pair-in-game"
             type="button"
             disabled={busy !== null || available === null}
             className="inline-flex items-center gap-1 rounded border border-cyan-300/30 px-2 py-1 text-[10px] font-semibold text-cyan-100 disabled:opacity-50"
@@ -960,7 +960,7 @@ export function SharedLiveRoomSourceBindingsPanel({
             <KeyRound className="h-3 w-3" />
             Pair in game
           </button>
-          <button
+          <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.advanced-fallback-reveal-and-install-the-full-source-configuration-manua"
             type="button"
             disabled={busy !== null || available === null}
             title="Advanced fallback: reveal and install the full source configuration manually"
@@ -1054,7 +1054,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                       Your identity in this environment
                     </label>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <select
+                      <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.select.2"
                         id={`environment-subject-${environment.environment_binding_id}`}
                         value={
                           environment.self_subject_binding?.status === "active"
@@ -1097,7 +1097,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                         })}
                       </select>
                       {environment.self_subject_binding ? (
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.remove"
                           type="button"
                           disabled={identityBusy}
                           className="inline-flex items-center gap-1 rounded border border-white/15 px-2 py-1 text-[9px] text-slate-300 disabled:opacity-50"
@@ -1167,7 +1167,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                       <div className="grid gap-2 sm:grid-cols-2">
                         <label className="text-[9px] text-violet-100/70">
                           Authority profile
-                          <select
+                          <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.select.3"
                             aria-label={`Command authority for ${environment.source_label}`}
                             value={profileDraft}
                             disabled={authorityBusy}
@@ -1188,7 +1188,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                         </label>
                         <label className="text-[9px] text-violet-100/70">
                           Approval mode
-                          <select
+                          <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.select.4"
                             aria-label={`Command approval mode for ${environment.source_label}`}
                             value={autonomyDraft}
                             disabled={authorityBusy}
@@ -1220,7 +1220,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                                 key={category.id}
                                 className="flex items-center gap-1.5 text-[9px] text-slate-300"
                               >
-                                <input
+                                <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.input"
                                   type="checkbox"
                                   checked={categoryDraft.includes(category.id)}
                                   onChange={(event) =>
@@ -1245,7 +1245,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                       {profileDraft === "server_administrator" ||
                       autonomyDraft === "autonomous" ? (
                         <label className="flex items-start gap-2 rounded border border-amber-300/25 bg-amber-950/20 p-2 text-[9px] text-amber-100">
-                          <input
+                          <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.input.2"
                             type="checkbox"
                             aria-label={`Acknowledge full Minecraft command authority for ${environment.source_label}`}
                             checked={commandAuthorityAcknowledged[environmentId] === true}
@@ -1264,7 +1264,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                       ) : null}
 
                       <div className="flex flex-wrap gap-2">
-                        <button
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.save-command-authority"
                           type="button"
                           disabled={
                             authorityBusy ||
@@ -1280,7 +1280,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                           Save command authority
                         </button>
                         {authority?.status === "active" ? (
-                          <button
+                          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.pair-command-access-in-game"
                             type="button"
                             disabled={
                               authorityBusy || busy !== null || !sourceBinding
@@ -1299,7 +1299,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                           </button>
                         ) : null}
                         {authority?.status === "active" ? (
-                          <button
+                          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.pair-local-server-privately"
                             type="button"
                             disabled={
                               authorityBusy || busy !== null || !sourceBinding
@@ -1316,7 +1316,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                           </button>
                         ) : null}
                         {authority?.status === "active" ? (
-                          <button
+                          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.void-emergency-stop-commands-environment"
                             type="button"
                             disabled={authorityBusy || busy !== null}
                             className="inline-flex items-center gap-1 rounded border border-red-300/30 px-2 py-1 text-[9px] font-semibold text-red-200 disabled:opacity-50"
@@ -1355,7 +1355,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                                     {participant.display_name}
                                     {subject ? ` · ${subject.display_label}` : " · no player selected"}
                                   </span>
-                                  <select
+                                  <select data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.select.5"
                                     aria-label={`Command ceiling for ${participant.display_name}`}
                                     value={
                                       memberGrantDraft[draftKey] ??
@@ -1380,7 +1380,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                                       </option>
                                     ))}
                                   </select>
-                                  <button
+                                  <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.apply"
                                     type="button"
                                     disabled={memberBusy || busy !== null}
                                     className="rounded border border-white/15 px-1.5 py-1 text-[9px] text-slate-300 disabled:opacity-50"
@@ -1445,7 +1445,7 @@ export function SharedLiveRoomSourceBindingsPanel({
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.void-copy-pairing-command"
                 type="button"
                 className="inline-flex items-center gap-1 rounded border border-emerald-200/30 px-2 py-1 text-[10px] text-emerald-50"
                 onClick={() => void copyPairingCommand()}
@@ -1457,7 +1457,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                     ? "Select"
                     : "Copy command"}
               </button>
-              <button
+              <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.hide-connector-pairing-code"
                 type="button"
                 aria-label="Hide connector pairing code"
                 className="rounded border border-emerald-200/30 p-1 text-emerald-50"
@@ -1492,7 +1492,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                   Pending {pairing.purpose} pairing for {pairing.source_label} ·
                   expires {new Date(pairing.expires_at).toLocaleTimeString()}
                 </p>
-                <button
+                <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.revoke-code"
                   type="button"
                   disabled={busy !== null}
                   className="rounded border border-rose-300/20 px-1.5 py-0.5 text-[9px] text-rose-200 disabled:opacity-50"
@@ -1511,7 +1511,7 @@ export function SharedLiveRoomSourceBindingsPanel({
             <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] text-amber-50">
               {configYaml(setupConfig)}
             </pre>
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.copy-minecraft-room-source-configuration"
               type="button"
               aria-label="Copy Minecraft room source configuration"
               className="inline-flex shrink-0 items-center gap-1 rounded border border-amber-200/30 px-2 py-1 text-[10px] text-amber-50"
@@ -1524,7 +1524,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                   ? "Select"
                   : "Copy"}
             </button>
-            <button
+            <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.hide-minecraft-room-source-configuration"
               type="button"
               aria-label="Hide Minecraft room source configuration"
               className="inline-flex shrink-0 items-center rounded border border-amber-200/30 p-1 text-amber-50"
@@ -1549,7 +1549,7 @@ export function SharedLiveRoomSourceBindingsPanel({
             The source binding exists, but its one-time browser credential
             claim has not completed.
           </p>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.retry-secure-claim"
             type="button"
             disabled={busy !== null}
             className="mt-1 rounded border border-amber-200/30 px-2 py-1 text-[10px] text-amber-50 disabled:opacity-50"
@@ -1587,7 +1587,7 @@ export function SharedLiveRoomSourceBindingsPanel({
               </div>
               {binding.status === "active" || binding.status === "expired" ? (
                 <>
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.re-pair"
                     type="button"
                     disabled={busy !== null}
                     className="inline-flex items-center gap-1 rounded border border-white/15 px-1.5 py-1 text-[9px] text-slate-300 disabled:opacity-50"
@@ -1597,7 +1597,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                     Re-pair
                   </button>
                   {binding.domain_adapter === "minecraft.fabric_mod.v1" ? (
-                    <button
+                    <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.re-pair-local-sensing-privately"
                       type="button"
                       disabled={busy !== null}
                       className="inline-flex items-center gap-1 rounded border border-cyan-300/25 px-1.5 py-1 text-[9px] text-cyan-100 disabled:opacity-50"
@@ -1607,7 +1607,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                       Re-pair local sensing privately
                     </button>
                   ) : null}
-                  <button
+                  <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-source-bindings-panel.void-revoke-binding"
                     type="button"
                     disabled={busy !== null}
                     className="inline-flex items-center gap-1 rounded border border-rose-300/25 px-1.5 py-1 text-[9px] text-rose-200 disabled:opacity-50"

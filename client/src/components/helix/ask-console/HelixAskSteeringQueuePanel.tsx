@@ -37,7 +37,7 @@ export function HelixAskSteeringQueuePanel({
       data-active-steering-count={activeCount}
       data-expanded={expanded ? "true" : "false"}
     >
-      <button
+      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-steering-queue-panel.on-toggle-expanded"
         type="button"
         aria-expanded={expanded}
         aria-controls="helix-ask-steering-queue-items"

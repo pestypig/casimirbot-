@@ -9,6 +9,7 @@ import {
   HELIX_USER_ACCOUNT_POLICY,
   helixPermissionRank,
 } from "@shared/helix-account-session";
+import { HELIX_PUBLIC_UI_ROUTE_OWNED_CAPABILITIES } from "@shared/helix-public-ui-affordance";
 
 const gatewayOnlyOrSpecializedAliases = new Set([
   "workstation.active_context",
@@ -42,9 +43,7 @@ const explicitlyTerminalControlReceipts = new Set([
   "account_session.set_interface_language",
 ]);
 
-const routeOwnedNonGatewayCapabilities = new Set([
-  "postulate.submit_proposal",
-]);
+const routeOwnedNonGatewayCapabilities = new Set(HELIX_PUBLIC_UI_ROUTE_OWNED_CAPABILITIES);
 
 describe("Helix Ask gateway capability readiness matrix", () => {
   const manifests = listWorkstationGatewayCapabilities({ agentRuntime: "codex", mode: "act" }).capabilities;

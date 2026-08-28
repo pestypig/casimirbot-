@@ -64,6 +64,13 @@ context. OAuth state is stored only as a namespaced SHA-256 digest, and the
 stored PKCE verifier is replaced by an encrypted tombstone after one successful
 exchange.
 
+An installed development profile may rotate an existing record whose stored
+key identity is exactly `dev-local` into a configured stable key. That fallback
+is admitted only outside production, requires the authenticated stored key ID,
+and the first successful credential lease immediately rewrites the envelope
+under the configured key. Production never attempts the development-key
+fallback, and any other stored/current key mismatch fails closed.
+
 ## Current API surface
 
 All endpoints are mounted below `/api/agi` and require a signed-in developer
@@ -91,6 +98,8 @@ account with the `brokerage_environment` feature.
 | `GET` | `/brokerage-connections/:connectionId/rooms/:roomId/live-equity-previews` | List bounded reviews and their expiry/approval state. |
 | `POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-equity-previews/:previewId/approve` | Record exact-text, explicit-user, one-time approval for the reviewed order. |
 | `GET` | `/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-readiness` | Aggregate sanitized read, contract, supervisor, operator, entry, exit, and exposure gates without provider order-tool calls. |
+| `GET` | `/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-archives/latest` | Read the latest immutable sanitized completed-canary archive for the owning developer. |
+| `POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-acceptance-archives` | After both live flags are off, seal completed entry/exit and zero-exposure evidence under an exact confirmation phrase without calling a provider tool. |
 | `GET/POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-contract-preflight` | Read the latest sanitized receipt or inspect the MCP catalog without calling an order tool. |
 | `GET/POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-control` | Inspect or explicitly arm/stop the fail-closed tiny live-entry control. |
 | `POST` | `/brokerage-connections/:connectionId/rooms/:roomId/live-presence` | Maintain a short-lived attended-operator heartbeat while the visible room UI is active. |
@@ -133,6 +142,16 @@ key. The evidence-only acceptance projection separates read acceptance, safe
 flag enablement, attended-canary readiness, arming readiness, and completed
 entry/exit acceptance. It is derived from sanitized database receipts, invokes
 zero provider order tools, and has neither execution nor answer authority.
+
+Completed acceptance is sealed only after both live flags are disabled. The
+archive route re-reads the sanitized readiness projection, requires one
+reconciled-filled entry, one reconciled-filled exit and zero unresolved
+exposure, then locks the active control and rechecks those counts in the insert
+transaction. The evidence document excludes credentials, account identifiers,
+raw provider payloads and the volatile report-generation time. Its stable hash
+makes exact retries idempotent, and the local workstation snapshot includes the
+archive table so the record survives a keyed-server restart. Archiving has no
+provider-order vocabulary and cannot itself satisfy a missing acceptance gate.
 
 While armed, attended operator presence is a ten-second lease. If it expires or
 has a future-invalid timestamp, the next five-second supervisor cycle durably
@@ -197,6 +216,12 @@ history observations without account identifiers in the browser or logs.
 ## Deterministic paper-risk boundary
 
 The paper account is a simulation ledger and cannot submit an upstream order.
+In this brokerage contract, **paper** always means simulated cash, orders,
+fills and positions in CasimirBot's local ledger. It does not refer to the
+Minecraft Paper server adapter. Minecraft's accepted player execution lane is
+Fabric; no Paper-server command or authority participates in brokerage
+simulation.
+
 Its starter policy is immutable at the public route and uses integer cents and
 price micros. At an account equity of $340, the percentage caps resolve to a
 $50 maximum position, $1.70 maximum estimated risk per trade, and $6.80 daily
@@ -227,6 +252,77 @@ holidays.
 The room UI can initialize a paper bankroll, inspect its lifecycle, process a
 fresh quote, cancel an entry, close a position, and operate the audited kill
 switch. There is not yet an unattended market observer/scanner.
+
+## Governed resident-controller mapping
+
+Robinhood reuses the environment harness's generic governed resident-controller
+protocol; it does not reuse Minecraft combat rules or Fabric actions. Its first
+implemented profiles and next specified simulation profile are:
+
+1. **Brokerage market observer (`monitor_only`).** Read profile-scoped quotes,
+   account, position and order state under a finite semantic-monitor lease;
+   apply deterministic scheduling, freshness and paper-simulation rules; emit
+   ordered typed changes; and wake the exact Codex task for interpretation. It
+   has no provider mutation vocabulary.
+
+   Local paper-state processing is admitted separately from Robinhood read
+   access through `helix.brokerage.paper_observer.process`. Brokerage read
+   permission alone cannot invoke the observer cycle. The separate permission
+   authorizes only deterministic simulated-state processing and semantic
+   projection; it is not a live-trading permission.
+
+   The installed MCP bootstrap reuses that permission together with room
+   read/manage, environment read and agent-run write. It creates or reuses a
+   room-scoped paper account and a brokerage-native durable goal only after the
+   server verifies the exact private room, read binding, connection epoch,
+   owner participant, owner-scoped room-bound run and paper account. The paper
+   account may occupy the generic durable identity's `action_authority_id`
+   field solely as local simulation authority; it is never Robinhood provider
+   order authority.
+2. **Brokerage simulated-execution controller (`bounded_reflex`, specified).**
+   Consume an admitted, versioned strategy manifest plus fresh ordered quote
+   observations; maintain bounded market and simulated-position state; rank
+   only the manifest's admitted symbols and conditions; and propose finite
+   local-simulation responses through the paper-risk arbiter. Its response
+   vocabulary is limited to proposing a simulated limit entry, simulated
+   cancellation, simulated risk-reducing exit, simulated kill-switch
+   activation, abstention or semantic escalation. The paper ledger—not the
+   controller—owns each simulated effect and its idempotent receipt.
+
+   The manifest binds its artifact hash, symbol universe, quote fields,
+   schedule, maximum quote age, predicates, ranking function, entry and exit
+   limits, stop conditions, state horizon, expiry and reset behavior. Runtime
+   Codex may select or revise that finite manifest between admitted runs and
+   interpret compact receipts; it does not evaluate every quote update. A
+   watchdog independently stops new simulated risk on stale or gapped data,
+   producer-epoch change, lease expiry, invariant failure, daily-loss breach,
+   manual override or Emergency Stop.
+
+   Initial live input may use bounded Robinhood MCP quote polling. The profile
+   remains provider-neutral so a later authenticated event-stream adapter can
+   supply the same ordered observation contract. Request/response quotes do
+   not justify a high-frequency or exchange-parity latency claim. Historical
+   replay and live-data shadow runs must preserve event time, arrival time and
+   processing time so evaluation cannot use future information.
+
+   This profile has no Robinhood review, placement, cancellation,
+   reconciliation, transfer, option, crypto or liquidation vocabulary. No
+   simulated result, profitability metric or controller artifact grants live
+   authority. Its staged implementation and acceptance contract is
+   `docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md`.
+3. **Brokerage live-risk supervisor (`bounded_reflex`).** Observe the local
+   control ledger, quote freshness, protective-exit state and attended-presence
+   heartbeat. Its finite response vocabulary is limited to locking new entries,
+   expiring stale approval authority, activating the local kill switch and
+   raising an operator alert. It cannot place, cancel, replace, reconcile or
+   liquidate a provider order.
+
+The live executor is not a resident-controller response. A real order remains a
+separate high-consequence route requiring fresh provider evidence, deterministic
+risk admission, provider review, exact user approval, at-most-once placement and
+reconciliation. If the required response deadline is shorter than fresh
+evidence and that route can safely satisfy, the profile must abstain and fail
+closed rather than infer permission from urgency.
 
 ## Robinhood review and explicit approval boundary
 
@@ -301,9 +397,14 @@ Production acceptance is specified in
 
 1. Complete the real-account read-only acceptance above and expose the governed
    read capabilities to the CasimirBot plugin/Helix workstation tool gateway.
-2. Build a deterministic market observer and scanner around the implemented
-   clock, risk gate, journal, and fill simulator. Keep scheduling, indicators,
-   and state transitions outside the conversational agent loop.
+2. In progress: the versioned `monitor_only` market-observer profile now wraps
+   the implemented clock, quote-evidence gate, journal and fill simulator and
+   projects bounded changes through the generic semantic-monitor contract. Its
+   separately admitted MCP bootstrap now creates the room-scoped paper ledger
+   and brokerage-native durable-run identity needed by the generic finite
+   monitor. Complete installed delivery, acknowledgement, reconnect,
+   revocation and stale-epoch acceptance; keep scheduling, indicators and state
+   transitions outside the conversational agent loop.
 3. Completed: preview-only equity proposal, live Robinhood review, encrypted
    provider receipt, and expiring exact-text approval with no execution
    authority.

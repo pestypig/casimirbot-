@@ -52,21 +52,21 @@ export function HelixAskContextChooserPanel({
           </p>
         ) : null}
         <div className="mt-2 flex items-center gap-1.5">
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-observer-lane.attach-context"
             type="button"
             className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
             onClick={onRunAttached}
           >
             Attach context
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-observer-lane.run-isolated"
             type="button"
             className="inline-flex items-center rounded-md border border-indigo-300/35 bg-indigo-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-indigo-100 transition hover:bg-indigo-500/25"
             onClick={onRunIsolated}
           >
             Run isolated
           </button>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-observer-lane.cancel"
             type="button"
             className="inline-flex items-center rounded-md border border-slate-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-200 transition hover:bg-black/35"
             onClick={onCancel}

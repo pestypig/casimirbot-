@@ -19,6 +19,7 @@ import {
   HELIX_MINECRAFT_PLAYER_CAMERA_TRACK_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_COLLECT_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EQUIP_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_EXECUTE_REACTIVE_PROGRAM_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_ARM_VIABILITY_GUARDIAN_CAPABILITY,
@@ -100,7 +101,7 @@ const capability = (
 const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.parse({
   schema: HELIX_ENVIRONMENT_ACTION_ADAPTER_PROFILE_SCHEMA,
   profile_id: HELIX_MINECRAFT_FABRIC_PLAYER_ACTION_PROFILE_ID,
-  profile_version: 5,
+  profile_version: 6,
   domain: "minecraft",
   action_family: "minecraft_player",
   accepted_domain_adapters: ["minecraft.fabric_client.v1"],
@@ -202,6 +203,12 @@ const minecraftFabricPlayerProfile = helixEnvironmentActionAdapterProfileSchema.
     capability(
       HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
       "craft",
+      "player_inventory",
+      ["long_running"],
+    ),
+    capability(
+      HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
+      "consume",
       "player_inventory",
       ["long_running"],
     ),

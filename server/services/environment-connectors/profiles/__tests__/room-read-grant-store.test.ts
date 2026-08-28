@@ -9,6 +9,8 @@ import { accountSessionRouter } from "../../../../routes/account-session";
 import {
   environmentConnectorBrowserRouter,
 } from "../../../../routes/environment-connector-platform";
+import { listEnvironmentConnectorDeviceChecks } from
+  "../../devices/device-check";
 import {
   authorizeRoomReadGrant,
   createRoomReadGrant,
@@ -261,6 +263,20 @@ describe("room read grant store", () => {
       blocking_reasons: [],
       ready: true,
       credential_included: false,
+    });
+
+    const deviceChecks = await listEnvironmentConnectorDeviceChecks({
+      ownerProfileId: OWNER,
+      roomId: ROOM,
+      now: NOW,
+    });
+    expect(deviceChecks[0]).toMatchObject({
+      device_id: DEVICE,
+      credential_status: "active",
+      probe_ready: true,
+      blocking_reasons: [],
+      credential_included: false,
+      terminal_eligible: false,
     });
 
     const grant = await createRoomReadGrant({

@@ -102,7 +102,7 @@ export function RuntimeWorkbenchSection() {
           <div className="mt-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
             Claim boundary: {selectedSetup.claimBoundary.currentTier}; promotion is not automatic. {selectedSetup.claimBoundary.promotionRequires.join("; ")}
           </div>
-          <Button className="mt-3 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => void start()} disabled={starting || Boolean(selected && ["queued", "running"].includes(selected.snapshot.request.status))}>
+          <Button data-helix-control-id="workstation.panel.scientific-calculator.runtime-workbench-section.void-start" data-helix-interaction-kind="act" data-helix-authority-state="client_local" className="mt-3 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => void start()} disabled={starting || Boolean(selected && ["queued", "running"].includes(selected.snapshot.request.status))}>
             {starting ? "Starting…" : "Run registered command"}
           </Button>
         </div>

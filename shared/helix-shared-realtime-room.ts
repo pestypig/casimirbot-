@@ -12,6 +12,8 @@ export const HELIX_SHARED_REALTIME_ROOM_DEBUG_SCHEMA =
   "helix.shared_realtime_room.debug.v1" as const;
 export const HELIX_SHARED_REALTIME_ROOM_PARTICIPANT_CONTEXT_SCHEMA =
   "helix.shared_realtime_room.participant_context.v1" as const;
+export const HELIX_SHARED_REALTIME_ROOM_PUBLIC_TERMINAL_RESULT_SCHEMA =
+  "helix.shared_realtime_room.public_terminal_result.v1" as const;
 
 export const HELIX_SHARED_REALTIME_ROOM_MAX_PARTICIPANTS = 2 as const;
 
@@ -99,6 +101,34 @@ export type HelixSharedRealtimeRoomReadiness = {
   missing_consent_by_participant: Record<string, Array<keyof HelixSharedRealtimeRoomConsentPatch>>;
 };
 
+/**
+ * A room-visible copy of an already authorized Ask terminal answer. This is a
+ * presentation projection only: it cannot answer a second time or grant any
+ * capability. The originating Ask turn remains the sole terminal writer.
+ */
+export type HelixSharedRealtimeRoomPublicTerminalResult = {
+  schema: typeof HELIX_SHARED_REALTIME_ROOM_PUBLIC_TERMINAL_RESULT_SCHEMA;
+  result_ref: string;
+  room_id: string;
+  turn_id: string;
+  author_participant_id: string;
+  published_at: string;
+  terminal_artifact_kind: string;
+  final_answer_source: string;
+  text: string;
+  evidence_refs: string[];
+  capability_ids: string[];
+  source_terminal_authorized: true;
+  content_role: "room_public_terminal_projection";
+  credential_included: false;
+  private_endpoint_included: false;
+  hidden_reasoning_included: false;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
 export type HelixSharedRealtimeRoom = {
   schema: typeof HELIX_SHARED_REALTIME_ROOM_SCHEMA;
   room_id: string;
@@ -108,6 +138,7 @@ export type HelixSharedRealtimeRoom = {
   self_participant_id: string;
   participants: HelixSharedRealtimeRoomParticipant[];
   participant_context_cards: HelixSharedRealtimeRoomParticipantContextCard[];
+  public_terminal_results: HelixSharedRealtimeRoomPublicTerminalResult[];
   readiness: HelixSharedRealtimeRoomReadiness;
   runtime: HelixSharedRealtimeRoomRuntime;
   created_at: string;

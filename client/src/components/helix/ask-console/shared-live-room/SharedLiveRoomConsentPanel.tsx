@@ -79,7 +79,7 @@ export function SharedLiveRoomConsentPanel({
         {consentControls.map((control) => {
           const enabled = participant.consent[control.key];
           return (
-            <button
+            <button data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-consent-panel.void-toggle-consent-control-key-enabled"
               key={control.key}
               type="button"
               aria-pressed={enabled}

@@ -44,11 +44,16 @@ import {
   type LiveAccountPreflightSnapshot,
 } from "./live-account-preflight";
 import { PaperTradingError } from "./paper-trading-errors";
+import { hasFreshRobinhoodLiveProviderContractAcceptance } from
+  "./live-provider-contract-preflight-store";
 import { readUsMarketClock } from "./us-market-clock";
 
 const PREVIEW_LIFETIME_MS = 90_000;
 const PLACEMENT_PREVIEW_MAX_AGE_MS = 30_000;
 const SNAPSHOT_MAX_AGE_MS = 10_000;
+const SUPERVISOR_FRESH_MS = 15_000;
+const OPERATOR_PRESENCE_FRESH_MS = 10_000;
+const LIVE_DEPLOYMENT_ENV = "ENABLE_ROBINHOOD_LIVE_EQUITY_EXECUTION";
 
 type EntryRow = {
   execution_id: string;
@@ -86,11 +91,21 @@ type ApprovalRow = {
   exit_preview_id: string;
   entry_execution_id: string;
   owner_profile_id: string;
+  session_hash: string;
   proposal_hash: string;
   provider_review_hash: string;
   approved_at: Date | string;
   expires_at: Date | string;
   consumed_at: Date | string | null;
+};
+
+type ProtectiveControlRow = {
+  protective_exit_ready: boolean;
+  supervisor_heartbeat_at: Date | string | null;
+  supervisor_status: "disabled" | "healthy" | "degraded";
+  operator_presence_at: Date | string | null;
+  operator_attendance_status: "active" | "inactive";
+  control_status: "active" | "archived";
 };
 
 type ExitExecutionRow = {
@@ -131,6 +146,24 @@ const hash = (domain: string, value: unknown): `sha256:${string}` =>
   `sha256:${crypto.createHash("sha256")
     .update(`${domain}\n${JSON.stringify(canonicalize(value))}`, "utf8")
     .digest("hex")}`;
+const deploymentEnabled = (override?: boolean): boolean =>
+  override ?? process.env[LIVE_DEPLOYMENT_ENV] === "1";
+const attendedProtectiveControlIsFresh = (
+  row: ProtectiveControlRow | null | undefined,
+  now: Date,
+): boolean => {
+  if (!row || row.control_status !== "active" ||
+      !row.protective_exit_ready || row.supervisor_status !== "healthy" ||
+      row.operator_attendance_status !== "active" ||
+      row.supervisor_heartbeat_at === null ||
+      row.operator_presence_at === null) return false;
+  const supervisorAge = now.getTime() -
+    new Date(row.supervisor_heartbeat_at).getTime();
+  const operatorAge = now.getTime() -
+    new Date(row.operator_presence_at).getTime();
+  return supervisorAge >= 0 && supervisorAge <= SUPERVISOR_FRESH_MS &&
+    operatorAge >= 0 && operatorAge <= OPERATOR_PRESENCE_FRESH_MS;
+};
 const strings = (value: unknown): string[] => Array.isArray(value)
   ? value.filter((entry: unknown): entry is string => typeof entry === "string")
   : [];
@@ -562,19 +595,89 @@ export const approveProtectiveExitPreview = async (input: {
 
 export const executeApprovedProtectiveExit = async (input: {
   ownerProfileId: string;
+  sessionId: string;
   connectionId: string;
   roomId: string;
   exitApprovalId: string;
   clientOrderId: string;
   now?: Date;
+  deploymentEnabled?: boolean;
   preflight?: LiveAccountPreflightSnapshot;
   placeExit?: RobinhoodProtectiveExitPlacementCall;
 }): Promise<HelixProtectiveExitExecution> => {
   const now = input.now ?? new Date();
+  if (!deploymentEnabled(input.deploymentEnabled)) throw new PaperTradingError(
+    "paper_trading_unavailable", 403,
+    "Live protective-exit execution is disabled by deployment policy.",
+  );
   if (readUsMarketClock(now).session !== "regular") throw new PaperTradingError(
     "paper_trading_unavailable", 409,
     "Protective stop placement is limited to the regular U.S. market session.",
   );
+  const initialGate = await withSharedRealtimeRoomTransaction(async (client: Queryable) => {
+    const { rows } = await client.query<PreviewRow & ApprovalRow &
+      ProtectiveControlRow & {
+      entry_intent_json: unknown;
+      entry_state: string;
+      control_id: string;
+    }>(
+      `SELECT p.*, a.*, e.intent_json AS entry_intent_json,
+              e.state AS entry_state, e.control_id,
+              c.protective_exit_ready, c.supervisor_heartbeat_at,
+              c.supervisor_status, c.operator_presence_at,
+              c.operator_attendance_status,
+              c.status AS control_status
+       FROM helix_live_protective_exit_approvals a
+       JOIN helix_live_protective_exit_previews p
+         ON p.exit_preview_id = a.exit_preview_id
+       JOIN helix_live_equity_executions e
+         ON e.execution_id = p.entry_execution_id
+       JOIN helix_live_trading_controls c ON c.control_id = e.control_id
+       WHERE a.exit_approval_id = $1 AND a.owner_profile_id = $2
+         AND p.connection_id = $3 AND p.room_id = $4 LIMIT 1;`,
+      [input.exitApprovalId, input.ownerProfileId,
+        input.connectionId, input.roomId],
+    );
+    return {
+      row: rows[0],
+      providerContractAccepted:
+        await hasFreshRobinhoodLiveProviderContractAcceptance({
+          client,
+          ownerProfileId: input.ownerProfileId,
+          connectionId: input.connectionId,
+          roomId: input.roomId,
+          now,
+        }),
+    };
+  });
+  const initial = initialGate.row;
+  if (!initial) throw new PaperTradingError(
+    "paper_order_not_found", 404, "The protective-exit approval was not found.",
+  );
+  if (initial.session_hash !==
+      hash("helix-protective-exit-session/v1", input.sessionId)) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The protective-exit approval belongs to a different authenticated session.",
+    );
+  }
+  if (initial.status !== "approved" || initial.consumed_at !== null ||
+      initial.entry_state !== "reconciled_filled" ||
+      now.getTime() >= new Date(initial.expires_at).getTime() ||
+      now.getTime() - new Date(initial.reviewed_at).getTime() >
+        PLACEMENT_PREVIEW_MAX_AGE_MS) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The one-time protective-exit approval is stale, consumed, or no longer admitted.",
+    );
+  }
+  if (!attendedProtectiveControlIsFresh(initial, now) ||
+      !initialGate.providerContractAccepted) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The attended supervisor or provider contract does not admit protective-exit placement.",
+    );
+  }
   let lease = await readRobinhoodCredentialBundleForPrivateRoomAdapter({
     ownerProfileId: input.ownerProfileId,
     connectionId: input.connectionId,
@@ -586,29 +689,6 @@ export const executeApprovedProtectiveExit = async (input: {
   if (!accountRef) throw new PaperTradingError(
     "paper_trading_unavailable", 409,
     "A uniquely selected Robinhood Agentic account is required.",
-  );
-  const initial = await withSharedRealtimeRoomTransaction(async (client: Queryable) => {
-    const { rows } = await client.query<PreviewRow & ApprovalRow & {
-      entry_intent_json: unknown;
-      entry_state: string;
-      control_id: string;
-    }>(
-      `SELECT p.*, a.*, e.intent_json AS entry_intent_json,
-              e.state AS entry_state, e.control_id
-       FROM helix_live_protective_exit_approvals a
-       JOIN helix_live_protective_exit_previews p
-         ON p.exit_preview_id = a.exit_preview_id
-       JOIN helix_live_equity_executions e
-         ON e.execution_id = p.entry_execution_id
-       WHERE a.exit_approval_id = $1 AND a.owner_profile_id = $2
-         AND p.connection_id = $3 AND p.room_id = $4 LIMIT 1;`,
-      [input.exitApprovalId, input.ownerProfileId,
-        input.connectionId, input.roomId],
-    );
-    return rows[0];
-  });
-  if (!initial) throw new PaperTradingError(
-    "paper_order_not_found", 404, "The protective-exit approval was not found.",
   );
   const entryIntent = helixLiveEquityOrderIntentSchema.parse(
     initial.entry_intent_json,
@@ -629,14 +709,19 @@ export const executeApprovedProtectiveExit = async (input: {
     );
   }
   const reserved = await withSharedRealtimeRoomTransaction(async (client: Queryable) => {
-    const { rows } = await client.query<PreviewRow & ApprovalRow & {
-      entry_state: string; control_id: string }>(
-      `SELECT p.*, a.*, e.state AS entry_state, e.control_id
+    const { rows } = await client.query<PreviewRow & ApprovalRow &
+      ProtectiveControlRow & { entry_state: string; control_id: string }>(
+      `SELECT p.*, a.*, e.state AS entry_state, e.control_id,
+              c.protective_exit_ready, c.supervisor_heartbeat_at,
+              c.supervisor_status, c.operator_presence_at,
+              c.operator_attendance_status,
+              c.status AS control_status
        FROM helix_live_protective_exit_approvals a
        JOIN helix_live_protective_exit_previews p
          ON p.exit_preview_id = a.exit_preview_id
        JOIN helix_live_equity_executions e
          ON e.execution_id = p.entry_execution_id
+       JOIN helix_live_trading_controls c ON c.control_id = e.control_id
        WHERE a.exit_approval_id = $1 AND a.owner_profile_id = $2
          AND p.connection_id = $3 AND p.room_id = $4
        LIMIT 1 FOR UPDATE;`,
@@ -644,8 +729,20 @@ export const executeApprovedProtectiveExit = async (input: {
         input.connectionId, input.roomId],
     );
     const row = rows[0];
+    const providerContractAccepted = await
+      hasFreshRobinhoodLiveProviderContractAcceptance({
+        client,
+        ownerProfileId: input.ownerProfileId,
+        connectionId: input.connectionId,
+        roomId: input.roomId,
+        now,
+      });
     if (!row || row.status !== "approved" || row.consumed_at !== null ||
+        row.session_hash !==
+          hash("helix-protective-exit-session/v1", input.sessionId) ||
         row.entry_state !== "reconciled_filled" ||
+        !attendedProtectiveControlIsFresh(row, now) ||
+        !providerContractAccepted ||
         now.getTime() >= new Date(row.expires_at).getTime() ||
         now.getTime() - new Date(row.reviewed_at).getTime() >
           PLACEMENT_PREVIEW_MAX_AGE_MS) {
@@ -814,9 +911,41 @@ export const cancelProtectiveExitExecution = async (input: {
   roomId: string;
   exitExecutionId: string;
   now?: Date;
+  deploymentEnabled?: boolean;
   cancelOrder?: RobinhoodLiveCancellationCall;
 }): Promise<HelixProtectiveExitExecution> => {
   const now = input.now ?? new Date();
+  if (!deploymentEnabled(input.deploymentEnabled)) throw new PaperTradingError(
+    "paper_trading_unavailable", 403,
+    "Live protective-exit cancellation is disabled by deployment policy.",
+  );
+  const initialControl = await withSharedRealtimeRoomTransaction(
+    async (client: Queryable) => {
+      const { rows } = await client.query<ProtectiveControlRow>(
+        `SELECT c.protective_exit_ready, c.supervisor_heartbeat_at,
+                c.supervisor_status, c.operator_presence_at,
+                c.operator_attendance_status,
+                c.status AS control_status
+         FROM helix_live_protective_exit_executions x
+         JOIN helix_live_trading_controls c ON c.control_id = x.control_id
+         WHERE x.exit_execution_id = $1 AND x.owner_profile_id = $2
+           AND x.connection_id = $3 AND x.room_id = $4 LIMIT 1;`,
+        [input.exitExecutionId, input.ownerProfileId,
+          input.connectionId, input.roomId],
+      );
+      return rows[0] ?? null;
+    },
+  );
+  if (!initialControl) throw new PaperTradingError(
+    "paper_order_not_found", 404,
+    "The protective-stop execution was not found.",
+  );
+  if (!attendedProtectiveControlIsFresh(initialControl, now)) {
+    throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "Cancelling a protective stop requires a fresh attended session and healthy supervisor.",
+    );
+  }
   let lease = await readRobinhoodCredentialBundleForPrivateRoomAdapter({
     ownerProfileId: input.ownerProfileId,
     connectionId: input.connectionId,
@@ -830,10 +959,15 @@ export const cancelProtectiveExitExecution = async (input: {
     "A uniquely selected Robinhood Agentic account is required.",
   );
   const reserved = await withSharedRealtimeRoomTransaction(async (client: Queryable) => {
-    const { rows } = await client.query<ExitExecutionRow>(
-      `SELECT * FROM helix_live_protective_exit_executions
-       WHERE exit_execution_id = $1 AND owner_profile_id = $2
-         AND connection_id = $3 AND room_id = $4 LIMIT 1 FOR UPDATE;`,
+    const { rows } = await client.query<ExitExecutionRow & ProtectiveControlRow>(
+      `SELECT x.*, c.protective_exit_ready, c.supervisor_heartbeat_at,
+              c.supervisor_status, c.operator_presence_at,
+              c.operator_attendance_status,
+              c.status AS control_status
+       FROM helix_live_protective_exit_executions x
+       JOIN helix_live_trading_controls c ON c.control_id = x.control_id
+       WHERE x.exit_execution_id = $1 AND x.owner_profile_id = $2
+         AND x.connection_id = $3 AND x.room_id = $4 LIMIT 1 FOR UPDATE;`,
       [input.exitExecutionId, input.ownerProfileId,
         input.connectionId, input.roomId],
     );
@@ -841,6 +975,19 @@ export const cancelProtectiveExitExecution = async (input: {
     if (!row) throw new PaperTradingError(
       "paper_order_not_found", 404,
       "The protective-stop execution was not found.",
+    );
+    const providerContractAccepted = await
+      hasFreshRobinhoodLiveProviderContractAcceptance({
+        client,
+        ownerProfileId: input.ownerProfileId,
+        connectionId: input.connectionId,
+        roomId: input.roomId,
+        now,
+      });
+    if (!attendedProtectiveControlIsFresh(row, now) ||
+        !providerContractAccepted) throw new PaperTradingError(
+      "paper_risk_decision_not_accepted", 409,
+      "The attended supervisor or provider contract no longer admits protective-stop cancellation.",
     );
     if (!["submitted", "reconciliation_required", "reconciled_open"]
       .includes(row.state) || !row.encrypted_provider_result) {

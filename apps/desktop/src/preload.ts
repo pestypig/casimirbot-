@@ -3,6 +3,8 @@ import {
   DESKTOP_RUNTIME_SNAPSHOT_CHANNEL,
   DESKTOP_AUTH0_ACCOUNT_LINK_COMPLETION_CHANNEL,
   DESKTOP_AUTH0_ACCOUNT_LINK_OPEN_CHANNEL,
+  DESKTOP_AUTH0_STEP_UP_COMPLETION_CHANNEL,
+  DESKTOP_AUTH0_STEP_UP_OPEN_CHANNEL,
   DESKTOP_CODEX_PLUGIN_OPEN_CHANNEL,
   DESKTOP_CODEX_PLUGIN_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_CLEAR_CHANNEL,
@@ -12,6 +14,11 @@ import {
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
   DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
+  DESKTOP_TEXTURE_PACK_FRAME_CHANNEL,
+  DESKTOP_TEXTURE_PACK_REVEAL_CHANNEL,
+  DESKTOP_TEXTURE_PACK_SHOW_CHANNEL,
+  DESKTOP_TEXTURE_PACK_STATE_CHANNEL,
+  DESKTOP_TEXTURE_PACK_STOP_CHANNEL,
   DESKTOP_UPDATE_CHECK_CHANNEL,
   DESKTOP_UPDATE_DOWNLOAD_CHANNEL,
   DESKTOP_UPDATE_INSTALL_CHANNEL,
@@ -46,11 +53,29 @@ const desktopBridge = Object.freeze({
       DESKTOP_AUTH0_ACCOUNT_LINK_OPEN_CHANNEL,
       authorizationUrl,
     ),
+  openAuth0StepUp: (authorizationUrl: unknown) =>
+    ipcRenderer.invoke(DESKTOP_AUTH0_STEP_UP_OPEN_CHANNEL, authorizationUrl),
   openRobinhoodOAuth: (authorizationUrl: unknown) =>
     ipcRenderer.invoke(
       DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
       authorizationUrl,
     ),
+  getRealtimeTexturePackState: () =>
+    ipcRenderer.invoke(DESKTOP_TEXTURE_PACK_STATE_CHANNEL),
+  showRealtimeTexturePackOverlay: (config: unknown) =>
+    ipcRenderer.invoke(DESKTOP_TEXTURE_PACK_SHOW_CHANNEL, config),
+  updateRealtimeTexturePackFrame: (frame: unknown) =>
+    ipcRenderer.invoke(DESKTOP_TEXTURE_PACK_FRAME_CHANNEL, frame),
+  revealRealtimeTexturePackOriginal: (reveal: boolean) =>
+    ipcRenderer.invoke(DESKTOP_TEXTURE_PACK_REVEAL_CHANNEL, reveal),
+  stopRealtimeTexturePackOverlay: () =>
+    ipcRenderer.invoke(DESKTOP_TEXTURE_PACK_STOP_CHANNEL),
+  onRealtimeTexturePackState: (listener: (state: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>
+      listener(state);
+    ipcRenderer.on(DESKTOP_TEXTURE_PACK_STATE_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(DESKTOP_TEXTURE_PACK_STATE_CHANNEL, handler);
+  },
   onAuth0AccountLinkCompletion: (listener: (state: unknown) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>
       listener(state);
@@ -60,6 +85,13 @@ const desktopBridge = Object.freeze({
         DESKTOP_AUTH0_ACCOUNT_LINK_COMPLETION_CHANNEL,
         handler,
       );
+  },
+  onAuth0StepUpCompletion: (listener: (state: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>
+      listener(state);
+    ipcRenderer.on(DESKTOP_AUTH0_STEP_UP_COMPLETION_CHANNEL, handler);
+    return () =>
+      ipcRenderer.removeListener(DESKTOP_AUTH0_STEP_UP_COMPLETION_CHANNEL, handler);
   },
   onMcpTunnelState: (listener: (state: unknown) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>

@@ -141,6 +141,21 @@ type LiveAcceptanceReadiness = {
   }>;
 };
 
+type LiveAcceptanceArchive = {
+  archive_id: string;
+  connection_id: string;
+  room_id: string;
+  control_id: string;
+  evidence_hash: string;
+  status: "accepted";
+  accepted_at: string;
+  reconciled_filled_entry_count: number;
+  reconciled_filled_exit_count: number;
+  unresolved_live_exposure_count: 0;
+  live_flags_enabled: false;
+  provider_order_tool_calls_made_by_archive: 0;
+};
+
 type ProtectiveExitPreview = {
   exit_preview_id: string;
   entry_execution_id: string;
@@ -213,13 +228,18 @@ export function SharedLiveRoomPaperTradingPanel({
     React.useState<LiveProviderContractPreflight | null>(null);
   const [liveAcceptanceReadiness, setLiveAcceptanceReadiness] =
     React.useState<LiveAcceptanceReadiness | null>(null);
+  const [liveAcceptanceArchive, setLiveAcceptanceArchive] =
+    React.useState<LiveAcceptanceArchive | null>(null);
   const [protectivePreviews, setProtectivePreviews] = React.useState<ProtectiveExitPreview[]>([]);
   const [protectiveExecutions, setProtectiveExecutions] = React.useState<ProtectiveExitExecution[]>([]);
   const [armingText, setArmingText] = React.useState("");
+  const [archiveConfirmationText, setArchiveConfirmationText] =
+    React.useState("");
   const [placementText, setPlacementText] = React.useState<Record<string, string>>({});
   const [protectiveApprovalText, setProtectiveApprovalText] = React.useState<Record<string, string>>({});
   const [protectivePlacementText, setProtectivePlacementText] = React.useState<Record<string, string>>({});
   const [attendingLive, setAttendingLive] = React.useState(false);
+  const [attendanceId, setAttendanceId] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
   const basePath = `/api/agi/brokerage-connections/${encodeURIComponent(connectionId)}/rooms/${encodeURIComponent(roomId)}`;
@@ -246,7 +266,8 @@ export function SharedLiveRoomPaperTradingPanel({
   const refreshLifecycle = React.useCallback(async (accountId: string) => {
     const [nextLifecycle, nextPreviews, nextControl, nextExecutions,
       nextProtectivePreviews, nextProtectiveExecutions,
-      nextContractPreflight, nextAcceptanceReadiness] = await Promise.all([
+      nextContractPreflight, nextAcceptanceReadiness,
+      nextAcceptanceArchive] = await Promise.all([
       request<PaperLifecycle>(
         `paper-lifecycle?account_id=${encodeURIComponent(accountId)}`,
       ),
@@ -257,6 +278,7 @@ export function SharedLiveRoomPaperTradingPanel({
       request<ProtectiveExitExecutionList>("protective-exit-executions"),
       request<LiveProviderContractPreflight>("live-contract-preflight"),
       request<LiveAcceptanceReadiness>("live-acceptance-readiness"),
+      request<LiveAcceptanceArchive>("live-acceptance-archives/latest"),
     ]);
     setLifecycle(nextLifecycle);
     setLivePreviews(nextPreviews?.previews ?? []);
@@ -266,6 +288,7 @@ export function SharedLiveRoomPaperTradingPanel({
     setProtectiveExecutions(nextProtectiveExecutions?.executions ?? []);
     setLiveContractPreflight(nextContractPreflight);
     setLiveAcceptanceReadiness(nextAcceptanceReadiness);
+    setLiveAcceptanceArchive(nextAcceptanceArchive);
   }, [request]);
 
   const refresh = React.useCallback(async () => {
@@ -285,7 +308,8 @@ export function SharedLiveRoomPaperTradingPanel({
   }, [readOnly, refresh]);
 
   React.useEffect(() => {
-    if (!attendingLive || !liveControl?.deployment_enabled) return undefined;
+    if (!attendingLive || !attendanceId ||
+        !liveControl?.deployment_enabled) return undefined;
     let cancelled = false;
     const pulse = async (): Promise<void> => {
       if (document.visibilityState !== "visible") return;
@@ -293,12 +317,17 @@ export function SharedLiveRoomPaperTradingPanel({
         const control = await request<LiveTradingControl>("live-presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ control_id: liveControl.control_id }),
+          body: JSON.stringify({
+            control_id: liveControl.control_id,
+            attendance_id: attendanceId,
+            action: "heartbeat",
+          }),
         });
         if (!cancelled && control) setLiveControl(control);
       } catch (error) {
         if (!cancelled) {
           setAttendingLive(false);
+          setAttendanceId(null);
           setMessage(error instanceof Error ? error.message :
             "The attended live-session heartbeat stopped.");
         }
@@ -310,7 +339,7 @@ export function SharedLiveRoomPaperTradingPanel({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [attendingLive, liveControl?.control_id,
+  }, [attendanceId, attendingLive, liveControl?.control_id,
     liveControl?.deployment_enabled, request]);
 
   const create = async (): Promise<void> => {
@@ -395,17 +424,61 @@ export function SharedLiveRoomPaperTradingPanel({
     }
   };
 
-  const readQuote = async (symbol: string): Promise<string> => {
+  const readObservation = async (
+    toolName: "get_equity_quotes" | "get_earnings_results",
+    args: Record<string, unknown>,
+  ): Promise<BrokerageObservation> => {
     const observation = await request<BrokerageObservation>("read", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tool_name: "get_equity_quotes",
-        arguments: { symbols: [symbol] },
+        tool_name: toolName,
+        arguments: args,
       }),
     });
-    if (!observation) throw new Error("Robinhood quote observation was unavailable.");
+    if (!observation) throw new Error("Robinhood observation was unavailable.");
+    return observation;
+  };
+
+  const readQuote = async (symbol: string): Promise<string> => {
+    const observation = await readObservation(
+      "get_equity_quotes", { symbols: [symbol] },
+    );
     return observation.observation_id;
+  };
+
+  const stagePaperObserverCanary = async (): Promise<void> => {
+    if (!account) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const symbol = "SPY";
+      const quote = await readObservation(
+        "get_equity_quotes", { symbols: [symbol] },
+      );
+      const earnings = await readObservation(
+        "get_earnings_results", { symbol },
+      );
+      await request("paper-observer-canaries/stage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: account.account_id,
+          symbol,
+          notional_cents: 2_000,
+          quote_observation_id: quote.observation_id,
+          earnings_observation_id: earnings.observation_id,
+          client_canary_id: `g8-${crypto.randomUUID()}`,
+        }),
+      });
+      await refresh();
+      setMessage("$20 SPY paper observer canary staged. No live order or provider mutation occurred.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message :
+        "Unable to stage the paper observer canary.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const processSymbol = async (symbol: string): Promise<void> => {
@@ -555,6 +628,73 @@ export function SharedLiveRoomPaperTradingPanel({
     }
   };
 
+  const toggleAttendedLiveSession = async (): Promise<void> => {
+    if (!attendingLive) {
+      if (!liveControl) return;
+      const nextAttendanceId = attendanceId ??
+        `live_attendance:${crypto.randomUUID()}`;
+      // Retain the pending generation across a lost HTTP response so retrying
+      // start remains idempotent instead of racing the already-created lease.
+      setAttendanceId(nextAttendanceId);
+      setBusy(true);
+      setMessage(null);
+      try {
+        const control = await request<LiveTradingControl>("live-presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            control_id: liveControl.control_id,
+            attendance_id: nextAttendanceId,
+            action: "start",
+          }),
+        });
+        if (control) setLiveControl(control);
+        const readiness = await request<LiveAcceptanceReadiness>(
+          "live-acceptance-readiness",
+        );
+        setLiveAcceptanceReadiness(readiness);
+        setAttendingLive(true);
+        setMessage("Attended live session started. Visibility heartbeats expire after ten seconds.");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message :
+          "Unable to start the attended live session.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    const endingAttendanceId = attendanceId;
+    setAttendingLive(false);
+    setAttendanceId(null);
+    if (!liveControl || !endingAttendanceId) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const control = await request<LiveTradingControl>("live-presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          control_id: liveControl.control_id,
+          attendance_id: endingAttendanceId,
+          action: "end",
+        }),
+      });
+      if (control) setLiveControl(control);
+      const readiness = await request<LiveAcceptanceReadiness>(
+        "live-acceptance-readiness",
+      );
+      setLiveAcceptanceReadiness(readiness);
+      setMessage("Attended live session ended. Placement is disarmed and the kill switch is active.");
+    } catch (error) {
+      setMessage(error instanceof Error
+        ? `${error.message} The stopped heartbeat will still trigger the dead-man relock.`
+        : "The stopped heartbeat will trigger the dead-man relock.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const checkLiveProviderContracts = async (): Promise<void> => {
     if (!account) return;
     setBusy(true);
@@ -577,6 +717,33 @@ export function SharedLiveRoomPaperTradingPanel({
     } catch (error) {
       setMessage(error instanceof Error ? error.message :
         "Unable to inspect Robinhood's live provider contracts.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const archiveLiveAcceptance = async (): Promise<void> => {
+    if (!account) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const archive = await request<LiveAcceptanceArchive>(
+        "live-acceptance-archives",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmation_text: archiveConfirmationText,
+          }),
+        },
+      );
+      setLiveAcceptanceArchive(archive);
+      setMessage(archive
+        ? "Sanitized live acceptance archived with both live flags off. No provider order tool was called by the archive."
+        : "The live-acceptance archive was unavailable.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message :
+        "Unable to archive Robinhood live acceptance.");
     } finally {
       setBusy(false);
     }
@@ -826,14 +993,14 @@ export function SharedLiveRoomPaperTradingPanel({
           Selects only the account Robinhood marks agentic_allowed, then records five sanitized account/market receipts. It calls no review, placement, cancellation, option, crypto, transfer, or watchlist tool. A paper account is not required.
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1">
-          <input
+          <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.read-only-quote-probe-symbol"
             aria-label="Read-only quote probe symbol"
             value={readProbeSymbol}
             onChange={(event) => setReadProbeSymbol(event.target.value.toUpperCase())}
             disabled={busy || disabled}
             className="w-24 rounded border border-white/15 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-50"
           />
-          <button type="button" onClick={() => void verifyReadOnlyAccess()}
+          <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.verify-read-only-access" type="button" onClick={() => void verifyReadOnlyAccess()}
             disabled={busy || disabled}
             className="rounded border border-emerald-300/30 px-2 py-1 text-emerald-100 disabled:opacity-50">
             Verify read-only access
@@ -845,7 +1012,7 @@ export function SharedLiveRoomPaperTradingPanel({
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="flex min-w-0 flex-1 items-center gap-1 text-[10px] text-slate-300">
             Paper bankroll $
-            <input
+            <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.paper-bankroll-in-dollars"
               aria-label="Paper bankroll in dollars"
               inputMode="decimal"
               value={startingDollars}
@@ -855,7 +1022,7 @@ export function SharedLiveRoomPaperTradingPanel({
               className="min-w-20 flex-1 rounded border border-white/15 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-50"
             />
           </label>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.create-paper-account"
             type="button"
             onClick={() => void create()}
             disabled={busy || disabled}
@@ -874,7 +1041,7 @@ export function SharedLiveRoomPaperTradingPanel({
                 : `${account.new_trades_today} paper trades today · ${account.open_symbols.length} open · live orders locked`}
             </p>
           </div>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.void-set-kill-switch-account-kill-switch-active"
             type="button"
             disabled={busy || disabled}
             onClick={() => void setKillSwitch(!account.kill_switch_active)}
@@ -893,14 +1060,21 @@ export function SharedLiveRoomPaperTradingPanel({
           <p className="text-slate-400">
             {lifecycle.orders.length} orders · {lifecycle.fills.length} fills · {lifecycle.journal.length} journal events
           </p>
+          {lifecycle.orders.length === 0 && lifecycle.positions.length === 0 ? (
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.stage-20-spy-paper-observer-canary" type="button" disabled={busy || disabled || account.kill_switch_active}
+              onClick={() => void stagePaperObserverCanary()}
+              className="rounded border border-cyan-300/30 px-1.5 py-0.5 text-cyan-100 disabled:opacity-50">
+              Stage $20 SPY paper observer canary
+            </button>
+          ) : null}
           {lifecycle.orders.filter((order) => order.intent === "entry" && order.status === "open").map((order) => (
             <div key={order.order_id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-slate-950/60 p-1.5">
               <span className="text-slate-300">{order.symbol} entry open · {money(order.notional_cents)}</span>
               <div className="flex gap-1">
-                <button type="button" disabled={busy || disabled} onClick={() => void processSymbol(order.symbol)} className="rounded border border-cyan-300/30 px-1.5 py-0.5 text-cyan-100 disabled:opacity-50">
+                <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.process-fresh-quote" type="button" disabled={busy || disabled} onClick={() => void processSymbol(order.symbol)} className="rounded border border-cyan-300/30 px-1.5 py-0.5 text-cyan-100 disabled:opacity-50">
                   Process fresh quote
                 </button>
-                <button type="button" disabled={busy || disabled} onClick={() => void cancelOrder(order)} className="rounded border border-rose-300/30 px-1.5 py-0.5 text-rose-100 disabled:opacity-50">
+                <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.cancel" type="button" disabled={busy || disabled} onClick={() => void cancelOrder(order)} className="rounded border border-rose-300/30 px-1.5 py-0.5 text-rose-100 disabled:opacity-50">
                   Cancel
                 </button>
               </div>
@@ -912,10 +1086,10 @@ export function SharedLiveRoomPaperTradingPanel({
                 {position.symbol} {money(position.market_value_cents)} · P&amp;L {money(position.unrealized_pnl_cents)}
               </span>
               <div className="flex gap-1">
-                <button type="button" disabled={busy || disabled} onClick={() => void processSymbol(position.symbol)} className="rounded border border-cyan-300/30 px-1.5 py-0.5 text-cyan-100 disabled:opacity-50">
+                <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.mark-check-stop" type="button" disabled={busy || disabled} onClick={() => void processSymbol(position.symbol)} className="rounded border border-cyan-300/30 px-1.5 py-0.5 text-cyan-100 disabled:opacity-50">
                   Mark / check stop
                 </button>
-                <button type="button" disabled={busy || disabled} onClick={() => void closePosition(position)} className="rounded border border-rose-300/30 px-1.5 py-0.5 text-rose-100 disabled:opacity-50">
+                <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.close-paper-position" type="button" disabled={busy || disabled} onClick={() => void closePosition(position)} className="rounded border border-rose-300/30 px-1.5 py-0.5 text-rose-100 disabled:opacity-50">
                   Close paper position
                 </button>
               </div>
@@ -932,7 +1106,7 @@ export function SharedLiveRoomPaperTradingPanel({
             Developer-only live boundary. Reviews expire in 90 seconds; approval alone never places an order.
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1">
-            <input
+            <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.accepted-risk-decision-id"
               aria-label="Accepted risk decision ID"
               value={riskDecisionId}
               onChange={(event) => setRiskDecisionId(event.target.value)}
@@ -940,7 +1114,7 @@ export function SharedLiveRoomPaperTradingPanel({
               disabled={busy || disabled || account.kill_switch_active}
               className="min-w-48 flex-1 rounded border border-white/15 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-50"
             />
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.request-robinhood-review"
               type="button"
               onClick={() => void requestLivePreview()}
               disabled={busy || disabled || account.kill_switch_active}
@@ -964,7 +1138,7 @@ export function SharedLiveRoomPaperTradingPanel({
                   <div className="mt-1.5 space-y-1">
                     <p className="break-all font-mono text-[9px] text-slate-400">Type exactly: {preview.approval_phrase}</p>
                     <div className="flex flex-wrap gap-1">
-                      <input
+                      <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.input"
                         aria-label={`Approval text for ${preview.intent.symbol}`}
                         value={approvalText[preview.preview_id] ?? ""}
                         onChange={(event) => setApprovalText((current) => ({
@@ -974,7 +1148,7 @@ export function SharedLiveRoomPaperTradingPanel({
                         disabled={busy || disabled}
                         className="min-w-48 flex-1 rounded border border-white/15 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50"
                       />
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.approve-once"
                         type="button"
                         onClick={() => void approveLivePreview(preview)}
                         disabled={busy || disabled || approvalText[preview.preview_id] !== preview.approval_phrase}
@@ -991,7 +1165,7 @@ export function SharedLiveRoomPaperTradingPanel({
                       To move real money, type exactly: PLACE APPROVED ORDER {preview.approval_id}
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      <input
+                      <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.input.2"
                         aria-label={`Live placement text for ${preview.intent.symbol}`}
                         value={placementText[preview.approval_id] ?? ""}
                         onChange={(event) => setPlacementText((current) => ({
@@ -1004,7 +1178,7 @@ export function SharedLiveRoomPaperTradingPanel({
                           liveContractPreflight?.fresh !== true}
                         className="min-w-48 flex-1 rounded border border-rose-300/20 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50"
                       />
-                      <button
+                      <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.place-real-order-once"
                         type="button"
                         onClick={() => void placeApprovedOrder(preview)}
                         disabled={busy || disabled ||
@@ -1056,6 +1230,39 @@ export function SharedLiveRoomPaperTradingPanel({
                   </div>
                 ))}
               </div>
+              {liveAcceptanceArchive ? (
+                <div className="mt-1.5 rounded border border-emerald-300/20 bg-emerald-400/5 p-1">
+                  <p className="text-emerald-200">
+                    ARCHIVED · {new Date(liveAcceptanceArchive.accepted_at).toLocaleString()} · entry {liveAcceptanceArchive.reconciled_filled_entry_count} · exit {liveAcceptanceArchive.reconciled_filled_exit_count} · unresolved 0
+                  </p>
+                  <p className="break-all font-mono text-[9px] text-slate-500">
+                    {liveAcceptanceArchive.evidence_hash}
+                  </p>
+                </div>
+              ) : liveAcceptanceReadiness.acceptance_complete &&
+                  liveControl?.deployment_enabled === false ? (
+                    <div className="mt-1.5 space-y-1">
+                      <p className="text-slate-400">
+                        Both live flags are off. Type the exact phrase to seal the sanitized acceptance evidence; this calls no provider order tool.
+                      </p>
+                      <p className="break-all font-mono text-[9px] text-slate-400">
+                        Type exactly: ARCHIVE ROBINHOOD LIVE ACCEPTANCE {connectionId} {roomId}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.live-acceptance-archive-confirmation" aria-label="Live acceptance archive confirmation"
+                          value={archiveConfirmationText}
+                          onChange={(event) => setArchiveConfirmationText(event.target.value)}
+                          disabled={busy || disabled}
+                          className="min-w-48 flex-1 rounded border border-white/15 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50" />
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.archive-accepted-canary" type="button" onClick={() => void archiveLiveAcceptance()}
+                          disabled={busy || disabled || archiveConfirmationText !==
+                            `ARCHIVE ROBINHOOD LIVE ACCEPTANCE ${connectionId} ${roomId}`}
+                          className="rounded border border-emerald-300/30 px-2 py-1 text-emerald-100 disabled:opacity-50">
+                          Archive accepted canary
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
             </div>
           ) : null}
           <div className="mt-2 rounded border border-cyan-300/20 bg-cyan-400/5 p-1.5">
@@ -1068,7 +1275,7 @@ export function SharedLiveRoomPaperTradingPanel({
                   Lists and validates MCP schemas only; it calls no review, placement, or cancellation tool.
                 </p>
               </div>
-              <button type="button" onClick={() => void checkLiveProviderContracts()}
+              <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.check-provider-contracts" type="button" onClick={() => void checkLiveProviderContracts()}
                 disabled={busy || disabled}
                 className="rounded border border-cyan-300/30 px-2 py-1 text-cyan-100 disabled:opacity-50">
                 Check provider contracts
@@ -1130,8 +1337,8 @@ export function SharedLiveRoomPaperTradingPanel({
               {liveControl.deployment_enabled && liveControl.supervisor_fresh &&
                   liveControl.protective_exit_ready ? (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <button type="button"
-                        onClick={() => setAttendingLive((current) => !current)}
+                      <button data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.void-toggle-attended-live-session" type="button"
+                        onClick={() => void toggleAttendedLiveSession()}
                         disabled={busy || disabled}
                         className="rounded border border-cyan-300/30 px-2 py-1 text-cyan-100 disabled:opacity-50">
                         {attendingLive ? "End attended live session" :
@@ -1147,11 +1354,11 @@ export function SharedLiveRoomPaperTradingPanel({
                 <div className="mt-1.5 space-y-1">
                   <p className="break-all font-mono text-[9px] text-slate-400">Type exactly: {liveControl.arming_phrase}</p>
                   <div className="flex flex-wrap gap-1">
-                    <input aria-label="Live trading arming text" value={armingText}
+                    <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.live-trading-arming-text" aria-label="Live trading arming text" value={armingText}
                       onChange={(event) => setArmingText(event.target.value)}
                       disabled={busy || disabled}
                       className="min-w-48 flex-1 rounded border border-white/15 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50" />
-                    <button type="button" onClick={() => void updateLiveControl("arm")}
+                    <button data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.arm-one-live-entry" type="button" onClick={() => void updateLiveControl("arm")}
                       disabled={busy || disabled || !liveControl.operator_present ||
                         liveControl.attention_required ||
                         liveContractPreflight?.verdict !== "pass" ||
@@ -1164,7 +1371,7 @@ export function SharedLiveRoomPaperTradingPanel({
                 </div>
               ) : null}
               {liveControl.live_order_execution_enabled ? (
-                <button type="button" onClick={() => void updateLiveControl("stop")}
+                <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.stop-live-placement" type="button" onClick={() => void updateLiveControl("stop")}
                   disabled={busy || disabled}
                   className="mt-1.5 rounded border border-rose-300/40 px-2 py-1 text-rose-100 disabled:opacity-50">
                   STOP LIVE PLACEMENT
@@ -1191,14 +1398,14 @@ export function SharedLiveRoomPaperTradingPanel({
                           !["reconciled_cancelled", "reconciled_rejected"]
                             .includes(exit.state)) ? (
                           <>
-                            <button type="button"
+                            <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.review-protective-stop" type="button"
                               onClick={() => void requestProtectiveExit(
                                 execution, "protective_stop")}
                               disabled={busy || disabled}
                               className="rounded border border-cyan-300/30 px-1.5 py-0.5 text-cyan-100 disabled:opacity-50">
                               Review protective stop
                             </button>
-                            <button type="button"
+                            <button data-helix-interaction-kind="navigate" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.review-market-close" type="button"
                               onClick={() => void requestProtectiveExit(
                                 execution, "market_close")}
                               disabled={busy || disabled}
@@ -1209,7 +1416,7 @@ export function SharedLiveRoomPaperTradingPanel({
                         ) : null}
                     {["submitted", "reconciliation_required", "reconciled_open"]
                       .includes(execution.state) ? (
-                        <button type="button"
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.cancel-once" type="button"
                           onClick={() => void cancelLiveExecution(execution)}
                           disabled={busy || disabled}
                           className="rounded border border-rose-300/30 px-1.5 py-0.5 text-rose-100 disabled:opacity-50">
@@ -1218,7 +1425,7 @@ export function SharedLiveRoomPaperTradingPanel({
                       ) : null}
                     {!["reconciled_cancelled", "reconciled_rejected"]
                       .includes(execution.state) ? (
-                        <button type="button" onClick={() => void reconcileExecution(execution)}
+                        <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.reconcile-from-robinhood" type="button" onClick={() => void reconcileExecution(execution)}
                           disabled={busy || disabled}
                           className="rounded border border-amber-300/30 px-1.5 py-0.5 text-amber-100 disabled:opacity-50">
                           Reconcile from Robinhood
@@ -1257,14 +1464,14 @@ export function SharedLiveRoomPaperTradingPanel({
                         Type exactly: {preview.approval_phrase}
                       </p>
                       <div className="flex flex-wrap gap-1">
-                        <input aria-label={`Protective stop approval for ${preview.intent.symbol}`}
+                        <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.input.3" aria-label={`Protective stop approval for ${preview.intent.symbol}`}
                           value={protectiveApprovalText[preview.exit_preview_id] ?? ""}
                           onChange={(event) => setProtectiveApprovalText((current) => ({
                             ...current, [preview.exit_preview_id]: event.target.value,
                           }))}
                           disabled={busy || disabled}
                           className="min-w-48 flex-1 rounded border border-white/15 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50" />
-                        <button type="button"
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.approve-protective-stop-once" type="button"
                           onClick={() => void approveProtectiveExit(preview)}
                           disabled={busy || disabled ||
                             protectiveApprovalText[preview.exit_preview_id] !==
@@ -1281,14 +1488,14 @@ export function SharedLiveRoomPaperTradingPanel({
                         Type exactly: PLACE APPROVED EXIT {preview.approval_id}
                       </p>
                       <div className="flex flex-wrap gap-1">
-                        <input aria-label={`Protective stop placement for ${preview.intent.symbol}`}
+                        <input data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.input.4" aria-label={`Protective stop placement for ${preview.intent.symbol}`}
                           value={protectivePlacementText[preview.approval_id] ?? ""}
                           onChange={(event) => setProtectivePlacementText((current) => ({
                             ...current, [preview.approval_id!]: event.target.value,
                           }))}
                           disabled={busy || disabled}
                           className="min-w-48 flex-1 rounded border border-rose-300/20 bg-slate-950 px-2 py-1 font-mono text-[9px] text-slate-100 disabled:opacity-50" />
-                        <button type="button"
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.place-protective-stop-once" type="button"
                           onClick={() => void placeProtectiveExit(preview)}
                           disabled={busy || disabled ||
                             protectivePlacementText[preview.approval_id] !==
@@ -1311,7 +1518,7 @@ export function SharedLiveRoomPaperTradingPanel({
                   <div className="flex gap-1">
                     {["submitted", "reconciliation_required", "reconciled_open"]
                       .includes(execution.state) ? (
-                        <button type="button"
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.cancel-protective-stop-once" type="button"
                           onClick={() => void cancelProtectiveExit(execution)}
                           disabled={busy || disabled}
                           className="rounded border border-rose-300/30 px-1.5 py-0.5 text-rose-100 disabled:opacity-50">
@@ -1320,7 +1527,7 @@ export function SharedLiveRoomPaperTradingPanel({
                       ) : null}
                     {!['reconciled_filled', 'reconciled_cancelled', 'reconciled_rejected']
                       .includes(execution.state) ? (
-                        <button type="button"
+                        <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-paper-trading-panel.reconcile-protective-stop" type="button"
                           onClick={() => void reconcileProtectiveExit(execution)}
                           disabled={busy || disabled}
                           className="rounded border border-amber-300/30 px-1.5 py-0.5 text-amber-100 disabled:opacity-50">

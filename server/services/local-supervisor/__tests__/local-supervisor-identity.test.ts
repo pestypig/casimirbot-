@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildHelixLocalSupervisorStatus,
@@ -9,6 +10,27 @@ import { decideHelixLocalSupervisorAttachment } from
   "../local-supervisor-attachment";
 
 describe("local supervisor identity", () => {
+  const signedLauncherEnvironment = (workspacePath: string, now: Date) => {
+    const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
+    const payload = Buffer.from(JSON.stringify({
+      schema: "helix.local_supervisor_ownership_receipt.v1",
+      workspace_ref: helixWorkspaceRefFor(workspacePath),
+      boot_nonce: "launcher_boot_nonce_1234567890",
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 60_000).toISOString(),
+      supervisor_mode: "external_keyed_launcher",
+    }), "utf8");
+    return {
+      CASIMIR_LOCAL_SUPERVISOR_OWNERSHIP_RECEIPT: Buffer.from(JSON.stringify({
+        payload: payload.toString("base64url"),
+        signature: crypto.sign(null, payload, privateKey).toString("base64url"),
+      }), "utf8").toString("base64url"),
+      CASIMIR_LOCAL_SUPERVISOR_TRUSTED_PUBLIC_KEYS: publicKey.export({
+        type: "spki",
+        format: "pem",
+      }).toString(),
+    };
+  };
   it("canonicalizes equivalent Windows workspace paths without exposing them", () => {
     const upper = helixWorkspaceRefFor("C:\\Work\\CasimirBot");
     const lower = helixWorkspaceRefFor("c:/work/casimirbot");
@@ -44,11 +66,14 @@ describe("local supervisor identity", () => {
     expect(resolveHelixLocalSupervisorMode({ CASIMIR_DESKTOP_HOST: "1" })).toBe(
       "desktop_single_instance",
     );
-    expect(
-      resolveHelixLocalSupervisorMode({
-        CASIMIR_KEYED_LAUNCHER_SUPERVISED: "1",
-      }),
-    ).toBe("external_keyed_launcher");
+    const workspace = "C:\\Work\\CasimirBot";
+    const now = new Date("2026-08-26T12:00:00.000Z");
+    expect(resolveHelixLocalSupervisorMode(
+      signedLauncherEnvironment(workspace, now), workspace, now,
+    )).toBe("external_keyed_launcher");
+    expect(resolveHelixLocalSupervisorMode({
+      CASIMIR_KEYED_LAUNCHER_SUPERVISED: "1",
+    }, workspace, now)).toBe("external_process");
     expect(resolveHelixLocalSupervisorMode({})).toBe("external_process");
 
     const status = buildHelixLocalSupervisorStatus({
@@ -71,6 +96,26 @@ describe("local supervisor identity", () => {
     expect(status.account_identity_included).toBe(false);
     expect(status.answer_authority).toBe(false);
     expect(status.terminal_eligible).toBe(false);
+  });
+
+  it("rejects tampered, expired, and wrong-workspace launcher receipts", () => {
+    const workspace = "C:\\Work\\CasimirBot";
+    const now = new Date("2026-08-26T12:00:00.000Z");
+    const valid = signedLauncherEnvironment(workspace, now);
+    expect(resolveHelixLocalSupervisorMode(valid, workspace, now)).toBe(
+      "external_keyed_launcher",
+    );
+    expect(resolveHelixLocalSupervisorMode({
+      ...valid,
+      CASIMIR_LOCAL_SUPERVISOR_OWNERSHIP_RECEIPT:
+        `${valid.CASIMIR_LOCAL_SUPERVISOR_OWNERSHIP_RECEIPT.slice(0, -2)}xx`,
+    }, workspace, now)).toBe("external_process");
+    expect(resolveHelixLocalSupervisorMode(valid, "C:\\Work\\Other", now)).toBe(
+      "external_process",
+    );
+    expect(resolveHelixLocalSupervisorMode(
+      valid, workspace, new Date(now.getTime() + 61_000),
+    )).toBe("external_process");
   });
 
   it("attaches only to the exact ready enforcing workspace", () => {
@@ -110,7 +155,7 @@ describe("local supervisor identity", () => {
     })).toEqual({ decision: "fail_closed", reason: "invalid_status" });
   });
 
-  it("may attach to a matching external service without claiming supervisor enforcement", () => {
+  it("rejects a matching external service without supervisor enforcement", () => {
     const identity = createHelixLocalSupervisorIdentity({
       workspacePath: "C:\\Work\\CasimirBot",
       environment: {},
@@ -122,10 +167,7 @@ describe("local supervisor identity", () => {
       expectedWorkspaceRef: identity.workspaceRef,
       status,
       listenerPresent: true,
-    })).toEqual({
-      decision: "attach",
-      reason: "compatible_workspace_service",
-    });
+    })).toEqual({ decision: "fail_closed", reason: "supervisor_not_enforcing" });
     expect(status.one_instance_enforced).toBe(false);
     expect(status.content_role).toBe("local_supervisor_status_not_authority");
   });

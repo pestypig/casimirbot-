@@ -35,7 +35,7 @@ export function SharedLiveRoomDebugPanel({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-debug-panel.const-artifact-read-shared-live-room-debug-artifact-void-copy-helix-ask"
             type="button"
             className="rounded border border-white/15 px-2 py-1 text-[10px] text-slate-200"
             onClick={() => {
@@ -51,7 +51,7 @@ export function SharedLiveRoomDebugPanel({
                 ? "Copy failed"
                 : "Copy room proof JSON"}
           </button>
-          <button
+          <button data-helix-interaction-kind="observe" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-debug-panel.refresh-debug"
             type="button"
             disabled={controller.busyAction !== null}
             className="rounded border border-white/15 px-2 py-1 text-[10px] text-slate-200 disabled:opacity-50"

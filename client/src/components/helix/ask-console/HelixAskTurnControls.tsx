@@ -241,7 +241,7 @@ export function HelixAskTurnControls({
       className="relative z-20 mt-2 flex max-w-fit items-center gap-1 opacity-100 transition-opacity duration-150"
       {...turnScopeAttributes}
     >
-      <button
+      <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-turn-controls.copy-response"
         type="button"
         onClick={onCopyFinal}
         className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100"
@@ -253,7 +253,7 @@ export function HelixAskTurnControls({
         <Copy className="h-3.5 w-3.5" aria-hidden />
       </button>
       {showDebugCopy ? (
-        <button
+        <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-turn-controls.debug-copy"
           type="button"
           onClick={onDebugCopy}
           disabled={debugCopyDisabled}
@@ -272,7 +272,7 @@ export function HelixAskTurnControls({
           <Bug className="h-3.5 w-3.5" aria-hidden />
         </button>
       ) : null}
-      <button
+      <button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-turn-controls.on-read-aloud"
         type="button"
         onClick={onReadAloud}
         className={`rounded-full border p-1.5 transition ${
@@ -290,7 +290,7 @@ export function HelixAskTurnControls({
       </button>
       {postulateEnabled ? (
         <>
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-turn-controls.submit-postulate"
             type="button"
             onClick={submitPostulate}
             disabled={postulateBusy}

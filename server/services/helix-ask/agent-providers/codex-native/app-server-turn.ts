@@ -19,6 +19,7 @@ import {
   CodexAppServerProtocolError,
   type CodexAppServerTransport,
 } from "./protocol";
+import type { HelixCodexAuthResolution } from "./auth-mode";
 
 type RecordLike = Record<string, unknown>;
 
@@ -66,6 +67,7 @@ export type CodexNativeAppServerDebug = {
   native_error_code: string | null;
   native_error_http_status: number | null;
   native_error_message: string | null;
+  provider_authentication: HelixCodexAuthResolution;
   terminal_candidate_present: boolean;
   turn_lifecycle: HelixTurnLifecycle;
 };
@@ -84,6 +86,7 @@ export type RunCodexNativeAppServerTurnInput = {
   cwd: string;
   model?: string | null;
   reasoningEffort?: string | null;
+  auth?: HelixCodexAuthResolution;
   capabilities: HelixWorkstationCapabilityManifest[];
   validateRouteProposal: (
     value: unknown,
@@ -133,6 +136,26 @@ export const CODEX_NATIVE_DISABLED_CONFIG: Record<string, unknown> = {
   web_search: "disabled",
   mcp_servers: {},
 };
+
+const CODEX_NATIVE_SESSION_CONFIG: Record<string, unknown> = {
+  features: Object.fromEntries(
+    CODEX_NATIVE_DISABLED_FEATURES.map((feature: string) => [feature, false]),
+  ),
+  web_search: "disabled",
+  mcp_servers: {},
+};
+
+const defaultApiKeyAuthResolution = (): HelixCodexAuthResolution => ({
+  schema: "helix.codex_auth_resolution.v1",
+  requested_mode: "api_key",
+  selected_mode: "api_key",
+  status: "available",
+  credential_source: "openai_api_key_environment",
+  codex_home_strategy: "helix_isolated",
+  preflight: "not_run",
+  reason: null,
+  credential_material_exposed: false,
+});
 
 const readHttpStatus = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isInteger(value) && value >= 100 && value <= 599) {
@@ -257,6 +280,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
   input: RunCodexNativeAppServerTurnInput,
   transport: CodexAppServerTransport,
 ): Promise<CodexNativeAppServerTurnResult> => {
+  const providerAuthentication = input.auth ?? defaultApiKeyAuthResolution();
   const lifecycle = createHelixTurnLifecycleRecorder({
     turnId: input.turnId,
     scope: "codex_native_provider_cycle",
@@ -733,7 +757,10 @@ export const runCodexNativeAppServerTurnWithTransport = async (
         cwd: input.cwd,
         approvalPolicy: "never",
         sandbox: "read-only",
-        config: CODEX_NATIVE_DISABLED_CONFIG,
+        config:
+          providerAuthentication.selected_mode === "chatgpt_session"
+            ? CODEX_NATIVE_SESSION_CONFIG
+            : CODEX_NATIVE_DISABLED_CONFIG,
         baseInstructions: NATIVE_BASE_INSTRUCTIONS,
         ephemeral: true,
         dynamicTools: catalog.specs,
@@ -853,6 +880,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
     native_error_code: nativeErrorCode,
     native_error_http_status: nativeErrorHttpStatus,
     native_error_message: nativeErrorMessage,
+    provider_authentication: providerAuthentication,
     terminal_candidate_present: Boolean(answer.trim()),
     turn_lifecycle: lifecycle.snapshot(),
   };
@@ -868,6 +896,7 @@ export const runCodexNativeAppServerTurnWithTransport = async (
 export const runCodexNativeAppServerTurn = async (
   input: RunCodexNativeAppServerTurnInput,
 ): Promise<CodexNativeAppServerTurnResult> => {
+  const providerAuthentication = input.auth ?? defaultApiKeyAuthResolution();
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "helix-codex-native-"));
   const nativeCwd = path.join(codexHome, "workspace");
   fs.mkdirSync(nativeCwd, { recursive: true });
@@ -875,7 +904,9 @@ export const runCodexNativeAppServerTurn = async (
   try {
     transport = createCodexAppServerProcessTransport({
       cwd: nativeCwd,
-      codexHome,
+      codexHome:
+        providerAuthentication.selected_mode === "api_key" ? codexHome : undefined,
+      auth: providerAuthentication,
     });
     return await runCodexNativeAppServerTurnWithTransport(
       { ...input, cwd: nativeCwd },
@@ -960,6 +991,7 @@ export const runCodexNativeAppServerTurn = async (
         native_error_message: sanitizeNativeProviderDiagnostic(
           error instanceof Error ? error.message : String(error),
         ),
+        provider_authentication: providerAuthentication,
         terminal_candidate_present: false,
         turn_lifecycle: lifecycle.snapshot(),
       },

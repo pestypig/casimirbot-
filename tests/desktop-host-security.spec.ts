@@ -97,7 +97,30 @@ describe("desktop Electron session security", () => {
     expect(smokeSource).toContain("casimir_desktop_service_ready_receipt/1");
     expect(smokeSource).toContain("FullReadinessReceipt = \"PASS\"");
     expect(smokeSource).toContain(
+      "$ids = @(Get-ProcessTreeIds ([uint32]$rootProcess.Id))",
+    );
+    expect(smokeSource).toContain(
+      "$ids -contains [uint32]$_.OwningProcess",
+    );
+    expect(smokeSource).toContain("$listenerCount -eq 2");
+    expect(smokeSource).toContain("ServiceListenerReceipt = \"PASS\"");
+    expect(smokeSource).toContain(
+      "The ready receipt did not identify exactly one service listener.",
+    );
+    expect(smokeSource).toContain(
       "The packaged application did not reach full API readiness.",
     );
+  });
+
+  it("routes subscription management through the exact sanitized Stripe portal projection", async () => {
+    const [mainSource, billingSchema] = await Promise.all([
+      readFile(path.resolve("apps/desktop/src/main.ts"), "utf8"),
+      readFile(path.resolve("shared/helix-billing-entitlement.ts"), "utf8"),
+    ]);
+    expect(mainSource).toContain("targetRef === HELIX_BILLING_PORTAL_TARGET");
+    expect(mainSource).toContain("helixBillingPortalOperationSchema.safeParse");
+    expect(mainSource).toContain("await shell.openExternal(hosted.data.hosted_url)");
+    expect(billingSchema).toContain('url.hostname === "billing.stripe.com"');
+    expect(billingSchema).toContain("customer_reference_included: z.literal(false)");
   });
 });

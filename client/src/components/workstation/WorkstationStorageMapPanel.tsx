@@ -277,7 +277,7 @@ export default function WorkstationStorageMapPanel() {
           <HardDrive className="h-4 w-4 text-cyan-200" />
           {t("storageMap.header.title")}
         </div>
-        <button
+        <button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-storage-map.workstation-storage-map-panel.void-refresh-server-status"
           type="button"
           onClick={() => void refreshServerStatus()}
           className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:border-cyan-300/40 hover:bg-cyan-500/10"
@@ -361,7 +361,7 @@ export default function WorkstationStorageMapPanel() {
               {rects.map((rect) => {
                 const selectedRect = rect.record.artifact_id === selected?.artifact_id;
                 return (
-                  <button
+                  <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-storage-map.workstation-storage-map-panel.set-selected-id-rect-record-artifact-id"
                     key={rect.record.artifact_id}
                     type="button"
                     onClick={() => setSelectedId(rect.record.artifact_id)}
@@ -429,7 +429,7 @@ export default function WorkstationStorageMapPanel() {
             </thead>
             <tbody>
               {storageStatus.records.map((record) => (
-                <tr
+                <tr data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-storage-map.workstation-storage-map-panel.set-selected-id-record-artifact-id"
                   key={record.artifact_id}
                   className={`cursor-pointer border-b border-white/5 hover:bg-white/[0.03] ${record.artifact_id === selected?.artifact_id ? "bg-white/[0.05]" : ""}`}
                   onClick={() => setSelectedId(record.artifact_id)}

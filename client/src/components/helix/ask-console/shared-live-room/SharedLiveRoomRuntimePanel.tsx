@@ -47,7 +47,7 @@ export function SharedLiveRoomRuntimePanel({
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {isOwner ? (
-          <button
+          <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-runtime-panel.connect-room-to-gpt-live"
             type="button"
             disabled={controller.busyAction !== null || !canConnect}
             title={!controller.runtimeActive
@@ -62,7 +62,7 @@ export function SharedLiveRoomRuntimePanel({
           </button>
         ) : null}
         {canTakeFloor && !ownsFloor ? (
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-runtime-panel.void-controller-take-floor"
             type="button"
             disabled={controller.busyAction !== null}
             className="rounded-lg border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-semibold text-emerald-100 disabled:opacity-45"
@@ -72,7 +72,7 @@ export function SharedLiveRoomRuntimePanel({
           </button>
         ) : null}
         {ownsFloor ? (
-          <button
+          <button data-helix-interaction-kind="configure" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-runtime-panel.release-speaking-floor"
             type="button"
             disabled={controller.busyAction !== null}
             className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-1.5 text-[10px] font-semibold text-amber-100 disabled:opacity-45"

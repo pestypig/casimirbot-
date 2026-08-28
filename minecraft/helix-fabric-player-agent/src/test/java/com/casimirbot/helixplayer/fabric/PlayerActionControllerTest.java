@@ -408,6 +408,55 @@ final class PlayerActionControllerTest {
     }
 
     @Test
+    void boundedWalkOwnsOnlyTheJumpArcItStartedFromGround() {
+        FakeBridge ownedBridge = new FakeBridge();
+        PlayerActionController ownedController = new PlayerActionController(
+            ownedBridge,
+            event -> {}
+        );
+        ownedController.start(request(
+            "walk",
+            Map.of(
+                "direction", "forward",
+                "duration_ms", 1_000,
+                "sprint", true,
+                "jump", true
+            ),
+            ManualOverridePolicy.CANCEL
+        ));
+
+        ownedController.tick();
+        assertTrue(ownedBridge.controlledJumpArc);
+        ownedBridge.snapshot = snapshotPose(
+            true, 0.2, 64.8, 0, 0, 0, false, false
+        );
+        ownedController.tick();
+        assertTrue(ownedBridge.controlledJumpArc);
+
+        FakeBridge airborneBridge = new FakeBridge();
+        airborneBridge.snapshot = snapshotPose(
+            true, 0, 64.8, 0, 0, 0, false, false
+        );
+        PlayerActionController airborneController = new PlayerActionController(
+            airborneBridge,
+            event -> {}
+        );
+        airborneController.start(request(
+            "walk",
+            Map.of(
+                "direction", "forward",
+                "duration_ms", 1_000,
+                "sprint", true,
+                "jump", true
+            ),
+            ManualOverridePolicy.CANCEL
+        ));
+
+        airborneController.tick();
+        assertFalse(airborneBridge.controlledJumpArc);
+    }
+
+    @Test
     void manualInputCancelsAndReleasesEveryControl() {
         FakeBridge bridge = new FakeBridge();
         List<WorkflowEvent> events = new ArrayList<>();
@@ -1264,6 +1313,7 @@ final class PlayerActionControllerTest {
                 LocomotionSafetyEnvelope.Decision.admit(),
                 Map.of("reason_code", "locomotion_safety_admitted")
             );
+        private boolean controlledJumpArc;
 
         @Override
         public PlayerSnapshot snapshot() {
@@ -1301,8 +1351,10 @@ final class PlayerActionControllerTest {
         public LocomotionSafetyEnvelope.Check checkLocomotionSafety(
             double targetX,
             double targetZ,
-            double minimumHealth
+            double minimumHealth,
+            boolean controlledJumpArc
         ) {
+            this.controlledJumpArc = controlledJumpArc;
             return locomotionSafety;
         }
 

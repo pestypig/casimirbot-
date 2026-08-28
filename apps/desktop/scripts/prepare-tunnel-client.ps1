@@ -24,7 +24,21 @@ $licensePath = Join-Path $expandedRoot "LICENSE"
 New-Item -ItemType Directory -Path $versionRoot -Force | Out-Null
 
 function Get-LowerSha256([string]$path) {
-  return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+  # Windows PowerShell installations embedded by some desktop build hosts do
+  # not expose Microsoft.PowerShell.Utility's Get-FileHash cmdlet. Use the
+  # framework implementation directly so artifact verification remains
+  # available without weakening or skipping any checksum gate.
+  $stream = $null
+  $sha256 = $null
+  try {
+    $stream = [System.IO.File]::OpenRead($path)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = $sha256.ComputeHash($stream)
+    return ([System.BitConverter]::ToString($bytes)).Replace("-", "").ToLowerInvariant()
+  } finally {
+    if ($null -ne $sha256) { $sha256.Dispose() }
+    if ($null -ne $stream) { $stream.Dispose() }
+  }
 }
 
 $payloadReady =

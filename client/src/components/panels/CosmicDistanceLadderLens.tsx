@@ -77,7 +77,7 @@ export default function CosmicDistanceLadderLens({
                 .map((rung) => {
                   const selected = selectedRungId === rung.id;
                   return (
-                    <button
+                    <button data-helix-control-id="workstation.panel.theory-badge-graph.cosmic-distance-ladder-lens.on-select-rung-rung" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                       key={rung.id}
                       type="button"
                       aria-label={`${tx("Select")} ${tx(rung.title)}`}
@@ -108,7 +108,7 @@ export default function CosmicDistanceLadderLens({
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">{tx("Object Binding")}</div>
                   {selectedBinding ? (
-                    <button
+                    <button data-helix-control-id="workstation.panel.theory-badge-graph.cosmic-distance-ladder-lens.on-clear-object-binding" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
                       type="button"
                       onClick={onClearObjectBinding}
                       className="border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:border-zinc-400"
@@ -120,7 +120,7 @@ export default function CosmicDistanceLadderLens({
                 {selectedRung.objectBindings.map((binding) => {
                   const selected = selectedObjectBindingId === binding.id;
                   return (
-                    <button
+                    <button data-helix-control-id="workstation.panel.theory-badge-graph.cosmic-distance-ladder-lens.on-select-object-binding-selected-rung-binding-id" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                       key={binding.id}
                       type="button"
                       aria-label={`${tx("Use")} ${tx(binding.label)} ${tx("object binding")}`}
@@ -144,7 +144,7 @@ export default function CosmicDistanceLadderLens({
                 const payload = badge?.calculatorPayloads.find((candidate) => candidate.id === ref.payloadId);
                 if (!badge || !payload) return null;
                 return (
-                  <button
+                  <button data-helix-control-id="workstation.panel.theory-badge-graph.cosmic-distance-ladder-lens.on-load-payload-ref-badge-id-ref-payload-id" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                     key={`${ref.badgeId}-${ref.payloadId}`}
                     type="button"
                     onClick={() => onLoadPayload(ref.badgeId, ref.payloadId)}

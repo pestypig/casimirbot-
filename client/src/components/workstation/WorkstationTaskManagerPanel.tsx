@@ -697,7 +697,7 @@ export default function WorkstationTaskManagerPanel() {
           <Activity className="h-4 w-4 text-emerald-200" />
           {t("taskManager.header.title")}
         </div>
-        <button
+        <button data-helix-interaction-kind="observe" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.workstation-task-manager.workstation-task-manager-panel.void-refresh-server-snapshot"
           type="button"
           onClick={() => {
             void refreshServerSnapshot();

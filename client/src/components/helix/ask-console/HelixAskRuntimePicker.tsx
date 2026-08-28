@@ -63,7 +63,7 @@ export function HelixAskRuntimePicker({
 }: HelixAskRuntimePickerProps) {
   return (
     <>
-      <button
+      <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-runtime-picker.choose-ask-agent-runtime"
         type="button"
         data-helix-ask-action-item="true"
         aria-label="Choose Ask agent runtime"
@@ -82,7 +82,7 @@ export function HelixAskRuntimePicker({
           className="absolute right-10 top-12 z-30 min-w-52 rounded-lg border border-white/10 bg-slate-950/95 p-1.5 text-xs text-slate-100 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur"
         >
           {model.items.map((provider) => (
-            <button
+            <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-runtime-picker.event-event-prevent-default-event-stop-propagation-on-select-provider-id"
               key={provider.id}
               type="button"
               role="menuitemradio"

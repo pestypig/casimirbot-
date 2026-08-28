@@ -39,6 +39,8 @@ export const HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY =
   "com.casimirbot.minecraft.player.place" as const;
 export const HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY =
   "com.casimirbot.minecraft.player.craft" as const;
+export const HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY =
+  "com.casimirbot.minecraft.player.consume" as const;
 export const HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY =
   "com.casimirbot.minecraft.player.inventory.transfer" as const;
 export const HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY =
@@ -73,6 +75,7 @@ export const HELIX_MINECRAFT_PLAYER_WORKFLOW_CAPABILITY_IDS = Object.freeze([
   HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY,
+  HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY,
   HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY,
 ] as const);
 
@@ -119,6 +122,7 @@ export const HELIX_MINECRAFT_PLAYER_ACTION_KINDS = [
   "mine",
   "place",
   "craft",
+  "consume",
   "inventory_transfer",
 ] as const;
 
@@ -445,6 +449,18 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
       .strict(),
     z
       .object({
+        action_kind: z.literal("consume"),
+        item_id: resourceLocationSchema,
+        count: z.number().int().min(1).max(64),
+        hand: z.literal("main_hand"),
+        max_duration_ms: z.number().int().min(1_000).max(60_000),
+        stop_below_health: z.number().finite().min(1).max(20),
+        minimum_food_gain: z.number().int().min(0).max(20),
+        expected_remainder_item_id: resourceLocationSchema.nullable().optional(),
+      })
+      .strict(),
+    z
+      .object({
         action_kind: z.literal("inventory_transfer"),
         direction: z.enum(["deposit", "withdraw"]),
         item_id: resourceLocationSchema,
@@ -646,6 +662,8 @@ export const minecraftPlayerCapabilityForActionKind = (
       return HELIX_MINECRAFT_PLAYER_PLACE_CAPABILITY;
     case "craft":
       return HELIX_MINECRAFT_PLAYER_CRAFT_CAPABILITY;
+    case "consume":
+      return HELIX_MINECRAFT_PLAYER_CONSUME_CAPABILITY;
     case "inventory_transfer":
       return HELIX_MINECRAFT_PLAYER_INVENTORY_TRANSFER_CAPABILITY;
   }

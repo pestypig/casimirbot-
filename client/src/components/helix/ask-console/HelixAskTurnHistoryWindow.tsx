@@ -55,7 +55,7 @@ export function HelixAskTurnHistoryWindowControl({
       <p>
         Showing the latest {visibleCount} of {totalCount} turns. Older turns remain in the durable chat history.
       </p>
-      <button
+      <button data-helix-interaction-kind="navigate" data-helix-authority-state="client_local" data-helix-control-id="helix.ask.helix-ask-turn-history-window.show-older"
         type="button"
         className="mt-2 rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 font-medium text-cyan-100 hover:bg-cyan-300/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40"
         onClick={onRevealOlder}

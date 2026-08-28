@@ -99,6 +99,34 @@ bool same_output(const selector::Output &left,
     return true;
 }
 
+bool same_result(const selector::Result &left,
+                 const selector::Result &right) {
+    return left.accepted == right.accepted
+        && left.detail == right.detail
+        && left.refinement_candidates_visited
+            == right.refinement_candidates_visited
+        && left.subpanels_accumulated == right.subpanels_accumulated
+        && left.jet_predecessor_calls == right.jet_predecessor_calls
+        && left.elementary_convolutions == right.elementary_convolutions
+        && left.numerical_width_checks == right.numerical_width_checks
+        && left.fixed_candidate_schedule == right.fixed_candidate_schedule
+        && left.increasing_subpanel_order == right.increasing_subpanel_order
+        && left.first_passing_candidate_selected
+            == right.first_passing_candidate_selected
+        && left.boundary_applied_once == right.boundary_applied_once
+        && left.exhaustion_retuned == right.exhaustion_retuned
+        && left.signed_remainder_cancellation_used
+            == right.signed_remainder_cancellation_used
+        && left.midpoint_selection_used == right.midpoint_selection_used
+        && left.point_sampling_used == right.point_sampling_used
+        && left.state_coefficients_read == right.state_coefficients_read
+        && left.candidate_evaluations == right.candidate_evaluations
+        && left.positive_parameter_samples == right.positive_parameter_samples
+        && left.candidate_root_created == right.candidate_root_created
+        && left.scientific_handler_linked == right.scientific_handler_linked
+        && left.authority_promoted == right.authority_promoted;
+}
+
 }  // namespace
 
 int main() {
@@ -256,6 +284,58 @@ int main() {
     selector::Result replay_result{};
     checks.push_back(selector::evaluate(input, &replay, &replay_result)
         && same_output(output, replay) && neutral(replay_result));
+
+    selector::Output parallel_one;
+    selector::Result parallel_one_result{};
+    checks.push_back(selector::evaluate_prepared_parallel(
+        input, 1U, &parallel_one, &parallel_one_result)
+        && same_output(output, parallel_one)
+        && same_result(result, parallel_one_result));
+    selector::Output parallel_two;
+    selector::Result parallel_two_result{};
+    checks.push_back(selector::evaluate_prepared_parallel(
+        input, 2U, &parallel_two, &parallel_two_result)
+        && same_output(parallel_one, parallel_two)
+        && same_result(parallel_one_result, parallel_two_result));
+    selector::Output parallel_two_replay;
+    selector::Result parallel_two_replay_result{};
+    checks.push_back(selector::evaluate_prepared_parallel(
+        input, 2U, &parallel_two_replay, &parallel_two_replay_result)
+        && same_output(parallel_two, parallel_two_replay)
+        && same_result(parallel_two_result, parallel_two_replay_result));
+    selector::Output invalid_threads_output;
+    selector::Result invalid_threads_result{};
+    checks.push_back(!selector::evaluate_prepared_parallel(
+        input, 0U, &invalid_threads_output, &invalid_threads_result)
+        && invalid_threads_result.detail
+            == selector::FailureDetail::parallel_resource
+        && invalid_threads_output.selected_u_panels == 0U
+        && neutral(invalid_threads_result));
+    checks.push_back(selector::kMaximumParallelThreads == 64U);
+
+    selector::Output candidate_four_serial;
+    selector::Result candidate_four_serial_result{};
+    selector::Output candidate_four_parallel;
+    selector::Result candidate_four_parallel_result{};
+    selector::Output candidate_four_replay;
+    selector::Result candidate_four_replay_result{};
+    checks.push_back(selector::evaluate_prepared_candidate(
+        input, 4U, 1U, &candidate_four_serial, &candidate_four_serial_result)
+        && candidate_four_serial_result.subpanels_accumulated == 4U
+        && candidate_four_serial_result.jet_predecessor_calls == 4U
+        && candidate_four_serial_result.elementary_convolutions
+            == 4U * jet::kElementaryConvolutions);
+    checks.push_back(selector::evaluate_prepared_candidate(
+        input, 4U, 2U, &candidate_four_parallel,
+        &candidate_four_parallel_result)
+        && same_output(candidate_four_serial, candidate_four_parallel)
+        && same_result(candidate_four_serial_result,
+                       candidate_four_parallel_result));
+    checks.push_back(selector::evaluate_prepared_candidate(
+        input, 4U, 2U, &candidate_four_replay, &candidate_four_replay_result)
+        && same_output(candidate_four_parallel, candidate_four_replay)
+        && same_result(candidate_four_parallel_result,
+                       candidate_four_replay_result));
 
     auto short_boundary = input;
     short_boundary.g_at_zero_count = 12U;

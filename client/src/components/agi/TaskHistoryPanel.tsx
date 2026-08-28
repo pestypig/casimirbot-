@@ -31,7 +31,7 @@ export default function TaskHistoryPanel() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <button
+              <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.agi-task-history.task-history-panel.set-active-session-id-window-dispatch-event-new-custom-event-open-helix"
                 className="text-left"
                 onClick={() => {
                   setActive(session.id);
@@ -48,7 +48,7 @@ export default function TaskHistoryPanel() {
                   <MessageSquare size={12} /> {t("taskHistory.session.messageCount", { count: session.messages.length })}
                 </div>
               </button>
-              <button
+              <button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.agi-task-history.task-history-panel.delete-session-session-id"
                 className="text-[11px] opacity-70 hover:opacity-100 underline"
                 onClick={() => deleteSession(session.id)}
                 title={t("taskHistory.session.deleteTitle")}

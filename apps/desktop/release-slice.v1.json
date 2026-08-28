@@ -7,10 +7,16 @@
   "ownedFiles": [
     ".agents/plugins/marketplace.json",
     ".github/workflows/desktop-release.yml",
+    "auth0/actions/casimirbot-post-login.cjs",
     "client/src/components/agent-access/AgentAccountBindingReadiness.tsx",
     "client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx",
     "client/src/components/DesktopUpdatePanel.tsx",
     "client/src/components/DeviceCheckPanel.tsx",
+    "client/src/components/workstation/InstalledServicesPanel.tsx",
+    "client/src/components/workstation/LocalHarnessPanel.tsx",
+    "client/src/components/workstation/__tests__/InstalledServicesPanel.spec.tsx",
+    "client/src/components/workstation/__tests__/LocalHarnessPanel.spec.tsx",
+    "client/src/components/workstation/__tests__/WorkstationPanelHost.account-policy.spec.tsx",
     "client/src/components/__tests__/DesktopUpdatePanel.spec.tsx",
     "client/src/components/__tests__/DeviceCheckPanel.spec.tsx",
     "client/src/lib/runtime/RuntimeSurfaceProvider.tsx",
@@ -20,19 +26,30 @@
     "docs/audits/casimirbot-desktop-app-readiness-2026-08-11.md",
     "docs/runbooks/auth0-codex-device-check.md",
     "docs/runbooks/desktop-release-and-update.md",
+    "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
+    "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+    "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json",
     "scripts/vite-lucide-direct-imports.ts",
     "scripts/vite-production-runtime-vendors.ts",
     "server/__tests__/desktop-release-status.test.ts",
+    "server/__tests__/helix.public-ui-capability-audit.test.ts",
     "server/auth/__tests__/helix-agent-principal.test.ts",
     "server/auth/helix-agent-principal.ts",
     "server/mcp/__tests__/helix-mcp-device-check.test.ts",
     "server/routes/__tests__/environment-connector-platform.test.ts",
     "server/routes/__tests__/desktop-auth0-account-link.test.ts",
+    "server/routes/__tests__/desktop-auth0-step-up.test.ts",
     "server/routes/__tests__/helix-agent-account-bindings.test.ts",
     "server/routes/__tests__/helix-agent-transports.test.ts",
+    "server/routes/__tests__/installed-account-services.test.ts",
+    "server/routes/__tests__/stripe-sandbox-webhook.test.ts",
+    "server/routes/__tests__/stripe-sandbox-acceptance.test.ts",
     "server/routes/desktop-auth0-account-link.ts",
+    "server/routes/desktop-auth0-step-up.ts",
     "server/routes/desktop-release.ts",
     "server/routes/helix-agent-account-bindings.ts",
+    "server/routes/installed-account-services.ts",
+    "server/routes/stripe-sandbox-webhook.ts",
     "server/security/__tests__/desktop-session.test.ts",
     "server/security/desktop-session.ts",
     "server/services/desktop-release.ts",
@@ -40,22 +57,40 @@
     "server/services/environment-connectors/devices/device-check.ts",
     "server/services/helix-account/__tests__/agent-account-link-store.test.ts",
     "server/services/helix-account/__tests__/auth0-native-account-link.test.ts",
+    "server/services/helix-account/__tests__/auth0-step-up-receipt-store.test.ts",
+    "server/services/helix-account/__tests__/auth0-step-up.test.ts",
+    "server/services/helix-account/__tests__/installed-security-store.test.ts",
+    "server/services/helix-account/__tests__/billing-entitlement-store.test.ts",
+    "server/services/helix-account/__tests__/stripe-sandbox-client.test.ts",
     "server/services/helix-account/agent-account-link-store.ts",
     "server/services/helix-account/auth0-native-account-link.ts",
+    "server/services/helix-account/auth0-step-up-receipt-store.ts",
+    "server/services/helix-account/auth0-step-up.ts",
+    "server/services/helix-account/installed-security-store.ts",
+    "server/services/helix-account/billing-entitlement-store.ts",
+    "server/services/helix-account/stripe-sandbox-client.ts",
     "shared/__tests__/desktop-update.spec.ts",
+    "shared/__tests__/helix-installed-account-services.spec.ts",
     "shared/__tests__/runtime-surface.spec.ts",
     "shared/desktop-release.ts",
     "shared/desktop-update.ts",
     "shared/helix-environment-device-check.ts",
+    "shared/helix-installed-account-services.ts",
+    "shared/helix-billing-entitlement.ts",
     "shared/runtime-surface.ts",
     "shared/codex-plugin.ts",
     "shared/desktop-mcp-tunnel.ts",
     "shared/desktop-auth0-account-link.ts",
+    "shared/desktop-auth0-step-up.ts",
     "tests/desktop-auth0-account-link.spec.ts",
+    "tests/auth0-post-login-action.spec.ts",
+    "tests/desktop-device-identity.spec.ts",
     "tests/desktop-codex-plugin.spec.ts",
     "tests/desktop-mcp-tunnel.spec.ts",
     "tests/desktop-casimir-gate-receipt.spec.ts",
     "tests/desktop-host-security.spec.ts",
+    "tests/desktop-provider-credential-broker.spec.ts",
+    "tests/desktop-provider-credential-key.spec.ts",
     "tests/desktop-release-slice.spec.ts",
     "tests/desktop-service-environment.spec.ts",
     "tests/desktop-site-release-metadata.spec.ts",
@@ -70,8 +105,8 @@
     },
     {
       "path": ".env.example",
-      "purpose": "Fail-closed public desktop release configuration",
-      "requiredMarkers": ["DESKTOP_RELEASE_APPROVED=0"]
+      "purpose": "Fail-closed public desktop release and hosted-only Stripe sandbox configuration",
+      "requiredMarkers": ["DESKTOP_RELEASE_APPROVED=0", "STRIPE_SECRET_KEY=", "STRIPE_SANDBOX_PORTAL_RETURN_URL=", "Never place a Stripe secret in the"]
     },
     {
       "path": "client/src/App.tsx",
@@ -89,6 +124,11 @@
       "requiredMarkers": ["import { AppWindow, Settings2 } from \"lucide-react\""]
     },
     {
+      "path": "client/src/lib/desktop/panelRegistry.ts",
+      "purpose": "Public local-harness status and developer-only installed account-service panel registration",
+      "requiredMarkers": ["id: \"local-harness\"", "LocalHarnessPanel", "id: \"connections-billing-security\"", "InstalledServicesPanel"]
+    },
+    {
       "path": "client/src/pages/helix-core.panels.ts",
       "purpose": "Developer Device Check and Desktop Updates panel registration",
       "requiredMarkers": ["id: \"device-check\"", "id: \"desktop-updates\""]
@@ -104,9 +144,44 @@
       "requiredMarkers": ["--max-old-space-size=2304 ./node_modules/vite/bin/vite.js build"]
     },
     {
+      "path": "server/db/migrator.ts",
+      "purpose": "Installed device and sandbox billing ledger migration registration",
+      "requiredMarkers": ["migration070", "migration073"]
+    },
+    {
+      "path": "server/db/client.ts",
+      "purpose": "Durable local snapshot coverage for installed device state and sandbox billing evidence",
+      "requiredMarkers": ["helix_installed_devices", "helix_billing_entitlements", "helix_billing_webhook_events", "helix_billing_ledger_entries"]
+    },
+    {
+      "path": "server/db/migrations/070_installed_security_devices.ts",
+      "purpose": "Profile-bound installed device security state",
+      "requiredMarkers": ["helix_installed_devices", "recovery_generation"]
+    },
+    {
+      "path": "server/db/migrations/__tests__/070_installed_security_devices.spec.ts",
+      "purpose": "Installed device lifecycle schema evidence",
+      "requiredMarkers": ["migration070", "finite device lifecycle"]
+    },
+    {
+      "path": "server/db/migrations/073_billing_entitlement_ledger.ts",
+      "purpose": "Finite sandbox entitlement, webhook replay, and immutable credit-ledger schema",
+      "requiredMarkers": ["helix_billing_entitlements", "helix_billing_webhook_events", "helix_billing_ledger_entries"]
+    },
+    {
+      "path": "server/db/migrations/__tests__/073_billing_entitlement_ledger.spec.ts",
+      "purpose": "Sandbox billing ledger schema and finite-state evidence",
+      "requiredMarkers": ["migration073", "creates sandbox-only immutable billing tables with currency and amount checks"]
+    },
+    {
+      "path": "server/__tests__/local-pg-mem-persistence.test.ts",
+      "purpose": "Installed device and billing-ledger continuity across local EXE restarts",
+      "requiredMarkers": ["retains installed-device revoke and recovery state across EXE restarts", "retains Stripe sandbox entitlement, idempotency, and credit across EXE restarts"]
+    },
+    {
       "path": "server/index.ts",
-      "purpose": "Loopback child env isolation and HTTP session guard",
-      "requiredMarkers": ["shouldLoadLocalEnvFile", "createDesktopSessionGuard"]
+      "purpose": "Loopback child env isolation, HTTP session guard, and raw signed Stripe sandbox webhook boundary",
+      "requiredMarkers": ["shouldLoadLocalEnvFile", "createDesktopSessionGuard", "createStripeSandboxWebhookRouter"]
     },
     {
       "path": "server/mcp/helix-mcp-server.ts",
@@ -116,7 +191,7 @@
     {
       "path": "server/routes.ts",
       "purpose": "Public release route and desktop WebSocket session guard",
-      "requiredMarkers": ["desktopReleaseRouter", "isDesktopSessionAuthorized"]
+      "requiredMarkers": ["desktopReleaseRouter", "isDesktopSessionAuthorized", "createInstalledAccountServicesRouter", "createDesktopAuth0StepUpRouter"]
     },
     {
       "path": "server/routes/environment-connector-platform.ts",
@@ -132,6 +207,11 @@
       "path": "server/startup-config.ts",
       "purpose": "Forced IPv4 loopback desktop host mode",
       "requiredMarkers": ["CASIMIR_DESKTOP_HOST", "CASIMIR_SKIP_LOCAL_ENV_FILE"]
+    },
+    {
+      "path": "shared/helix-account-session.ts",
+      "purpose": "Public local-harness visibility and developer-only installed service management policy boundary",
+      "requiredMarkers": ["\"local-harness\"", "installed_service_management"]
     },
     {
       "path": "tests/startup-config.spec.ts",

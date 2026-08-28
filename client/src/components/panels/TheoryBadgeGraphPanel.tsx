@@ -4724,7 +4724,7 @@ function SelectFilter({
   return (
     <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
       {label}
-      <select
+      <select data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.select"
         value={value}
         onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value)}
         className="h-9 rounded-md border border-slate-800 bg-slate-950 px-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-cyan-500"
@@ -4754,7 +4754,7 @@ function BadgeButton({
   translateText: (text: string) => string;
 }) {
   return (
-    <button
+    <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.on-select"
       type="button"
       onClick={onSelect}
       className={`w-full rounded-md border p-3 text-left transition ${
@@ -4794,7 +4794,7 @@ function LoadPayloadButton({
   t: InterfaceTextResolver["t"];
 }) {
   return (
-    <Button
+    <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.dispatch-scientific-calculator-math-picked-latex-payload-display-latex-p"
       type="button"
       size="sm"
       variant="secondary"
@@ -4829,7 +4829,7 @@ function RelatedBadgeRow({
   const relatedId = edge.from === selectedId ? edge.to : edge.from;
   const related = byId.get(relatedId);
   return (
-    <button
+    <button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.on-select-related-id"
       type="button"
       onClick={() => onSelect(relatedId)}
       className="w-full rounded-md border border-slate-800 bg-slate-950/70 p-2 text-left text-xs text-slate-300 hover:border-slate-600"
@@ -4908,7 +4908,7 @@ function Inspector({
                 {translateText(labelize(badge.status))}
               </Badge>
             </div>
-            <Button
+            <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.on-run-playback"
               type="button"
               size="sm"
               onClick={onRunPlayback}
@@ -4918,7 +4918,7 @@ function Inspector({
               <Play className="h-4 w-4" />
               {t("theoryBadgeGraph.action.runPath")}
             </Button>
-            <Button
+            <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.on-load-theory-run"
               type="button"
               size="sm"
               variant="outline"
@@ -5060,7 +5060,7 @@ function Inspector({
               {t("theoryBadgeGraph.playback.title")}
             </h3>
             <div className="flex flex-wrap gap-2">
-              <Button
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.playback-copy-text-json-stringify-playback-null-2"
                 type="button"
                 size="sm"
                 variant="outline"
@@ -5071,7 +5071,7 @@ function Inspector({
                 <Copy className="h-4 w-4" />
                 {t("theoryBadgeGraph.action.copyPlaybackJson")}
               </Button>
-              <Button
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.playback-copy-text-format-theory-badge-playback-markdown-playback"
                 type="button"
                 size="sm"
                 variant="outline"
@@ -5082,7 +5082,7 @@ function Inspector({
                 <Copy className="h-4 w-4" />
                 {t("theoryBadgeGraph.action.copyPlaybackMarkdown")}
               </Button>
-              <Button
+              <Button data-helix-interaction-kind="act" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.on-clear-playback"
                 type="button"
                 size="sm"
                 variant="ghost"
@@ -7124,7 +7124,7 @@ export default function TheoryBadgeGraphPanel() {
               </div>
             ) : null}
             <div className="flex rounded-md border border-slate-800 bg-slate-950 p-1">
-              <Button
+              <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.set-view-mode-map"
                 type="button"
                 size="sm"
                 variant="ghost"
@@ -7133,7 +7133,7 @@ export default function TheoryBadgeGraphPanel() {
               >
                 {t("theoryBadgeGraph.view.achievementMap")}
               </Button>
-              <Button
+              <Button data-helix-interaction-kind="configure" data-helix-authority-state="client_local" data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.set-view-mode-list"
                 type="button"
                 size="sm"
                 variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -7150,7 +7150,7 @@ export default function TheoryBadgeGraphPanel() {
             {t("theoryBadgeGraph.filter.search")}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
-              <Input
+              <Input data-helix-control-id="workstation.panel.theory-badge-graph.theory-badge-graph-panel.input" data-helix-interaction-kind="configure" data-helix-authority-state="client_local"
                 value={query}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
                 placeholder={t("theoryBadgeGraph.filter.searchPlaceholder")}

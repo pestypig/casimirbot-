@@ -430,7 +430,11 @@ describe("Helix MCP environment monitor", () => {
         schema: "helix.client_authorization_readiness.v1",
         capability_profile: "g8-monitor",
         ready: false,
-        missing_scopes: ["helix.environment_actions.write", "helix.agent_runs.write"],
+        missing_scopes: [
+          "helix.environment_actions.write",
+          "helix.agent_runs.write",
+          "helix.brokerage.paper_observer.process",
+        ],
         recovery_action: "authorize_missing_scopes",
         credential_included: false,
         bearer_included: false,

@@ -89,7 +89,8 @@ describe("desktop Secure MCP Tunnel boundary", () => {
       SystemRoot: "C:\\Windows",
       CONTROL_PLANE_TUNNEL_ID: validCredentials.tunnelId,
       CONTROL_PLANE_API_KEY: validCredentials.runtimeApiKey,
-      MCP_SERVER_URL: "http://127.0.0.1:43123/mcp/device-check",
+      MCP_SERVER_URL:
+        "http://127.0.0.1:43123/mcp/local-supervisor-coordination",
       MCP_EXTRA_HEADERS:
         "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET",
       MCP_DISCOVERY_EXTRA_HEADERS:
@@ -120,6 +121,9 @@ describe("desktop Secure MCP Tunnel boundary", () => {
     const state = controller.configure(validCredentials);
     expect(parseDesktopMcpTunnelState(state)).toEqual(state);
     expect(state).toMatchObject({ status: "stopped", configured: true });
+    expect(state.scope).toBe(
+      "local_supervisor_coordination_and_device_check",
+    );
     expect(JSON.stringify(state)).not.toContain(validCredentials.tunnelId);
     expect(JSON.stringify(state)).not.toContain(validCredentials.runtimeApiKey);
 

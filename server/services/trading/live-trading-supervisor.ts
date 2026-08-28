@@ -14,6 +14,7 @@ type ControlIdentity = {
   owner_profile_id: string;
   operator_armed: boolean;
   operator_presence_at: Date | string | null;
+  operator_attendance_status: "active" | "inactive";
 };
 
 export type LiveTradingSupervisorCycleReceipt = {
@@ -54,7 +55,8 @@ export const runLiveTradingSupervisorCycle = async (input: {
   };
   return withSharedRealtimeRoomTransaction(async (client: Queryable) => {
     const { rows: controls } = await client.query<ControlIdentity>(
-      `SELECT control_id, owner_profile_id, operator_armed, operator_presence_at
+      `SELECT control_id, owner_profile_id, operator_armed, operator_presence_at,
+              operator_attendance_status
        FROM helix_live_trading_controls
        WHERE status = 'active' FOR UPDATE;`,
     );
@@ -93,12 +95,12 @@ export const runLiveTradingSupervisorCycle = async (input: {
       const operatorAge = control.operator_presence_at === null
         ? Number.POSITIVE_INFINITY
         : now.getTime() - new Date(control.operator_presence_at).getTime();
-      const deadmanRelock = control.operator_armed &&
+      const attendanceExpired = control.operator_attendance_status === "active" &&
         (operatorAge < 0 || operatorAge > OPERATOR_PRESENCE_FRESH_MS);
       if (attentionRequired) attentionControls += 1;
-      if (deadmanRelock) deadmanRelocks += 1;
+      if (attendanceExpired) deadmanRelocks += 1;
       const lockReason = attentionReason ??
-        (deadmanRelock
+        (attendanceExpired
           ? "Attended operator presence expired; live placement relocked."
           : "Live supervisor requires operator attention");
       await client.query(
@@ -108,13 +110,15 @@ export const runLiveTradingSupervisorCycle = async (input: {
              attention_required = $3, attention_reason = $4,
              operator_armed = CASE WHEN $3 OR $5 THEN false ELSE operator_armed END,
              operator_presence_at = CASE WHEN $5 THEN NULL ELSE operator_presence_at END,
+             operator_attendance_id_hash = CASE WHEN $5 THEN NULL ELSE operator_attendance_id_hash END,
+             operator_attendance_status = CASE WHEN $5 THEN 'inactive' ELSE operator_attendance_status END,
              kill_switch_active = CASE WHEN $3 OR $5 THEN true ELSE kill_switch_active END,
              kill_switch_reason = CASE WHEN $3 OR $5 THEN $6 ELSE kill_switch_reason END,
              updated_at = $2 WHERE control_id = $1;`,
         [control.control_id, now.toISOString(), attentionRequired,
-          attentionReason, deadmanRelock, lockReason],
+          attentionReason, attendanceExpired, lockReason],
       );
-      if (deadmanRelock) await client.query(
+      if (attendanceExpired) await client.query(
         `INSERT INTO helix_live_equity_execution_events (
            event_id, execution_id, control_id, owner_profile_id,
            event_type, detail_json, created_at

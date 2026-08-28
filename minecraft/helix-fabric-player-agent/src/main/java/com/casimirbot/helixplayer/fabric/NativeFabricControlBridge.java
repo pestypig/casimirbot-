@@ -119,9 +119,15 @@ final class NativeFabricControlBridge implements ControlBridge {
     public LocomotionSafetyEnvelope.Check checkLocomotionSafety(
         double targetX,
         double targetZ,
-        double minimumHealth
+        double minimumHealth,
+        boolean controlledJumpArc
     ) {
-        return workflowEngine.locomotionSafetyCheck(targetX, targetZ, minimumHealth);
+        return workflowEngine.locomotionSafetyCheck(
+            targetX,
+            targetZ,
+            minimumHealth,
+            controlledJumpArc
+        );
     }
 
     private PlayerSensorFrame captureSensorFrame() {
@@ -887,6 +893,20 @@ final class NativeFabricControlBridge implements ControlBridge {
             player.getItemBySlot(equipmentSlot(destination)),
             itemId
         );
+    }
+
+    boolean holdItemUse(String itemId, String handName) {
+        LocalPlayer player = minecraft.player;
+        if (player == null || !"main_hand".equals(handName) ||
+            !matches(player.getMainHandItem(), itemId)) {
+            return false;
+        }
+        set(minecraft.options.keyUse, true);
+        return true;
+    }
+
+    void releaseItemUse() {
+        set(minecraft.options.keyUse, false);
     }
 
     @Override

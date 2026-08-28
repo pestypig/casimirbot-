@@ -649,6 +649,7 @@ export const helixMinecraftFluidSequenceArgumentsSchema = z
       } else if (
         action.action_kind === "collect" ||
         action.action_kind === "craft" ||
+        action.action_kind === "consume" ||
         action.action_kind === "inventory_transfer"
       ) {
         declaredInventoryTransfers += action.count;

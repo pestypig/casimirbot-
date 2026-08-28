@@ -107,6 +107,14 @@ await build({
   external: ["electron"],
 });
 
+await build({
+  ...common,
+  entryPoints: [path.join(desktopRoot, "src", "realtime-texture-pack-overlay-preload.ts")],
+  outfile: path.join(distRoot, "realtime-texture-pack-overlay-preload.cjs"),
+  format: "cjs",
+  external: ["electron"],
+});
+
 const sourceCommit = resolveCommit();
 const serviceEntry = path.join(distRoot, "service.mjs");
 await build({

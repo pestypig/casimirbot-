@@ -1,0 +1,10 @@
+{
+  "action_kind": "consume",
+  "item_id": "minecraft:mushroom_stew",
+  "count": 1,
+  "hand": "main_hand",
+  "max_duration_ms": 8000,
+  "stop_below_health": 8,
+  "minimum_food_gain": 6,
+  "expected_remainder_item_id": "minecraft:bowl"
+}
