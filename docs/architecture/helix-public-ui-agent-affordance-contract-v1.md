@@ -33,7 +33,13 @@ not_applicable
 Interaction metadata describes what the visible control does. It never grants
 permission or tool admission. `client_local` means the control has no agent
 execution contract. Room controls remain `blocked_pending_contract` until an
-explicit room/participant/source/subject/lease/confirmation contract exists.
+explicit room/participant/source/subject/lease/confirmation contract exists;
+each control graduates individually only after the full binding checklist
+passes. The first graduated room controls are shared-handler
+`room.floor.acquire` and exact-epoch `room.floor.release`; the room feature
+gate remains unchanged. MCP acquisition additionally requires its signed
+delegation artifact; this route binding does not transfer browser-session
+authority to an MCP caller.
 
 ## Source ownership and delegated components
 

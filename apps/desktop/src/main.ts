@@ -27,6 +27,8 @@ import {
   type Session,
 } from "electron";
 import type { DesktopUpdateState } from "../../../shared/desktop-update";
+import { parseDesktopMcpTunnelStartRequest } from
+  "../../../shared/desktop-mcp-tunnel";
 import {
   DESKTOP_AUTH0_ACCOUNT_LINK_CALLBACK_PATH,
   DESKTOP_AUTH0_ACCOUNT_LINK_COMPLETION_SCHEMA,
@@ -67,6 +69,10 @@ import {
   DESKTOP_MCP_TUNNEL_START_CHANNEL,
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
+  DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL,
+  DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL,
+  DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL,
+  DESKTOP_MINECRAFT_RUN_PROFILE_CLEAR_CHANNEL,
   DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
   DESKTOP_TEXTURE_PACK_FRAME_CHANNEL,
   DESKTOP_TEXTURE_PACK_REVEAL_CHANNEL,
@@ -106,9 +112,30 @@ import {
   startDesktopProviderCredentialBroker,
   type DesktopProviderCredentialBroker,
 } from "./provider-credential-broker";
+import {
+  startDesktopMcpTunnelTransitionBroker,
+  type DesktopMcpTunnelTransitionBroker,
+  type DesktopMcpTunnelTransitionBrokerRequest,
+} from "./mcp-tunnel-transition-broker";
+import {
+  autoStartConfiguredDesktopMcpTunnelReadOnly,
+  DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS,
+  executeDesktopMcpTunnelTransitionNow,
+  restoreDesktopMcpTunnelReadOnly,
+} from "./mcp-tunnel-transition-executor";
+import {
+  parseActiveDesktopAccount,
+  type ActiveDesktopAccount,
+} from "./active-account-session";
 import { loadOrCreateDesktopDeviceIdentity } from "./device-identity";
 import { isAllowedDesktopRobinhoodAuthorizationUrl } from
   "./robinhood-oauth";
+import {
+  clearDesktopMinecraftRunProfile,
+  inspectDesktopMinecraftRunProfile,
+  saveDesktopMinecraftRunProfile,
+  saveDesktopMinecraftPlayerGameDirectory,
+} from "./minecraft-run-profile";
 import {
   RealtimeTexturePackOverlayController,
   type TexturePackOverlayWindow,
@@ -131,6 +158,7 @@ type DesktopRuntime = {
   secret: string;
   port: number;
   providerCredentialBroker: DesktopProviderCredentialBroker;
+  mcpTransitionBroker: DesktopMcpTunnelTransitionBroker;
 };
 
 type StartupJournal = {
@@ -142,6 +170,8 @@ let desktopRuntime: DesktopRuntime | null = null;
 let mcpTunnelController: DesktopMcpTunnelController | null = null;
 let mainWindow: BrowserWindow | null = null;
 let texturePackOverlayController: RealtimeTexturePackOverlayController | null = null;
+let mcpFullLeaseTimer: NodeJS.Timeout | null = null;
+let mcpTransitionGeneration = 0;
 let quitting = false;
 let pendingAuth0Callback: string | null = null;
 
@@ -354,6 +384,68 @@ const waitForServiceReady = async (runtime: DesktopRuntime): Promise<void> => {
   );
 };
 
+const resolveActiveDesktopAccount = async (
+  runtime: DesktopRuntime,
+  rendererSession: Session,
+): Promise<ActiveDesktopAccount> => {
+  const response = await rendererSession.fetch(`${runtime.origin}/api/account/session`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+  const account = parseActiveDesktopAccount(
+    await response.json().catch(() => null),
+  );
+  if (!response.ok || !account) {
+    throw new Error("mcp_tunnel_active_account_session_required");
+  }
+  return account;
+};
+
+const restoreReadOnlyMcpTunnel = async (
+  controller: DesktopMcpTunnelController,
+  accountSessionId: string,
+): Promise<void> => {
+  if (mcpFullLeaseTimer) clearTimeout(mcpFullLeaseTimer);
+  mcpFullLeaseTimer = null;
+  await restoreDesktopMcpTunnelReadOnly({ controller, accountSessionId });
+};
+
+const scheduleNativeMcpTunnelTransition = (input: {
+  controller: DesktopMcpTunnelController;
+  request: DesktopMcpTunnelTransitionBrokerRequest;
+}): void => {
+  const generation = ++mcpTransitionGeneration;
+  const timer = setTimeout(() => {
+    void (async () => {
+      if (generation !== mcpTransitionGeneration) return;
+      const execution = await executeDesktopMcpTunnelTransitionNow({
+        controller: input.controller,
+        accountSessionId: input.request.accountSessionId,
+        targetScope: input.request.targetScope,
+      });
+      if (
+        execution.requestedScopeReady &&
+        input.request.targetScope === "full_helix_agent"
+      ) {
+          const remaining = Math.max(
+            0,
+            Date.parse(input.request.delegationExpiresAt) - Date.now(),
+          );
+          mcpFullLeaseTimer = setTimeout(() => {
+            void restoreReadOnlyMcpTunnel(
+              input.controller,
+              input.request.accountSessionId,
+            );
+          }, remaining);
+          mcpFullLeaseTimer.unref();
+      }
+    })();
+  }, DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS);
+  timer.unref();
+};
+
 const startDesktopService = async (): Promise<DesktopRuntime> => {
   const runtimeRoot = resolveRuntimeRoot();
   const serverEntry = resolveServerEntry(runtimeRoot);
@@ -381,6 +473,37 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   const port = await reserveLoopbackPort();
   const origin = `http://127.0.0.1:${port}`;
   const secret = randomBytes(32).toString("base64url");
+  const mcpTransitionBroker = await startDesktopMcpTunnelTransitionBroker({
+      onTransition: async (request) => {
+        const runtime = desktopRuntime;
+        const window = mainWindow;
+        const controller = mcpTunnelController;
+        if (!runtime || !window || window.isDestroyed() || !controller) {
+          throw new Error("native_transition_runtime_unavailable");
+        }
+        if (!controller.getState().configured) {
+          throw new Error("native_transition_tunnel_unconfigured");
+        }
+        if (request.targetScope === "full_helix_agent") {
+          const account = await resolveActiveDesktopAccount(
+            runtime,
+            window.webContents.session,
+          );
+          if (
+            account.sessionId !== request.accountSessionId ||
+            account.accountType !== "developer"
+          ) throw new Error("native_transition_developer_revalidation_failed");
+        }
+        scheduleNativeMcpTunnelTransition({ controller, request });
+        return {
+          nativeReceiptRef:
+            `native_transition_receipt:${randomBytes(18).toString("base64url")}`,
+        };
+      },
+    }).catch(async (error) => {
+      await providerCredentialBroker.close();
+      throw error;
+    });
   let child: ChildProcessByStdio<null, Readable, Readable>;
   try {
     child = spawn(
@@ -394,6 +517,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
             userDataPath: app.getPath("userData"),
             serviceOrigin: origin,
             providerCredentialBroker,
+            mcpTransitionBroker,
             deviceId: deviceIdentity.deviceId,
           }),
         ELECTRON_RUN_AS_NODE: "1",
@@ -413,6 +537,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
     );
   } catch (error) {
     await providerCredentialBroker.close();
+    await mcpTransitionBroker.close();
     throw error;
   }
 
@@ -439,6 +564,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
     secret,
     port,
     providerCredentialBroker,
+    mcpTransitionBroker,
   } satisfies DesktopRuntime;
 
   try {
@@ -461,6 +587,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
       await Promise.race([childExited, delay(5_000)]);
     }
     await providerCredentialBroker.close();
+    await mcpTransitionBroker.close();
     throw new Error(`${message}. Startup log: ${startupJournal.filePath}`);
   }
 
@@ -752,7 +879,10 @@ const registerDesktopIpc = (
       throw new Error("Untrusted renderer requested a desktop capability");
     }
   };
-  const assertDeveloperAccount = async (rendererSession: Session): Promise<void> => {
+  const assertDeveloperAccount = async (
+    rendererSession: Session,
+    failureCode = "realtime_texture_pack_developer_account_required",
+  ): Promise<void> => {
     const response = await rendererSession.fetch(`${runtime.origin}/api/account/session`, {
       method: "GET",
       cache: "no-store",
@@ -765,7 +895,7 @@ const registerDesktopIpc = (
     const accountType = payload?.account_policy?.account_type ??
       payload?.session?.account_policy?.account_type;
     if (!response.ok || accountType !== "developer") {
-      throw new Error("realtime_texture_pack_developer_account_required");
+      throw new Error(failureCode);
     }
   };
   const publishUpdateState = (state: DesktopUpdateState): void => {
@@ -989,9 +1119,18 @@ const registerDesktopIpc = (
     assertTrustedRenderer(event.senderFrame?.url ?? "");
     return tunnelController.configure(input);
   });
-  ipcMain.handle(DESKTOP_MCP_TUNNEL_START_CHANNEL, async (event) => {
+  ipcMain.handle(DESKTOP_MCP_TUNNEL_START_CHANNEL, async (event, input: unknown) => {
     assertTrustedRenderer(event.senderFrame?.url ?? "");
-    return tunnelController.start();
+    const request = parseDesktopMcpTunnelStartRequest(input);
+    if (!request) throw new Error("mcp_tunnel_start_request_invalid");
+    const account = await resolveActiveDesktopAccount(runtime, event.sender.session);
+    if (
+      request.scope === "full_helix_agent" &&
+      account.accountType !== "developer"
+    ) {
+      throw new Error("mcp_tunnel_full_developer_account_required");
+    }
+    return tunnelController.start(account.sessionId, request.scope);
   });
   ipcMain.handle(DESKTOP_MCP_TUNNEL_STOP_CHANNEL, async (event) => {
     assertTrustedRenderer(event.senderFrame?.url ?? "");
@@ -1007,6 +1146,62 @@ const registerDesktopIpc = (
     if (!adminUrl) throw new Error("Tunnel admin UI is unavailable");
     await shell.openExternal(adminUrl);
     return tunnelController.getState();
+  });
+  ipcMain.handle(DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL, async (event) => {
+    assertTrustedRenderer(event.senderFrame?.url ?? "");
+    const account = await resolveActiveDesktopAccount(runtime, event.sender.session);
+    return inspectDesktopMinecraftRunProfile({
+      userDataPath: app.getPath("userData"),
+      ownerProfileId: account.profileId,
+    });
+  });
+  ipcMain.handle(DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL, async (event) => {
+    assertTrustedRenderer(event.senderFrame?.url ?? "");
+    const account = await resolveActiveDesktopAccount(runtime, event.sender.session);
+    const selection = await dialog.showOpenDialog({
+      title: "Select the Minecraft Fabric server profile",
+      message: "Choose the dedicated-server folder containing config and server.properties.",
+      properties: ["openDirectory", "dontAddToRecent"],
+    });
+    if (selection.canceled || selection.filePaths.length !== 1) {
+      return inspectDesktopMinecraftRunProfile({
+        userDataPath: app.getPath("userData"),
+        ownerProfileId: account.profileId,
+      });
+    }
+    return saveDesktopMinecraftRunProfile({
+      userDataPath: app.getPath("userData"),
+      ownerProfileId: account.profileId,
+      runDirectory: selection.filePaths[0],
+    });
+  });
+  ipcMain.handle(DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL, async (event) => {
+    assertTrustedRenderer(event.senderFrame?.url ?? "");
+    const account = await resolveActiveDesktopAccount(runtime, event.sender.session);
+    const selection = await dialog.showOpenDialog({
+      title: "Select the Minecraft Fabric player profile",
+      message: "Choose the client game directory containing config and mods.",
+      properties: ["openDirectory", "dontAddToRecent"],
+    });
+    if (selection.canceled || selection.filePaths.length !== 1) {
+      return inspectDesktopMinecraftRunProfile({
+        userDataPath: app.getPath("userData"),
+        ownerProfileId: account.profileId,
+      });
+    }
+    return saveDesktopMinecraftPlayerGameDirectory({
+      userDataPath: app.getPath("userData"),
+      ownerProfileId: account.profileId,
+      playerGameDirectory: selection.filePaths[0],
+    });
+  });
+  ipcMain.handle(DESKTOP_MINECRAFT_RUN_PROFILE_CLEAR_CHANNEL, async (event) => {
+    assertTrustedRenderer(event.senderFrame?.url ?? "");
+    const account = await resolveActiveDesktopAccount(runtime, event.sender.session);
+    return clearDesktopMinecraftRunProfile({
+      userDataPath: app.getPath("userData"),
+      ownerProfileId: account.profileId,
+    });
   });
 };
 
@@ -1051,10 +1246,14 @@ const createMainWindow = async (runtime: DesktopRuntime): Promise<void> => {
 };
 
 const stopDesktopService = (): void => {
+  mcpTransitionGeneration += 1;
+  if (mcpFullLeaseTimer) clearTimeout(mcpFullLeaseTimer);
+  mcpFullLeaseTimer = null;
   const runtime = desktopRuntime;
   desktopRuntime = null;
   if (!runtime) return;
   void runtime.providerCredentialBroker.close();
+  void runtime.mcpTransitionBroker.close();
   if (runtime.child.exitCode === null) runtime.child.kill();
 };
 
@@ -1087,7 +1286,9 @@ if (!singleInstance) {
 
   void app.whenReady().then(async () => {
     try {
-      installDesktopSessionSecurity(session.defaultSession);
+      installDesktopSessionSecurity(session.defaultSession, {
+        getTrustedRendererOrigin: () => desktopRuntime?.origin ?? null,
+      });
       const runtimeRoot = resolveRuntimeRoot();
       const codexIntegration = await inspectCodexPluginIntegration({
         marketplaceRoot: app.isPackaged
@@ -1122,6 +1323,20 @@ if (!singleInstance) {
         pendingAuth0Callback = null;
         await completeDesktopAuth0Callback(desktopRuntime, callbackUrl);
       }
+      void autoStartConfiguredDesktopMcpTunnelReadOnly({
+        controller: mcpTunnelController,
+        resolveAccount: async () => {
+          const window = mainWindow;
+          const runtime = desktopRuntime;
+          if (!runtime || !window || window.isDestroyed()) {
+            throw new Error("mcp_tunnel_native_window_unavailable");
+          }
+          return resolveActiveDesktopAccount(
+            runtime,
+            window.webContents.session,
+          );
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       dialog.showErrorBox("CasimirBot could not start", message);

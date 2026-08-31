@@ -193,19 +193,26 @@ nearby files or a successful UI demonstration.
 ### Reserved dynamic visual-direction lane
 
 `docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md`
-specifies the post-baseline path for compiling a fresh image prompt from the
-developer's artistic direction plus provenance-linked Minecraft situation
-cues. It reuses the accepted situation-digest/live-mail framework, reserves a
-deterministic per-request prompt compiler, and permits an optional asynchronous
+specifies the post-baseline path for compiling a provider-neutral visual
+treatment from the developer's artistic direction plus provenance-linked
+Minecraft situation cues. It classifies native shader parameters, scene-change
+dynamic materials, attended resource-pack snapshots, and overlay frames as
+separate targets; the image prompt is one child projection. It reuses the
+accepted situation-digest/live-mail framework, reserves a deterministic
+treatment compiler, and permits an optional asynchronous
 semantic scene capsule only through an existing provider-native interpreter
 contract. It also reserves a separate developer-enabled agent/MCP prompt-control
 lease without granting capture start, source/provider selection, billing,
 Minecraft action, evidence, or terminal authority.
 
 This remains a `specified` full-capability lane. Its isolated VDC-1 typed
-contract/projector slice is deterministically verified by the evidence in that
-packet; VDC-2 is merely eligible for a later explicit assignment. This does not
-advance RTP-5 or authorize an SDK, credential, provider call, or billable work.
+contract/projector slice, VDC-1A target-classification slice, VDC-2 pure
+treatment compiler, and VDC-3 latest-only controller integration are
+deterministically verified by the evidence in that packet. VDC-4 now adds the
+developer-only Image Lens reservation and expiring, revision-checked agent/MCP
+prompt-control mailbox. This does not advance RTP-5 or authorize a live
+environment binding, Fabric render mutation, resource reload, SDK, credential,
+provider call, or billable work.
 
 ## Stage instructions for future Codex turns
 

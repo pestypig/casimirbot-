@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace nhm2::g2h_e_s5::primary_c08_h2_ledger_v1 {
 
@@ -74,6 +75,24 @@ struct Result {
     bool authority_promoted = false;
 };
 
+inline constexpr std::size_t kMaximumDiagnosticStringBytes = 256U;
+inline constexpr std::size_t kMaximumDiagnosticRecordBytes = 65536U;
+
+// P8B retains only the selector executed most recently in the current parent
+// call. On failure this is the terminal selector, so the record is bounded by
+// the frozen 17-candidate schedule regardless of ledger length.
+struct ParentDiagnostics {
+    bool present = false;
+    std::size_t source_ordinal = 0U;
+    std::size_t selector_call_ordinal = 0U;
+    bool selector_passed = false;
+    selector::FailureDetail selector_detail = selector::FailureDetail::none;
+    selector::WidthDiagnostics width;
+    bool observation_only = true;
+    bool parent_decision_unchanged = true;
+    bool persistence_bounded = true;
+};
+
 class Context {
   public:
     struct Impl;
@@ -86,6 +105,19 @@ class Context {
     std::unique_ptr<Impl> impl_;
     friend bool initialize(const Input &, Context *, Result *);
     friend bool extend(const Input &, Context *, Result *);
+    friend bool initialize_diagnostic(const Input &, Context *, Result *,
+                                      ParentDiagnostics *);
+    friend bool extend_diagnostic(const Input &, Context *, Result *,
+                                  ParentDiagnostics *);
+    friend bool diagnose_next_selector_candidate(
+        const Input &, const Context *, std::size_t, std::size_t, unsigned,
+        std::size_t, selector::Output *, selector::Result *,
+        selector::CoefficientDecompositionObservation *);
+    friend bool diagnose_next_selector_candidate_observable(
+        const Input &, const Context *, std::size_t, std::size_t, unsigned,
+        std::size_t, selector::Output *, selector::Result *,
+        selector::CoefficientDecompositionObservation *,
+        selector::CandidateProgressObserver, void *);
     friend ledger::LedgerView published(const Context &);
 };
 
@@ -102,6 +134,38 @@ bool initialize(const Input &input, Context *context, Result *result);
 // a new H2 model is validated before commit, and the first C08-010,
 // translation or validation failure is terminal and cannot be retried.
 bool extend(const Input &input, Context *context, Result *result);
+
+// P8B observation-enabled parent entrypoints. They use the same parent and
+// selector decisions, retain only the most recent/terminal selector record,
+// and never consult diagnostics when accepting or rejecting H2 models.
+bool initialize_diagnostic(const Input &input, Context *context,
+                           Result *result, ParentDiagnostics *diagnostics);
+bool extend_diagnostic(const Input &input, Context *context, Result *result,
+                       ParentDiagnostics *diagnostics);
+
+// H2-P8F read-only binding for one named next-ordinal selector candidate.
+// It authenticates the admitted prefix and constructs the ordinary selector
+// input, but performs no selection, translation, publication or parent-state
+// mutation.
+bool diagnose_next_selector_candidate(
+    const Input &input, const Context *context, std::size_t panel_count,
+    std::size_t thread_count, unsigned target_degree, std::size_t target_jet,
+    selector::Output *output, selector::Result *result,
+    selector::CoefficientDecompositionObservation *observation);
+
+// P8F-C1 adds a write-only monotone progress channel while preserving the
+// authenticated prefix, selector input and read-only parent-state boundary.
+bool diagnose_next_selector_candidate_observable(
+    const Input &input, const Context *context, std::size_t panel_count,
+    std::size_t thread_count, unsigned target_degree, std::size_t target_jet,
+    selector::Output *output, selector::Result *result,
+    selector::CoefficientDecompositionObservation *observation,
+    selector::CandidateProgressObserver progress, void *progress_context);
+
+// Deterministic bounded JSON representation for future executor persistence.
+// This function performs no file I/O and rejects incomplete or over-cap data.
+bool serialize_diagnostics(const ParentDiagnostics &diagnostics,
+                           std::string *canonical);
 
 ledger::LedgerView published(const Context &context);
 const char *failure_detail_name(FailureDetail detail);

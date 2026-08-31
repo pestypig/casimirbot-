@@ -11,6 +11,7 @@ import {
   Trash2,
   ExternalLink,
   WifiOff,
+  FolderOpen,
 } from "lucide-react";
 import {
   helixEnvironmentDeviceCheckListSchema,
@@ -24,6 +25,12 @@ import {
   parseDesktopMcpTunnelState,
   type DesktopMcpTunnelState,
 } from "@shared/desktop-mcp-tunnel";
+import type { DesktopMcpTransitionRequest } from
+  "@shared/desktop-mcp-tunnel-transition";
+import {
+  parseDesktopMinecraftRunProfileState,
+  type DesktopMinecraftRunProfileState,
+} from "@shared/desktop-minecraft-run-profile";
 import { useRuntimeSurface } from "@/lib/runtime/RuntimeSurfaceProvider";
 
 const statusClass: Record<HelixEnvironmentDeviceCheck["health"], string> = {
@@ -71,6 +78,16 @@ export default function DeviceCheckPanel() {
   const [runtimeApiKey, setRuntimeApiKey] = useState("");
   const [tunnelBusy, setTunnelBusy] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
+  const [transitionRequests, setTransitionRequests] =
+    useState<DesktopMcpTransitionRequest[]>([]);
+  const [transitionConsentAvailable, setTransitionConsentAvailable] =
+    useState(false);
+  const [transitionBusyRef, setTransitionBusyRef] = useState<string | null>(null);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [minecraftRunProfile, setMinecraftRunProfile] =
+    useState<DesktopMinecraftRunProfileState | null>(null);
+  const [minecraftProfileBusy, setMinecraftProfileBusy] = useState(false);
+  const [minecraftProfileError, setMinecraftProfileError] = useState<string | null>(null);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -138,6 +155,133 @@ export default function DeviceCheckPanel() {
       cancelled = true;
     };
   }, [runtime.surface]);
+
+  useEffect(() => {
+    if (runtime.surface !== "desktop_native") return;
+    const inspect = window.casimirDesktop?.getMinecraftRunProfile;
+    if (!inspect) return;
+    let cancelled = false;
+    void inspect().then((candidate) => {
+      if (cancelled) return;
+      const parsed = parseDesktopMinecraftRunProfileState(candidate);
+      if (parsed) setMinecraftRunProfile(parsed);
+      else setMinecraftProfileError("The desktop host returned an invalid Minecraft profile state.");
+    }).catch(() => {
+      if (!cancelled) setMinecraftProfileError("The Minecraft profile could not be inspected.");
+    });
+    return () => { cancelled = true; };
+  }, [runtime.surface]);
+
+  const runMinecraftProfileOperation = useCallback(async (
+    operation: (() => Promise<unknown>) | undefined,
+  ) => {
+    if (!operation) return;
+    setMinecraftProfileBusy(true);
+    setMinecraftProfileError(null);
+    try {
+      const parsed = parseDesktopMinecraftRunProfileState(await operation());
+      if (!parsed) throw new Error("invalid Minecraft profile state");
+      setMinecraftRunProfile(parsed);
+    } catch (caught) {
+      setMinecraftProfileError(
+        caught instanceof Error ? caught.message : "The Minecraft profile operation failed.",
+      );
+    } finally {
+      setMinecraftProfileBusy(false);
+    }
+  }, []);
+
+  const refreshTransitionRequests = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch(
+        "/api/desktop/mcp-tunnel-transition/requests",
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          signal,
+        },
+      );
+      const body = await response.json().catch(() => null) as
+        | { requests?: unknown }
+        | null;
+      if (response.status === 401 || response.status === 403) {
+        setTransitionConsentAvailable(false);
+        setTransitionRequests([]);
+        return;
+      }
+      if (!response.ok || !Array.isArray(body?.requests)) {
+        setTransitionConsentAvailable(false);
+        return;
+      }
+      const admitted = body.requests.filter((candidate): candidate is DesktopMcpTransitionRequest => {
+        if (!candidate || typeof candidate !== "object") return false;
+        const request = candidate as Partial<DesktopMcpTransitionRequest>;
+        return request.schema === "helix.desktop_tunnel_transition.v1" &&
+          typeof request.transition_request_ref === "string" &&
+          typeof request.declared_task_summary === "string" &&
+          typeof request.status === "string" &&
+          request.credential_included === false &&
+          request.private_endpoint_included === false &&
+          request.assistant_answer === false &&
+          request.terminal_eligible === false;
+      });
+      setTransitionRequests(admitted);
+      setTransitionConsentAvailable(true);
+      setTransitionError(null);
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return;
+      setTransitionError("Tunnel delegation requests could not be inspected.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (runtime.surface !== "desktop_native" || !tunnel?.configured) return;
+    const controller = new AbortController();
+    void refreshTransitionRequests(controller.signal);
+    return () => controller.abort();
+  }, [refreshTransitionRequests, runtime.surface, tunnel?.configured]);
+
+  const decideTransitionRequest = useCallback(async (
+    requestRef: string,
+    decision: "delegate" | "revoke",
+    requestedLeaseSeconds?: number,
+  ) => {
+    setTransitionBusyRef(requestRef);
+    setTransitionError(null);
+    try {
+      const response = await fetch(
+        `/api/desktop/mcp-tunnel-transition/requests/${encodeURIComponent(requestRef)}/${decision}`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(decision === "delegate"
+            ? { lease_seconds: requestedLeaseSeconds }
+            : {}),
+        },
+      );
+      const body = await response.json().catch(() => null) as
+        | { error?: unknown }
+        | null;
+      if (!response.ok) {
+        throw new Error(typeof body?.error === "string"
+          ? label(body.error)
+          : "Tunnel delegation decision failed");
+      }
+      await refreshTransitionRequests();
+    } catch (caught) {
+      setTransitionError(
+        caught instanceof Error ? caught.message : "Tunnel delegation decision failed.",
+      );
+    } finally {
+      setTransitionBusyRef(null);
+    }
+  }, [refreshTransitionRequests]);
 
   useEffect(() => {
     if (runtime.surface !== "desktop_native") return;
@@ -286,11 +430,12 @@ export default function DeviceCheckPanel() {
                   Local Desktop MCP tunnel
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">
-              Outbound-only developer connection to OpenAI Secure MCP Tunnel. It exposes only owner-scoped Device Check plus bounded local-supervisor presence and advisory coordination. Environment actions and general MCP tools remain unavailable; the desktop session secret and runtime key stay outside the web service and Codex.
+              Outbound-only developer connection to OpenAI Secure MCP Tunnel. Read-only Device Check and local-supervisor coordination remain the default. A signed-in developer may explicitly start the full Helix MCP surface; OAuth scopes, room grants, and environment authority are still enforced separately. The desktop session secret and runtime key stay outside the web service and Codex.
                 </p>
                 <p className="mt-2 text-xs text-slate-300" data-testid="device-check-tunnel-status">
                   Status: <span className="font-medium text-emerald-200">{tunnel ? label(tunnel.status) : "Inspecting"}</span>
-                  {tunnel?.binaryVersion ? ` · tunnel-client ${tunnel.binaryVersion}` : ""}
+                   {tunnel?.binaryVersion ? ` · tunnel-client ${tunnel.binaryVersion}` : ""}
+                   {tunnel ? ` · ${tunnel.scope === "full_helix_agent" ? "Full developer MCP" : "Read-only coordination"}` : ""}
                   {tunnelFailureMessage ? ` · ${tunnelFailureMessage}` : ""}
                 </p>
               </div>
@@ -345,18 +490,32 @@ export default function DeviceCheckPanel() {
             {tunnel?.configured ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {!tunnel.processRunning ? (
-                  <button
-                    type="button"
-                    disabled={tunnelBusy}
-                    onClick={() => {
-                      const start = window.casimirDesktop?.startMcpTunnel;
-                      if (start) void runTunnelOperation(start);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-50"
-                  >
-                    <Play className="h-3.5 w-3.5" aria-hidden="true" />
-                    Start tunnel
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      disabled={tunnelBusy}
+                      onClick={() => {
+                        const start = window.casimirDesktop?.startMcpTunnel;
+                        if (start) void runTunnelOperation(() => start({ scope: "local_supervisor_coordination_and_device_check" }));
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-50"
+                    >
+                      <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                      Start read-only tunnel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={tunnelBusy}
+                      onClick={() => {
+                        const start = window.casimirDesktop?.startMcpTunnel;
+                        if (start) void runTunnelOperation(() => start({ scope: "full_helix_agent" }));
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 disabled:opacity-50"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                      Start full developer MCP
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -385,7 +544,148 @@ export default function DeviceCheckPanel() {
                 </button>
               </div>
             ) : null}
+            {transitionConsentAvailable ? (
+              <div
+                className="mt-3 rounded-md border border-cyan-400/20 bg-cyan-400/5 p-3"
+                data-testid="device-check-tunnel-transition-consent"
+              >
+                <p className="text-xs font-medium text-cyan-100">
+                  Agent-requested tunnel delegations
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  A grant lasts 120 seconds and permits only the native tunnel transport to switch modes. It does not grant room, environment, brokerage, trading, or answer authority. Current private-pilot identity binds the native tunnel client plus a server-derived conversation continuation; independent external-client cryptographic binding remains a release gate.
+                </p>
+                {transitionRequests.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    No agent has requested a delegation from the read-only MCP surface.
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {transitionRequests.map((request) => {
+                      const canDelegate = request.status === "pending_user_delegation";
+                      const canRevoke = [
+                        "delegated",
+                        "transition_accepted",
+                        "active",
+                      ].includes(request.status);
+                      return (
+                        <div
+                          key={request.transition_request_ref}
+                          className="rounded border border-slate-700 bg-slate-950/60 p-2"
+                        >
+                          <p className="text-xs text-slate-200">
+                            {request.declared_task_summary}
+                          </p>
+                          <p className="mt-1 font-mono text-[11px] text-slate-500">
+                            {label(request.status)} · {request.client_session_ref}
+                          </p>
+                          {canDelegate || canRevoke ? (
+                            <div className="mt-2 flex gap-2">
+                              {canDelegate ? (
+                                <button
+                                  type="button"
+                                  disabled={transitionBusyRef === request.transition_request_ref}
+                                  onClick={() => void decideTransitionRequest(
+                                    request.transition_request_ref,
+                                    "delegate",
+                                    request.requested_lease_seconds,
+                                  )}
+                                  className="rounded border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100 disabled:opacity-50"
+                                >
+                                  Grant {request.requested_lease_seconds}-second tunnel lease
+                                </button>
+                              ) : null}
+                              {canRevoke ? (
+                                <button
+                                  type="button"
+                                  disabled={transitionBusyRef === request.transition_request_ref}
+                                  onClick={() => void decideTransitionRequest(
+                                    request.transition_request_ref,
+                                    "revoke",
+                                  )}
+                                  className="rounded border border-rose-400/30 bg-rose-400/10 px-2 py-1 text-xs text-rose-100 disabled:opacity-50"
+                                >
+                                  Revoke and return read-only
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {transitionError ? (
+                  <p className="mt-2 text-xs text-rose-200" role="alert">
+                    {transitionError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {tunnelError ? <p className="mt-2 text-xs text-rose-200" role="alert">{tunnelError}</p> : null}
+          </div>
+        ) : null}
+
+        {runtime.surface === "desktop_native" ? (
+          <div
+            className="mb-4 rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3"
+            data-testid="device-check-minecraft-run-profile"
+          >
+            <p className="text-sm font-medium text-cyan-100">Local Minecraft profile</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              Select both the dedicated Fabric server folder and the Fabric client game directory once for this Casimir profile. Opaque pairing then reaches each exact local inbox without exposing a pairing code or letting an agent choose a filesystem path.
+            </p>
+            <p className="mt-2 break-all font-mono text-[11px] text-slate-300">
+              {minecraftRunProfile?.configured
+                ? `Server: ${minecraftRunProfile.label} · ${minecraftRunProfile.runDirectory}`
+                : "No local Minecraft server profile selected"}
+            </p>
+            <p className="mt-1 break-all font-mono text-[11px] text-slate-300">
+              {minecraftRunProfile?.playerGameDirectory
+                ? `Player: ${minecraftRunProfile.playerGameDirectory}`
+                : "No local Minecraft player profile selected"}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={minecraftProfileBusy}
+                onClick={() => void runMinecraftProfileOperation(
+                  window.casimirDesktop?.selectMinecraftRunProfile,
+                )}
+                className="inline-flex items-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 disabled:opacity-50"
+              >
+                <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                {minecraftRunProfile?.configured ? "Change server folder" : "Select server folder"}
+              </button>
+              <button
+                type="button"
+                disabled={minecraftProfileBusy || !minecraftRunProfile?.configured}
+                onClick={() => void runMinecraftProfileOperation(
+                  window.casimirDesktop?.selectMinecraftPlayerProfile,
+                )}
+                className="inline-flex items-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 disabled:opacity-50"
+              >
+                <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                {minecraftRunProfile?.playerGameDirectory
+                  ? "Change player folder"
+                  : "Select player folder"}
+              </button>
+              {minecraftRunProfile?.configured ? (
+                <button
+                  type="button"
+                  disabled={minecraftProfileBusy}
+                  onClick={() => void runMinecraftProfileOperation(
+                    window.casimirDesktop?.clearMinecraftRunProfile,
+                  )}
+                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300 disabled:opacity-50"
+                >
+                  Forget selection
+                </button>
+              ) : null}
+            </div>
+            {minecraftProfileError ? (
+              <p className="mt-2 text-xs text-rose-200" role="alert">{minecraftProfileError}</p>
+            ) : null}
           </div>
         ) : null}
 

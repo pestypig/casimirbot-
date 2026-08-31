@@ -2,13 +2,45 @@ import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { REALTIME_TEXTURE_PACK_HARNESS_ACTIONS } from "@shared/realtime-texture-pack-harness";
 import {
+  HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+  HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+  desktopMcpTransitionExecuteInputSchema,
+  desktopMcpTransitionRequestInputSchema,
+  type DesktopMcpTransitionIdentity,
+  type DesktopMcpTransitionTarget,
+} from "@shared/desktop-mcp-tunnel-transition";
+import {
+  REALTIME_TEXTURE_PACK_HARNESS_ACTIONS,
+  REALTIME_TEXTURE_PACK_VISUAL_DIRECTION_COMMANDS,
+  parseRealtimeTexturePackVisualDirectionCommandArguments,
+} from "@shared/realtime-texture-pack-harness";
+import {
+  HELIX_PUBLIC_UI_AGENT_CATALOG_SCHEMA,
   HELIX_PUBLIC_UI_SURFACE_CATALOG,
   type HelixPublicUiAuthorityState,
   type HelixPublicUiInteractionKind,
 } from "@shared/helix-public-ui-affordance";
+import { helixMcpEvidenceObservationSchema } from
+  "@shared/contracts/helix-mcp-evidence-capability.v1";
+import {
+  computeHelixSharedLiveRoomMcpDelegationSealedInputSha256V1,
+  type HelixSharedLiveRoomMcpDelegationReceiptV1,
+} from "@shared/contracts/helix-shared-live-room-mcp-delegation.v1";
+import { getHelixMcpEvidenceCapabilityDescriptor } from
+  "@shared/helix-mcp-evidence-capability-registry";
+import {
+  HelixMcpEvidenceObservationStore,
+  HelixMcpEvidenceObservationStoreError,
+} from "../services/mcp-evidence/observation-store";
+import { createPostgresHelixMcpEvidenceObservationStore } from
+  "../services/mcp-evidence/postgres-observation-store";
 import { realtimeTexturePackHarnessStore } from "../services/helix-ask/workstation-tool-gateway/realtime-texture-pack-harness-store";
+import { inspectAttendedFalControlProjection } from "../services/realtime-texture-pack/attended-fal-runtime";
+import {
+  DesktopMcpTunnelTransitionError,
+  type DesktopMcpTunnelTransitionStore,
+} from "../services/local-supervisor/desktop-mcp-tunnel-transition-store";
 import {
   HELIX_AGENT_RUN_READ_SCOPE,
   HELIX_AGENT_RUN_WRITE_SCOPE,
@@ -30,6 +62,16 @@ import {
   HELIX_SHARED_LIVE_ROOM_CHAT_BINDING_UNBIND_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_CREATE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_INSPECT_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_INSPECT_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_LIST_CAPABILITY,
@@ -50,6 +92,10 @@ import {
   helixSharedLiveRoomChatBindingClaimRequestSchema,
   helixSharedLiveRoomChatBindingRevokeRequestSchema,
   helixSharedLiveRoomCreateRequestSchema,
+  helixSharedLiveRoomConsentRevokeRequestSchema,
+  helixSharedLiveRoomConsentGrantRequestSchema,
+  helixSharedLiveRoomFloorAcquireRequestSchema,
+  helixSharedLiveRoomFloorReleaseRequestSchema,
   helixSharedLiveRoomErrorSchema,
   helixSharedLiveRoomIdSchema,
   helixSharedLiveRoomPresenceSetRequestSchema,
@@ -59,6 +105,10 @@ import {
   type HelixSharedLiveRoomChatBindingClaimRequest,
   type HelixSharedLiveRoomChatBindingRevokeRequest,
   type HelixSharedLiveRoomCreateRequest,
+  type HelixSharedLiveRoomConsentRevokeRequest,
+  type HelixSharedLiveRoomConsentGrantRequest,
+  type HelixSharedLiveRoomFloorReleaseRequest,
+  type HelixSharedLiveRoomFloorAcquireRequest,
   type HelixSharedLiveRoomRunBindingRequest,
   type HelixSharedLiveRoomRunBindingRevokeRequest,
   type HelixSharedLiveRoomSourceCreateRequest,
@@ -200,6 +250,8 @@ import {
   SharedLiveRoomControlError,
   SharedLiveRoomControlService,
 } from "../services/shared-live-room-control/service";
+import type { SharedLiveRoomMcpDelegationVerifier } from
+  "../services/shared-live-room-control/mcp-delegation-verifier";
 import {
   projectSharedLiveRoomChatBindingClaimReceipt,
   projectSharedLiveRoomChatBindingUnbindReceipt,
@@ -215,6 +267,8 @@ import {
 } from "../services/helix-ask/workstation-tool-gateway/environment-action";
 import { buildHelixPublicUiAgentCatalog } from
   "../services/helix-ask/public-ui-capability-audit";
+import { buildHelixMcpEvidenceObservation } from
+  "../services/mcp-evidence/observation";
 import {
   executeEnvironmentActionControlGatewayCapability,
   type EnvironmentActionControlGatewayExecution,
@@ -268,7 +322,10 @@ import {
   stageLocalMinecraftPlayerPairing,
 } from
   "../services/environment-connectors/pairing/local-player-pairing-handoff";
-import { stageLocalMinecraftServerPairing } from
+import {
+  resolveLocalMinecraftPairingEndpoint,
+  stageLocalMinecraftServerPairing,
+} from
   "../services/environment-connectors/pairing/local-server-pairing-handoff";
 import {
   configureEnvironmentActionAuthority,
@@ -318,11 +375,17 @@ import {
 import {
   HelixLocalSupervisorCoordinationError,
   type HelixLocalSupervisorCoordinationStore,
+  type HelixLocalSupervisorVerifiedIdentity,
 } from "../services/local-supervisor/local-supervisor-coordination";
 import {
   readEnvironmentActionExecutionLeaseClaim,
   type EnvironmentActionExecutionLeaseClaim,
 } from "../services/environment-connectors/actions/action-broker";
+import {
+  readLocalSupervisorEnvironmentIdentity,
+  type LocalSupervisorEnvironmentIdentity,
+} from
+  "../services/environment-connectors/bindings/local-supervisor-identity-reader";
 
 type RecordLike = Record<string, unknown>;
 
@@ -408,6 +471,27 @@ type HelixRoomIdToolArguments = {
 
 type HelixRoomPresenceSetToolArguments = {
   request: z.infer<typeof helixSharedLiveRoomPresenceSetRequestSchema>;
+};
+
+type HelixRoomConsentRevokeToolArguments = {
+  idempotency_key: string;
+  request: HelixSharedLiveRoomConsentRevokeRequest;
+};
+
+type HelixRoomConsentGrantToolArguments = {
+  idempotency_key: string;
+  request: HelixSharedLiveRoomConsentGrantRequest;
+  delegation: HelixSharedLiveRoomMcpDelegationReceiptV1;
+};
+
+type HelixRoomFloorReleaseToolArguments = {
+  request: HelixSharedLiveRoomFloorReleaseRequest;
+};
+
+type HelixRoomFloorAcquireToolArguments = {
+  idempotency_key: string;
+  request: HelixSharedLiveRoomFloorAcquireRequest;
+  delegation: HelixSharedLiveRoomMcpDelegationReceiptV1;
 };
 
 type HelixEnvironmentDeviceCheckToolArguments = {
@@ -806,6 +890,12 @@ export type HelixLocalSupervisorExecutionLeaseClaimReader = (input: {
   profileId: string;
   actionRequestId: string;
 }) => Promise<EnvironmentActionExecutionLeaseClaim | null>;
+export type HelixLocalSupervisorEnvironmentIdentityReader = (input: {
+  roomId: string;
+  profileId: string;
+  participantId: string;
+  environmentBindingId: string;
+}) => Promise<LocalSupervisorEnvironmentIdentity | null>;
 
 type HelixRoomSourceCreateToolArguments = HelixRoomIdToolArguments & {
   idempotency_key: string;
@@ -944,6 +1034,105 @@ const roomPresenceSetOutputSchema = z
     content_role: z.literal("room_control_receipt_not_assistant_answer"),
     room: jsonObjectSchema,
   })
+  .passthrough();
+
+const roomConsentRevokeReceiptOutputSchema = z
+  .object({
+    ...roomReceiptAuthorityFields,
+    schema: z.literal(HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA),
+    operation: z.literal(HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY),
+    content_role: z.literal("room_control_receipt_not_assistant_answer"),
+    room: jsonObjectSchema,
+    changed_fields: z.array(z.string()),
+    authority_delta: z.literal("reduced_only"),
+  })
+  .passthrough();
+
+const roomConsentRevokeOutputSchema = z
+  .object({
+    operation: z.literal("room.consent.revoke"),
+    idempotency_replayed: z.boolean(),
+    receipt: roomConsentRevokeReceiptOutputSchema,
+  })
+  .strict();
+
+const roomConsentGrantReceiptOutputSchema = z
+  .object({
+    ...roomReceiptAuthorityFields,
+    schema: z.literal(HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_RECEIPT_SCHEMA),
+    operation: z.literal(HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY),
+    content_role: z.literal("room_control_receipt_not_assistant_answer"),
+    room: jsonObjectSchema,
+    changed_fields: z.array(z.string()),
+    delegation_ref: z.string(),
+    authority_delta: z.literal("increased_bounded"),
+  })
+  .passthrough();
+
+const roomConsentGrantSuccessOutputSchema = z.object({
+  operation: z.literal("room.consent.grant"),
+  idempotency_replayed: z.boolean(),
+  receipt: roomConsentGrantReceiptOutputSchema,
+}).strict();
+const roomConsentGrantOutputSchema = roomConsentGrantSuccessOutputSchema
+  .partial()
+  .passthrough();
+
+const roomFloorProjectionSchema = z
+  .object({
+    participant_id: z.string().nullable(),
+    epoch: z.number().int().nonnegative(),
+    acquired_at: z.string().nullable(),
+    lease_expires_at: z.string().nullable(),
+  })
+  .strict();
+
+const roomFloorInspectOutputSchema = z
+  .object({
+    ...roomReceiptAuthorityFields,
+    schema: z.literal(HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_RECEIPT_SCHEMA),
+    operation: z.literal(HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_CAPABILITY),
+    content_role: z.literal("room_control_observation_not_assistant_answer"),
+    room_id: z.string(),
+    floor: roomFloorProjectionSchema.nullable(),
+  })
+  .strict();
+
+const roomFloorReleaseOutputSchema = z
+  .object({
+    ...roomReceiptAuthorityFields,
+    schema: z.literal(HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_RECEIPT_SCHEMA),
+    operation: z.literal(HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_CAPABILITY),
+    content_role: z.literal("room_control_receipt_not_assistant_answer"),
+    room: jsonObjectSchema,
+    released: z.boolean(),
+    requested_floor_epoch: z.number().int().nonnegative(),
+    floor: roomFloorProjectionSchema,
+    authority_delta: z.literal("reduced_only"),
+  })
+  .passthrough();
+
+const roomFloorAcquireReceiptOutputSchema = z
+  .object({
+    ...roomReceiptAuthorityFields,
+    schema: z.literal(HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_RECEIPT_SCHEMA),
+    operation: z.literal(HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY),
+    content_role: z.literal("room_control_receipt_not_assistant_answer"),
+    room: jsonObjectSchema,
+    granted: z.literal(true),
+    floor: roomFloorProjectionSchema,
+    delegation_ref: z.string(),
+    authority_delta: z.literal("increased_bounded"),
+  })
+  .passthrough();
+
+const roomFloorAcquireSuccessOutputSchema = z.object({
+  operation: z.literal("room.floor.acquire"),
+  idempotency_replayed: z.boolean(),
+  receipt: roomFloorAcquireReceiptOutputSchema,
+}).strict();
+const roomFloorAcquireOutputSchema = roomFloorAcquireSuccessOutputSchema
+  .partial()
   .passthrough();
 
 const roomCreateReceiptOutputSchema = z
@@ -2035,11 +2224,149 @@ const requireSharedLiveRoomFeature = (
   }
 };
 
+const publicUiSurfaceIds = new Set(
+  HELIX_PUBLIC_UI_SURFACE_CATALOG.map((surface) => surface.surface_id),
+);
+
+const publicUiCatalogQuerySchema = z.object({
+  surface_id: z.string().trim().min(1).max(160)
+    .refine((value) => publicUiSurfaceIds.has(value), "Unknown public UI surface.")
+    .optional(),
+  interaction_kind: z.enum(["observe", "navigate", "configure", "act", "human_only"])
+    .optional(),
+  authority_state: z.enum([
+    "shared_gateway",
+    "route_owned",
+    "client_local",
+    "blocked_pending_contract",
+    "not_applicable",
+  ]).optional(),
+  include_capabilities: z.boolean().default(true),
+  include_mcp_bindings: z.boolean().default(true),
+}).strict();
+
+const requireMcpEvidenceDescriptor = (toolName: string) => {
+  const descriptor = getHelixMcpEvidenceCapabilityDescriptor(toolName);
+  if (!descriptor) {
+    throw new Error(`mcp_evidence_capability_descriptor_missing:${toolName}`);
+  }
+  return descriptor;
+};
+
+const registerPublicUiCatalogTool = (input: {
+  server: McpServer;
+  principal: HelixAgentApiPrincipal;
+  requiredScope: string;
+  resourceMetadataPath?: string;
+  evidenceStore: Pick<HelixMcpEvidenceObservationStore, "put">;
+}): void => {
+  input.server.registerTool(
+    "helix_public_ui_catalog",
+    {
+      title: "Inspect the public Helix UI catalog",
+      description: "Returns the public-user UI surfaces, stable control IDs, interaction classifications, policy-audited capability projections, and governed MCP bindings. It never controls the DOM, grants authority, exposes handlers, or returns private UI state.",
+      inputSchema: publicUiCatalogQuerySchema,
+      outputSchema: z.object({
+        mcp_evidence: helixMcpEvidenceObservationSchema,
+      }).passthrough(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(input.requiredScope),
+    },
+    async (query) => callTool(input.requiredScope, async () => {
+      requireHelixAgentApiScope(input.principal, input.requiredScope);
+      const catalog = buildHelixPublicUiAgentCatalog();
+      const controls = catalog.controls.filter((control) =>
+        (!query.surface_id || control.surface_id === query.surface_id) &&
+        (!query.interaction_kind || control.interaction_kind === query.interaction_kind) &&
+        (!query.authority_state || control.authority_state === query.authority_state),
+      );
+      const capabilities = query.include_capabilities
+        ? catalog.capabilities.filter((capability) =>
+            (!query.surface_id || capability.projection_surface_id === query.surface_id) &&
+            (!query.interaction_kind || capability.interaction_kind === query.interaction_kind) &&
+            (!query.authority_state || capability.authority_state === query.authority_state),
+          )
+        : [];
+      const mcpBindings = query.include_mcp_bindings
+        ? catalog.mcp_bindings.filter((binding) =>
+            (!query.surface_id || binding.projection_surface_id === query.surface_id) &&
+            (!query.interaction_kind || binding.interaction_kind === query.interaction_kind) &&
+            (!query.authority_state || binding.authority_state === query.authority_state),
+          )
+        : [];
+      const payload = {
+        ...catalog,
+        surfaces: query.surface_id
+          ? catalog.surfaces.filter((surface) => surface.surface_id === query.surface_id)
+          : catalog.surfaces,
+        controls,
+        capabilities,
+        mcp_bindings: mcpBindings,
+        query: {
+          surface_id: query.surface_id ?? null,
+          interaction_kind: (query.interaction_kind ?? null) as HelixPublicUiInteractionKind | null,
+          authority_state: (query.authority_state ?? null) as Exclude<HelixPublicUiAuthorityState, "unmapped"> | null,
+          include_capabilities: query.include_capabilities,
+          include_mcp_bindings: query.include_mcp_bindings,
+        },
+        totals: {
+          public_surface_count: catalog.surfaces.length,
+          public_control_count: catalog.controls.length,
+          public_capability_count: catalog.capabilities.length,
+          public_mcp_binding_count: catalog.mcp_bindings.length,
+          matched_surface_count: query.surface_id ? 1 : catalog.surfaces.length,
+          matched_control_count: controls.length,
+          matched_capability_count: capabilities.length,
+          matched_mcp_binding_count: mcpBindings.length,
+        },
+      };
+      const mcpEvidence = buildHelixMcpEvidenceObservation({
+        descriptor: requireMcpEvidenceDescriptor("helix_public_ui_catalog"),
+        request: {
+          surface_id: query.surface_id ?? null,
+          interaction_kind: query.interaction_kind ?? null,
+          authority_state: query.authority_state ?? null,
+          include_capabilities: query.include_capabilities,
+          include_mcp_bindings: query.include_mcp_bindings,
+        },
+        payload,
+        producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+        subjectRefs: [`account-profile:${input.principal.accountProfileId}`],
+        summary: "Observed the bounded public-user UI catalog and semantic capability projection.",
+        payloadSchema: HELIX_PUBLIC_UI_AGENT_CATALOG_SCHEMA,
+        supportRefs: [
+          HELIX_PUBLIC_UI_AGENT_CATALOG_SCHEMA,
+          ...capabilities.map((capability) => capability.capability_id),
+          ...mcpBindings.map((binding) => binding.tool_name),
+        ],
+      });
+      await input.evidenceStore.put({
+        owner: {
+          tenantId: input.principal.tenantId,
+          accountProfileId: input.principal.accountProfileId,
+        },
+        toolName: "helix_public_ui_catalog",
+        observation: mcpEvidence,
+      });
+      return {
+        ...payload,
+        mcp_evidence: mcpEvidence,
+      };
+    }, input.resourceMetadataPath),
+  );
+};
+
 const registerEnvironmentDeviceCheckTool = (input: {
   server: McpServer;
   principal: HelixAgentApiPrincipal;
   deviceCheckService: HelixEnvironmentDeviceCheckServicePort;
   resourceMetadataPath?: string;
+  evidenceStore: Pick<HelixMcpEvidenceObservationStore, "put">;
 }): void => {
   input.server.registerTool(
     "helix_environment_device_check",
@@ -2052,7 +2379,9 @@ const registerEnvironmentDeviceCheckTool = (input: {
           room_id: helixSharedLiveRoomIdSchema.optional(),
         })
         .strict(),
-      outputSchema: helixEnvironmentDeviceCheckListSchema,
+      outputSchema: helixEnvironmentDeviceCheckListSchema.extend({
+        mcp_evidence: helixMcpEvidenceObservationSchema,
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -2065,25 +2394,174 @@ const registerEnvironmentDeviceCheckTool = (input: {
       callTool(
         HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
         async () => {
-          requireHelixAgentApiScope(
-            input.principal,
-            HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
-          );
-          requireSharedLiveRoomFeature(input.principal);
-          return await input.deviceCheckService({
-            ownerProfileId: input.principal.accountProfileId,
-            roomId: room_id,
-          });
+          try {
+            requireHelixAgentApiScope(
+              input.principal,
+              HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+            );
+            // Device Check is an owner-scoped health observation, not admission
+            // to create, join, source, or mutate a Shared Live Room. Keep those
+            // room operations behind their existing feature gate while allowing
+            // a scoped user account to inspect only its own connector devices.
+            const payload = await input.deviceCheckService({
+              ownerProfileId: input.principal.accountProfileId,
+              roomId: room_id,
+            });
+            const mcpEvidence = buildHelixMcpEvidenceObservation({
+              descriptor: requireMcpEvidenceDescriptor("helix_environment_device_check"),
+              request: { room_id: room_id ?? null },
+              payload,
+              producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+              subjectRefs: [
+                `account-profile:${input.principal.accountProfileId}`,
+                ...(room_id ? [room_id] : []),
+              ],
+              summary: "Observed owner-scoped environment connector identity, freshness, and probe readiness.",
+              payloadSchema: payload.schema,
+              supportRefs: payload.devices.map((device) => `environment-device:${device.device_id}`),
+              observedAt: payload.generated_at,
+              freshness: {
+                state: "fresh",
+                ageMs: 0,
+                expiresAt: null,
+              },
+            });
+            await input.evidenceStore.put({
+              owner: {
+                tenantId: input.principal.tenantId,
+                accountProfileId: input.principal.accountProfileId,
+              },
+              toolName: "helix_environment_device_check",
+              observation: mcpEvidence,
+            });
+            return {
+              ...payload,
+              mcp_evidence: mcpEvidence,
+            };
+          } catch (error) {
+            console.error("[helix-mcp] unexpected Device Check tool error", {
+              name: error instanceof Error ? error.name : typeof error,
+              message: error instanceof Error ? error.message : "non_error_value",
+            });
+            throw error;
+          }
         },
         input.resourceMetadataPath,
       ),
   );
 };
 
+type HelixMcpEvidenceObservationStorePort = Pick<
+  HelixMcpEvidenceObservationStore,
+  "put" | "get"
+>;
+
+const registerMcpEvidenceObservationGetTool = (input: {
+  server: McpServer;
+  principal: HelixAgentApiPrincipal;
+  requiredScope: RequiredOAuthScopes;
+  evidenceStore: HelixMcpEvidenceObservationStorePort;
+  resourceMetadataPath?: string;
+}): void => {
+  input.server.registerTool(
+    "helix_evidence_observation_get",
+    {
+      title: "Retrieve an MCP evidence observation",
+      description:
+        "Retrieves one still-valid owner-scoped evidence envelope for Codex re-entry. Retrieval does not refresh, execute, answer, or grant terminal authority.",
+      inputSchema: z.object({
+        observation_ref: z.string().trim().min(1).max(320),
+      }).strict(),
+      outputSchema: z.object({
+        schema: z.literal("helix.mcp_evidence_retrieval.v1"),
+        requested_observation_ref: z.string(),
+        observation: helixMcpEvidenceObservationSchema,
+        content_role: z.literal("retrieved_observation_for_codex_reentry"),
+        assistant_answer: z.literal(false),
+        agent_executable: z.literal(false),
+        terminal_eligible: z.literal(false),
+        reentry_required: z.literal(true),
+        mcp_evidence: helixMcpEvidenceObservationSchema,
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(input.requiredScope),
+    },
+    async ({ observation_ref }) => callTool(
+      input.requiredScope,
+      async () => {
+        requireHelixAgentApiScope(input.principal, input.requiredScope);
+        let observation;
+        try {
+          observation = await input.evidenceStore.get({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            observationRef: observation_ref,
+          });
+        } catch (error) {
+          if (!(error instanceof HelixMcpEvidenceObservationStoreError)) throw error;
+          const status = error.code === "observation_owner_mismatch" ? 403
+            : error.code === "observation_not_found" ? 404
+            : error.code === "observation_corrupt" ? 500
+            : 410;
+          throw new HelixAgentApiServiceError(
+            status,
+            error.code,
+            error.message,
+            false,
+          );
+        }
+        const payload = {
+          schema: "helix.mcp_evidence_retrieval.v1" as const,
+          requested_observation_ref: observation_ref,
+          observation,
+          content_role: "retrieved_observation_for_codex_reentry" as const,
+          assistant_answer: false as const,
+          agent_executable: false as const,
+          terminal_eligible: false as const,
+          reentry_required: true as const,
+        };
+        const retrievalEvidence = buildHelixMcpEvidenceObservation({
+          descriptor: requireMcpEvidenceDescriptor("helix_evidence_observation_get"),
+          request: { observation_ref },
+          payload,
+          producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+          subjectRefs: [
+            `account-profile:${input.principal.accountProfileId}`,
+            observation_ref,
+          ],
+          summary: "Retrieved one still-valid owner-scoped MCP evidence observation for Codex re-entry.",
+          payloadSchema: "helix.mcp_evidence_retrieval.v1",
+          supportRefs: [observation_ref],
+        });
+        await input.evidenceStore.put({
+          owner: {
+            tenantId: input.principal.tenantId,
+            accountProfileId: input.principal.accountProfileId,
+          },
+          toolName: "helix_evidence_observation_get",
+          observation: retrievalEvidence,
+        });
+        return { ...payload, mcp_evidence: retrievalEvidence };
+      },
+      input.resourceMetadataPath,
+    ),
+  );
+};
+
 export const createHelixDeviceCheckMcpServer = (input: {
   principal: HelixAgentApiPrincipal;
   deviceCheckService?: HelixEnvironmentDeviceCheckServicePort;
+  mcpEvidenceObservationStore?: HelixMcpEvidenceObservationStorePort;
 }): McpServer => {
+  const evidenceStore = input.mcpEvidenceObservationStore ??
+    createPostgresHelixMcpEvidenceObservationStore();
   const server = new McpServer(
     {
       name: "casimirbot-device-check",
@@ -2103,11 +2581,28 @@ export const createHelixDeviceCheckMcpServer = (input: {
     deviceCheckService:
       input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList,
     resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+    evidenceStore,
+  });
+  registerPublicUiCatalogTool({
+    server,
+    principal: input.principal,
+    requiredScope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+    evidenceStore,
+  });
+  registerMcpEvidenceObservationGetTool({
+    server,
+    principal: input.principal,
+    requiredScope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    resourceMetadataPath: HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+    evidenceStore,
   });
   installOAuthToolCatalogAugmentation(
     server,
     new Map<string, RequiredOAuthScopes>([
       ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_public_ui_catalog", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
     ]),
   );
   return server;
@@ -2145,6 +2640,391 @@ const idempotencyKeySchema = z
     "Caller-stable idempotency key; JSON-RPC request IDs are not substitutes.",
   );
 
+const ROOM_TRANSITION_SHADOW_TOOL_SCOPES = new Map<
+  string,
+  RequiredOAuthScopes
+>([
+  ["helix_room_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+  ["helix_room_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+  ["helix_room_floor_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+  ["helix_room_create", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+  ["helix_room_presence_set", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_room_consent_revoke", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+  ["helix_room_consent_grant", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+  ["helix_room_floor_release", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+  ["helix_room_floor_acquire", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+]);
+
+const ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES = new Map<
+  string,
+  RequiredOAuthScopes
+>([
+  ["helix_room_source_list", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
+  ["helix_room_source_create", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
+  ["helix_environment_subject_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+  ["helix_environment_subject_select", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+  ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_environment_command_authority_configure", HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES],
+  ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_environment_source_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
+  ["helix_environment_server_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
+  ["helix_environment_action_authority_extend", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_minecraft_actor_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+  ["helix_minecraft_player_action", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_minecraft_workflow_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
+  ["helix_minecraft_workflow_control", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+]);
+
+const roomTransitionShadowError = (
+  requiredScopes: RequiredOAuthScopes,
+) => {
+  const payload = {
+    schema: "helix.mcp_transition_shadow_error.v1" as const,
+    error: "full_mcp_transition_required" as const,
+    message:
+      "This exact tool schema is pre-advertised for catalog continuity, but execution remains unavailable until the governed native tunnel transition reaches the full Helix MCP surface.",
+    required_scopes: normalizeRequiredScopes(requiredScopes),
+    retryable: true as const,
+    mutation_executed: false as const,
+    credential_included: false as const,
+    private_endpoint_included: false as const,
+    answer_authority: false as const,
+    assistant_answer: false as const,
+    terminal_eligible: false as const,
+  };
+  return {
+    isError: true as const,
+    content: [{ type: "text" as const, text: JSON.stringify(payload) }],
+  };
+};
+
+const registerRoomTransitionShadowTools = (server: McpServer): void => {
+  server.registerTool(
+    "helix_room_list",
+    {
+      title: "List Shared Live Rooms",
+      description:
+        "Lists only rooms visible to the verified linked Helix account. The receipt is an observation and never an assistant answer.",
+      inputSchema: z.object({}).strict(),
+      outputSchema: roomListOutputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_inspect",
+    {
+      title: "Inspect a Shared Live Room",
+      description:
+        "Inspects one opaque room ID after current account membership and policy checks.",
+      inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+      outputSchema: roomInspectOutputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_floor_inspect",
+    {
+      title: "Inspect Shared Live Room speaking floor",
+      description:
+        "Reads the bounded current speaking-floor owner, epoch, and lease for one room after membership checks. Use the exact epoch for a safe release request.",
+      inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+      outputSchema: roomFloorInspectOutputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_create",
+    {
+      title: "Create a Shared Live Room",
+      description:
+        "Idempotently creates a room owned by the verified linked Helix account. Caller-provided identity fields are not accepted.",
+      inputSchema: z.object({
+        idempotency_key: idempotencyKeySchema,
+        request: helixSharedLiveRoomCreateRequestSchema,
+      }).strict(),
+      outputSchema: roomCreateOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_presence_set",
+    {
+      title: "Set own Shared Live Room presence",
+      description:
+        "Marks only the verified linked account participant present or away in an existing room. It cannot change another participant, consent, environment authority, or terminal authority.",
+      inputSchema: z.object({ request: helixSharedLiveRoomPresenceSetRequestSchema }).strict(),
+      outputSchema: roomPresenceSetOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async () => roomTransitionShadowError(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  );
+  server.registerTool(
+    "helix_room_consent_revoke",
+    {
+      title: "Revoke own Shared Live Room consent",
+      description:
+        "Idempotently disables one or more consent grants owned by the verified linked account. This authority-reducing tool rejects true values and cannot grant microphone, transcript, screen, thumbnail, or model-audio permission.",
+      inputSchema: z.object({
+        idempotency_key: idempotencyKeySchema,
+        request: helixSharedLiveRoomConsentRevokeRequestSchema,
+      }).strict(),
+      outputSchema: roomConsentRevokeOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_consent_grant",
+    {
+      title: "Grant own Shared Live Room consent with delegation",
+      description:
+        "Grants only explicitly selected consent fields for the verified linked participant. Requires a short-lived, signed, one-time delegation bound to this MCP client, conversation, account session, room, capability, and exact request.",
+      inputSchema: z.object({
+        idempotency_key: idempotencyKeySchema,
+        request: helixSharedLiveRoomConsentGrantRequestSchema,
+        delegation: jsonObjectSchema,
+      }).strict(),
+      outputSchema: roomConsentGrantOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_floor_release",
+    {
+      title: "Release own Shared Live Room speaking floor",
+      description:
+        "Releases only the verified linked participant's speaking floor for the exact inspected epoch. A stale epoch or another participant's floor is left unchanged.",
+      inputSchema: z.object({ request: helixSharedLiveRoomFloorReleaseRequestSchema }).strict(),
+      outputSchema: roomFloorReleaseOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+  );
+  server.registerTool(
+    "helix_room_floor_acquire",
+    {
+      title: "Acquire own Shared Live Room speaking floor with delegation",
+      description:
+        "Acquires a bounded speaking-floor lease only for the verified linked participant. Requires a short-lived, signed, one-time delegation bound to this MCP client, conversation, account session, room, capability, and exact request.",
+      inputSchema: z.object({
+        idempotency_key: idempotencyKeySchema,
+        request: helixSharedLiveRoomFloorAcquireRequestSchema,
+        delegation: jsonObjectSchema,
+      }).strict(),
+      outputSchema: roomFloorAcquireOutputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async () => roomTransitionShadowError(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+  );
+};
+
+const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
+  const deny = (requiredScopes: RequiredOAuthScopes) =>
+    async () => roomTransitionShadowError(requiredScopes);
+  server.registerTool("helix_room_source_list", {
+    title: "List room source bindings",
+    description:
+      "Lists bounded non-authoritative source-binding projections for a developer-owned room. Credentials are never included.",
+    inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+    outputSchema: roomSourceListOutputSchema,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE),
+  }, deny(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE));
+  server.registerTool("helix_room_source_create", {
+    title: "Create a deferred room source binding",
+    description:
+      "Idempotently creates source identity and returns only an opaque short-lived secure-delivery handle. It never returns the source bearer or plugin configuration.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      idempotency_key: idempotencyKeySchema,
+      request: helixSharedLiveRoomSourceCreateRequestSchema,
+    }).strict(),
+    outputSchema: roomSourceCreateOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE),
+  }, deny(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE));
+  server.registerTool("helix_environment_subject_list", {
+    title: "List my live environment subjects",
+    description:
+      "Lists sanitized subject directories and this authenticated room member's current environment identity. It never exposes native player IDs, connector credentials, or answer authority.",
+    inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+    outputSchema: helixRoomEnvironmentsReceiptSchema,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+  }, deny(HELIX_SHARED_LIVE_ROOM_READ_SCOPE));
+  server.registerTool("helix_environment_subject_select", {
+    title: "Select my live environment subject",
+    description:
+      "Re-verifies only the authenticated room member's own exact subject from a fresh connector directory. It cannot assign another participant, expand permissions, or bypass subject conflicts and connector-epoch checks.",
+    inputSchema: helixRoomEnvironmentSelfBindingRequestSchema.extend({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+    }).strict(),
+    outputSchema: helixRoomEnvironmentsReceiptSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  server.registerTool("helix_environment_action_authority_inspect", {
+    title: "Inspect current player-action authority",
+    description:
+      "Lists the authenticated room member's visible Player Embodiment authorities and sanitized connector readiness for one exact environment. Credentials are never returned.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+    }).strict(),
+    outputSchema: environmentActionAuthorityInspectOutputSchema,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_STATUS_MCP_SCOPES));
+  server.registerTool("helix_environment_action_authority_configure", {
+    title: "Configure current player-action authority",
+    description:
+      "Lets the authenticated room owner configure the same finite Player Embodiment lease exposed by the owner UI. Exact participant/player binding, adapter capability registry, autonomy mode, manual override, and expiry remain server validated; no connector credential is returned.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+      settings: helixEnvironmentActionAuthoritySettingsSchema,
+    }).strict(),
+    outputSchema: environmentActionAuthorityConfigureOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  server.registerTool("helix_environment_command_authority_configure", {
+    title: "Configure current world command authority",
+    description:
+      "Lets the authenticated room owner configure the same finite Minecraft World Authority lease exposed by the owner UI. Authority profile, autonomy mode, approved command categories, environment ownership, and expiry remain server validated. This tool does not execute a command, issue a connector credential, expose pairing material, or grant host access.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+      settings: helixEnvironmentCommandAuthoritySettingsSchema,
+    }).strict(),
+    outputSchema: environmentCommandAuthorityConfigureOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES));
+  server.registerTool("helix_environment_player_pair_local", {
+    title: "Pair the same-host Minecraft player companion",
+    description:
+      "Creates an owner-authorized action-only pairing and stages it directly into the bounded same-host Fabric client inbox. The one-time code and connector credential never enter MCP output, model context, chat, or debug projections.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      binding_id: z.string().trim().min(1).max(320),
+      action_authority_id: z.string().trim().min(1).max(320),
+      credential_ttl_ms: z.number().int().min(60_000).max(30 * 24 * 60 * 60 * 1_000),
+      idempotency_key: idempotencyKeySchema,
+    }).strict(),
+    outputSchema: environmentPlayerPairLocalOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  const pairSchema = z.object({
+    room_id: helixSharedLiveRoomIdSchema,
+    binding_id: z.string().trim().min(1).max(320),
+    credential_ttl_ms: z.number().int().min(60_000).max(30 * 24 * 60 * 60 * 1_000),
+    idempotency_key: idempotencyKeySchema,
+  }).strict();
+  server.registerTool("helix_environment_source_pair_local", {
+    title: "Re-pair same-host Minecraft read-only sensing",
+    description:
+      "Rotates only the read-only source credential for the authenticated owner's exact existing Fabric room-source binding and stages it into the fixed repository server inbox. Pairing material and connector credentials never enter MCP output, model context, chat, or debug projections. This tool grants neither World Authority nor Player Embodiment.",
+    inputSchema: pairSchema,
+    outputSchema: environmentSourcePairLocalOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE),
+  }, deny(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE));
+  server.registerTool("helix_environment_server_pair_local", {
+    title: "Pair the same-host Minecraft server connector",
+    description:
+      "Creates an owner-authorized command-only pairing for the exact existing Fabric room-source binding and stages it into the fixed repository server inbox. The one-time code and connector credential never enter MCP output, model context, chat, or debug projections. This tool does not execute Minecraft commands or grant command authority.",
+    inputSchema: pairSchema,
+    outputSchema: environmentServerPairLocalOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE),
+  }, deny(HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE));
+  server.registerTool("helix_environment_action_authority_extend", {
+    title: "Extend an exact player-action authority lease",
+    description:
+      "Lets the authenticated room owner extend only the expiry of one exact active Player Embodiment authority and its existing connector credential. Capability policy, subject, participant, world, adapter, autonomy mode, and policy version remain unchanged; no credential is returned.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+      action_authority_id: z.string().trim().min(1).max(320),
+      expires_at: z.string().datetime({ offset: true }).refine((value) => {
+        const delta = Date.parse(value) - Date.now();
+        return delta >= 60_000 && delta <= 7 * 24 * 60 * 60_000;
+      }, "Lease expiry must be between one minute and seven days in the future."),
+    }).strict(),
+    outputSchema: environmentActionAuthorityExtendOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  server.registerTool("helix_minecraft_actor_status", {
+    title: "Read the selected Minecraft actor status",
+    description:
+      "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The result also carries a separately labeled same-revision perception snapshot compatibility observation for clients whose MCP catalog has not yet refreshed; callers should still refresh their catalog to use the dedicated situation-probe tool. Both observations are evidence for Codex re-entry, never assistant answers or terminal authority.",
+    inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+    outputSchema: minecraftActorStatusOutputSchema,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_STATUS_MCP_SCOPES));
+  server.registerTool("helix_minecraft_player_action", {
+    title: "Execute a typed Minecraft player action",
+    description:
+      "Executes one bounded typed action or an admitted concurrent guardian program through the exact room, participant/player binding, Fabric action authority, live manifest, lease, resource locks, and manual-override policy. For perception-guided play, pass the exact fresh semantic_fingerprint: the harness derives a stable action identity so the same action against unchanged perception cannot become a second physical effect merely by changing the caller's idempotency key. It does not accept raw server commands, shell, files, credentials, pairing material, or embedded model code. The returned observation must re-enter Codex before any answer is written.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      idempotency_key: idempotencyKeySchema,
+      perception_semantic_fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/u).optional(),
+      principal_turn_id: z.string().trim().min(1).max(320).optional(),
+      environment_label: z.string().trim().min(1).max(240).optional(),
+      action: minecraftPlayerActionInputSchema,
+    }).strict(),
+    outputSchema: minecraftPlayerActionOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  const workflowSchema = z.object({
+    room_id: helixSharedLiveRoomIdSchema,
+    workflow_ref: z.string().trim().min(1).max(320),
+  });
+  server.registerTool("helix_minecraft_workflow_status", {
+    title: "Read a Minecraft player workflow status",
+    description:
+      "Reads one exact admitted workflow through its room/player authority. The result is a current non-terminal observation, not an assistant answer.",
+    inputSchema: workflowSchema.strict(),
+    outputSchema: minecraftWorkflowControlOutputSchema,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_STATUS_MCP_SCOPES));
+  server.registerTool("helix_minecraft_workflow_control", {
+    title: "Control a Minecraft player workflow",
+    description:
+      "Resumes, cancels, or emergency-stops one exact admitted workflow. Cancellation and Emergency Stop require the Fabric client to release asserted controls; the returned receipt is evidence, never answer authority.",
+    inputSchema: workflowSchema.extend({
+      control: z.enum(["resume", "cancel", "emergency_stop"]),
+      reason: z.string().trim().min(1).max(1_000).optional(),
+    }).strict(),
+    outputSchema: minecraftWorkflowControlOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+};
+
 const runIdSchema = z
   .string()
   .trim()
@@ -2164,17 +3044,39 @@ export type HelixEnvironmentSubjectMcpService = {
   }): Promise<HelixRoomEnvironmentSubjectBinding>;
 };
 
+export type DesktopMcpTunnelTransitionExecutor = (input: {
+  transitionRequestRef: string;
+  delegationRef: string;
+  accountSessionId: string;
+  targetScope: DesktopMcpTransitionTarget;
+  delegationExpiresAt: string;
+}) => Promise<{
+  accepted: true;
+  nativeReceiptRef: string;
+}>;
+
 export const createHelixMcpServer = (input: {
   principal: HelixAgentApiPrincipal;
   surface?: "full" | "local_supervisor_coordination";
   service?: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
+  desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
   localSupervisorExecutionLeaseClaimReader?:
     HelixLocalSupervisorExecutionLeaseClaimReader;
+  localSupervisorEnvironmentIdentityReader?:
+    HelixLocalSupervisorEnvironmentIdentityReader;
   roomControlService?: SharedLiveRoomControlService;
+  roomMcpDelegationIdentity?: {
+    authenticatedMcpClientRef: string;
+    conversationThreadRef: string;
+    accountSessionId: string;
+  };
+  roomMcpDelegationVerifier?: SharedLiveRoomMcpDelegationVerifier;
   roomBindingStore?: Pick<
     SharedLiveRoomBindingStore,
     | "bindRunToRoom"
+    | "getActiveRunRoomBinding"
     | "claimPendingChatBinding"
     | "revokeRunRoomBindingForOwner"
     | "revokeClaimedRunChatBindingForOwner"
@@ -2203,6 +3105,7 @@ export const createHelixMcpServer = (input: {
   environmentPlayerPairLocalHandoff?: HelixEnvironmentPlayerPairLocalHandoff;
   environmentSourcePairLocalHandoff?: HelixEnvironmentSourcePairLocalHandoff;
   environmentServerPairLocalHandoff?: HelixEnvironmentServerPairLocalHandoff;
+  mcpEvidenceObservationStore?: HelixMcpEvidenceObservationStorePort;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const roomControlService =
@@ -2214,9 +3117,14 @@ export const createHelixMcpServer = (input: {
   );
   const deviceCheckService =
     input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList;
+  const evidenceStore = input.mcpEvidenceObservationStore ??
+    createPostgresHelixMcpEvidenceObservationStore();
   const executionLeaseClaimReader =
     input.localSupervisorExecutionLeaseClaimReader ??
       readEnvironmentActionExecutionLeaseClaim;
+  const localSupervisorEnvironmentIdentityReader =
+    input.localSupervisorEnvironmentIdentityReader ??
+      readLocalSupervisorEnvironmentIdentity;
   const environmentSubjectService = input.environmentSubjectService ?? {
     list: listRoomEnvironmentProjections,
     select: bindOwnRoomEnvironmentSubject,
@@ -2286,6 +3194,7 @@ export const createHelixMcpServer = (input: {
       });
       const staged = await stageLocalMinecraftPlayerPairing({
         command: `/helix-player pair ${created.pairingCode}`,
+        ownerProfileId: request.ownerProfileId,
       });
       return {
         pairing: created.pairing as unknown as RecordLike,
@@ -2308,6 +3217,12 @@ export const createHelixMcpServer = (input: {
       });
       const staged = await stageLocalMinecraftServerPairing({
         command: `/helix pair ${created.pairingCode}`,
+        ownerProfileId: request.ownerProfileId,
+        pairingEndpoint: resolveLocalMinecraftPairingEndpoint({
+          serviceBaseUrl: process.env.CASIMIR_PUBLIC_BASE_URL,
+          requestBaseUrl:
+            `http://127.0.0.1:${process.env.PORT?.trim() || "1522"}`,
+        }),
       });
       return {
         pairing: created.pairing as unknown as RecordLike,
@@ -2330,6 +3245,12 @@ export const createHelixMcpServer = (input: {
       });
       const staged = await stageLocalMinecraftServerPairing({
         command: `/helix pair ${created.pairingCode}`,
+        ownerProfileId: request.ownerProfileId,
+        pairingEndpoint: resolveLocalMinecraftPairingEndpoint({
+          serviceBaseUrl: process.env.CASIMIR_PUBLIC_BASE_URL,
+          requestBaseUrl:
+            `http://127.0.0.1:${process.env.PORT?.trim() || "1522"}`,
+        }),
       });
       return {
         pairing: created.pairing as unknown as RecordLike,
@@ -2374,34 +3295,103 @@ export const createHelixMcpServer = (input: {
     return inspected.room.self_participant_id;
   };
   const requireMonitorClientRef = (): string => {
-    const ref = input.principal.oauthClientRef?.trim();
+    const ref = input.principal.mcpClientRef?.trim() ||
+      input.principal.oauthClientRef?.trim();
     if (ref) return ref;
     throw new EnvironmentMonitorStoreError(
       "mcp_client_identity_required",
       403,
-      "The signed access token does not identify its OAuth client.",
+      "The request does not identify an authenticated MCP client.",
     );
   };
   const requireLocalSupervisorClientRef = (): string => {
-    const ref = input.principal.oauthClientRef?.trim();
+    const ref = input.principal.mcpClientRef?.trim() ||
+      input.principal.oauthClientRef?.trim();
     if (ref) return ref;
     throw new HelixAgentApiServiceError(
       403,
       "mcp_client_identity_required",
-      "The signed access token does not identify its OAuth client.",
+      "The request does not identify an authenticated MCP client.",
       false,
     );
   };
+  const consumeRoomMcpDelegation = async (args: {
+    capabilityId: "room.consent.grant" | "room.floor.acquire";
+    roomId: string;
+    request: unknown;
+    receipt: unknown;
+  }): Promise<string> => {
+    const identity = input.roomMcpDelegationIdentity;
+    const verifier = input.roomMcpDelegationVerifier;
+    const authenticatedClientRef = input.principal.mcpClientRef?.trim() ||
+      input.principal.oauthClientRef?.trim();
+    if (!identity || !authenticatedClientRef) {
+      throw new HelixAgentApiServiceError(
+        403,
+        "room_mcp_delegation_identity_unavailable",
+        "A trusted MCP client and conversation binding is required for this room mutation.",
+        false,
+      );
+    }
+    if (
+      identity.authenticatedMcpClientRef !== authenticatedClientRef ||
+      identity.accountSessionId !== input.principal.accountContext.session_id
+    ) {
+      throw new HelixAgentApiServiceError(
+        403,
+        "room_mcp_delegation_identity_mismatch",
+        "The trusted MCP delegation identity does not match the authenticated principal.",
+        false,
+      );
+    }
+    if (!verifier) {
+      throw new HelixAgentApiServiceError(
+        503,
+        "room_mcp_delegation_verifier_unavailable",
+        "The trusted room MCP delegation verifier is not configured.",
+        true,
+      );
+    }
+    const sealedInputSha256 =
+      await computeHelixSharedLiveRoomMcpDelegationSealedInputSha256V1(
+        args.capabilityId,
+        args.request,
+      );
+    const result = await verifier.consume({
+      receipt: args.receipt,
+      expectedBinding: {
+        capabilityId: args.capabilityId,
+        accountType: input.principal.accountType,
+        profileId: input.principal.accountProfileId,
+        accountSessionId: identity.accountSessionId,
+        authenticatedMcpClientRef: identity.authenticatedMcpClientRef,
+        conversationThreadRef: identity.conversationThreadRef,
+        roomId: args.roomId,
+        sealedInputSha256,
+      },
+    });
+    if (!result.ok) {
+      throw new HelixAgentApiServiceError(
+        403,
+        "room_mcp_delegation_rejected",
+        "The signed room MCP delegation was rejected.",
+        false,
+        { issues: result.issues },
+      );
+    }
+    return result.delegationRef;
+  };
   const localSupervisorIdentity = (continuationRef: string) => {
-    const oauthClientRef = requireLocalSupervisorClientRef();
+    const authenticatedClientRef = requireLocalSupervisorClientRef();
     const binding = [
       input.principal.issuer,
       input.principal.subjectId,
       input.principal.accountProfileId,
-      oauthClientRef,
+      authenticatedClientRef,
       continuationRef,
     ].join("\n");
     return {
+      authenticatedClientRef,
       clientSessionRef: `supervisor_client:${crypto.createHash("sha256").update(
         `${input.localSupervisorCoordinationStore?.serviceInstanceRef ?? "missing"}\n${binding}`,
         "utf8",
@@ -2424,6 +3414,28 @@ export const createHelixMcpServer = (input: {
           "The local-supervisor coordination request was rejected.",
           error.status >= 500,
         ), requiredScopes);
+      }
+      if (error instanceof DesktopMcpTunnelTransitionError) {
+        const value = {
+          schema: "helix.desktop_tunnel_transition_error.v1" as const,
+          error: error.code,
+          message: "The governed desktop tunnel transition request was rejected.",
+          retryable: error.status >= 500,
+          credential_included: false as const,
+          private_endpoint_included: false as const,
+          authority_limited_to_tunnel_transport: true as const,
+          environment_authority_granted: false as const,
+          trading_authority_granted: false as const,
+          content_role: "desktop_tunnel_transition_error_not_assistant_answer" as const,
+          answer_authority: false as const,
+          assistant_answer: false as const,
+          terminal_eligible: false as const,
+        };
+        return {
+          isError: true as const,
+          content: [{ type: "text" as const, text: JSON.stringify(value) }],
+          structuredContent: value,
+        };
       }
       return toolError(error, requiredScopes);
     }
@@ -2469,6 +3481,7 @@ export const createHelixMcpServer = (input: {
     {
       instructions: coordinationOnly ? [
         "This MCP resource exposes only authenticated local-supervisor presence and advisory coordination for one installed node.",
+        "Shared Live Room and bounded environment-control tool schemas are pre-advertised only for transition continuity; every shadow call fails closed until the governed native tunnel targets the full Helix MCP surface.",
         "Relay text is inert and cannot execute commands, transfer authority, restart a process, satisfy evidence, or become an assistant answer.",
         "Use one stable client_continuation_ref per Codex conversation and revalidate after a service-epoch change.",
       ].join(" ") : [
@@ -2502,6 +3515,18 @@ export const createHelixMcpServer = (input: {
     raw_content_included: false as const,
   };
 
+  registerMcpEvidenceObservationGetTool({
+    server,
+    principal: input.principal,
+    requiredScope: coordinationOnly
+      ? HELIX_SHARED_LIVE_ROOM_READ_SCOPE
+      : HELIX_AGENT_RUN_READ_SCOPE,
+    resourceMetadataPath: coordinationOnly
+      ? HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH
+      : undefined,
+    evidenceStore,
+  });
+
   if (coordinationOnly) {
     registerEnvironmentDeviceCheckTool({
       server,
@@ -2509,82 +3534,27 @@ export const createHelixMcpServer = (input: {
       deviceCheckService,
       resourceMetadataPath:
         HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+      evidenceStore,
     });
+    registerPublicUiCatalogTool({
+      server,
+      principal: input.principal,
+      requiredScope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+      resourceMetadataPath:
+        HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+      evidenceStore,
+    });
+    registerRoomTransitionShadowTools(server);
+    registerEnvironmentTransitionShadowTools(server);
   }
 
-  const publicUiSurfaceIds = new Set(
-    HELIX_PUBLIC_UI_SURFACE_CATALOG.map((surface) => surface.surface_id),
-  );
-  const publicUiCatalogQuerySchema = z.object({
-    surface_id: z.string().trim().min(1).max(160)
-      .refine((value) => publicUiSurfaceIds.has(value), "Unknown public UI surface.")
-      .optional(),
-    interaction_kind: z.enum(["observe", "navigate", "configure", "act", "human_only"])
-      .optional(),
-    authority_state: z.enum([
-      "shared_gateway",
-      "route_owned",
-      "client_local",
-      "blocked_pending_contract",
-      "not_applicable",
-    ]).optional(),
-    include_capabilities: z.boolean().default(true),
-  }).strict();
-
   if (!coordinationOnly) {
-  server.registerTool(
-    "helix_public_ui_catalog",
-    {
-      title: "Inspect the public Helix UI catalog",
-      description: "Returns the public-user UI surfaces, stable control IDs, interaction classifications, and policy-audited capability projections. It never controls the DOM, grants authority, exposes handlers, or returns private UI state.",
-      inputSchema: publicUiCatalogQuerySchema,
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-      },
-      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
-    },
-    async (query) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
-      requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_READ_SCOPE);
-      const catalog = buildHelixPublicUiAgentCatalog();
-      const controls = catalog.controls.filter((control) =>
-        (!query.surface_id || control.surface_id === query.surface_id) &&
-        (!query.interaction_kind || control.interaction_kind === query.interaction_kind) &&
-        (!query.authority_state || control.authority_state === query.authority_state),
-      );
-      const capabilities = query.include_capabilities
-        ? catalog.capabilities.filter((capability) =>
-            (!query.surface_id || capability.projection_surface_id === query.surface_id) &&
-            (!query.interaction_kind || capability.interaction_kind === query.interaction_kind) &&
-            (!query.authority_state || capability.authority_state === query.authority_state),
-          )
-        : [];
-      return {
-        ...catalog,
-        surfaces: query.surface_id
-          ? catalog.surfaces.filter((surface) => surface.surface_id === query.surface_id)
-          : catalog.surfaces,
-        controls,
-        capabilities,
-        query: {
-          surface_id: query.surface_id ?? null,
-          interaction_kind: (query.interaction_kind ?? null) as HelixPublicUiInteractionKind | null,
-          authority_state: (query.authority_state ?? null) as Exclude<HelixPublicUiAuthorityState, "unmapped"> | null,
-          include_capabilities: query.include_capabilities,
-        },
-        totals: {
-          public_surface_count: catalog.surfaces.length,
-          public_control_count: catalog.controls.length,
-          public_capability_count: catalog.capabilities.length,
-          matched_surface_count: query.surface_id ? 1 : catalog.surfaces.length,
-          matched_control_count: controls.length,
-          matched_capability_count: capabilities.length,
-        },
-      };
-    }),
-  );
+  registerPublicUiCatalogTool({
+    server,
+    principal: input.principal,
+    requiredScope: HELIX_AGENT_RUN_READ_SCOPE,
+    evidenceStore,
+  });
 
   server.registerTool(
     "helix_realtime_texture_pack_inspect",
@@ -2600,7 +3570,10 @@ export const createHelixMcpServer = (input: {
       if (input.principal.accountType !== "developer") {
         throw new HelixAgentApiServiceError(403, "developer_account_required", "Realtime Texture Pack harness control is restricted to developer accounts.", false);
       }
-      return realtimeTexturePackHarnessStore.inspect(input.principal.accountProfileId);
+      return {
+        ...realtimeTexturePackHarnessStore.inspect(input.principal.accountProfileId),
+        attended_provider: inspectAttendedFalControlProjection(input.principal.accountProfileId),
+      };
     }),
   );
 
@@ -2628,6 +3601,54 @@ export const createHelixMcpServer = (input: {
       };
     }),
   );
+
+  server.registerTool(
+    "helix_realtime_texture_pack_visual_direction_control",
+    {
+      title: "Control enabled Realtime Texture Pack visual direction",
+      description: "Queues one revision-checked prompt-direction change for an existing user-selected capture. It cannot start capture, select a source/provider, arm billing, inspect pixels, retrieve prompt bodies, or steer the environment.",
+      inputSchema: z.object({
+        command: z.enum(REALTIME_TEXTURE_PACK_VISUAL_DIRECTION_COMMANDS),
+        expected_configuration_revision: z.number().int().nonnegative(),
+        preset_id: z.enum(["playable", "painterly", "custom"]).optional(),
+        custom_visual_directive: z.string().trim().max(1_000).optional(),
+        enabled_cue_families: z.array(z.enum([
+          "dimension", "biome", "time", "weather", "lighting",
+          "activity", "hazards", "focus", "workflow",
+        ])).max(9).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+    },
+    async ({ command, expected_configuration_revision, preset_id, custom_visual_directive, enabled_cue_families }) =>
+      callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_WRITE_SCOPE);
+        if (input.principal.accountType !== "developer") {
+          throw new HelixAgentApiServiceError(403, "developer_account_required", "Realtime Texture Pack visual-direction control is restricted to developer accounts.", false);
+        }
+        const commandArguments = parseRealtimeTexturePackVisualDirectionCommandArguments({
+          command,
+          ...(command === "set_visual_direction_profile" ? { preset_id } : {}),
+          ...(command === "set_custom_visual_directive" ? { custom_visual_directive } : {}),
+          ...(command === "set_dynamic_cue_policy" ? { enabled_cue_families } : {}),
+        });
+        if (!commandArguments) {
+          throw new HelixAgentApiServiceError(400, "visual_direction_command_arguments_invalid", "The visual-direction command arguments do not match the selected command.", false);
+        }
+        const result = realtimeTexturePackHarnessStore.enqueueVisualDirection({
+          profileId: input.principal.accountProfileId,
+          arguments: commandArguments,
+          expectedConfigurationRevision: expected_configuration_revision,
+        });
+        return {
+          ...result,
+          queued_receipt_not_execution_proof: result.ok,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        };
+      }),
+  );
   }
 
   if (input.localSupervisorCoordinationStore) {
@@ -2636,7 +3657,7 @@ export const createHelixMcpServer = (input: {
       "helix_local_supervisor_presence_update",
       {
         title: "Update this Codex client's local-supervisor presence",
-        description: "Registers or refreshes this authenticated OAuth client and declared Codex continuation on the installed node. Objective text and unverified resource claims remain inert advisory data.",
+        description: "Registers or refreshes this authenticated MCP client and declared Codex continuation on the installed node. Objective text and unverified resource claims remain inert advisory data.",
         inputSchema: z.object({
           client_continuation_ref: localSupervisorContinuationSchema,
           declared_objective_summary: z.string().trim().min(1).max(360),
@@ -2655,51 +3676,130 @@ export const createHelixMcpServer = (input: {
         requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
         const identity = localSupervisorIdentity(args.client_continuation_ref);
         const verifiedClaims = new Map<string, string>();
+        const verifiedIdentity: {
+          -readonly [Key in keyof HelixLocalSupervisorVerifiedIdentity]?:
+            HelixLocalSupervisorVerifiedIdentity[Key];
+        } = {};
         const verificationRef = (kind: string, value: string): string =>
           `supervisor_verification:${kind}:${crypto.createHash("sha256").update(
             `${coordinationStore.serviceInstanceRef}\n${input.principal.accountProfileId}\n${value}`,
             "utf8",
           ).digest("hex").slice(0, 32)}`;
-        if (args.room_ref && args.resource_claims.some((claim) =>
-          claim.claim_class === "read" && claim.resource_ref === args.room_ref)) {
-          await roomControlService.inspectRoom({ actor: roomActor, roomId: args.room_ref });
+        const roomClaimRequested = Boolean(args.room_ref &&
+          args.resource_claims.some((claim) =>
+            claim.claim_class === "read" &&
+            claim.resource_ref === args.room_ref));
+        const environmentClaimRequested = Boolean(args.environment_ref &&
+          args.resource_claims.some((claim) =>
+            claim.claim_class === "read" &&
+            claim.resource_ref === args.environment_ref));
+        const retainedRuntimeClaimRequested = Boolean(args.run_ref &&
+          args.resource_claims.some((claim) =>
+            claim.claim_class === "retained_runtime" &&
+            claim.resource_ref === args.run_ref));
+        const mutationClaim = args.resource_claims.find((claim) =>
+          claim.claim_class === "mutation_lease_active");
+        const needsRoomIdentity = roomClaimRequested ||
+          environmentClaimRequested || retainedRuntimeClaimRequested ||
+          Boolean(mutationClaim);
+        let roomParticipantId: string | null = null;
+        if (args.room_ref && needsRoomIdentity) {
+          roomParticipantId = await resolveSelfParticipantId(args.room_ref);
+          const roomVerificationRef = verificationRef(
+            "room_membership",
+            `${args.room_ref}:${roomParticipantId}`,
+          );
+          verifiedIdentity.room = {
+            roomRef: args.room_ref,
+            participantRef: roomParticipantId,
+            verificationRef: roomVerificationRef,
+          };
+          if (roomClaimRequested) {
           verifiedClaims.set(
             `read\n${args.room_ref}`,
-            verificationRef("room_membership", args.room_ref),
+              roomVerificationRef,
           );
-        }
-        if (args.room_ref && args.environment_ref && args.resource_claims.some((claim) =>
-          claim.claim_class === "read" && claim.resource_ref === args.environment_ref)) {
-          const deviceList = await deviceCheckService({
-            ownerProfileId: input.principal.accountProfileId,
-            roomId: args.room_ref,
-          });
-          if (deviceList.devices.some((device) =>
-            device.environment_binding_id === args.environment_ref &&
-            device.room_id === args.room_ref)) {
-            verifiedClaims.set(
-              `read\n${args.environment_ref}`,
-              verificationRef("environment_binding", args.environment_ref),
-            );
           }
         }
-        if (args.run_ref && input.principal.scopes.has(HELIX_AGENT_RUN_READ_SCOPE) &&
-            args.resource_claims.some((claim) =>
-              claim.claim_class === "retained_runtime" && claim.resource_ref === args.run_ref)) {
+        let environmentIdentity: LocalSupervisorEnvironmentIdentity | null =
+          null;
+        if (args.room_ref && roomParticipantId && args.environment_ref &&
+            (environmentClaimRequested || mutationClaim)) {
+          environmentIdentity = await localSupervisorEnvironmentIdentityReader({
+            roomId: args.room_ref,
+            profileId: input.principal.accountProfileId,
+            participantId: roomParticipantId,
+            environmentBindingId: args.environment_ref,
+          });
+          if (environmentIdentity &&
+              environmentIdentity.roomId === args.room_ref &&
+              environmentIdentity.participantId === roomParticipantId &&
+              environmentIdentity.environmentBindingId ===
+                args.environment_ref) {
+            const connectorVerificationRef = verificationRef(
+              "connector_source_epoch",
+              [environmentIdentity.environmentBindingId,
+                environmentIdentity.connectorInstallationId,
+                environmentIdentity.sourceId,
+                environmentIdentity.producerEpochRef].join(":"),
+            );
+            verifiedIdentity.connector = {
+              environmentRef: environmentIdentity.environmentBindingId,
+              connectorInstallationRef:
+                environmentIdentity.connectorInstallationId,
+              sourceRef: environmentIdentity.sourceId,
+              producerEpochRef: environmentIdentity.producerEpochRef,
+              verificationRef: connectorVerificationRef,
+            };
+            if (environmentClaimRequested) {
+            verifiedClaims.set(
+              `read\n${args.environment_ref}`,
+                connectorVerificationRef,
+            );
+            }
+          }
+        }
+        if (args.run_ref && args.room_ref && roomParticipantId &&
+            input.principal.scopes.has(HELIX_AGENT_RUN_READ_SCOPE) &&
+            retainedRuntimeClaimRequested) {
           const run = await service.inspectRun({
             principal: input.principal,
             runId: args.run_ref,
           });
-          if (["queued", "running", "waiting"].includes(run.lifecycle_status)) {
+          const runRoomBinding = await roomBindingStore.getActiveRunRoomBinding({
+            owner: {
+              tenantId: input.principal.tenantId,
+              issuer: input.principal.issuer,
+              subjectId: input.principal.subjectId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            runId: args.run_ref,
+          });
+          if (["queued", "running", "waiting"].includes(run.lifecycle_status) &&
+              runRoomBinding?.roomId === args.room_ref &&
+              runRoomBinding.participantIdAtBind === roomParticipantId) {
+            const runVerificationRef = verificationRef(
+              "retained_agent_run",
+              [run.run_id, run.version, run.lifecycle_status,
+                runRoomBinding.bindingId, runRoomBinding.version,
+                runRoomBinding.roomId,
+                runRoomBinding.participantIdAtBind].join(":"),
+            );
             verifiedClaims.set(
               `retained_runtime\n${args.run_ref}`,
-              verificationRef("agent_run", `${run.run_id}:${run.version}:${run.lifecycle_status}`),
+              runVerificationRef,
             );
+            verifiedIdentity.retainedRuntime = {
+              runRef: run.run_id,
+              runVersion: run.version,
+              runRoomBindingRef: runRoomBinding.bindingId,
+              runRoomBindingVersion: runRoomBinding.version,
+              verificationRef: runVerificationRef,
+            };
           }
         }
-        const mutationClaim = args.resource_claims.find((claim) =>
-          claim.claim_class === "mutation_lease_active");
         if (mutationClaim && args.room_ref && args.environment_ref && args.run_ref &&
+            roomParticipantId && environmentIdentity &&
             input.principal.scopes.has(HELIX_ENVIRONMENT_ACTION_READ_SCOPE)) {
           const lease = await executionLeaseClaimReader({
             roomId: args.room_ref,
@@ -2708,21 +3808,34 @@ export const createHelixMcpServer = (input: {
           });
           if (lease && lease.roomId === args.room_ref &&
               lease.environmentBindingId === args.environment_ref &&
-              lease.runId === args.run_ref) {
+              lease.runId === args.run_ref &&
+              lease.participantId === roomParticipantId &&
+              lease.sourceId === environmentIdentity.sourceId) {
+            const leaseVerificationRef = verificationRef(
+              "execution_lease",
+              [lease.actionRequestId, lease.workflowId, lease.actionAuthorityId,
+                lease.sourceId, lease.participantId, lease.status,
+                lease.leaseExpiresAt].join(":"),
+            );
             verifiedClaims.set(
               `mutation_lease_active\n${mutationClaim.resource_ref}`,
-              verificationRef(
-                "execution_lease",
-                [lease.actionRequestId, lease.workflowId, lease.actionAuthorityId,
-                  lease.sourceId, lease.participantId, lease.status,
-                  lease.leaseExpiresAt].join(":"),
-              ),
+              leaseVerificationRef,
             );
+            verifiedIdentity.executionLease = {
+              executionLeaseRef: lease.actionRequestId,
+              workflowRef: lease.workflowId,
+              actionAuthorityRef: lease.actionAuthorityId,
+              participantRef: lease.participantId,
+              sourceRef: lease.sourceId,
+              leaseExpiresAt: lease.leaseExpiresAt,
+              verificationRef: leaseVerificationRef,
+            };
           }
         }
         const presence = coordinationStore.registerOrHeartbeat({
           profileRef: input.principal.accountProfileId,
           accountSessionId: identity.accountSessionId,
+          authenticatedMcpClientRef: identity.authenticatedClientRef,
           presence: {
             client_session_ref: identity.clientSessionRef,
             conversation_thread_ref: identity.conversationThreadRef,
@@ -2736,10 +3849,11 @@ export const createHelixMcpServer = (input: {
             heartbeat_ttl_seconds: args.heartbeat_ttl_seconds,
           },
           verifiedResourceClaims: verifiedClaims,
+          verifiedIdentity,
         });
         return { ok: true, presence, identity_basis: {
           authenticated_profile: "server_verified",
-          oauth_client: "server_verified",
+          authenticated_mcp_client: "server_verified",
           conversation_thread: "client_declared",
           client_session: "server_derived",
         }, ...localSupervisorFlags };
@@ -2870,6 +3984,232 @@ export const createHelixMcpServer = (input: {
         return { ok: true, presence, ...localSupervisorFlags };
       }),
     );
+
+    if (input.desktopMcpTunnelTransitionStore) {
+      const transitionStore = input.desktopMcpTunnelTransitionStore;
+      if (transitionStore.serviceInstanceRef !== coordinationStore.serviceInstanceRef) {
+        throw new Error("desktop_tunnel_transition_service_epoch_mismatch");
+      }
+      const transitionIdentity = (
+        continuationRef: string,
+      ): DesktopMcpTransitionIdentity => {
+        const nativeDesktopClient =
+          input.principal.issuer === "urn:casimirbot:desktop-session" &&
+          input.principal.oauthClientRef === null;
+        const externalOAuthClient = Boolean(input.principal.oauthClientRef);
+        const trustedDeveloperRequester = nativeDesktopClient
+          ? input.principal.accountType === "developer"
+          : externalOAuthClient && input.principal.trustedDeveloperProfile === true;
+        if (
+          !trustedDeveloperRequester ||
+          !input.principal.accountContext.trusted_account_session ||
+          (!nativeDesktopClient && !externalOAuthClient)
+        ) {
+          throw new DesktopMcpTunnelTransitionError(
+            "transition_trusted_developer_session_required",
+            403,
+          );
+        }
+        const localIdentity = localSupervisorIdentity(continuationRef);
+        const presence = coordinationStore.listPresence().find((entry) =>
+          entry.client_session_ref === localIdentity.clientSessionRef);
+        if (
+          !presence?.active ||
+          presence.conversation_thread_ref !== continuationRef ||
+          presence.authenticated_mcp_client_ref !==
+            localIdentity.authenticatedClientRef
+        ) {
+          throw new DesktopMcpTunnelTransitionError(
+            "transition_active_presence_required",
+            409,
+          );
+        }
+        coordinationStore.authenticateClient({
+          profileRef: input.principal.accountProfileId,
+          accountSessionId: localIdentity.accountSessionId,
+          clientSessionRef: localIdentity.clientSessionRef,
+        });
+        return {
+          serviceInstanceRef: coordinationStore.serviceInstanceRef,
+          clientSessionRef: localIdentity.clientSessionRef,
+          conversationThreadRef: continuationRef,
+          authenticatedProfileRef: input.principal.accountProfileId,
+          authenticatedMcpClientRef: localIdentity.authenticatedClientRef,
+          accountSessionId: input.principal.accountContext.session_id,
+          clientIdentityAssurance: nativeDesktopClient
+            ? "native_tunnel_client_plus_server_derived_continuation"
+            : "external_oauth_client_plus_server_derived_continuation",
+          independentExternalOAuthClientBound: externalOAuthClient,
+        };
+      };
+      const transitionOutputFlags = {
+        reconnect_required: true as const,
+        catalog_refresh_required: true as const,
+        shared_live_room_catalog_pre_advertised: true as const,
+        tool_list_changed_supported: true as const,
+        authority_limited_to_tunnel_transport: true as const,
+        environment_authority_granted: false as const,
+        trading_authority_granted: false as const,
+        credential_included: false as const,
+        private_endpoint_included: false as const,
+        hidden_reasoning_included: false as const,
+        answer_authority: false as const,
+        assistant_answer: false as const,
+        terminal_eligible: false as const,
+      };
+      const requestToolCatalogRefresh = async (): Promise<boolean> => {
+        try {
+          await server.server.sendToolListChanged();
+          return true;
+        } catch {
+          // The native transport may already be reconnecting. The accepted
+          // transition remains authoritative; a missed advisory notification
+          // must not turn that completed native side effect into a tool error.
+          return false;
+        }
+      };
+
+      server.registerTool(
+        "helix_desktop_tunnel_transition_request",
+        {
+          title: "Request a governed full MCP tunnel delegation",
+          description: "Creates a pending, developer-only, short-lived tunnel transport request bound to this exact active MCP presence. A separate first-party native desktop session must approve it before execution. It cannot grant itself, start the tunnel, grant an environment capability, or become an assistant answer.",
+          inputSchema: desktopMcpTransitionRequestInputSchema,
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE),
+        },
+        async (args) => callLocalSupervisorTool(
+          HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+          () => {
+            requireAllAgentScopes([HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]);
+            const created = transitionStore.request({
+              identity: transitionIdentity(args.client_continuation_ref),
+              declaredTaskSummary: args.declared_task_summary,
+              requestedLeaseSeconds: args.requested_lease_seconds,
+            });
+            return { ok: true, ...created, ...transitionOutputFlags };
+          },
+        ),
+      );
+
+      server.registerTool(
+        "helix_desktop_tunnel_transition_inspect",
+        {
+          title: "Inspect this governed tunnel transition request",
+          description: "Reads only a transition request owned by this exact active MCP presence. It returns no credentials, private endpoint, environment authority, or assistant answer.",
+          inputSchema: z.object({
+            client_continuation_ref: localSupervisorContinuationSchema,
+            transition_request_ref: z.string().trim().min(1).max(128),
+          }).strict(),
+          annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE),
+        },
+        async (args) => callLocalSupervisorTool(
+          HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+          () => {
+            requireAllAgentScopes([HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]);
+            const request = transitionStore.inspect({
+              identity: transitionIdentity(args.client_continuation_ref),
+              requestRef: args.transition_request_ref,
+            });
+            const receipts = transitionStore.listReceipts(
+              args.transition_request_ref,
+            );
+            return {
+              ok: true,
+              request,
+              receipts,
+              receipt_chain_scope: "service_instance" as const,
+              ...transitionOutputFlags,
+            };
+          },
+        ),
+      );
+
+      server.registerTool(
+        "helix_desktop_tunnel_transition_execute",
+        {
+          title: "Execute an already-delegated native MCP tunnel transition",
+          description: "Asks the native desktop broker to transition only the MCP transport under an active user delegation. The response is a nonterminal acceptance receipt; reconnect and catalog refresh remain separate observations.",
+          inputSchema: desktopMcpTransitionExecuteInputSchema,
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE),
+        },
+        async (args) => callLocalSupervisorTool(
+          HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+          async () => {
+            requireAllAgentScopes([HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE]);
+            if (!input.desktopMcpTunnelTransitionExecutor) {
+              throw new DesktopMcpTunnelTransitionError(
+                "transition_native_broker_unavailable",
+                503,
+              );
+            }
+            const identity = transitionIdentity(args.client_continuation_ref);
+            const delegated = transitionStore.inspect({
+              identity,
+              requestRef: args.transition_request_ref,
+            });
+            if (!delegated.delegation_ref || !delegated.delegation_expires_at) {
+              throw new DesktopMcpTunnelTransitionError(
+                "transition_delegation_not_active",
+                409,
+              );
+            }
+            const authorization = transitionStore.authorize({
+              identity,
+              requestRef: args.transition_request_ref,
+              targetScope: args.target_scope,
+              idempotencyKey: args.idempotency_key,
+            });
+            if (authorization.idempotencyReplayed) {
+              const toolListChangedRequested =
+                await requestToolCatalogRefresh();
+              return {
+                ok: true,
+                accepted: true,
+                receipt: authorization.receipt,
+                native_receipt_ref: null,
+                idempotency_replayed: true,
+                native_transition_resubmitted: false,
+                tool_list_changed_requested: toolListChangedRequested,
+                ...transitionOutputFlags,
+              };
+            }
+            try {
+              const native = await input.desktopMcpTunnelTransitionExecutor({
+                transitionRequestRef: args.transition_request_ref,
+                delegationRef: delegated.delegation_ref,
+                accountSessionId:
+                  authorization.delegatedAccountSessionId,
+                targetScope: args.target_scope,
+                delegationExpiresAt: delegated.delegation_expires_at,
+              });
+              const toolListChangedRequested = native.accepted
+                ? await requestToolCatalogRefresh()
+                : false;
+              return {
+                ok: true,
+                accepted: native.accepted,
+                receipt: authorization.receipt,
+                native_receipt_ref: native.nativeReceiptRef,
+                idempotency_replayed: false,
+                native_transition_resubmitted: true,
+                tool_list_changed_requested: toolListChangedRequested,
+                ...transitionOutputFlags,
+              };
+            } catch (error) {
+              transitionStore.settle({
+                requestRef: args.transition_request_ref,
+                eventType: "failed",
+                reasonCode: "native_transition_rejected",
+              });
+              throw error;
+            }
+          },
+        ),
+      );
+    }
   }
 
   if (coordinationOnly) {
@@ -2877,11 +4217,20 @@ export const createHelixMcpServer = (input: {
       server,
       new Map<string, RequiredOAuthScopes>([
         ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+        ["helix_public_ui_catalog", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+        ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
         ["helix_local_supervisor_presence_update", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_local_supervisor_coordination_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ...ROOM_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
+        ...ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
+        ...(input.desktopMcpTunnelTransitionStore ? [
+          ["helix_desktop_tunnel_transition_request", [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]],
+          ["helix_desktop_tunnel_transition_inspect", [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]],
+          ["helix_desktop_tunnel_transition_execute", [HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE]],
+        ] as Array<[string, RequiredOAuthScopes]> : []),
       ]),
     );
     return server;
@@ -3146,6 +4495,7 @@ export const createHelixMcpServer = (input: {
     server,
     principal: input.principal,
     deviceCheckService,
+    evidenceStore,
   });
 
   server.registerTool(
@@ -5358,6 +6708,35 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_room_floor_inspect",
+    {
+      title: "Inspect Shared Live Room speaking floor",
+      description:
+        "Reads the bounded current speaking-floor owner, epoch, and lease for one room after membership checks. Use the exact epoch for a safe release request.",
+      inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+      outputSchema: roomFloorInspectOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
+    },
+    async ({ room_id }: HelixRoomIdToolArguments) =>
+      callRoomTool(HELIX_SHARED_LIVE_ROOM_READ_SCOPE, async () => {
+        requireHelixAgentApiScope(
+          input.principal,
+          HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        );
+        return (await roomControlService.inspectFloor({
+          actor: roomActor,
+          roomId: room_id,
+        })) as unknown as RecordLike;
+      }),
+  );
+
+  server.registerTool(
     "helix_room_create",
     {
       title: "Create a Shared Live Room",
@@ -5422,6 +6801,158 @@ export const createHelixMcpServer = (input: {
           actor: roomActor,
           request,
         })) as unknown as RecordLike;
+      }),
+  );
+
+  server.registerTool(
+    "helix_room_consent_revoke",
+    {
+      title: "Revoke own Shared Live Room consent",
+      description:
+        "Idempotently disables one or more consent grants owned by the verified linked account. This authority-reducing tool rejects true values and cannot grant microphone, transcript, screen, thumbnail, or model-audio permission.",
+      inputSchema: z
+        .object({
+          idempotency_key: idempotencyKeySchema,
+          request: helixSharedLiveRoomConsentRevokeRequestSchema,
+        })
+        .strict(),
+      outputSchema: roomConsentRevokeOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async ({
+      idempotency_key,
+      request,
+    }: HelixRoomConsentRevokeToolArguments) =>
+      callRoomTool(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE, async () => {
+        requireHelixAgentApiScope(
+          input.principal,
+          HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+        );
+        const result = await roomControlService.revokeOwnConsent({
+          actor: roomActor,
+          idempotencyKey: idempotency_key,
+          request,
+        });
+        return {
+          operation: "room.consent.revoke",
+          idempotency_replayed: result.idempotencyReplayed,
+          receipt: result.body,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_room_consent_grant",
+    {
+      title: "Grant own Shared Live Room consent with delegation",
+      description:
+        "Grants only explicitly selected consent fields for the verified linked participant. Requires a short-lived, signed, one-time delegation bound to this MCP client, conversation, account session, room, capability, and exact request.",
+      inputSchema: z.object({
+        idempotency_key: idempotencyKeySchema,
+        request: helixSharedLiveRoomConsentGrantRequestSchema,
+        delegation: jsonObjectSchema,
+      }).strict(),
+      outputSchema: roomConsentGrantOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async ({ idempotency_key, request, delegation }: HelixRoomConsentGrantToolArguments) =>
+      callRoomTool(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE);
+        const delegationRef = await consumeRoomMcpDelegation({
+          capabilityId: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY,
+          roomId: request.room_id,
+          request,
+          receipt: delegation,
+        });
+        const result = await roomControlService.grantOwnConsent({
+          actor: roomActor,
+          idempotencyKey: idempotency_key,
+          request,
+          delegationRef,
+        });
+        return { operation: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY, idempotency_replayed: result.idempotencyReplayed, receipt: result.body };
+      }),
+  );
+
+  server.registerTool(
+    "helix_room_floor_release",
+    {
+      title: "Release own Shared Live Room speaking floor",
+      description:
+        "Releases only the verified linked participant's speaking floor for the exact inspected epoch. A stale epoch or another participant's floor is left unchanged.",
+      inputSchema: z
+        .object({ request: helixSharedLiveRoomFloorReleaseRequestSchema })
+        .strict(),
+      outputSchema: roomFloorReleaseOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async ({ request }: HelixRoomFloorReleaseToolArguments) =>
+      callRoomTool(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE, async () => {
+        requireHelixAgentApiScope(
+          input.principal,
+          HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+        );
+        return (await roomControlService.releaseOwnFloor({
+          actor: roomActor,
+          request,
+        })) as unknown as RecordLike;
+      }),
+  );
+
+  server.registerTool(
+    "helix_room_floor_acquire",
+    {
+      title: "Acquire own Shared Live Room speaking floor with delegation",
+      description:
+        "Acquires a bounded speaking-floor lease only for the verified linked participant. Requires a short-lived, signed, one-time delegation bound to this MCP client, conversation, account session, room, capability, and exact request.",
+      inputSchema: z.object({
+        idempotency_key: idempotencyKeySchema,
+        request: helixSharedLiveRoomFloorAcquireRequestSchema,
+        delegation: jsonObjectSchema,
+      }).strict(),
+      outputSchema: roomFloorAcquireOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE),
+    },
+    async ({ idempotency_key, request, delegation }: HelixRoomFloorAcquireToolArguments) =>
+      callRoomTool(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE);
+        const delegationRef = await consumeRoomMcpDelegation({
+          capabilityId: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY,
+          roomId: request.room_id,
+          request,
+          receipt: delegation,
+        });
+        const result = await roomControlService.acquireOwnFloor({
+          actor: roomActor,
+          idempotencyKey: idempotency_key,
+          request,
+          delegationRef,
+        });
+        return { operation: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY, idempotency_replayed: result.idempotencyReplayed, receipt: result.body };
       }),
   );
 
@@ -5682,8 +7213,10 @@ export const createHelixMcpServer = (input: {
     new Map<string, RequiredOAuthScopes>([
       ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_public_ui_catalog", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_evidence_observation_get", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_realtime_texture_pack_inspect", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_realtime_texture_pack_control", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_realtime_texture_pack_visual_direction_control", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_client_authorization_status", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_run_continue", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_run_cancel", HELIX_AGENT_RUN_WRITE_SCOPE],
@@ -5724,7 +7257,13 @@ export const createHelixMcpServer = (input: {
       ["helix_minecraft_workflow_control", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_room_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_room_floor_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_room_create", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+      ["helix_room_presence_set", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_room_consent_revoke", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+      ["helix_room_consent_grant", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+      ["helix_room_floor_release", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
+      ["helix_room_floor_acquire", HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE],
       ["helix_room_bind_run", HELIX_ROOM_RUN_ATTACHMENT_SCOPES],
       ["helix_room_claim_chat_binding", HELIX_ROOM_RUN_ATTACHMENT_SCOPES],
       ["helix_room_unbind_run", HELIX_ROOM_RUN_ATTACHMENT_SCOPES],

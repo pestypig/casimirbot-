@@ -103,6 +103,11 @@ final class NativeFabricWorkflowEngine {
     private int initialRemainderCount;
     private int consumeUseTicks;
     private int consumeStartWaitTicks;
+    private boolean consumeUseStarted;
+    private float consumeMinimumHealth;
+    private float consumePreviousHealth;
+    private float consumeObservedHealthLoss;
+    private int consumeHealthLossEventCount;
     private final Set<Long> completedBlockTargets = new HashSet<>();
 
     static boolean usesReusableWorkflowEngine(String actionKind) {
@@ -1443,6 +1448,8 @@ final class NativeFabricWorkflowEngine {
             initialFoodLevel = player.getFoodData().getFoodLevel();
             initialSaturationLevel = player.getFoodData().getSaturationLevel();
             initialHealth = player.getHealth();
+            consumeMinimumHealth = initialHealth;
+            consumePreviousHealth = initialHealth;
             initialRemainderCount = expectedRemainder.isBlank()
                 ? 0
                 : inventoryCount(expectedRemainder);
@@ -1452,6 +1459,16 @@ final class NativeFabricWorkflowEngine {
         int foodAfter = player.getFoodData().getFoodLevel();
         float saturationAfter = player.getFoodData().getSaturationLevel();
         float healthAfter = player.getHealth();
+        boolean withinUseWindow = consumeUseStarted || player.isUsingItem();
+        if (withinUseWindow) {
+            consumeUseStarted = true;
+            consumeMinimumHealth = Math.min(consumeMinimumHealth, healthAfter);
+            if (healthAfter + 0.001F < consumePreviousHealth) {
+                consumeObservedHealthLoss += consumePreviousHealth - healthAfter;
+                consumeHealthLossEventCount++;
+            }
+        }
+        consumePreviousHealth = healthAfter;
         int remainderDelta = expectedRemainder.isBlank()
             ? 0
             : Math.max(0, inventoryCount(expectedRemainder) - initialRemainderCount);
@@ -1468,6 +1485,9 @@ final class NativeFabricWorkflowEngine {
         measured.put("health_before", initialHealth);
         measured.put("health_after", healthAfter);
         measured.put("health_delta", healthAfter - initialHealth);
+        measured.put("minimum_health_during_use", consumeMinimumHealth);
+        measured.put("observed_health_loss_during_use", consumeObservedHealthLoss);
+        measured.put("health_loss_event_count_during_use", consumeHealthLossEventCount);
         measured.put("use_ticks", consumeUseTicks);
         measured.put("expected_remainder_item_id", expectedRemainder.isBlank() ? "none" : expectedRemainder);
         measured.put("remainder_item_delta", remainderDelta);
@@ -2215,6 +2235,11 @@ final class NativeFabricWorkflowEngine {
         initialRemainderCount = 0;
         consumeUseTicks = 0;
         consumeStartWaitTicks = 0;
+        consumeUseStarted = false;
+        consumeMinimumHealth = 0;
+        consumePreviousHealth = 0;
+        consumeObservedHealthLoss = 0;
+        consumeHealthLossEventCount = 0;
         completedBlockTargets.clear();
     }
 

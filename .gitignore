@@ -167,3 +167,10 @@ external/openai-codex-compare/
 # Pinned third-party desktop runtime payloads are fetched and checksum-verified
 # during the Windows build. Keep the binary/archive cache out of Git.
 /apps/desktop/vendor/tunnel-client/
+
+# Packaged Electron builds are reproducible release artifacts.
+# Keep them local (or publish them as release assets), not in Git history.
+/apps/desktop/release-*/
+/apps/desktop/.tmp/
+/.codex-tmp/
+/.tmp-*.json

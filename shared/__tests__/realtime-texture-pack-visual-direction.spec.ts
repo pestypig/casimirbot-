@@ -7,12 +7,16 @@ import {
 import {
   REALTIME_TEXTURE_PACK_MINECRAFT_VISUAL_DIRECTION_PROFILE_ID,
   REALTIME_TEXTURE_PACK_VISUAL_CUE_FAMILIES,
+  REALTIME_TEXTURE_PACK_VISUAL_TARGET_CLASSES,
   assertRealtimeTexturePackCueAdmissibleForBinding,
   assertRealtimeTexturePackPromptRevisionAdmissibleForBinding,
+  assertRealtimeTexturePackVisualTreatmentAdmissibleForBinding,
   buildRealtimeTexturePackPromptRevision,
   buildRealtimeTexturePackSourceBinding,
   buildRealtimeTexturePackVisualDirectionSupport,
+  buildRealtimeTexturePackVisualTreatmentRevision,
   realtimeTexturePackVisualCuesSchema,
+  realtimeTexturePackVisualTreatmentRevisionSchema,
   type RealtimeTexturePackSourceBindingV1,
 } from "../realtime-texture-pack-visual-direction";
 import { projectMinecraftSituationDigestToVisualCues } from "../../server/services/realtime-texture-pack/visual-direction/minecraft-situation-cue-projector";
@@ -436,6 +440,188 @@ describe("Realtime Texture Pack VDC-1 contracts", () => {
     ).toThrow("realtime_texture_pack_prompt_binding_identity_mismatch");
   });
 
+  it("classifies native, material, resource-pack, and overlay delivery separately", () => {
+    const treatment = buildRealtimeTexturePackVisualTreatmentRevision({
+      visual_treatment_revision_id: "rtp_visual_treatment:test",
+      visual_treatment_revision: 1,
+      source_binding_id: binding().binding_id,
+      source_binding_revision: binding().binding_revision,
+      capture_session_id: binding().capture_session_id,
+      cue_packet_id: null,
+      prompt_revision_id: null,
+      treatment_hash: HASH_C,
+      compiler_version: "realtime_texture_pack.visual_direction.compiler.v1",
+      target_classifications: [
+        {
+          target_class: "native_shader",
+          delivery_class: "render_parameter_stream",
+          update_class: "render_frame_parameters",
+          geometry_source: "native_world_renderer",
+          generated_pixels_allowed: false,
+          requires_attended_apply: false,
+        },
+        {
+          target_class: "dynamic_material",
+          delivery_class: "dynamic_texture_upload",
+          update_class: "semantic_scene_change",
+          geometry_source: "native_world_renderer",
+          generated_pixels_allowed: true,
+          requires_attended_apply: false,
+        },
+        {
+          target_class: "resource_pack",
+          delivery_class: "attended_resource_reload",
+          update_class: "attended_session_snapshot",
+          geometry_source: "native_world_renderer",
+          generated_pixels_allowed: true,
+          requires_attended_apply: true,
+        },
+        {
+          target_class: "overlay",
+          delivery_class: "frame_composite",
+          update_class: "generated_keyframe",
+          geometry_source: "captured_visual_projection",
+          generated_pixels_allowed: true,
+          requires_attended_apply: false,
+        },
+      ],
+      compiled_at: NOW,
+      expires_at: "2026-08-27T16:00:10.000Z",
+    });
+
+    expect(treatment.target_classifications.map((entry) => entry.target_class)).toEqual(
+      REALTIME_TEXTURE_PACK_VISUAL_TARGET_CLASSES,
+    );
+    expect(treatment).toMatchObject({
+      presentation_only: true,
+      environment_action_authority: false,
+      world_mutation_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("rejects mismatched delivery semantics and duplicate target classes", () => {
+    const base = buildRealtimeTexturePackVisualTreatmentRevision({
+      visual_treatment_revision_id: "rtp_visual_treatment:validation",
+      visual_treatment_revision: 1,
+      source_binding_id: binding().binding_id,
+      source_binding_revision: binding().binding_revision,
+      capture_session_id: binding().capture_session_id,
+      cue_packet_id: null,
+      prompt_revision_id: null,
+      treatment_hash: HASH_A,
+      compiler_version: "realtime_texture_pack.visual_direction.compiler.v1",
+      target_classifications: [
+        {
+          target_class: "native_shader",
+          delivery_class: "render_parameter_stream",
+          update_class: "render_frame_parameters",
+          geometry_source: "native_world_renderer",
+          generated_pixels_allowed: false,
+          requires_attended_apply: false,
+        },
+      ],
+      compiled_at: NOW,
+      expires_at: "2026-08-27T16:00:10.000Z",
+    });
+    expect(
+      realtimeTexturePackVisualTreatmentRevisionSchema.safeParse({
+        ...base,
+        target_classifications: [
+          { ...base.target_classifications[0], delivery_class: "frame_composite" },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      realtimeTexturePackVisualTreatmentRevisionSchema.safeParse({
+        ...base,
+        target_classifications: [
+          base.target_classifications[0],
+          base.target_classifications[0],
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("admits a treatment only for its exact binding, cue, prompt, and revision", () => {
+    const currentBinding = binding();
+    const cue = projectMinecraftSituationDigestToVisualCues({
+      binding: currentBinding,
+      support: support(),
+      digest: digest(),
+      now: NOW,
+    });
+    const prompt = buildRealtimeTexturePackPromptRevision({
+      prompt_revision_id: "rtp_prompt_revision:treatment",
+      prompt_revision: 1,
+      source_binding_id: currentBinding.binding_id,
+      source_binding_revision: currentBinding.binding_revision,
+      capture_session_id: currentBinding.capture_session_id,
+      source_frame_id: "rtp_source_frame:treatment",
+      cue_packet_id: cue.cue_packet_id,
+      scene_capsule_id: null,
+      base_prompt_hash: HASH_A,
+      preset_id: "playable",
+      compiled_prompt_hash: HASH_B,
+      compiler_version: "realtime_texture_pack.visual_direction.compiler.v1",
+      compiled_at: NOW,
+      expires_at: "2026-08-27T16:00:10.000Z",
+    });
+    const treatment = buildRealtimeTexturePackVisualTreatmentRevision({
+      visual_treatment_revision_id: "rtp_visual_treatment:admission",
+      visual_treatment_revision: 2,
+      source_binding_id: currentBinding.binding_id,
+      source_binding_revision: currentBinding.binding_revision,
+      capture_session_id: currentBinding.capture_session_id,
+      cue_packet_id: cue.cue_packet_id,
+      prompt_revision_id: prompt.prompt_revision_id,
+      treatment_hash: HASH_C,
+      compiler_version: "realtime_texture_pack.visual_direction.compiler.v1",
+      target_classifications: [
+        {
+          target_class: "overlay",
+          delivery_class: "frame_composite",
+          update_class: "generated_keyframe",
+          geometry_source: "captured_visual_projection",
+          generated_pixels_allowed: true,
+          requires_attended_apply: false,
+        },
+      ],
+      compiled_at: NOW,
+      expires_at: "2026-08-27T16:00:10.000Z",
+    });
+
+    expect(() =>
+      assertRealtimeTexturePackVisualTreatmentAdmissibleForBinding({
+        binding: currentBinding,
+        treatment,
+        cue,
+        promptRevision: prompt,
+        at: "2026-08-27T16:00:06.000Z",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertRealtimeTexturePackVisualTreatmentAdmissibleForBinding({
+        binding: binding({ binding_revision: 2 }),
+        treatment,
+        cue,
+        promptRevision: prompt,
+        at: "2026-08-27T16:00:06.000Z",
+      }),
+    ).toThrow("realtime_texture_pack_treatment_binding_identity_mismatch");
+    expect(() =>
+      assertRealtimeTexturePackVisualTreatmentAdmissibleForBinding({
+        binding: currentBinding,
+        treatment: { ...treatment, visual_treatment_revision: 1 },
+        previousTreatment: treatment,
+        cue,
+        promptRevision: prompt,
+        at: "2026-08-27T16:00:06.000Z",
+      }),
+    ).toThrow("realtime_texture_pack_treatment_revision_regressed");
+  });
+
   it("rejects attempts to promote a cue into answer or visual authority", () => {
     const cue = projectMinecraftSituationDigestToVisualCues({
       binding: binding(),
@@ -449,6 +635,38 @@ describe("Realtime Texture Pack VDC-1 contracts", () => {
         authoritative_visual_output: true,
         assistant_answer: true,
         terminal_eligible: true,
+      }).success,
+    ).toBe(false);
+    const treatment = buildRealtimeTexturePackVisualTreatmentRevision({
+      visual_treatment_revision_id: "rtp_visual_treatment:authority",
+      visual_treatment_revision: 1,
+      source_binding_id: binding().binding_id,
+      source_binding_revision: binding().binding_revision,
+      capture_session_id: binding().capture_session_id,
+      cue_packet_id: null,
+      prompt_revision_id: null,
+      treatment_hash: HASH_A,
+      compiler_version: "realtime_texture_pack.visual_direction.compiler.v1",
+      target_classifications: [
+        {
+          target_class: "native_shader",
+          delivery_class: "render_parameter_stream",
+          update_class: "render_frame_parameters",
+          geometry_source: "native_world_renderer",
+          generated_pixels_allowed: false,
+          requires_attended_apply: false,
+        },
+      ],
+      compiled_at: NOW,
+      expires_at: "2026-08-27T16:00:10.000Z",
+    });
+    expect(
+      realtimeTexturePackVisualTreatmentRevisionSchema.safeParse({
+        ...treatment,
+        presentation_only: false,
+        environment_action_authority: true,
+        world_mutation_authority: true,
+        assistant_answer: true,
       }).success,
     ).toBe(false);
   });

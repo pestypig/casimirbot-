@@ -208,6 +208,8 @@ describe("Shared Live Room Player Embodiment controls", () => {
     for (const capabilityLabel of [
       "Camera tracking",
       "Combat attack",
+      "Combat guard",
+      "Consume",
       "Reactive guardian program",
       "Arm viability guardian",
       "Disarm viability guardian",

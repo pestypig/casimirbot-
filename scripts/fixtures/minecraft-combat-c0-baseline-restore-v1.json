@@ -1,0 +1,20 @@
+{
+  "schema": "helix.minecraft.arena_fixture.v1",
+  "fixture_id": "fixture:combat-c0-baseline-restore-v1",
+  "setup_commands": [
+    "kill @e[type=minecraft:zombie,tag=helix_rec2c_fixture]",
+    "difficulty normal",
+    "gamerule naturalRegeneration true",
+    "gamemode survival DatDamPig",
+    "effect clear DatDamPig",
+    "effect give DatDamPig minecraft:instant_health 1 10 true",
+    "effect give DatDamPig minecraft:saturation 1 10 true",
+    "tp DatDamPig -3.5 65 0.5 90 0"
+  ],
+  "release_commands": [
+    "effect clear @e[type=minecraft:zombie,tag=helix_rec2c_fixture]"
+  ],
+  "cleanup_commands": [
+    "kill @e[type=minecraft:zombie,tag=helix_rec2c_fixture]"
+  ]
+}

@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ final class ConnectorPairingClientTest {
     private final AtomicBoolean unpairAuthorized = new AtomicBoolean(false);
     private final AtomicBoolean commandOnlyResponse = new AtomicBoolean(false);
     private final AtomicBoolean actionOnlyResponse = new AtomicBoolean(false);
+    private final AtomicReference<String> redeemProtocol = new AtomicReference<>();
 
     @BeforeEach
     void startServer() throws IOException {
@@ -54,6 +56,7 @@ final class ConnectorPairingClientTest {
                 "minecraft.fabric_mod.v1",
                 "0.1.0"
             );
+            assertEquals("HTTP/1.1", redeemProtocol.get());
             assertEquals("room:test", paired.roomId());
             assertEquals("minecraft:fabric:test", paired.worldId());
             assertFalse(paired.replayed());
@@ -137,6 +140,7 @@ final class ConnectorPairingClientTest {
     }
 
     private void redeem(HttpExchange exchange) throws IOException {
+        redeemProtocol.set(exchange.getProtocol());
         if (actionOnlyResponse.get()) {
             String response = """
                 {

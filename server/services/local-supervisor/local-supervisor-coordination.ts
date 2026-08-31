@@ -33,6 +33,37 @@ export type HelixLocalSupervisorResourceClaimVerifier = (input: {
   claimClass: "read" | "retained_runtime" | "mutation_lease_wait" | "mutation_lease_active";
 }) => { verificationRef: string } | null;
 
+export type HelixLocalSupervisorVerifiedIdentity = Readonly<{
+  room?: {
+    roomRef: string;
+    participantRef: string;
+    verificationRef: string;
+  };
+  connector?: {
+    environmentRef: string;
+    connectorInstallationRef: string;
+    sourceRef: string;
+    producerEpochRef: string;
+    verificationRef: string;
+  };
+  retainedRuntime?: {
+    runRef: string;
+    runVersion: number;
+    runRoomBindingRef: string;
+    runRoomBindingVersion: number;
+    verificationRef: string;
+  };
+  executionLease?: {
+    executionLeaseRef: string;
+    workflowRef: string;
+    actionAuthorityRef: string;
+    participantRef: string;
+    sourceRef: string;
+    leaseExpiresAt: string;
+    verificationRef: string;
+  };
+}>;
+
 export class HelixLocalSupervisorCoordinationError extends Error {
   constructor(
     readonly code: string,
@@ -89,9 +120,13 @@ export class HelixLocalSupervisorCoordinationStore {
   registerOrHeartbeat(input: {
     profileRef: string;
     accountSessionId: string;
+    /** Server-authenticated MCP client ref. Non-MCP callers leave this null. */
+    authenticatedMcpClientRef?: string | null;
     presence: unknown;
     /** Server-owned proof refs; never populated from an HTTP/MCP request body. */
     verifiedResourceClaims?: ReadonlyMap<string, string>;
+    /** Canonical identity projections; never populated from an HTTP/MCP body. */
+    verifiedIdentity?: HelixLocalSupervisorVerifiedIdentity;
   }): HelixLocalSupervisorPresence {
     const parsed = helixLocalSupervisorPresenceInputSchema.parse(input.presence);
     const existing = this.presence.get(parsed.client_session_ref);
@@ -116,6 +151,8 @@ export class HelixLocalSupervisorCoordinationStore {
     if (existing && (
       existing.authenticated_profile_ref !== input.profileRef ||
       existing.accountSessionHash !== accountSessionHash ||
+      existing.authenticated_mcp_client_ref !==
+        (input.authenticatedMcpClientRef ?? null) ||
       existing.conversation_thread_ref !== parsed.conversation_thread_ref
     )) throw new HelixLocalSupervisorCoordinationError("supervisor_client_identity_mismatch", 403);
     const observedAt = this.now();
@@ -149,6 +186,7 @@ export class HelixLocalSupervisorCoordinationStore {
       client_session_ref: parsed.client_session_ref,
       conversation_thread_ref: parsed.conversation_thread_ref,
       authenticated_profile_ref: input.profileRef,
+      authenticated_mcp_client_ref: input.authenticatedMcpClientRef ?? null,
       declared_objective_summary: parsed.declared_objective_summary,
       declared_objective_is_verified: false,
       lifecycle_basis: "authenticated_client_heartbeat",
@@ -157,6 +195,49 @@ export class HelixLocalSupervisorCoordinationStore {
       room_ref: parsed.room_ref ?? null,
       environment_ref: parsed.environment_ref ?? null,
       run_ref: parsed.run_ref ?? null,
+      verified_room_identity: input.verifiedIdentity?.room ? {
+        basis: "server_verified",
+        room_ref: input.verifiedIdentity.room.roomRef,
+        participant_ref: input.verifiedIdentity.room.participantRef,
+        verification_ref: input.verifiedIdentity.room.verificationRef,
+      } : null,
+      verified_connector_identity: input.verifiedIdentity?.connector ? {
+        basis: "server_verified",
+        environment_ref: input.verifiedIdentity.connector.environmentRef,
+        connector_installation_ref:
+          input.verifiedIdentity.connector.connectorInstallationRef,
+        source_ref: input.verifiedIdentity.connector.sourceRef,
+        producer_epoch_ref: input.verifiedIdentity.connector.producerEpochRef,
+        verification_ref: input.verifiedIdentity.connector.verificationRef,
+      } : null,
+      verified_retained_runtime_identity:
+        input.verifiedIdentity?.retainedRuntime ? {
+          basis: "server_verified",
+          run_ref: input.verifiedIdentity.retainedRuntime.runRef,
+          run_version: input.verifiedIdentity.retainedRuntime.runVersion,
+          run_room_binding_ref:
+            input.verifiedIdentity.retainedRuntime.runRoomBindingRef,
+          run_room_binding_version:
+            input.verifiedIdentity.retainedRuntime.runRoomBindingVersion,
+          verification_ref:
+            input.verifiedIdentity.retainedRuntime.verificationRef,
+        } : null,
+      verified_execution_lease_identity:
+        input.verifiedIdentity?.executionLease ? {
+          basis: "server_verified",
+          execution_lease_ref:
+            input.verifiedIdentity.executionLease.executionLeaseRef,
+          workflow_ref: input.verifiedIdentity.executionLease.workflowRef,
+          action_authority_ref:
+            input.verifiedIdentity.executionLease.actionAuthorityRef,
+          participant_ref:
+            input.verifiedIdentity.executionLease.participantRef,
+          source_ref: input.verifiedIdentity.executionLease.sourceRef,
+          lease_expires_at:
+            input.verifiedIdentity.executionLease.leaseExpiresAt,
+          verification_ref:
+            input.verifiedIdentity.executionLease.verificationRef,
+        } : null,
       blocker_summary: parsed.blocker_summary ?? null,
       observed_at: observedAt.toISOString(),
       heartbeat_expires_at: new Date(observedAt.getTime() + parsed.heartbeat_ttl_seconds * 1000).toISOString(),
@@ -178,13 +259,23 @@ export class HelixLocalSupervisorCoordinationStore {
 
   listPresence(): HelixLocalSupervisorPresence[] {
     const nowMs = this.now().getTime();
-    return [...this.presence.values()].map((entry) => publicPresence({
-      ...entry,
-      active: entry.active && Date.parse(entry.heartbeat_expires_at) > nowMs,
-      resource_claims: entry.active && Date.parse(entry.heartbeat_expires_at) > nowMs
-        ? entry.resource_claims
-        : [],
-    })).sort((left, right) => left.client_session_ref.localeCompare(right.client_session_ref));
+    return [...this.presence.values()].map((entry) => {
+      const active = entry.active &&
+        Date.parse(entry.heartbeat_expires_at) > nowMs;
+      return publicPresence({
+        ...entry,
+        active,
+        resource_claims: active ? entry.resource_claims : [],
+        verified_room_identity: active ? entry.verified_room_identity : null,
+        verified_connector_identity:
+          active ? entry.verified_connector_identity : null,
+        verified_retained_runtime_identity:
+          active ? entry.verified_retained_runtime_identity : null,
+        verified_execution_lease_identity:
+          active ? entry.verified_execution_lease_identity : null,
+      });
+    }).sort((left, right) =>
+      left.client_session_ref.localeCompare(right.client_session_ref));
   }
 
   listRecommendations(): HelixLocalSupervisorRecommendation[] {
@@ -296,6 +387,10 @@ export class HelixLocalSupervisorCoordinationStore {
       ...entry,
       lifecycle_state: "disconnected",
       resource_claims: [],
+      verified_room_identity: null,
+      verified_connector_identity: null,
+      verified_retained_runtime_identity: null,
+      verified_execution_lease_identity: null,
       active: false,
       observed_at: now,
       heartbeat_expires_at: now,
@@ -353,7 +448,14 @@ export class HelixLocalSupervisorCoordinationStore {
     };
     this.relays.push(relay);
     this.relayKeys.set(dedupeKey, relay);
-    while (this.relays.length > 300) this.relays.shift();
+    while (this.relays.length > 300) {
+      const evicted = this.relays.shift();
+      if (evicted) {
+        this.relayKeys.delete(
+          `${evicted.sender_client_session_ref}\n${evicted.client_message_ref}`,
+        );
+      }
+    }
     return clone(relay);
   }
 

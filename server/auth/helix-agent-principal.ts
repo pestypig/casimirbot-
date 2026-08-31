@@ -1,10 +1,24 @@
 import crypto from "node:crypto";
 import type { Request } from "express";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
-import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import {
+  buildHelixAccountCapabilityPolicy,
+  buildHelixSharedRealtimeRoomsExperimentPolicy,
+} from "@shared/helix-account-session";
 import type { HelixAccountType } from "@shared/helix-account-session";
 import { HELIX_AGENT_RUN_DEVELOPER_SCOPE } from "@shared/contracts/helix-agent-api.v1";
+import {
+  HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+  HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+} from "@shared/contracts/helix-shared-live-room-agent.v1";
+import { DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER } from "@shared/desktop-mcp-tunnel";
 import { ensureDatabase, getPool } from "../db/client";
+import {
+  isDesktopSessionAuthorized,
+  resolveDesktopSessionConfig,
+} from "../security/desktop-session";
+import { getAccountSessionById } from
+  "../services/helix-account/account-session-store";
 import { HelixAgentApiServiceError } from "../services/helix-agent-api/errors";
 import type { HelixAgentApiPrincipal } from "../services/helix-agent-api/types";
 export { requireHelixAgentApiScope } from "./helix-agent-scope";
@@ -335,19 +349,25 @@ const developerWhitelist = (): ReadonlySet<string> =>
       .filter(Boolean),
   );
 
-const resolveAccountType = (input: {
+const isTrustedDeveloperProfile = (input: {
   row: AccountLinkRow;
   token: HelixAgentVerifiedToken;
-}): HelixAccountType => {
-  if (input.row.account_type !== "developer") return "user";
-  if (process.env.NODE_ENV !== "production") return "developer";
+}): boolean => {
+  if (input.row.account_type !== "developer") return false;
+  if (process.env.NODE_ENV !== "production") return true;
   const whitelist = developerWhitelist();
-  const admitted = [
+  return [
     input.row.profile_id,
     input.row.email,
     input.token.subject,
   ].some((value) => value && whitelist.has(value.toLowerCase()));
-  return admitted && input.token.scopes.has(HELIX_AGENT_RUN_DEVELOPER_SCOPE)
+};
+
+const resolveAccountType = (input: {
+  trustedDeveloperProfile: boolean;
+  token: HelixAgentVerifiedToken;
+}): HelixAccountType => {
+  return input.trustedDeveloperProfile && input.token.scopes.has(HELIX_AGENT_RUN_DEVELOPER_SCOPE)
     ? "developer"
     : "user";
 };
@@ -422,10 +442,19 @@ export const resolveHelixAgentApiPrincipal = async (
       "The verified OAuth subject is not explicitly bound to an active Helix account for this issuer and tenant.",
     );
   }
-  const accountType = resolveAccountType({ row: account, token });
-  const accountPolicy = buildHelixAccountCapabilityPolicy(accountType);
+  const trustedDeveloperProfile = isTrustedDeveloperProfile({ row: account, token });
+  const accountType = resolveAccountType({ trustedDeveloperProfile, token });
+  // An exact room OAuth capability is the admission boundary for the room
+  // experiment. Keep generic developer authority attenuated independently:
+  // enabling Shared Live Rooms here does not promote accountType or unlock any
+  // other developer feature.
+  const accountPolicy = token.scopes.has(HELIX_SHARED_LIVE_ROOM_READ_SCOPE) ||
+      token.scopes.has(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE)
+    ? buildHelixSharedRealtimeRoomsExperimentPolicy(accountType)
+    : buildHelixAccountCapabilityPolicy(accountType);
   const now = new Date().toISOString();
   const sessionId = sessionRef(token.issuer, token.subject, account.profile_id);
+  const clientRef = oauthClientRef(token.issuer, token.claims);
   const accountSession = {
     schema: "helix.account_session.v1" as const,
     session_id: sessionId,
@@ -459,7 +488,9 @@ export const resolveHelixAgentApiPrincipal = async (
     subjectId: token.subject,
     accountProfileId: account.profile_id,
     accountType,
-    oauthClientRef: oauthClientRef(token.issuer, token.claims),
+    trustedDeveloperProfile,
+    mcpClientRef: clientRef,
+    oauthClientRef: clientRef,
     scopes: token.scopes,
     tokenExpiresAt: token.expiresAt,
     accountContext: {
@@ -468,6 +499,83 @@ export const resolveHelixAgentApiPrincipal = async (
       trusted_account_session: true,
       account_session: accountSession,
       account_policy: accountPolicy,
+    },
+  };
+};
+
+const isLoopbackRequestHost = (host: string): boolean => {
+  try {
+    const hostname = new URL(`http://${host}`).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" ||
+      hostname === "[::1]";
+  } catch {
+    return false;
+  }
+};
+
+export const resolveHelixDesktopMcpPrincipal = async (
+  req: Request,
+  allowedScopes: readonly string[],
+): Promise<HelixAgentApiPrincipal> => {
+  const desktopSession = resolveDesktopSessionConfig(process.env);
+  const sessionId = normalize(
+    req.get(DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER),
+  );
+  if (
+    !desktopSession.enabled ||
+    !isLoopbackRequestHost(normalize(req.get("host"))) ||
+    !isDesktopSessionAuthorized(req.headers, desktopSession) ||
+    !/^account_session:[A-Za-z0-9-]{8,128}$/u.test(sessionId)
+  ) {
+    throw new HelixAgentApiServiceError(
+      401,
+      "unauthorized",
+      "A valid native desktop tunnel delegation is required.",
+    );
+  }
+  const session = await getAccountSessionById(sessionId);
+  if (!session || session.status !== "active") {
+    throw new HelixAgentApiServiceError(
+      401,
+      "unauthorized",
+      "The native desktop tunnel delegation is no longer active.",
+    );
+  }
+  const profileId = session.profile.profile_id;
+  const accountType = session.account_policy.account_type;
+  const desktopDeviceId = normalize(process.env.HELIX_DESKTOP_DEVICE_ID);
+  if (!/^desktop_device_[A-Za-z0-9_-]{22}$/u.test(desktopDeviceId)) {
+    throw new HelixAgentApiServiceError(
+      503,
+      "native_mcp_client_identity_unavailable",
+      "The native desktop MCP client identity is unavailable.",
+    );
+  }
+  const nativeMcpClientRef = `mcp_client:native_desktop:${crypto
+    .createHash("sha256")
+    .update(`${desktopDeviceId}\n${profileId}\n${session.session_id}`)
+    .digest("hex")}`;
+  return {
+    tenantId: `desktop:${crypto
+      .createHash("sha256")
+      .update(profileId)
+      .digest("hex")
+      .slice(0, 24)}`,
+    issuer: "urn:casimirbot:desktop-session",
+    subjectId: profileId,
+    accountProfileId: profileId,
+    accountType,
+    trustedDeveloperProfile: accountType === "developer",
+    mcpClientRef: nativeMcpClientRef,
+    oauthClientRef: null,
+    scopes: new Set(allowedScopes),
+    tokenExpiresAt: session.expires_at ?? null,
+    accountContext: {
+      session_id: session.session_id,
+      profile_id: profileId,
+      trusted_account_session: true,
+      account_session: session,
+      account_policy: session.account_policy,
     },
   };
 };

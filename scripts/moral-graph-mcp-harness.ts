@@ -27,13 +27,17 @@ try {
       options: {
         includeLocator: false,
         includeSharedAuthoritySocialRenewal: true,
+        includeMediationPacket: true,
         includeProceduralClassification: true,
       },
     },
   });
   if (result.isError) throw new Error("Moral Graph MCP harness returned an error result");
   const structuredContent = result.structuredContent as Record<string, unknown> | undefined;
-  process.stdout.write(`${JSON.stringify(structuredContent?.sharedAuthoritySocialRenewal, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({
+    sharedAuthoritySocialRenewal: structuredContent?.sharedAuthoritySocialRenewal,
+    moralReflectionMediation: structuredContent?.moralReflectionMediation,
+  }, null, 2)}\n`);
 } finally {
   await client.close();
   await server.close();

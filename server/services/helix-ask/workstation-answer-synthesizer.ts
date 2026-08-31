@@ -573,6 +573,12 @@ function synthesizeMoralGraphReflectionAnswer(input: SynthesizeWorkstationAnswer
     !Array.isArray(toolOutput.proceduralClassification)
       ? (toolOutput.proceduralClassification as Record<string, unknown>)
       : null;
+  const mediation =
+    toolOutput?.moralReflectionMediation &&
+    typeof toolOutput.moralReflectionMediation === "object" &&
+    !Array.isArray(toolOutput.moralReflectionMediation)
+      ? (toolOutput.moralReflectionMediation as Record<string, unknown>)
+      : null;
   const matches =
     reflection?.matches && typeof reflection.matches === "object" && !Array.isArray(reflection.matches)
       ? (reflection.matches as Record<string, unknown>)
@@ -607,6 +613,32 @@ function synthesizeMoralGraphReflectionAnswer(input: SynthesizeWorkstationAnswer
       : "Use this as diagnostic procedure evidence, not as a verdict.";
     return `- ${pattern} -> ${root} -> ${move}: ${explanation}`;
   });
+  const mediationLines = Array.isArray(mediation?.steps)
+    ? mediation.steps
+        .map((entry) => (entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null))
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+        .filter((entry) => entry.priority !== "available")
+        .slice(0, 6)
+        .map((entry) => {
+          const id = String(entry.id ?? "mediation question").replace(/_/g, " ");
+          const priority = entry.priority === "primary" ? "primary" : "supporting";
+          const question = typeof entry.question === "string" && entry.question.trim()
+            ? entry.question.trim()
+            : "What evidence is still needed before strengthening this interpretation?";
+          return `- ${priority} — ${id}: ${question}`;
+        })
+    : [];
+  const objectiveSources = Array.isArray(mediation?.objectiveSourceOptions)
+    ? mediation.objectiveSourceOptions.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+  const evidenceOrderBoundary = mediation?.evidenceOrderBoundary &&
+    typeof mediation.evidenceOrderBoundary === "object" &&
+    !Array.isArray(mediation.evidenceOrderBoundary)
+      ? mediation.evidenceOrderBoundary as Record<string, unknown>
+      : null;
+  const evidenceOrderLine = evidenceOrderBoundary
+    ? `Evidence order: ${String(evidenceOrderBoundary.kind ?? "moral_scenario_ready").replace(/_/g, " ")} — ${String(evidenceOrderBoundary.reason ?? "preserve evidence boundaries before strengthening the claim")}`
+    : "Evidence order: establish scenario observations before strengthening the moral claim.";
   const recommendedProceduralMoves = Array.isArray(proceduralClassification?.recommendedNextMoves)
     ? proceduralClassification.recommendedNextMoves
         .map((entry) => (entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null))
@@ -680,6 +712,16 @@ function synthesizeMoralGraphReflectionAnswer(input: SynthesizeWorkstationAnswer
     proceduralLines.length > 0
       ? ["Procedural classification:", ...proceduralLines].join("\n")
       : "Procedural classification: no procedural classification receipt was exposed, so the safe posture is to ask for concrete observations and preserve uncertainty.",
+    evidenceOrderLine,
+    mediationLines.length > 0
+      ? [
+          "Mediation questions for the reasoning step:",
+          ...mediationLines,
+          objectiveSources.length
+            ? `Objective attribution remains unresolved; test ${objectiveSources.join(", ")}.`
+            : "Objective attribution remains unresolved until its personal, role, and institutional sources are evidenced.",
+        ].join("\n")
+      : "Mediation questions: distinguish observations from inference, personal purpose from institutional incentive, and accountability from permanent identity judgment.",
     appliedLines.length > 0
       ? ["Applied to the prompt:", ...appliedLines].join("\n")
       : "Applied to the prompt: use the graph receipt as evidence for a careful next question, not as a final moral classification.",

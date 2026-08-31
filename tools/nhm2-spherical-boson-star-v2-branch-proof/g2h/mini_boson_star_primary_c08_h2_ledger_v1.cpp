@@ -284,7 +284,8 @@ Context::~Context() = default;
 namespace {
 
 bool extend_impl(const Input &input, Context::Impl &impl, Result *result,
-                 bool initializing) {
+                 bool initializing, ParentDiagnostics *diagnostics) {
+    if (diagnostics != nullptr) *diagnostics = ParentDiagnostics{};
     std::array<const finite::TaggedLedgerView *, kScalarStateCount> scalar{};
     if (!valid_inventory(input, &scalar)
         || (!initializing && (input.scalar_ledger_identities != impl.scalar_ids
@@ -347,9 +348,22 @@ bool extend_impl(const Input &input, Context::Impl &impl, Result *result,
         selector::Result selector_result{};
         ++result->selector_calls;
         result->selector_thread_count = kSelectorThreadCount;
-        const bool selector_passed = selector::evaluate_prepared_parallel(
-            selector_input, kSelectorThreadCount, &selector_output,
-            &selector_result);
+        selector::WidthDiagnostics selector_diagnostics;
+        const bool selector_passed = diagnostics == nullptr
+            ? selector::evaluate_prepared_parallel(
+                selector_input, kSelectorThreadCount, &selector_output,
+                &selector_result)
+            : selector::evaluate_prepared_parallel_diagnostic(
+                selector_input, kSelectorThreadCount, &selector_output,
+                &selector_result, &selector_diagnostics);
+        if (diagnostics != nullptr) {
+            diagnostics->present = true;
+            diagnostics->source_ordinal = ordinal;
+            diagnostics->selector_call_ordinal = result->selector_calls;
+            diagnostics->selector_passed = selector_passed;
+            diagnostics->selector_detail = selector_result.detail;
+            diagnostics->width = std::move(selector_diagnostics);
+        }
         result->selector_refinement_candidates_visited +=
             selector_result.refinement_candidates_visited;
         result->selector_subpanels_accumulated +=
@@ -454,7 +468,7 @@ bool initialize(const Input &input, Context *context, Result *result) {
     }
     for (std::size_t jet = 0U; jet < kJetCount; ++jet)
         arb_set(impl.b_at_zero.data() + jet, origin_b.coefficients + jet);
-    if (!extend_impl(input, impl, result, true)) return false;
+    if (!extend_impl(input, impl, result, true, nullptr)) return false;
     impl.initialized = true;
     return true;
 }
@@ -466,7 +480,321 @@ bool extend(const Input &input, Context *context, Result *result) {
         result->detail = FailureDetail::input_or_output;
         return false;
     }
-    return extend_impl(input, *context->impl_, result, false);
+    return extend_impl(input, *context->impl_, result, false, nullptr);
+}
+
+bool initialize_diagnostic(const Input &input, Context *context,
+                           Result *result, ParentDiagnostics *diagnostics) {
+    if (result == nullptr) return false;
+    *result = Result{};
+    if (diagnostics == nullptr || context == nullptr
+        || context->impl_->initialized) {
+        result->detail = FailureDetail::input_or_output;
+        return false;
+    }
+    *diagnostics = ParentDiagnostics{};
+    std::array<const finite::TaggedLedgerView *, kScalarStateCount> scalar{};
+    if (!valid_inventory(input, &scalar)) {
+        result->detail = FailureDetail::scalar_inventory_or_prefix;
+        return false;
+    }
+    const auto *b = scalar[0];
+    auto &impl = *context->impl_;
+    impl.scalar_ids = input.scalar_ledger_identities;
+    impl.h2_id = input.h2_ledger_identity;
+    const ledger::ModelView &origin_b = b->ledger.models[0];
+    if (origin_b.kind != ledger::ModelKind::origin
+        || origin_b.order > ledger::kMaximumOriginOrder
+        || origin_b.coefficient_count < kJetCount) {
+        result->detail = FailureDetail::scalar_inventory_or_prefix;
+        return false;
+    }
+    for (std::size_t jet = 0U; jet < kJetCount; ++jet)
+        arb_set(impl.b_at_zero.data() + jet, origin_b.coefficients + jet);
+    if (!extend_impl(input, impl, result, true, diagnostics)) return false;
+    impl.initialized = true;
+    return true;
+}
+
+bool extend_diagnostic(const Input &input, Context *context, Result *result,
+                       ParentDiagnostics *diagnostics) {
+    if (result == nullptr) return false;
+    *result = Result{};
+    if (diagnostics == nullptr || context == nullptr
+        || !context->impl_->initialized) {
+        result->detail = FailureDetail::input_or_output;
+        return false;
+    }
+    return extend_impl(input, *context->impl_, result, false, diagnostics);
+}
+
+bool diagnose_next_selector_candidate(
+    const Input &input, const Context *context, std::size_t panel_count,
+    std::size_t thread_count, unsigned target_degree, std::size_t target_jet,
+    selector::Output *output, selector::Result *result,
+    selector::CoefficientDecompositionObservation *observation) {
+    if (result == nullptr) return false;
+    *result = selector::Result{};
+    if (context == nullptr || output == nullptr || observation == nullptr
+        || !context->impl_->initialized || context->impl_->terminal_failure) {
+        return false;
+    }
+    const auto &impl = *context->impl_;
+    std::array<const finite::TaggedLedgerView *, kScalarStateCount> scalar{};
+    if (!valid_inventory(input, &scalar)
+        || input.scalar_ledger_identities != impl.scalar_ids
+        || input.h2_ledger_identity != impl.h2_id) return false;
+    const auto *b = scalar[0];
+    const auto *v = scalar[1];
+    if (b->ledger.model_count != impl.models.size() + 1U) return false;
+    for (std::size_t state = 1U; state < kScalarStateCount; ++state) {
+        if (scalar[state]->ledger.model_count != b->ledger.model_count)
+            return false;
+    }
+    for (std::size_t ordinal = 0U; ordinal < impl.models.size(); ++ordinal) {
+        for (std::size_t state = 0U; state < kScalarStateCount; ++state) {
+            std::string digest;
+            if (!model_digest(scalar[state]->ledger.models[ordinal], &digest)
+                || digest != impl.scalar_source_digests[state][ordinal]) {
+                return false;
+            }
+        }
+    }
+    const std::size_t ordinal = impl.models.size();
+    const ledger::ModelView &target = b->ledger.models[ordinal];
+    const ledger::LedgerView b_prefix{ordinal + 1U, b->ledger.models};
+    const ledger::LedgerView v_prefix{ordinal + 1U, v->ledger.models};
+    const selector::Input selector_input{b_prefix, v_prefix,
+        target.left_endpoint, target.right_endpoint, target.order,
+        kJetCount, impl.b_at_zero.data()};
+    return selector::evaluate_prepared_candidate_decomposition(
+        selector_input, panel_count, thread_count, target_degree, target_jet,
+        output, result, observation);
+}
+
+bool diagnose_next_selector_candidate_observable(
+    const Input &input, const Context *context, std::size_t panel_count,
+    std::size_t thread_count, unsigned target_degree, std::size_t target_jet,
+    selector::Output *output, selector::Result *result,
+    selector::CoefficientDecompositionObservation *observation,
+    selector::CandidateProgressObserver progress, void *progress_context) {
+    if (result == nullptr) return false;
+    *result = selector::Result{};
+    if (context == nullptr || output == nullptr || observation == nullptr
+        || progress == nullptr || !context->impl_->initialized
+        || context->impl_->terminal_failure) {
+        return false;
+    }
+    const auto &impl = *context->impl_;
+    std::array<const finite::TaggedLedgerView *, kScalarStateCount> scalar{};
+    if (!valid_inventory(input, &scalar)
+        || input.scalar_ledger_identities != impl.scalar_ids
+        || input.h2_ledger_identity != impl.h2_id) return false;
+    const auto *b = scalar[0];
+    const auto *v = scalar[1];
+    if (b->ledger.model_count != impl.models.size() + 1U) return false;
+    for (std::size_t state = 1U; state < kScalarStateCount; ++state) {
+        if (scalar[state]->ledger.model_count != b->ledger.model_count)
+            return false;
+    }
+    for (std::size_t ordinal = 0U; ordinal < impl.models.size(); ++ordinal) {
+        for (std::size_t state = 0U; state < kScalarStateCount; ++state) {
+            std::string digest;
+            if (!model_digest(scalar[state]->ledger.models[ordinal], &digest)
+                || digest != impl.scalar_source_digests[state][ordinal]) {
+                return false;
+            }
+        }
+    }
+    const std::size_t ordinal = impl.models.size();
+    const ledger::ModelView &target = b->ledger.models[ordinal];
+    const ledger::LedgerView b_prefix{ordinal + 1U, b->ledger.models};
+    const ledger::LedgerView v_prefix{ordinal + 1U, v->ledger.models};
+    const selector::Input selector_input{b_prefix, v_prefix,
+        target.left_endpoint, target.right_endpoint, target.order,
+        kJetCount, impl.b_at_zero.data()};
+    return selector::evaluate_prepared_candidate_decomposition_observable(
+        selector_input, panel_count, thread_count, target_degree, target_jet,
+        output, result, observation, progress, progress_context);
+}
+
+namespace {
+
+bool append_diagnostic(std::string *output, const std::string &value) {
+    if (output == nullptr
+        || output->size() + value.size() > kMaximumDiagnosticRecordBytes)
+        return false;
+    output->append(value);
+    return true;
+}
+
+bool append_json_string(std::string *output, const std::string &value) {
+    if (value.size() > kMaximumDiagnosticStringBytes
+        || !append_diagnostic(output, "\"")) return false;
+    constexpr char hex[] = "0123456789abcdef";
+    for (const unsigned char byte : value) {
+        if (byte == '"' || byte == '\\') {
+            std::string escaped{"\\"};
+            escaped.push_back(static_cast<char>(byte));
+            if (!append_diagnostic(output, escaped)) return false;
+        } else if (byte < 0x20U) {
+            std::string escaped = "\\u00";
+            escaped.push_back(hex[(byte >> 4U) & 0x0fU]);
+            escaped.push_back(hex[byte & 0x0fU]);
+            if (!append_diagnostic(output, escaped)) return false;
+        } else if (!append_diagnostic(
+                       output, std::string(1U, static_cast<char>(byte)))) {
+            return false;
+        }
+    }
+    return append_diagnostic(output, "\"");
+}
+
+const char *boolean_text(bool value) { return value ? "true" : "false"; }
+
+bool valid_observation(const selector::WidthObservation &observation,
+                       std::size_t expected_index) {
+    if (!observation.evaluated || observation.candidate_index != expected_index
+        || observation.panel_count != selector::kUPanelCandidates[expected_index]
+        || observation.width_checks == 0U
+        || observation.worst_kind == selector::WidthTermKind::none
+        || observation.worst_radius.empty()
+        || observation.worst_threshold.empty()
+        || observation.worst_ratio.empty()) return false;
+    if (!observation.passed
+        && (observation.first_failed_kind == selector::WidthTermKind::none
+            || observation.first_failed_radius.empty()
+            || observation.first_failed_threshold.empty()
+            || observation.first_failed_ratio.empty())) return false;
+    const std::array<const std::string *, 6U> strings = {
+        &observation.first_failed_radius,
+        &observation.first_failed_threshold,
+        &observation.first_failed_ratio,
+        &observation.worst_radius,
+        &observation.worst_threshold,
+        &observation.worst_ratio,
+    };
+    for (const auto *value : strings)
+        if (value->size() > kMaximumDiagnosticStringBytes) return false;
+    return true;
+}
+
+bool append_observation(std::string *output,
+                        const selector::WidthObservation &observation) {
+    return append_diagnostic(output, "{\"candidate_index\":")
+        && append_diagnostic(output,
+                             std::to_string(observation.candidate_index))
+        && append_diagnostic(output, ",\"first_failed_degree\":")
+        && append_diagnostic(output,
+                             std::to_string(observation.first_failed_degree))
+        && append_diagnostic(output, ",\"first_failed_jet\":")
+        && append_diagnostic(output,
+                             std::to_string(observation.first_failed_jet))
+        && append_diagnostic(output, ",\"first_failed_kind\":")
+        && append_json_string(
+            output, selector::width_term_kind_name(
+                        observation.first_failed_kind))
+        && append_diagnostic(output, ",\"first_failed_radius\":")
+        && append_json_string(output, observation.first_failed_radius)
+        && append_diagnostic(output, ",\"first_failed_ratio\":")
+        && append_json_string(output, observation.first_failed_ratio)
+        && append_diagnostic(output, ",\"first_failed_threshold\":")
+        && append_json_string(output, observation.first_failed_threshold)
+        && append_diagnostic(output, ",\"panel_count\":")
+        && append_diagnostic(output, std::to_string(observation.panel_count))
+        && append_diagnostic(output, ",\"passed\":")
+        && append_diagnostic(output, boolean_text(observation.passed))
+        && append_diagnostic(output, ",\"width_checks\":")
+        && append_diagnostic(output, std::to_string(observation.width_checks))
+        && append_diagnostic(output, ",\"worst_degree\":")
+        && append_diagnostic(output, std::to_string(observation.worst_degree))
+        && append_diagnostic(output, ",\"worst_jet\":")
+        && append_diagnostic(output, std::to_string(observation.worst_jet))
+        && append_diagnostic(output, ",\"worst_kind\":")
+        && append_json_string(
+            output, selector::width_term_kind_name(observation.worst_kind))
+        && append_diagnostic(output, ",\"worst_radius\":")
+        && append_json_string(output, observation.worst_radius)
+        && append_diagnostic(output, ",\"worst_ratio\":")
+        && append_json_string(output, observation.worst_ratio)
+        && append_diagnostic(output, ",\"worst_ratio_exceeds_one\":")
+        && append_diagnostic(
+            output, boolean_text(observation.worst_ratio_exceeds_one))
+        && append_diagnostic(output, ",\"worst_threshold\":")
+        && append_json_string(output, observation.worst_threshold)
+        && append_diagnostic(output, "}");
+}
+
+}  // namespace
+
+bool serialize_diagnostics(const ParentDiagnostics &diagnostics,
+                           std::string *canonical) {
+    if (canonical == nullptr || !diagnostics.present
+        || !diagnostics.observation_only
+        || !diagnostics.parent_decision_unchanged
+        || !diagnostics.persistence_bounded
+        || diagnostics.selector_call_ordinal == 0U
+        || diagnostics.width.observations == 0U
+        || diagnostics.width.observations > selector::kUPanelCandidateCount
+        || !diagnostics.width.observation_only
+        || !diagnostics.width.fixed_candidate_schedule
+        || !diagnostics.width.thresholds_unchanged
+        || !diagnostics.width.reduction_order_unchanged) return false;
+    for (std::size_t index = 0U;
+         index < diagnostics.width.observations; ++index)
+        if (!valid_observation(diagnostics.width.candidates[index], index))
+            return false;
+    const auto &last = diagnostics.width.candidates[
+        diagnostics.width.observations - 1U];
+    if (diagnostics.selector_passed != last.passed
+        || (diagnostics.selector_passed
+            && (diagnostics.selector_detail != selector::FailureDetail::none
+                || diagnostics.width.all_observed_candidates_failed))
+        || (!diagnostics.selector_passed
+            && diagnostics.selector_detail
+                == selector::FailureDetail::volterra_convolution_or_u_refinement_exhaustion
+            && !diagnostics.width.all_observed_candidates_failed)) return false;
+    std::string output;
+    output.reserve(16384U);
+    if (!append_diagnostic(&output,
+            "{\"all_observed_candidates_failed\":")
+        || !append_diagnostic(
+            &output,
+            boolean_text(diagnostics.width.all_observed_candidates_failed))
+        || !append_diagnostic(&output, ",\"fixed_candidate_schedule\":true")
+        || !append_diagnostic(&output, ",\"observation_only\":true")
+        || !append_diagnostic(&output, ",\"observations\":[")) return false;
+    for (std::size_t index = 0U;
+         index < diagnostics.width.observations; ++index) {
+        if (index != 0U && !append_diagnostic(&output, ",")) return false;
+        if (!append_observation(&output,
+                                diagnostics.width.candidates[index]))
+            return false;
+    }
+    if (!append_diagnostic(&output,
+            "],\"parent_decision_unchanged\":true,"
+            "\"persistence_bounded\":true,"
+            "\"reduction_order_unchanged\":true,\"schema\":")
+        || !append_json_string(
+            &output, "nhm2.g2h_e_s5.c08_h2_p8b_parent_diagnostic.v1")
+        || !append_diagnostic(&output, ",\"selector_call_ordinal\":")
+        || !append_diagnostic(
+            &output, std::to_string(diagnostics.selector_call_ordinal))
+        || !append_diagnostic(&output, ",\"selector_detail\":")
+        || !append_json_string(
+            &output, selector::failure_detail_name(
+                         diagnostics.selector_detail))
+        || !append_diagnostic(&output, ",\"selector_passed\":")
+        || !append_diagnostic(&output,
+                              boolean_text(diagnostics.selector_passed))
+        || !append_diagnostic(&output, ",\"source_ordinal\":")
+        || !append_diagnostic(&output,
+                              std::to_string(diagnostics.source_ordinal))
+        || !append_diagnostic(&output, ",\"thresholds_unchanged\":true}"))
+        return false;
+    if (output.size() > kMaximumDiagnosticRecordBytes) return false;
+    *canonical = std::move(output);
+    return true;
 }
 
 ledger::LedgerView published(const Context &context) {

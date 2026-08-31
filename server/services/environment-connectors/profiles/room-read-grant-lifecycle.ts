@@ -23,6 +23,7 @@ export type RoomReadGrantErrorCode =
   | "room_read_connection_not_found"
   | "room_read_connection_inactive"
   | "room_read_connection_node_mismatch"
+  | "room_read_connection_identity_mismatch"
   | "room_read_grant_not_found"
   | "room_read_grant_wrong_room"
   | "room_read_grant_inactive"
@@ -145,6 +146,44 @@ export class RoomReadGrantLifecycle {
       updated_at: connection.updatedAt,
       ...HELIX_ROOM_CAPABILITY_NON_AUTHORITATIVE_FIELDS,
     });
+  }
+
+  /**
+   * Applies a server-owned lifecycle transition to one exact connection. The
+   * owner/node/source identity is immutable, so a health, epoch, rotation, or
+   * recovery change cannot drift onto a similarly named connection.
+   */
+  transitionConnection(input: {
+    connectionRef: string;
+    ownerProfileRef: string;
+    installedNodeRef: string;
+    expectedProducerEpochRef: string;
+    next: Pick<TrustedProfileConnection,
+      "producerEpochRef" | "status" | "policyRevision" | "updatedAt">;
+  }): HelixProfileEnvironmentConnectionRef {
+    const current = this.connections.get(input.connectionRef);
+    if (!current) fail("room_read_connection_not_found", "Connection was not found.");
+    if (
+      current.ownerProfileRef !== input.ownerProfileRef ||
+      current.installedNodeRef !== input.installedNodeRef ||
+      current.producerEpochRef !== input.expectedProducerEpochRef
+    ) {
+      fail(
+        "room_read_connection_identity_mismatch",
+        "Connection lifecycle identity did not match the current connection.",
+      );
+    }
+    if (input.next.policyRevision < current.policyRevision) {
+      fail(
+        "room_read_connection_identity_mismatch",
+        "Connection policy revision cannot move backward.",
+      );
+    }
+    this.connections.set(current.connectionRef, {
+      ...current,
+      ...input.next,
+    });
+    return this.projectConnection(current.connectionRef);
   }
 
   createGrant(input: {

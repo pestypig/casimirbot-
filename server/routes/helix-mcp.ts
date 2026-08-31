@@ -10,6 +10,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import {
   DefaultHelixAgentAccessTokenVerifier,
   resolveHelixAgentApiPrincipal,
+  resolveHelixDesktopMcpPrincipal,
   type HelixAgentAccessTokenVerifier,
 } from "../auth/helix-agent-principal";
 import { createHelixMcpServer } from "../mcp/helix-mcp-server";
@@ -19,6 +20,14 @@ import { sharedLiveRoomAgentApiService } from "../services/shared-live-room-cont
 import type { HelixAgentApiPrincipal } from "../services/helix-agent-api/types";
 import type { HelixLocalSupervisorCoordinationStore } from
   "../services/local-supervisor/local-supervisor-coordination";
+import type { DesktopMcpTunnelTransitionStore } from
+  "../services/local-supervisor/desktop-mcp-tunnel-transition-store";
+import type { DesktopMcpTunnelTransitionExecutor } from
+  "../mcp/helix-mcp-server";
+import { DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER } from
+  "@shared/desktop-mcp-tunnel";
+import { CASIMIR_DESKTOP_SESSION_HEADER } from
+  "../security/desktop-session";
 import {
   containsSharedLiveRoomSensitiveText,
   containsSharedLiveRoomSensitiveValue,
@@ -37,17 +46,26 @@ export type HelixMcpServerFactory = (input: {
   principal: HelixAgentApiPrincipal;
   service: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
+  desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
 }) => McpServer;
 
 type McpRouterDependencies = {
   service?: HelixAgentApiService;
   createServer?: HelixMcpServerFactory;
   authenticate?: (req: Request) => Promise<HelixAgentApiPrincipal>;
+  authenticateDesktop?: (
+    req: Request,
+    allowedScopes: readonly string[],
+  ) => Promise<HelixAgentApiPrincipal>;
   verifier?: HelixAgentAccessTokenVerifier;
   rateLimit?: boolean;
   enforceTransportSecurity?: boolean;
   resourceMetadataPath?: string;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
+  desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
+  desktopDelegationScopes?: readonly string[];
 };
 
 const MCP_RESOURCE_METADATA_PATH =
@@ -117,9 +135,28 @@ export const createHelixMcpRouter = (
   const createServer = dependencies.createServer ?? createHelixMcpServer;
   const verifier =
     dependencies.verifier ?? new DefaultHelixAgentAccessTokenVerifier();
-  const authenticate =
-    dependencies.authenticate ??
-    ((req: Request) => resolveHelixAgentApiPrincipal(req, verifier));
+  const authenticate = dependencies.authenticate ?? (async (req: Request) => {
+    const nativeDesktopHeadersPresent = Boolean(
+      (req.get(CASIMIR_DESKTOP_SESSION_HEADER) ?? "").trim() ||
+      (req.get(DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER) ?? "").trim(),
+    );
+    if (
+      (!(req.get("authorization") ?? "").trim() ||
+        nativeDesktopHeadersPresent) &&
+      dependencies.desktopDelegationScopes?.length
+    ) {
+      return dependencies.authenticateDesktop
+        ? dependencies.authenticateDesktop(
+            req,
+            dependencies.desktopDelegationScopes,
+          )
+        : resolveHelixDesktopMcpPrincipal(
+            req,
+            dependencies.desktopDelegationScopes,
+          );
+    }
+    return resolveHelixAgentApiPrincipal(req, verifier);
+  });
 
   if (dependencies.rateLimit !== false) {
     router.use(
@@ -179,7 +216,19 @@ export const createHelixMcpRouter = (
         locals.helixAgentPrincipal = principal;
         next();
       })
-      .catch(next);
+      .catch((error: unknown): void => {
+        const rawMessage = error instanceof Error ? error.message : "unknown";
+        const safeMessage = containsSharedLiveRoomSensitiveText(rawMessage)
+          ? "redacted"
+          : rawMessage.trim().slice(0, 240) || "unknown";
+        console.warn(
+          "[helix-mcp] authentication failed",
+          locals.helixAgentRequestId ?? "unknown_request",
+          error instanceof Error ? error.name : "unknown_error",
+          safeMessage,
+        );
+        next(error);
+      });
   });
   if (dependencies.rateLimit !== false) {
     router.use(
@@ -223,22 +272,53 @@ export const createHelixMcpRouter = (
         });
         return;
       }
-      const server = createServer({
-        principal,
-        service,
-        localSupervisorCoordinationStore:
-          dependencies.localSupervisorCoordinationStore,
-      });
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
+      const envelope = record(req.body);
+      if (envelope?.method === "server/discover") {
+        // The installed SDK currently serves the initialization-era MCP
+        // lifecycle. Newer clients probe the 2026-07-28 stateless lifecycle
+        // first and fall back only when an unsupported RPC is reported as a
+        // typed 404/-32601 response. Letting the older SDK see this method
+        // turns the compatibility probe into an incorrect HTTP 500.
+        const requestId =
+          typeof envelope.id === "string" || typeof envelope.id === "number"
+            ? envelope.id
+            : null;
+        res.status(404).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32601,
+            message: "Method not found",
+          },
+          id: requestId,
+        });
+        return;
+      }
+      let server: McpServer | null = null;
+      let transport: StreamableHTTPServerTransport | null = null;
       const close = (): void => {
-        void transport.close();
-        void server.close();
+        if (transport) void transport.close();
+        if (server) void server.close();
       };
       res.once("close", close);
       try {
+        // Keep server construction inside the guarded transport boundary. A
+        // surface-specific registration error must remain a typed MCP failure
+        // with a safe operational receipt instead of escaping to Express as an
+        // opaque 500.
+        server = createServer({
+          principal,
+          service,
+          localSupervisorCoordinationStore:
+            dependencies.localSupervisorCoordinationStore,
+          desktopMcpTunnelTransitionStore:
+            dependencies.desktopMcpTunnelTransitionStore,
+          desktopMcpTunnelTransitionExecutor:
+            dependencies.desktopMcpTunnelTransitionExecutor,
+        });
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
         await server.connect(transport);
         // Express globally gives Request.auth an application JWT shape, while
         // the MCP SDK reserves the same optional key for its AuthInfo shape.
@@ -251,8 +331,17 @@ export const createHelixMcpRouter = (
           res,
           req.body,
         );
-      } catch {
+      } catch (error) {
         close();
+        const rawMessage = error instanceof Error ? error.message : "unknown";
+        const safeMessage = containsSharedLiveRoomSensitiveText(rawMessage)
+          ? "redacted"
+          : rawMessage.trim().slice(0, 240) || "unknown";
+        console.warn(
+          "[helix-mcp] request failed",
+          (res.locals as McpLocals).helixAgentRequestId ?? "unknown_request",
+          safeMessage,
+        );
         if (!res.headersSent) {
           res.status(500).json({
             jsonrpc: "2.0",

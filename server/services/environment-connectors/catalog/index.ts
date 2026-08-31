@@ -1823,6 +1823,12 @@ const minecraftCombatGuardInputSchema: HelixEnvironmentConstrainedJsonSchema = {
       minItems: 1,
       maxItems: 16,
     },
+    combat_mode: {
+      type: "string",
+      enum: ["engage", "disengage_to_distance"],
+      description:
+        "engage permits admitted hostile attacks. disengage_to_distance suppresses attacks and succeeds only after every visible eligible hostile is at least retreat_stop_distance away.",
+    },
     max_acquisition_distance: { type: "number", minimum: 2, maximum: 32 },
     require_line_of_sight: { type: "boolean", enum: [true] },
     minimum_attack_cooldown: { type: "number", minimum: 0.1, maximum: 1 },
@@ -2056,7 +2062,7 @@ const minecraftCraftInputSchema: HelixEnvironmentConstrainedJsonSchema = {
       minLength: 3,
       maxLength: 320,
       description:
-        "Optional exact recipe resource key. Use null to allow the client to select a known craftable recipe by output.",
+        "Optional exact recipe resource key. Omit it to allow the client to select a known craftable recipe by output.",
     },
   },
   required: ["action_kind", "output_item_id", "count"],
@@ -2705,6 +2711,7 @@ const minecraftFluidEmbeddedActionInputSchema: HelixEnvironmentConstrainedJsonSc
         },
         ["action_kind", "output_item_id", "count"],
       ),
+      minecraftConsumeInputSchema,
       exactObjectSchema(
         {
           action_kind: literalStringSchema("inventory_transfer"),
@@ -2718,6 +2725,18 @@ const minecraftFluidEmbeddedActionInputSchema: HelixEnvironmentConstrainedJsonSc
         },
         ["action_kind", "direction", "item_id", "count", "container_target"],
       ),
+    ],
+  };
+
+const minecraftReactiveEmbeddedActionInputSchema: HelixEnvironmentConstrainedJsonSchema =
+  {
+    ...minecraftFluidEmbeddedActionInputSchema,
+    description:
+      "One exact typed Player Embodiment action selected by action_kind. Reactive programs additionally admit bounded hostile-only attack and combat-guard actions when mutation_scope.combat_allowed is true; programs cannot nest other programs.",
+    oneOf: [
+      ...(minecraftFluidEmbeddedActionInputSchema.oneOf ?? []),
+      minecraftCombatAttackInputSchema,
+      minecraftCombatGuardInputSchema,
     ],
   };
 
@@ -2978,7 +2997,7 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
               additionalProperties: false,
             },
           },
-          combat_allowed: { type: "boolean", enum: [false] },
+          combat_allowed: { type: "boolean" },
         },
         required: [
           "world_mutation_allowed",
@@ -3052,7 +3071,7 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
                         minimum: 1,
                         maximum: 36_000,
                       },
-                      action: minecraftFluidEmbeddedActionInputSchema,
+                      action: minecraftReactiveEmbeddedActionInputSchema,
                       on_success: {
                         type: "string",
                         minLength: 1,
@@ -3089,7 +3108,7 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
                         minimum: 0,
                         maximum: 36_000,
                       },
-                      action: minecraftFluidEmbeddedActionInputSchema,
+                      action: minecraftReactiveEmbeddedActionInputSchema,
                       max_iterations: {
                         type: "integer",
                         minimum: 1,
@@ -3138,7 +3157,7 @@ const minecraftReactiveProgramInputSchema: HelixEnvironmentConstrainedJsonSchema
                         minimum: 0,
                         maximum: 36_000,
                       },
-                      action: minecraftFluidEmbeddedActionInputSchema,
+                      action: minecraftReactiveEmbeddedActionInputSchema,
                       while_condition: minecraftFluidConditionInputSchema,
                       max_restarts: {
                         type: "integer",

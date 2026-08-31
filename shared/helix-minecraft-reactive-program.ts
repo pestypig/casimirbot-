@@ -57,6 +57,11 @@ const resourceSchema = z.enum(HELIX_MINECRAFT_REACTIVE_RESOURCES);
 
 const embeddedActionSchema = helixMinecraftPlayerActionArgumentsSchema;
 
+export const helixMinecraftReactiveMutationScopeSchema =
+  helixMinecraftFluidMutationScopeSchema.extend({
+    combat_allowed: z.boolean(),
+  });
+
 export const minecraftReactiveResourcesForAction = (
   action: HelixMinecraftPlayerActionArguments,
 ): readonly HelixMinecraftReactiveResource[] => {
@@ -71,6 +76,16 @@ export const minecraftReactiveResourcesForAction = (
       return ["locomotion"];
     case "interact":
       return [action.hand];
+    case "attack":
+      return ["camera", "main_hand"];
+    case "combat_guard":
+      return [
+        "camera",
+        "locomotion",
+        "main_hand",
+        "off_hand",
+        "native_workflow",
+      ];
     case "hotbar_select":
       return ["hotbar"];
     case "equip":
@@ -409,7 +424,7 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
         cancel_remaining_on_settle: z.literal(true),
       })
       .strict(),
-    mutation_scope: helixMinecraftFluidMutationScopeSchema,
+    mutation_scope: helixMinecraftReactiveMutationScopeSchema,
     lanes: z.array(laneSchema).min(1).max(8),
     races: z.array(raceSchema).max(8),
     interrupts: z.array(interruptSchema).max(16),
@@ -629,6 +644,18 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
           }
         }
         for (const action of nodeActions(node)) {
+          if (
+            (action.action_kind === "attack" ||
+              action.action_kind === "combat_guard") &&
+            !program.mutation_scope.combat_allowed
+          ) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["lanes", laneIndex, "nodes", nodeIndex, "action"],
+              message:
+                "Reactive combat actions require mutation_scope.combat_allowed=true.",
+            });
+          }
           if (
             action.action_kind === "follow" ||
             (action.action_kind === "look_at" &&

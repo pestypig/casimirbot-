@@ -4,6 +4,7 @@
 
 #include <arb.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -16,6 +17,7 @@ namespace ledger = primary_c08_convolution_ledger_v1;
 inline constexpr std::size_t kParameterCount = 3U;
 inline constexpr std::size_t kJetCount = 13U;
 inline constexpr std::size_t kElementaryConvolutions = 43U;
+inline constexpr std::size_t kSecondJetTermCount = 4U;
 
 constexpr std::size_t value_jet() { return 0U; }
 constexpr std::size_t first_jet(std::size_t a) { return 1U + a; }
@@ -86,6 +88,26 @@ struct Result {
     bool authority_promoted = false;
 };
 
+// H2-P8E observation-only decomposition of one retained coefficient in one
+// ordered second jet. The four balls retain the existing product-rule order
+// and are never consulted by the ordinary evaluation path.
+struct CoefficientDecomposition {
+    std::array<arb_struct, kSecondJetTermCount> terms{};
+    unsigned target_degree = 0U;
+    std::size_t target_jet = 0U;
+    std::size_t terms_recorded = 0U;
+    bool observation_only = true;
+
+    CoefficientDecomposition();
+    ~CoefficientDecomposition();
+    CoefficientDecomposition(const CoefficientDecomposition &) = delete;
+    CoefficientDecomposition &operator=(const CoefficientDecomposition &) =
+        delete;
+
+    arb_ptr term(std::size_t slot);
+    arb_srcptr term(std::size_t slot) const;
+};
+
 // Candidate-neutral C08-010c kernel. For each exact base/first/ordered-second
 // derivative-convolution term it invokes C08-010b, then adds only outward
 // nonnegative analytic, source-hull, affine-radius and discarded-polynomial
@@ -95,6 +117,13 @@ bool evaluate(const Input &input, Output *output, Result *result);
 // Additive H2-P2 path: prepares the unchanged beta moments once per subpanel
 // and reuses them across the frozen 43 elementary convolutions.
 bool evaluate_prepared(const Input &input, Output *output, Result *result);
+
+// Additive H2-P8E surface. It preserves evaluate_prepared arithmetic and
+// additionally copies the four ordered elementary contributions to one
+// requested degree/second-jet coefficient after each predecessor succeeds.
+bool evaluate_prepared_decomposed(
+    const Input &input, unsigned target_degree, std::size_t target_jet,
+    Output *output, Result *result, CoefficientDecomposition *decomposition);
 
 const char *failure_detail_name(FailureDetail detail);
 

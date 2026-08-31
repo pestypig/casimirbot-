@@ -147,6 +147,11 @@ export const buildSharedLiveRoomExternalError = (input: {
     message: normalized.message,
     request_id: input.requestId ?? null,
     retryable: normalized.retryable,
+    content_role: "room_control_error_not_assistant_answer" as const,
+    reentry_required: true as const,
+    answer_authority: false as const,
+    assistant_answer: false as const,
+    terminal_eligible: false as const,
     ...(normalized.details ? { details: normalized.details } : {}),
   } satisfies HelixSharedLiveRoomError;
   return {

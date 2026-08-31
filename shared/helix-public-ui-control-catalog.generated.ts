@@ -935,18 +935,20 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "blocked_pending_contract"
   },
   {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-runtime-panel.void-controller-take-floor",
+    "control_id": "helix.ask.shared_live_room.shared-live-room-runtime-panel.take-speaking-floor",
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
     "interaction_kind": "configure",
-    "authority_state": "blocked_pending_contract"
+    "authority_state": "route_owned",
+    "route_contract_id": "room.floor.acquire"
   },
   {
     "control_id": "helix.ask.shared_live_room.shared-live-room-runtime-panel.release-speaking-floor",
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
     "interaction_kind": "configure",
-    "authority_state": "blocked_pending_contract"
+    "authority_state": "route_owned",
+    "route_contract_id": "room.floor.release"
   },
   {
     "control_id": "helix.ask.shared_live_room.open_existing_room",

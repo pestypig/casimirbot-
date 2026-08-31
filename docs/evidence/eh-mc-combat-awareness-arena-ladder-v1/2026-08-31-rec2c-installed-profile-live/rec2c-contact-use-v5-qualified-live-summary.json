@@ -1,0 +1,85 @@
+{
+  "schema": "casimirbot.minecraft_rec2c_contact_use_live_summary.v1",
+  "fixture_id": "fixture:combat-rec2c-staggered-pressure-v5",
+  "program_id": "program:combat-pressure-commit-rec2c-v1",
+  "workflow_ref": "environment_action_workflow:d5e7c345-ffd5-46e9-8162-0e2b50331f60",
+  "action_evidence_ref": "environment_action_evidence:cfcde061d45c2fd0ec5944448e52b536754033498",
+  "classification": "qualified_single_contact_use_reengagement_trial_not_rec2c_breakpoint_acceptance",
+  "timeline": {
+    "workflow_admission_confirmed_at": "2026-08-31T05:55:02.323Z",
+    "fixture_released_at": "2026-08-31T05:55:02.330Z",
+    "containment_triggered_at": "2026-08-31T05:55:07.873Z",
+    "fixture_cleaned_at": "2026-08-31T05:55:07.875Z"
+  },
+  "controller_result": {
+    "outcome": "succeeded",
+    "reason_code": "reactive_program_interrupted",
+    "duration_ticks": 118,
+    "interrupt_count": 1,
+    "executed_action_count": 3,
+    "inventory_mutations_performed": 2,
+    "consumed_item_count": 1,
+    "controls_released": true,
+    "node_outcomes": {
+      "node:consume-survival-item": "succeeded",
+      "node:reequip-weapon": "succeeded",
+      "node:resume-fight": "succeeded",
+      "node:pressure-commit-succeeded": "succeeded",
+      "node:opening-fight": "canceled"
+    },
+    "consume_measurement": {
+      "item": "minecraft:golden_apple",
+      "use_ticks": 31,
+      "health_before": 14,
+      "minimum_health_during_use": 11,
+      "health_after": 11,
+      "observed_health_loss_during_use": 3,
+      "health_loss_event_count_during_use": 1
+    },
+    "combat_measurement": {
+      "attack_pulses": 8,
+      "eligible_hostile_count_at_settle": 0,
+      "outcome": "succeeded"
+    }
+  },
+  "post_trial_observation": {
+    "actor_evidence_ref": "environment_probe_evidence:54b42a13d1c0b55b0e8ee9f77e9aefa497202084",
+    "perception_evidence_ref": "environment_probe_evidence:2a1d1893aefe5a9e2bbd23251da8452c3002a8db",
+    "observed_at": "2026-08-31T05:55:58.207Z",
+    "health": 15,
+    "max_health": 20,
+    "hostile_entity_count": 0,
+    "inventory": [
+      { "slot": 0, "item": "minecraft:iron_sword", "count": 1 },
+      { "slot": 1, "item": "minecraft:golden_apple", "count": 1 },
+      { "slot": 2, "item": "minecraft:rotten_flesh", "count": 4 }
+    ],
+    "semantic_fingerprint": "sha256:7c0dabda9c186c6260f1a01c07700d6485dab30dfc09fd59a686e49ce8fc810a"
+  },
+  "restored_baseline": {
+    "health": 20,
+    "max_health": 20,
+    "food_level": 20,
+    "hostile_entity_count": 0,
+    "difficulty": "normal",
+    "natural_regeneration": true,
+    "screenshot": "minecraft-rec2c-v5-restored-baseline.png",
+    "screenshot_sha256": "8873023C967D5407233FD6603764027DAFB8ED9DE0A91781652D53926C07ACAE"
+  },
+  "claims": {
+    "positive_admission_gated_release_proven": true,
+    "consumption_during_measured_contact_damage_proven": true,
+    "reequip_proven": true,
+    "reengagement_and_hostile_clear_proven": true,
+    "workflow_inactive_containment_proven": true,
+    "single_trial_sequence_proven": true,
+    "stew_crafting_proven": false,
+    "repeated_breakpoint_proven": false,
+    "skilled_player_comparison_proven": false
+  },
+  "credential_included": false,
+  "raw_rcon_command_included": false,
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

@@ -82,7 +82,9 @@ final class PlayerActionHttpClient implements AutoCloseable {
     }
 
     private URI endpoint(String suffix) {
-        String value = config.endpoint().replaceAll("/+$", "") + suffix;
+        String value = InstalledDesktopServiceEndpointResolver.resolve(
+            config.endpoint().replaceAll("/+$", "") + suffix
+        );
         if (!HelixSensorConfig.secureEndpointAllowed(value)) {
             throw new IllegalArgumentException("Player-action endpoint must use HTTPS or loopback HTTP.");
         }

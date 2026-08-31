@@ -20,6 +20,8 @@ import {
 } from "../../helix-ask/realtime-room/room-store/database";
 import type { Queryable } from "../../helix-ask/realtime-room/room-store/types";
 import { resolveEnvironmentActionAdapterProfile } from "../../situation-room/environment-action-adapter-registry";
+import { requestDesktopMcpTunnelReadOnlyForSafety } from
+  "../../local-supervisor/desktop-mcp-tunnel-safety";
 
 export type EnvironmentActionAuthorityErrorCode =
   | "action_authority_forbidden"
@@ -1040,7 +1042,7 @@ export const emergencyStopEnvironmentActionAuthority = async (input: {
     roomId: input.roomId,
     profileId: input.profileId,
   });
-  return withSharedRealtimeRoomTransaction(async (db) => {
+  const stopped = await withSharedRealtimeRoomTransaction(async (db) => {
     await readEnvironment(db, input.roomId, input.environmentBindingId, true);
     const selected = await db.query<AuthorityRow>(
       `SELECT * FROM helix_environment_action_authorities
@@ -1123,4 +1125,8 @@ export const emergencyStopEnvironmentActionAuthority = async (input: {
       controlRequest,
     };
   });
+  void requestDesktopMcpTunnelReadOnlyForSafety(
+    "environment_emergency_stop",
+  ).catch(() => false);
+  return stopped;
 };

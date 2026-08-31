@@ -1,0 +1,100 @@
+{
+  "schema": "helix.shared_room_multi_host.m3_native_node_preflight.v1",
+  "captured_at": "2026-08-29T19:09:03.9035363Z",
+  "program_gate": "G8",
+  "workstream": "M3 live cross-host evidence synthesis",
+  "capability_or_component": "EH-G8 Shared Room Multi-Host Capability Federation v1 / M3 native node A",
+  "lifecycle_stage": "admission",
+  "reaction_timescale": "none",
+  "authority_owner": {
+    "installed_node_access": "authenticated node owner",
+    "room_and_evidence_admission": "Helix",
+    "interpretation_and_terminal_synthesis": "Runtime Codex"
+  },
+  "current_maturity": "deterministically verified",
+  "target_maturity": "live accepted",
+  "required_evidence": [
+    "a second separately owned native installed node",
+    "one fresh installed-node-bound read-only connector on each node",
+    "exact current profile, MCP client, participant, room, connection, source, and producer-epoch bindings",
+    "one natural two-source read-only prompt",
+    "failure-isolated re-entry and one terminal writer"
+  ],
+  "explicit_non_goals": [
+    "host-resource telemetry",
+    "advisory fan-out changes",
+    "Minecraft mutation",
+    "Player Embodiment",
+    "World Authority",
+    "generic-device publication",
+    "M4 behavior",
+    "a second solver",
+    "a second terminal writer"
+  ],
+  "downstream_gate_unlocked": "none",
+  "native_installed_node_a": {
+    "application": "installed CasimirBot Windows EXE",
+    "supervisor_status": "ready",
+    "credential_isolation_status": "ready",
+    "installed_node_ref": "device:sha256:27b9475bb93cea3fb7235343c0c405e1",
+    "installed_node_status": "active",
+    "profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+    "profile_status": "active",
+    "profile_auth_mode": "password_account",
+    "profile_provider": "local",
+    "profile_email_verified": false,
+    "raw_authentication_material_included": false
+  },
+  "desktop_mcp_tunnel": {
+    "status": "ready",
+    "client_version": "0.0.13",
+    "scope": "read_only_coordination",
+    "environment_authority_granted": false,
+    "room_authority_granted": false,
+    "answer_authority_granted": false,
+    "credential_included": false
+  },
+  "environment_source_a": {
+    "paired_device_count": 1,
+    "device_ref": "connector_device:legacy:9d171579a2405c30790d901570b8f1993702768d",
+    "package_id": "com.casimirbot.legacy.minecraft",
+    "status": "offline",
+    "freshness": "contact_stale",
+    "probe_lane": "blocked",
+    "room_ref": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "installed_node_binding_current": false,
+    "fresh_read_admissible": false
+  },
+  "remaining_blockers": [
+    {
+      "code": "m3_node_a_fresh_installed_source_unavailable",
+      "stage": "source_admission"
+    },
+    {
+      "code": "m3_node_b_native_installed_node_unavailable",
+      "stage": "node_admission"
+    },
+    {
+      "code": "m3_two_node_room_grants_unavailable",
+      "stage": "tool_admission"
+    }
+  ],
+  "acceptance": {
+    "node_a_native_identity_admitted": true,
+    "node_a_fresh_environment_read_admitted": false,
+    "node_b_native_identity_admitted": false,
+    "m3_live_accepted": false,
+    "m4_unlocked": false,
+    "synthetic_second_node_used": false,
+    "natural_cross_host_prompt_executed": false,
+    "terminal_answer_emitted": false
+  },
+  "secret_exclusion": {
+    "password_recorded": false,
+    "session_cookie_recorded": false,
+    "oauth_token_recorded": false,
+    "connector_credential_recorded": false,
+    "private_endpoint_recorded": false,
+    "invite_recorded": false
+  }
+}

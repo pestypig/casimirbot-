@@ -75,6 +75,7 @@ public final class ConnectorPairingClient implements AutoCloseable {
     public ConnectorPairingClient() {
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
+            .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
     }

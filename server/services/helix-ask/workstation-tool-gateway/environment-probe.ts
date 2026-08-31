@@ -1282,7 +1282,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
         requestingParticipantId,
         connectionOwnerProfileId: connectorOwnerProfileId,
         connectionRef: connector.environmentBindingId,
-        installedNodeRef: connector.installationId,
+        installedNodeRef: connector.installedNodeRef,
         sourceRef: source.sourceId,
         producerEpochRef: source.adapterAdmission.producer_epoch_ref,
         capabilityId,

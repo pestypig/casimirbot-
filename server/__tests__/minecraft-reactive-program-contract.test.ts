@@ -5,6 +5,9 @@ import {
   minecraftReactiveResourcesForAction,
 } from "@shared/helix-minecraft-reactive-program";
 import { helixMinecraftPlayerActionArgumentsSchema } from "@shared/helix-minecraft-player-capabilities";
+import recoveryFixture from "../../scripts/fixtures/minecraft-combat-rec2-inventory-recovery-v1.json";
+import latentRecoveryFixture from "../../scripts/fixtures/minecraft-combat-rec2a-latent-recovery-v1.json";
+import pressureCommitFixture from "../../scripts/fixtures/minecraft-combat-rec2c-pressure-commit-v1.json";
 
 const terminal = (nodeId: string, outcome = "succeeded") => ({
   node_id: nodeId,
@@ -175,6 +178,45 @@ describe("Minecraft concurrent reactive program contract", () => {
   it("derives exact resources from typed actions instead of trusting prose", () => {
     expect(
       minecraftReactiveResourcesForAction({
+        action_kind: "attack",
+        target_ref: "target:1234567890abcdef1234567890abcdef12345678",
+        target_entity_type_id: "minecraft:zombie",
+        target_classification: "hostile",
+        max_acquisition_distance: 8,
+        require_line_of_sight: true,
+        minimum_attack_cooldown: 0.9,
+        max_attack_pulses: 16,
+        max_duration_ms: 20_000,
+        stop_below_health: 6,
+        friendly_fire: false,
+      }),
+    ).toEqual(["camera", "main_hand"]);
+    expect(
+      minecraftReactiveResourcesForAction({
+        action_kind: "combat_guard",
+        hostile_entity_type_ids: ["minecraft:zombie"],
+        max_acquisition_distance: 16,
+        require_line_of_sight: true,
+        minimum_attack_cooldown: 0.9,
+        max_attack_pulses: 32,
+        max_target_switches: 4,
+        target_commit_ticks: 8,
+        retreat_start_distance: 2.5,
+        retreat_stop_distance: 4,
+        retreat_when_hostile_count_at_least: 1,
+        max_duration_ms: 30_000,
+        stop_below_health: 6,
+        friendly_fire: false,
+      }),
+    ).toEqual([
+      "camera",
+      "locomotion",
+      "main_hand",
+      "off_hand",
+      "native_workflow",
+    ]);
+    expect(
+      minecraftReactiveResourcesForAction({
         action_kind: "mine",
         block_id: "minecraft:stone",
         count: 1,
@@ -220,6 +262,91 @@ describe("Minecraft concurrent reactive program contract", () => {
       "world",
       "native_workflow",
     ]);
+  });
+
+  it("admits the frozen REC2 craft-consume-reengage program", () => {
+    const parsed =
+      helixMinecraftReactiveProgramArgumentsSchema.parse(recoveryFixture);
+    expect(parsed.mutation_scope.combat_allowed).toBe(true);
+    expect(parsed.mutation_scope.max_inventory_transfers).toBe(3);
+    expect(parsed.lanes[0]?.lane_kind).toBe("inventory");
+    expect(parsed.lanes[1]?.activation).toBe("interrupt_only");
+  });
+
+  it("admits REC2A as combat-only opening work plus one dormant recovery contingency", () => {
+    const parsed =
+      helixMinecraftReactiveProgramArgumentsSchema.parse(latentRecoveryFixture);
+    expect(parsed.mutation_scope.combat_allowed).toBe(true);
+    expect(parsed.lanes[0]?.activation).toBe("immediate");
+    expect(parsed.lanes[0]?.lane_kind).toBe("safety");
+    expect(parsed.lanes[1]?.activation).toBe("interrupt_only");
+    expect(parsed.interrupts).toHaveLength(1);
+    expect(parsed.interrupts[0]?.cancel_lane_ids).toEqual([
+      "lane:opening-combat",
+    ]);
+    const dormantActions = parsed.lanes[1]?.nodes.flatMap((node) =>
+      "action" in node ? [node.action] : [],
+    );
+    expect(dormantActions?.map((action) => action.action_kind)).toEqual([
+      "combat_guard",
+      "craft",
+      "consume",
+      "equip",
+      "combat_guard",
+    ]);
+    expect(
+      dormantActions?.find(
+        (action) =>
+          action.action_kind === "combat_guard" &&
+          action.combat_mode === "disengage_to_distance",
+      ),
+    ).toBeDefined();
+  });
+
+  it("admits REC2C as one health-triggered pressure commit followed by combat resumption", () => {
+    const parsed =
+      helixMinecraftReactiveProgramArgumentsSchema.parse(pressureCommitFixture);
+    expect(parsed.mutation_scope.combat_allowed).toBe(true);
+    expect(parsed.mutation_scope.max_inventory_transfers).toBe(2);
+    expect(parsed.lanes[0]?.activation).toBe("immediate");
+    expect(parsed.lanes[1]?.activation).toBe("interrupt_only");
+    expect(parsed.interrupts).toHaveLength(1);
+    expect(parsed.interrupts[0]?.cancel_lane_ids).toEqual([
+      "lane:opening-combat",
+    ]);
+    const pressureActions = parsed.lanes[1]?.nodes.flatMap((node) =>
+      "action" in node ? [node.action] : [],
+    );
+    expect(pressureActions?.map((action) => action.action_kind)).toEqual([
+      "consume",
+      "equip",
+      "combat_guard",
+    ]);
+    expect(pressureActions?.[0]).toMatchObject({
+      action_kind: "consume",
+      item_id: "minecraft:golden_apple",
+      minimum_food_gain: 0,
+    });
+  });
+
+  it("does not let a reactive recovery graph smuggle combat through a noncombat scope", () => {
+    const result = helixMinecraftReactiveProgramArgumentsSchema.safeParse({
+      ...recoveryFixture,
+      mutation_scope: {
+        ...recoveryFixture.mutation_scope,
+        combat_allowed: false,
+      },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) =>
+          issue.message.includes(
+            "Reactive combat actions require mutation_scope.combat_allowed=true",
+          ),
+        ),
+      ).toBe(true);
+    }
   });
 
   it("requires exact source-item and hand identity for item-use placement", () => {

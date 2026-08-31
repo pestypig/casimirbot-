@@ -7,7 +7,7 @@ Authority owner: the signed-in user owns interaction and consent; shared account
 Current maturity: deterministically verified
 Target maturity: deterministically verified
 Required evidence: exact public surface inventory; component-level interactive-control inventory; one classification for every public affordance; account-policy/gateway/route parity; no-orphan control audit; confirmation and receipt classification; focused deterministic tests; Helix Ask discipline quick check; environment-harness docs audit; compiled client or type/build verification
-Explicit non-goals: developer-only panels or controls; new mutation authority; arbitrary DOM control; credential, pairing-material, hidden-state, or hidden-reasoning projection; private model/tool loops; prompt-specific action sequences; live-provider, keyed Ask, installed-node, browser-session, or MCP reconnect acceptance in this deterministic tranche
+Explicit non-goals: developer-only panels or controls; new mutation authority; arbitrary DOM control; credential, pairing-material, hidden-state, or hidden-reasoning projection; private model/tool loops; prompt-specific action sequences; live-provider, keyed Ask, installed-package replacement, browser-session control, or MCP reconnect acceptance in this deterministic tranche
 Downstream gate unlocked: the G8 public profile can expose one coherent agent-discoverable UI catalog and later prove installed MCP/UI catalog convergence without inventing per-component control paths
 
 # EH-G8 public UI agent affordance manifest v1
@@ -74,12 +74,12 @@ confirmation requirements all admit it.
 | Stage | Status | Deterministic acceptance |
 | --- | --- | --- |
 | UI-0 packet and scope | complete | Packet freezes public surfaces, authority split, non-goals, and stop conditions. |
-| UI-1 surface manifest | complete | All 15 public panels plus Ask, feature-gated room, shell, and mobile families have stable surface IDs and source ownership. |
-| UI-2 control inventory | complete | The deterministic TSX inventory currently finds 396 controls across public roots and their static or statically analyzable dynamic delegated component imports. |
-| UI-3 classification | complete | All 396 controls have unique canonical IDs plus explicit interaction and authority metadata. The distribution is 186 `act`, 150 `configure`, 42 `navigate`, 17 `observe`, and one disabled status indicator `human_only`. |
-| UI-4 parity audits | partial | All 40 public policy capabilities classify as 36 shared-gateway plus 4 route-owned capabilities with zero policy orphans. `helix_public_ui_catalog` now projects all 396 controls through the OAuth-scoped composed MCP server without source/handler leakage; in-memory MCP tests cover listing, user-principal access, filters, scope denial, and nonterminal flags. Direct button-to-capability bindings and handler/receipt parity remain separately gated promotions. |
-| UI-5 deterministic closure | complete | Generated-catalog drift checks, public UI audits, focused contracts, Ask discipline quick, environment docs audit, and the production client build pass. One pre-existing room-dialog fixture mismatch and the checkout-wide TypeScript error baseline remain separate from this packet; no keyed/live checks have run. |
-| UI-6 live convergence | blocked by operator-started keyed server | Natural Ask/UI and authenticated MCP traces prove exact catalog, admission, re-entry, and presentation parity. |
+| UI-1 surface manifest | complete | All 16 public panels plus Ask, feature-gated room, shell, and mobile families have stable surface IDs and source ownership. |
+| UI-2 control inventory | complete | The deterministic TSX inventory currently finds 398 controls across public roots and their static or statically analyzable dynamic delegated component imports. |
+| UI-3 classification | complete | All 398 controls have unique canonical IDs plus explicit interaction and authority metadata. The distribution is 186 `act`, 150 `configure`, 43 `navigate`, 18 `observe`, and one disabled status indicator `human_only`. |
+| UI-4 parity audits | partial | All 41 public policy capabilities classify as 36 shared-gateway plus 5 route-owned capabilities with zero policy orphans. `helix_public_ui_catalog` projects all 398 controls without source/handler leakage through the full MCP server, standalone Device Check server, and installed local-supervisor coordination surface. The narrow installed surfaces reuse their existing Shared Live Room read scope and resource-metadata challenge. In-memory MCP tests cover listing, user-principal access, filters, scope denial, nonterminal flags, 102 room controls that remain blocked pending contract, and the first explicitly bound room control: exact-epoch speaking-floor release. Further direct control bindings and handler/receipt parity remain separately gated promotions. |
+| UI-5 deterministic closure | complete | Generated-catalog drift checks, public UI audits, 14 focused MCP contracts, Ask discipline quick, environment docs audit, and the production server build pass. The build reports four pre-existing duplicate-key/case warnings outside this packet. No keyed Ask or refreshed-package catalog call has run. |
+| UI-6 live convergence | blocked by installed-package refresh | The running CasimirBot EXE reports its private tunnel Ready on tunnel-client 0.0.13, but that installed package predates narrow-surface catalog publication. A rebuilt/upgraded EXE and MCP reconnect are required before an authenticated installed-tunnel catalog trace can prove exact catalog, admission, and presentation convergence. No localhost port is required. |
 
 ## Stop/fail criteria
 
@@ -142,14 +142,17 @@ with the surface and capability rows without source paths, line numbers,
 handlers, credentials, pairing material, DOM state, or answer authority. The
 audit fails when the generated artifact differs from the source inventory.
 
-The composed MCP server exposes this observation as
-`helix_public_ui_catalog`, requiring the ordinary agent-run read scope. Agents
-may filter by public surface, interaction kind, and authority state. The room
-filter therefore reports all 103 controls as `blocked_pending_contract`, while
-Ask and panel-local controls remain `client_local` unless a future explicit
-binding passes the control-to-policy audit. The tool cannot click, configure,
-or execute a UI handler merely because it can describe that handler's public
-control identity.
+The full MCP server exposes this observation as `helix_public_ui_catalog` under
+the ordinary agent-run read scope. The standalone Device Check and installed
+local-supervisor coordination servers expose the same tool under their existing
+Shared Live Room read scope and private resource-metadata paths. Agents may
+filter by public surface, interaction kind, and authority state. The room filter
+therefore reports 102 room controls as `blocked_pending_contract` and one
+feature-gated `route_owned` controls for `room.floor.acquire` and
+`room.floor.release`, while Ask and
+panel-local controls remain `client_local` unless an explicit binding passes
+the control-to-policy audit. The tool cannot click, configure, or execute a UI
+handler merely because it can describe that handler's public control identity.
 
 The durable implementation contract is
 `docs/architecture/helix-public-ui-agent-affordance-contract-v1.md`.

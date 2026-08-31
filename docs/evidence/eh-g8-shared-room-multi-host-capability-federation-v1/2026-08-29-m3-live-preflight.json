@@ -1,0 +1,106 @@
+{
+  "schema": "helix.shared_room_multi_host.m3_live_preflight.v1",
+  "captured_at": "2026-08-29T19:00:00.000Z",
+  "program_gate": "G8",
+  "workstream": "M3 live cross-host evidence synthesis",
+  "capability_or_component": "EH-G8 Shared Room Multi-Host Capability Federation v1 / M3",
+  "lifecycle_stage": "admission",
+  "reaction_timescale": "none",
+  "authority_owner": {
+    "installed_node_access": "separately authenticated node owners",
+    "room_and_evidence_admission": "Helix",
+    "interpretation_and_terminal_synthesis": "Runtime Codex"
+  },
+  "current_maturity": "deterministically verified",
+  "target_maturity": "live accepted",
+  "required_evidence": [
+    "two separately owned live installed-node identities",
+    "two exact current profile, MCP client, participant, room, connection, source, and producer-epoch bindings",
+    "one natural two-source read-only prompt",
+    "two fresh observations re-entering one principal Runtime Codex turn",
+    "one terminal writer",
+    "independent disconnect, reconnect, expiry, and revocation isolation"
+  ],
+  "explicit_non_goals": [
+    "host-resource telemetry",
+    "advisory fan-out changes",
+    "Minecraft mutation",
+    "Player Embodiment",
+    "World Authority",
+    "generic-device publication",
+    "M4 behavior",
+    "a second solver",
+    "a second terminal writer"
+  ],
+  "downstream_gate_unlocked": "none",
+  "service": {
+    "service_instance_ref": "service_instance:2f33890c1e26b495a63499a3a96572e6",
+    "workspace_ref": "workspace:d58a75be7e317287b8f641f2f550df2630292d46e55fd5a52a46e0c585b2ca2d",
+    "ready": true,
+    "supervisor_mode": "external_process",
+    "one_instance_enforced": false,
+    "attach_supported": true,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "workspace_path_included": false,
+    "process_identity_included": false
+  },
+  "profile_probe": {
+    "profile_ref": "profile:g2-a1-codex",
+    "account_type": "developer",
+    "authenticated_local_session_created_for_preflight": true
+  },
+  "candidate_room": {
+    "room_ref": "shared_realtime_room:14bc1eee-6cfd-4714-9b59-57a8cc17bdda",
+    "status": "waiting_for_consent",
+    "participant_count": 2,
+    "participants_present": 0,
+    "participants_away": 2,
+    "participants_with_complete_consent": 0,
+    "runtime_state": "idle",
+    "transport_owner": "unbound",
+    "limitations": [
+      "room_media_bridge_not_connected"
+    ]
+  },
+  "connector_inventory": {
+    "visible_device_count": 12,
+    "legacy_device_count": 12,
+    "current_installed_node_bound_count": 0,
+    "probe_ready_count": 0,
+    "credentials_included": false,
+    "private_endpoints_included": false
+  },
+  "native_boundary_checks": [
+    {
+      "endpoint_class": "installed_account_services",
+      "admitted": false,
+      "typed_error": "installed_node_required"
+    },
+    {
+      "endpoint_class": "installed_security_status",
+      "admitted": false,
+      "typed_error": "desktop_required"
+    }
+  ],
+  "first_lifecycle_divergence": {
+    "stage": "admission",
+    "code": "m3_two_live_installed_nodes_unavailable",
+    "detail": "The current healthy service is an external process rather than a verified installed-node supervisor, and no environment connector installation is bound to a current installed-node identity. The persisted two-member room therefore cannot establish two-host evidence authority.",
+    "fail_closed": true
+  },
+  "acceptance": {
+    "m3_live_accepted": false,
+    "m4_unlocked": false,
+    "synthetic_second_node_used": false,
+    "natural_cross_host_prompt_executed": false,
+    "terminal_answer_emitted": false
+  },
+  "secret_exclusion": {
+    "session_cookie_recorded": false,
+    "oauth_token_recorded": false,
+    "connector_credential_recorded": false,
+    "private_endpoint_recorded": false,
+    "invite_recorded": false
+  }
+}

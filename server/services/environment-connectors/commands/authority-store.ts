@@ -20,6 +20,8 @@ import {
 import type { Queryable } from
   "../../helix-ask/realtime-room/room-store/types";
 import { environmentCommandProfileAtMost } from "./authority-policy";
+import { requestDesktopMcpTunnelReadOnlyForSafety } from
+  "../../local-supervisor/desktop-mcp-tunnel-safety";
 
 export type EnvironmentCommandAuthorityErrorCode =
   | "command_authority_forbidden"
@@ -654,7 +656,7 @@ export const emergencyStopEnvironmentCommandAuthority = async (input: {
     profileId: input.ownerProfileId,
     owner: true,
   });
-  return withSharedRealtimeRoomTransaction(async (db) => {
+  const stopped = await withSharedRealtimeRoomTransaction(async (db) => {
     await readEnvironment(db, input.roomId, input.environmentBindingId, true);
     const authority = await readActiveAuthority(db, input.environmentBindingId);
     if (!authority) {
@@ -706,4 +708,8 @@ export const emergencyStopEnvironmentCommandAuthority = async (input: {
     const stopped = { ...authority, status: "suspended" as const };
     return projectAuthority(stopped);
   });
+  void requestDesktopMcpTunnelReadOnlyForSafety(
+    "environment_emergency_stop",
+  ).catch(() => false);
+  return stopped;
 };

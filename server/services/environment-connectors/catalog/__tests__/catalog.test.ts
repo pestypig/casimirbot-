@@ -30,6 +30,7 @@ import {
   readBuiltinEnvironmentConnectorPackage,
   readEnvironmentConnectorCapabilityDescriptor,
 } from "../index";
+import combatRecoveryFixture from "../../../../../scripts/fixtures/minecraft-combat-rec2-inventory-recovery-v1.json";
 
 describe("environment connector capability catalog", () => {
   it("publishes trusted, read-only, schema-hashed capability descriptors", () => {
@@ -499,6 +500,26 @@ describe("environment connector capability catalog", () => {
       descriptor!.input_schema,
       itemUsePlacement,
     )).toEqual([]);
+
+    expect(
+      helixMinecraftReactiveProgramArgumentsSchema.safeParse(
+        combatRecoveryFixture,
+      ).success,
+    ).toBe(true);
+    expect(
+      validateEnvironmentConnectorSchemaValue(
+        descriptor!.input_schema,
+        combatRecoveryFixture,
+      ),
+    ).toEqual([]);
+
+    const combatWithoutScope = structuredClone(combatRecoveryFixture);
+    combatWithoutScope.mutation_scope.combat_allowed = false;
+    expect(
+      helixMinecraftReactiveProgramArgumentsSchema.safeParse(
+        combatWithoutScope,
+      ).success,
+    ).toBe(false);
 
     const misleadingOldCatalogShape = structuredClone(candidate);
     Object.assign(misleadingOldCatalogShape.lanes[0]!.nodes[0]!, {

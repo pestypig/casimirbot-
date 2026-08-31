@@ -22,6 +22,7 @@ const inputSchema = z.object({
   options: z.object({
     includeLocator: z.boolean().optional(),
     includeSharedAuthoritySocialRenewal: z.boolean().optional(),
+    includeMediationPacket: z.boolean().optional(),
     includeProceduralClassification: z.boolean().optional(),
     includeAdmissionArtifacts: z.boolean().optional(),
   }).strict().optional(),
@@ -46,6 +47,7 @@ export function createMoralGraphReflectionMcpHarnessServer(): McpServer {
       outputSchema: z.object({
         reflection: z.record(z.string(), z.unknown()),
         sharedAuthoritySocialRenewal: z.record(z.string(), z.unknown()).optional(),
+        moralReflectionMediation: z.record(z.string(), z.unknown()).optional(),
         admissions: z.array(z.unknown()),
       }).passthrough(),
       annotations: {

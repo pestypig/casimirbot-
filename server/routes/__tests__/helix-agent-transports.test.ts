@@ -23,8 +23,10 @@ import {
 } from "../helix-agent-api";
 import { createHelixMcpRouter } from "../helix-mcp";
 import { createHelixRunMcpServer } from "../../mcp/helix-run-mcp-server";
-import { HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH } from
-  "../../mcp/helix-mcp-server";
+import {
+  HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
+  HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+} from "../../mcp/helix-mcp-server";
 import {
   HelixAgentApiServiceError,
   type HelixAgentApiService,
@@ -503,6 +505,36 @@ describe("Helix agent REST transport", () => {
     });
   });
 
+  it("publishes the exact local-supervisor MCP resource on a verified loopback request", async () => {
+    process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
+    const verifier = {
+      verify: vi.fn(),
+      authorizationServer: () => "https://issuer.example",
+      audience: () => "https://agent.example/mcp",
+      providerAlias: () => "oidc",
+    };
+    const app = express();
+    app.use(
+      createHelixAgentProtectedResourceMetadataRouter({
+        verifier,
+        resourcePaths: [
+          HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
+        ],
+        useLoopbackRequestResource: false,
+      }),
+    );
+
+    const response = await request(app)
+      .get(HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH)
+      .set("Host", "localhost:1522")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      resource: "https://agent.example/mcp",
+      authorization_servers: ["https://issuer.example"],
+    });
+  });
+
   it("publishes a least-privilege Device Check resource profile", async () => {
     process.env.CASIMIR_PUBLIC_BASE_URL = "https://agent.example";
     const verifier = {
@@ -767,6 +799,11 @@ describe("Helix MCP HTTP transport", () => {
   const createMcpApp = (input?: {
     service?: ServiceDouble;
     authenticate?: () => Promise<HelixAgentApiPrincipal>;
+    authenticateDesktop?: (
+      req: express.Request,
+      scopes: readonly string[],
+    ) => Promise<HelixAgentApiPrincipal>;
+    desktopDelegationScopes?: readonly string[];
     resourceMetadataPath?: string;
   }): express.Express => {
     const app = express();
@@ -775,6 +812,8 @@ describe("Helix MCP HTTP transport", () => {
       createHelixMcpRouter({
         service: asService(input?.service ?? serviceDouble()),
         authenticate: input?.authenticate ?? (async () => principal()),
+        authenticateDesktop: input?.authenticateDesktop,
+        desktopDelegationScopes: input?.desktopDelegationScopes,
         rateLimit: false,
         enforceTransportSecurity: false,
         resourceMetadataPath: input?.resourceMetadataPath,
@@ -982,5 +1021,83 @@ describe("Helix MCP HTTP transport", () => {
         "u",
       ),
     );
+  });
+
+  it("prefers an exact native desktop delegation even when the tunnel forwards a bearer", async () => {
+    const authenticateDesktop = vi.fn(
+      async (_req: express.Request, _scopes: readonly string[]) =>
+        principal(),
+    );
+    const app = express();
+    app.use(
+      "/mcp",
+      createHelixMcpRouter({
+        service: asService(serviceDouble()),
+        authenticateDesktop,
+        desktopDelegationScopes: ["helix.rooms.read"],
+        rateLimit: false,
+        enforceTransportSecurity: false,
+      }),
+    );
+
+    await mcpHeaders(request(app).post("/mcp"))
+      .send({ jsonrpc: "2.0", id: 41, method: "tools/list", params: {} })
+      .expect(200);
+    expect(authenticateDesktop).toHaveBeenCalledOnce();
+    expect(authenticateDesktop.mock.calls[0]?.[1]).toEqual([
+      "helix.rooms.read",
+    ]);
+
+    await mcpHeaders(
+      request(app).post("/mcp").set("Authorization", "Bearer external-token"),
+    )
+      .send({ jsonrpc: "2.0", id: 42, method: "tools/list", params: {} })
+      .expect(401);
+    expect(authenticateDesktop).toHaveBeenCalledOnce();
+
+    await mcpHeaders(
+      request(app)
+        .post("/mcp")
+        .set("Authorization", "Bearer external-token")
+        .set("X-Casimir-Desktop-Session", "native-desktop-secret")
+        .set(
+          "X-Casimir-Desktop-Account-Session",
+          "account_session:native-developer-owner",
+        ),
+    )
+      .send({ jsonrpc: "2.0", id: 43, method: "tools/list", params: {} })
+      .expect(200);
+    expect(authenticateDesktop).toHaveBeenCalledTimes(2);
+    expect(authenticateDesktop.mock.calls[1]?.[1]).toEqual([
+      "helix.rooms.read",
+    ]);
+  });
+
+  it("returns a typed legacy fallback for the modern server discovery probe", async () => {
+    const app = createMcpApp();
+
+    const response = await mcpHeaders(request(app).post("/mcp"))
+      .send({
+        jsonrpc: "2.0",
+        id: "discover-fixture",
+        method: "server/discover",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {
+              name: "fixture-client",
+              version: "1.0.0",
+            },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      })
+      .expect(404);
+
+    expect(response.body).toEqual({
+      jsonrpc: "2.0",
+      error: { code: -32601, message: "Method not found" },
+      id: "discover-fixture",
+    });
   });
 });

@@ -26,6 +26,7 @@ import {
   type HelixRoomSourceBinding,
 } from "@shared/helix-room-source-ingress";
 import { ensureDatabase, getPool, resetDbClient } from "../../../../db/client";
+import { installedDeviceRef } from "../../../helix-account/installed-security-store";
 import { materializeLegacyRoomSourceConnector } from "../../bindings";
 import {
   listEnvironmentConnectorCapabilityDescriptors,
@@ -484,6 +485,51 @@ describe("durable environment probe broker", () => {
     expect(packages.rows).toHaveLength(2);
     expect(new Set(packages.rows.map((row) => row.package_version)).size).toBe(2);
     expect(new Set(packages.rows.map((row) => row.content_hash)).size).toBe(2);
+  });
+
+  it("binds an explicitly attested same-host connector to the active installed desktop node", async () => {
+    const original = await seed();
+    const installedDeviceId = "desktop_device:durable-environment-probe";
+    await getPool().query(
+      `
+        INSERT INTO helix_installed_devices (
+          profile_id, device_id, label, platform, status,
+          recovery_generation, registered_at, last_seen_at,
+          revoked_at, created_at, updated_at
+        ) VALUES (
+          $1, $2, 'Durable probe desktop', 'windows', 'active',
+          0, $3, $3, NULL, $3, $3
+        );
+      `,
+      [PROFILE_ID, installedDeviceId, NOW.toISOString()],
+    );
+
+    const rebound = await materializeLegacyRoomSourceConnector({
+      ownerProfileId: PROFILE_ID,
+      installedDeviceId,
+      roomSourceBindingId: BINDING_ID,
+      credentialId: CREDENTIAL_ID,
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      worldId: WORLD_ID,
+      producerEpochRef,
+      adapterAdmission: admission,
+      capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
+        adapterProfileId: admission.adapter_profile_id,
+      }),
+    });
+
+    expect(rebound.environmentBindingId).toBe(original.environmentBindingId);
+    expect(rebound.installedNodeRef).toBe(installedDeviceRef(installedDeviceId));
+    const installation = await getPool().query<{
+      installed_device_id: string | null;
+    }>(
+      `SELECT installed_device_id
+       FROM helix_environment_connector_installations
+       WHERE installation_id = $1;`,
+      [rebound.installationId],
+    );
+    expect(installation.rows).toEqual([{ installed_device_id: installedDeviceId }]);
   });
 
   it("persists exact correlation, leases once, hashes the lease token, and normalizes an idempotent result", async () => {

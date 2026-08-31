@@ -132,8 +132,9 @@ describe("Helix public UI control inventory", () => {
       observe: 18,
     });
     expect(authorityCounts).toEqual({
-      blocked_pending_contract: 103,
+      blocked_pending_contract: 101,
       client_local: 295,
+      route_owned: 2,
     });
     expect(
       inventory.filter((entry) => entry.interaction_kind === "human_only").map((entry) => entry.locator),
@@ -142,15 +143,30 @@ describe("Helix public UI control inventory", () => {
 
   it("classifies every control while never inferring gateway or route authority from labels", () => {
     const inventory = buildHelixPublicUiControlInventory(repoRoot);
-    const implicitAgentAuthority = inventory.filter((entry) =>
+    const explicitAgentAuthority = inventory.filter((entry) =>
       entry.authority_state === "shared_gateway" || entry.authority_state === "route_owned",
     );
 
     expect(inventory.every((entry) => entry.authority_state !== "unmapped")).toBe(true);
-    expect(implicitAgentAuthority).toEqual([]);
+    expect(explicitAgentAuthority).toHaveLength(2);
+    expect(explicitAgentAuthority).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        locator: "helix.ask.shared_live_room.shared-live-room-runtime-panel.take-speaking-floor",
+        authority_state: "route_owned",
+        route_contract_id: "room.floor.acquire",
+        authority_classification_source: "route_binding",
+      }),
+      expect.objectContaining({
+        locator: "helix.ask.shared_live_room.shared-live-room-runtime-panel.release-speaking-floor",
+        authority_state: "route_owned",
+        route_contract_id: "room.floor.release",
+        authority_classification_source: "route_binding",
+      }),
+    ]));
     expect(
       inventory
         .filter((entry) => entry.surface_id === "helix.ask.shared_live_room")
+        .filter((entry) => !explicitAgentAuthority.some((authority) => authority.locator === entry.locator))
         .every((entry) => entry.authority_state === "blocked_pending_contract"),
     ).toBe(true);
     expect(inventory.some((entry) => entry.interaction_kind === "act")).toBe(true);

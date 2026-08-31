@@ -1,0 +1,203 @@
+{
+  "action_kind": "execute_reactive_program",
+  "program_schema": "helix.minecraft.reactive_program.v1",
+  "program_id": "program:combat-pressure-commit-rec2c-v1",
+  "ruleset": "survival_tas",
+  "execution_plane": "player_embodiment",
+  "scheduler_engine": "native_fabric_concurrent",
+  "max_total_ticks": 1400,
+  "completion_policy": {
+    "mode": "all_required",
+    "cancel_remaining_on_settle": true
+  },
+  "mutation_scope": {
+    "world_mutation_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 2,
+    "allowed_block_ids": [],
+    "allowed_regions": [],
+    "combat_allowed": true
+  },
+  "resident_guardian_coverage": [],
+  "lanes": [
+    {
+      "lane_id": "lane:opening-combat",
+      "lane_kind": "safety",
+      "priority": 100,
+      "required": true,
+      "activation": "immediate",
+      "resource_ceiling": [
+        "camera",
+        "locomotion",
+        "main_hand",
+        "off_hand",
+        "native_workflow",
+        "safety"
+      ],
+      "start_node_id": "node:opening-fight",
+      "nodes": [
+        {
+          "node_id": "node:opening-fight",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 1200,
+          "action": {
+            "action_kind": "combat_guard",
+            "combat_mode": "engage",
+            "hostile_entity_type_ids": ["minecraft:zombie"],
+            "max_acquisition_distance": 20,
+            "require_line_of_sight": true,
+            "minimum_attack_cooldown": 0.9,
+            "max_attack_pulses": 192,
+            "max_target_switches": 48,
+            "target_commit_ticks": 8,
+            "retreat_start_distance": 2.5,
+            "retreat_stop_distance": 4.5,
+            "retreat_when_hostile_count_at_least": 16,
+            "max_duration_ms": 60000,
+            "stop_below_health": 4,
+            "friendly_fire": false,
+            "approach_policy": "local_reroute_bounded",
+            "max_approach_ticks": 1000,
+            "cover_policy": "none",
+            "max_cover_ticks": 0,
+            "projectile_response": "none",
+            "projectile_evasion_horizon_ticks": 8,
+            "max_evasion_ticks": 0,
+            "shield_hand": "none",
+            "max_shield_hold_ticks": 0
+          },
+          "on_success": "node:opening-combat-succeeded",
+          "on_failure": "node:opening-combat-failed",
+          "on_timeout": "node:opening-combat-failed"
+        },
+        {
+          "node_id": "node:opening-combat-succeeded",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "fight_completed_without_pressure_commit"
+        },
+        {
+          "node_id": "node:opening-combat-failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "opening_combat_failed"
+        }
+      ]
+    },
+    {
+      "lane_id": "lane:pressure-commit",
+      "lane_kind": "inventory",
+      "priority": 230,
+      "required": false,
+      "activation": "interrupt_only",
+      "resource_ceiling": [
+        "camera",
+        "locomotion",
+        "hotbar",
+        "main_hand",
+        "off_hand",
+        "inventory",
+        "native_workflow"
+      ],
+      "start_node_id": "node:consume-survival-item",
+      "nodes": [
+        {
+          "node_id": "node:consume-survival-item",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 100,
+          "action": {
+            "action_kind": "consume",
+            "item_id": "minecraft:golden_apple",
+            "count": 1,
+            "hand": "main_hand",
+            "max_duration_ms": 5000,
+            "stop_below_health": 4,
+            "minimum_food_gain": 0
+          },
+          "on_success": "node:reequip-weapon",
+          "on_failure": "node:pressure-commit-failed",
+          "on_timeout": "node:pressure-commit-failed"
+        },
+        {
+          "node_id": "node:reequip-weapon",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 40,
+          "action": {
+            "action_kind": "equip",
+            "item_id": "minecraft:iron_sword",
+            "destination": "main_hand"
+          },
+          "on_success": "node:resume-fight",
+          "on_failure": "node:pressure-commit-failed",
+          "on_timeout": "node:pressure-commit-failed"
+        },
+        {
+          "node_id": "node:resume-fight",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 1100,
+          "action": {
+            "action_kind": "combat_guard",
+            "combat_mode": "engage",
+            "hostile_entity_type_ids": ["minecraft:zombie"],
+            "max_acquisition_distance": 20,
+            "require_line_of_sight": true,
+            "minimum_attack_cooldown": 0.9,
+            "max_attack_pulses": 192,
+            "max_target_switches": 48,
+            "target_commit_ticks": 8,
+            "retreat_start_distance": 2.5,
+            "retreat_stop_distance": 4.5,
+            "retreat_when_hostile_count_at_least": 16,
+            "max_duration_ms": 55000,
+            "stop_below_health": 4,
+            "friendly_fire": false,
+            "approach_policy": "local_reroute_bounded",
+            "max_approach_ticks": 1000,
+            "cover_policy": "none",
+            "max_cover_ticks": 0,
+            "projectile_response": "none",
+            "projectile_evasion_horizon_ticks": 8,
+            "max_evasion_ticks": 0,
+            "shield_hand": "none",
+            "max_shield_hold_ticks": 0
+          },
+          "on_success": "node:pressure-commit-succeeded",
+          "on_failure": "node:pressure-commit-failed",
+          "on_timeout": "node:pressure-commit-failed"
+        },
+        {
+          "node_id": "node:pressure-commit-succeeded",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "pressure_committed_consumption_completed"
+        },
+        {
+          "node_id": "node:pressure-commit-failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "pressure_committed_consumption_failed"
+        }
+      ]
+    }
+  ],
+  "races": [],
+  "interrupts": [
+    {
+      "interrupt_id": "interrupt:pressure-health-threshold",
+      "priority": 230,
+      "condition": {
+        "condition_kind": "health_at_least",
+        "health": 18
+      },
+      "trigger_when": "not_satisfied",
+      "debounce_ticks": 1,
+      "activate_lane_id": "lane:pressure-commit",
+      "cancel_lane_ids": ["lane:opening-combat"],
+      "max_activations": 1
+    }
+  ]
+}

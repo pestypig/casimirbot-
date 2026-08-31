@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "helix_fabric_companion_spike",
+  "version": "0.1.0-feasibility",
+  "name": "Helix Fabric Companion Spike",
+  "description": "Feasibility-only server-native companion and survival-interaction probe.",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.casimirbot.helixcompanion.spike.HelixCompanionSpikeMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

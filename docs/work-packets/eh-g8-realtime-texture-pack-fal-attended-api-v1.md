@@ -125,6 +125,102 @@ The non-billable half of RTP5-A is complete:
 No SDK was installed, no credential was read, and no provider network request
 was made. RTP5-A remains active solely at the explicit approval boundary.
 
+## Deterministic protected-boundary rehearsal — 2026-08-29
+
+The remaining non-billable RTP5-A integration surface is now implemented and
+rehearsed without changing the approval record:
+
+- `server/services/realtime-texture-pack/attended-fal-runtime.ts` owns a
+  server-only provider factory and per-profile/session provider custody. The
+  factory is absent by default and cannot be installed through an HTTP,
+  workstation-gateway, MCP, renderer, or agent command, so production readiness
+  continues to report `sdk_available: false` until the separately approved SDK
+  bootstrap exists.
+- Developer-session-only same-origin routes now expose sanitized readiness and
+  session inspection, exact attended arm, one-in-flight transform, and stop.
+  Arm requires the frozen provider/approval IDs, both explicit egress and
+  billable-call acknowledgements, and the exact 60-second, 60-request, USD 1.00
+  ceilings. Transform cannot run before a matching armed capture session.
+- Transform uses the existing provider-neutral request identity and injected
+  fal adapter, does not retry, applies the session runtime ceiling, settles
+  accepted/failed cost counters, closes provider custody on timeout/stop, and
+  returns cancellation acknowledgement. Readiness, errors, session receipts,
+  gateway inspection, and MCP inspection exclude credentials, prompts, and
+  pixels.
+- Image Lens now presents local versus fal provider selection, boolean
+  readiness, the two attended acknowledgements, exact frozen ceilings, manual
+  arm/stop controls, and live request/estimated-cost counters. Capture begins
+  in local passthrough; only a successful manual arm switches the active
+  preview controller to the same-origin fal transform route. Reveal-original,
+  capture stop, policy loss, and panel teardown stop provider custody.
+- Existing `realtime_texture_pack.inspect` workstation/MCP observations include
+  sanitized provider readiness and session state, while declaring provider
+  selection and billing arm as `developer_ui_only` and agent billing authority
+  as false. No agent or MCP mutation capability was added.
+
+Focused deterministic verification passed 27/27 across the adapter, attended
+session, provider route, Image Lens, and preview-controller suites. The broader
+24/24 UI/controller/route/gateway/MCP integration set also passed. Client,
+server, and packaged desktop host/service production builds passed with only
+the repository's pre-existing dependency/chunk and duplicate-key/case warnings.
+The fake route rehearsal used a generated local JPEG and injected in-process
+transport only. It installed no SDK, read no credential, contacted no provider,
+and incurred no billable traffic. RTP5-A therefore remains active at the exact
+provider/SDK/credential/live-benchmark approval boundary; RTP5-B and RTP5-C
+remain blocked.
+
+## Deterministic SDK-transport rehearsal — 2026-08-30
+
+The final non-secret production transport seam is prepared without installing
+the SDK or changing the approval record:
+
+- Official provider documentation and the `@fal-ai/client` 1.10.1 source were
+  rechecked. The endpoint remains `fal-ai/flux-2/klein/realtime`, the package
+  remains `@fal-ai/client` 1.10.1, the realtime API remains
+  `client.realtime.connect(...).send(...)`, 704 x 704 JPEG at about 50% quality
+  remains recommended, and the published model-page rate remains USD 0.00194
+  per compute-second. The authenticated pricing API must still be queried from
+  the approved account immediately before the live arm because account-specific
+  pricing or discounts may differ.
+- `server/services/realtime-texture-pack/fal-realtime-sdk-transport.ts` adapts
+  the SDK's persistent connection to the existing injected transport. It fixes
+  `throttleInterval: 0` and `maxBuffering: 1`, attaches one bounded request ID,
+  permits one pending request, rejects result rebinding, sanitizes SDK errors,
+  closes deterministically, and resolves only one raw JPEG result.
+- The server-client factory receives the protected credential directly and the
+  adapter retains no credential field. No renderer, route, MCP result, trace,
+  provider object or error includes the credential. Missing credential custody
+  fails closed before connection creation.
+- Four focused SDK-transport cases passed. Together with the five image-adapter,
+  six session-authority and three protected-route cases, the deterministic
+  provider boundary passed 18/18. The production bootstrap import remains
+  intentionally absent until SDK-install approval; therefore readiness still
+  truthfully reports `sdk_available: false`.
+
+Current machine readiness remains: SDK absent, `FAL_KEY` absent, production
+factory bootstrap absent, no provider connection, and zero billable requests.
+RTP5-A remains active at the explicit approval boundary.
+
+## Exact attended launch checklist
+
+The next operator authorization must record all four decisions together or
+leave RTP5-A active:
+
+1. approve provider `fal-ai/flux-2/klein/realtime`;
+2. approve adding `@fal-ai/client` version `1.10.1` to the server dependency
+   lockfile;
+3. choose protected `FAL_KEY` enrollment through the keyed server/desktop
+   service environment, never chat, repository files, renderer state or a
+   process argument; and
+4. approve one attended benchmark capped at 60 seconds, 60 accepted requests
+   and USD 1.00, with interpolation and output feedback disabled.
+
+After those approvals, RTP5-B installs and imports the SDK, installs the
+server-only factory during bootstrap, verifies boolean readiness, and stops
+before traffic. RTP5-C begins only when the developer manually selects fal,
+starts capture locally, checks both Image Lens acknowledgements, and presses
+**Arm attended API**.
+
 ## Live trace requirements
 
 The sanitized trace must include session/provider/request identities; source

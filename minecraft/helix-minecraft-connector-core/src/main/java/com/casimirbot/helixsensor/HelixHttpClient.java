@@ -20,12 +20,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 
 public final class HelixHttpClient implements Closeable {
     private static final int MAX_SAME_IDENTITY_ATTEMPTS = 3;
     static final int MAX_QUEUED_REQUESTS = 16;
     private static final long MAX_QUEUED_AGE_MS = 60_000L;
+    private static final long ORDINARY_REQUEST_TIMEOUT_SECONDS = 8L;
+    private static final long CONTROL_PLANE_REQUEST_TIMEOUT_SECONDS = 30L;
 
     public record IngressResponse(
         int statusCode,
@@ -95,6 +98,7 @@ public final class HelixHttpClient implements Closeable {
     private final Object clientLock = new Object();
     private final AtomicLong transportGeneration = new AtomicLong(1L);
     private final Runnable terminalPauseHandler;
+    private final UnaryOperator<String> endpointResolver;
     private final boolean roomIngressEndpoint;
     private final String roomIngressBindingId;
     private final String producerEpoch = UUID.randomUUID().toString();
@@ -115,7 +119,7 @@ public final class HelixHttpClient implements Closeable {
         Logger logger,
         HelixSensorRuntimeStatus runtimeStatus
     ) {
-        this(config, logger, runtimeStatus, () -> {});
+        this(config, logger, runtimeStatus, () -> {}, UnaryOperator.identity());
     }
 
     public HelixHttpClient(
@@ -124,10 +128,29 @@ public final class HelixHttpClient implements Closeable {
         HelixSensorRuntimeStatus runtimeStatus,
         Runnable terminalPauseHandler
     ) {
+        this(
+            config,
+            logger,
+            runtimeStatus,
+            terminalPauseHandler,
+            UnaryOperator.identity()
+        );
+    }
+
+    public HelixHttpClient(
+        HelixSensorConfig config,
+        Logger logger,
+        HelixSensorRuntimeStatus runtimeStatus,
+        Runnable terminalPauseHandler,
+        UnaryOperator<String> endpointResolver
+    ) {
         this.config = config;
         this.logger = logger;
         this.runtimeStatus = runtimeStatus;
         this.terminalPauseHandler = terminalPauseHandler == null ? () -> {} : terminalPauseHandler;
+        this.endpointResolver = endpointResolver == null
+            ? UnaryOperator.identity()
+            : endpointResolver;
         this.roomIngressEndpoint = isRoomIngressEndpoint(config.endpoint());
         this.roomIngressBindingId = roomIngressEndpoint
             ? roomIngressBindingId(config.endpoint())
@@ -504,9 +527,19 @@ public final class HelixHttpClient implements Closeable {
     }
 
     private HttpRequest.Builder requestBuilder(RequestEnvelope envelope) {
+        String endpoint = endpointResolver.apply(config.endpoint());
+        if (endpoint == null || endpoint.isBlank()) endpoint = config.endpoint();
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-            .uri(URI.create(config.endpoint() + envelope.path()))
-            .timeout(Duration.ofSeconds(8))
+            .uri(URI.create(HelixSensorConfig.stripTrailingSlash(endpoint) + envelope.path()))
+            // Local durable admission may need to flush the complete desktop
+            // state snapshot before it can return the signed receipt. Keep the
+            // fast telemetry/action timeout for ordinary traffic, but do not
+            // abandon a manifest or heartbeat while that bounded commit is
+            // still finishing; an early same-identity retry can only observe
+            // the valid request as temporarily in progress.
+            .timeout(Duration.ofSeconds(requestTimeoutSecondsFor(
+                envelope.controlPlane()
+            )))
             .header("Accept", "application/json")
             .header("X-Helix-Ingress-Version", "1")
             .header("X-Helix-Request-Id", envelope.requestId())
@@ -518,6 +551,12 @@ public final class HelixHttpClient implements Closeable {
             builder.header("Authorization", "Bearer " + config.bearerToken());
         }
         return builder;
+    }
+
+    static long requestTimeoutSecondsFor(boolean controlPlane) {
+        return controlPlane
+            ? CONTROL_PLANE_REQUEST_TIMEOUT_SECONDS
+            : ORDINARY_REQUEST_TIMEOUT_SECONDS;
     }
 
     private IngressResponse parseResponse(

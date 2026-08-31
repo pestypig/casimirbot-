@@ -168,6 +168,8 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "text_to_speech.speak_text",
     "live_env.narrator_say",
     "situation-room.live-source.set_rate",
+    "room.floor.release",
+    "room.floor.acquire",
   ],
   locked_workstation_capabilities: [
     "permission:write",

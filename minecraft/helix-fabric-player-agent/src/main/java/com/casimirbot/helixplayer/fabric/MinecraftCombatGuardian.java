@@ -15,7 +15,7 @@ import java.util.Set;
  */
 final class MinecraftCombatGuardian {
     static final String PROFILE_ID = "resident.minecraft.hostile-combat.v1";
-    static final String ARTIFACT_VERSION = "1.2.4";
+    static final String ARTIFACT_VERSION = "1.3.1";
 
     enum MovementMode {
         HOLD,
@@ -31,6 +31,7 @@ final class MinecraftCombatGuardian {
 
     record Profile(
         Set<String> hostileEntityTypeIds,
+        String combatMode,
         double maxAcquisitionDistance,
         double minimumAttackCooldown,
         int maxAttackPulses,
@@ -54,6 +55,9 @@ final class MinecraftCombatGuardian {
             hostileEntityTypeIds = Set.copyOf(Objects.requireNonNull(hostileEntityTypeIds));
             if (hostileEntityTypeIds.isEmpty() || hostileEntityTypeIds.size() > 16) {
                 throw new IllegalArgumentException("hostileEntityTypeIds must contain 1-16 values");
+            }
+            if (!Set.of("engage", "disengage_to_distance").contains(combatMode)) {
+                throw new IllegalArgumentException("combatMode is unsupported");
             }
             if (maxAcquisitionDistance < 2 || maxAcquisitionDistance > 32) {
                 throw new IllegalArgumentException("maxAcquisitionDistance must be 2-32");
@@ -169,6 +173,7 @@ final class MinecraftCombatGuardian {
         List<Target> eligibleTargets(Profile profile);
         List<ProjectileThreat> collisionThreats(Profile profile);
         void track(Target target);
+        void orientAway(Target target);
         boolean move(MovementMode mode, ProjectileThreat threat, Target target);
         boolean shield(boolean active, String hand);
         boolean attack(String targetRef);
@@ -274,6 +279,21 @@ final class MinecraftCombatGuardian {
             );
         }
 
+        double minimumHostileDistance = targets.stream()
+            .mapToDouble(Target::distance)
+            .min()
+            .orElse(Double.POSITIVE_INFINITY);
+        if (
+            "disengage_to_distance".equals(profile.combatMode()) &&
+            minimumHostileDistance >= profile.retreatStopDistance()
+        ) {
+            runtime.release();
+            return WorkflowStep.succeeded(
+                "Every visible admitted hostile is outside the requested recovery separation envelope.",
+                measurements("safe_separation_reached", targets, projectileThreats)
+            );
+        }
+
         ProjectileThreat imminentThreat = projectileThreats.isEmpty()
             ? null
             : projectileThreats.get(0);
@@ -353,7 +373,11 @@ final class MinecraftCombatGuardian {
             .filter(target -> target.targetRef().equals(selectedTargetRef))
             .findFirst()
             .orElse(null);
-        Target preferred = targets.get(0);
+        Target preferred = "disengage_to_distance".equals(profile.combatMode())
+            ? targets.stream()
+                .min(Comparator.comparingDouble(Target::distance).thenComparing(Target::targetRef))
+                .orElse(targets.get(0))
+            : targets.get(0);
         boolean commitmentActive = current != null &&
             actionTicks - selectedAtTick < profile.targetCommitTicks();
         Target selected = commitmentActive ? current : preferred;
@@ -385,8 +409,14 @@ final class MinecraftCombatGuardian {
             selectedAtTick = actionTicks;
         }
 
-        runtime.track(selected);
-        boolean retreatEligible = targets.size() >= profile.retreatWhenHostileCountAtLeast();
+        if ("disengage_to_distance".equals(profile.combatMode())) {
+            runtime.orientAway(selected);
+        } else {
+            runtime.track(selected);
+        }
+        boolean retreatEligible =
+            "disengage_to_distance".equals(profile.combatMode()) ||
+            targets.size() >= profile.retreatWhenHostileCountAtLeast();
         if (retreating) {
             retreating = retreatEligible && selected.distance() < profile.retreatStopDistance();
         } else {
@@ -395,8 +425,20 @@ final class MinecraftCombatGuardian {
         approaching = false;
         if (!covering && !evading) {
             if (retreating) {
-                runtime.move(MovementMode.RETREAT, imminentThreat, selected);
-                retreatTicks++;
+                boolean moved = runtime.move(MovementMode.RETREAT, imminentThreat, selected);
+                if (!moved && "disengage_to_distance".equals(profile.combatMode())) {
+                    MovementMode preferredFlank = ((selected.targetRef().hashCode() & 1) == 0)
+                        ? MovementMode.FLANK_LEFT
+                        : MovementMode.FLANK_RIGHT;
+                    moved = runtime.move(preferredFlank, imminentThreat, selected);
+                    if (!moved) {
+                        MovementMode alternateFlank = preferredFlank == MovementMode.FLANK_LEFT
+                            ? MovementMode.FLANK_RIGHT
+                            : MovementMode.FLANK_LEFT;
+                        moved = runtime.move(alternateFlank, imminentThreat, selected);
+                    }
+                }
+                if (moved) retreatTicks++;
             } else if (!selected.withinAttackRange() &&
                 !"none".equals(profile.approachPolicy())) {
                 if (approachTicks >= profile.maxApproachTicks()) {
@@ -437,7 +479,8 @@ final class MinecraftCombatGuardian {
             }
         }
 
-        if (!shieldActive && selected.withinAttackRange() &&
+        if ("engage".equals(profile.combatMode()) &&
+            !shieldActive && selected.withinAttackRange() &&
             selected.attackCooldown() >= profile.minimumAttackCooldown()) {
             if (attackPulses >= profile.maxAttackPulses()) {
                 runtime.release();
@@ -500,8 +543,19 @@ final class MinecraftCombatGuardian {
         Map<String, Object> measured = new LinkedHashMap<>();
         measured.put("profile_id", PROFILE_ID);
         measured.put("artifact_version", ARTIFACT_VERSION);
+        measured.put("combat_mode", profile.combatMode());
         measured.put("reason_code", reason);
         measured.put("eligible_hostile_count", targets.size());
+        measured.put("minimum_hostile_distance", targets.stream()
+            .mapToDouble(Target::distance)
+            .min()
+            .orElse(-1));
+        measured.put(
+            "safe_separation_reached",
+            !targets.isEmpty() && targets.stream().allMatch(target ->
+                target.distance() >= profile.retreatStopDistance()
+            )
+        );
         measured.put("peak_hostile_count", peakHostileCount);
         measured.put("selected_target_ref", selectedTargetRef == null ? "" : selectedTargetRef);
         targets.stream()

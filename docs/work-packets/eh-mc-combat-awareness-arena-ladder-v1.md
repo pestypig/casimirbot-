@@ -1773,6 +1773,7 @@ The recovery ladder is deliberately incremental:
 | REC2 — craft then use while contained | Ingredients are present but no stew exists. One tagged zombie supplies bounded pressure and the arena watchdog owns containment. | The plan disengages or obtains a verified stable envelope, crafts exactly one stew through the existing craft workflow, consumes it through REC1, reassesses a newer frame and either resumes combat or abstains with the exact reason. |
 | REC2A — latent recovery under unexpected crowd pressure | The declared objective is to finish the fight, not to eat. One pre-crafted food item is available and a bounded recovery contingency is admitted but inactive. Begin against one tagged zombie, then introduce two additional tagged zombies or one controlled damage transition after combat has started. | A fresh health/crowd frame crosses the admitted risk threshold; the resident arbiter pre-empts combat, disengages to a verified safe envelope, consumes once, observes the post-use state, and resumes only if the newer frame satisfies the admitted resume rule. Runtime Codex receives the semantic transition and may revise the longer strategy, but is not required for the tick-critical dodge/use sequence. |
 | REC2B — bad-break abstention | Repeat REC2A with no reachable separation envelope, an imminent projectile, full hunger, a missing item, or health already at/below the hard floor in separate trials. | The controller does not force a meal merely because recovery was authorized. Defense, cover, Emergency Stop or exact abstention wins according to priority; no use input, duplicate consumption or unsupported healing claim occurs. |
+| REC2C — pressure-committed consumption and horde breakpoint | A fixed arena, loadout, health/food state and admitted direct-survival consumable are repeated against increasing tagged-zombie counts. One branch has no reachable separation envelope but still has a positive bounded survival margin through item-use completion. | The resident arbiter may deliberately complete one admitted use while receiving contact damage only when predicted health at completion remains above the hard floor and the item's measured benefit beats immediate attack, shield or escape. It then re-equips, resumes the still-admitted fight and reports damage received during use. Matched trials identify the first repeated controller-loss count and compare it with a separately recorded skilled-player baseline; no single win or loss establishes the breakpoint. |
 | REC3 — projectile priority | A bow skeleton or deterministic collision-path arrow is introduced during the recovery window. | Shield/evade/cover pre-empts crafting or consumption before impact; recovery resumes only from a later safe frame. No simultaneous hand-resource conflict occurs. |
 | REC4 — missing resource/no cover | Remove one ingredient, fill the food bar, block retreat, or invalidate cover in separate trials. | The controller never fabricates craftability or repeats an unchanged mutation; it stabilizes, selects an admitted alternative, or escalates an exact bounded blocker. |
 | REC5 — semantic handoff | Repeat the accepted direct fixture through authenticated MCP and then keyed Helix. | At least three consecutive sense-decide-act-observe cycles correlate the operator trace, monitor cursor, action receipts and durable-goal revision with zero duplicate effects and no hidden user gameplay. |
@@ -1830,6 +1831,54 @@ bad-break fixture that must refuse recovery. Randomized perturbations are an
 evaluation layer only after these deterministic fixtures pass; fixture timing
 and expected branch must remain hidden from the controller but recorded for
 replay.
+
+REC2C adds a second recovery policy; it does not weaken REC2B. `safe_break`
+continues to require verified separation or cover. `pressure_commit` permits a
+bounded main-hand use without separation only when a fresh risk frame proves
+all of the following:
+
+- the exact item, use duration and expected vanilla effect are admitted;
+- the item can finish before `health - predicted_damage_through_completion`
+  reaches the hard floor, including a configurable uncertainty margin;
+- current hunger/effect state allows the expected benefit;
+- the benefit is relevant on the encounter timescale (mushroom stew restores
+  hunger but is not immediate healing; a golden apple is the first
+  direct-survival calibration item);
+- no higher-priority projectile, lethal, authority, containment or manual-input
+  transition is active; and
+- one main-hand owner holds the use resource until completion or a typed
+  cancellation. The controller never attacks and consumes in the same tick.
+
+The horde ladder uses counts `3, 5, 7, ...` until the first candidate failure,
+then brackets the boundary one zombie at a time. Each count receives at least
+five controller trials from the same reset snapshot. A provisional controller
+breakpoint is the first count with at least three losses in five trials. The
+same fixture and visible rules are offered to a skilled human for at least five
+trials; an actionable controller gap exists when the human succeeds at least
+four times where the controller loses at least three. Record survival, kills,
+terminal reason, minimum health, time-to-first-use, completed/canceled uses,
+damage and hits during use, skipped and completed attack opportunities, target
+switches, contact time, movement modes, item/effect deltas and full control
+release. This is an arena-relative comparator, not a universal player-skill
+rating.
+
+Target admission is also separated from entity classification. A zombie may be
+`hostile_by_type` without being an `actionable_threat`. Runtime Codex must admit
+an encounter posture (`engage`, `avoid`, `ignore`, or `deflect_only`) plus a
+bounded predicate over exact entity incarnation, targeting state, reachability,
+containment, path intersection and protected-region context. The resident
+controller may react only to entities satisfying that predicate. Thus a named
+or intentionally retained hostile behind a verified closed barrier can remain
+observed and ignored, while a zombie targeting the player inside the arena can
+be engaged. Type-only automatic attack remains a diagnostic compatibility mode,
+not the target production contract.
+
+The later ghast case composes concurrent lanes rather than redefining all
+hostiles as objectives: navigation retains the strategic route, a projectile
+lane may intercept or deflect collision-path fireballs toward an admitted aim
+region, and the safety arbiter pre-empts either lane on a hard transition. That
+case begins only after REC2C and REC3 establish hand arbitration, trajectory
+freshness and stable objective resumption.
 
 The immediate implementation slice is REC0/REC1: expose and verify a general
 `consume` Player Embodiment action, retain existing `craft` semantics, and add
@@ -2053,3 +2102,1061 @@ whereas restarting the keyed CasimirBot service alone only refreshes server
 code. REC1 must still resume through the same authenticated source-only
 operation after that catalog reload; the command-authority pairing contract
 must not be repurposed as a compatibility alias.
+
+### REC1 installed-EXE private-tunnel handoff — 2026-08-28
+
+The operator switched from the repository-keyed service to the installed
+CasimirBot EXE and its bundled OpenAI Secure MCP Tunnel. The exact installed
+`tunnel-client.exe` process was present, and its app-private loopback
+`/healthz` and `/readyz` probes both returned HTTP 200. Port 1522 was already
+free, so no local Node listener was retained or replaced.
+
+The green tunnel state is transport health, not full environment-harness
+readiness. The shipped desktop controller currently forwards only to
+`/mcp/local-supervisor-coordination`; the shared state schema fixes its scope to
+`local_supervisor_coordination_and_device_check`, and the installed Device
+Check UI explicitly excludes environment actions and general MCP tools. This
+Codex task consequently exposed no CasimirBot MCP tools after the EXE switch.
+Its saved CLI aliases still target the now-absent loopback port and do not
+automatically attach the app-private tunnel to the active task.
+
+REC1 therefore cannot use the current installed tunnel for source-only pairing
+or Player Embodiment. The G8 prerequisite is an explicit profile-owned,
+developer-authorized full Helix MCP tunnel mode (or equivalent managed client
+connection) that preserves OAuth scope admission, room ownership, separately
+leased Player Embodiment and World Authority, desktop-session transport
+security, and complete credential exclusion. The existing read-only tunnel
+must remain the default; a green read-only tunnel must not silently imply or
+acquire environment mutation authority. Managed client reconnect and catalog
+re-enumeration remain part of the same G8 release blocker.
+
+### REC1 source recovery and consume-only lease preparation — 2026-08-29
+
+The owner-keyed harness was restored on port 1522 through the approved opaque
+launcher, and the disposable Fabric server was restored on
+`127.0.0.1:25566` with the existing `helix_combat_c0_world`. The isolated
+`helix-combat-c0-isolated` client joined as `DatDamPig`. The first source-only
+local handoff did not reach the server because the keyed harness had been
+started without the required `combat-c0-server` run-directory selector. The
+listener was stopped through its retained terminal, relaunched with
+`HELIX_MINECRAFT_SERVER_RUN_DIR=minecraft/helix-fabric-sensor/run/combat-c0-server`,
+and the authenticated owner repeated only **Re-pair local sensing privately**.
+
+The server independently logged that pairing succeeded, the connector
+restarted, its read-only manifest was admitted, and the command lane remained
+disabled. The owner UI then observed the exact C0 projection as active with 12
+admitted read capabilities, current observation time, bound world
+`minecraft:connector:023aa276-59a`, and online subject `DatDamPig`. The owner
+reselected that fresh subject, replacing the stale re-verification state with
+an active participant-to-player binding. No World Authority was configured.
+
+The live lease editor exposed a separate fidelity defect before action pairing:
+the action contract selected 21 capabilities by default, including
+`com.casimirbot.minecraft.player.combat.guard` and
+`com.casimirbot.minecraft.player.consume`, but the UI omitted both from its
+checkbox list. An owner could therefore not prove a consume-only draft by
+visible deselection. The editor now exposes **Combat guard** and **Consume**,
+and the focused component test passes 4/4. `npm run build:client` also passed,
+and the C0-profiled keyed harness was restarted against the rebuilt client.
+
+Using the corrected UI, the owner selected exactly **Consume**, approved-
+capabilities mode, manual-input cancellation, and a one-hour lease. The
+returned projection reported active authority, one capability, and manual
+input cancellation. The next browser action is **Pair local player privately**,
+which creates the separately scoped action credential. That action is held at
+the action-time confirmation boundary; no Player Embodiment credential was
+created in this continuation, no consume workflow was attempted, and the
+staged A1 fixture was not mutated. REC2, Nether, and Wither remain NO-GO.
+
+### REC1 installed-EXE full-tunnel convergence check — 2026-08-29
+
+The isolated C0 fixture remained intact while the installed-node route was
+rechecked. An independent Fabric server-console read observed `DatDamPig`
+online with health `20.0`, food `13`, saturation `0.0`, one
+`minecraft:mushroom_stew`, no bowl, and no hostile fixture. The C0 room source
+remained fresh with 12 admitted read capabilities and bound world
+`minecraft:connector:023aa276-59a`. Its Player Embodiment lease projected one
+exact capability, **Consume**, manual-input cancellation, and a finite
+one-hour expiry, but remained `waiting for client`. No action or inventory
+mutation occurred.
+
+The current alpha.11 `win-unpacked` CasimirBot EXE was then launched directly.
+Its native service and bundled `tunnel-client` 0.0.13 started successfully.
+The signed-in `qte-demo-dev@casimirbot.local` profile was independently
+confirmed as a developer account. Device Check initially projected
+`Ready · tunnel-client 0.0.13 · Read only coordination`, matching the required
+restart default. Through the explicit native stop/start boundary, the operator-
+authorized session selected **Start full developer MCP**; Device Check then
+projected `Ready · tunnel-client 0.0.13 · Full developer MCP`. This mode switch
+does not itself grant room, source, Player Embodiment, World Authority, or
+terminal authority.
+
+The already-open Codex task retained its installed Device Check plugin schema.
+An authenticated `helix_environment_device_check` call succeeded through the
+new full tunnel for EXE room
+`shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef` and returned a
+valid credential-free device-check list with zero devices. The task's callable
+catalog still contained no environment action, subject, source-pair, player-
+pair, or player-action tools. This proves native full-tunnel transport and the
+cached-client catalog divergence separately; it does not prove authenticated
+REC1 action readiness.
+
+The EXE room currently has no environment binding. Its next credential-creating
+action is **Pair in game**, held at the explicit action-time confirmation
+boundary. After source admission, the already-confirmed **Pair local player
+privately** action can stage the isolated client credential. Authenticated MCP
+consume still additionally requires a managed Codex catalog refresh or a new
+full-MCP client attachment. REC2, Nether, and Wither remain NO-GO.
+
+### REC1 installed-EXE connector admission and direct replay — 2026-08-29
+
+The installed desktop session boundary admitted source pairing and room ingress
+but rejected the independently authenticated Player Embodiment transport with
+`desktop_session_required` after its one-time pairing succeeded. The native
+guard now admits only the exact
+`/api/environment-action/v1/authorities/` connector namespace. Every route
+under that namespace still requires its separately scoped action bearer token;
+browser authority-management routes remain behind the per-launch desktop
+session. Focused desktop-session and MCP transport tests passed 28/28.
+
+The Fabric connector client also pins HTTP/1.1 so Java does not attempt an h2c
+upgrade through the Node transport. Its focused connector tests, Fabric sensor
+build and Player Agent build all passed. The rebuilt alpha.11 EXE then reported
+the exact C0 source fresh, subject `DatDamPig` selected, consume-only authority
+active, and the paired client ready with 21 declared capabilities. World
+Authority remained disabled.
+
+A first replay timed out with controls released because Peaceful difficulty
+refilled hunger to 20 before use. That was a rejected fixture, not an acceptance
+result. After restoring Normal difficulty with no hostile entity and staging a
+bounded Hunger effect, the accepted direct fixture began at food `13`,
+saturation `0.0`, health `20.0`, mushroom stew x1 and bowl x0. Workflow
+`direct_player_action_workflow:fa76fdce-7254-4be8-8364-c2f4a611ca46`
+succeeded in 32 use ticks with food `13 -> 19`, saturation
+`0 -> 7.2000003`, health unchanged, stew `1 -> 0`, bowl `0 -> 1`, zero world
+mutations, no manual override and controls released. Independent server-console
+reads matched every material postcondition.
+
+The A1 fixture is restaged at food `15`, saturation `0.0`, health `20.0`, one
+stew, no bowl and no hostile. OAuth reauthorization for
+`casimirbot_g2_a1_local` completed successfully, and the configured server
+catalog includes `helix_minecraft_player_action`. This already-running Codex
+task still holds its pre-login callable catalog, so the authenticated consume
+requires one client-host catalog refresh. No MCP consume was simulated through
+the direct lane, and maturity is not promoted. REC2, Nether and Wither remain
+NO-GO.
+
+### REC1 authenticated MCP A1 pass — 2026-08-29
+
+After the Codex client-host reload, the local MCP profile still failed to
+attach because its keyed port-1522 listener and the isolated Fabric server had
+both exited with the previous app process. The MCP profile and OAuth session
+were valid. The profile allowlist was corrected to include the already
+registered `helix_environment_source_pair_local` tool, the owner-keyed harness
+was restored through the approved opaque launcher with the exact
+`combat-c0-server` selector, and all three required health routes returned
+HTTP 200. The disposable Fabric server was restored with Java 21, the existing
+`helix_combat_c0_world`, and its 640 MiB ceiling. Docker, WSL, the preserved
+Nether world and unrelated processes were untouched.
+
+The authenticated source-only handoff rotated the exact existing Fabric
+binding without requesting command or action credentials. The dedicated
+server claimed the opaque inbox, admitted its 12-capability read-only manifest,
+and explicitly kept the command lane disabled. The still-open isolated client
+was rejoined to `127.0.0.1:25566`. The room then projected a fresh active source
+and online `DatDamPig`; the participant re-verified the new subject at producer
+epoch `adapter_epoch:6c62552b30ff0e670e562fac3a4d5fbfa6cddd02`.
+
+The source rotation correctly invalidated the prior action binding. A new
+one-hour Player Embodiment lease was created for exactly
+`com.casimirbot.minecraft.player.consume`, approved-capabilities mode and
+manual-input cancellation. The action pairing was staged opaquely and moved,
+without reading it, from the default Minecraft profile into the isolated
+`.minecraft-helix-c0` inbox. The client admitted a 21-capability manifest and
+fresh heartbeat. Readiness reported no active workflow, no asserted controls,
+no manual input and no emergency-stop latch.
+
+The MCP actor-status preflight exposed a separate retained-grant defect:
+`room_read_grant_identity_mismatch` after the environment-binding rotation.
+No read grant or World Authority was expanded. Instead, the retained dedicated
+server console supplied independent read-only fixture evidence. It confirmed
+health `20`, food `15`, saturation `0`, mushroom stew `1` and bowl `0`.
+
+The first authenticated action was intentionally retained as failed evidence.
+Workflow `environment_action_workflow:6b44e434-f497-4550-bd7e-7f2c07bd7da5`
+consumed the stew and produced the bowl with food `15 -> 20`, saturation
+`0 -> 7.2000003`, unchanged health, zero world mutations and released controls,
+but correctly failed the requested `minimum_food_gain=6` because Minecraft's
+food cap allowed only a five-point gain. This was a fixture/assertion mismatch,
+not an execution failure, and it was not replayed under the same idempotency
+key.
+
+The isolated fixture was then restored through the dedicated test console to
+the canonical health `20`, food `14`, saturation `0`, stew `1`, bowl `0` state.
+The second logical MCP action completed successfully:
+
+- workflow: `environment_action_workflow:10e69d62-6341-485e-8c35-ba3d65700bcc`
+- execution: `environment_action_execution:295424ef-68f5-4bc5-a9ef-cf91ebbe242e`
+- evidence: `environment_action_evidence:2c7942ac1f657ea1b2e41640ba41c69ca88bc13c9`
+- duration: 34 synchronized client ticks, including 33 use ticks
+- food: `14 -> 20`; saturation: `0 -> 7.2000003`; health: `20 -> 20`
+- mushroom stew: `1 -> 0`; bowl: `0 -> 1`; inventory mutations: `1`
+- world mutations: `0`; manual override: none; controls released: true
+- model invoked inside connector: false; host access: false; automatic replay: false
+
+An independent dedicated-server read matched health `20`, food `20`, saturation
+`7.2000003`, no stew and one bowl. The post-action connector inspection showed
+the consume-only authority still active, heartbeat fresh, zero active workflows,
+controls unasserted and no manual input or emergency stop. The in-game proof
+screenshot is recorded at
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-29-rec1-a1-mcp/minecraft-post-consume.png`
+with SHA-256
+`720F27F7F64F301547BE05662FBB26ED41C067C8502769281269AD14B57EECD0`.
+
+This satisfies the REC1 authenticated MCP A1 evidence requirement and closes
+the scoped REC0/REC1 acceptance objective. It does not close G8 or authorize
+REC2, Nether or Wither progression. Per the goal boundary, all three remain
+NO-GO in this continuation.
+
+### Combat Inventory Recovery v1 / REC2 goal activation — 2026-08-29
+
+The next bounded goal is REC2, not the full Nether journey and not REC2A crowd
+pressure. The user-supplied soup-PvP inventory image is comparative operator
+evidence for rapid inventory use under damage; it is not a prescribed loadout,
+vanilla-healing claim, or permission to encode mushroom-stew strategy in the
+controller. Vanilla mushroom stew restores food and saturation. Any later
+health regeneration remains a separately observed consequence of the active
+game rules.
+
+The frozen first direct program is
+`scripts/fixtures/minecraft-combat-rec2-inventory-recovery-v1.json`. Runtime
+Codex may author an equivalent bounded program from fresh state, but the
+fixture defines the deterministic capability benchmark and evidence fields:
+
+```text
+stable hostile-clear envelope
+  -> recipe craftability checkpoint
+  -> craft exactly one admitted output
+  -> verify output inventory delta
+  -> consume exactly one admitted item
+  -> verify food and remainder delta
+  -> explicitly re-equip the reasoning-selected weapon
+  -> re-engage only through admitted combat policy
+  -> verify the newer combat/player state and release all controls
+```
+
+One health-floor interrupt may cancel the inventory lane and activate a
+separately declared defensive stabilization lane. A handled interrupt proves
+preemption and control release, not recovery-goal completion; the exact partial
+inventory state must re-enter Runtime Codex before a revised program may run.
+The controller may not replay a mutating craft, consumption, or attack from an
+ambiguous receipt.
+
+The initial code audit found that `attack` and `combat_guard` were valid typed
+Player Embodiment actions and standalone live capabilities, but both were
+absent from the reactive scheduler's TypeScript and Fabric resource maps. That
+made a model-authored `fight -> recover -> re-engage` program fail before
+execution even with an explicit combat scope. The shared correction assigns
+exact camera/hand/locomotion/native-workflow locks and requires
+`mutation_scope.combat_allowed=true`; it neither selects a target nor invents
+a recovery branch.
+
+REC2 acceptance requires one equivalent-state direct A0 run and then one
+authenticated MCP A1 run. Each must preserve the program hash, authority and
+subject/world identity, initial ingredient/food/health state, condition
+changes, action receipts, inventory ceiling, interrupt outcome, minimum health,
+food/stew/bowl deltas, combat outcome, timing, zero world mutation, and full
+resource/control release. A screenshot is afterward-only corroboration. REC2A,
+keyed Helix B parity, unknown-world Nether progression and Wither progression
+remain NO-GO until this narrower chain passes.
+
+### REC2 direct A0 and authenticated MCP A1 live acceptance — 2026-08-29
+
+The generic reactive protocol repair is complete. Reactive programs now admit
+`attack` and `combat_guard` only when `mutation_scope.combat_allowed=true`, and
+the TypeScript and Fabric schedulers assign their exact camera, locomotion,
+hand and native-workflow resources. The public connector catalog now describes
+the same combat actions plus craft and consume shapes accepted by the trusted
+parser. Noncombat fluid sequences retain literal `combat_allowed=false`.
+
+The frozen program is SHA-256
+`701E715624A92288DBCF99DF3C80CBB9D9B34FF7B7C0706D9E0B2B2AA4046BA5`.
+Its final graph requires a hostile-clear envelope, craftability, one stew
+craft, measured consumption, food recovery, explicit reasoning-selected iron
+sword re-equipment, and bounded zombie re-engagement. The declared inventory
+ceiling is three; the graph cannot add another inventory-affecting action
+without failing validation.
+
+The live diagnostic sequence retained three informative fail-closed results:
+
+- the first run completed craft and consumption but observed no admitted
+  hostile, proving only the inventory chain;
+- the next visible-hostile run reduced the tagged zombie from health `20` to
+  `4.020001` but exhausted 32 bare-hand attack pulses after consumption left
+  the recovery item path selected; and
+- the first re-equipment retry timed out at the hostile-clear checkpoint after
+  the prior chase displaced the player inside the four-block safety radius.
+
+The repaired direct A0 fixture restored the known open arena pose and began at
+health `20`, food `15`, saturation `0`, bowl x1, red mushroom x1, brown
+mushroom x1, iron sword x1, shield x1 and one visible tagged zombie. Workflow
+`direct_player_action_workflow:03fe8c8c-e39c-4400-ba11-0c01358e307e`
+succeeded in 106 synchronized client ticks. Craft succeeded at tick 4,
+consume at tick 37, weapon equip at tick 37 and combat guard at tick 106.
+There were two inventory mutations, zero world mutations, no interrupt or
+manual override and every resource/control was released. Independent server
+reads confirmed health `20`, food `20`, saturation `7.2000003`, bowl x1,
+iron sword x1 and no tagged zombie.
+
+The first A1 submission then exposed the expected running-service schema
+boundary: the old keyed service still required reactive
+`combat_allowed=false`, so no workflow was created. The exact keyed Node
+listener was restarted through the opaque launcher after supervisor
+coordination showed no active competing client. The room survived, the source
+credential was rotated read-only after expiry, and DatDamPig was re-verified
+at producer epoch
+`adapter_epoch:afce61ca4673c3538e4c316b0aa0221de295d1c0`. A new
+guardian-only Player Embodiment lease was paired opaquely:
+
+- environment binding:
+  `environment_binding:legacy:207e917c2f59fc92062bdcf568c509e8db419cff`
+- subject binding:
+  `environment_subject_binding:a647bf6d-a22e-42f7-a6c2-65d3e5640aad`
+- action authority:
+  `environment_action_authority:04f69a80-5710-48fe-a3e7-aa5a48611a43`
+- allowed capability:
+  `com.casimirbot.minecraft.player.guardian.execute`
+
+The final A1 fixture began at health `20`, food `14`, saturation `0`, the same
+ingredient/weapon inventory and the same bounded tagged-zombie geometry.
+Authenticated MCP workflow
+`environment_action_workflow:3109f77d-7015-4b91-b132-c311252b5caf`
+succeeded in 107 synchronized client ticks:
+
+- request: `environment_action_request:8ff2dd58-5253-4b73-a208-dcce0d688898`
+- execution:
+  `environment_action_execution:9359861e-7e16-4cd0-a5b3-8819c1c65e0c`
+- evidence:
+  `environment_action_evidence:0895c26a223251ebc5a413b6a2fbca989a6f0deae`
+- craft tick 5; consume and sword equip tick 38; combat completion tick 107
+- two inventory mutations; zero world mutations; no manual override
+- no connector-side model, host access or automatic replay
+- all lanes settled and every held resource/control released
+
+Independent server reads again confirmed health `20`, food `20`, saturation
+`7.2000003`, bowl x1, iron sword x1 and no tagged zombie. The direct capture,
+comparison trace, A1 summary and afterward-only screenshot are under
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-29-rec2-a0/`.
+The screenshot SHA-256 is
+`FE812CAB4B7828AE6EC5E52840F44C0D3698CAFB99CDE5E6EA2D673B783557D0`.
+
+This promotes only the bounded REC2 capability slice to `live accepted`.
+REC2A latent recovery is now unblocked as the next arena goal, but it is not
+yet accepted. Keyed Helix B parity, unknown-world Nether progression and
+Wither progression remain NO-GO pending their own evidence.
+
+Final deterministic verification passed 25 of 25 focused TypeScript contract
+tests, the focused Java scheduler tests, and the full Fabric build with five
+GameTests. The installed remapped Fabric agent JAR is SHA-256
+`751C3D9156DF661BBCF378172A9498ECA2EA64A8C529EBC45001BF020D4D5883`.
+The canonical environment-harness documentation audit passed with active gate
+G8, 36 capability-status rows, 14 acceptance claims and zero failures.
+
+### REC2A latent combat recovery implementation contract — 2026-08-29
+
+Primary lifecycle stage: execution. Secondary stages are tool admission,
+evidence normalization and semantic re-entry. This slice remains inside active
+program gate G8 and extends the already accepted C0/REC2 arena capability; it
+does not depend on or perturb an open prerequisite.
+
+REC2A freezes one provider-neutral reactive program at
+`scripts/fixtures/minecraft-combat-rec2a-latent-recovery-v1.json`. Its only
+immediate required lane is ordinary bounded zombie combat. Craft, consume,
+re-equip and resumed combat exist only in a dormant interrupt lane. The
+program contains no damage timestamp, fixture command, scheduled meal or
+adapter-authored target. The external arena fixture introduces the recorded
+health transition only after physical combat has begun, and the resident
+scheduler sees only the resulting ordinary health observation.
+
+The first-divergence audit found that `combat_guard` could defeat hostiles but
+could not settle a deliberate separation maneuver while those hostiles still
+existed. The generic correction adds an optional `combat_mode`:
+
+- `engage` preserves the existing target, cooldown, retreat and attack
+  behavior; and
+- `disengage_to_distance` suppresses every attack pulse, tracks the closest
+  visible eligible hostile, retreats through the existing collision-checked
+  movement primitive and succeeds only after every visible eligible hostile
+  is at least `retreat_stop_distance` away.
+
+The mode is reasoning-selected data in the typed action schema and public
+catalog. It does not choose when to eat, set a health threshold, identify a
+target class, invent a route, perform a fixture mutation or grant combat
+authority. Its terminal receipt must retain `combat_mode`, minimum hostile
+distance, `safe_separation_reached`, retreat ticks, zero attack pulses and
+control release.
+
+The frozen recovery trigger is a one-shot same-tick health condition:
+`health_at_least: 16`, observed as `not_satisfied`. It cancels the required
+opening-combat lane and activates exactly one dormant recovery lane. That lane
+must then establish seven-block hostile separation, independently verify a
+six-block hostile-clear envelope, verify recipe craftability, craft one stew,
+consume it above the hard health floor, verify food at least 18 and health at
+least 10, re-equip the iron sword and resume bounded combat. The mutation
+ceiling remains three inventory-affecting actions and zero world mutations.
+
+Acceptance uses matched control and treatment runs from equivalent C0 state:
+
+1. **No-perturbation control:** opening combat settles without activating the
+   interrupt, crafting, consuming or changing the ingredient inventory.
+2. **Latent-trigger treatment:** physical combat starts first; a separately
+   recorded bounded damage transition crosses the threshold; preemption occurs
+   within one client tick; disengagement performs zero attacks; exactly one
+   stew is crafted and consumed; a later verified frame satisfies the resume
+   rules; the sword is restored; and the original fight settles.
+3. **Fail-closed floor:** any action that observes health at or below five
+   stops rather than forcing inventory use or replay. REC2B will separately
+   test missing food, unreachable separation and other bad-break branches.
+
+Record the program hash, player/world/authority identity, external
+perturbation receipt and tick, threshold-to-preemption ticks,
+preemption-to-separation ticks, separation-to-consumption ticks, hits after the
+trigger, minimum health, ingredient/stew/bowl/food deltas, action receipts,
+interrupt count, zero world mutation and final control/resource release.
+Equivalent-state direct A0 must pass before authenticated MCP A1. Keyed Helix
+B, REC2B, unknown-world Nether progression and Wither progression remain
+outside this slice.
+
+### REC2A direct A0 live acceptance and first-divergence repair — 2026-08-29
+
+The final direct program is SHA-256
+`8D71CE6C1A0159CD3FD03E2FE14E58E268300642C52177A355112D2A750307F5`.
+The final installed remapped Player Agent JAR is SHA-256
+`AB2663106EB8C512D696A2A1787355D8BA7B9EC107D6231FC6509740D1CEF9D1`
+and carries combat-controller artifact version `1.3.1`.
+
+The live sequence retained two useful rejected attempts. Two early
+perturbations arrived after the short opening fight had already settled and
+therefore did not qualify as latent-trigger evidence. After replacing only the
+fixture zombie with a 200-health, zero-damage equivalent, one treatment exposed
+a real controller divergence: looking at the pursuer while holding backward
+could not create separation. The attempt failed closed at the disengagement
+timeout with minimum hostile distance `0.7548506259918213`, zero attack pulses,
+zero mutations and controls released.
+
+The generic repair does not slow the fixture or script an escape path.
+`disengage_to_distance` now orients away from the closest admitted hostile,
+uses forward sprint when the camera reaches that direction and tries the
+existing collision-checked deterministic flank alternatives when the direct
+step is blocked. Engage mode still tracks the hostile normally. The scheduler
+also normalizes the native consume receipt's `consumed_count` into the
+program-level `consumed_item_count` and retains the bounded combat separation
+measurements required by acceptance.
+
+The matched final-artifact A0 pair then passed:
+
+- control workflow
+  `direct_player_action_workflow:401dd018-3254-4c8d-bd0c-f93e27357f44`
+  completed at tick 397 with one engage action, 34 attack pulses, zero
+  interrupts, zero consumption, zero inventory/world mutations and controls
+  released;
+- treatment workflow
+  `direct_player_action_workflow:4b3286f7-b513-4fa5-934d-fa612a87083c`
+  observed the external health transition `20 -> 15`, fired the authored
+  interrupt once, canceled opening combat, and reached verified 7.045-block
+  separation at tick 212 with zero disengagement attack pulses;
+- the dormant lane then crafted and consumed exactly one stew, reported
+  program-level `consumed_item_count=1`, re-equipped the iron sword at tick
+  248, resumed combat for 28 attack pulses, cleared the zombie and settled at
+  tick 635; and
+- treatment totals were two inventory mutations, zero world mutations, no
+  manual override and full resource/control release.
+
+The public captures and comparison summary are under
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-29-rec2a-a0/`.
+This promotes only REC2A direct A0 to `live accepted`. Authenticated MCP A1 is
+still required before REC2A as a whole may be promoted. On the first A1
+preflight, the keyed server reached `app ready`, but the old Fabric source
+credential expired and stopped its loops fail-closed. The currently loaded
+Codex catalog exposes only the read-only Device Check plugin, and no browser
+control surface is attached, so the credential-opaque
+`helix_environment_source_pair_local` handoff has not yet been invoked. No
+credential was read, copied or replaced through a manual fallback.
+
+### REC2A authenticated MCP A1 live acceptance — 2026-08-30
+
+The restarted Codex client loaded the full OAuth MCP catalog with all required
+room-read and environment-action scopes. The existing C0 room was recovered,
+the read-only Fabric credential was rotated through the opaque same-host
+handoff, `DatDamPig` was re-verified against the fresh producer epoch, and a
+one-hour `approved_capabilities` authority was issued for only
+`com.casimirbot.minecraft.player.guardian.execute`. The action connector then
+reported an admitted 21-capability manifest, a fresh active heartbeat, no
+manual input, no emergency-stop latch and zero asserted controls.
+
+The action-plane adapter identity is `minecraft.fabric_client.v1`; the source
+plane remains `minecraft.fabric_mod.v1`. An initial configure call used the
+source label for the action plane and correctly failed before issuing an
+authority. The corrected action-adapter identity succeeded without widening
+the requested capability set.
+
+The matched authenticated pair passed on the unchanged program and JAR:
+
+- control workflow
+  `environment_action_workflow:3497d5be-b08a-40f7-be66-8989c12bc185`
+  completed in 410 synchronized ticks with 35 attack pulses, zero interrupts,
+  zero consumption, zero inventory/world mutations and controls released;
+- one treatment timing diagnostic
+  `environment_action_workflow:83eb3a59-79c6-4fdf-a110-0697e9b54064`
+  is excluded because the interactive console write serialized behind MCP and
+  arrived after terminal completion;
+- accepted treatment workflow
+  `environment_action_workflow:4b4a8263-de5d-4d1c-81c4-520eb5eeeb08`
+  began normal combat before a separate localhost-only arena RCON actor
+  recorded exactly five generic damage and health `20 -> 15`;
+- the watchdog crossed its threshold at tick 68, canceled opening combat and
+  reached 7.0045-block separation at tick 118 with zero disengagement attacks;
+- it crafted at tick 120, consumed one stew and re-equipped the sword at tick
+  154, resumed combat for 30 attack pulses and settled at tick 540; and
+- totals were one interrupt, five actions, two inventory mutations, zero world
+  mutations, no manual override, no connector-side model/replay/host access
+  and full resource/control release.
+
+Independent afterward reads found health 20, food 19, saturation 0, one bowl,
+one iron sword, no stew or mushroom ingredients and no tagged zombie. The
+sanitized summary and afterward screenshot are under
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-30-rec2a-a1/`.
+The screenshot SHA-256 is
+`C4F9E2F14991E9AE3E7D33BB7ED5F73BD75FFA68213E073FD99845360FF16070`.
+
+This promotes the bounded REC2A slice to `live accepted`. It does not promote
+REC2B bad-break recovery, keyed Helix B parity, unknown-world Nether
+progression, PvP or Wither progression.
+
+### REC2C pressure-commit exploratory A1 and first evidence gap — 2026-08-30
+
+The next bounded slice separates direct-survival consumption from the accepted
+REC2A safe-break policy. A frozen reactive fixture now admits one low-health
+interrupt, exact golden-apple use, sword re-equip and resumed zombie combat.
+The deterministic TypeScript contract passes 19/19 tests. This fixture is an
+evaluation artifact, not yet a predictive damage-risk controller.
+
+Open-floor controls cleared five adult zombies in 239 ticks with 18 attacks and
+seven adults in 335 ticks with 26 attacks; afterward health remained 20 in both
+single exploratory trials. A close nine-adult surround also cleared without a
+recovery trigger. These are not breakpoint samples because each count has only
+one run and the open retreat geometry did not generate pressure.
+
+A temporary inner ring plus seven baby zombies produced the first genuine loss.
+The guardian timed out at 1,200 ticks with four survivors after 13 attacks, then
+released controls. The survivors killed the player before setup cleanup arrived.
+This does not establish the count-seven breakpoint, but it proves that terminal
+control release is not a sufficient safe handoff while admitted live threats
+remain. A required failure must retain a bounded defensive/containment owner or
+emit a synchronous fixture-stop request before action ownership settles.
+
+After two discarded setup attempts exposed healing from an uncleared Instant
+Health effect, the accepted exploratory sequence began from independently
+verified health 17 with passive natural regeneration disabled. Authenticated
+workflow `environment_action_workflow:7e6cbf20-d74b-4687-9aa3-4e86f375418f`
+triggered recovery at tick zero, consumed exactly one golden apple at tick 33,
+re-equipped the iron sword at tick 33, then cleared five adult zombies by tick
+179 with 13 attacks. Independent afterward reads found health 20, absorption 4
+and two apples remaining. The run had one interrupt, two inventory mutations,
+zero measured world mutations and full control release.
+
+The receipt proves ordered `consume -> re-equip -> resume -> clear` execution
+while live hostiles were released, but it does not expose minimum health,
+health-loss event count or damage received during the 33 use ticks. Therefore
+it does not yet prove that a zombie strike landed while the use key remained
+held. REC2C remains `specified` plus exploratory A1 evidence, not live accepted.
+The next implementation increment adds those use-window measurements, a
+damage-through-completion risk margin and hazard-safe terminal settlement before
+repeating five trials per count. Evidence is under
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-30-rec2c-a1/`;
+the screenshot SHA-256 is
+`02165C89D47680B12790D65AE9AFBF85DDB2379F4820025A62C729BA1808C94E`.
+
+The first measurement increment is now implemented in the native Fabric
+workflow engine. Every admitted `consume` receipt reports
+`minimum_health_during_use`, `observed_health_loss_during_use` and
+`health_loss_event_count_during_use`; the scheduler retains those fields in
+the authenticated MCP result. Adapter artifact version `0.4.1` was deployed
+from JAR SHA-256
+`497BE8BC50B02AC2C2AC7B25334462E5ED9CCF5A8EF0FD192573D7010D0518E3`.
+The focused TypeScript contract passed 19/19, the Java 21 test/build and all
+five Fabric GameTests passed, and the environment-harness documentation audit
+passed.
+
+Measured authenticated workflow
+`environment_action_workflow:af6f96d0-597a-45f6-bba1-5bb0775b50c3`
+repeated the low-health five-baby pressure sequence. It consumed one golden
+apple over 31 use ticks, re-equipped at tick 32 and cleared the horde at tick
+250 with 19 attack pulses. The new receipt measured minimum health 17, zero
+health-loss events during use and zero observed health loss during use. A
+seven-baby low-health repeat also consumed and cleared, but likewise measured
+zero use-window health loss.
+
+Full-health reactive trials then admitted live baby-zombie counts 7, 11, 15
+and 16. All four cleared without crossing the health interrupt: respectively
+11 attacks/121 ticks, 20/229, 32/373 and 34/397. A five-opponent sustained
+pressure variant with Speed III, Strength II and Resistance II also cleared in
+289 ticks with 25 attacks and no interrupt. These are single exploratory
+trials, not the frozen five-run breakpoint bracket, and the status remains
+`exploratory_not_accepted`. They establish that raw count through 16 is not the
+observed limiting variable in this tight-ring setup; the controller suppresses
+contact faster than ordinary zombies can produce the intended pressure event.
+The next arena rung must vary sustained threat geometry or projectile pressure,
+while preserving a human-comparable opponent contract, rather than increasing
+zombie count alone.
+
+The implementation still does not provide source-attributed damage, bounded
+hazard ownership after a failed workflow, contextual target admission, or the
+five-trial controller-versus-human breakpoint bracket. Those remain the REC2C
+acceptance blockers. The temporary ring and tagged fixtures were removed,
+natural regeneration was restored, effects were cleared and the player was
+returned alive at health 20.
+
+### REC2C installed-EXE MCP transport/catalog preflight — 2026-08-30
+
+The next C0 continuation intentionally preferred the installed CasimirBot EXE
+and its private tunnel over browser or desktop-input execution. The arena
+server and Minecraft client remained running, but restarting the installed EXE
+created a fresh service instance and left Device Check with zero paired
+devices. No hostile fixture or environment mutation was admitted during this
+preflight.
+
+The native desktop UI reported `Ready · tunnel-client 0.0.13 · Full developer
+MCP`, and the existing Codex client automatically reattached to service
+instance `service_instance:a899ee6276a95ea38b8ac07cb5efcb65` without a Codex
+application restart. The callable client catalog nevertheless remained the
+read-only Device Check catalog: exactly one environment tool was present, and
+the source-pair, subject, Player Embodiment, controller and finite action-pulse
+tools were absent. A native transition request then returned `Tool
+helix_desktop_tunnel_transition_request not found` while that tool remained in
+the Codex-side catalog. A room-list observation on the same authenticated
+profile returned `account_policy_blocked`, even though the desktop retained the
+active local `qte-demo-dev@casimirbot.local` session.
+
+The tunnel process itself remained alive. A secondary diagnostic exposed a
+separate Windows plugin-integration defect: the Tunnel MCP selector rejected
+the installed, currently running 21.8 MB `tunnel-client.exe` as “not an
+executable file.” Invoking that binary's native `runtimes list --json` command
+directly succeeded and reported no managed runtime aliases, which is consistent
+with the EXE owning its tunnel lifecycle rather than the plugin runtime
+inventory.
+
+This is a transport/catalog convergence failure, not a REC2C controller or
+Minecraft-play failure. The next implementation increment must make the full
+catalog selection, authenticated account policy and tool-list refresh converge
+for the already-attached Codex continuation, then re-pair the exact C0 Fabric
+source opaquely on the fresh service instance. Only after Device Check is fresh
+and the bounded action-pulse tools are callable may the mixed-pressure arena
+test resume. REC2C remains `exploratory_not_accepted`; REC2B, Nether, PvP and
+Wither maturity are unchanged.
+
+### REC2C native full-MCP convergence repair and live transition — 2026-08-30
+
+The transport/catalog preflight produced two concrete server defects and one
+remaining client-lifecycle limitation.
+
+First, the full MCP router selected ordinary bearer authentication whenever an
+`Authorization` header was present, even when the native tunnel had also
+injected its protected desktop session headers. Tunnel-client 0.0.13 can
+forward both. The router now gives the protected native desktop delegation
+precedence whenever either protected native header is present; bearer-only
+clients retain their previous path. The native full-agent delegation scope set
+was also completed with agent-run, room/source, environment-action, brokerage,
+supervisor and tunnel-transition scopes. The focused transport suite passed
+21/21.
+
+Second, the read-only coordination catalog pre-advertised only room controls.
+It now pre-advertises exact-schema, fail-closed transition shadows for source
+pairing, subject selection, environment authority, local player/server pairing,
+Minecraft actor status, finite player actions and workflow control. Every
+shadow returns typed `full_mcp_transition_required` with
+`mutation_executed=false` before the full transport is active. Exact schema
+parity and fail-closed coverage passed 14/14. The server build and desktop host
+build passed; the unpacked desktop artifact was produced before packaging later
+stopped at icon conversion because Windows could not allocate another WebAssembly
+memory block. No Minecraft, Docker or Fabric process was stopped by that build
+failure.
+
+Live acceptance then launched the repaired unpacked CasimirBot host against the
+existing local developer profile. The active Codex continuation registered with
+fresh service instance
+`service_instance:46c0f88c7b6ba1628dce16ae0e0c7674`, created a bounded
+300-second transport request, received explicit native UI delegation and
+executed the transition. The desktop independently reported
+`Ready · tunnel-client 0.0.13 · Full developer MCP`. This proves that native
+presence, developer policy and the full transport now converge without a Codex
+application restart.
+
+The already-open Codex turn did not apply the requested tool-list refresh. Its
+callable catalog remained the immutable pre-transition snapshot containing only
+`helix_environment_device_check`, and an inspect call issued after the transport
+switch remained pending until canceled. Therefore no source credential,
+environment authority, hostile fixture or Minecraft action was admitted in this
+turn. The repaired transition-shadow catalog makes a subsequent catalog
+initialization stable, but the current Codex client still needs to honor the MCP
+`tools/list_changed` notification (or refresh tools at a turn boundary) before
+seamless same-turn play is proven. This is now the sole pre-play blocker for the
+resumed C0 mixed-pressure test; the Fabric arena server on 25566 and Minecraft
+client remain retained.
+
+### REC2C endpoint-aware opaque re-pair and installed-profile finding — 2026-08-30
+
+The next continuation rebuilt and packaged the unpacked desktop successfully,
+deployed the remapped Fabric sensor JAR, and restarted only the C0 Fabric server
+on `127.0.0.1:25566`. Docker remained untouched. The server returned to the
+exact `helix_combat_c0_world` baseline with the command lane disabled.
+
+The opaque pairing handoff now supports a strict
+`casimirbot.local_server_pairing_handoff.v1` envelope carrying the current
+loopback redeem endpoint. The Fabric inbox accepts that envelope as well as the
+legacy plain pairing command, validates the exact loopback route and port, and
+uses the envelope endpoint instead of a stale endpoint persisted by an earlier
+ephemeral desktop service. Focused TypeScript tests passed 6/6, the Java 21
+Fabric pairing tests passed 5/5, `build:server`, `build:host`, runtime staging
+and unpacked Electron packaging passed. The deployed sensor JAR SHA-256 was
+`CC2FF5BFDD89823E6B5AFEB490CAD5B59D18C7DBC47785066200C155310B3063`.
+
+Live transition proved that Computer Control is still needed only for a broken
+bootstrap boundary, not intended steady-state play. The limited native catalog
+could register supervisor presence and request full MCP, but the consent surface
+was trapped inside a Device Check panel omitted from the current launcher. The
+same native owner operation used by that panel switched the tunnel to
+`ready · full_helix_agent`; `helix_room_list` then succeeded immediately through
+MCP without a Codex restart. The current Codex turn still did not add the
+Minecraft source, subject, status or action schemas to its advertised tool set.
+
+The authenticated desktop staged a sensing-only local handoff for the exact
+active Fabric binding without exposing the one-time code or enabling command
+access. A second release defect was then isolated: the packaged service ignored
+the selected C0 run profile and wrote the unopened inbox under its packaged
+runtime tree. After the unopened file was moved atomically, without reading its
+contents, the running server reported `Helix pairing succeeded`, followed by
+`manifest was admitted; read-only observations are active`. This is direct live
+proof that the endpoint-aware envelope and sensor consumption path work.
+
+Two pre-action blockers remain. First, the installed profile must persist and
+route the selected Minecraft run directory so opaque handoffs never depend on a
+manual file transfer or process working directory. Second, two fresh
+`helix_environment_device_check` calls returned retryable `internal_error`
+after manifest admission, while the same full MCP connection continued to serve
+room reads. No Player Embodiment authority, command access, hostile fixture or
+combat action was enabled. REC2C remains `exploratory_not_accepted` until Device
+Check projects the fresh connector and the finite Minecraft action schemas are
+callable from the Codex turn.
+
+### REC2C Codex-plugin durability finding — 2026-08-30
+
+Device Check error re-entry was repaired and now returns a valid typed stale
+connector observation rather than `internal_error`. The observation identifies
+the exact C0 room and Fabric binding but reports `health=offline`,
+`freshness=stale`, `probe_ready=false`, and `contact_stale`. This is useful
+evidence, not gameplay readiness.
+
+The remote Device Check v2 plugin declaration was then refreshed and visibly
+advertised the environment subject, opaque source-pair, actor-status, player
+action, and workflow controls. The current Codex task retained its older
+catalog, proving that remote schema publication and existing-task catalog
+adoption are separate lifecycle events. In addition, the full `/mcp` surface
+was found to omit its own governed transition controls. That discontinuity is
+now repaired and covered by a focused passing test; the server production build
+also passes.
+
+The product boundary for the resumed C0 test is now explicit:
+
+1. the plugin publishes one stable superset and unavailable tools fail closed;
+2. the installed app reports transport, catalog, connector freshness, selected
+   environment, and action-authority readiness as separate states;
+3. the installed profile owns opaque connector enrollment and the selected
+   Minecraft installation/run profile;
+4. the Fabric connector discovers or is relayed to the current installed
+   loopback service without retaining an obsolete per-launch port;
+5. Codex receives only sanitized handles and readiness receipts, never tunnel,
+   connector, or environment credentials; and
+6. desktop automation remains a bootstrap/recovery fallback, never the normal
+   combat or inventory-control plane.
+
+The next implementation slice is the profile-owned local connector gateway and
+managed catalog/readiness receipt. After that installed slice is rebuilt, the
+acceptance order remains: opaque re-pair -> fresh Device Check -> exact actor
+selection -> bounded Player Embodiment -> mixed-pressure recovery/combat test.
+REC2C remains `exploratory_not_accepted`; no combat maturity changes here.
+
+### REC2C installed-service endpoint discovery implementation — 2026-08-30
+
+The installed EXE already writes an atomic, credential-free
+`casimir_desktop_service_ready_receipt/1` under its protected user-data state.
+It contains the current per-launch loopback origin and service PID, but no
+desktop-session secret. The Fabric sensor now resolves that receipt before each
+HTTP request. It accepts only the exact schema, `ready=true`, a live PID and an
+HTTP `127.0.0.1` origin; it retains the previously paired room-ingress binding
+path and bearer credential unchanged. Invalid files, dead processes, remote
+origins, HTTPS connectors and non-binding endpoints fail closed to the original
+configured endpoint.
+
+This removes the installed-app restart dependency from an already paired local
+Fabric connector without introducing port 1522, another fixed port, a model-
+visible credential, or a second planner. It does not solve first enrollment or
+select a Minecraft installation: those remain profile-owned UI/native-host
+responsibilities.
+
+Verification passed under Java 21:
+
+- focused installed-service endpoint resolver tests — 2/2;
+- full Fabric sensor test task — pass;
+- Fabric sensor remapped build — pass;
+- rebuilt `HelixFabricSensor-0.3.0.jar` SHA-256
+  `1B3F478D84AE1133E869811F8AA8B2938DA590F458F74DFE425FD8E937A436CB`.
+
+The retained C0 server is still running the previous admitted JAR. Deployment
+is intentionally deferred to its next graceful stop so a development patch
+does not terminate the live world process without a save-capable console path.
+No live freshness or combat acceptance is claimed from deterministic tests.
+
+### REC2C live installed-service endpoint recovery — 2026-08-30
+
+The retained C0 process was subsequently stopped by a console control event,
+which released only `127.0.0.1:25566`. The rebuilt sensor JAR was copied into
+the exact `combat-c0-server` profile and the same world was relaunched with a
+hidden Java 21 process. The server reported Fabric sensor `0.3.0`, prepared
+`helix_combat_c0_world`, and returned to `Done` on port 25566.
+
+The pre-restart Device Check observation was
+`mcp_evidence_observation:helix.environment.device_check.inspect:8e5f801a-e46d-4bc3-bfa5-2e71d430af57`:
+`health=offline`, `freshness=stale`, `probe_ready=false`, with
+`contact_stale`. After restart, without re-pairing or moving an inbox, the same
+room, binding, source, world and active credential produced observation
+`mcp_evidence_observation:helix.environment.device_check.inspect:2f6558af-f40d-4192-a61c-21a3efe534f4`:
+`health=online`, `freshness=fresh`, `probe_ready=true`, with no blockers and a
+5.347-second contact age. This is live proof that the Fabric connector followed
+the installed EXE's current per-launch service origin while retaining exact
+connector identity.
+
+The current Codex task still exposes none of the refreshed environment subject,
+actor-status, Player Embodiment or workflow tools in its callable catalog.
+Therefore no action authority or combat effect was attempted. The remaining
+pre-action blocker is now isolated to existing-task plugin catalog adoption;
+Minecraft sensing transport and installed-service endpoint recovery are live.
+
+### REC2C profile-owned local run selection — 2026-08-30
+
+The installed Device Check panel now includes a native **Local Minecraft
+profile** selector. The signed-in Casimir profile chooses a dedicated Fabric
+server directory through Electron's native directory picker and may later
+change or forget it. The native host validates an absolute local Windows
+directory containing `config/` and `server.properties`, stores the selection
+atomically under protected Electron user data, and keys it by the exact active
+account profile. The selected path is visible to its owner for transparency but
+is neither a credential nor accepted from MCP.
+
+The bundled service receives only the native registry-file location. Opaque
+source/server pairing resolves exactly one owner-profile entry and independently
+revalidates the dedicated-server shape before staging the inbox. Missing,
+duplicate, malformed, wrong-profile, root, UNC and non-server selections fail
+closed to the existing bounded repository profile behavior.
+
+Verification evidence:
+
+- pairing profile resolver and existing handoff tests — 7/7 pass;
+- native service environment, native profile persistence and Device Check UI —
+  13/13 pass;
+- desktop TypeScript — pass;
+- server build, client production build and desktop host/bundled-service build
+  — pass with existing unrelated warnings;
+- repository-wide TypeScript emitted no source diagnostic but exhausted its
+  4 GiB Node heap, so it is recorded as resource-cancelled rather than passed.
+
+This closes the implementation portion of profile-owned first enrollment. A
+packaged installed-node picker/re-pair trace remains required for live
+acceptance. The current C0 credential is already fresh through endpoint
+discovery, so no rotation was needed or performed here.
+
+### REC2C current-task catalog blocker audit — 2026-08-30
+
+Three consecutive goal continuations checked the current Codex task after the
+remote plugin refresh. On every continuation,
+`helix_environment_subject_list`, `helix_minecraft_actor_status`, and
+`helix_minecraft_player_action` were absent from `ALL_TOOLS` and dynamically
+undefined. The final Device Check observation,
+`mcp_evidence_observation:helix.environment.device_check.inspect:514fc185-be60-4f94-b01f-8afbb827360d`,
+simultaneously proved the C0 connector remained `online`, `fresh`,
+`probe_ready=true`, with no blocking reasons and a 5.644-second contact age.
+
+The same host catalog condition therefore repeated after server catalog repair,
+remote plugin refresh, full-surface transition continuity repair, live Fabric
+endpoint recovery, and profile-owned first-enrollment implementation. This
+task cannot grant or exercise Player Embodiment because the Codex host does not
+admit tools into an already-created task. A fresh Codex task lifecycle that
+loads the published catalog is now required. No unrelated MCP tool, browser
+receipt, desktop click, command plane, or raw HTTP path may substitute for the
+missing action schema. REC2C remains `exploratory_not_accepted` and the durable
+goal is paused at the exact pre-action boundary.
+
+### REC2C installed-profile opaque pairing and mixed-pressure boundary — 2026-08-31
+
+The restarted Codex task loaded the full installed-EXE MCP catalog. The native
+Casimir profile saved the separate player game directory
+`C:\Users\dan\AppData\Roaming\.minecraft-helix-c0`; the MCP player-pair tool
+then staged one opaque handoff into that exact profile. The running Fabric
+client consumed it without a manual file move or disclosed pairing material,
+published 21 capabilities and reached fresh `ready_for_actions=true` state.
+This is live acceptance for profile-owned local player routing. It does not
+grant World Authority or broaden the finite Player Embodiment lease.
+
+An authenticated REC2C transport rehearsal then ran the frozen
+`minecraft-combat-rec2c-pressure-commit-v1.json` program against seven NoAI
+baby zombies. Workflow
+`environment_action_workflow:9c51b92a-15dd-4c21-a9a9-e0e2ddf5ad7e`
+crossed the health interrupt, consumed one golden apple in 33 use ticks,
+re-equipped the iron sword and cleared the frozen targets with 24 attack
+pulses in 312 ticks. It performed two inventory mutations, zero world
+mutations, no model invocation or host access and released all controls. This
+proves the installed MCP/controller path, but it is not pressure evidence.
+
+The real seven-active-baby treatment exposed the lower unsafe boundary.
+Workflow `environment_action_workflow:ef526db4-12fe-43f0-ade9-6e449f0643e7`
+observed health 2 at its tick-zero consume decision, below the frozen hard
+floor of 4. The resident arbiter correctly refused consumption, performed zero
+actions and mutations, and released controls. Tagged-hostile cleanup ran, but
+the player subsequently died from the already-committed damage sequence. This
+is useful REC2B-style bad-break evidence, not REC2C acceptance: the geometry
+collapses too quickly to measure consumption while taking survivable contact
+damage.
+
+Two orchestration failures were also retained as required implementation work:
+
+1. a fixture-release write serialized behind a blocking MCP action call and
+   arrived only after that workflow timed out;
+2. a later release occurred after the action request had already failed on a
+   stale heartbeat because release was keyed to request submission rather than
+   positive workflow admission.
+
+Before the next active-pressure trial, fixture release must be one governed
+state transition gated by fresh heartbeat plus an admitted active workflow.
+Unknown, failed or timed-out outcomes must synchronously retain containment or
+stop the fixture before controls settle. The next arena geometry should use a
+staggered approach or bounded damage rate so health remains above 4 for at
+least the 33-tick use window. REC2C remains `exploratory_not_accepted`.
+Evidence and the death-screen capture are under
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/`;
+the screenshot SHA-256 is
+`4C3D757DE7400052CC838F9B4615B9EFA5A1224C60A49EEF9FC74054E4A9604A`.
+
+Final containment verification observed DatDamPig alive in Survival at health
+20/20 and food 20, at the C0 baseline position, with zero hostiles in the
+bounded snapshot. Natural regeneration and Normal difficulty were restored.
+The environment-harness documentation audit passed, the full Helix Ask
+discipline battery passed (prompt-solving, four adversarial shards, fixed API
+parity, four parity scenario shards, 26/26 live-source continuation cases,
+9/9 identity-audit cases and server build), and only pre-existing build
+warnings were emitted.
+
+### REC2C governed fixture supervisor and staggered-pressure v3 — 2026-08-31
+
+The two orchestration failures above are now closed at the implementation and
+live-transition levels. `helix-minecraft-arena-fixture-supervisor` owns one
+strict fixture state machine: stage inert and invulnerable tagged entities,
+observe a credential-free local player runtime projection, release only after
+the exact action authority has a fresh accepted heartbeat plus one running
+workflow with controls asserted, and clean the fixture as soon as that workflow
+is no longer active. Timeout, malformed or stale status, authority mismatch,
+manual input, emergency stop, process interruption and RCON failure all retain
+containment or enter cleanup. The supervisor has no gameplay-success authority
+and emits only sanitized state transitions.
+
+The Fabric player companion now writes that local projection atomically every
+five client ticks. It includes only authority and producer-epoch handles,
+readiness, last accepted heartbeat, active workflow/state, control assertion,
+manual/emergency flags and timestamps. It explicitly excludes credentials,
+raw content and answer authority. A bounded three-attempt, 5 ms replacement
+retry absorbs transient Windows sharing violations without turning local file
+presence into action admission.
+
+Deterministic verification passed:
+
+- fixture supervisor behavior — 11/11 focused Vitest cases;
+- supervisor standalone TypeScript check — pass;
+- Fabric player-agent unit test/build — pass;
+- Fabric GameTest — all 5 required tests pass;
+- rebuilt player-agent JAR SHA-256
+  `D6F7050640E6F106546785E0CC3D9EF2828D932434E1E8B0F4366AFE5F1D5DCE`;
+- environment-harness documentation audit — pass; and
+- Helix Ask discipline quick check under `tool admission, evidence
+  normalization` — pass.
+
+The first v2 live admission correctly failed closed after the client reported
+`action_event_stream_resync_required`: the local projection removed readiness
+and control assertion, so the supervisor never released the staged fixture and
+cleaned it. After an idle opaque re-pair restored a fresh epoch, staggered v3
+produced the required positive path. The supervisor observed one running
+workflow with controls asserted at `05:37:15.811Z`, released at
+`05:37:15.863Z` (52 ms later), detected workflow inactivity at
+`05:37:23.795Z`, and completed tagged cleanup nine milliseconds later. Thus the
+fixture was active for 7.932 seconds and could not outlive the admitted
+workflow.
+
+Fresh post-trial evidence observed DatDamPig alive at health 20/20 and food 20,
+with zero hostile entities in the bounded snapshot. The inventory retained the
+iron sword and unused golden apple and contained three rotten flesh; five
+dropped item entities were visible. This is qualified live evidence for
+positive-admission release, resident combat progress, survival and synchronous
+containment. It is **not** recovery acceptance: the evidence does not show a
+health interrupt, food use, crafting, re-equipping after use or damage received
+during use. The normalized receipt is
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/rec2c-staggered-v3-qualified-live-summary.json`.
+
+REC2C therefore remains `exploratory_not_accepted`. The next qualified trial
+must start with a controlled health deficit and an admitted consumable or stew
+recipe, maintain survivable contact pressure across the measured use/craft
+window, and capture the ordered transition `fight -> recovery interrupt -> use
+or craft/use -> re-equip -> re-engage`. Repeated matched trials are still
+required before a controller-loss breakpoint or skilled-player comparison can
+be claimed.
+
+### REC2C controlled-deficit contact-use trial — 2026-08-31
+
+The next two governed fixtures separated baseline restoration from test damage
+so health was observed rather than inferred from multiple same-tick commands.
+Every attempted launch was preceded by a fresh actor/perception probe. One v5
+staging attempt found health 1 instead of 14 and was aborted before positive
+admission; the inert entities were never released. A reset-only fixture then
+restored and verified health 20/20, after which the action fixture applied six
+points of generic damage and a fresh probe verified the exact 14/20 start,
+three inert tagged baby zombies at 3, 6 and 8 blocks, full food, two golden
+apples and no active effects.
+
+The admitted v5 workflow
+`environment_action_workflow:d5e7c345-ffd5-46e9-8162-0e2b50331f60`
+produced a successful single-trial recovery sequence. Positive workflow
+admission was observed at `05:55:02.323Z`; the fixture released seven
+milliseconds later. The health interrupt fired at tick 0. The controller:
+
+1. consumed one golden apple in 31 ticks;
+2. measured one contact-damage event during use, health 14 -> 11 with a minimum
+   of 11;
+3. re-equipped the iron sword at tick 32;
+4. re-engaged and issued eight attack pulses; and
+5. settled at tick 118 with zero admitted hostiles remaining and all controls
+   released.
+
+The supervisor detected workflow inactivity at `05:55:07.873Z` and completed
+tagged cleanup two milliseconds later. Fresh post-trial sensing observed health
+15/20, absorption active, zero hostiles, the iron sword and one remaining
+golden apple in inventory, and four rotten flesh. The arena was then restored
+to Normal difficulty, natural regeneration enabled, health 20/20, food 20 and
+zero hostiles. The restored visual state is captured in
+`minecraft-rec2c-v5-restored-baseline.png` with SHA-256
+`8873023C967D5407233FD6603764027DAFB8ED9DE0A91781652D53926C07ACAE`.
+
+The normalized single-trial receipt is
+`docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/rec2c-contact-use-v5-qualified-live-summary.json`.
+This qualifies the narrow `interrupt -> consume under measured contact damage
+-> re-equip -> re-engage -> clear -> contain` mechanism as live evidence. It
+does not promote the whole REC2C ladder: mushroom-stew crafting, repeated
+matched trials, a controller-loss bracket and the skilled-player comparison
+remain unproven. REC2C therefore remains `exploratory_not_accepted` while the
+underlying governed recovery transition is now live demonstrated once.

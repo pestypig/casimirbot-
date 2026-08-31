@@ -4,12 +4,25 @@ import type {
   HelixAccountCapabilityPolicy,
   HelixAccountType,
 } from "@shared/helix-account-session";
-import type { HelixSharedRealtimeRoom } from "@shared/helix-shared-realtime-room";
+import type {
+  HelixSharedRealtimeRoom,
+  HelixSharedRealtimeRoomConsentPatch,
+} from "@shared/helix-shared-realtime-room";
 import type { HelixRoomSourceBinding } from "@shared/helix-room-source-ingress";
 import {
   HELIX_SHARED_LIVE_ROOM_AGENT_API_VERSION,
   HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_CREATE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_INSPECT_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_INSPECT_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_LIST_CAPABILITY,
@@ -24,6 +37,10 @@ import {
   HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
   helixSharedLiveRoomCreateRequestSchema,
+  helixSharedLiveRoomConsentRevokeRequestSchema,
+  helixSharedLiveRoomConsentGrantRequestSchema,
+  helixSharedLiveRoomFloorAcquireRequestSchema,
+  helixSharedLiveRoomFloorReleaseRequestSchema,
   helixSharedLiveRoomPresenceSetRequestSchema,
   helixSharedLiveRoomCredentialDeliverySchema,
   helixSharedLiveRoomIdSchema,
@@ -31,6 +48,11 @@ import {
   type HelixSharedLiveRoomAgentReceipt,
   type HelixSharedLiveRoomControlErrorCode,
   type HelixSharedLiveRoomCreateReceipt,
+  type HelixSharedLiveRoomConsentRevokeReceipt,
+  type HelixSharedLiveRoomConsentGrantReceipt,
+  type HelixSharedLiveRoomFloorInspectReceipt,
+  type HelixSharedLiveRoomFloorReleaseReceipt,
+  type HelixSharedLiveRoomFloorAcquireReceipt,
   type HelixSharedLiveRoomCredentialDelivery,
   type HelixSharedLiveRoomInspectReceipt,
   type HelixSharedLiveRoomListReceipt,
@@ -58,6 +80,7 @@ import {
   readSharedRealtimeRoom,
   readSharedRealtimeRoomMembership,
   updateSharedRealtimeRoomPresence,
+  patchOwnSharedRealtimeRoomConsent,
   type SharedRealtimeRoomMembership,
 } from "../helix-ask/realtime-room/room-store";
 import {
@@ -65,8 +88,18 @@ import {
   listSharedRealtimeRoomSourceBindings,
 } from "../helix-ask/realtime-room/source-link-store";
 import { runWithSharedRealtimeProfileAdmissionLock } from "../helix-ask/realtime-room/profile-admission-lock";
-import { readSharedRealtimeRoomRuntime } from "../helix-ask/realtime-room/runtime-registry";
+import {
+  readSharedRealtimeRoomRuntime,
+  readSharedRealtimeRoomSpeakerFloor,
+  claimSharedRealtimeRoomSpeakerFloor,
+  releaseSharedRealtimeRoomSpeakerFloor,
+} from "../helix-ask/realtime-room/runtime-registry";
 import { projectSharedRealtimeRoomParticipantContext } from "../helix-ask/realtime-room/participant-context";
+import { sendSharedRealtimeRoomParticipantContextIfBound } from "../helix-ask/realtime-room/participant-context";
+import {
+  degradeSharedRealtimeRoomRuntimeForReadiness,
+  reconcileSharedRealtimeRoomVisualConsent,
+} from "../helix-ask/realtime-room/room-runtime-reconciliation";
 import { SharedLiveRoomBindingStoreError } from "./binding-store";
 import {
   containsSharedLiveRoomSensitiveValue,
@@ -177,6 +210,7 @@ type SharedLiveRoomDomainStore = {
   readMembership: typeof readSharedRealtimeRoomMembership;
   listSourceBindings: typeof listSharedRealtimeRoomSourceBindings;
   updatePresence: typeof updateSharedRealtimeRoomPresence;
+  patchConsent: typeof patchOwnSharedRealtimeRoomConsent;
 };
 
 export type SharedLiveRoomControlDependencies = {
@@ -193,6 +227,19 @@ export type SharedLiveRoomControlDependencies = {
   projectRoom?: (
     room: HelixSharedRealtimeRoom,
   ) => HelixSharedRealtimeRoom | Promise<HelixSharedRealtimeRoom>;
+  afterConsentUpdate?: (
+    room: HelixSharedRealtimeRoom,
+  ) => void | Promise<void>;
+  readRuntime?: typeof readSharedRealtimeRoomRuntime;
+  readFloor?: typeof readSharedRealtimeRoomSpeakerFloor;
+  releaseFloor?: typeof releaseSharedRealtimeRoomSpeakerFloor;
+  claimFloor?: typeof claimSharedRealtimeRoomSpeakerFloor;
+  afterFloorRelease?: (
+    room: HelixSharedRealtimeRoom,
+  ) => void | Promise<void>;
+  afterFloorAcquire?: (
+    room: HelixSharedRealtimeRoom,
+  ) => void | Promise<void>;
 };
 
 export class SharedLiveRoomControlError extends Error {
@@ -510,6 +557,19 @@ export class SharedLiveRoomControlService {
   private readonly projectRoom: (
     room: HelixSharedRealtimeRoom,
   ) => HelixSharedRealtimeRoom | Promise<HelixSharedRealtimeRoom>;
+  private readonly afterConsentUpdate: (
+    room: HelixSharedRealtimeRoom,
+  ) => void | Promise<void>;
+  private readonly readRuntime: typeof readSharedRealtimeRoomRuntime;
+  private readonly readFloor: typeof readSharedRealtimeRoomSpeakerFloor;
+  private readonly releaseFloor: typeof releaseSharedRealtimeRoomSpeakerFloor;
+  private readonly claimFloor: typeof claimSharedRealtimeRoomSpeakerFloor;
+  private readonly afterFloorRelease: (
+    room: HelixSharedRealtimeRoom,
+  ) => void | Promise<void>;
+  private readonly afterFloorAcquire: (
+    room: HelixSharedRealtimeRoom,
+  ) => void | Promise<void>;
 
   constructor(dependencies: SharedLiveRoomControlDependencies = {}) {
     this.idempotencyStore =
@@ -528,6 +588,9 @@ export class SharedLiveRoomControlService {
       updatePresence:
         dependencies.domainStore?.updatePresence ??
         updateSharedRealtimeRoomPresence,
+      patchConsent:
+        dependencies.domainStore?.patchConsent ??
+        patchOwnSharedRealtimeRoomConsent,
     };
     this.deferredSourceBindingStore = dependencies.deferredSourceBindingStore;
     this.credentialDelivery = dependencies.credentialDelivery;
@@ -539,6 +602,39 @@ export class SharedLiveRoomControlService {
       dependencies.withProfileAdmissionLock ??
       runWithSharedRealtimeProfileAdmissionLock;
     this.projectRoom = dependencies.projectRoom ?? defaultProjectRoom;
+    this.afterConsentUpdate =
+      dependencies.afterConsentUpdate ??
+      ((room) => {
+        degradeSharedRealtimeRoomRuntimeForReadiness(room);
+        reconcileSharedRealtimeRoomVisualConsent({
+          room,
+          participantId: room.self_participant_id,
+        });
+        sendSharedRealtimeRoomParticipantContextIfBound({
+          room: defaultProjectRoom(room),
+          reason: "participant_state_changed",
+        });
+      });
+    this.readRuntime = dependencies.readRuntime ?? readSharedRealtimeRoomRuntime;
+    this.readFloor = dependencies.readFloor ?? readSharedRealtimeRoomSpeakerFloor;
+    this.releaseFloor = dependencies.releaseFloor ?? releaseSharedRealtimeRoomSpeakerFloor;
+    this.claimFloor = dependencies.claimFloor ?? claimSharedRealtimeRoomSpeakerFloor;
+    this.afterFloorRelease =
+      dependencies.afterFloorRelease ??
+      ((room) => {
+        sendSharedRealtimeRoomParticipantContextIfBound({
+          room: defaultProjectRoom(room),
+          reason: "participant_state_changed",
+        });
+      });
+    this.afterFloorAcquire =
+      dependencies.afterFloorAcquire ??
+      ((room) => {
+        sendSharedRealtimeRoomParticipantContextIfBound({
+          room: defaultProjectRoom(room),
+          reason: "participant_state_changed",
+        });
+      });
   }
 
   private requireFeature(actor: SharedLiveRoomControlActor): void {
@@ -924,6 +1020,122 @@ export class SharedLiveRoomControlService {
     }
   }
 
+  async inspectFloor(input: {
+    actor: SharedLiveRoomControlActor;
+    roomId: string;
+  }): Promise<HelixSharedLiveRoomFloorInspectReceipt> {
+    try {
+      this.requireRead(input.actor);
+      const roomId = helixSharedLiveRoomIdSchema.parse(input.roomId);
+      const membership = await this.domainStore.readMembership({
+        roomId,
+        profileId: input.actor.profileId,
+      });
+      if (!membership) {
+        throw new SharedLiveRoomControlError(
+          404,
+          "room_not_found",
+          "Shared Live Room not found.",
+        );
+      }
+      if (membership.roomStatus === "closed") {
+        throw new SharedLiveRoomControlError(
+          410,
+          "room_closed",
+          "The room is closed.",
+        );
+      }
+      return {
+        ...receiptBase,
+        schema: HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_RECEIPT_SCHEMA,
+        operation: HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_CAPABILITY,
+        content_role: "room_control_observation_not_assistant_answer",
+        room_id: roomId,
+        floor: this.readFloor({ roomId }),
+      };
+    } catch (error) {
+      throw normalizeControlError(error);
+    }
+  }
+
+  async releaseOwnFloor(input: {
+    actor: SharedLiveRoomControlActor;
+    request: unknown;
+  }): Promise<HelixSharedLiveRoomFloorReleaseReceipt> {
+    try {
+      this.requireManage(input.actor);
+      const request = helixSharedLiveRoomFloorReleaseRequestSchema.parse(
+        input.request,
+      );
+      const membership = await this.domainStore.readMembership({
+        roomId: request.room_id,
+        profileId: input.actor.profileId,
+      });
+      if (!membership) {
+        throw new SharedLiveRoomControlError(
+          404,
+          "room_not_found",
+          "Shared Live Room not found.",
+        );
+      }
+      if (membership.roomStatus === "closed") {
+        throw new SharedLiveRoomControlError(
+          410,
+          "room_closed",
+          "The room is closed.",
+        );
+      }
+      if (membership.presence !== "present") {
+        throw new SharedLiveRoomControlError(
+          409,
+          "room_runtime_conflict",
+          "Return to the room before changing its speaking floor.",
+        );
+      }
+      const runtime = this.readRuntime({ roomId: request.room_id });
+      if (!runtime?.runtime_id) {
+        throw new SharedLiveRoomControlError(
+          409,
+          "room_runtime_conflict",
+          "The room runtime has not been reserved.",
+        );
+      }
+      const released = this.releaseFloor({
+        roomId: request.room_id,
+        runtimeId: runtime.runtime_id,
+        participantId: membership.participantId,
+        epoch: request.floor_epoch,
+      });
+      if (!released.ok || !released.floor) {
+        throw new SharedLiveRoomControlError(
+          409,
+          "room_runtime_conflict",
+          "The speaking floor could not be released from the current runtime.",
+          false,
+          { runtime_error: released.error },
+        );
+      }
+      const room = await this.domainStore.readRoom({
+        roomId: request.room_id,
+        profileId: input.actor.profileId,
+      });
+      await this.afterFloorRelease(room);
+      return {
+        ...receiptBase,
+        schema: HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_RECEIPT_SCHEMA,
+        operation: HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_CAPABILITY,
+        content_role: "room_control_receipt_not_assistant_answer",
+        room: await this.projectSafeRoom(room),
+        released: released.released,
+        requested_floor_epoch: request.floor_epoch,
+        floor: released.floor,
+        authority_delta: "reduced_only",
+      };
+    } catch (error) {
+      throw normalizeControlError(error);
+    }
+  }
+
   async setOwnPresence(input: {
     actor: SharedLiveRoomControlActor;
     request: unknown;
@@ -946,6 +1158,242 @@ export class SharedLiveRoomControlService {
         room: await this.projectSafeRoom(room),
       };
     } catch (error) {
+      throw normalizeControlError(error);
+    }
+  }
+
+  async updateOwnConsentFromFirstPartyUi(input: {
+    actor: SharedLiveRoomControlActor;
+    roomId: string;
+    consentPatch: HelixSharedRealtimeRoomConsentPatch;
+  }): Promise<HelixSharedRealtimeRoom> {
+    try {
+      this.requireManage(input.actor);
+      if (input.actor.authKind !== "first_party_session") {
+        throw new SharedLiveRoomControlError(
+          403,
+          "room_forbidden",
+          "The full consent editor is available only to the authenticated first-party UI.",
+        );
+      }
+      const roomId = helixSharedLiveRoomIdSchema.parse(input.roomId);
+      const room = await this.domainStore.patchConsent({
+        roomId,
+        profileId: input.actor.profileId,
+        consentPatch: input.consentPatch,
+      });
+      await this.afterConsentUpdate(room);
+      return this.projectSafeRoom(room);
+    } catch (error) {
+      throw normalizeControlError(error);
+    }
+  }
+
+  async grantOwnConsent(input: {
+    actor: SharedLiveRoomControlActor;
+    idempotencyKey: string;
+    request: unknown;
+    delegationRef: string;
+  }): Promise<SharedLiveRoomControlMutationResult<HelixSharedLiveRoomConsentGrantReceipt>> {
+    let reservation: { keyHash: string; requestHash: string } | null = null;
+    let mutationCommitted = false;
+    try {
+      this.requireManage(input.actor);
+      assertNoProtectedControlInput(input.request);
+      const request = helixSharedLiveRoomConsentGrantRequestSchema.parse(input.request);
+      const delegationRef = normalize(input.delegationRef);
+      if (!delegationRef) throw new SharedLiveRoomControlError(403, "room_forbidden", "A verified room MCP delegation is required.");
+      const idempotency = await this.acquireIdempotency({
+        actor: input.actor,
+        operation: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY,
+        idempotencyKey: input.idempotencyKey,
+        request: { request, delegation_ref: delegationRef },
+      });
+      if (idempotency.replay) return {
+        status: 201,
+        body: redactSharedLiveRoomSensitiveValue(idempotency.replay) as HelixSharedLiveRoomConsentGrantReceipt,
+        idempotencyReplayed: true,
+      };
+      reservation = idempotency;
+      const room = await this.domainStore.patchConsent({
+        roomId: request.room_id,
+        profileId: input.actor.profileId,
+        consentPatch: request.consent,
+      });
+      mutationCommitted = true;
+      await this.afterConsentUpdate(room);
+      const receipt: HelixSharedLiveRoomConsentGrantReceipt = {
+        ...receiptBase,
+        schema: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_RECEIPT_SCHEMA,
+        operation: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY,
+        content_role: "room_control_receipt_not_assistant_answer",
+        room: await this.projectSafeRoom(room),
+        changed_fields: Object.keys(request.consent) as Array<keyof HelixSharedRealtimeRoomConsentPatch>,
+        delegation_ref: delegationRef,
+        authority_delta: "increased_bounded",
+      };
+      await this.completeIdempotency({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY, ...reservation, receipt: receipt as unknown as RecordLike });
+      return { status: 201, body: receipt, idempotencyReplayed: false };
+    } catch (error) {
+      if (reservation) {
+        if (mutationCommitted) await this.markIdempotencyOutcomeUnknown({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY, ...reservation });
+        else await this.abandonIdempotency({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY, ...reservation });
+      }
+      throw normalizeControlError(error);
+    }
+  }
+
+  private async claimOwnFloor(input: {
+    actor: SharedLiveRoomControlActor;
+    request: unknown;
+  }): Promise<{ room: HelixSharedRealtimeRoom; floor: NonNullable<ReturnType<typeof readSharedRealtimeRoomSpeakerFloor>> }> {
+    this.requireManage(input.actor);
+    const request = helixSharedLiveRoomFloorAcquireRequestSchema.parse(input.request);
+    const membership = await this.domainStore.readMembership({ roomId: request.room_id, profileId: input.actor.profileId });
+    if (!membership) throw new SharedLiveRoomControlError(404, "room_not_found", "Shared Live Room not found.");
+    if (membership.roomStatus === "closed") throw new SharedLiveRoomControlError(410, "room_closed", "The room is closed.");
+    if (membership.presence !== "present") throw new SharedLiveRoomControlError(409, "room_runtime_conflict", "Return to the room before changing its speaking floor.");
+    const runtime = this.readRuntime({ roomId: request.room_id });
+    if (!runtime?.runtime_id) throw new SharedLiveRoomControlError(409, "room_runtime_conflict", "The room runtime has not been reserved.");
+    if (runtime.transport_owner === "host_browser" && membership.role !== "owner") throw new SharedLiveRoomControlError(409, "room_runtime_conflict", "The participant speaking floor requires the room media bridge.");
+    const claimed = this.claimFloor({
+      roomId: request.room_id,
+      runtimeId: runtime.runtime_id,
+      participantId: membership.participantId,
+      microphoneToModelAuthorized: membership.consent.microphone_to_model,
+      leaseMs: request.lease_ms,
+    });
+    if (!claimed.ok || !claimed.granted || !claimed.floor) throw new SharedLiveRoomControlError(409, "room_runtime_conflict", "The speaking floor could not be acquired from the current runtime.", false, { runtime_error: claimed.error });
+    const room = await this.domainStore.readRoom({ roomId: request.room_id, profileId: input.actor.profileId });
+    await this.afterFloorAcquire(room);
+    return { room, floor: claimed.floor };
+  }
+
+  async acquireOwnFloorFromFirstPartyUi(input: {
+    actor: SharedLiveRoomControlActor;
+    request: unknown;
+  }): Promise<HelixSharedRealtimeRoom> {
+    try {
+      if (input.actor.authKind !== "first_party_session") throw new SharedLiveRoomControlError(403, "room_forbidden", "The direct floor control is available only to the authenticated first-party UI.");
+      const result = await this.claimOwnFloor(input);
+      return this.projectSafeRoom(result.room);
+    } catch (error) {
+      throw normalizeControlError(error);
+    }
+  }
+
+  async acquireOwnFloor(input: {
+    actor: SharedLiveRoomControlActor;
+    idempotencyKey: string;
+    request: unknown;
+    delegationRef: string;
+  }): Promise<SharedLiveRoomControlMutationResult<HelixSharedLiveRoomFloorAcquireReceipt>> {
+    let reservation: { keyHash: string; requestHash: string } | null = null;
+    let mutationCommitted = false;
+    try {
+      const request = helixSharedLiveRoomFloorAcquireRequestSchema.parse(input.request);
+      const delegationRef = normalize(input.delegationRef);
+      if (!delegationRef) throw new SharedLiveRoomControlError(403, "room_forbidden", "A verified room MCP delegation is required.");
+      const idempotency = await this.acquireIdempotency({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY, idempotencyKey: input.idempotencyKey, request: { request, delegation_ref: delegationRef } });
+      if (idempotency.replay) return { status: 201, body: redactSharedLiveRoomSensitiveValue(idempotency.replay) as HelixSharedLiveRoomFloorAcquireReceipt, idempotencyReplayed: true };
+      reservation = idempotency;
+      const result = await this.claimOwnFloor({ actor: input.actor, request });
+      mutationCommitted = true;
+      const receipt: HelixSharedLiveRoomFloorAcquireReceipt = {
+        ...receiptBase,
+        schema: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_RECEIPT_SCHEMA,
+        operation: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY,
+        content_role: "room_control_receipt_not_assistant_answer",
+        room: await this.projectSafeRoom(result.room),
+        granted: true,
+        floor: result.floor,
+        delegation_ref: delegationRef,
+        authority_delta: "increased_bounded",
+      };
+      await this.completeIdempotency({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY, ...reservation, receipt: receipt as unknown as RecordLike });
+      return { status: 201, body: receipt, idempotencyReplayed: false };
+    } catch (error) {
+      if (reservation) {
+        if (mutationCommitted) await this.markIdempotencyOutcomeUnknown({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY, ...reservation });
+        else await this.abandonIdempotency({ actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY, ...reservation });
+      }
+      throw normalizeControlError(error);
+    }
+  }
+
+  async revokeOwnConsent(input: {
+    actor: SharedLiveRoomControlActor;
+    idempotencyKey: string;
+    request: unknown;
+  }): Promise<
+    SharedLiveRoomControlMutationResult<HelixSharedLiveRoomConsentRevokeReceipt>
+  > {
+    let reservation: { keyHash: string; requestHash: string } | null = null;
+    let mutationCommitted = false;
+    try {
+      this.requireManage(input.actor);
+      assertNoProtectedControlInput(input.request);
+      const request = helixSharedLiveRoomConsentRevokeRequestSchema.parse(
+        input.request,
+      );
+      const idempotency = await this.acquireIdempotency({
+        actor: input.actor,
+        operation: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+        idempotencyKey: input.idempotencyKey,
+        request,
+      });
+      if (idempotency.replay) {
+        return {
+          status: 201,
+          body: redactSharedLiveRoomSensitiveValue(
+            idempotency.replay,
+          ) as HelixSharedLiveRoomConsentRevokeReceipt,
+          idempotencyReplayed: true,
+        };
+      }
+      reservation = idempotency;
+      const room = await this.domainStore.patchConsent({
+        roomId: request.room_id,
+        profileId: input.actor.profileId,
+        consentPatch: request.consent,
+      });
+      mutationCommitted = true;
+      await this.afterConsentUpdate(room);
+      const receipt: HelixSharedLiveRoomConsentRevokeReceipt = {
+        ...receiptBase,
+        schema: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA,
+        operation: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+        content_role: "room_control_receipt_not_assistant_answer",
+        room: await this.projectSafeRoom(room),
+        changed_fields: Object.keys(request.consent) as Array<
+          keyof HelixSharedRealtimeRoomConsentPatch
+        >,
+        authority_delta: "reduced_only",
+      };
+      await this.completeIdempotency({
+        actor: input.actor,
+        operation: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+        ...reservation,
+        receipt: receipt as unknown as RecordLike,
+      });
+      return { status: 201, body: receipt, idempotencyReplayed: false };
+    } catch (error) {
+      if (reservation) {
+        if (mutationCommitted) {
+          await this.markIdempotencyOutcomeUnknown({
+            actor: input.actor,
+            operation: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+            ...reservation,
+            resourceRef: null,
+          });
+        } else {
+          await this.abandonIdempotency({
+            actor: input.actor,
+            operation: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
+            ...reservation,
+          });
+        }
+      }
       throw normalizeControlError(error);
     }
   }

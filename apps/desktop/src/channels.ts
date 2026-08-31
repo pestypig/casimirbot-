@@ -22,6 +22,14 @@ export const DESKTOP_MCP_TUNNEL_CLEAR_CHANNEL =
   "casimir-desktop:mcp-tunnel-clear";
 export const DESKTOP_MCP_TUNNEL_OPEN_ADMIN_CHANNEL =
   "casimir-desktop:mcp-tunnel-open-admin";
+export const DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL =
+  "casimir-desktop:minecraft-run-profile-state";
+export const DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL =
+  "casimir-desktop:minecraft-run-profile-select";
+export const DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL =
+  "casimir-desktop:minecraft-player-profile-select";
+export const DESKTOP_MINECRAFT_RUN_PROFILE_CLEAR_CHANNEL =
+  "casimir-desktop:minecraft-run-profile-clear";
 export const DESKTOP_AUTH0_ACCOUNT_LINK_OPEN_CHANNEL =
   "casimir-desktop:auth0-account-link-open";
 export const DESKTOP_AUTH0_ACCOUNT_LINK_COMPLETION_CHANNEL =

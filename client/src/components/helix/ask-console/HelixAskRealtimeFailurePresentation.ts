@@ -61,6 +61,22 @@ export const describeHelixAskRealtimeFailure = (
       retryable: true,
     };
   }
+  if (code.includes("browser_media_api_unavailable")) {
+    return {
+      code,
+      label: "Microphone capture is unavailable in this browser",
+      detail: "Open CasimirBot in Chrome or Edge, or use a desktop host that enables microphone capture.",
+      retryable: false,
+    };
+  }
+  if (code.includes("microphone_not_found")) {
+    return {
+      code,
+      label: "No microphone was found",
+      detail: "Connect or enable a microphone, then start GPT Live again.",
+      retryable: true,
+    };
+  }
   if (code.includes("provider_http_400") || code.includes("invalid_request")) {
     return {
       code,

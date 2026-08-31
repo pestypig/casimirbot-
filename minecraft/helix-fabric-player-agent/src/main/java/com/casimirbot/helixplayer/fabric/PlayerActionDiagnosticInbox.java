@@ -697,7 +697,7 @@ final class PlayerActionDiagnosticInbox {
                 "stop_below_health", "friendly_fire"
             ),
             Set.of(
-                "approach_policy", "max_approach_ticks", "cover_policy",
+                "combat_mode", "approach_policy", "max_approach_ticks", "cover_policy",
                 "max_cover_ticks", "projectile_response",
                 "projectile_evasion_horizon_ticks", "max_evasion_ticks",
                 "shield_hand", "max_shield_hold_ticks"
@@ -779,6 +779,12 @@ final class PlayerActionDiagnosticInbox {
         }
         Map<String, Object> normalized = new LinkedHashMap<>();
         normalized.put("hostile_entity_type_ids", List.copyOf(hostileTypes));
+        normalized.put(
+            "combat_mode",
+            value.containsKey("combat_mode")
+                ? enumText(value, "combat_mode", Set.of("engage", "disengage_to_distance"))
+                : "engage"
+        );
         normalized.put("max_acquisition_distance", finite(value, "max_acquisition_distance", 2, 32));
         normalized.put("require_line_of_sight", true);
         normalized.put("minimum_attack_cooldown", finite(value, "minimum_attack_cooldown", 0.1, 1));

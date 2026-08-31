@@ -1,12 +1,16 @@
 package com.casimirbot.helixsensor.fabric;
 
+import com.casimirbot.helixsensor.HelixJson;
+import com.casimirbot.helixsensor.pairing.ConnectorPairingClient;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.fabricmc.loader.api.FabricLoader;
@@ -23,16 +27,18 @@ final class FabricServerPairingInbox {
     private static final Pattern PAIR_COMMAND = Pattern.compile(
         "^/helix\\s+pair\\s+([A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4})\\s*$"
     );
+    private static final String ENVELOPE_SCHEMA =
+        "casimirbot.local_server_pairing_handoff.v1";
 
     private FabricServerPairingInbox() {}
 
-    record PollResult(String code, String failureCode) {
+    record PollResult(String code, String pairingEndpoint, String failureCode) {
         static PollResult absent() {
-            return new PollResult(null, "");
+            return new PollResult(null, null, "");
         }
 
         static PollResult rejected(String failureCode) {
-            return new PollResult(null, failureCode);
+            return new PollResult(null, null, failureCode);
         }
     }
 
@@ -83,17 +89,50 @@ final class FabricServerPairingInbox {
                 return PollResult.rejected("server_pairing_inbox_stale");
             }
 
-            String command = Files.readString(
+            String payload = Files.readString(
                 claimed,
                 StandardCharsets.UTF_8
             ).trim();
-            Matcher match = PAIR_COMMAND.matcher(command);
-            if (!match.matches()) {
+            Matcher legacy = PAIR_COMMAND.matcher(payload);
+            if (legacy.matches()) {
+                return new PollResult(legacy.group(1), null, "");
+            }
+            try {
+                Map<String, Object> envelope = HelixJson.asObject(
+                    HelixJson.parse(payload)
+                );
+                if (
+                    envelope.size() != 3 ||
+                    !ENVELOPE_SCHEMA.equals(envelope.get("schema")) ||
+                    !(envelope.get("command") instanceof String command) ||
+                    !(envelope.get("pairing_endpoint") instanceof String endpoint)
+                ) return PollResult.rejected("server_pairing_inbox_invalid");
+                Matcher commandMatch = PAIR_COMMAND.matcher(command.trim());
+                if (!commandMatch.matches() || !validLoopbackEndpoint(endpoint)) {
+                    return PollResult.rejected("server_pairing_inbox_invalid");
+                }
+                return new PollResult(commandMatch.group(1), endpoint, "");
+            } catch (RuntimeException ignored) {
                 return PollResult.rejected("server_pairing_inbox_invalid");
             }
-            return new PollResult(match.group(1), "");
         } finally {
             Files.deleteIfExists(claimed);
+        }
+    }
+
+    private static boolean validLoopbackEndpoint(String value) {
+        try {
+            URI endpoint = URI.create(value);
+            return "http".equals(endpoint.getScheme()) &&
+                "127.0.0.1".equals(endpoint.getHost()) &&
+                endpoint.getPort() > 0 &&
+                endpoint.getPort() <= 65_535 &&
+                ConnectorPairingClient.REDEEM_PATH.equals(endpoint.getPath()) &&
+                endpoint.getRawUserInfo() == null &&
+                endpoint.getRawQuery() == null &&
+                endpoint.getRawFragment() == null;
+        } catch (RuntimeException ignored) {
+            return false;
         }
     }
 }

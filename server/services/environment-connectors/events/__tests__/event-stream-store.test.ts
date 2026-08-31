@@ -17,6 +17,8 @@ import {
   recordEnvironmentActionEventBatch,
   readLatestEnvironmentSituationDigest,
   resolveWorldAuthoritySubjectNativeId,
+  subscribeEnvironmentSituationDigestRecorded,
+  type EnvironmentSituationDigestRecordedEvent,
   type EnvironmentEventTransactionRunner,
 } from "../event-stream-store";
 import type { EnvironmentActionConnectorClaim } from "../../actions";
@@ -292,6 +294,10 @@ describe("environment event stream and digest reducer", () => {
       const withTransaction: EnvironmentEventTransactionRunner = async (
         handler,
       ) => handler(client);
+      const published: EnvironmentSituationDigestRecordedEvent[] = [];
+      const unsubscribe = subscribeEnvironmentSituationDigestRecorded((value) =>
+        published.push(value),
+      );
       const recorded = await recordEnvironmentActionEventBatch({
         claim,
         batch,
@@ -302,9 +308,16 @@ describe("environment event stream and digest reducer", () => {
         batch,
         withTransaction,
       });
+      unsubscribe();
       expect(recorded.replayed).toBe(false);
       expect(replayed.replayed).toBe(true);
       expect(replayed.digest.digest_id).toBe(recorded.digest.digest_id);
+      expect(published).toEqual([
+        {
+          environment_binding_id: claim.environmentBindingId,
+          digest: recorded.digest,
+        },
+      ]);
       const readBack = await readLatestEnvironmentSituationDigest({
         context: {
           environmentBindingId: claim.environmentBindingId,

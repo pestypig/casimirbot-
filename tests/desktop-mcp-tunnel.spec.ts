@@ -9,7 +9,10 @@ import {
   parseMcpTunnelCredentials,
   type SecureStoragePort,
 } from "../apps/desktop/src/mcp-tunnel";
-import { parseDesktopMcpTunnelState } from "../shared/desktop-mcp-tunnel";
+import {
+  parseDesktopMcpTunnelStartRequest,
+  parseDesktopMcpTunnelState,
+} from "../shared/desktop-mcp-tunnel";
 
 const roots: string[] = [];
 const validCredentials = {
@@ -78,10 +81,12 @@ describe("desktop Secure MCP Tunnel boundary", () => {
         DATABASE_URL: "database-secret",
         NODE_OPTIONS: "--inspect",
         HTTPS_PROXY: "http://user:password@proxy.invalid",
+        HELIX_AGENT_OAUTH_ISSUER: "https://tenant.example.auth0.com/",
       },
       credentials: validCredentials,
       runtimeOrigin: "http://127.0.0.1:43123",
       desktopSessionSecret: "desktop-session-secret",
+      accountSessionId: "account_session:fixture-owner",
       healthUrlFile: "C:\\state\\health.url",
     });
 
@@ -92,12 +97,19 @@ describe("desktop Secure MCP Tunnel boundary", () => {
       MCP_SERVER_URL:
         "http://127.0.0.1:43123/mcp/local-supervisor-coordination",
       MCP_EXTRA_HEADERS:
-        "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET",
+        "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET, x-casimir-desktop-account-session: env:CASIMIR_TUNNEL_ACCOUNT_SESSION_ID",
       MCP_DISCOVERY_EXTRA_HEADERS:
-        "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET",
+        "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET, x-casimir-desktop-account-session: env:CASIMIR_TUNNEL_ACCOUNT_SESSION_ID",
+      CASIMIR_TUNNEL_ACCOUNT_SESSION_ID: "account_session:fixture-owner",
       HEALTH_LISTEN_ADDR: "127.0.0.1:0",
+      LOG_FILE: "C:\\state\\health.url.log",
       ALLOW_REMOTE_UI: "false",
+      HARPOON_TARGETS:
+        "label=oauth-auth-server-metadata-0,url=https://tenant.example.auth0.com/.well-known/oauth-authorization-server,desc=OAuth authorization server metadata;label=oauth-registration-endpoint-0,url=https://tenant.example.auth0.com/oidc/register,desc=OAuth dynamic client registration",
+      HARPOON_ALLOW_PLAINTEXT_HTTP: "true",
+      HARPOON_HOSTS_INCLUDE_LOOPBACK: "true",
     });
+    expect(environment).not.toHaveProperty("HARPOON_HOSTS_INCLUDE_PRIVATE");
     for (const excluded of [
       "PATH",
       "OPENAI_API_KEY",
@@ -107,6 +119,68 @@ describe("desktop Secure MCP Tunnel boundary", () => {
       "HTTPS_PROXY",
     ]) {
       expect(environment).not.toHaveProperty(excluded);
+    }
+    expect(environment).not.toHaveProperty("HELIX_AGENT_OAUTH_ISSUER");
+  });
+
+  it("selects full Helix MCP only for the exact explicit start scope", () => {
+    expect(parseDesktopMcpTunnelStartRequest(undefined)).toEqual({
+      scope: "local_supervisor_coordination_and_device_check",
+    });
+    expect(
+      parseDesktopMcpTunnelStartRequest({ scope: "full_helix_agent" }),
+    ).toEqual({ scope: "full_helix_agent" });
+    expect(parseDesktopMcpTunnelStartRequest({ scope: "full_helix_agent", extra: true }))
+      .toBeNull();
+    expect(parseDesktopMcpTunnelStartRequest({ scope: "arbitrary" })).toBeNull();
+
+    const environment = buildMcpTunnelEnvironment({
+      processEnv: {},
+      credentials: validCredentials,
+      runtimeOrigin: "http://127.0.0.1:43123",
+      desktopSessionSecret: "desktop-session-secret",
+      accountSessionId: "account_session:fixture-owner",
+      healthUrlFile: "C:\\state\\health.url",
+      scope: "full_helix_agent",
+    });
+    expect(environment.MCP_SERVER_URL).toBe("http://127.0.0.1:43123/mcp");
+    expect(environment.MCP_EXTRA_HEADERS).toBe(
+      "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET, x-casimir-desktop-account-session: env:CASIMIR_TUNNEL_ACCOUNT_SESSION_ID",
+    );
+  });
+
+  it("admits only exact HTTPS OAuth metadata and registration targets", () => {
+    const build = (issuer: string) =>
+      buildMcpTunnelEnvironment({
+        processEnv: { HELIX_AGENT_OAUTH_ISSUER: issuer },
+        credentials: validCredentials,
+        runtimeOrigin: "http://127.0.0.1:43123",
+        desktopSessionSecret: "desktop-session-secret",
+        accountSessionId: "account_session:fixture-owner",
+        healthUrlFile: "C:\\state\\health.url",
+      });
+
+    expect(build("https://login.customer.example/oauth/").HARPOON_TARGETS)
+      .toBe(
+        "label=oauth-auth-server-metadata-0,url=https://login.customer.example/.well-known/oauth-authorization-server/oauth,desc=OAuth authorization server metadata;label=oauth-registration-endpoint-0,url=https://login.customer.example/oidc/register,desc=OAuth dynamic client registration",
+      );
+    expect(build("https://login.customer.example/oauth/")).toMatchObject({
+      HARPOON_ALLOW_PLAINTEXT_HTTP: "true",
+      HARPOON_HOSTS_INCLUDE_LOOPBACK: "true",
+    });
+    for (const invalid of [
+      "http://login.customer.example/",
+      "https://localhost/",
+      "https://127.0.0.1/",
+      "https://com/",
+      "https://user:password@login.customer.example/",
+      "https://login.customer.example/?redirect=elsewhere",
+      "not-a-url",
+    ]) {
+      const environment = build(invalid);
+      expect(environment).not.toHaveProperty("HARPOON_TARGETS");
+      expect(environment).not.toHaveProperty("HARPOON_ALLOW_PLAINTEXT_HTTP");
+      expect(environment).not.toHaveProperty("HARPOON_HOSTS_INCLUDE_LOOPBACK");
     }
   });
 

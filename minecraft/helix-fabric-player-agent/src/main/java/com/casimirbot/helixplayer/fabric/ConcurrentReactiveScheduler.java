@@ -1002,7 +1002,11 @@ final class ConcurrentReactiveScheduler {
         collectedCount += nonnegativeMeasurement(measurements, "collected_count");
         producedCount += nonnegativeMeasurement(measurements, "produced_count");
         transferredCount += nonnegativeMeasurement(measurements, "transferred_count");
-        consumedItemCount += nonnegativeMeasurement(measurements, "consumed_item_count");
+        int observedConsumedItems = nonnegativeMeasurement(measurements, "consumed_item_count");
+        if (observedConsumedItems == 0) {
+            observedConsumedItems = nonnegativeMeasurement(measurements, "consumed_count");
+        }
+        consumedItemCount += observedConsumedItems;
         if (actionReceipts.size() < 256) {
             Map<String, Object> receipt = new LinkedHashMap<>();
             receipt.put("lane_id", laneId);
@@ -1019,7 +1023,10 @@ final class ConcurrentReactiveScheduler {
                 "post_interaction_observed", "held_item_id_before",
                 "held_item_id_after", "held_item_count_before",
                 "held_item_count_after", "held_item_count_delta",
-                "consumed_item_count", "inventory_mutations_performed",
+                "consumed_item_count", "consumed_count", "inventory_mutations_performed",
+                "health_before", "health_after", "health_delta", "use_ticks",
+                "minimum_health_during_use", "observed_health_loss_during_use",
+                "health_loss_event_count_during_use",
                 "world_mutations_performed", "collected_count", "produced_count",
                 "transferred_count", "placement_method", "source_item_id",
                 "block_id", "verified_positions", "requested_positions",
@@ -1032,7 +1039,9 @@ final class ConcurrentReactiveScheduler {
                 "line_of_sight_retained_ticks", "reacquisition_count",
                 "mean_angular_error_degrees", "p95_angular_error_degrees",
                 "max_angular_error_degrees", "final_yaw_error_degrees",
-                "final_pitch_error_degrees"
+                "final_pitch_error_degrees", "combat_mode", "attack_pulses",
+                "minimum_hostile_distance", "safe_separation_reached",
+                "visible_hostile_count", "eligible_hostile_count"
             )) {
                 Object value = measurements.get(key);
                 if (value != null) receipt.put(key, value);
@@ -1286,6 +1295,10 @@ final class ConcurrentReactiveScheduler {
             case "interact" -> "off_hand".equals(text(action, "hand"))
                 ? Set.of("off_hand")
                 : Set.of("main_hand");
+            case "attack" -> Set.of("camera", "main_hand");
+            case "combat_guard" -> Set.of(
+                "camera", "locomotion", "main_hand", "off_hand", "native_workflow"
+            );
             case "hotbar_select" -> Set.of("hotbar");
             case "equip" -> Set.of("hotbar", "main_hand", "off_hand", "inventory");
             case "follow" -> Set.of("camera", "locomotion", "native_workflow");

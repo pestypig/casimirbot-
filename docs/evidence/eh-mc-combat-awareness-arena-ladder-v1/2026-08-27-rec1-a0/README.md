@@ -97,3 +97,27 @@ DatDamPig subject binding marked stale. The active sensing installation reported
 `helix_environment_server_pair_local`, not the required source-only pairing
 operation. The authenticated consume was therefore correctly withheld rather
 than acting without the REC1 observe-before-act precondition.
+
+## Installed-EXE replay on 2026-08-29
+
+The installed EXE was rebuilt with a narrow native-session exception for the
+separately authenticated Player Embodiment connector namespace. The exact C0
+source became fresh, the consume-only authority remained active, and the Fabric
+client reported ready. World Authority remained off.
+
+After rejecting one invalid Peaceful-mode fixture that refilled hunger and
+timed out with controls released, the accepted direct replay used food `13`,
+saturation `0.0`, health `20.0`, stew x1, bowl x0 and no hostile. Workflow
+`direct_player_action_workflow:fa76fdce-7254-4be8-8364-c2f4a611ca46`
+reported `workflow.succeeded`: one stew consumed, food `13 -> 19`, saturation
+`0 -> 7.2000003`, health unchanged, bowl delta +1, 32 use ticks, zero world
+mutations, no manual override and controls released. Independent server reads
+confirmed food `19`, saturation `7.2000003`, health `20.0`, stew x0 and bowl
+x1.
+
+The authenticated fixture is now restaged at food `15`, saturation `0.0`,
+health `20.0`, stew x1 and bowl x0. The local MCP alias is OAuth-authorized and
+its configured allowlist contains `helix_minecraft_player_action`, but the
+already-loaded task catalog predates that login. Authenticated A1 remains open
+until one refreshed client catalog performs the same consume and re-enters its
+receipt. REC2, Nether and Wither were not entered.

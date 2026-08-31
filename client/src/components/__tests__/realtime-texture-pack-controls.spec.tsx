@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   getState: vi.fn(),
+  updateDirection: vi.fn(),
+  updateProvider: vi.fn(),
   createController: vi.fn(),
 }));
 
@@ -67,10 +69,17 @@ vi.mock("@/lib/helix/realtimeTexturePack", () => ({
       };
       dependencies.onFrame?.(projection);
       dependencies.onState?.(state);
+      mocks.getState.mockReturnValue(state);
       return state;
     });
     mocks.stop.mockImplementation(() => ({ ...idle, status: "stopped" }));
-    return { start: mocks.start, stop: mocks.stop, getState: mocks.getState };
+    return {
+      start: mocks.start,
+      updateDirection: mocks.updateDirection,
+      updateProvider: mocks.updateProvider,
+      stop: mocks.stop,
+      getState: mocks.getState,
+    };
   },
 }));
 
@@ -82,8 +91,28 @@ describe("RealtimeTexturePackControls", () => {
     mocks.start.mockReset();
     mocks.stop.mockReset();
     mocks.getState.mockReset();
+    mocks.updateDirection.mockReset();
+    mocks.updateProvider.mockReset();
     mocks.createController.mockReset();
-    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("fetch", vi.fn(async (path) => ({
+      ok: true,
+      json: async () => String(path).endsWith("/fal/readiness")
+        ? {
+            ok: true,
+            readiness: {
+              runtime_enabled: false,
+              credential_configured: false,
+              sdk_available: false,
+              ready_for_attended_arm: false,
+              missing_requirements: ["provider_runtime_not_enabled", "provider_credential_not_configured", "provider_sdk_not_available"],
+              duration_cap_seconds: 60,
+              request_cap: 60,
+              spend_cap_usd: 1,
+              published_compute_rate_usd: 0.00194,
+            },
+          }
+        : { ok: true, commands: [] },
+    } as Response)));
     delete window.casimirDesktop;
   });
 
@@ -113,7 +142,8 @@ describe("RealtimeTexturePackControls", () => {
       "src",
       "data:image/jpeg;base64,cHJldmlldw==",
     );
-    expect(fetch).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).endsWith("/fal/transform"))).toBe(false);
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).endsWith("/fal/session/arm"))).toBe(false);
   });
 
   it("does not expose capture controls to public user accounts", async () => {
@@ -187,7 +217,141 @@ describe("RealtimeTexturePackControls", () => {
     expect(JSON.parse(String((pollCall?.[1] as RequestInit)?.body))).toMatchObject({
       session_id: "texture-session:test",
       allowed_actions: ["show_overlay", "reveal_original", "stop"],
-      client_state: { capture_active: false, overlay_visible: false },
+      client_state: { capture_active: true, overlay_visible: false },
+    });
+  });
+
+  it("keeps visual-direction authority separate and acknowledges an exact revision", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (_path, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      if (String(_path).endsWith("/harness/poll")) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            commands: [{
+              command_id: "rtp-command:visual-test",
+              action: "set_custom_visual_directive",
+              expected_configuration_revision: 0,
+              arguments: {
+                command: "set_custom_visual_directive",
+                custom_visual_directive: "luminous stained-glass caves",
+              },
+            }],
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({ ok: true, echoed: body }) } as Response;
+    });
+    render(<RealtimeTexturePackControls />);
+
+    expect(screen.getByLabelText("Enable agent visual direction control")).toBeDisabled();
+    expect(screen.getByText("Provider API is not armed.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Choose game/window" }));
+    await screen.findByAltText("Realtime Texture Pack local preview");
+    fireEvent.click(screen.getByLabelText("Enable agent visual direction control"));
+
+    await waitFor(() => expect(mocks.updateDirection).toHaveBeenCalledWith({
+      presetId: "playable",
+      customPrompt: "luminous stained-glass caves",
+    }));
+    const ackCall = fetchMock.mock.calls.find(([path]) => String(path).endsWith("/harness/ack"));
+    expect(JSON.parse(String((ackCall?.[1] as RequestInit)?.body))).toMatchObject({
+      command_id: "rtp-command:visual-test",
+      outcome: "completed",
+      applied_configuration_revision: 1,
+      client_state: {
+        visual_direction: {
+          control_enabled: true,
+          configuration_revision: 1,
+        },
+      },
+    });
+  });
+
+  it("shows attended provider readiness but keeps arm disabled when the server boundary is unavailable", async () => {
+    render(<RealtimeTexturePackControls />);
+    fireEvent.change(screen.getByLabelText("Realtime Texture Pack image provider"), {
+      target: { value: "fal_flux2_klein_realtime" },
+    });
+    expect(await screen.findByTestId("realtime-texture-pack-fal-readiness")).toHaveTextContent(
+      "provider_runtime_not_enabled",
+    );
+    expect(screen.getByRole("button", { name: "Arm attended API" })).toBeDisabled();
+    expect(screen.getByText(/agent\/MCP harness cannot select this provider/i)).toBeInTheDocument();
+  });
+
+  it("arms only after both attended acknowledgements and sends the exact frozen ceilings", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (path) => {
+      if (String(path).endsWith("/fal/readiness")) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            readiness: {
+              runtime_enabled: true,
+              credential_configured: true,
+              sdk_available: true,
+              ready_for_attended_arm: true,
+              missing_requirements: [],
+              duration_cap_seconds: 60,
+              request_cap: 60,
+              spend_cap_usd: 1,
+              published_compute_rate_usd: 0.00194,
+            },
+          }),
+        } as Response;
+      }
+      if (String(path).endsWith("/fal/session/arm")) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            session: {
+              session_id: "texture-session:test",
+              status: "armed",
+              requests_started: 0,
+              requests_accepted: 0,
+              requests_failed: 0,
+              request_cap: 60,
+              spend_cap_usd: 1,
+              estimated_cost_usd: 0,
+              in_flight: false,
+              cancellation_acknowledged: false,
+              cancellation_reason: null,
+            },
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({ ok: true, commands: [] }) } as Response;
+    });
+    render(<RealtimeTexturePackControls />);
+    fireEvent.change(screen.getByLabelText("Realtime Texture Pack image provider"), {
+      target: { value: "fal_flux2_klein_realtime" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Choose game/window" }));
+    await screen.findByAltText("Realtime Texture Pack local preview");
+    const arm = screen.getByRole("button", { name: "Arm attended API" });
+    expect(arm).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("Acknowledge external frame egress"));
+    expect(arm).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("Acknowledge billable provider calls"));
+    await waitFor(() => expect(arm).toBeEnabled());
+    fireEvent.click(arm);
+
+    await waitFor(() => expect(mocks.updateProvider).toHaveBeenCalledWith("fal_flux2_klein_realtime"));
+    const armCall = fetchMock.mock.calls.find(([path]) => String(path).endsWith("/fal/session/arm"));
+    expect(JSON.parse(String((armCall?.[1] as RequestInit)?.body))).toEqual({
+      session_id: "texture-session:test",
+      provider_id: "fal_flux2_klein_realtime",
+      approval_version: "rtp-fal-attended-v1",
+      duration_cap_seconds: 60,
+      request_cap: 60,
+      spend_cap_usd: 1,
+      external_frame_egress_acknowledged: true,
+      billable_calls_acknowledged: true,
     });
   });
 });

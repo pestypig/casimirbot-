@@ -4,7 +4,7 @@ Status: canonical program-control document.
 
 Active program gate: **G2H-E-S5 — inert primary execution-preflight decision**
 
-Status date: **August 27, 2026**
+Status date: **August 30, 2026**
 
 This document preserves the complete scientific objective while identifying the
 single gate that repository agents are permitted to treat as the current
@@ -84,11 +84,307 @@ preflight 12/12 and independent proposal audit 27/27; exact binary
 [H2-P7 launch](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-parent-cloud-launch.md)
 created the one exact C4 VM, reproduced the archive and binary identities, and
 started exactly one candidate-neutral parent process at `2026-08-28T00:05:17Z`.
-The process is active under the 100,800-second timeout and scheduled VM
-shutdown; no result or independent result audit exists yet. Its separately
+The VM later stopped at `2026-08-28T06:16:21.113Z`, more than 22 hours before
+the scheduled aggregate ceiling; its retained 30 GB disk is `READY`.
+The inert [retrieval proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-evidence-retrieval-proposal.md)
+was frozen at `3c581eb9...ee25` and independently audited 18/18. Its one
+authorized restart was consumed on August 28: the VM reached `RUNNING`, SSH
+port 22 refused the guarded connection, and the retrieval failed closed before
+the remote guard, evidence read or archive creation. The cleanup trap returned
+the original VM to `TERMINATED`; no second restart, retry or numerical action
+occurred. Its separately
 frozen [pre-result audit definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-result-audit-definition.md)
 passes synthetic fixtures 4/4 and an independent definition audit 17/17. It
 cannot inspect or alter the active process and does not imply a result verdict.
+The [snapshot-rescue proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-snapshot-rescue-recovery-proposal.md)
+rejects direct attachment because Hyperdisk Balanced lacks read-only attachment
+support. It instead freezes one standard snapshot, one `pd-standard` read-only
+clone and one `e2-small` rescue VM at `b6ac7496...4406`; its independent audit
+passes 26/26. Its exact authorization was consumed once. The original VM
+remained stopped; the derivative disk was attached and mounted read-only; the
+deterministic 1,550-byte evidence archive hashes to `fa50e5c6...5a831`; and the
+rescue VM is `TERMINATED`. The
+[authenticated parent result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-parent-result.md)
+passes the frozen independent audit 24/24 with receipt `c827c1d2...44c22` and
+classification `H2_PARENT_FAIL`. The one selector consumed all 17 fixed
+refinement candidates and terminated
+`C08-010_VOLTERRA_CONVOLUTION_OR_U_REFINEMENT_EXHAUSTION`; no candidate was
+evaluated and every authority remains false. The completed
+[H2-P8 no-execution review](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8-exhaustion-data-sufficiency-review.md)
+finds `INSUFFICIENT_PERSISTED_DATA_FOR_CAUSAL_SEPARATION`: the P7 record proves
+complete schedule exhaustion but discards the per-candidate width decisions
+needed to distinguish a U-panel ceiling from non-contracting Volterra
+enclosures. The completed
+[H2-P8A diagnostic definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8a-additive-diagnostic-definition.md)
+adds observation-only per-candidate width records without changing selection.
+Its fixture passes 17/17 twice, the predecessor regression passes 31/31, and
+the corrected independent audit passes 40/40 at receipt `94ee2a0c...b986`.
+The candidate-neutral H2-P8B parent-diagnostic
+binding
+[P8B binding](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8b-parent-diagnostic-binding.md)
+is closed at fixture maturity: it retains only the most recent/terminal
+17-candidate observation, emits a deterministic record capped at 65,536 bytes,
+passes parent equivalence 13/13 twice, independent audit 48/48 at
+`e4fa37c1...6ee7`, and bounded P2 regression 11/11. The resulting
+[P8C proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-diagnostic-execution-proposal.md)
+is frozen at `7e8f28d7...a2ace`. Its deterministic 47-entry archive
+and exact binary pass producer preflight 13/13 and corrected independent audit
+36/36. Its first authorization uploaded and cloud-verified the archive, then
+stopped before VM creation because the proposal omitted an exact boot image.
+The separately authorized [P8C boot-image correction](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-boot-image-correction.md)
+binds `projects/debian-cloud/global/images/debian-12-bookworm-v20260817` at
+`aade7e5d...6c32b` and passes independent audit 18/18. The sole creation
+attempt has now succeeded, the remote archive and absent-root checks passed,
+the frozen offline build exited `0`, and binary `7e7d7839...deb25` was
+reproduced. The one diagnostic process started at `2026-08-28T19:08:28Z`; the
+Google Cloud console now reports the original VM `Stopped`, while the retained
+result remains unread. The [launch checkpoint](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-launch-checkpoint.md)
+preserves the one-process launch boundary. The separately frozen
+[P8C result-audit definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-result-audit-definition.md)
+passes 4/4 synthetic classifications and 19/19 independent checks. The executed
+[P8C snapshot-rescue proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-snapshot-rescue-recovery-proposal.md)
+freezes the proven snapshot-to-read-only-`pd-standard` recovery path at
+`ea2f7265...1dedb` and passes 33/33 independent checks. Its one read-only
+execution created and retained archive `9535ce13...bd4d`, then stopped before
+SCP; no numerical process ran. The successor
+[P8C-R1 stopped-rescue retrieval proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r1-stopped-rescue-archive-retrieval-proposal.md)
+was executed once under exact authorization and is exhausted. Its full-command
+`pgrep` predicate matched the SSH guard shell itself because evidence paths
+contained `nhm2-h2-p8c`; it failed closed before SCP and cleanup returned the
+rescue VM to `TERMINATED`. Partial evidence `a618dbe9...cd7d` is preserved and
+the independent [R1 result audit](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r1-stopped-rescue-retrieval-result.md)
+passes 21/21 at `d879f2a7...ba0f`. The corrected
+[P8C-R2 stopped-rescue retrieval proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r2-stopped-rescue-archive-retrieval-proposal.md)
+used exact process `comm` identities and was executed once. External TCP/22
+timed out before the remote guard, SCP was not attempted, and cleanup returned
+both VMs to `TERMINATED`. Its immutable
+[R2 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r2-stopped-rescue-retrieval-result.md)
+passes 19/19 at `c65d88c...7114`; R2 is exhausted. The candidate-neutral
+[P8C-R3 IAP retrieval proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r3-iap-stopped-rescue-archive-retrieval-proposal.md)
+was executed once. Its IAP guest guard authenticated the exact source archive
+and read-only unmounted clone, but the stage contains no SCP or Cloud Shell
+archive receipts. Its immutable
+[R3 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r3-iap-stopped-rescue-retrieval-result.md)
+passes 19/19 at `91e647ca...28c4` and classifies the attempt as
+`INCOMPLETE_AFTER_IAP_GUARD_BEFORE_SCP_EVIDENCE`; R3 is exhausted. The P8C
+scientific audit remains blocked at 1/25 because no terminal archive reached
+the local capture. No retry, retune, candidate evaluation, numerical work, or
+authority promotion is authorized. A separately frozen
+[P8C-R4 stage-before-restart proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r4-staged-iap-retrieval-proposal.md)
+bound a 4,115-byte Cloud Shell procedure at `a4104d49...ed79b` and passed
+independent audit 38/38. Its one staging authorization is now exhausted: the
+destination absence check passed, but the hidden file input did not open a file
+chooser, so no file was selected or uploaded. The immutable staging result
+passes 11/11 at `eec24a3f...4b136`. It records zero VM starts, SCP operations,
+archive downloads or numerical actions. A separately frozen staging-transport
+successor is required before a short-command execution proposal can become
+eligible. The separately frozen
+[P8C-R4-R1 chunked staging proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r4-r1-chunked-procedure-staging-proposal.md)
+bound the same 4,115 source bytes as 15 pre-hashed chunks and exactly 19
+derived commands, each at most 573 characters. Its one authorized protocol
+completed with all four PASS markers and exact command-ledger equality. The
+[R4-R1 staging result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r4-r1-chunked-procedure-staging-result.md)
+passes 19/19 at `6d60f0f9...c4bc7b`; the final Cloud Shell procedure is 4,115
+bytes at `a4104d49...ed79b`. It was not executed, and VM/numerical/candidate
+actions remain zero. R4-R1 is exhausted; a separately frozen retrieval
+execution proposal is now eligible. The inert
+[P8C-R5 staged-procedure execution proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r5-staged-procedure-retrieval-execution-proposal.md)
+is frozen at `a3353a7c...e6e15`. It binds exactly one 497-character command at
+`78eda80c...7eda4`, one rescue restart, one IAP guard and one IAP SCP under the
+unchanged 1,200-second and `$0.10` ceilings. Independent audit passes 35/35 at
+`dc71da1b...0171d`. Its separately authorized attempt lost the Cloud Shell
+connection before any command character was transmitted. The immutable
+[R5 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r5-staged-procedure-retrieval-execution-result.md)
+is `0a9d11e...cdc24e`; its bounded record audit passes 14/14 at
+`6137cf13...edee1`. Command submissions, VM restarts, SSH/SCP, archive,
+numerical and candidate actions are all zero. R5 is exhausted. The inert
+[R6 connection-gated proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r6-connection-gated-retrieval-proposal.md)
+is now frozen at `1b78a6d7...0d3c6`. Its 35-character round-trip marker gates
+the unchanged 497-character invocation; independent audit passes 15/15 at
+`c719df73...a235`. R6 then executed once. Its marker passed, the procedure was
+invoked once, the prompt returned, and both VMs were observed stopped. The
+[R6 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r6-connection-gated-retrieval-result.md)
+is `377b66e2...54b6e`; audit `372c490d...5170` passes 16/16 but leaves the exit
+and archive unread. The inert
+[R7 read-only proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r7-readonly-disambiguation-proposal.md)
+is frozen at `5fbd0adc...88408` with a 15/15 audit at
+`bf7ff7e3...9db3`. R7 executed once and failed on the reprovisioned shell's
+missing project binding; its non-failfast chain nevertheless observed
+`procedure_exit=255`, the 11-file stage and an absent archive. The
+[R7 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r7-readonly-disambiguation-result.md)
+is `5e8261c9...adbc` with an 18/18 audit at `631d1103...2298`. R8 froze at
+`f4d1558a...8fa22` as a project-bound fail-fast remote-guard diagnosis and was
+executed once. The [R8 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r8-failfast-guard-diagnosis-result.md)
+passes 22/22 at `95f96892...cffb5` and authenticates the cause as a stale Cloud
+Shell SSH host key for the rescue VM before the remote guest guard. Both VMs
+remain `TERMINATED`, the Cloud Shell archive is absent, and no numerical or
+candidate action occurred. R8 is exhausted. The inert
+[R9 guest-attribute preflight](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r9-guest-attribute-hostkey-preflight-proposal.md)
+is now frozen at `186447b2...a4df`; its exact two-command read-only ledger
+passes 20/20 at `a2f98470...6abe`. It binds the rescue instance ID, both stopped
+VMs, the bounded stale known-hosts identity and Google's documented `hostkeys/`
+guest-attribute back channel. R9 then executed once: its health marker passed
+and its exact inspection command was submitted, but the terminal input
+disappeared before either trust or completion marker was observable. The
+[R9 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r9-guest-attribute-hostkey-preflight-result.md)
+is indeterminate at `c658f96f...7fdc` with a 15/15 audit at
+`ae5fa6fc...4f92e`. No trust decision, mutation, SSH, VM action or numerical
+action occurred. R9 is exhausted. The next eligible work is a separately
+frozen child-process diagnostic that preserves first-failure markers without
+closing the operator terminal. That inert
+[R10 proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r10-observable-hostkey-preflight-proposal.md)
+is now frozen at `4926fa95...851a`; its exact two-command ledger and Python
+syntax pass 23/23 at `e57c1be6...e47d`. It preserves every R9 trust predicate,
+adds immediate step markers and then executed once. The
+[R10 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r10-observable-hostkey-preflight-result.md)
+passes 19/19 at `ab97af6e...bd43`: both VMs are stopped, rescue instance ID
+`3332429239243725178` and stale known-hosts line 10 are authenticated, and the
+Google API returns HTTP 404 because `hostkeys/` guest attributes are absent.
+The terminal remained active, no trust decision was reached, and no mutation,
+SSH, VM or numerical action occurred. R10 is exhausted. The next eligible work
+is a separately frozen offline read-only rescue-boot-disk host-key attestation.
+Its prerequisite
+[R11 resource inventory](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r11-offline-hostkey-resource-preflight-proposal.md)
+is now frozen and inert at `7eec8a94...af47`. The unchanged 3,928-byte
+two-command ledger passes corrected independent audit 24/24 at
+`ec040612...b3b7a`; the first over-broad audit failure is preserved separately.
+R11 may only authenticate the stopped rescue boot disk, read-only clone
+attachment and absence of three proposed derivative names. It authorizes no
+cloud action, SSH/SCP, mount, file mutation, numerical work or candidate work.
+The exact R11 authorization was subsequently received, but the local Codex
+browser-control kernel failed before browser discovery or any Cloud Shell
+character transmission. Chrome/extension/native-host diagnostics passed, one
+kernel reset/retry reproduced the missing-path failure, command count remains
+zero, and R11 is not consumed. Its first execution remains eligible only after
+the authorized browser-control surface is restored. A later full app restart
+restored Chrome attachment, but the retained Cloud Shell tab timed out under
+claim, DOM, screenshot and narrow terminal-locator inspection before any
+input. The packet did not infer terminal-input absence, reload the tab or open
+a fresh tab; all command and cloud-action counts remain zero and R11 remains
+unconsumed. The operator then authorized a fresh terminal surface. R11
+executed exactly once, reached `R11_READONLY_COMPLETE`, and authenticated the
+stopped VM states, rescue instance `3332429239243725178`, exact two-disk
+topology, read-only evidence clone, 10 GB `pd-standard` Debian boot disk and
+absence of all three proposed derivative names. The
+[R11 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r11-offline-hostkey-resource-preflight-result.md)
+is `6c386c37...bc8c6` and passes 19/19 at `98117b1d...c083`; mutations,
+numerical actions and authority remain zero. R11 is exhausted. To reduce
+operator micro-approvals, an inert
+[bounded continuation charter](./nhm2-spherical-boson-star-v2-bounded-continuation-operating-charter.md)
+is now active under authorization receipt `4f28231a...680dc`, independently
+audited 7/7 at `10d2966c...13a6d`. It replaces repeated scientific packet
+authorization inside its exact candidate-neutral cloud, cleanup, cost,
+runtime, storage, evidence-protection and authority-lock bounds. R12 is the
+first packet operating under that charter:
+[R12 offline host-key attestation](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r12-offline-hostkey-attestation-proposal.md)
+is frozen at `e9ee7ed7...2ef45` and independently audited 30/30 at
+`83a530ba...27f71`. No R12 resource has been created. The two scripts may be
+staged and hash-verified without a new scientific authorization; a short
+browser action-time cost confirmation is required immediately before the one
+billed execution.
+R12 was subsequently staged with both frozen hashes verified and invoked
+exactly once after the connection marker passed. It stopped on the first
+read-only `gcloud compute instances describe` because Cloud Shell had no active
+account selected. [R12 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r12-offline-hostkey-attestation-result.md)
+`f7e404f8...7fc5c` passes independent audit 23/23 at
+`b4eb0f53...b431c`: zero resource creation, deletion, SSH/SCP, numerical or
+candidate action. R12 is exhausted. Account restoration/selection is outside
+the charter's credential boundary, so the active blocker is environmental
+authentication rather than host-key or scientific failure.
+The operator then selected the existing Google account and authorized one
+bounded successor. [R13](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r13-offline-hostkey-attestation-proposal.md)
+was frozen at `87df2de9...c547f` with independent proposal audit 32/32. Its one
+execution created the exact snapshot, read-only clone and helper, but the
+helper serial capture was empty. The immutable
+[R13 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r13-offline-hostkey-attestation-result.md)
+is `BLOCKED_EMPTY_SERIAL_EVIDENCE_AFTER_HELPER_TERMINATION`, result
+`7fb529b9...9872`, audit 34/34. Post-stop diagnosis authenticated the exact
+startup binding and read-only clone, but helper guest attributes contained only
+the helper's own keys and could not attest the offline source disk. R13 is
+exhausted; no fingerprint decision, numerical action or authority promotion
+occurred.
+
+The separately versioned
+[R14 guest-attribute successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r14-guest-attribute-hostkey-attestation-proposal.md)
+was frozen at `e1261d73...1fa2` and passed 31/31. Its one helper was created
+with a configured read-write boot disk and the retained clone read-only. Live
+serial evidence then proved a duplicate image-derived root-`PARTUUID`
+collision: the kernel selected read-only `sdb1`, `systemd-remount-fs` failed,
+and Google's metadata runner could not create its startup-script directory.
+The 900-second guard stopped the helper. The
+[R14 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r14-guest-attribute-hostkey-attestation-result.md)
+is `BLOCKED_READ_ONLY_SOURCE_CLONE_SELECTED_AS_ROOT_BEFORE_STARTUP_EXECUTION`,
+result `52d68596...aed0`, audit 35/35. The fingerprint was not evaluated; R14
+is exhausted; zero NHM2 VMs are running.
+
+The minimal repair was frozen as the
+[R15 boot-first/hot-attach proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r15-boot-first-hot-attach-hostkey-attestation-proposal.md)
+at `4ad78a6f...b5d30`, independent audit 37/37. Its one execution created the
+helper without the clone, authenticated a writable boot/guest channel, and
+only then hot-attached the retained clone read-only. The source mounted as
+`ext4` with `ro,noload`; device-read-only and unmount checks passed. The
+offline Ed25519 fingerprint is `SHA256:+AxR3...v7Ks`, which differs from the
+R8 SSH-presented `SHA256:ijX48...3XFw`. The immutable
+[R15 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8c-r15-boot-first-hot-attach-hostkey-attestation-result.md)
+therefore classifies
+`BLOCKED_SSH_PRESENTED_HOSTKEY_DIFFERS_FROM_OFFLINE_RESCUE_BOOT_DISK_HOSTKEY`,
+result `cd41d4f...c24e`, audit 44/44. R15 is exhausted, the helper is
+`TERMINATED`, zero NHM2 VMs are running, and no numerical or candidate action
+occurred. The active charter requires operator direction at this evidence
+mismatch before any identity reconciliation or archive retrieval.
+The operator subsequently selected the transport-independent path. R16
+stopped before resource creation because the retained clone had three stopped
+helper users rather than sole R15 attachment. R17 authenticated that topology,
+detached stopped R13/R14, retained R15 as the sole stopped user, and completed
+the inherited boot-first/read-only-hot-attach retrieval under separate R17
+helper, archive and evidence names. Exact archive `9535ce13...bd4d` is now
+preserved locally; the helper is `TERMINATED`, the clone is detached and zero
+NHM2 VMs run. The unchanged P8C audit passes 25/25 at `74c85154...d84d` and
+classifies `P8C_DIAGNOSTIC_NUMERICAL_FAIL`. All 17 fixed candidates fail first
+at degree 3 coefficient width, three at jet 8 and fourteen at jet 9; the best
+first-failure ratio is `1.0258985158...`. Result-only P8D classification
+`77c3b945...ef33` passes 19/19 and selects candidate-neutral constituent-bound
+decomposition as the next lead, with no threshold relaxation, retry or retune.
+P8E implemented that observation-only four-slot product-rule decomposition and
+passes its exact 52/52 independent audit at `0cf28e9a...d0dd`. P8F then bound
+the same surface read-only into the authenticated H2 parent and passes 47/47 at
+`2fb073ba...218`. The one candidate-neutral P=65,536, degree-3 jet-9
+[representative run](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-local-representative-launch-checkpoint.md)
+was intentionally stopped after about 6 hours 58 minutes when the local path
+could not provide bounded progress evidence. Exact container
+`8cacecb9...52ec1` is retained with exit 137, OOM false and empty logs; that is
+interrupted evidence, not a numerical result. The separately versioned P8F-C1
+cloud-observable successor preserves P=65,536, degree 3, jet 9, MPFR512 and the
+`2^-180` rail, raises only the worker batch to 32, and adds post-reduction
+1,024-panel progress markers. Its callback equivalence fixture passes 17/17;
+its exact 52-entry archive `c40fda6b...24640` is uploaded and cloud-rehashed.
+The first `c4-standard-32` request was rejected before resource creation by the
+24-vCPU C4 family quota. A later N2 terminal-input defect created a wrong-name
+but same-specification VM `instances`; it stopped before setup and was deleted
+under the exact recovery packet. The corrected C1 N2 VM then authenticated the
+archive and loaded both pinned base images, but the offline build failed before
+container or numerical creation. Read-only stopped-disk evidence proves
+`BLOCKED_PREEXECUTION_ARCHIVE_INVENTORY_SKEW`: the archive paired the intended
+decomposition-aware selector with stale jet source files. C1 is exhausted;
+candidate and numerical actions remain zero. The separately versioned C2
+archive repaired only those two source members but omitted the required
+observability fixture during exact extracted-inventory preflight, so it remains
+an inert intermediate. The [C2-R1 cloud proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-c2-r1-cloud-execution-proposal.md)
+preserves all 55 C2 members and adds the two fixture files plus separately
+named runtime/evidence bindings. Its 60-entry archive `fa8d8c99...36978`
+reproduces binary `14140897...1bad6`, the extracted fixture passes 17/17, and
+its independent proposal audit passes 28/28. No C2-R1 cloud resource has been
+created or started; a fresh exact authorization is required.
+The result-only
+[P8F audit definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-result-audit-definition.md)
+is frozen before terminal output. Its exact auditor passes 4/4 synthetic
+PASS/FAIL/timeout/corruption fixtures and preregisters a strict, tolerance-free
+outer-accumulation/boundary/slot/distributed decision. It cannot inspect or
+control the active process and has not read the live evidence root. A separate
+static definition audit passes 31/31 with receipt `6ad6d18d...bbbca`.
+The C2-R1 verification checkpoint is math 323/323, WARP 18/18 files and
+179/179 tests, and Casimir adapter run 2591 `PASS/GREEN` with certificate
+`6e84f965...e12a4e45` and integrity true.
 Its active S5-A
 [`formal-germ subtraction definition review`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a-formal-germ-subtraction-definition-review.md)
 records an unbound truncation/formal-tail issue and selects nothing.
@@ -395,7 +691,7 @@ close.
 | G2H-E-S3-R1 — Surface-regularity first-failure theoretical disposition | closed: independently audited theoretical `PASS` | Disposition `e86dcd10...ec0a` and audit 27/27 preserve the exact order-2 failure and ordinary junction pass, independently replay the `Box R` surface-delta coefficient `18/5` and minimal-coupling `v1` coefficient `3/100`, require the standard globally `C∞` route for the frozen Hadamard/RSET/noise duties, and narrow analytic germ equality to a sufficient special method. Math 318, WARP 179/179 and Casimir run 2471 are green with certificate integrity true. No sharp finite-regularity alternative is invented; all authority remains false. | G2H-E-S3-R2 |
 | G2H-E-S3-R2 — Smooth replacement-family research and preregistration | closed: independently replayed selection `PASS`; no candidate execution | Protocol `f2fec60d...a6cb2` freezes six families, hard minima, rank and no-selection rules before scoring. Primary-source matrix `7f7b7ac8...10d03` selects the ordinary nodeless quadratic mini-boson star at source coordinate `shat(0)=1.2`, ingressed as `6/5`, as the unique rank `(1,1,19,2,2,2,2,2,2,2,2,2)` maximum. Contract `041c406c...ed12a` freezes the global surface-free EKG problem, 15 classical and six quantum duties, arithmetic, grids, continuation, two future disjoint runtimes and absent-root rules. Selection/replay and closure audit pass 33/33; R1 remains 27/27; math 318, WARP 179/179 and Casimir run 2472 are green with certificate integrity true. New evaluations are zero; no implementation, execution, admission or scientific/physical authority. | G2H-E-S4 |
 | G2H-E-S4 — Mini-boson-star proof implementation and preexecution closure | closed: independently audited implementation/preexecution `PASS`; no candidate execution or proof | R1 seal `728d8c9a...025ca` and quantum builder `29893736...62fc` remain unchanged. Both disjoint lanes complete 4/4 common and 13/13 scientific fixture roles; final audit passes 23/23. Closure receipt `539a4ac5...a191`, current-head receipt `b5ab2249...c816`, math 318, WARP 179/179, and Casimir `PASS/GREEN` with certificate `6e84f965...4e45` and integrity true close S4. Both candidate roots remain absent; evaluations, samples, authorization, proof and every authority remain zero/false. | G2H-E-S5 inert primary execution-preflight decision |
-| G2H-E-S5 — Inert primary execution-preflight decision | active: ABI and outer guard PASS; scientific handlers 0/19 | Checkpoint ABI `6fbf6cdb...911ca`, outer guard, scheduler, record, ingress and existing candidate-neutral foundations remain green. A2 is complete-unsealed and A3 has exact-byte independent acknowledgement. A4 remains active. The generic C08-010 kernel passes 23/23 fixtures plus an 87/87 audit. C08-011a passes 26/26 plus 81/81; C08-011b passes 23/23 plus 92/92. Partial C08-011c1 verifies prefix/onset/history under 25/25 plus 86/86; C08-011c2 arbitrary-left panels pass 17/17 plus 57/57; C08-011c3 origin models pass 13/13 plus 48/48; and C08-011c4 owns stable scalar ledgers, commits four-state panels atomically and persists the first finite failure under 17/17 fixtures plus a 51/51 recursive audit. Exact internal `kappa`, `mu`, `beta+1` analytic 13-jets now pass 10/10 fixtures plus a 37/37 audit; the exact analytic degree-one model product passes 9/9 plus a 38/38 audit; paired `P/Pprime` persistence passes 14/14 fixtures plus a 52/52 recursive audit; per-panel analytic `F/E1/E2` models pass 11/11 plus a 43/43 audit and their persistent ledgers pass 13/13 plus a 45/45 recursive audit. Exact per-panel `Fprime/E1prime/E2prime` models pass 11/11 plus a 36/36 recursive audit and their persistent ledgers pass 15/15 plus a 45/45 recursive audit. H2 remains under candidate-neutral implementation closure. H2-P1 profiling and H2-P2 prepared-moment reuse pass. H2-P3 exact equivalence closes PASS at 1/2/4/8/16 threads, including deterministic repeated 16-thread semantics, two 31/31 fixtures and a 40/40 independent audit. H2-P4 measures seven-subpanel candidate times of 7.612 seconds at one thread, 4.442 at two, 3.376 at four, 3.381 at eight and 3.371/3.354 at sixteen. H2-P5 audit 19/19 proves the largest exponent-2 candidate exposes only four outer worker tasks. H2-P5A froze the representative single-call surface but its corrected C4 attempt stopped before build because archive `5a4f6f98...c321d` omitted the Dockerfile; its 25/25 blocker audit passes and the VM is `TERMINATED`. H2-P5A-R1 preserved those 36 members byte-for-byte, added only Dockerfile `bf45b37b...de9c`, and froze archive `a8b66052...6422` plus proposal `73fd408f...36d1`. Producer preflight passes 15/15; the preserved first audit is 26/28 and the corrected extracted-context audit passes 28/28 while reproducing binary `aa37562f...13b7`. The separately authorized R1 cloud run is immutably `BLOCKED_PREEXECUTION_BUILD_BINDING`: cloud and VM archive checks passed, both archived base tags loaded with empty `RepoDigests`, and the frozen `name@repository-digest` `FROM` stopped before compilation. Result audit passes 22/22; zero representative calibrations ran; R1 and predecessor VMs are `TERMINATED`; the R1 disk and evidence bundle `e9b0dcce...75f4d` remain preserved. H2-P5A-R2 now closes that build blocker: its 39-entry archive preserves all R1 bytes, producer preflight passes 11/11, an empty classic daemon restores exact config IDs `540d7039...c304c` and `17043e9f...2057e`, the local-tag/no-pull/no-network build reproduces binary `aa37562f...13b7`, and independent audit passes 28/28. Its exactly authorized cloud execution completed 5/5 `P=1024` runs with semantic agreement; the slower 16-thread time is 157,550 ms and the frozen two-selector projection is 22.406940158 hours, below 24 hours. Result audit passes 50/50, capture `01fa09a9...4336` is preserved, and the VM is `TERMINATED` with its disk `READY`. H2-P6 then binds H2/P2 to the exact-equivalent 16-thread selector; its bounded manufactured fixture passes 11/11 and independent audit 33/33 without a long parent selector. H2-P7 proposal `3f15f387...fdc3` passed producer 12/12 and independent 27/27 audits; under separate exact authorization, one C4 VM reproduced archive `9c2a6af7...f1f5`, cleanly built exact binary `e6dfc340...8f56`, and started exactly one candidate-neutral parent process at `2026-08-28T00:05:17Z`. It is active under the 100,800-second timeout and automatic stop; result and independent audit remain pending. Both serial runs remain stopped with partial evidence preserved. A separately named P2 adapter passes an 11/11 exact manufactured fixture but remains provisional pending final H2 parent result and independent audit. Remaining derivative-convolution origin/target-panel ledgers are absent, so the history callback remains unbound and C08-011c incomplete. C08-011d through C08-015, C08-021 and the handler remain absent. No selected-member panel, instantiated growth witness or candidate summability proof exists. Candidate roots, authorization token, candidate ledgers, selected-member sampling/execution, G3 and every authority remain absent/false. | await the immutable H2-P7 termination evidence and independent result audit; do not start a second process, retry, retune or evaluate the frozen member |
+| G2H-E-S5 — Inert primary execution-preflight decision | active: ABI and outer guard PASS; scientific handlers 0/19 | Checkpoint ABI `6fbf6cdb...911ca`, outer guard, scheduler, record, ingress and existing candidate-neutral foundations remain green. A2 is complete-unsealed and A3 has exact-byte independent acknowledgement. A4 remains active. The generic C08-010 kernel passes 23/23 fixtures plus an 87/87 audit. C08-011a passes 26/26 plus 81/81; C08-011b passes 23/23 plus 92/92. Partial C08-011c1 verifies prefix/onset/history under 25/25 plus 86/86; C08-011c2 arbitrary-left panels pass 17/17 plus 57/57; C08-011c3 origin models pass 13/13 plus 48/48; and C08-011c4 owns stable scalar ledgers, commits four-state panels atomically and persists the first finite failure under 17/17 fixtures plus a 51/51 recursive audit. Exact internal `kappa`, `mu`, `beta+1` analytic 13-jets now pass 10/10 fixtures plus a 37/37 audit; the exact analytic degree-one model product passes 9/9 plus a 38/38 audit; paired `P/Pprime` persistence passes 14/14 fixtures plus a 52/52 recursive audit; per-panel analytic `F/E1/E2` models pass 11/11 plus a 43/43 audit and their persistent ledgers pass 13/13 plus a 45/45 recursive audit. Exact per-panel `Fprime/E1prime/E2prime` models pass 11/11 plus a 36/36 recursive audit and their persistent ledgers pass 15/15 plus a 45/45 recursive audit. H2 remains under candidate-neutral implementation closure. H2-P1 profiling and H2-P2 prepared-moment reuse pass. H2-P3 exact equivalence closes PASS at 1/2/4/8/16 threads, including deterministic repeated 16-thread semantics, two 31/31 fixtures and a 40/40 independent audit. H2-P4 measures seven-subpanel candidate times of 7.612 seconds at one thread, 4.442 at two, 3.376 at four, 3.381 at eight and 3.371/3.354 at sixteen. H2-P5 audit 19/19 proves the largest exponent-2 candidate exposes only four outer worker tasks. H2-P5A froze the representative single-call surface but its corrected C4 attempt stopped before build because archive `5a4f6f98...c321d` omitted the Dockerfile; its 25/25 blocker audit passes and the VM is `TERMINATED`. H2-P5A-R1 preserved those 36 members byte-for-byte, added only Dockerfile `bf45b37b...de9c`, and froze archive `a8b66052...6422` plus proposal `73fd408f...36d1`. Producer preflight passes 15/15; the preserved first audit is 26/28 and the corrected extracted-context audit passes 28/28 while reproducing binary `aa37562f...13b7`. The separately authorized R1 cloud run is immutably `BLOCKED_PREEXECUTION_BUILD_BINDING`: cloud and VM archive checks passed, both archived base tags loaded with empty `RepoDigests`, and the frozen `name@repository-digest` `FROM` stopped before compilation. Result audit passes 22/22; zero representative calibrations ran; R1 and predecessor VMs are `TERMINATED`; the R1 disk and evidence bundle `e9b0dcce...75f4d` remain preserved. H2-P5A-R2 now closes that build blocker: its 39-entry archive preserves all R1 bytes, producer preflight passes 11/11, an empty classic daemon restores exact config IDs `540d7039...c304c` and `17043e9f...2057e`, the local-tag/no-pull/no-network build reproduces binary `aa37562f...13b7`, and independent audit passes 28/28. Its exactly authorized cloud execution completed 5/5 `P=1024` runs with semantic agreement; the slower 16-thread time is 157,550 ms and the frozen two-selector projection is 22.406940158 hours, below 24 hours. Result audit passes 50/50, capture `01fa09a9...4336` is preserved, and the VM is `TERMINATED` with its disk `READY`. H2-P6 then binds H2/P2 to the exact-equivalent 16-thread selector; its bounded manufactured fixture passes 11/11 and independent audit 33/33 without a long parent selector. H2-P7 proposal `3f15f387...fdc3` passed producer 12/12 and independent 27/27 audits; its one authorized C4 process completed at `2026-08-28T06:15:08Z`. Read-only snapshot rescue recovered archive `fa50e5c6...5a831`; independent result audit passes 24/24 and authenticates `H2_PARENT_FAIL`: all 17 fixed candidates were consumed at `C08-010`, with zero candidate evaluations and all authority false. H2-P8 closes `INSUFFICIENT_PERSISTED_DATA_FOR_CAUSAL_SEPARATION`. P8A now records per-candidate width failure location, radius, threshold and ratio without changing selection; its fixture passes 17/17 twice, predecessor regression passes 31/31 and corrected independent audit passes 40/40 at receipt `94ee2a0c...b986`. P8B binds only the most recent or terminal observation into optional H2 entrypoints and a bounded canonical record; parent equivalence passes 13/13 twice, independent audit passes 48/48 at receipt `e4fa37c1...6ee7`, and bounded P2 regression passes 11/11. P8C remains frozen at proposal `7e8f28d7...a2ace`; its exact run completed and the original VM is stopped, but the result archive remains unretrieved. R15 now proves the transport blocker is an authenticated host-key mismatch: read-only offline fingerprint `SHA256:+AxR3...v7Ks` differs from the R8 SSH-presented `SHA256:ijX48...3XFw`; result `cd41d4f...c24e`, audit 44/44. R15 is exhausted, its helper is stopped, zero NHM2 VMs run, and the charter requires operator direction before any identity reconciliation or archive retrieval. Both serial predecessor runs remain stopped with partial evidence preserved. A separately named P2 adapter passes an 11/11 exact manufactured fixture but remains provisional pending final H2 parent result and independent audit. Remaining derivative-convolution origin/target-panel ledgers are absent, so the history callback remains unbound and C08-011c incomplete. C08-011d through C08-015, C08-021 and the handler remain absent. No selected-member panel, instantiated growth witness or candidate summability proof exists. Candidate roots, authorization token, candidate ledgers, selected-member sampling/execution, G3 and every authority remain absent/false. | stop at the authenticated R15 evidence mismatch and obtain operator direction for a separately versioned identity-reconciliation path; no archive retrieval, retry or retune |
 | G2H-E-S4-R2 — Quantum-builder definition repair | closed: additive total definition seal `PASS`; no quantum source or scientific execution | Gap inventory `3da161ec...b4c52` remains the immutable reproduced defect. Successor `29893736...62fc` fixes panel endpoints, node/weight construction, radial corrections, atom-safe weighted Richardson/Poisson remainders, explicit D=4 Hadamard transport, state-dependent W_DF subtraction, noise projection/factors, error allocation, wire-v1 payloads and every finite inner budget without changing an inherited selector. Exact audit passes 49/49, independent Node replay 29/29 and receipt audit 13/13 under closure `9928c20b...5bf1`. Candidate ingress and roots remain absent; all authority remains false. | G2H-E-S4 fixture-only quantum producer implementation |
 | G2H-E-S4-R1 — Mini-boson-star proof-definition completeness review | closed: exact additive definition seal `PASS` | R2 remains byte-identical. Classical definitions cover wire/record, seed, corrected grids, endpoint/tails, inverse/radii, 1,024-cell continuation, common-unit masses and the exact ell=0 Friedrichs stability certificate. Quantum definitions cover optical-metric global hyperbolicity, positive `K`, complete threshold-aware spectral measure, one static ground `G_plus`, Hadamard RSET, 64x4 mean and 256x256 Fock-Gram noise products. Two finite producer-specific builder algorithms fix every selector and exhaustion rule. Combined closure passes 42/42, cross-language replay 100/100, math 318, WARP 179/179 and Casimir run 2473 `PASS/GREEN`, integrity true. Zero scientific ingress; both roots absent; all authority false. | G2H-E-S4 fixture-only implementation |
 | G3 — Accepted joint geometry and quantum state       | blocked by a versioned authenticated primary proof and independent replay | A converged joint fixed-point witness binding the same geometry, Hadamard state, renormalization/effective-action definitions, spectral evidence, and authenticated bytes                                                                                                                                                                                                               | G4                            |
@@ -403,6 +699,76 @@ close.
 | G5 — Two complete disjoint 68-file lanes             | blocked by G4                          | Four mean/noise files and 63 constraint files per lane, complete manifests, exclusive output-root chronology, and two source/runtime-disjoint executions                                                                                                                                                                                                                                | G6                            |
 | G6 — Replay, agreement, diagnostic lamp              | blocked by G5                          | Server reread/replay of both lanes, exact pair agreement, all diagnostic gates, and no-retune evidence                                                                                                                                                                                                                                                                                  | G7                            |
 | G7 — Current-head verification and evidence package  | blocked by G6                          | Required math validation, Casimir adapter PASS, certificate integrity when policy requires it, and a current-head evidence packet                                                                                                                                                                                                                                                       | Program diagnostic completion |
+
+### August 29 P8C recovery status
+
+Snapshot-rescue proposal `ea2f7265...1dedb` was executed exactly once. The
+read-only guest guard issued ext4 `ro,noload`; `findmnt` reported its equivalent
+kernel option set `ro,relatime,norecovery`,
+found 42 evidence files, and created the authorized 16,443-byte archive
+`9535ce13...bd4d` on the rescue boot disk. Its recovered manifest proves
+`run.exit=1` and `orchestrator.exit=1`. The outer procedure terminated before
+SCP; its cleanup trap stopped the rescue VM, and a 16,919-byte partial Cloud
+Shell capture `ca69472e...cdc5` is preserved locally. The unchanged frozen
+audit correctly returns 1/25 `AUDIT_FAIL` at receipt `f52f2484...6aba` because
+the terminal archive and normalized bindings are absent locally. No retry,
+numerical execution, evidence mutation, deletion or authority promotion
+occurred. R1, R2 and R3 retrieval attempts are exhausted. R3 authenticated the
+source archive through IAP but produced no SCP receipts. The next active lead is
+the separately frozen R4 stage-before-restart packet at proposal
+`cfd15b9b...8a11a`: its exact 4,115-byte procedure hashes to
+`a4104d49...ed79b` and independent proposal audit passes 38/38. Its one staging
+attempt then stopped before file selection because the hidden input did not
+open a chooser. Result audit passes 11/11 at `eec24a3f...4b136`; no upload, VM
+restart or numerical action occurred, and R4 is exhausted. A separately frozen
+staging-transport successor was required. R4-R1 froze and executed that
+successor once: its 15-chunk manifest `3477c768...6570f` reconstructed the same
+4,115 bytes, all 19 commands matched the frozen ledger, and all four PASS
+markers were observed. Result audit passes 19/19 at `6d60f0f9...c4bc7b`; the
+final procedure identity is `a4104d49...ed79b`. It was not executed, and VM,
+numerical and candidate actions remained zero. R4-R1 is exhausted; a separately
+frozen retrieval execution proposal became eligible. R5 was frozen at
+`a3353a7c...e6e15`; its one exact command and unchanged staged procedure passed
+35/35 independent checks. Its separately authorized attempt then lost the
+Cloud Shell connection before transmission. Result `0a9d11e...cdc24e` and its
+14/14 bounded consistency audit `6137cf13...edee1` record zero command, VM,
+SSH/SCP, archive, numerical or candidate actions. R5 is exhausted and may not
+be retried. R6 freezes the separately named connection-gated successor at
+`1b78a6d7...0d3c6`: its short round-trip marker must pass before the unchanged
+staged procedure can be invoked. Independent proposal audit passes 15/15 at
+`c719df73...a235`; preparation performed zero cloud or numerical actions. R6
+then executed once: its marker passed, its staged procedure was invoked once,
+the prompt returned, and both VMs were observed stopped. Result
+`377b66e2...54b6e` and its 16/16 audit `372c490d...5170` leave the procedure
+exit and archive identity explicitly unread. R6 is exhausted. R7 now freezes a
+no-restart, read-only disambiguation proposal at `5fbd0adc...88408`; independent
+audit passed 15/15 at `bf7ff7e3...9db3`. R7 then failed on the missing project
+binding and exposed a non-failfast command defect while partially observing
+`procedure_exit=255`, the 11-file stage and an absent archive. Its result
+`5e8261c9...adbc` passes an 18/18 audit at `631d1103...2298`; R7 is exhausted.
+R8 froze the corrected project-bound fail-fast remote-guard diagnosis at
+`f4d1558a...8fa22` and then executed once. Its result `590c56d9...a9b1`
+passes 22/22 at `95f96892...cffb5`: both VMs are authenticated `TERMINATED`,
+the exact 11 R6 stage files are bound, `procedure_exit=255`, the Cloud Shell
+archive is absent, and the remote receipt proves a stale Cloud Shell SSH host
+key stopped IAP SSH before the guest guard. This is a transport-identity
+failure, not a P8C numerical result. R8 is exhausted. R9 now freezes the
+read-only Google-API guest-attribute trust preflight at `186447b2...a4df`; its
+two-command ledger passes 20/20 at `a2f98470...6abe`. R9 then executed once:
+the health marker passed and the inspection was submitted, but terminal input
+disappeared before trust or completion markers were observable. Its result
+`c658f96f...7fdc` passes 15/15 at `ae5fa6fc...4f92e` and reaches no trust
+decision. R9 is exhausted. A separately frozen child-shell successor must make
+each first-failure boundary observable while retaining every trust predicate.
+Only a future authenticated match between the exact Compute instance and
+R8-presented fingerprint may unlock stale-entry reconciliation. Only after
+authenticated terminal retrieval and the unchanged P8C audit may bounded P8D
+causal classification begin. R10 then executed once and authenticated the
+`hostkeys/` guest-attribute channel as absent with HTTP 404. Result
+`ae3f4ed5...eb6a` passes 19/19 at `ab97af6e...bd43`; no trust decision or
+mutation occurred. Only a separately frozen offline read-only rescue-boot-disk
+host-key attestation may now establish the presented key before any
+known-hosts reconciliation.
 
 ## Active-gate rule
 

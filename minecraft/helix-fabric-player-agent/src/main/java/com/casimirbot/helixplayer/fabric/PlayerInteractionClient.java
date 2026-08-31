@@ -148,10 +148,11 @@ final class PlayerInteractionClient implements AutoCloseable {
     }
 
     private static URI secureEndpoint(String value) {
-        if (!HelixSensorConfig.secureEndpointAllowed(value)) {
+        String resolved = InstalledDesktopServiceEndpointResolver.resolve(value);
+        if (!HelixSensorConfig.secureEndpointAllowed(resolved)) {
             throw new IllegalArgumentException("In-game Ask endpoint must use HTTPS or loopback HTTP.");
         }
-        return URI.create(value);
+        return URI.create(resolved);
     }
 
     private static String safeError(Throwable error) {

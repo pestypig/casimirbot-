@@ -323,6 +323,12 @@ export const helixMinecraftPlayerActionArgumentsSchema = z
           .array(resourceLocationSchema)
           .min(1)
           .max(16),
+        combat_mode: z
+          .enum(["engage", "disengage_to_distance"])
+          .optional()
+          .describe(
+            "engage permits admitted hostile attacks; disengage_to_distance suppresses attacks and succeeds only after every visible eligible hostile is at least retreat_stop_distance away.",
+          ),
         max_acquisition_distance: z.number().finite().min(2).max(32),
         require_line_of_sight: z.literal(true),
         minimum_attack_cooldown: z.number().finite().min(0.1).max(1),

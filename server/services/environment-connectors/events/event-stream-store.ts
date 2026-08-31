@@ -31,6 +31,38 @@ import type { RoomSourceIngressRequestClaim } from "../../helix-ask/realtime-roo
 
 const DIGEST_EVENT_WINDOW = 512;
 
+export type EnvironmentSituationDigestRecordedEvent = {
+  environment_binding_id: string;
+  digest: HelixEnvironmentSituationDigest;
+};
+
+type EnvironmentSituationDigestRecordedSubscriber = (
+  event: EnvironmentSituationDigestRecordedEvent,
+) => void;
+
+const environmentSituationDigestRecordedSubscribers = new Set<
+  EnvironmentSituationDigestRecordedSubscriber
+>();
+
+export const subscribeEnvironmentSituationDigestRecorded = (
+  subscriber: EnvironmentSituationDigestRecordedSubscriber,
+): (() => void) => {
+  environmentSituationDigestRecordedSubscribers.add(subscriber);
+  return () => environmentSituationDigestRecordedSubscribers.delete(subscriber);
+};
+
+const publishEnvironmentSituationDigestRecorded = (
+  event: EnvironmentSituationDigestRecordedEvent,
+): void => {
+  for (const subscriber of environmentSituationDigestRecordedSubscribers) {
+    try {
+      subscriber(event);
+    } catch {
+      // Observation subscribers cannot change the committed event result.
+    }
+  }
+};
+
 export type EnvironmentEventTransactionRunner = <T>(
   handler: (db: Queryable) => Promise<T>,
 ) => Promise<T>;
@@ -327,7 +359,7 @@ export const recordEnvironmentActionEventBatch = async (input: {
   }
 
   const transact = input.withTransaction ?? withSharedRealtimeRoomTransaction;
-  return transact(async (db) => {
+  const recorded = await transact(async (db) => {
     const manifest = await latestActionManifestIdentity(db, input.claim);
     const identityValid =
       manifest &&
@@ -527,6 +559,13 @@ export const recordEnvironmentActionEventBatch = async (input: {
     );
     return { batch, digest, replayed: false };
   });
+  if (!recorded.replayed) {
+    publishEnvironmentSituationDigestRecorded({
+      environment_binding_id: input.claim.environmentBindingId,
+      digest: recorded.digest,
+    });
+  }
+  return recorded;
 };
 
 const worldEventSnapshot = (
@@ -614,7 +653,8 @@ export const recordWorldAuthorityEventBatch = async (input: {
     );
   }
   const transact = input.withTransaction ?? withSharedRealtimeRoomTransaction;
-  return transact(async (db) => {
+  let committedEnvironmentBindingId: string | null = null;
+  const recorded = await transact(async (db) => {
     const binding = await db.query<{ environment_binding_id: string }>(
       `SELECT environment_binding_id
        FROM helix_environment_connector_bindings
@@ -639,6 +679,7 @@ export const recordWorldAuthorityEventBatch = async (input: {
         "The admitted room source has no active environment connector binding.",
       );
     }
+    committedEnvironmentBindingId = environmentBindingId;
 
     const priorBatchId = `environment_event_batch:world:${crypto
       .createHash("sha256")
@@ -915,6 +956,15 @@ export const recordWorldAuthorityEventBatch = async (input: {
     }
     return { batch, digests, replayed: false };
   });
+  if (!recorded.replayed) {
+    for (const digest of recorded.digests) {
+      publishEnvironmentSituationDigestRecorded({
+        environment_binding_id: committedEnvironmentBindingId!,
+        digest,
+      });
+    }
+  }
+  return recorded;
 };
 
 export type EnvironmentSituationDigestReadContext = {

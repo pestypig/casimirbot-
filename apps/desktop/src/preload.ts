@@ -13,6 +13,10 @@ import {
   DESKTOP_MCP_TUNNEL_START_CHANNEL,
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
+  DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL,
+  DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL,
+  DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL,
+  DESKTOP_MINECRAFT_RUN_PROFILE_CLEAR_CHANNEL,
   DESKTOP_ROBINHOOD_OAUTH_OPEN_CHANNEL,
   DESKTOP_TEXTURE_PACK_FRAME_CHANNEL,
   DESKTOP_TEXTURE_PACK_REVEAL_CHANNEL,
@@ -40,14 +44,22 @@ const desktopBridge = Object.freeze({
     ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_STATE_CHANNEL),
   configureMcpTunnel: (input: unknown) =>
     ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_CONFIGURE_CHANNEL, input),
-  startMcpTunnel: () =>
-    ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_START_CHANNEL),
+  startMcpTunnel: (input?: unknown) =>
+    ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_START_CHANNEL, input),
   stopMcpTunnel: () =>
     ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_STOP_CHANNEL),
   clearMcpTunnel: () =>
     ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_CLEAR_CHANNEL),
   openMcpTunnelAdmin: () =>
     ipcRenderer.invoke(DESKTOP_MCP_TUNNEL_OPEN_ADMIN_CHANNEL),
+  getMinecraftRunProfile: () =>
+    ipcRenderer.invoke(DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL),
+  selectMinecraftRunProfile: () =>
+    ipcRenderer.invoke(DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL),
+  selectMinecraftPlayerProfile: () =>
+    ipcRenderer.invoke(DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL),
+  clearMinecraftRunProfile: () =>
+    ipcRenderer.invoke(DESKTOP_MINECRAFT_RUN_PROFILE_CLEAR_CHANNEL),
   openAuth0AccountLink: (authorizationUrl: unknown) =>
     ipcRenderer.invoke(
       DESKTOP_AUTH0_ACCOUNT_LINK_OPEN_CHANNEL,

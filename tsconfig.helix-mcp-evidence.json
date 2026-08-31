@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo.helix-mcp-evidence",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "shared/contracts/helix-mcp-evidence-capability.v1.ts",
+    "shared/helix-mcp-evidence-capability-registry.ts",
+    "server/services/mcp-evidence/observation.ts",
+    "server/services/mcp-evidence/observation-store.ts",
+    "server/services/mcp-evidence/__tests__/**/*.ts",
+    "scripts/lib/helix-mcp-evidence-capability-inventory.ts",
+    "scripts/lib/helix-mcp-evidence-public-ui-crosswalk.ts",
+    "scripts/lib/helix-mcp-evidence-conformance.ts",
+    "scripts/audit-helix-mcp-evidence-capabilities.ts",
+    "shared/contracts/__tests__/helix-mcp-evidence-capability.v1.spec.ts",
+    "tests/helix-mcp-evidence-capability-inventory.spec.ts",
+    "tests/helix-mcp-evidence-public-ui-crosswalk.spec.ts",
+    "tests/helix-mcp-evidence-conformance.spec.ts"
+  ],
+  "exclude": []
+}

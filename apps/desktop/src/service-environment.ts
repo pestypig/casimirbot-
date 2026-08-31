@@ -43,6 +43,11 @@ export const DESKTOP_LOCAL_DATABASE_RELATIVE_PATH = path.join(
   "helix-local-pg-mem.json",
 );
 
+export const DESKTOP_LOCAL_MINECRAFT_PROFILES_RELATIVE_PATH = path.join(
+  "state",
+  "local-minecraft-run-profiles.json",
+);
+
 export const resolveDesktopUserDataOverride = (
   value: string | null | undefined,
 ): string | null => {
@@ -61,6 +66,10 @@ export const buildDesktopServiceEnvironment = (input: {
   userDataPath: string;
   serviceOrigin: string;
   providerCredentialBroker: Readonly<{
+    origin: string;
+    token: string;
+  }>;
+  mcpTransitionBroker: Readonly<{
     origin: string;
     token: string;
   }>;
@@ -111,6 +120,30 @@ export const buildDesktopServiceEnvironment = (input: {
       "Desktop provider credential broker token must be exactly 32 base64url bytes",
     );
   }
+  const mcpTransitionBrokerOrigin = new URL(input.mcpTransitionBroker.origin);
+  if (
+    mcpTransitionBrokerOrigin.protocol !== "http:" ||
+    mcpTransitionBrokerOrigin.hostname !== "127.0.0.1" ||
+    !mcpTransitionBrokerOrigin.port ||
+    mcpTransitionBrokerOrigin.username ||
+    mcpTransitionBrokerOrigin.password ||
+    mcpTransitionBrokerOrigin.pathname !== "/" ||
+    mcpTransitionBrokerOrigin.search ||
+    mcpTransitionBrokerOrigin.hash
+  ) {
+    throw new Error(
+      "Desktop MCP transition broker must be an exact HTTP 127.0.0.1 origin",
+    );
+  }
+  const mcpTransitionBrokerToken = input.mcpTransitionBroker.token.trim();
+  if (
+    !/^[A-Za-z0-9_-]{43}$/u.test(mcpTransitionBrokerToken) ||
+    Buffer.from(mcpTransitionBrokerToken, "base64url").length !== 32
+  ) {
+    throw new Error(
+      "Desktop MCP transition broker token must be exactly 32 base64url bytes",
+    );
+  }
   const deviceId = input.deviceId.trim();
   if (!/^desktop_device_[A-Za-z0-9_-]{22}$/u.test(deviceId)) {
     throw new Error("Desktop device identity is invalid");
@@ -143,7 +176,18 @@ export const buildDesktopServiceEnvironment = (input: {
     providerCredentialBrokerOrigin.origin;
   environment.HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN =
     providerCredentialBrokerToken;
+  environment.HELIX_DESKTOP_MCP_TRANSITION_BROKER_ORIGIN =
+    mcpTransitionBrokerOrigin.origin;
+  environment.HELIX_DESKTOP_MCP_TRANSITION_BROKER_TOKEN =
+    mcpTransitionBrokerToken;
   environment.HELIX_DESKTOP_DEVICE_ID = deviceId;
+  // The service receives only the native-owned profile registry location.
+  // Individual run directories are selected by the signed-in profile through
+  // the native picker and are never accepted from an MCP request.
+  environment.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE = path.join(
+    userDataRoot,
+    DESKTOP_LOCAL_MINECRAFT_PROFILES_RELATIVE_PATH,
+  );
   // The private desktop MCP publishes discovery at its per-launch loopback
   // origin. OpenAI Secure MCP Tunnel performs that discovery locally and
   // rewrites resource URLs to the public tunnel endpoint. Never inherit the

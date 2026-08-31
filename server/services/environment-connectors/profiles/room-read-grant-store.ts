@@ -17,6 +17,7 @@ import {
 } from "../../helix-ask/realtime-room/room-store/database";
 import type { Queryable } from
   "../../helix-ask/realtime-room/room-store/types";
+import { installedDeviceRef } from "../../helix-account/installed-security-store";
 
 const MAX_GRANT_MINUTES = 24 * 60;
 const DEFAULT_STALE_AFTER_MS = 120_000;
@@ -47,6 +48,9 @@ type ConnectionRow = {
   owner_profile_id: string;
   owner_label: string;
   installation_id: string;
+  installed_device_id: string | null;
+  installed_device_status: string | null;
+  installed_device_recovery_generation: number | string | null;
   device_id: string;
   package_id: string;
   room_id: string;
@@ -69,6 +73,7 @@ type GrantRow = ConnectionRow & {
   grant_status: string;
   policy_revision: number | string;
   grant_producer_epoch_ref: string;
+  grant_installed_node_ref: string;
   capability_ids: unknown;
   created_at: Date | string;
   expires_at: Date | string;
@@ -98,6 +103,11 @@ const stringArray = (value: unknown): string[] => {
     : [];
 };
 
+const installedNodeProjection = (row: ConnectionRow): string =>
+  row.installed_device_id
+    ? installedDeviceRef(row.installed_device_id)
+    : "installed_node:unbound";
+
 const healthProjection = (row: ConnectionRow, now: Date) => {
   const lastObservedAt = isoOrNull(row.last_contact_at);
   const ageMs = lastObservedAt
@@ -110,6 +120,10 @@ const healthProjection = (row: ConnectionRow, now: Date) => {
       : "stale" as const;
   const blockers: string[] = [];
   if (row.installation_status !== "active") blockers.push("installation_inactive");
+  if (!row.installed_device_id) blockers.push("installed_node_unbound");
+  else if (row.installed_device_status !== "active") {
+    blockers.push("installed_node_inactive");
+  }
   if (row.binding_status !== "active") blockers.push("binding_inactive");
   if (row.device_status !== "active") blockers.push("device_inactive");
   if (row.admission_status !== "active") blockers.push("adapter_admission_inactive");
@@ -143,7 +157,7 @@ const connectionProjection = (
     schema: HELIX_ROOM_SHARED_CAPABILITY_CONNECTION_SCHEMA,
     owner_profile_ref: row.owner_profile_id,
     owner_label: row.owner_label,
-    installed_node_ref: row.installation_id,
+    installed_node_ref: installedNodeProjection(row),
     connection_ref: row.environment_binding_id,
     environment_ref: row.environment_binding_id,
     environment_label: row.package_id,
@@ -187,7 +201,7 @@ const grantProjection = (input: {
     room_id: row.room_id,
     owner_profile_ref: row.owner_profile_id,
     owner_label: row.owner_label,
-    installed_node_ref: row.installation_id,
+    installed_node_ref: row.grant_installed_node_ref,
     connection_ref: row.environment_binding_id,
     environment_ref: row.environment_binding_id,
     environment_label: row.package_id,
@@ -219,6 +233,9 @@ const connectionSelect = `
     b.owner_profile_id,
     account.display_name AS owner_label,
     b.installation_id,
+    installation.installed_device_id,
+    installed_device.status AS installed_device_status,
+    installed_device.recovery_generation AS installed_device_recovery_generation,
     b.device_id,
     connector_package.package_id,
     b.room_id,
@@ -240,6 +257,9 @@ const connectionSelect = `
     ON installation.installation_id = b.installation_id
   JOIN helix_environment_connector_packages connector_package
     ON connector_package.package_version_id = installation.package_version_id
+  LEFT JOIN helix_installed_devices installed_device
+    ON installed_device.profile_id = installation.owner_profile_id
+   AND installed_device.device_id = installation.installed_device_id
   JOIN helix_environment_connector_devices device ON device.device_id = b.device_id
   JOIN helix_environment_adapter_admissions admission
     ON admission.admission_id = b.adapter_admission_id
@@ -267,6 +287,9 @@ const grantSelect = `
     binding.owner_profile_id,
     account.display_name AS owner_label,
     binding.installation_id,
+    installation.installed_device_id,
+    installed_device.status AS installed_device_status,
+    installed_device.recovery_generation AS installed_device_recovery_generation,
     binding.device_id,
     connector_package.package_id,
     binding.room_id,
@@ -285,6 +308,7 @@ const grantSelect = `
     room_grant.grant_id, room_grant.status AS grant_status,
     room_grant.policy_revision,
     room_grant.producer_epoch_ref AS grant_producer_epoch_ref,
+    room_grant.installed_node_ref AS grant_installed_node_ref,
     room_grant.capability_ids, room_grant.created_at, room_grant.expires_at,
     room_grant.revoked_at
   FROM helix_room_environment_capability_grants room_grant
@@ -295,6 +319,9 @@ const grantSelect = `
     ON installation.installation_id = binding.installation_id
   JOIN helix_environment_connector_packages connector_package
     ON connector_package.package_version_id = installation.package_version_id
+  LEFT JOIN helix_installed_devices installed_device
+    ON installed_device.profile_id = installation.owner_profile_id
+   AND installed_device.device_id = installation.installed_device_id
   JOIN helix_environment_connector_devices device
     ON device.device_id = binding.device_id
   JOIN helix_environment_adapter_admissions admission
@@ -419,16 +446,17 @@ export const createRoomReadGrant = async (input: {
     await db.query(
       `INSERT INTO helix_room_environment_capability_grants (
         grant_id, room_id, connection_owner_profile_id,
-        environment_binding_id, installation_id, device_id, source_id,
+        environment_binding_id, installation_id, installed_node_ref, device_id, source_id,
         world_or_site_ref, producer_epoch_ref, capability_ids, grant_mode,
         status, policy_revision, created_by_participant_id, created_at,
         expires_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,'read','active',1,$11,$12,$13);`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,'read','active',1,$12,$13,$14);`,
       [
         grantId, input.roomId, input.ownerProfileId,
-        row.environment_binding_id, row.installation_id, row.device_id,
-        row.source_id, row.world_id, row.producer_epoch_ref,
-        JSON.stringify(capabilityIds), input.ownerParticipantId,
+        row.environment_binding_id, row.installation_id,
+        installedNodeProjection(row), row.device_id, row.source_id,
+        row.world_id, row.producer_epoch_ref, JSON.stringify(capabilityIds),
+        input.ownerParticipantId,
         now.toISOString(),
         new Date(now.getTime() + expiresInMinutes * 60_000).toISOString(),
       ],
@@ -495,11 +523,43 @@ export const authorizeRoomReadGrant = async (input: {
   toolCallId: string;
   now?: Date;
 }): Promise<{ basis: "connection_owner" | "room_grant"; grantRef: string | null; policyRevision: number }> => {
+  const now = input.now ?? new Date();
+  const db = await readSharedRealtimeRoomDatabase();
+  const connectionRows = await listConnectionRows({
+    db,
+    roomId: input.roomId,
+    ownerProfileId: input.connectionOwnerProfileId,
+  });
+  const connection = connectionRows.find((row) =>
+    row.environment_binding_id === input.connectionRef &&
+    installedNodeProjection(row) === input.installedNodeRef &&
+    row.source_id === input.sourceRef &&
+    row.producer_epoch_ref === input.producerEpochRef &&
+    stringArray(row.consent_capability_ids).includes(input.capabilityId)
+  );
+  if (!connection || healthProjection(connection, now).blockers.length > 0) {
+    throw new RoomReadGrantStoreError(
+      "room_read_grant_identity_mismatch", 403,
+      "The requested read does not match one current installed-node connection.",
+    );
+  }
+  const membership = await db.query<{ present: boolean }>(
+    `SELECT true AS present
+     FROM helix_shared_realtime_room_members
+     WHERE room_id = $1 AND profile_id = $2 AND participant_id = $3
+       AND presence <> 'left'
+     LIMIT 1;`,
+    [input.roomId, input.requestingProfileId, input.requestingParticipantId],
+  );
+  if (!membership.rows[0]?.present) {
+    throw new RoomReadGrantStoreError(
+      "room_read_grant_identity_mismatch", 403,
+      "The requesting participant is not a current member of this room.",
+    );
+  }
   if (input.requestingProfileId === input.connectionOwnerProfileId) {
     return { basis: "connection_owner", grantRef: null, policyRevision: 1 };
   }
-  const now = input.now ?? new Date();
-  const db = await readSharedRealtimeRoomDatabase();
   const result = await db.query<{
     grant_id: string;
     policy_revision: number | string;
@@ -516,7 +576,7 @@ export const authorizeRoomReadGrant = async (input: {
      WHERE room_grant.room_id = $1
        AND room_grant.connection_owner_profile_id = $4
        AND room_grant.environment_binding_id = $5
-       AND room_grant.installation_id = $6
+       AND room_grant.installed_node_ref = $6
        AND room_grant.source_id = $7
        AND room_grant.producer_epoch_ref = $8
        AND room_grant.capability_ids @> $9::jsonb

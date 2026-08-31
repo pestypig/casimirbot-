@@ -36,6 +36,9 @@ const localPersistenceTables = [
   "helix_billing_entitlements",
   "helix_billing_webhook_events",
   "helix_billing_ledger_entries",
+  // Bounded MCP observations survive local restart for owner-scoped Codex
+  // re-entry. The envelope contains no credentials or answer authority.
+  "helix_mcp_evidence_observations",
   "helix_account_profile_storage",
   "helix_account_events",
   "helix_account_credentials",
@@ -151,10 +154,12 @@ const localPersistenceTables = [
   "helix_environment_connector_device_credentials",
   "helix_room_source_credential_deliveries",
   "helix_runtime_tool_confirmation_replay_claims",
+  "helix_shared_live_room_mcp_delegation_replay_claims",
   "casimir_theory_execution_state",
   "helix_research_library_documents",
 ] as const;
 const localPersistenceJsonColumns = new Set([
+  "helix_mcp_evidence_observations.observation",
   "helix_shared_realtime_room_members.consent",
   "helix_shared_realtime_room_events.metadata",
   "helix_room_source_bindings.scopes",
@@ -275,7 +280,9 @@ const LOCAL_RESTORE_BATCH_MAX_PARAMETERS = 5_000;
 let localPersistencePath: string | null = null;
 let localPersistenceReady = false;
 let localPersistenceRestored = false;
-let localPersistenceWrite: Promise<void> = Promise.resolve();
+let localPersistenceWrite: Promise<void> | null = null;
+let localPersistenceMutationGeneration = 0;
+let localPersistenceFlushedGeneration = 0;
 let localPersistenceSuppress = false;
 let localPersistenceScheduler: LocalPersistenceScheduler | null = null;
 let localPersistenceSnapshotCache: LocalSnapshot | null = null;
@@ -515,16 +522,45 @@ function installLocalPersistence(pool: PgPool): PgPool {
           scheduleDeferredLocalPersistence(pool);
           return value;
         }
-        localPersistenceWrite = localPersistenceWrite.then(() => persistLocalSnapshot(pool)).catch((err) => {
-          console.warn("[db] failed to persist local pg-mem snapshot", err);
-        });
-        await localPersistenceWrite;
+        await persistImmediateLocalSnapshot(pool);
         return value;
       }) as unknown as ReturnType<PgPool["query"]>;
     }
     return result;
   }) as PgPool["query"];
   return pool;
+}
+
+async function persistImmediateLocalSnapshot(activePool: PgPool): Promise<void> {
+  const requiredGeneration = ++localPersistenceMutationGeneration;
+  while (localPersistenceFlushedGeneration < requiredGeneration) {
+    if (!localPersistenceWrite) {
+      let settledWrite!: Promise<void>;
+      const activeWrite = (async () => {
+        while (
+          localPersistenceFlushedGeneration < localPersistenceMutationGeneration
+        ) {
+          const capturedGeneration = localPersistenceMutationGeneration;
+          try {
+            await persistLocalSnapshot(activePool);
+          } catch (err) {
+            console.warn("[db] failed to persist local pg-mem snapshot", err);
+          }
+          // Preserve the existing best-effort local persistence contract: a
+          // failed atomic write is reported, but must not deadlock every later
+          // database mutation behind an unachievable generation.
+          localPersistenceFlushedGeneration = capturedGeneration;
+        }
+      })();
+      settledWrite = activeWrite.finally(() => {
+        if (localPersistenceWrite === settledWrite) {
+          localPersistenceWrite = null;
+        }
+      });
+      localPersistenceWrite = settledWrite;
+    }
+    await localPersistenceWrite;
+  }
 }
 
 function createMemPool(key: string): PgPool {
@@ -690,19 +726,14 @@ export async function persistLocalDatabaseSnapshotIfEnabled(
     scheduleDeferredLocalPersistence(activePool);
     return;
   }
-  localPersistenceWrite = localPersistenceWrite
-    .then(() => persistLocalSnapshot(activePool))
-    .catch((err) => {
-      console.warn("[db] failed to persist local pg-mem snapshot", err);
-    });
-  await localPersistenceWrite;
+  await persistImmediateLocalSnapshot(activePool);
 }
 
 export async function flushLocalDatabaseSnapshotIfEnabled(): Promise<void> {
   if (localPersistenceScheduler) {
     await localPersistenceScheduler.drain();
   }
-  await localPersistenceWrite;
+  if (localPersistenceWrite) await localPersistenceWrite;
 }
 
 async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
@@ -899,7 +930,9 @@ export async function resetDbClient(): Promise<void> {
   localPersistencePath = null;
   localPersistenceReady = false;
   localPersistenceRestored = false;
-  localPersistenceWrite = Promise.resolve();
+  localPersistenceWrite = null;
+  localPersistenceMutationGeneration = 0;
+  localPersistenceFlushedGeneration = 0;
   localPersistenceSuppress = false;
   localPersistenceScheduler?.reset();
   localPersistenceScheduler = null;

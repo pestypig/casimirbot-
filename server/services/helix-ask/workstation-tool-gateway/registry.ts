@@ -7245,6 +7245,7 @@ export const callWorkstationGatewayCapability = async (
     const gatewayResult = executeRealtimeTexturePackHarnessGatewayCapability({
       capabilityId: manifest.capability_id,
       profileId: input.profileId,
+      arguments: input.arguments,
     });
     const admission = buildAdmission({
       capabilityId: manifest.capability_id,

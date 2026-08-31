@@ -16,7 +16,10 @@ import {
   listConnectorBootstrapPairings,
   revokeConnectorBootstrapPairing,
 } from "../../services/environment-connectors/pairing";
-import { stageLocalMinecraftServerPairing } from "../../services/environment-connectors/pairing/local-server-pairing-handoff";
+import {
+  resolveLocalMinecraftPairingEndpoint,
+  stageLocalMinecraftServerPairing,
+} from "../../services/environment-connectors/pairing/local-server-pairing-handoff";
 import { stageLocalMinecraftPlayerPairing } from "../../services/environment-connectors/pairing/local-player-pairing-handoff";
 import {
   buildSharedLiveRoomControlActorFromAccountContext,
@@ -220,6 +223,11 @@ sharedRealtimeRoomConnectorPairingRouter.post(
     });
     await stageLocalMinecraftServerPairing({
       command: `/helix pair ${created.pairingCode}`,
+      ownerProfileId: account.profileId,
+      pairingEndpoint: resolveLocalMinecraftPairingEndpoint({
+        serviceBaseUrl: process.env.CASIMIR_PUBLIC_BASE_URL,
+        requestBaseUrl: `${req.protocol}://${req.get("host")}`,
+      }),
     });
     res.status(201).json(
       receipt({
@@ -267,6 +275,11 @@ sharedRealtimeRoomConnectorPairingRouter.post(
     });
     await stageLocalMinecraftServerPairing({
       command: `/helix pair ${created.pairingCode}`,
+      ownerProfileId: account.profileId,
+      pairingEndpoint: resolveLocalMinecraftPairingEndpoint({
+        serviceBaseUrl: process.env.CASIMIR_PUBLIC_BASE_URL,
+        requestBaseUrl: `${req.protocol}://${req.get("host")}`,
+      }),
     });
     res.status(201).json(
       receipt({
@@ -316,6 +329,7 @@ sharedRealtimeRoomConnectorPairingRouter.post(
     });
     await stageLocalMinecraftPlayerPairing({
       command: `/helix-player pair ${created.pairingCode}`,
+      ownerProfileId: account.profileId,
     });
     res.status(201).json(
       receipt({

@@ -1,0 +1,87 @@
+{
+  "schema": "helix.minecraft.rec2a_a1_summary.v1",
+  "recorded_at": "2026-08-30T07:09:14Z",
+  "program_sha256": "8D71CE6C1A0159CD3FD03E2FE14E58E268300642C52177A355112D2A750307F5",
+  "player_agent_jar_sha256": "AB2663106EB8C512D696A2A1787355D8BA7B9EC107D6231FC6509740D1CEF9D1",
+  "identity": {
+    "room_id": "shared_realtime_room:43b93243-1f90-49fd-88c9-bd2f4cbdf3d3",
+    "environment_binding_id": "environment_binding:legacy:7f8dfd0a6617de1545bc3466e308a4ded7874737",
+    "room_source_binding_id": "room_source_binding:20f1abec-2d06-4295-bd2d-a18b04fda00a",
+    "source_id": "source:room-ingress:d8bdbd0a-a49d-4eef-8769-a33128fc9dd5",
+    "world_id": "minecraft:connector:023aa276-59a",
+    "participant_id": "shared_realtime_participant:bf819346-e0a9-48ff-aac4-dcb778b2a4be",
+    "subject_binding_id": "environment_subject_binding:66409a60-cd24-451d-a5a6-b7ca7ee01318",
+    "subject_label": "DatDamPig",
+    "action_authority_id": "environment_action_authority:d0f5e7f4-4a7d-4c0a-ae67-e8754b5f7680",
+    "action_adapter": "minecraft.fabric_client.v1"
+  },
+  "control": {
+    "action_request_ref": "environment_action_request:285e17d8-31c0-458f-a039-ca744267bc08",
+    "workflow_ref": "environment_action_workflow:3497d5be-b08a-40f7-be66-8989c12bc185",
+    "action_execution_ref": "environment_action_execution:e2e346f0-e004-46a8-b984-d9cd276c03d7",
+    "evidence_ref": "environment_action_evidence:d777e36669618b55c3bfaefe7171e32d53d0ad727",
+    "outcome": "succeeded",
+    "duration_ticks": 410,
+    "attack_pulses": 35,
+    "interrupt_count": 0,
+    "consumed_item_count": 0,
+    "inventory_mutations_performed": 0,
+    "world_mutations_performed": 0,
+    "controls_released": true
+  },
+  "discarded_timing_diagnostic": {
+    "workflow_ref": "environment_action_workflow:83eb3a59-79c6-4fdf-a110-0697e9b54064",
+    "evidence_ref": "environment_action_evidence:c8dc8bb1d620b527e4e03b4a96c41a6c9771956de",
+    "reason": "external console write arrived after terminal completion",
+    "counts_as_acceptance": false
+  },
+  "treatment": {
+    "action_request_ref": "environment_action_request:1569cdaa-8d6f-4452-b998-95f2e07675c6",
+    "workflow_ref": "environment_action_workflow:4b4a8263-de5d-4d1c-81c4-520eb5eeeb08",
+    "action_execution_ref": "environment_action_execution:d4c120c2-68e5-4807-9703-253a545bdbdb",
+    "evidence_ref": "environment_action_evidence:426febedde50eda3e787bcd64ade278b272565f4d",
+    "outcome": "succeeded",
+    "duration_ticks": 540,
+    "external_perturbation": {
+      "executed_at": "2026-08-30T07:08:21.4786952Z",
+      "damage": 5,
+      "health_before": 20,
+      "health_after": 15,
+      "transport": "localhost_rcon_arena_fixture"
+    },
+    "threshold_tick": 68,
+    "separation_tick": 118,
+    "minimum_hostile_distance": 7.004542827606201,
+    "disengagement_attack_pulses": 0,
+    "craft_tick": 120,
+    "consume_tick": 154,
+    "reequip_tick": 154,
+    "resumed_combat_attack_pulses": 30,
+    "interrupt_count": 1,
+    "executed_action_count": 5,
+    "consumed_item_count": 1,
+    "inventory_mutations_performed": 2,
+    "world_mutations_performed": 0,
+    "manual_override_detected": false,
+    "controls_released": true
+  },
+  "afterward": {
+    "health": 20,
+    "food": 19,
+    "saturation": 0,
+    "bowl_count": 1,
+    "stew_count": 0,
+    "iron_sword_count": 1,
+    "red_mushroom_count": 0,
+    "brown_mushroom_count": 0,
+    "tagged_zombie_count": 0,
+    "connector_ready": true,
+    "active_workflow_count": 0,
+    "controls_asserted": false
+  },
+  "screenshot": {
+    "file": "rec2a-a1-after.png",
+    "sha256": "C4F9E2F14991E9AE3E7D33BB7ED5F73BD75FFA68213E073FD99845360FF16070"
+  },
+  "verdict": "live_accepted"
+}

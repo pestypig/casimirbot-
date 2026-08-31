@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "helix_fabric_companion_spike_gametest",
+  "version": "1.0.0",
+  "name": "Helix Fabric Companion Spike GameTests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionFeasibilityGameTests"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "fabric-api": "*",
+    "helix_fabric_companion_spike": "*"
+  }
+}

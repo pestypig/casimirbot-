@@ -213,6 +213,18 @@ super-user. Cross-host reasoning still uses one principal Runtime Codex path,
 one execution arbiter, and one terminal writer. The exact projected acceptance
 contract is `docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md`.
 
+Development on one computer may rehearse that topology with two installed EXE
+instances only when each uses a separate native data root, profile session,
+installed-node identity, MCP-client identity where applicable, profile
+connection, connector credential, producer epoch, and room grant. The two
+instances may share one room and one OS-protected model-provider/tunnel broker;
+sharing brokered reasoning transport does not share a login session, OAuth
+token, provider key, connector credential, or authority. This same-device
+dual-EXE surface can prove multi-profile routing, evidence re-entry, revocation,
+process failure and reconnect, but it cannot prove physical-host loss, network
+partition recovery, independent OS secure stores, or cross-device acceptance.
+Those claims require a later two-physical-device artifact.
+
 ### Phone continuation
 
 A user may continue steering or reviewing a durable goal from a phone while the

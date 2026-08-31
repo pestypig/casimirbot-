@@ -1,0 +1,53 @@
+{
+  "schema": "casimirbot.minecraft_rec2c_staggered_live_summary.v1",
+  "fixture_id": "fixture:combat-rec2c-staggered-pressure-v3",
+  "classification": "qualified_pressure_and_containment_evidence_not_rec2c_recovery_acceptance",
+  "timeline": {
+    "fixture_staged_at": "2026-08-31T05:36:41.519Z",
+    "workflow_admission_confirmed_at": "2026-08-31T05:37:15.811Z",
+    "fixture_released_at": "2026-08-31T05:37:15.863Z",
+    "containment_triggered_at": "2026-08-31T05:37:23.795Z",
+    "fixture_cleaned_at": "2026-08-31T05:37:23.804Z",
+    "supervisor_completed_at": "2026-08-31T05:37:23.804Z"
+  },
+  "admission": {
+    "active_workflow_count": 1,
+    "controls_asserted": true,
+    "release_delay_after_positive_admission_ms": 52,
+    "released_active_duration_ms": 7932,
+    "containment_reason": "workflow_inactive",
+    "cleanup_duration_ms": 9
+  },
+  "post_trial_observation": {
+    "actor_evidence_ref": "environment_probe_evidence:b03fe7a06ac2f9406a75a40a8ebf1cbc96dc32cc",
+    "perception_evidence_ref": "environment_probe_evidence:3a22c20043f74bd7d06058dbf81f390140d28dc6",
+    "observed_at": "2026-08-31T05:39:04.429Z",
+    "health": 20,
+    "max_health": 20,
+    "food_level": 20,
+    "hostile_entity_count": 0,
+    "dropped_item_entity_count": 5,
+    "inventory": [
+      { "slot": 0, "item": "minecraft:iron_sword", "count": 1 },
+      { "slot": 1, "item": "minecraft:golden_apple", "count": 1 },
+      { "slot": 2, "item": "minecraft:rotten_flesh", "count": 3 }
+    ],
+    "semantic_fingerprint": "sha256:e8f45ad2fd12156dba6784d3d51425ef15e3b3b00a492eb9fd40b67adcc337b6"
+  },
+  "claims": {
+    "positive_admission_gated_release_proven": true,
+    "workflow_inactive_containment_proven": true,
+    "player_survived": true,
+    "bounded_hostiles_absent_after_cleanup": true,
+    "combat_progress_indicated_by_rotten_flesh": true,
+    "recovery_branch_proven": false,
+    "consumption_proven": false,
+    "inventory_crafting_proven": false,
+    "breakpoint_proven": false
+  },
+  "credential_included": false,
+  "raw_rcon_command_included": false,
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

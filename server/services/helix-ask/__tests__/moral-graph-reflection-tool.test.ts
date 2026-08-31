@@ -8,6 +8,7 @@ import { validateCivicTrustTraversabilityV1 } from "../../../../shared/civic-tru
 import { validateCivicOrderParticipationV1 } from "../../../../shared/civic-order-participation";
 import { validateCivilizationProvisioningNetworkV1 } from "../../../../shared/civilization-provisioning-network";
 import { validateSharedAuthoritySocialRenewalReflectionV1 } from "../../../../shared/contracts/shared-authority-social-renewal.v1";
+import { validateMoralReflectionMediationPacketV1 } from "../../../../shared/contracts/moral-reflection-mediation-packet.v1";
 import { evaluateWorkstationToolReceipt } from "../workstation-tool-evaluator";
 import {
   HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME,
@@ -30,6 +31,30 @@ describe("Helix Ask MoralGraph reflection tool", () => {
     expect(output.locator).toBeDefined();
     expect(validateMoralBadgeLocatorV1(output.locator!)).toEqual([]);
     expect(validateSharedAuthoritySocialRenewalReflectionV1(output.sharedAuthoritySocialRenewal)).toEqual([]);
+    expect(validateMoralReflectionMediationPacketV1(output.moralReflectionMediation)).toEqual([]);
+    expect(output.moralReflectionMediation).toMatchObject({
+      objectiveSourceStatus: "unresolved",
+      objectiveSourceOptions: expect.arrayContaining([
+        "person_declared",
+        "person_inferred",
+        "role_prescribed",
+        "institutionally_incentivized",
+        "mutually_reinforced",
+        "unknown",
+      ]),
+      authority: {
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+        agent_executable: false,
+        diagnostic_only: true,
+        evidence_only: true,
+        no_moral_verdict: true,
+        no_intent_inference: true,
+        no_character_identity_claim: true,
+        no_legitimacy_inference: true,
+      },
+    });
     expect(output.fruition).toBeUndefined();
     expect(output.reflection.artifactId).toBe("ideology_context_reflection");
     expect(output.reflection.authority).toMatchObject({
@@ -174,6 +199,81 @@ describe("Helix Ask MoralGraph reflection tool", () => {
       agent_executable: false,
       character_verdict: false,
       moral_finality: false,
+    });
+    expect(output.moralReflectionMediation?.steps.find((step) => step.id === "ai_mediated_judgment")?.priority)
+      .toBe("available");
+  });
+
+  it("prioritizes public AI judgment without mistaking generic present-position language for inherited order", async () => {
+    const output = await runHelixAskMoralGraphReflectionTool({
+      inputKind: "user_prompt",
+      text: [
+        "A powerful public figure asks an AI to roast a young artist as a hypocrite using an earlier statement.",
+        "The artist is absent, no current position is supplied, and the requested response is public ridicule.",
+      ].join(" "),
+      refs: ["turn:ai-mediated-judgment"],
+    });
+    const locatedIds = output.locator
+      ? [
+          ...output.locator.locatedBadges.exact,
+          ...output.locator.locatedBadges.likely,
+        ].map((entry) => entry.nodeId)
+      : [];
+    const primaryStepIds = output.moralReflectionMediation?.steps
+      .filter((step) => step.priority === "primary")
+      .map((step) => step.id);
+
+    expect(locatedIds).toEqual(expect.arrayContaining([
+      "right-speech-and-accurate-formulation",
+      "identity-view-and-non-attachment",
+    ]));
+    expect(locatedIds).not.toContain("inherited-order-participation");
+    expect(locatedIds).not.toContain("no-bypass-guardrail");
+    expect(primaryStepIds).toEqual(expect.arrayContaining([
+      "observation_claim_boundary",
+      "objective_source_attribution",
+      "perspective_power_and_asymmetry",
+      "developmental_freedom",
+      "ai_mediated_judgment",
+    ]));
+    expect(output.moralReflectionMediation?.steps.find((step) => step.id === "instrumentalization_ledger")?.priority)
+      .toBe("available");
+    expect(output.moralReflectionMediation?.authority).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      no_intent_inference: true,
+    });
+    expect(output.moralReflectionMediation?.evidenceOrderBoundary.kind).toBe("moral_scenario_ready");
+  });
+
+  it("orders cross-domain and externally checkable evidence before strong moral synthesis", async () => {
+    const theoryOutput = await runHelixAskMoralGraphReflectionTool({
+      inputKind: "user_prompt",
+      text: [
+        "An independently replicated boundary-sensitive coherence lifetime may favor heritable molecular structures",
+        "whose useful transformations finish within that lifetime.",
+        "Consider the analogy without treating a physical process as moral proof.",
+      ].join(" "),
+    });
+    const externalOutput = await runHelixAskMoralGraphReflectionTool({
+      inputKind: "user_prompt",
+      text: "What happened recently in episode 18 according to a public post, and what moral reflection follows?",
+    });
+
+    expect(theoryOutput.moralReflectionMediation?.evidenceOrderBoundary).toMatchObject({
+      kind: "theory_ideology_bridge_first",
+      advisory_only: true,
+      requiredBeforeStrongClaim: expect.arrayContaining([
+        "physical_claim_maturity_and_replication",
+        "naturalistic_fallacy_boundary",
+      ]),
+    });
+    expect(theoryOutput.moralReflectionMediation?.steps.filter((step) => step.priority === "primary").map((step) => step.id))
+      .toEqual(["observation_claim_boundary"]);
+    expect(externalOutput.moralReflectionMediation?.evidenceOrderBoundary).toMatchObject({
+      kind: "external_verification_first",
+      advisory_only: true,
+      requiredBeforeStrongClaim: expect.arrayContaining(["source_identity", "event_freshness"]),
     });
   });
 

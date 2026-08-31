@@ -1,0 +1,55 @@
+{
+  "schema": "helix.minecraft.rec2_a1_summary.v1",
+  "scenario_id": "minecraft_combat_rec2_inventory_recovery_v1",
+  "program_sha256": "701E715624A92288DBCF99DF3C80CBB9D9B34FF7B7C0706D9E0B2B2AA4046BA5",
+  "room_id": "shared_realtime_room:43b93243-1f90-49fd-88c9-bd2f4cbdf3d3",
+  "environment_binding_id": "environment_binding:legacy:207e917c2f59fc92062bdcf568c509e8db419cff",
+  "subject_binding_id": "environment_subject_binding:a647bf6d-a22e-42f7-a6c2-65d3e5640aad",
+  "producer_epoch_ref": "adapter_epoch:afce61ca4673c3538e4c316b0aa0221de295d1c0",
+  "action_authority_id": "environment_action_authority:04f69a80-5710-48fe-a3e7-aa5a48611a43",
+  "allowed_capability_ids": [
+    "com.casimirbot.minecraft.player.guardian.execute"
+  ],
+  "action_request_ref": "environment_action_request:8ff2dd58-5253-4b73-a208-dcce0d688898",
+  "workflow_ref": "environment_action_workflow:3109f77d-7015-4b91-b132-c311252b5caf",
+  "execution_ref": "environment_action_execution:9359861e-7e16-4cd0-a5b3-8819c1c65e0c",
+  "evidence_ref": "environment_action_evidence:0895c26a223251ebc5a413b6a2fbca989a6f0deae",
+  "outcome": "succeeded",
+  "duration_ticks": 107,
+  "starting_state": {
+    "health": 20,
+    "food": 14,
+    "saturation": 0,
+    "bowl": 1,
+    "red_mushroom": 1,
+    "brown_mushroom": 1,
+    "iron_sword": 1,
+    "shield": 1,
+    "tagged_zombie_health": 20
+  },
+  "terminal_state": {
+    "health": 20,
+    "food": 20,
+    "saturation": 7.2000003,
+    "mushroom_stew": 0,
+    "bowl": 1,
+    "iron_sword": 1,
+    "tagged_zombie_present": false
+  },
+  "action_receipts": [
+    { "action_kind": "craft", "tick_index": 5, "outcome": "succeeded" },
+    { "action_kind": "consume", "tick_index": 38, "outcome": "succeeded" },
+    { "action_kind": "equip", "tick_index": 38, "outcome": "succeeded" },
+    { "action_kind": "combat_guard", "tick_index": 107, "outcome": "succeeded" }
+  ],
+  "inventory_mutations_performed": 2,
+  "world_mutations_performed": 0,
+  "controls_released": true,
+  "manual_override_detected": false,
+  "model_invoked": false,
+  "host_access_performed": false,
+  "automatic_replay_performed": false,
+  "answer_authority": false,
+  "terminal_eligible": false,
+  "raw_content_included": false
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "helix.environment_action.differential_trace.v1",
+  "trace_id": "environment_action_differential_trace:direct_codex:4b03e807344effffef8ee10b90fee0cad780d39b",
+  "scenario_id": "minecraft_combat_rec2_inventory_recovery_v1",
+  "lane": "direct_codex",
+  "action_kind": "execute_reactive_program",
+  "prompt_hash": "sha256:1849a6c94609960f94ab4c28cc6dd22cfb83e8ca49ce35f17cc9dd52ee1c2ec4",
+  "starting_state_hash": "sha256:7e0afa22aeda60cd55b53fd815ce91a9c6e00a9b4fd2247b0840558be83cfc7c",
+  "capability_contract_hash": "sha256:60dd3119bbe8689e00807fc642dcf6e3761e1d0e31346faa32e75e9e11d05e37",
+  "source_artifact_refs": [
+    "minecraft_client_log_sha256:7bb038f2153b771dc6116c291bd6488413701eec7fc49a37ecbe2dc2e88b3b5c",
+    "direct_diagnostic_workflow:direct_player_action_workflow:03fe8c8c-e39c-4400-ba11-0c01358e307e"
+  ],
+  "public_capture_hash": "sha256:4b03e807344effffef8ee10b90fee0cad780d39bd11ae18ec648a2b1ea5eeb8e",
+  "selected_capability_id": "com.casimirbot.minecraft.player.guardian.execute",
+  "normalized_arguments_hash": "sha256:8957d919ee6754daeae683ebb128d4612a8304c49084164e01a14b2fb0bdc9a5",
+  "admission_status": "not_applicable",
+  "execution_outcome": "succeeded",
+  "normalized_progress_hashes": [
+    "sha256:205aedae950af78cc3424db06abc6216e539aa4be9da180321de16d6d38810c5",
+    "sha256:0c3b8c191cc2e0973463605727a76b1be7a72ac378a160f395a0d87c7b98fd52"
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "direct_diagnostic_observation:direct_player_action_workflow:03fe8c8c-e39c-4400-ba11-0c01358e307e:7"
+  ],
+  "observation_reentered": false,
+  "final_candidate_hash": null,
+  "final_candidate_support_refs": [],
+  "route_product_hash": null,
+  "route_product_support_refs": [],
+  "terminal_outcome": "success",
+  "terminal_authority_status": "not_applicable",
+  "terminal_writer_hash": null,
+  "terminal_writer_support_refs": [],
+  "visible_text_hash": null,
+  "voice_projection_status": "not_applicable",
+  "voice_text_hash": null,
+  "created_at": "2026-08-29T21:22:18.465991600Z",
+  "hidden_reasoning_included": false,
+  "content_role": "environment_action_differential_trace_not_assistant_answer",
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false,
+  "raw_content_included": false
+}

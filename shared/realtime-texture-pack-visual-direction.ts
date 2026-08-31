@@ -8,6 +8,8 @@ export const REALTIME_TEXTURE_PACK_VISUAL_CUES_SCHEMA =
   "helix.realtime_texture_pack_visual_cues.v1" as const;
 export const REALTIME_TEXTURE_PACK_PROMPT_REVISION_SCHEMA =
   "helix.realtime_texture_pack_prompt_revision.v1" as const;
+export const REALTIME_TEXTURE_PACK_VISUAL_TREATMENT_REVISION_SCHEMA =
+  "helix.realtime_texture_pack_visual_treatment_revision.v1" as const;
 
 export const REALTIME_TEXTURE_PACK_MINECRAFT_VISUAL_DIRECTION_PROFILE_ID =
   "realtime_texture_pack.visual_direction.minecraft.v1" as const;
@@ -36,6 +38,12 @@ export const REALTIME_TEXTURE_PACK_SOURCE_BINDING_STATUSES = [
   "active",
   "revoked",
   "expired",
+] as const;
+export const REALTIME_TEXTURE_PACK_VISUAL_TARGET_CLASSES = [
+  "native_shader",
+  "dynamic_material",
+  "resource_pack",
+  "overlay",
 ] as const;
 
 export const REALTIME_TEXTURE_PACK_DIMENSION_CLASSES = [
@@ -350,6 +358,95 @@ export const realtimeTexturePackPromptRevisionSchema = z
     ]);
   });
 
+export const realtimeTexturePackVisualTargetClassificationSchema =
+  z.discriminatedUnion("target_class", [
+    z
+      .object({
+        target_class: z.literal("native_shader"),
+        delivery_class: z.literal("render_parameter_stream"),
+        update_class: z.literal("render_frame_parameters"),
+        geometry_source: z.literal("native_world_renderer"),
+        generated_pixels_allowed: z.literal(false),
+        requires_attended_apply: z.literal(false),
+      })
+      .strict(),
+    z
+      .object({
+        target_class: z.literal("dynamic_material"),
+        delivery_class: z.literal("dynamic_texture_upload"),
+        update_class: z.literal("semantic_scene_change"),
+        geometry_source: z.literal("native_world_renderer"),
+        generated_pixels_allowed: z.literal(true),
+        requires_attended_apply: z.literal(false),
+      })
+      .strict(),
+    z
+      .object({
+        target_class: z.literal("resource_pack"),
+        delivery_class: z.literal("attended_resource_reload"),
+        update_class: z.literal("attended_session_snapshot"),
+        geometry_source: z.literal("native_world_renderer"),
+        generated_pixels_allowed: z.literal(true),
+        requires_attended_apply: z.literal(true),
+      })
+      .strict(),
+    z
+      .object({
+        target_class: z.literal("overlay"),
+        delivery_class: z.literal("frame_composite"),
+        update_class: z.literal("generated_keyframe"),
+        geometry_source: z.literal("captured_visual_projection"),
+        generated_pixels_allowed: z.literal(true),
+        requires_attended_apply: z.literal(false),
+      })
+      .strict(),
+  ]);
+
+export const realtimeTexturePackVisualTreatmentRevisionSchema = z
+  .object({
+    schema: z.literal(REALTIME_TEXTURE_PACK_VISUAL_TREATMENT_REVISION_SCHEMA),
+    visual_treatment_revision_id: identifierSchema,
+    visual_treatment_revision: z.number().int().positive(),
+    source_binding_id: identifierSchema,
+    source_binding_revision: z.number().int().positive(),
+    capture_session_id: identifierSchema,
+    cue_packet_id: identifierSchema.nullable(),
+    prompt_revision_id: identifierSchema.nullable(),
+    treatment_hash: sha256Schema,
+    compiler_version: identifierSchema,
+    target_classifications: z
+      .array(realtimeTexturePackVisualTargetClassificationSchema)
+      .min(1)
+      .max(REALTIME_TEXTURE_PACK_VISUAL_TARGET_CLASSES.length),
+    compiled_at: timestampSchema,
+    expires_at: timestampSchema,
+    content_role: z.literal(
+      "realtime_texture_pack_visual_treatment_revision_not_assistant_answer",
+    ),
+    presentation_only: z.literal(true),
+    environment_action_authority: z.literal(false),
+    world_mutation_authority: z.literal(false),
+    authoritative: z.literal(false),
+    authority_class: z.literal("non_authoritative_visual_treatment_projection"),
+    ...evidenceAuthorityShape,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    requireOrderedWindow(value.compiled_at, value.expires_at, context, [
+      "expires_at",
+    ]);
+    const targetClasses = value.target_classifications.map(
+      (classification) => classification.target_class,
+    );
+    if (new Set(targetClasses).size !== targetClasses.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["target_classifications"],
+        message: "Visual target classes must be unique.",
+      });
+    }
+  });
+
 export type RealtimeTexturePackVisualDirectionSupportV1 = z.infer<
   typeof realtimeTexturePackVisualDirectionSupportSchema
 >;
@@ -362,6 +459,54 @@ export type RealtimeTexturePackVisualCuesV1 = z.infer<
 export type RealtimeTexturePackPromptRevisionV1 = z.infer<
   typeof realtimeTexturePackPromptRevisionSchema
 >;
+export type RealtimeTexturePackVisualTargetClassificationV1 = z.infer<
+  typeof realtimeTexturePackVisualTargetClassificationSchema
+>;
+export type RealtimeTexturePackVisualTreatmentRevisionV1 = z.infer<
+  typeof realtimeTexturePackVisualTreatmentRevisionSchema
+>;
+
+export const buildRealtimeTexturePackVisualTargetClassification = (
+  targetClass: (typeof REALTIME_TEXTURE_PACK_VISUAL_TARGET_CLASSES)[number],
+): RealtimeTexturePackVisualTargetClassificationV1 => {
+  const classificationByTarget = {
+    native_shader: {
+      target_class: "native_shader",
+      delivery_class: "render_parameter_stream",
+      update_class: "render_frame_parameters",
+      geometry_source: "native_world_renderer",
+      generated_pixels_allowed: false,
+      requires_attended_apply: false,
+    },
+    dynamic_material: {
+      target_class: "dynamic_material",
+      delivery_class: "dynamic_texture_upload",
+      update_class: "semantic_scene_change",
+      geometry_source: "native_world_renderer",
+      generated_pixels_allowed: true,
+      requires_attended_apply: false,
+    },
+    resource_pack: {
+      target_class: "resource_pack",
+      delivery_class: "attended_resource_reload",
+      update_class: "attended_session_snapshot",
+      geometry_source: "native_world_renderer",
+      generated_pixels_allowed: true,
+      requires_attended_apply: true,
+    },
+    overlay: {
+      target_class: "overlay",
+      delivery_class: "frame_composite",
+      update_class: "generated_keyframe",
+      geometry_source: "captured_visual_projection",
+      generated_pixels_allowed: true,
+      requires_attended_apply: false,
+    },
+  } as const;
+  return realtimeTexturePackVisualTargetClassificationSchema.parse(
+    classificationByTarget[targetClass],
+  );
+};
 
 type SupportInput = Omit<
   RealtimeTexturePackVisualDirectionSupportV1,
@@ -436,6 +581,38 @@ export const buildRealtimeTexturePackPromptRevision = (
     content_role: "realtime_texture_pack_prompt_revision_not_assistant_answer",
     authoritative: false,
     authority_class: "non_authoritative_projection_prompt",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  });
+
+type VisualTreatmentRevisionInput = Omit<
+  RealtimeTexturePackVisualTreatmentRevisionV1,
+  | "schema"
+  | "content_role"
+  | "presentation_only"
+  | "environment_action_authority"
+  | "world_mutation_authority"
+  | "authoritative"
+  | "authority_class"
+  | "assistant_answer"
+  | "terminal_eligible"
+  | "raw_content_included"
+>;
+
+export const buildRealtimeTexturePackVisualTreatmentRevision = (
+  input: VisualTreatmentRevisionInput,
+): RealtimeTexturePackVisualTreatmentRevisionV1 =>
+  realtimeTexturePackVisualTreatmentRevisionSchema.parse({
+    ...input,
+    schema: REALTIME_TEXTURE_PACK_VISUAL_TREATMENT_REVISION_SCHEMA,
+    content_role:
+      "realtime_texture_pack_visual_treatment_revision_not_assistant_answer",
+    presentation_only: true,
+    environment_action_authority: false,
+    world_mutation_authority: false,
+    authoritative: false,
+    authority_class: "non_authoritative_visual_treatment_projection",
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -533,3 +710,81 @@ export const assertRealtimeTexturePackPromptRevisionAdmissibleForBinding = (inpu
     });
   }
 };
+
+export const assertRealtimeTexturePackVisualTreatmentAdmissibleForBinding =
+  (input: {
+    binding: RealtimeTexturePackSourceBindingV1;
+    treatment: RealtimeTexturePackVisualTreatmentRevisionV1;
+    cue?: RealtimeTexturePackVisualCuesV1 | null;
+    promptRevision?: RealtimeTexturePackPromptRevisionV1 | null;
+    previousTreatment?: RealtimeTexturePackVisualTreatmentRevisionV1 | null;
+    at: string;
+  }): void => {
+    const binding = realtimeTexturePackSourceBindingSchema.parse(input.binding);
+    const treatment = realtimeTexturePackVisualTreatmentRevisionSchema.parse(
+      input.treatment,
+    );
+    ensureActiveAt(binding, input.at);
+    if (
+      treatment.source_binding_id !== binding.binding_id ||
+      treatment.source_binding_revision !== binding.binding_revision ||
+      treatment.capture_session_id !== binding.capture_session_id
+    ) {
+      throw new Error("realtime_texture_pack_treatment_binding_identity_mismatch");
+    }
+    const atMs = Date.parse(input.at);
+    if (
+      atMs < Date.parse(treatment.compiled_at) ||
+      atMs >= Date.parse(treatment.expires_at)
+    ) {
+      throw new Error("realtime_texture_pack_visual_treatment_stale");
+    }
+    if (treatment.cue_packet_id) {
+      if (!input.cue || input.cue.cue_packet_id !== treatment.cue_packet_id) {
+        throw new Error("realtime_texture_pack_treatment_cue_identity_mismatch");
+      }
+      assertRealtimeTexturePackCueAdmissibleForBinding({
+        binding,
+        cue: input.cue,
+        at: input.at,
+      });
+    }
+    if (treatment.prompt_revision_id) {
+      if (
+        !input.promptRevision ||
+        input.promptRevision.prompt_revision_id !== treatment.prompt_revision_id
+      ) {
+        throw new Error("realtime_texture_pack_treatment_prompt_identity_mismatch");
+      }
+      assertRealtimeTexturePackPromptRevisionAdmissibleForBinding({
+        binding,
+        revision: input.promptRevision,
+        cue: input.cue,
+        at: input.at,
+      });
+    }
+    if (input.previousTreatment) {
+      const previous = realtimeTexturePackVisualTreatmentRevisionSchema.parse(
+        input.previousTreatment,
+      );
+      if (
+        previous.source_binding_id !== binding.binding_id ||
+        previous.source_binding_revision !== binding.binding_revision
+      ) {
+        throw new Error("realtime_texture_pack_previous_treatment_binding_mismatch");
+      }
+      if (
+        treatment.visual_treatment_revision <
+        previous.visual_treatment_revision
+      ) {
+        throw new Error("realtime_texture_pack_treatment_revision_regressed");
+      }
+      if (
+        treatment.visual_treatment_revision ===
+          previous.visual_treatment_revision &&
+        treatment.treatment_hash !== previous.treatment_hash
+      ) {
+        throw new Error("realtime_texture_pack_treatment_revision_conflict");
+      }
+    }
+  };

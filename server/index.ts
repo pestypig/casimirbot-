@@ -54,6 +54,7 @@ import { createAgentAccessDiscoveryRouter } from
 import { createHelixMcpRouter } from "./routes/helix-mcp";
 import {
   createHelixDeviceCheckMcpServer,
+  createHelixMcpServer,
   HELIX_DEVICE_CHECK_MCP_PATH,
   HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
   HELIX_LOCAL_SUPERVISOR_COORDINATION_MCP_PATH,
@@ -68,6 +69,10 @@ import {
   HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
 } from "@shared/contracts/helix-shared-live-room-agent.v1";
+import {
+  HELIX_AGENT_RUN_READ_SCOPE,
+  HELIX_AGENT_RUN_WRITE_SCOPE,
+} from "@shared/contracts/helix-agent-api.v1";
 import {
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
@@ -94,6 +99,18 @@ import { createLocalSupervisorCoordinationRouter } from
   "./routes/local-supervisor-coordination";
 import { HelixLocalSupervisorCoordinationStore } from
   "./services/local-supervisor/local-supervisor-coordination";
+import { DesktopMcpTunnelTransitionStore } from
+  "./services/local-supervisor/desktop-mcp-tunnel-transition-store";
+import { createDesktopMcpTunnelTransitionExecutorFromEnvironment } from
+  "./services/local-supervisor/desktop-mcp-tunnel-transition-broker-client";
+import { installDesktopMcpTunnelSafetyHandler } from
+  "./services/local-supervisor/desktop-mcp-tunnel-safety";
+import { createDesktopMcpTunnelTransitionRouter } from
+  "./routes/desktop-mcp-tunnel-transition";
+import {
+  HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+  HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+} from "@shared/desktop-mcp-tunnel-transition";
 import {
   installRuntimeToolConfirmationVerifierFromEnvironmentV1,
 } from
@@ -150,6 +167,28 @@ const localSupervisorCoordinationStore =
   new HelixLocalSupervisorCoordinationStore(
     localSupervisorIdentity.serviceInstanceRef,
   );
+const desktopMcpTunnelTransitionStore =
+  new DesktopMcpTunnelTransitionStore(
+    localSupervisorIdentity.serviceInstanceRef,
+  );
+const desktopMcpTunnelTransitionExecutor =
+  createDesktopMcpTunnelTransitionExecutorFromEnvironment(process.env);
+installDesktopMcpTunnelSafetyHandler(
+  desktopMcpTunnelTransitionExecutor
+    ? async (reason) => {
+        const actions = desktopMcpTunnelTransitionStore.revokeAllForSafety(reason);
+        const action = actions.at(-1);
+        if (!action) return;
+        await desktopMcpTunnelTransitionExecutor({
+          transitionRequestRef: action.transitionRequestRef,
+          delegationRef: action.delegationRef,
+          accountSessionId: action.accountSessionId,
+          targetScope: "local_supervisor_coordination_and_device_check",
+          delegationExpiresAt: action.delegationExpiresAt,
+        });
+      }
+    : null,
+);
 const desktopSessionConfig = resolveDesktopSessionConfig(process.env);
 app.use(createDesktopSessionGuard(desktopSessionConfig));
 
@@ -553,15 +592,24 @@ app.use(createAgentAccessDiscoveryRouter());
 app.use(createHelixAgentProtectedResourceMetadataRouter({
   resourcePaths: [HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH],
   scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
-  useLoopbackRequestResource: true,
+  // Device Check is published through the desktop tunnel. Keep its OAuth
+  // resource bound to the verifier's stable audience instead of allowing the
+  // transport to turn an ephemeral loopback origin into a tunnel-specific
+  // audience that the same verifier cannot accept.
+  useLoopbackRequestResource: false,
 }));
 app.use(createHelixAgentProtectedResourceMetadataRouter({
   resourcePaths: [HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH],
   scopes: Array.from(new Set([
     ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
     ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+    HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+    HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
   ])),
-  useLoopbackRequestResource: true,
+  // The public tunnel URL identifies the current transport, not the OAuth
+  // audience. Keep tokens bound to the verifier's stable resource across
+  // desktop and tunnel restarts.
+  useLoopbackRequestResource: false,
 }));
 app.use(createHelixAgentProtectedResourceMetadataRouter({
   additionalResourcePaths: [
@@ -595,14 +643,56 @@ app.use(
         principal,
         surface: "local_supervisor_coordination",
         localSupervisorCoordinationStore: store,
+        desktopMcpTunnelTransitionStore,
+        desktopMcpTunnelTransitionExecutor,
       }),
     resourceMetadataPath:
       HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
     localSupervisorCoordinationStore,
+    desktopMcpTunnelTransitionStore,
+    desktopMcpTunnelTransitionExecutor,
+    // Secure MCP Tunnel does not relay ChatGPT's bearer token to the local
+    // target. Bind only the bounded advisory coordination scopes to the exact
+    // active desktop account session carried by the supervised child.
+    desktopDelegationScopes: Array.from(new Set([
+      ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+      ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+      HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+      HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+    ])),
   }),
 );
 app.use("/mcp", createHelixMcpRouter({
   localSupervisorCoordinationStore,
+  // Keep the governed transport controls present after the native tunnel
+  // reaches the full surface. Without these shared dependencies the client
+  // can pre-advertise the transition tools on the restricted endpoint, then
+  // receive Unknown tool from /mcp after a successful transition. Stable
+  // registration lets the same authenticated continuation inspect/replay a
+  // catalog refresh or request a bounded recovery without falling back to UI
+  // automation. The transition store still requires active presence plus a
+  // separate native developer delegation before any scope increase.
+  desktopMcpTunnelTransitionStore,
+  desktopMcpTunnelTransitionExecutor,
+  // A current tunnel-client may forward the external bearer as well as the
+  // two protected native headers. The MCP router gives the exact native
+  // desktop delegation precedence when those headers are present. Bind the
+  // complete first-party full-agent scope set to that revalidated developer
+  // session; environment and room authority remain independently governed.
+  desktopDelegationScopes: Array.from(new Set([
+    HELIX_AGENT_RUN_READ_SCOPE,
+    HELIX_AGENT_RUN_WRITE_SCOPE,
+    HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
+    HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
+    HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+    HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+    HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE,
+    ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+    ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+    HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+    HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+  ])),
 }));
 // First-party browser observation is deliberately cookie-authenticated and
 // remains separate from both external OAuth and the optional global bearer
@@ -626,6 +716,23 @@ app.use("/api/local-supervisor", createLocalSupervisorCoordinationRouter({
   serviceInstanceRef: localSupervisorIdentity.serviceInstanceRef,
   store: localSupervisorCoordinationStore,
 }));
+app.use(
+  "/api/desktop/mcp-tunnel-transition",
+  createDesktopMcpTunnelTransitionRouter({
+    store: desktopMcpTunnelTransitionStore,
+    onRevoked: desktopMcpTunnelTransitionExecutor
+      ? async (request) => {
+          await desktopMcpTunnelTransitionExecutor({
+            transitionRequestRef: request.transitionRequestRef,
+            delegationRef: request.delegationRef,
+            accountSessionId: request.accountSessionId,
+            targetScope: "local_supervisor_coordination_and_device_check",
+            delegationExpiresAt: request.delegationExpiresAt,
+          });
+        }
+      : undefined,
+  }),
+);
 // Agent-binding readiness and revocation are first-party account-session
 // operations. Mount them before the optional legacy bearer middleware so
 // ENABLE_AUTH does not silently replace their documented cookie boundary.

@@ -60,7 +60,10 @@ public final class FabricSensorConfigLoader {
     }
 
     public static String loadPairingEndpoint(Logger logger) {
-        Map<String, Object> root = readRoot(logger);
+        return pairingEndpointFromMap(readRoot(logger));
+    }
+
+    static String pairingEndpointFromMap(Map<String, Object> root) {
         String sourceEndpoint = text(
             root,
             "endpoint",

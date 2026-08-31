@@ -190,6 +190,36 @@ final class MinecraftCombatGuardianTest {
         assertFalse(runtime.shielding);
     }
 
+    @Test
+    void disengagesWithoutAttackingUntilEveryVisibleHostileIsOutsideTheEnvelope() {
+        FakeRuntime runtime = new FakeRuntime();
+        runtime.targets = List.of(
+            target("nearest", 2.0, true, true, 1.0),
+            target("farther", 3.5, false, true, 1.0)
+        );
+        MinecraftCombatGuardian guardian = new MinecraftCombatGuardian(runtime);
+        guardian.begin(disengageProfile());
+
+        PlayerActionWorkflow.WorkflowStep retreating = guardian.step(1);
+        assertEquals(PlayerActionWorkflow.WorkflowStepStatus.RUNNING, retreating.status());
+        assertEquals(List.of(MinecraftCombatGuardian.MovementMode.RETREAT), runtime.movementModes);
+        assertEquals(List.of("nearest"), runtime.orientedAwayRefs);
+        assertTrue(runtime.trackedRefs.isEmpty());
+        assertTrue(runtime.attackedRefs.isEmpty());
+
+        runtime.targets = List.of(
+            target("nearest", 5.0, true, false, 1.0),
+            target("farther", 6.0, false, false, 1.0)
+        );
+        PlayerActionWorkflow.WorkflowStep separated = guardian.step(2);
+
+        assertEquals(PlayerActionWorkflow.WorkflowStepStatus.SUCCEEDED, separated.status());
+        assertEquals("safe_separation_reached", separated.measurements().get("reason_code"));
+        assertEquals(true, separated.measurements().get("safe_separation_reached"));
+        assertTrue(runtime.attackedRefs.isEmpty());
+        assertTrue(runtime.releaseCount >= 2);
+    }
+
     private static MinecraftCombatGuardian.Profile profile(
         int retreatThreshold,
         int commitTicks
@@ -204,6 +234,7 @@ final class MinecraftCombatGuardianTest {
     ) {
         return new MinecraftCombatGuardian.Profile(
             Set.of("minecraft:zombie"),
+            "engage",
             16,
             0.9,
             32,
@@ -212,6 +243,31 @@ final class MinecraftCombatGuardianTest {
             2.75,
             4,
             retreatThreshold,
+            4,
+            "none",
+            0,
+            "none",
+            0,
+            "none",
+            8,
+            0,
+            "none",
+            0
+        );
+    }
+
+    private static MinecraftCombatGuardian.Profile disengageProfile() {
+        return new MinecraftCombatGuardian.Profile(
+            Set.of("minecraft:zombie"),
+            "disengage_to_distance",
+            16,
+            0.9,
+            1,
+            8,
+            0,
+            2.75,
+            4.5,
+            1,
             4,
             "none",
             0,
@@ -237,6 +293,7 @@ final class MinecraftCombatGuardianTest {
     ) {
         return new MinecraftCombatGuardian.Profile(
             Set.of("minecraft:skeleton"),
+            "engage",
             16,
             0.9,
             32,
@@ -297,6 +354,7 @@ final class MinecraftCombatGuardianTest {
         List<MinecraftCombatGuardian.Target> targets = List.of();
         List<MinecraftCombatGuardian.ProjectileThreat> threats = List.of();
         final List<String> trackedRefs = new ArrayList<>();
+        final List<String> orientedAwayRefs = new ArrayList<>();
         final List<String> attackedRefs = new ArrayList<>();
         final List<MinecraftCombatGuardian.MovementMode> movementModes = new ArrayList<>();
         boolean retreating;
@@ -328,6 +386,11 @@ final class MinecraftCombatGuardianTest {
         @Override
         public void track(MinecraftCombatGuardian.Target target) {
             trackedRefs.add(target.targetRef());
+        }
+
+        @Override
+        public void orientAway(MinecraftCombatGuardian.Target target) {
+            orientedAwayRefs.add(target.targetRef());
         }
 
         @Override

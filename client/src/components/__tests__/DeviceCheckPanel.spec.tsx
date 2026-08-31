@@ -7,6 +7,7 @@ import { HELIX_PANELS } from "@/pages/helix-core.panels";
 import { RuntimeSurfaceProvider } from "@/lib/runtime/RuntimeSurfaceProvider";
 import { DESKTOP_RUNTIME_SNAPSHOT_SCHEMA_VERSION } from "@shared/runtime-surface";
 import { DESKTOP_CODEX_PLUGIN_STATE_SCHEMA_VERSION } from "@shared/codex-plugin";
+import { DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION } from "@shared/desktop-mcp-tunnel";
 
 describe("Device Check panel", () => {
   afterEach(() => {
@@ -208,9 +209,193 @@ describe("Device Check panel", () => {
     );
 
     const button = await screen.findByRole("button", { name: "Open in Codex" });
-    expect(button).toBeEnabled();
+    await waitFor(() => expect(button).toBeEnabled());
     expect(openCodexPlugin).not.toHaveBeenCalled();
     fireEvent.click(button);
     await waitFor(() => expect(openCodexPlugin).toHaveBeenCalledOnce());
+  });
+
+  it("starts the full Helix MCP tunnel only after the explicit developer click", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        schema: "helix.environment_connector.device_check_list.v1",
+        generated_at: "2026-08-28T19:00:00.000Z",
+        devices: [],
+        content_role: "device_health_observations_not_assistant_answer",
+        credential_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    })) as unknown as typeof fetch);
+    const stoppedState = {
+      schemaVersion: DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
+      transport: "openai_secure_mcp_tunnel" as const,
+      access: "developer_private" as const,
+      scope: "local_supervisor_coordination_and_device_check" as const,
+      status: "stopped" as const,
+      configured: true,
+      vaultAvailable: true,
+      binaryVersion: "0.0.13",
+      processRunning: false,
+      healthy: false,
+      ready: false,
+      adminUiAvailable: false,
+      failureCode: null,
+    };
+    const fullState = {
+      ...stoppedState,
+      scope: "full_helix_agent" as const,
+      status: "ready" as const,
+      processRunning: true,
+      healthy: true,
+      ready: true,
+    };
+    const startMcpTunnel = vi.fn(async () => fullState);
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => ({
+        schemaVersion: DESKTOP_RUNTIME_SNAPSHOT_SCHEMA_VERSION,
+        surface: "desktop_native",
+        serviceOrigin: window.location.origin,
+        capabilities: {
+          nativeBinaryUpdate: false,
+          localServiceControl: true,
+          localWorkspaceAccess: false,
+          codexMcpRegistration: false,
+          secureCredentialVault: true,
+          deviceAgentControl: false,
+        },
+      })),
+      getMcpTunnelState: vi.fn(async () => stoppedState),
+      startMcpTunnel,
+    });
+
+    const panel = HELIX_PANELS.find((entry) => entry.id === "device-check")!;
+    const loaded = await panel.loader();
+    render(
+      <RuntimeSurfaceProvider>
+        <loaded.default />
+      </RuntimeSurfaceProvider>,
+    );
+
+    const button = await screen.findByRole("button", {
+      name: "Start full developer MCP",
+    });
+    expect(startMcpTunnel).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(startMcpTunnel).toHaveBeenCalledWith({ scope: "full_helix_agent" }),
+    );
+    expect(await screen.findByText(/Full developer MCP/)).toBeDefined();
+  });
+
+  it("grants only an agent-created pending tunnel request from the developer consent surface", async () => {
+    const request = {
+      schema: "helix.desktop_tunnel_transition.v1",
+      transition_request_ref: "desktop_tunnel_request:consent-fixture",
+      service_instance_ref: "service_instance:consent",
+      client_session_ref: "supervisor_client:consent",
+      conversation_thread_ref: "codex_thread:consent",
+      authenticated_profile_ref: "profile:developer",
+      authenticated_mcp_client_ref: "mcp_client:native_desktop:consent",
+      declared_task_summary: "Refresh the admitted MCP catalog.",
+      declared_task_is_verified: false,
+      requested_scope: "full_helix_agent",
+      requested_lease_seconds: 180,
+      status: "pending_user_delegation",
+      delegation_ref: null,
+      delegation_expires_at: null,
+      created_at: "2026-08-29T12:00:00.000Z",
+      updated_at: "2026-08-29T12:00:00.000Z",
+      client_identity_assurance: "native_tunnel_client_plus_server_derived_continuation",
+      independent_external_oauth_client_bound: false,
+      authority_limited_to_tunnel_transport: true,
+      environment_authority_granted: false,
+      trading_authority_granted: false,
+      credential_included: false,
+      private_endpoint_included: false,
+      content_role: "desktop_tunnel_transition_request_not_assistant_answer",
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/desktop/mcp-tunnel-transition/requests") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, requests: [request] }),
+        };
+      }
+      if (url.includes("/delegate") && init?.method === "POST") {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          schema: "helix.environment_connector.device_check_list.v1",
+          generated_at: "2026-08-29T12:00:00.000Z",
+          devices: [],
+          content_role: "device_health_observations_not_assistant_answer",
+          credential_included: false,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    const stoppedState = {
+      schemaVersion: DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
+      transport: "openai_secure_mcp_tunnel" as const,
+      access: "developer_private" as const,
+      scope: "local_supervisor_coordination_and_device_check" as const,
+      status: "stopped" as const,
+      configured: true,
+      vaultAvailable: true,
+      binaryVersion: "0.0.13",
+      processRunning: false,
+      healthy: false,
+      ready: false,
+      adminUiAvailable: false,
+      failureCode: null,
+    };
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => ({
+        schemaVersion: DESKTOP_RUNTIME_SNAPSHOT_SCHEMA_VERSION,
+        surface: "desktop_native",
+        serviceOrigin: window.location.origin,
+        capabilities: {
+          nativeBinaryUpdate: false,
+          localServiceControl: true,
+          localWorkspaceAccess: false,
+          codexMcpRegistration: false,
+          secureCredentialVault: true,
+          deviceAgentControl: false,
+        },
+      })),
+      getMcpTunnelState: vi.fn(async () => stoppedState),
+    });
+    const panel = HELIX_PANELS.find((entry) => entry.id === "device-check")!;
+    const loaded = await panel.loader();
+    render(<RuntimeSurfaceProvider><loaded.default /></RuntimeSurfaceProvider>);
+    const grant = await screen.findByRole("button", {
+      name: "Grant 180-second tunnel lease",
+    });
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    fireEvent.click(grant);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/desktop/mcp-tunnel-transition/requests/desktop_tunnel_request%3Aconsent-fixture/delegate",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+        body: JSON.stringify({ lease_seconds: 180 }),
+      }),
+    ));
   });
 });

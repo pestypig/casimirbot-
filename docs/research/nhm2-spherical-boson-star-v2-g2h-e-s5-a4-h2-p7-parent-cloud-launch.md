@@ -1,7 +1,7 @@
 Program gate: G2H-E-S5 — inert primary execution-preflight decision
 Workstream: candidate-neutral C08 implementation and performance equivalence
 Capability or component: H2-P7 candidate-neutral parent cloud execution launch
-Current maturity: exactly one authorized parent process active; pre-result audit definition 17/17 PASS; real result and result audit pending
+Current maturity: sole parent process terminated and VM stopped before the scheduled ceiling; retained disk READY; result retrieval and audit pending
 Target maturity: one immutable candidate-neutral H2 parent result binding the origin and first positive-panel H2 ledgers
 Required frozen inputs: proposal `3f15f387...fdc3`, archive `9c2a6af7...f1f5`, manifest `d20e0f8e...f9d5f`, guard `2e7a2cb9...305c`, Dockerfile `26c8f0fb...1949` and binary `e6dfc340...8f56`
 Required evidence: complete/FAIL/timeout/partial stdout, stderr, exit status and timestamps; exact resource/build/binary identity; independent result audit; stopped VM; preserved disk and false authority locks
@@ -13,7 +13,7 @@ Downstream gate unlocked: only after process termination and independent result 
 
 Status date: August 28, 2026.
 
-Status: **ACTIVE / ONE AUTHORIZED PROCESS RUNNING**.
+Status: **TERMINATED / RESULT PRESERVED ON STOPPED DISK**.
 
 The exact authorization for proposal SHA-256
 `3f15f387c95079d2049f346e260cd8b31e51732ea903b06ae11f8feb0eabfdc3`
@@ -62,6 +62,13 @@ logs and evidence are not deleted.
 
 No H2 parent verdict exists until the process terminates and its preserved
 evidence passes the separately required independent audit.
+
+Read-only follow-up inspection found the VM `TERMINATED` at
+`2026-08-28T06:16:21.113Z`, more than 22 hours before its scheduled aggregate
+ceiling, with the retained 30 GB disk `READY`. The stopped-disk
+[evidence-retrieval proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-evidence-retrieval-proposal.md)
+is frozen and independently audited 18/18. No restart or evidence read has
+occurred, so PASS versus FAIL remains unknown.
 
 The [pre-result audit definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p7-result-audit-definition.md)
 was frozen while the process remained active. Its synthetic cases pass 4/4

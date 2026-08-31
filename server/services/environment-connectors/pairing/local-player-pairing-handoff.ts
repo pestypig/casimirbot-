@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { resolveProfileOwnedMinecraftPlayerGameDirectory } from
+  "./local-minecraft-run-profile-store";
 
 const PLAYER_PAIRING_INBOX =
   "helix-fabric-player-agent.pairing-inbox" as const;
@@ -25,6 +27,7 @@ export const stageLocalMinecraftPlayerPairing = async (input: {
   command: string;
   appDataPath?: string | null;
   minecraftGameDirectoryPath?: string | null;
+  ownerProfileId?: string | null;
 }): Promise<{ status: "player_pairing_inbox_staged" }> => {
   const command = input.command.trim();
   if (
@@ -44,8 +47,15 @@ export const stageLocalMinecraftPlayerPairing = async (input: {
       "The same-host Minecraft instance root is unavailable.",
     );
   }
+  const profileOwnedGameDirectory = input.ownerProfileId?.trim()
+    ? await resolveProfileOwnedMinecraftPlayerGameDirectory({
+        ownerProfileId: input.ownerProfileId,
+        storePath: process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE,
+      })
+    : null;
   const configuredGameDirectory =
     input.minecraftGameDirectoryPath?.trim() ||
+    profileOwnedGameDirectory ||
     process.env.HELIX_MINECRAFT_PLAYER_GAME_DIR?.trim();
   if (configuredGameDirectory && !path.isAbsolute(configuredGameDirectory)) {
     throw new LocalPlayerPairingHandoffError(

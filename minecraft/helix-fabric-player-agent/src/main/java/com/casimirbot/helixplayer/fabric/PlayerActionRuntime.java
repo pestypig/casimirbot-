@@ -24,9 +24,10 @@ import org.slf4j.Logger;
 
 final class PlayerActionRuntime implements AutoCloseable {
     private static final String PROTOCOL_VERSION = "helix.environment_action.v1";
-    static final String ADAPTER_VERSION = "0.4.0";
+    static final String ADAPTER_VERSION = "0.4.1";
     private static final int POLL_INTERVAL_TICKS = 20;
     private static final int HEARTBEAT_INTERVAL_TICKS = 100;
+    private static final int LOCAL_STATUS_INTERVAL_TICKS = 5;
     private static final int MAX_PENDING_DELIVERIES = 768;
     private static final int RESERVED_TERMINAL_DELIVERIES = 3;
 
@@ -59,6 +60,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final ExecutorService network;
     private final PlayerActionHttpClient http;
     private final Consumer<String> localDiagnosticMessage;
+    private final PlayerActionLocalStatusWriter localStatusWriter;
     private volatile String producerEpochRef = id("environment_action_epoch");
     private volatile String manifestId = id("environment_action_manifest");
     private final String executionClockId = id("minecraft_client_tick_clock");
@@ -67,6 +69,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final AtomicBoolean deliveryFlushPending = new AtomicBoolean(false);
     private volatile boolean manifestReady;
     private volatile boolean heartbeatReady;
+    private volatile Instant lastHeartbeatAcceptedAt;
     private volatile boolean emergencyStopLatched;
     private volatile boolean eventStreamResyncRequired;
     private volatile boolean manualInputDetected;
@@ -92,6 +95,12 @@ final class PlayerActionRuntime implements AutoCloseable {
         this.minecraft = minecraft;
         this.logger = logger;
         this.localDiagnosticMessage = localDiagnosticMessage;
+        this.localStatusWriter = new PlayerActionLocalStatusWriter(
+            minecraft.gameDirectory.toPath()
+                .resolve("config")
+                .resolve("helix-fabric-player-agent.runtime-status.json"),
+            logger
+        );
         this.bridge = new NativeFabricControlBridge(minecraft);
         this.controller = new PlayerActionController(bridge, this::onWorkflowEvent);
         this.network = Executors.newSingleThreadExecutor(runnable -> {
@@ -128,6 +137,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         }
         ticks++;
         latestClockSnapshot = captureClockSnapshot(ticks);
+        if (ticks % LOCAL_STATUS_INTERVAL_TICKS == 0) publishLocalStatus();
         if (!config.ready() || http == null) return;
         if (!connectedIdentityMatches()) {
             if (controller.activeWorkflowId() != null) {
@@ -502,6 +512,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         try {
             PlayerActionHttpClient.Response response = http.post("/heartbeat", heartbeat());
             heartbeatReady = response.ok();
+            if (response.ok()) lastHeartbeatAcceptedAt = Instant.now();
             if (!response.ok()) {
                 recordTransportError(response.error());
                 if (heartbeatFailureRequiresManifestRepublish(response.error())) {
@@ -524,6 +535,24 @@ final class PlayerActionRuntime implements AutoCloseable {
             recordTransportError("heartbeat_unreachable");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
+    }
+
+    private void publishLocalStatus() {
+        String workflow = controller.activeWorkflowId();
+        State state = controller.state();
+        boolean running = workflow != null && state == State.RUNNING;
+        localStatusWriter.write(
+            config.actionAuthorityId(),
+            producerEpochRef,
+            ready(),
+            lastHeartbeatAcceptedAt,
+            workflow,
+            wireState(state),
+            running && !emergencyStopLatched && !eventStreamResyncRequired,
+            emergencyStopLatched,
+            manualInputDetected,
+            Instant.now()
+        );
     }
 
     private boolean rotateEvidenceEpochIfIdle() {
@@ -1650,6 +1679,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         emergencyStopLatched = true;
         controller.emergencyStop("The player-action connector stopped.");
         bridge.releaseAll();
+        publishLocalStatus();
         network.shutdownNow();
         if (http != null) http.close();
     }

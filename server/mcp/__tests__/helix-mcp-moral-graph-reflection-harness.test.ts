@@ -7,6 +7,10 @@ import {
   type SharedAuthoritySocialRenewalReflectionV1,
 } from "@shared/contracts/shared-authority-social-renewal.v1";
 import { HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME } from "../../skills/helix-ask.moral-graph-reflection";
+import {
+  validateMoralReflectionMediationPacketV1,
+  type MoralReflectionMediationPacketV1,
+} from "@shared/contracts/moral-reflection-mediation-packet.v1";
 import { createMoralGraphReflectionMcpHarnessServer } from "../testing/moral-graph-reflection-mcp-harness";
 
 const scenario = [
@@ -81,6 +85,16 @@ describe("Moral Graph MCP reflection harness", () => {
       no_moral_verdict: true,
       no_legitimacy_inference: true,
     });
+    const mediation = result.structuredContent?.moralReflectionMediation as MoralReflectionMediationPacketV1;
+    expect(validateMoralReflectionMediationPacketV1(mediation)).toEqual([]);
+    expect(mediation.steps).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "objective_source_attribution" }),
+      expect.objectContaining({ id: "instrumentalization_ledger" }),
+      expect.objectContaining({ id: "perspective_power_and_asymmetry" }),
+      expect.objectContaining({ id: "developmental_freedom" }),
+      expect.objectContaining({ id: "ai_mediated_judgment" }),
+    ]));
+    expect(mediation.objectiveSourceStatus).toBe("unresolved");
   });
 
   it("does not turn quoted or negated authority language into execution authority", async () => {

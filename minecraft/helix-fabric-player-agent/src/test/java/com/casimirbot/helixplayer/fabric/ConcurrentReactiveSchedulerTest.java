@@ -35,6 +35,25 @@ final class ConcurrentReactiveSchedulerTest {
     }
 
     @Test
+    void combatActionsDeclareTheResourcesTheyActuallyControl() {
+        assertEquals(
+            Set.of("camera", "main_hand"),
+            ConcurrentReactiveScheduler.resourcesFor(Map.of(
+                "action_kind", "attack"
+            ))
+        );
+        assertEquals(
+            Set.of(
+                "camera", "locomotion", "main_hand", "off_hand",
+                "native_workflow"
+            ),
+            ConcurrentReactiveScheduler.resourcesFor(Map.of(
+                "action_kind", "combat_guard"
+            ))
+        );
+    }
+
+    @Test
     void itemUsePlacementLocksItsExactHandAndWorldMutationResources() {
         Map<String, Object> action = Map.of(
             "action_kind", "place",
@@ -489,6 +508,53 @@ final class ConcurrentReactiveSchedulerTest {
         assertEquals(List.of(0, 1, 2), receipts.stream()
             .map(receipt -> receipt.get("iteration"))
             .toList());
+    }
+
+    @Test
+    void normalizesNativeConsumeCountsAndPreservesCombatRecoveryEvidence() {
+        FakeRuntime runtime = new FakeRuntime();
+        runtime.successfulMeasurements.put("lane:recovery", Map.of(
+            "consumed_count", 1,
+            "inventory_mutations_performed", 1,
+            "combat_mode", "disengage_to_distance",
+            "attack_pulses", 0,
+            "minimum_hostile_distance", 7.25,
+            "safe_separation_reached", true,
+            "visible_hostile_count", 1,
+            "eligible_hostile_count", 1
+        ));
+        ConcurrentReactiveScheduler scheduler = new ConcurrentReactiveScheduler(runtime);
+        scheduler.begin(program(
+            "all_required",
+            List.of(lane(
+                "lane:recovery",
+                "inventory",
+                100,
+                true,
+                List.of("main_hand"),
+                actionNode("node:consume", interactAction(), 20),
+                terminal("node:consume:done", "succeeded"),
+                terminal("node:consume:failed", "failed")
+            )),
+            List.of(),
+            List.of()
+        ));
+
+        WorkflowStep terminal = scheduler.step(0);
+
+        assertEquals(WorkflowStepStatus.SUCCEEDED, terminal.status());
+        assertEquals(1, terminal.measurements().get("consumed_item_count"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> receipts =
+            (List<Map<String, Object>>) terminal.measurements().get("action_receipts");
+        Map<String, Object> receipt = receipts.getFirst();
+        assertEquals(1, receipt.get("consumed_count"));
+        assertEquals("disengage_to_distance", receipt.get("combat_mode"));
+        assertEquals(0, receipt.get("attack_pulses"));
+        assertEquals(7.25, receipt.get("minimum_hostile_distance"));
+        assertEquals(true, receipt.get("safe_separation_reached"));
+        assertEquals(1, receipt.get("visible_hostile_count"));
+        assertEquals(1, receipt.get("eligible_hostile_count"));
     }
 
     @Test

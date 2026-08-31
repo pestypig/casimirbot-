@@ -9,6 +9,7 @@ import {
   type RealtimeTexturePackConfigV1,
   type RealtimeTexturePackProjectionFrameV1,
   type RealtimeTexturePackSessionStateV1,
+  type RealtimeTexturePackTransformRequestV1,
 } from "@shared/realtime-texture-pack";
 import { captureFrameDataUrlFromStream } from "./visualFrameProducer";
 import {
@@ -24,6 +25,8 @@ export type RealtimeTexturePackPreviewOptions = {
 
 export type RealtimeTexturePackPreviewController = {
   start(options: RealtimeTexturePackPreviewOptions): Promise<RealtimeTexturePackSessionStateV1>;
+  updateDirection(options: RealtimeTexturePackPreviewOptions): RealtimeTexturePackConfigV1 | null;
+  updateProvider(providerId: string): RealtimeTexturePackConfigV1 | null;
   stop(reason?: string): RealtimeTexturePackSessionStateV1;
   getState(): RealtimeTexturePackSessionStateV1;
 };
@@ -38,6 +41,10 @@ export type RealtimeTexturePackPreviewDependencies = {
   onState?: (state: RealtimeTexturePackSessionStateV1) => void;
   onConfig?: (config: RealtimeTexturePackConfigV1) => void;
   onFrame?: (frame: RealtimeTexturePackProjectionFrameV1) => void;
+  transformRemote?: (
+    request: RealtimeTexturePackTransformRequestV1,
+    providerId: string,
+  ) => Promise<RealtimeTexturePackProjectionFrameV1>;
 };
 
 const resizeRealtimeTexturePackFrame = async (dataUrl: string): Promise<string> => {
@@ -92,6 +99,7 @@ export function createRealtimeTexturePackPreviewController(
   let abortController: AbortController | null = null;
   let inFlight = false;
   let frameSequence = 0;
+  let activeConfig: RealtimeTexturePackConfigV1 | null = null;
   let state = buildRealtimeTexturePackSessionState({
     sessionId: `texture-session:${now().getTime()}`,
   });
@@ -111,6 +119,7 @@ export function createRealtimeTexturePackPreviewController(
     if (stream) stopVisualSourceMediaStream(stream);
     stream = null;
     inFlight = false;
+    activeConfig = null;
     return publishState({
       status: "stopped",
       capture_active: false,
@@ -151,18 +160,18 @@ export function createRealtimeTexturePackPreviewController(
     state = buildRealtimeTexturePackSessionState({ sessionId, status: "source_selected" });
     publishState({ capture_active: true, failure_reason: null });
     const sourceId = `texture-source:${sessionId}`;
-    const config = buildRealtimeTexturePackConfig({
+    activeConfig = buildRealtimeTexturePackConfig({
       sessionId,
       sourceId,
       sourceSurface: "window",
       presetId: options.presetId,
       customPrompt: options.customPrompt,
     });
-    dependencies.onConfig?.(config);
+    dependencies.onConfig?.(activeConfig);
     abortController = new AbortController();
 
     const capture = async () => {
-      if (!stream || !abortController || activeGeneration !== generation) return;
+      if (!stream || !abortController || !activeConfig || activeGeneration !== generation) return;
       if (inFlight) {
         publishState({ dropped_frame_count: state.dropped_frame_count + 1 });
         return;
@@ -175,13 +184,17 @@ export function createRealtimeTexturePackPreviewController(
         const sourceFrame = await resizeFrame(rawFrame);
         if (activeGeneration !== generation) return;
         const request = buildRealtimeTexturePackTransformRequest({
-          config,
+          config: activeConfig,
           requestId: `texture-request:${sessionId}:${sequence}`,
           sourceFrameId: `source-frame:${sessionId}:${sequence}`,
           sourceCapturedAt: capturedAt,
           sourceImageDataUrl: sourceFrame,
         });
-        const projection = await provider.transform(request);
+        const projection = activeConfig.provider_id === provider.provider_id
+          ? await provider.transform(request)
+          : dependencies.transformRemote
+            ? await dependencies.transformRemote(request, activeConfig.provider_id)
+            : (() => { throw new Error("realtime_texture_pack_remote_provider_unavailable"); })();
         if (activeGeneration !== generation) return;
         dependencies.onFrame?.(projection);
         publishState({
@@ -190,12 +203,14 @@ export function createRealtimeTexturePackPreviewController(
           last_source_frame_id: projection.source_frame_id,
           last_projection_frame_id: projection.projection_frame_id,
           frame_age_ms: Math.max(0, now().getTime() - Date.parse(projection.source_captured_at)),
+          provider_state: projection.provider_id === provider.provider_id ? "local_only" : "connected",
           failure_reason: null,
         });
       } catch (error) {
         if (activeGeneration === generation && !abortController?.signal.aborted) {
           publishState({
             status: "degraded",
+            provider_state: activeConfig?.provider_id === provider.provider_id ? "local_only" : "error",
             failure_reason: error instanceof Error ? error.message : "realtime_texture_pack_capture_failed",
           });
         }
@@ -214,6 +229,32 @@ export function createRealtimeTexturePackPreviewController(
 
   return {
     start,
+    updateDirection: (options) => {
+      if (!activeConfig || !stream) return null;
+      activeConfig = buildRealtimeTexturePackConfig({
+        sessionId: activeConfig.session_id,
+        sourceId: activeConfig.source_id,
+        sourceSurface: activeConfig.source_surface,
+        providerId: activeConfig.provider_id,
+        presetId: options.presetId,
+        customPrompt: options.customPrompt,
+      });
+      dependencies.onConfig?.(activeConfig);
+      return activeConfig;
+    },
+    updateProvider: (providerId) => {
+      if (!activeConfig || !stream) return null;
+      activeConfig = buildRealtimeTexturePackConfig({
+        sessionId: activeConfig.session_id,
+        sourceId: activeConfig.source_id,
+        sourceSurface: activeConfig.source_surface,
+        providerId,
+        presetId: activeConfig.preset_id,
+        customPrompt: activeConfig.custom_prompt,
+      });
+      dependencies.onConfig?.(activeConfig);
+      return activeConfig;
+    },
     stop: (reason = "user_stopped") => settleStop(reason),
     getState: () => state,
   };

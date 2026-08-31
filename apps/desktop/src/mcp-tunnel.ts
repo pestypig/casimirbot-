@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 import {
   existsSync,
   mkdirSync,
@@ -10,8 +11,10 @@ import {
 } from "node:fs";
 import path from "node:path";
 import {
+  DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER,
   DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
   type DesktopMcpTunnelFailureCode,
+  type DesktopMcpTunnelScope,
   type DesktopMcpTunnelState,
   type DesktopMcpTunnelStatus,
 } from "../../../shared/desktop-mcp-tunnel";
@@ -19,10 +22,55 @@ import {
 const VAULT_SCHEMA_VERSION = "casimir_desktop_mcp_tunnel_credentials/1";
 const DESKTOP_SESSION_ENV = "CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET";
 const DESKTOP_SESSION_HEADER = "X-Casimir-Desktop-Session";
+const ACCOUNT_SESSION_ENV = "CASIMIR_TUNNEL_ACCOUNT_SESSION_ID";
 const HEALTH_URL_WAIT_MS = 20_000;
 const READY_WAIT_MS = 45_000;
 const HEALTH_POLL_MS = 500;
 const HEALTH_MONITOR_MS = 5_000;
+const READ_ONLY_TUNNEL_SCOPE =
+  "local_supervisor_coordination_and_device_check" as const;
+
+const exactHttpsIssuer = (raw: string | undefined): URL | null => {
+  const candidate = raw?.trim();
+  if (!candidate) return null;
+  try {
+    const issuer = new URL(candidate);
+    const hostname = issuer.hostname.toLowerCase().replace(/\.$/u, "");
+    if (
+      issuer.protocol !== "https:" ||
+      issuer.username ||
+      issuer.password ||
+      issuer.search ||
+      issuer.hash ||
+      !hostname.includes(".") ||
+      hostname === "localhost" ||
+      isIP(hostname) !== 0 ||
+      !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(
+        hostname,
+      )
+    ) {
+      return null;
+    }
+    return issuer;
+  } catch {
+    return null;
+  }
+};
+
+const authorizationServerMetadataUrl = (issuer: URL): string => {
+  const issuerPath = issuer.pathname === "/"
+    ? ""
+    : issuer.pathname.replace(/\/$/u, "");
+  const metadata = new URL(issuer.origin);
+  metadata.pathname = `/.well-known/oauth-authorization-server${issuerPath}`;
+  return metadata.toString();
+};
+
+const authorizationServerRegistrationUrl = (issuer: URL): string => {
+  const registration = new URL(issuer.origin);
+  registration.pathname = "/oidc/register";
+  return registration.toString();
+};
 
 export type McpTunnelCredentials = Readonly<{
   tunnelId: string;
@@ -83,7 +131,9 @@ export function buildMcpTunnelEnvironment(input: {
   credentials: McpTunnelCredentials;
   runtimeOrigin: string;
   desktopSessionSecret: string;
+  accountSessionId: string;
   healthUrlFile: string;
+  scope?: DesktopMcpTunnelScope;
 }): NodeJS.ProcessEnv {
   const inheritedKeys = [
     "SystemRoot",
@@ -100,28 +150,59 @@ export function buildMcpTunnelEnvironment(input: {
     const value = input.processEnv[key];
     if (typeof value === "string" && value.length > 0) env[key] = value;
   }
+  const scope = input.scope ?? READ_ONLY_TUNNEL_SCOPE;
   const mcpUrl = new URL(
-    "/mcp/local-supervisor-coordination",
+    scope === "full_helix_agent"
+      ? "/mcp"
+      : "/mcp/local-supervisor-coordination",
     input.runtimeOrigin,
   ).toString();
   const protectedHeader = `${DESKTOP_SESSION_HEADER}: env:${DESKTOP_SESSION_ENV}`;
+  const accountSessionHeader =
+    `${DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER}: env:${ACCOUNT_SESSION_ENV}`;
+  // tunnel-client parses repeatable header values from the environment as a
+  // comma-separated list (`Key: Value, Key2: Value2`). A semicolon is part of
+  // one header value and would prevent the account-session header from being
+  // emitted at all.
+  const mcpHeaders = `${protectedHeader}, ${accountSessionHeader}`;
+  const oauthIssuer = exactHttpsIssuer(
+    input.processEnv.HELIX_AGENT_OAUTH_ISSUER,
+  );
   return {
     ...env,
     CONTROL_PLANE_TUNNEL_ID: input.credentials.tunnelId,
     CONTROL_PLANE_API_KEY: input.credentials.runtimeApiKey,
     MCP_SERVER_URL: mcpUrl,
-    MCP_EXTRA_HEADERS: protectedHeader,
-    MCP_DISCOVERY_EXTRA_HEADERS: protectedHeader,
+    MCP_EXTRA_HEADERS: mcpHeaders,
+    MCP_DISCOVERY_EXTRA_HEADERS: mcpHeaders,
     MCP_STARTUP_WAIT_TIMEOUT: "10s",
     MCP_MAX_CONCURRENT_REQUESTS: "4",
+    ...(oauthIssuer
+      ? {
+          HARPOON_TARGETS:
+            `label=oauth-auth-server-metadata-0,url=${authorizationServerMetadataUrl(oauthIssuer)},desc=OAuth authorization server metadata;` +
+            `label=oauth-registration-endpoint-0,url=${authorizationServerRegistrationUrl(oauthIssuer)},desc=OAuth dynamic client registration`,
+          // The supervised MCP server is intentionally loopback-only and uses
+          // HTTP inside the same workstation. Permit OAuth discovery to
+          // register only those loopback PRMD/resource URLs; private/LAN host
+          // registration remains disabled and the public auth target is HTTPS.
+          HARPOON_ALLOW_PLAINTEXT_HTTP: "true",
+          HARPOON_HOSTS_INCLUDE_LOOPBACK: "true",
+        }
+      : {}),
     HEALTH_LISTEN_ADDR: "127.0.0.1:0",
     HEALTH_URL_FILE: input.healthUrlFile,
     OPEN_WEB_UI: "false",
     ALLOW_REMOTE_UI: "false",
     LOG_LEVEL: "info",
     LOG_FORMAT: "json",
+    // Keep tunnel-client diagnostics local to the supervised desktop run. The
+    // child otherwise has fully ignored stdio, which collapses every launch
+    // failure into an unactionable `process_exit` state.
+    LOG_FILE: `${input.healthUrlFile}.log`,
     NO_PROXY: "127.0.0.1,localhost,::1",
     [DESKTOP_SESSION_ENV]: input.desktopSessionSecret,
+    [ACCOUNT_SESSION_ENV]: input.accountSessionId,
   };
 }
 
@@ -151,6 +232,7 @@ export class DesktopMcpTunnelController {
   private healthBase: URL | null = null;
   private healthTimer: NodeJS.Timeout | null = null;
   private stopping = false;
+  private activeScope: DesktopMcpTunnelScope = READ_ONLY_TUNNEL_SCOPE;
   private state: DesktopMcpTunnelState;
   private readonly vaultPath: string;
   private readonly runRoot: string;
@@ -216,7 +298,7 @@ export class DesktopMcpTunnelController {
       schemaVersion: DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
       transport: "openai_secure_mcp_tunnel",
       access: "developer_private",
-      scope: "local_supervisor_coordination_and_device_check",
+      scope: this.activeScope,
       status: input.status,
       configured: input.configured,
       vaultAvailable: input.vaultAvailable,
@@ -281,9 +363,11 @@ export class DesktopMcpTunnelController {
   async clear(): Promise<DesktopMcpTunnelState> {
     await this.stop();
     rmSync(this.vaultPath, { force: true });
+    this.activeScope = READ_ONLY_TUNNEL_SCOPE;
     return this.setState({
       status: "unconfigured",
       configured: false,
+      scope: this.activeScope,
       failureCode: null,
     });
   }
@@ -321,13 +405,22 @@ export class DesktopMcpTunnelController {
     this.healthTimer.unref();
   }
 
-  async start(): Promise<DesktopMcpTunnelState> {
-    if (this.child) return this.state;
+  async start(
+    accountSessionId: string,
+    scope: DesktopMcpTunnelScope = READ_ONLY_TUNNEL_SCOPE,
+  ): Promise<DesktopMcpTunnelState> {
+    if (this.child) {
+      if (scope !== this.activeScope) {
+        throw new Error("Stop the tunnel before changing its capability scope");
+      }
+      return this.state;
+    }
     if (this.state.status === "blocked" && this.state.failureCode !== "credentials_invalid") {
       throw new Error(`Tunnel is blocked: ${this.state.failureCode ?? "unknown"}`);
     }
     if (!this.state.configured) throw new Error("Configure the tunnel first");
     const credentials = this.readCredentials();
+    this.activeScope = scope;
     mkdirSync(this.runRoot, { recursive: true });
     const healthUrlFile = path.join(
       this.runRoot,
@@ -338,12 +431,15 @@ export class DesktopMcpTunnelController {
       credentials,
       runtimeOrigin: this.options.runtimeOrigin,
       desktopSessionSecret: this.options.desktopSessionSecret,
+      accountSessionId,
       healthUrlFile,
+      scope: this.activeScope,
     });
     this.stopping = false;
     this.healthBase = null;
     this.setState({
       status: "starting",
+      scope: this.activeScope,
       processRunning: false,
       healthy: false,
       ready: false,
@@ -363,8 +459,10 @@ export class DesktopMcpTunnelController {
     child.once("error", () => {
       if (this.child !== child) return;
       this.child = null;
+      this.activeScope = READ_ONLY_TUNNEL_SCOPE;
       this.setState({
         status: "degraded",
+        scope: this.activeScope,
         processRunning: false,
         healthy: false,
         ready: false,
@@ -379,8 +477,10 @@ export class DesktopMcpTunnelController {
       if (this.healthTimer) clearInterval(this.healthTimer);
       this.healthTimer = null;
       if (!this.stopping) {
+        this.activeScope = READ_ONLY_TUNNEL_SCOPE;
         this.setState({
           status: "degraded",
+          scope: this.activeScope,
           processRunning: false,
           healthy: false,
           ready: false,
@@ -434,8 +534,10 @@ export class DesktopMcpTunnelController {
   async stop(): Promise<DesktopMcpTunnelState> {
     const child = this.child;
     if (!child) {
+      this.activeScope = READ_ONLY_TUNNEL_SCOPE;
       return this.setState({
         status: this.state.configured ? "stopped" : "unconfigured",
+        scope: this.activeScope,
         processRunning: false,
         healthy: false,
         ready: false,
@@ -454,8 +556,10 @@ export class DesktopMcpTunnelController {
     this.child = null;
     this.healthBase = null;
     this.stopping = false;
+    this.activeScope = READ_ONLY_TUNNEL_SCOPE;
     return this.setState({
       status: this.state.configured ? "stopped" : "unconfigured",
+      scope: this.activeScope,
       processRunning: false,
       healthy: false,
       ready: false,

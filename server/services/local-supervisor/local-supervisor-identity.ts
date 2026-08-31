@@ -55,17 +55,36 @@ export const createHelixLocalSupervisorIdentity = (input?: {
   const environment = input?.environment ?? process.env;
   const startedAt = input?.startedAt ?? new Date().toISOString();
   const entropy = input?.entropy ?? crypto.randomUUID();
+  const workspaceRef = helixWorkspaceRefFor(workspacePath);
+  const ownershipReceipt = environment.CASIMIR_DESKTOP_HOST === "1"
+    ? null
+    : verifyHelixLocalSupervisorOwnershipReceipt({
+        encodedReceipt:
+          environment.CASIMIR_LOCAL_SUPERVISOR_OWNERSHIP_RECEIPT,
+        trustedPublicKeysPem:
+          environment.CASIMIR_LOCAL_SUPERVISOR_TRUSTED_PUBLIC_KEYS,
+        trustedPublicKeysSpkiBase64Url:
+          environment.CASIMIR_LOCAL_SUPERVISOR_TRUSTED_PUBLIC_KEYS_SPKI_B64URL,
+        expectedWorkspaceRef: workspaceRef,
+        now: new Date(startedAt),
+      });
+  const supervisorMode = environment.CASIMIR_DESKTOP_HOST === "1"
+    ? "desktop_single_instance"
+    : ownershipReceipt
+      ? "external_keyed_launcher"
+      : "external_process";
+  // A keyed launcher's signed boot nonce is the service epoch. Reusing the
+  // same short-lived receipt cannot manufacture a second service identity.
+  const serviceEpoch = ownershipReceipt
+    ? `signed_boot_nonce:${ownershipReceipt.bootNonce}`
+    : `${startedAt}\n${entropy}`;
   return Object.freeze({
     serviceInstanceRef: `service_instance:${digest(
-      `${helixWorkspaceRefFor(workspacePath)}\n${startedAt}\n${entropy}`,
+      `${workspaceRef}\n${serviceEpoch}`,
     ).slice(0, 32)}`,
-    workspaceRef: helixWorkspaceRefFor(workspacePath),
+    workspaceRef,
     startedAt,
-    supervisorMode: resolveHelixLocalSupervisorMode(
-      environment,
-      workspacePath,
-      new Date(startedAt),
-    ),
+    supervisorMode,
   });
 };
 

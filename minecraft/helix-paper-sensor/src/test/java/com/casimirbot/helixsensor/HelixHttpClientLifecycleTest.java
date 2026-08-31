@@ -33,6 +33,12 @@ final class HelixHttpClientLifecycleTest {
     private ExecutorService executor;
     private String endpoint;
 
+    @Test
+    void givesDurableControlPlaneAdmissionMoreTimeThanOrdinaryTraffic() {
+        assertEquals(8L, HelixHttpClient.requestTimeoutSecondsFor(false));
+        assertEquals(30L, HelixHttpClient.requestTimeoutSecondsFor(true));
+    }
+
     @BeforeEach
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

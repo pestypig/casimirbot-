@@ -10,12 +10,16 @@ import { decideHelixLocalSupervisorAttachment } from
   "../local-supervisor-attachment";
 
 describe("local supervisor identity", () => {
-  const signedLauncherEnvironment = (workspacePath: string, now: Date) => {
+  const signedLauncherEnvironment = (
+    workspacePath: string,
+    now: Date,
+    bootNonce = "launcher_boot_nonce_1234567890",
+  ) => {
     const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
     const payload = Buffer.from(JSON.stringify({
       schema: "helix.local_supervisor_ownership_receipt.v1",
       workspace_ref: helixWorkspaceRefFor(workspacePath),
-      boot_nonce: "launcher_boot_nonce_1234567890",
+      boot_nonce: bootNonce,
       issued_at: now.toISOString(),
       expires_at: new Date(now.getTime() + 60_000).toISOString(),
       supervisor_mode: "external_keyed_launcher",
@@ -60,6 +64,38 @@ describe("local supervisor identity", () => {
     expect(first).toEqual(same);
     expect(first.serviceInstanceRef).not.toBe(second.serviceInstanceRef);
     expect(first.workspaceRef).toBe(second.workspaceRef);
+  });
+
+  it("binds a signed keyed-launch receipt to exactly one service epoch", () => {
+    const workspacePath = "C:\\Work\\CasimirBot";
+    const startedAt = new Date("2026-08-26T12:00:00.000Z");
+    const environment = signedLauncherEnvironment(workspacePath, startedAt);
+    const first = createHelixLocalSupervisorIdentity({
+      workspacePath,
+      environment,
+      startedAt: startedAt.toISOString(),
+      entropy: "first-process",
+    });
+    const replay = createHelixLocalSupervisorIdentity({
+      workspacePath,
+      environment,
+      startedAt: new Date(startedAt.getTime() + 1_000).toISOString(),
+      entropy: "second-process",
+    });
+    const nextBoot = createHelixLocalSupervisorIdentity({
+      workspacePath,
+      environment: signedLauncherEnvironment(
+        workspacePath,
+        startedAt,
+        "launcher_boot_nonce_0987654321",
+      ),
+      startedAt: startedAt.toISOString(),
+      entropy: "first-process",
+    });
+
+    expect(first.supervisorMode).toBe("external_keyed_launcher");
+    expect(replay.serviceInstanceRef).toBe(first.serviceInstanceRef);
+    expect(nextBoot.serviceInstanceRef).not.toBe(first.serviceInstanceRef);
   });
 
   it("claims one-instance enforcement only for an enforcing supervisor", () => {

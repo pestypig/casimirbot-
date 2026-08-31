@@ -39,9 +39,10 @@ final class PlayerActionConfigLoader {
 
     static String pairingEndpoint(Logger logger) {
         Object value = readRoot(path(), logger).get("pairing_endpoint");
-        return value instanceof String text && !text.isBlank()
+        String configured = value instanceof String text && !text.isBlank()
             ? text.trim()
             : ConnectorPairingClient.LOCAL_PAIRING_ENDPOINT;
+        return InstalledDesktopServiceEndpointResolver.resolve(configured);
     }
 
     static synchronized String loadOrCreateNonce(

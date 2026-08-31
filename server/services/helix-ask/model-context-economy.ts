@@ -225,6 +225,100 @@ export const compactAgentStepObservationPacketForModel = (input: {
   };
 };
 
+export const compactMoralGraphReflectionArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const mediation = readRecord(payload.moralReflectionMediation);
+  const sharedAuthority = readRecord(payload.sharedAuthoritySocialRenewal);
+  if (!mediation && !sharedAuthority) return null;
+  const cfg = config();
+  const steps = readArray(mediation?.steps).map((entry) => readRecord(entry)).filter(Boolean);
+  const relevantSteps = steps.filter((step) => {
+    const priority = readString(step?.priority);
+    return priority === "primary" || priority === "supporting";
+  });
+  const selectedSteps = relevantSteps.length ? relevantSteps : steps;
+  const domains = readArray(sharedAuthority?.domains).map((entry) => readRecord(entry)).filter(Boolean);
+  const reflection = readRecord(payload.reflection);
+  const reflectionId =
+    readString(mediation?.reflectionId) ??
+    readString(sharedAuthority?.reflectionId) ??
+    readString(reflection?.reflectionId);
+  const observationRef =
+    readString(artifact?.artifact_id) ??
+    readString(mediation?.artifactId) ??
+    readString(sharedAuthority?.artifactId) ??
+    `moral-reflection:${input.turnId}`;
+  const questions = selectedSteps.length
+    ? selectedSteps.map((step) => {
+        const id = readString(step?.id) ?? "mediation";
+        const priority = readString(step?.priority);
+        const prefix = priority ? `[${priority}] ` : "";
+        return compactText(`${prefix}${id}: ${readString(step?.question) ?? "Mediation question is unresolved."}`, 420);
+      })
+    : domains.map((domain) => {
+        const id = readString(domain?.id) ?? "domain";
+        return compactText(`${id}: ${readString(domain?.question) ?? "Reflection domain is unresolved."}`, 420);
+      });
+  const objectiveOptions = readStringArray(mediation?.objectiveSourceOptions);
+  const objectiveAttributionSelected = selectedSteps.some(
+    (step) => readString(step?.id) === "objective_source_attribution",
+  );
+  const missing = unique(
+    selectedSteps.map((step) => readStringArray(step?.missingEvidence).at(-1)),
+    cfg.observationMaxFindings,
+  );
+  const protocol = readStringArray(mediation?.synthesisProtocol);
+  const evidenceOrderBoundary = readRecord(mediation?.evidenceOrderBoundary);
+  const boundaryKind = readString(evidenceOrderBoundary?.kind);
+  const boundaryReason = readString(evidenceOrderBoundary?.reason);
+  const supportRefs = unique([
+    observationRef,
+    ...(reflectionId ? [`moral-reflection:${reflectionId}`] : []),
+    ...readStringArray(sharedAuthority?.prioritizedBadgeIds).map((id) => `moral-badge:${id}`),
+  ], 64);
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: input.turnId,
+    observation_ref: observationRef,
+    source: "tool",
+    source_target: "moral_graph_reflection",
+    capability_key: "moral-graph-reflection.reflect_ideology_context",
+    panel_id: "moral-graph-reflection",
+    action: "reflect_ideology_context",
+    status: "succeeded",
+    user_requested: compactText(input.userRequested ?? "", 320),
+    found: unique([
+      ...(boundaryKind
+        ? [compactText(`Evidence order boundary [${boundaryKind}]: ${boundaryReason ?? "Preserve the declared evidence order before strengthening the moral claim."}`, 420)]
+        : []),
+      ...questions,
+      ...(objectiveOptions.length && objectiveAttributionSelected
+        ? [`Objective source remains unresolved; test: ${objectiveOptions.join(", ")}.`]
+        : []),
+    ], cfg.observationMaxFindings),
+    proves: unique([
+      ...protocol.map((rule) => compactText(`Synthesis discipline: ${rule}`, 420)),
+      "This Moral Graph artifact is evidence-only and supplies reflection questions, not a verdict or intent attribution.",
+    ], cfg.observationMaxProves),
+    support_refs: supportRefs,
+    missing_or_uncertain: unique([
+      ...readStringArray(evidenceOrderBoundary?.requiredBeforeStrongClaim),
+      ...missing,
+    ], cfg.observationMaxFindings),
+    suggested_next_steps: ["answer"],
+    raw_debug_ref: `${observationRef}:raw_moral_graph_payload`,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export const compactDocsEvidenceArtifactForModel = (input: {
   turnId: string;
   artifact: unknown;
@@ -798,6 +892,13 @@ export const buildHelixModelPromptContext = (input: {
       const record = readRecord(artifact);
       const payload = readRecord(record?.payload) ?? record;
       const kind = readString(record?.kind) ?? readString(payload?.kind) ?? readString(payload?.schema);
+      if (/helix_moral_graph_reflection_tool_result|moral_graph_reflection/i.test(kind ?? "")) {
+        return compactMoralGraphReflectionArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
+        });
+      }
       if (/repo_code_evidence_observation/i.test(kind ?? "")) {
         return compactRepoEvidenceArtifactForModel({
           turnId: input.turnId,

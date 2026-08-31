@@ -25,6 +25,12 @@ void reset(Output &output) {
     output.retained_order = 0U;
 }
 
+void reset(CoefficientDecomposition &decomposition) {
+    for (auto &term : decomposition.terms) arb_zero(&term);
+    decomposition.terms_recorded = 0U;
+    decomposition.observation_only = true;
+}
+
 bool set_exact_upper(arb_ptr target, arb_srcptr value) {
     if (!finite(value)) return false;
     arb_t absolute;
@@ -176,7 +182,9 @@ bool add_elementary(const Input &input, std::size_t f_jet,
                     const std::vector<std::size_t> &f_ordinals,
                     const std::vector<std::size_t> &g_ordinals,
                     const bivariate::PreparedMoments *prepared,
-                    Output &output, Result &result) {
+                    Output &output, Result &result,
+                    CoefficientDecomposition *decomposition,
+                    std::size_t decomposition_slot) {
     bivariate::Input predecessor{input.f_ledger, input.gprime_ledger,
         input.target_left, input.target_right, input.target_order,
         input.u_left, input.u_right, f_jet, g_jet,
@@ -202,6 +210,17 @@ bool add_elementary(const Input &input, std::size_t f_jet,
 
     arb_t next, remainder;
     arb_init(next); arb_init(remainder);
+    if (decomposition != nullptr
+        && destination_jet == decomposition->target_jet) {
+        if (decomposition_slot >= kSecondJetTermCount
+            || decomposition->target_degree > output.retained_order) {
+            arb_clear(remainder); arb_clear(next);
+            return false;
+        }
+        arb_set(decomposition->term(decomposition_slot),
+                elementary.coefficient(decomposition->target_degree));
+        ++decomposition->terms_recorded;
+    }
     for (unsigned degree = 0U; degree <= output.retained_order; ++degree) {
         arb_add(next, output.coefficient(degree, destination_jet),
                 elementary.coefficient(degree), kPrecisionBits);
@@ -244,6 +263,23 @@ Output::~Output() {
     arb_clear(target_half_width); arb_clear(target_center);
 }
 
+CoefficientDecomposition::CoefficientDecomposition() {
+    for (auto &value : terms) arb_init(&value);
+    reset(*this);
+}
+
+CoefficientDecomposition::~CoefficientDecomposition() {
+    for (auto &value : terms) arb_clear(&value);
+}
+
+arb_ptr CoefficientDecomposition::term(std::size_t slot) {
+    return terms.data() + slot;
+}
+
+arb_srcptr CoefficientDecomposition::term(std::size_t slot) const {
+    return terms.data() + slot;
+}
+
 arb_ptr Output::coefficient(unsigned degree, std::size_t jet) {
     return retained_xi_coefficients.data()
         + static_cast<std::size_t>(degree) * kJetCount + jet;
@@ -263,7 +299,8 @@ arb_srcptr Output::remainder(std::size_t jet) const {
 }
 
 bool evaluate_impl(const Input &input, bool use_prepared_moments,
-                   Output *output, Result *result) {
+                   Output *output, Result *result,
+                   CoefficientDecomposition *decomposition) {
     if (result == nullptr) return false;
     *result = Result{};
     if (output == nullptr) {
@@ -271,6 +308,7 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
         return false;
     }
     reset(*output);
+    if (decomposition != nullptr) reset(*decomposition);
     if (input.g_at_zero_count != kJetCount
         || input.g_at_zero_jets == nullptr) {
         fail(result, FailureDetail::invalid_jet_inventory);
@@ -317,7 +355,8 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
     }
 
     if (!add_elementary(input, value_jet(), value_jet(), value_jet(),
-                        f_ordinals, g_ordinals, prepared, *output, *result)) {
+                        f_ordinals, g_ordinals, prepared, *output, *result,
+                        nullptr, 0U)) {
         fail(result, FailureDetail::bivariate_predecessor);
         return false;
     }
@@ -325,10 +364,11 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
     for (std::size_t a = 0U; a < kParameterCount; ++a) {
         const std::size_t first = first_jet(a);
         if (!add_elementary(input, first, value_jet(), first,
-                            f_ordinals, g_ordinals, prepared, *output, *result)
+                            f_ordinals, g_ordinals, prepared, *output, *result,
+                            nullptr, 0U)
             || !add_elementary(input, value_jet(), first, first,
                                f_ordinals, g_ordinals, prepared, *output,
-                               *result)) {
+                               *result, nullptr, 0U)) {
             fail(result, FailureDetail::nonfinite_remainder_or_assembly);
             return false;
         }
@@ -339,16 +379,19 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
             const std::size_t destination = second_jet(a, b);
             if (!add_elementary(input, destination, value_jet(), destination,
                                 f_ordinals, g_ordinals, prepared, *output,
-                                *result)
+                                *result, decomposition, 0U)
                 || !add_elementary(input, first_jet(a), first_jet(b),
                                    destination, f_ordinals, g_ordinals,
-                                   prepared, *output, *result)
+                                   prepared, *output, *result,
+                                   decomposition, 1U)
                 || !add_elementary(input, first_jet(b), first_jet(a),
                                    destination, f_ordinals, g_ordinals,
-                                   prepared, *output, *result)
+                                   prepared, *output, *result,
+                                   decomposition, 2U)
                 || !add_elementary(input, value_jet(), destination,
                                    destination, f_ordinals, g_ordinals,
-                                   prepared, *output, *result)) {
+                                   prepared, *output, *result,
+                                   decomposition, 3U)) {
                 fail(result, FailureDetail::nonfinite_remainder_or_assembly);
                 return false;
             }
@@ -357,6 +400,11 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
         }
     }
     if (result->elementary_convolutions != kElementaryConvolutions) {
+        fail(result, FailureDetail::nonfinite_remainder_or_assembly);
+        return false;
+    }
+    if (decomposition != nullptr
+        && decomposition->terms_recorded != kSecondJetTermCount) {
         fail(result, FailureDetail::nonfinite_remainder_or_assembly);
         return false;
     }
@@ -384,11 +432,26 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
 }
 
 bool evaluate(const Input &input, Output *output, Result *result) {
-    return evaluate_impl(input, false, output, result);
+    return evaluate_impl(input, false, output, result, nullptr);
 }
 
 bool evaluate_prepared(const Input &input, Output *output, Result *result) {
-    return evaluate_impl(input, true, output, result);
+    return evaluate_impl(input, true, output, result, nullptr);
+}
+
+bool evaluate_prepared_decomposed(
+    const Input &input, unsigned target_degree, std::size_t target_jet,
+    Output *output, Result *result, CoefficientDecomposition *decomposition) {
+    if (decomposition == nullptr || target_jet < second_jet(0U, 0U)
+        || target_jet > second_jet(kParameterCount - 1U,
+                                   kParameterCount - 1U)) {
+        if (result != nullptr)
+            fail(result, FailureDetail::invalid_jet_inventory);
+        return false;
+    }
+    decomposition->target_degree = target_degree;
+    decomposition->target_jet = target_jet;
+    return evaluate_impl(input, true, output, result, decomposition);
 }
 
 const char *failure_detail_name(FailureDetail detail) {

@@ -1,0 +1,60 @@
+{
+  "schema": "helix.minecraft_combat_rec2c_installed_profile_live_summary.v1",
+  "observed_at": "2026-08-31T04:23:36Z",
+  "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+  "player": "DatDamPig",
+  "player_game_directory": "C:\\Users\\dan\\AppData\\Roaming\\.minecraft-helix-c0",
+  "opaque_pairing": {
+    "status": "consumed_by_selected_profile",
+    "pairing_material_exposed": false,
+    "manifest_admitted": true,
+    "declared_capability_count": 21,
+    "action_ready": true
+  },
+  "rehearsal": {
+    "workflow_ref": "environment_action_workflow:9c51b92a-15dd-4c21-a9a9-e0e2ddf5ad7e",
+    "fixture": "seven frozen baby zombies",
+    "outcome": "succeeded",
+    "duration_ticks": 312,
+    "interrupt_count": 1,
+    "consumed_item_count": 1,
+    "attack_pulses": 24,
+    "inventory_mutations": 2,
+    "world_mutations": 0,
+    "controls_released": true,
+    "pressure_evidence": false
+  },
+  "active_pressure_trial": {
+    "workflow_ref": "environment_action_workflow:ef526db4-12fe-43f0-ade9-6e449f0643e7",
+    "fixture": "seven active baby zombies at 0.7 to 1.7 blocks",
+    "outcome": "failed_closed_below_hard_health_floor",
+    "health_at_consume_decision": 2,
+    "hard_health_floor": 4,
+    "consumed_item_count": 0,
+    "inventory_mutations": 0,
+    "world_mutations": 0,
+    "controls_released": true,
+    "fixture_cleanup": "tagged hostiles removed",
+    "later_player_death_observed": true
+  },
+  "orchestration_findings": [
+    "A fixture release scheduled behind a blocking MCP action call can arrive after the workflow deadline.",
+    "Sending a request is not a sufficient fixture-release interlock; release requires positive workflow admission.",
+    "A stale heartbeat must prevent hostile release as well as prevent player action.",
+    "Failed or unknown terminal settlement requires synchronous hazard containment before control ownership ends."
+  ],
+  "screenshot": {
+    "path": "minecraft-post-failure-death-screen.png",
+    "sha256": "4C3D757DE7400052CC838F9B4615B9EFA5A1224C60A49EEF9FC74054E4A9604A"
+  },
+  "final_containment": {
+    "health": 20,
+    "max_health": 20,
+    "food": 20,
+    "game_mode": "survival",
+    "hostile_count": 0,
+    "position": { "x": -3.5, "y": 65, "z": 0.5 },
+    "evidence_ref": "environment_probe_evidence:d4dfb7c1baa0650681c0a07ba58592014834b977"
+  },
+  "maturity": "exploratory_not_accepted"
+}

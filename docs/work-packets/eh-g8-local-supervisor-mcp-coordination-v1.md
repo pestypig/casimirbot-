@@ -3,12 +3,12 @@ Workstream: M1 installed-node multi-client convergence
 Capability or component: Signed supervisor ownership receipt and authenticated local-supervisor MCP coordination
 Lifecycle stage: admission; secondary stages are observation, evidence normalization, and presentation
 Reaction timescale: none
-Authority owner: the signed native or approved opaque launcher owns service/process admission; Helix owns authenticated profile, OAuth-client, room, run, connector, and execution authority; Codex owns whether and when to publish or acknowledge advisory coordination
-Current maturity: deterministically verified
+Authority owner: the signed native or approved opaque launcher owns service/process admission; Helix owns authenticated profile, authenticated MCP client, room, run, connector, and execution authority; Codex owns whether and when to publish or acknowledge advisory coordination
+Current maturity: live accepted
 Target maturity: live accepted
 Required evidence: Ed25519 receipt verification bound to exact workspace and short boot epoch; legacy boolean rejection; unknown-listener fail-closed behavior; one shared browser/MCP coordination store; server-derived client sessions; explicit client-declared continuation identity; two-client relay and acknowledgement; wrong-profile and wrong-continuation denial; server-owned resource verification; command-like inertness; bounded load; live keyed two-client trace
 Explicit non-goals: no arbitrary process control; no PID, command-line, credential, private endpoint, hidden reasoning, or ambient host access; no democratic restart authority; no second-host federation; no environment mutation; no M2 behavior
-Downstream gate unlocked: none until the approved launcher emits the signed ownership receipt and the live two-client trace passes
+Downstream gate unlocked: M2 is eligible for a later explicit assignment; this packet grants no M2 behavior
 
 # EH-G8 local-supervisor MCP coordination v1
 
@@ -22,11 +22,14 @@ sharing credentials, native account sessions, or model context.
 
 The MCP client does not choose its sender identity. Helix derives
 `client_session_ref` from the current service instance, signed account profile,
-signed OAuth client, and a bounded client-declared continuation reference. The
+server-verified authenticated MCP client (OAuth or protected native desktop
+delegation), and a bounded client-declared continuation reference. The
 projection labels those four identity inputs respectively as server epoch,
 server verified, server verified, and client declared. A reconnect with the
-same tuple resolves the same client; a different profile, OAuth client, thread,
-or service epoch resolves a different client.
+same tuple resolves the same client; a different profile, authenticated MCP
+client, thread, or service epoch resolves a different client. Native desktop
+delegation remains explicitly distinct from OAuth and never claims an OAuth
+client identity.
 
 ## M1 progress ledger — 2026-08-27
 
@@ -37,12 +40,12 @@ The CasimirBot EXE work completed in this increment is:
 | --- | --- | --- |
 | Installed-node ownership | The packaged EXE supervises one private CasimirBot node and selects its own ephemeral loopback port. Agents no longer allocate port 1522 or launch competing harness processes. | Installed and live-observed |
 | Private runtime boundary | Direct unauthenticated access to the EXE-owned runtime fails closed; desktop-session and runtime keys remain outside the renderer, web service, and Codex context. | Live-observed |
-| Restricted MCP surface | Added `/mcp/local-supervisor-coordination`, publishing Device Check and exactly five bounded presence/relay coordination tools. General MCP, environment actions, workstation control, and pairing tools are absent. | Deterministically verified |
+| Restricted MCP surface | Added `/mcp/local-supervisor-coordination`, publishing Device Check, the public UI catalog, and exactly five bounded presence/relay coordination tools. General MCP, environment actions, workstation control, and pairing tools are absent. | Deterministically verified |
 | Tunnel contract | The desktop tunnel now targets the restricted coordination surface. Its sanitized shared contract is version 2 and reports scope without revealing its credential, endpoint, secret, runtime key, or selected local port. | Deterministically verified |
 | Device Check UX | Device Check explains the restricted read/coordination boundary and provides start, stop, readiness, and console controls. Credential removal is disabled while the tunnel is running. | Installed and live-observed |
 | Package synchronization | The web renderer and Electron native host were rebuilt together, installed over the stable alpha.9 application path, and reopened with the developer session and locally held tunnel credential intact. | Build passed; installed |
 | Live tunnel readiness | The already-configured outbound tunnel transitioned from `Stopped` to `Ready` in the installed EXE without an opaque-launcher or fixed-port edit. | Live-observed |
-| Two-client acceptance | Two separately OAuth-authorized Codex clients must still attach to the same service epoch and pass presence, relay, acknowledgement, release, wrong-profile, reconnect, inert-command, and bounded-load checks. | Pending; M1 is not live accepted |
+| Two-client acceptance | Two separately authorized Codex continuations attached to the same installed-node service epoch and passed distinct presence, reconnect, bounded load, advisory relay, target-only acknowledgement, handoff, release, disconnect, wrong-target, wrong-continuation, and command-inertness checks. Wrong-profile denial remains proven by the deterministic authenticated-profile battery because this attended trace intentionally used one owner profile. | Live accepted |
 | Public release path | Production OAuth discovery and the public “Open in Codex” installation path remain locked until deployed and verified. | Pending; explicit release blocker |
 
 Current operational rule: keep one installed CasimirBot EXE running and keep
@@ -107,7 +110,9 @@ The coordination store admits at most 256 retained client identities per
 service epoch by default. It never evicts an active client to admit another;
 capacity fails closed with a typed 429. Expired or explicitly inactive presence
 may be reclaimed. Relay history is separately bounded to 300 entries and reads
-return at most 100 relevant relays.
+return at most 100 relevant relays. Relay deduplication state is evicted with
+the corresponding bounded history entry, so repeated advisory traffic cannot
+grow an unbounded side map.
 
 ## Protected supervisor receipt
 
@@ -117,6 +122,12 @@ to the exact opaque workspace reference and boot nonce, and the service must
 verify it against a configured public trust root. A missing, malformed,
 tampered, expired, overlong, or wrong-workspace receipt leaves the process in
 `external_process` mode with `one_instance_enforced=false`.
+
+The verified boot nonce is also the keyed launcher's service epoch. Replaying
+the same still-valid receipt therefore resolves the same service identity
+rather than manufacturing a second boot identity; a newly signed boot nonce
+resolves a new service epoch. Desktop single-instance supervision remains a
+separate native-host enforcement mode.
 
 The receipt, signature, public key, workspace path, process identity, and
 credentials are never projected through status or MCP. The repository defines
@@ -398,3 +409,234 @@ receipt's public trust root remains an input owned by the approved native or
 opaque launcher profile, while the corresponding private signing key must stay
 outside the child environment, renderer, MCP, and model context. A renderer or
 ordinary child process cannot promote itself by changing UI state.
+
+### Exact-issuer retry — 2026-08-28
+
+Both live Auth0 discovery documents were re-read and independently confirmed
+to include `code_challenge_methods_supported` containing `S256`, public-client
+token endpoint authentication `none`, and the authorization and token
+endpoints. Because Auth0's exact issuer identifier ends in `/`, the ChatGPT
+connector form was reconstructed with that exact trailing slash in
+**Authorization server base**. The public client id, callback, token method,
+and two room scopes were otherwise unchanged, and **Create** was submitted
+once.
+
+ChatGPT returned the identical PKCE-metadata error. The exact-issuer hypothesis
+is therefore rejected for this connector build. The remaining first
+divergence is inside or in front of ChatGPT's authorization-server metadata
+validator: it is fetching a different document, rejecting another part of the
+discovery response while projecting the generic PKCE error, or otherwise not
+observing the `S256` value independently verified at both well-known URLs. No
+connector or token was created. Do not repeat the trailing-slash retry, remove
+OAuth, or broaden scopes as a workaround.
+
+### Tunnel OAuth-metadata routing repair — 2026-08-28
+
+The installed tunnel-client 0.0.13 admin evidence identified the first local
+runtime divergence more precisely. Protected-resource discovery succeeded with
+HTTP 200, and the authorization-server metadata fetch selected the RFC 8414
+OAuth document with HTTP 200. However, the Harpoon channel retained zero
+targets. Its redacted runtime log showed that the external authorization-server
+and derived endpoint records were skipped by the default private-host
+classifier, while the loopback protected-resource source was correctly rejected
+as a plaintext Harpoon target. The tunnel was therefore ready for the main MCP
+channel but could not offer its bounded OAuth-metadata route to the connector
+validator.
+
+The desktop child environment now derives one exact DNS hostname from the
+already-configured HTTPS `HELIX_AGENT_OAUTH_ISSUER` and supplies only that
+hostname through tunnel-client's documented
+`HARPOON_HOSTS_INCLUDE_SUFFIX` admission input. It does not forward the issuer
+environment value, accept HTTP, admit loopback or IP literals, enable arbitrary
+Harpoon targets, broaden MCP scopes, or expose credentials. Plaintext Harpoon
+remains disabled. The protected-resource metadata router also projects the
+exact loopback resource identity for every explicitly registered `/mcp/*`
+metadata route, including local-supervisor coordination, instead of falling
+back to the generic MCP audience before tunnel-service performs its public URL
+rewrite.
+
+Focused deterministic verification passed the five-test desktop tunnel
+boundary, including invalid issuer rejection, and the exact coordination
+metadata regression. One unrelated REST case exceeded its original five-second
+Windows timeout in a combined run after passing in the preceding run; both that
+case and the new metadata case passed independently. Live promotion still
+requires rebuilding the installed EXE, confirming a nonzero bounded OAuth
+target set on the current tunnel epoch, and retrying connector creation once.
+
+### ChatGPT OAuth and live read acceptance — 2026-08-28
+
+The developer acceptance path advanced through Auth0 authorization and ChatGPT
+connector creation without weakening the MCP resource to No Auth. Auth0 Dynamic
+Client Registration was enabled only on the developer tenant, the authorization
+server continued to require PKCE `S256`, and the connector requested only
+`helix.rooms.read` plus `helix.rooms.manage`. The MCP protected-resource
+audience remains stable across tunnel and desktop restarts. This developer DCR
+configuration is acceptance infrastructure, not the production registration
+or database architecture.
+
+OpenAI Secure MCP Tunnel does not forward ChatGPT's bearer token to its private
+local target. The installed host therefore admits a separate native delegation
+only on the restricted local-supervisor MCP mount. That delegation requires the
+exact per-launch desktop secret, loopback transport, and exact active account
+session identifier held in the supervised child environment. It grants only
+the mount's configured scopes. Any supplied bearer, valid or invalid, is sent
+through the ordinary OAuth verifier and can never fall back to desktop
+delegation; the general `/mcp` resource has no native delegation fallback.
+
+The tunnel client's documented comma-separated multi-header environment form
+was verified with dummy values against a local capture server: both protected
+headers were present on discovery, initialization, and subsequent requests,
+and no header value was retained in this packet. The restricted server also
+implements the standards-defined compatibility response for the MCP 2026-07-28
+`server/discover` probe: HTTP 404 with JSON-RPC `-32601` lets newer clients fall
+back to the supported initialization lifecycle instead of receiving an opaque
+500.
+
+Live packaged acceptance exposed and repaired one desktop-only bundle defect.
+The local-supervisor mount referenced `createHelixMcpServer` without importing
+that binding into `server/index.ts`; esbuild emitted the unresolved reference,
+so the tunnel's valid `initialize` reached the service and failed with a safe
+`createHelixMcpServer is not defined` diagnostic. The import is now explicit,
+server construction is inside the guarded MCP transport boundary, and the
+signed unpacked Windows package was rebuilt. Device Check then transitioned
+from `Stopped` to `Ready` on the current installed-node epoch.
+
+ChatGPT refresh subsequently discovered the bounded catalog: Device Check,
+public UI catalog, two read-only local-supervisor tools, and the separately
+scoped relay/acknowledgement/disconnect tools. A live ChatGPT read of
+`helix_public_ui_catalog` completed successfully and returned the current
+public surface count. This is the first end-to-end receipt spanning ChatGPT
+OAuth, public tunnel delivery, native desktop delegation, MCP discovery,
+tool execution, and result re-entry.
+
+The `helix_environment_device_check` smoke call reached the same tool surface
+but returned a typed `internal_error`/`INVALID_ARGUMENT` result, so paired-device
+read acceptance remains open and no claim about paired-device presence was
+made. The successful public-catalog read closes the single-client transport
+and execution slice only. M1 remains below `live accepted` until the
+device-read failure is diagnosed and the required two-client same-epoch
+presence, relay, acknowledgement, release, wrong-profile, reconnect, inert
+command, and bounded-load trace passes.
+
+### Native client identity and bounded-load correction — 2026-08-29
+
+A read-only acceptance audit found that the installed tunnel delegation had no
+authenticated client reference and received only the read scope. The MCP tools
+therefore could be discovered while presence was structurally unable to begin,
+and relay, acknowledgement, and disconnect lacked their bounded room-management
+scope. The restricted mount now derives an opaque MCP client reference from the
+server-owned desktop device, active account session, and authenticated profile.
+It grants the union of only the coordination read and advisory-management
+scopes. The OAuth client reference remains null on this native path; supplied
+bearers still use only the OAuth verifier and never fall back.
+
+Deterministic verification now covers stable native identity without raw device,
+profile, or account-session projection; external OAuth identity; invalid-bearer
+fail-closed behavior; 64 simultaneous client heartbeats; relay-history and
+dedupe eviction; signed boot-nonce service-epoch binding; wrong-target/profile
+denial; reconnect; handoff and release; and command-like inert relay text. The
+focused regression battery passed 101 tests across 11 files. The Helix Ask
+discipline static guard passed. A repository-wide TypeScript run exhausted its
+default 4 GiB Node heap before producing diagnostics; an 8 GiB rerun completed
+and reported the repository's existing broad CLI, physics-tool, and UI-test
+type backlog rather than a clean baseline. The focused M1 compile-and-test
+battery and authoritative desktop service bundle passed. Live M1 acceptance
+remains pending completion of the rebuilt installed-node, same-service-epoch
+two-client trace.
+
+### Server-owned coordination identity convergence — 2026-08-29
+
+The presence projection now keeps all five coordination identity dimensions
+separate. It reports the authenticated profile, authenticated MCP client,
+client-declared conversation continuation, server-inspected retained-run
+version, and canonical connector producer epoch as distinct fields. The
+client-declared `room_ref`, `environment_ref`, and `run_ref` remain advisory;
+they do not become verified merely because they are syntactically valid or
+match another client's prose.
+
+Room verification now records the current server-owned participant identity.
+Connector verification uses a canonical database reader that joins the exact
+active room membership, environment binding, connector installation, device,
+source, and current producer epoch. A non-owner must also hold a still-active
+room grant for that same binding, installation, device, source, and producer
+epoch. A rotated producer epoch, departed member, closed room, inactive
+installation/device/binding, missing grant, or ambiguous result fails closed.
+
+A retained-runtime claim now receives collision authority only when the
+authenticated principal owns the inspected resumable Agent API run and that
+run has an exact active run-to-room binding for the current room participant.
+The projection preserves both run version and run-room-binding version. An
+execution-lease claim must additionally match the canonical connector source
+and current room participant, as well as the declared room, environment, and
+run. The presence projection records the action request, workflow, action
+authority, participant, source, expiry, and an opaque verification reference,
+but it cannot create, renew, transfer, or release the lease. The existing
+environment action broker remains the single mutation arbiter.
+
+Verified identity fields and verified claims are cleared when a heartbeat
+expires or disconnects. This prevents a stale presence row from presenting an
+old room membership, connector epoch, retained run, or execution lease as
+current authority. The database-backed identity fixture proves owner and
+grantee resolution, producer-epoch rotation denial, and departed-member denial.
+The focused MCP fixture proves exact retained-run binding/version projection,
+connector/source-epoch projection, execution-lease correlation, and mismatch
+fail-closed behavior. These additions remain deterministically verified until
+the rebuilt installed node completes the live two-client trace below.
+
+### Rebuilt-node read-only live acceptance — 2026-08-29
+
+The signed Windows package was rebuilt, installed over the stable alpha.9
+application path, and launched under desktop single-instance supervision. The
+private service reached full API readiness on a fresh service epoch and the
+Device Check panel started the restricted read-only coordination tunnel. The
+live `helix_environment_device_check` call now returns a valid owner-scoped
+empty device list instead of the prior typed `internal_error`, closing that
+regression without enabling Shared Live Room mutation features for user policy.
+
+Two independent Codex continuations then registered concurrently through the
+same installed node, MCP origin, authenticated profile/client, and service
+epoch. They received distinct derived client-session references. Repeating the
+same heartbeat from each client preserved both its service epoch and exact
+client-session identity. A bounded live burst of 16 simultaneous heartbeat
+calls succeeded 16/16, produced 16 distinct client identities, and remained on
+one service epoch. The coordination read returned no credentials, private
+endpoints, hidden reasoning, answer authority, relays, or automatic
+recommendations. A read using an unregistered continuation failed closed as
+`supervisor_client_not_registered`.
+
+The first live command-like relay attempt was rejected before publication with
+typed `insufficient_scope`. The first divergence was the Auth0 resource-server
+definition: it exposed only `helix.rooms.read`, so Auth0 correctly omitted the
+requested `helix.rooms.manage` scope. The API was updated with exactly that
+missing scope. Auth0's per-application access table then showed that ChatGPT had
+dynamically registered a newer client for the current connection; the older
+client was restored to read-only and the current client alone was granted both
+approved room scopes. A fresh authorization-code flow presented an explicit
+consent screen containing only `helix.rooms.read` and
+`helix.rooms.manage`. After consent, ChatGPT removed every `Reconnect needed`
+marker and the relay tool advanced past OAuth admission.
+
+Two active continuations on the same service epoch then completed the live
+write trace. A deliberately command-like relay was published and preserved
+`advisory_only=true`, `execution_requested=false`,
+`authority_transfer=false`, and `evidence_satisfied=false`; credential,
+private-endpoint, hidden-reasoning, answer-authority, and terminal-eligibility
+flags also remained false. The sender's attempt to acknowledge its own relay
+failed closed as `supervisor_relay_ack_forbidden`, while the exact target read
+and acknowledged it. The second client published an inert handoff request, the
+first client acknowledged it and published an inert release notice, and the
+second client acknowledged the release before disconnecting. The final read
+showed all three relays acknowledged and the second presence as
+`lifecycle_state=disconnected`, `active=false`, with empty resource claims; no
+process or execution lease was touched.
+
+The same installed node had already passed a 16/16 simultaneous live heartbeat
+burst with distinct derived client sessions on one service epoch, plus live
+reconnect identity and wrong-continuation denial. The focused deterministic
+battery supplies the complementary wrong-authenticated-profile denial and
+server-verified resource-owner recommendation cases that this single-profile,
+no-live-lease trace could not safely manufacture. Taken together with the
+signed supervisor ownership receipt, 122/122 focused tests, successful signed
+Windows rebuild/install, and the live read/write trace above, M1 is `live
+accepted`. This acceptance does not grant process control, a mutation lease,
+cross-host federation, or any M2 behavior.

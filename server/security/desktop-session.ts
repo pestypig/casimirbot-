@@ -1,6 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingHttpHeaders } from "node:http";
 import type { RequestHandler } from "express";
+import { isPublicRoomSourceIngressPath } from
+  "../auth/public-source-ingress";
 
 export const CASIMIR_DESKTOP_HOST_ENV = "CASIMIR_DESKTOP_HOST";
 export const CASIMIR_DESKTOP_SESSION_SECRET_ENV =
@@ -9,6 +11,12 @@ export const CASIMIR_DESKTOP_SESSION_HEADER =
   "x-casimir-desktop-session";
 
 const MIN_DESKTOP_SESSION_SECRET_LENGTH = 32;
+const OAUTH_PROTECTED_RESOURCE_METADATA_PATH =
+  "/.well-known/oauth-protected-resource";
+const PUBLIC_ENVIRONMENT_CONNECTOR_PATH =
+  "/api/environment-connectors/v1/";
+const PUBLIC_ENVIRONMENT_ACTION_CONNECTOR_PATH =
+  "/api/environment-action/v1/authorities/";
 export const DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH =
   "/api/agi/brokerage-connections/robinhood/oauth/callback";
 
@@ -78,11 +86,31 @@ export function createDesktopSessionGuard(
   config: DesktopSessionConfig,
 ): RequestHandler {
   return (req, res, next) => {
+    const method = (req.method ?? "").toUpperCase();
+    const isPublicProtectedResourceMetadata = config.enabled &&
+      (method === "GET" || method === "HEAD") &&
+      (req.path === OAUTH_PROTECTED_RESOURCE_METADATA_PATH ||
+        req.path.startsWith(`${OAUTH_PROTECTED_RESOURCE_METADATA_PATH}/`));
     const isOneTimeRobinhoodCallback = config.enabled &&
-      (req.method ?? "").toUpperCase() === "GET" &&
+      method === "GET" &&
       req.path === DESKTOP_ROBINHOOD_OAUTH_CALLBACK_PATH;
+    // These transports already enforce their own one-time-code, bearer-token,
+    // signature, replay, body-limit, and rate-limit boundaries. A Fabric or
+    // Paper process cannot possess the renderer-only per-launch desktop secret,
+    // so requiring it here would make installed-node pairing and evidence
+    // delivery impossible while adding no connector authority.
+    const isIndependentEnvironmentConnectorTransport = config.enabled &&
+      (req.path ?? "").startsWith(PUBLIC_ENVIRONMENT_CONNECTOR_PATH);
+    const isIndependentEnvironmentActionConnectorTransport = config.enabled &&
+      (req.path ?? "").startsWith(PUBLIC_ENVIRONMENT_ACTION_CONNECTOR_PATH);
+    const isIndependentRoomSourceIngress = config.enabled &&
+      isPublicRoomSourceIngressPath(req.originalUrl ?? req.path);
     if (
+      isPublicProtectedResourceMetadata ||
       isOneTimeRobinhoodCallback ||
+      isIndependentEnvironmentConnectorTransport ||
+      isIndependentEnvironmentActionConnectorTransport ||
+      isIndependentRoomSourceIngress ||
       isDesktopSessionAuthorized(req.headers, config)
     ) {
       next();

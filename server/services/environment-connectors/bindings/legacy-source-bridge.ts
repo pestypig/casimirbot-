@@ -9,6 +9,7 @@ import type { HelixEnvironmentAdapterAdmissionProjection } from "@shared/helix-e
 import { withSharedRealtimeRoomTransaction } from "../../helix-ask/realtime-room/room-store/database";
 import type { Queryable } from "../../helix-ask/realtime-room/room-store/types";
 import { environmentConnectorSha256 } from "../catalog";
+import { installedDeviceRef } from "../../helix-account/installed-security-store";
 
 const shortHash = (value: unknown, size = 40): string =>
   crypto
@@ -20,6 +21,7 @@ const shortHash = (value: unknown, size = 40): string =>
 export type MaterializedEnvironmentConnectorBinding = {
   packageVersionId: string;
   installationId: string;
+  installedNodeRef: string;
   deviceId: string;
   environmentBindingId: string;
   catalogSnapshot: HelixEnvironmentCatalogSnapshot;
@@ -36,6 +38,7 @@ export type MaterializedEnvironmentConnectorBinding = {
  */
 export const materializeLegacyRoomSourceConnector = async (input: {
   ownerProfileId: string;
+  installedDeviceId?: string | null;
   roomSourceBindingId: string;
   credentialId: string;
   roomId: string;
@@ -82,9 +85,25 @@ export const materializeLegacyRoomSourceConnector = async (input: {
     ])}`;
   let catalogHash = "";
   let catalogSnapshotId = "";
+  let installedDeviceId: string | null = null;
   const frozenAt = new Date().toISOString();
 
   await withSharedRealtimeRoomTransaction(async (db: Queryable) => {
+    const requestedInstalledDeviceId = input.installedDeviceId?.trim() || null;
+    if (requestedInstalledDeviceId) {
+      const installedDevice = await db.query<{ device_id: string }>(
+        `
+          SELECT device_id
+          FROM helix_installed_devices
+          WHERE profile_id = $1
+            AND device_id = $2
+            AND status = 'active'
+          LIMIT 1;
+        `,
+        [input.ownerProfileId, requestedInstalledDeviceId],
+      );
+      installedDeviceId = installedDevice.rows[0]?.device_id ?? null;
+    }
     await db.query(
       `
         INSERT INTO helix_environment_connector_packages (
@@ -151,9 +170,18 @@ export const materializeLegacyRoomSourceConnector = async (input: {
           installation_id,
           owner_profile_id,
           package_version_id,
-          granted_capability_ids
-        ) VALUES ($1, $2, $3, $4::jsonb)
-        ON CONFLICT (installation_id) DO NOTHING;
+          granted_capability_ids,
+          installed_device_id
+        ) VALUES ($1, $2, $3, $4::jsonb, $5)
+        ON CONFLICT (installation_id) DO UPDATE
+        SET granted_capability_ids = EXCLUDED.granted_capability_ids,
+            installed_device_id = COALESCE(
+              EXCLUDED.installed_device_id,
+              helix_environment_connector_installations.installed_device_id
+            ),
+            status = 'active',
+            revoked_at = NULL,
+            updated_at = now();
       `,
       [
         installationId,
@@ -164,6 +192,7 @@ export const materializeLegacyRoomSourceConnector = async (input: {
             (descriptor) => descriptor.capability_id,
           ),
         ),
+        installedDeviceId,
       ],
     );
     await db.query(
@@ -268,6 +297,9 @@ export const materializeLegacyRoomSourceConnector = async (input: {
   return {
     packageVersionId,
     installationId,
+    installedNodeRef: installedDeviceId
+      ? installedDeviceRef(installedDeviceId)
+      : "installed_node:unbound",
     deviceId,
     environmentBindingId,
     catalogSnapshot: helixEnvironmentCatalogSnapshotSchema.parse({

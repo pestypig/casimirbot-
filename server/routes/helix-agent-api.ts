@@ -713,7 +713,7 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
         const resource =
           localOrigin &&
           (protectedPath === "/mcp" ||
-            protectedPath === "/mcp/device-check" ||
+            protectedPath.startsWith("/mcp/") ||
             protectedPath.startsWith("/api/v1/"))
             ? `${localOrigin}${protectedPath}`
             : verifier.audience();

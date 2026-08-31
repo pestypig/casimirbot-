@@ -50,6 +50,12 @@ describe("Helix MCP Realtime Texture Pack harness", () => {
     const { client, profileId } = await connect("developer");
     const inactive = await client.callTool({ name: "helix_realtime_texture_pack_inspect", arguments: {} });
     expect((inactive.structuredContent as any).lease_active).toBe(false);
+    expect((inactive.structuredContent as any).attended_provider).toMatchObject({
+      provider_selection_authority: "developer_ui_only",
+      billing_arm_authority: "developer_ui_only",
+      agent_billing_authority: false,
+      credential_included: false,
+    });
 
     realtimeTexturePackHarnessStore.renew({
       profileId,
@@ -71,5 +77,55 @@ describe("Helix MCP Realtime Texture Pack harness", () => {
     const result = await client.callTool({ name: "helix_realtime_texture_pack_inspect", arguments: {} });
     expect(result.isError).toBe(true);
     expect((result.structuredContent as any).error).toBe("developer_account_required");
+  });
+
+  it("queues a sanitized revision-checked visual-direction command", async () => {
+    const { client, profileId } = await connect("developer");
+    realtimeTexturePackHarnessStore.renew({
+      profileId,
+      sessionId: "texture-session:mcp-visual",
+      allowedActions: [],
+      visualDirectionControlEnabled: true,
+      allowedVisualDirectionCommands: ["set_custom_visual_directive"],
+      clientState: {
+        capture_active: true,
+        overlay_visible: false,
+        session_status: "streaming",
+        visual_direction: {
+          control_enabled: true,
+          mode: "static_prompt_only",
+          preset_id: "playable",
+          configuration_revision: 0,
+          pinned: false,
+          enabled_cue_families: [],
+          selected_targets: ["overlay"],
+          source_binding_id: null,
+          source_binding_revision: null,
+          environment_binding_id: null,
+          compatibility_state: "disconnected",
+          cue_packet_id: null,
+          prompt_revision_id: null,
+          visual_treatment_revision_id: null,
+          cue_state: "static_fallback",
+          fallback_reason: "no_binding",
+        },
+      },
+    });
+    const result = await client.callTool({
+      name: "helix_realtime_texture_pack_visual_direction_control",
+      arguments: {
+        command: "set_custom_visual_directive",
+        expected_configuration_revision: 0,
+        custom_visual_directive: "turn the caves into luminous stained glass",
+      },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(JSON.stringify(result.structuredContent)).not.toContain("luminous stained glass");
+    expect(JSON.stringify(result.structuredContent)).toContain("sha256:");
+    expect(realtimeTexturePackHarnessStore.poll(profileId, "texture-session:mcp-visual").commands[0])
+      .toMatchObject({
+        action: "set_custom_visual_directive",
+        expected_configuration_revision: 0,
+      });
   });
 });

@@ -11,6 +11,10 @@ const TEST_PROVIDER_CREDENTIAL_BROKER = Object.freeze({
   origin: "http://127.0.0.1:43122",
   token: TEST_PROVIDER_CREDENTIAL_KEY,
 });
+const TEST_MCP_TRANSITION_BROKER = Object.freeze({
+  origin: "http://127.0.0.1:43123",
+  token: Buffer.alloc(32, 8).toString("base64url"),
+});
 const TEST_DEVICE_ID = `desktop_device_${Buffer.alloc(16, 3).toString("base64url")}`;
 
 describe("desktop service environment", () => {
@@ -29,6 +33,7 @@ describe("desktop service environment", () => {
       userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
       providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
       deviceId: TEST_DEVICE_ID,
     });
 
@@ -54,6 +59,7 @@ describe("desktop service environment", () => {
       userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
       providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
       deviceId: TEST_DEVICE_ID,
     });
 
@@ -71,6 +77,7 @@ describe("desktop service environment", () => {
       userDataPath,
       serviceOrigin: "http://127.0.0.1:43121",
       providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
       deviceId: TEST_DEVICE_ID,
     });
     const databasePath = environment.HELIX_LOCAL_DB_PATH!;
@@ -81,6 +88,9 @@ describe("desktop service environment", () => {
     expect(path.isAbsolute(relative)).toBe(false);
     expect(environment.HELIX_LOCAL_PG_MEM_PERSIST).toBe("1");
     expect(environment.HELIX_LOCAL_PG_MEM_WRITE_MODE).toBe("immediate");
+    expect(environment.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE).toBe(
+      path.join(userDataPath, "state", "local-minecraft-run-profiles.json"),
+    );
   });
 
   it("admits public OAuth verifier metadata without inheriting OAuth or admin secrets", () => {
@@ -105,6 +115,7 @@ describe("desktop service environment", () => {
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
       providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
       deviceId: TEST_DEVICE_ID,
     });
     expect(environment).toMatchObject({
@@ -130,6 +141,7 @@ describe("desktop service environment", () => {
       userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
       serviceOrigin: "http://127.0.0.1:43121",
       providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+      mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
       deviceId: TEST_DEVICE_ID,
     });
 
@@ -142,6 +154,7 @@ describe("desktop service environment", () => {
         userDataPath: "C:\\Users\\test\\AppData\\Roaming\\CasimirBot",
         serviceOrigin: "https://casimirbot.com",
         providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+        mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
         deviceId: TEST_DEVICE_ID,
       }),
     ).toThrow(/exact HTTP 127\.0\.0\.1 origin/);
@@ -154,6 +167,7 @@ describe("desktop service environment", () => {
         userDataPath: "  ",
         serviceOrigin: "http://127.0.0.1:43121",
         providerCredentialBroker: TEST_PROVIDER_CREDENTIAL_BROKER,
+        mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
         deviceId: TEST_DEVICE_ID,
       }),
     ).toThrow(/userData path is required/);

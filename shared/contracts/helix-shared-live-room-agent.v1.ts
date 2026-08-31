@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { HelixSharedRealtimeRoom } from "../helix-shared-realtime-room";
+import type { HelixSharedRealtimeRoomConsentPatch } from "../helix-shared-realtime-room";
 import type {
   HelixRoomSourceBinding,
   HelixRoomSourceIngressScope,
@@ -19,6 +20,16 @@ export const HELIX_SHARED_LIVE_ROOM_INSPECT_CAPABILITY =
 export const HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY = "room.create" as const;
 export const HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY =
   "room.presence.set" as const;
+export const HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY =
+  "room.consent.revoke" as const;
+export const HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY =
+  "room.consent.grant" as const;
+export const HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_CAPABILITY =
+  "room.floor.inspect" as const;
+export const HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_CAPABILITY =
+  "room.floor.release" as const;
+export const HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY =
+  "room.floor.acquire" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_CAPABILITY =
   "room.source.list" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_CAPABILITY =
@@ -42,6 +53,16 @@ export const HELIX_SHARED_LIVE_ROOM_CREATE_RECEIPT_SCHEMA =
   "helix.shared_live_room.create_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA =
   "helix.shared_live_room.presence_set_receipt.v1" as const;
+export const HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA =
+  "helix.shared_live_room.consent_revoke_receipt.v1" as const;
+export const HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_RECEIPT_SCHEMA =
+  "helix.shared_live_room.consent_grant_receipt.v1" as const;
+export const HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_RECEIPT_SCHEMA =
+  "helix.shared_live_room.floor_inspect_receipt.v1" as const;
+export const HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_RECEIPT_SCHEMA =
+  "helix.shared_live_room.floor_release_receipt.v1" as const;
+export const HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_RECEIPT_SCHEMA =
+  "helix.shared_live_room.floor_acquire_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_RECEIPT_SCHEMA =
   "helix.shared_live_room.source_list_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_SOURCE_CREATE_RECEIPT_SCHEMA =
@@ -83,6 +104,63 @@ export const helixSharedLiveRoomPresenceSetRequestSchema = z
   .object({
     room_id: helixSharedLiveRoomIdSchema,
     presence: z.enum(["present", "away"]),
+  })
+  .strict();
+
+const revocableConsentFields = [
+  "microphone_to_room",
+  "microphone_to_model",
+  "transcript_to_room",
+  "screen_to_model",
+  "screen_thumbnail_to_room",
+  "model_audio_output",
+] as const satisfies ReadonlyArray<keyof HelixSharedRealtimeRoomConsentPatch>;
+
+const grantableConsentFields = revocableConsentFields;
+
+export const helixSharedLiveRoomConsentRevokeRequestSchema = z
+  .object({
+    room_id: helixSharedLiveRoomIdSchema,
+    consent: z
+      .object(
+        Object.fromEntries(
+          revocableConsentFields.map((field) => [field, z.literal(false).optional()]),
+        ) as Record<(typeof revocableConsentFields)[number], z.ZodOptional<z.ZodLiteral<false>>>,
+      )
+      .strict()
+      .refine((value) => Object.values(value).some((entry) => entry === false), {
+        message: "At least one consent field must be revoked.",
+      }),
+  })
+  .strict();
+
+export const helixSharedLiveRoomConsentGrantRequestSchema = z
+  .object({
+    room_id: helixSharedLiveRoomIdSchema,
+    consent: z
+      .object(
+        Object.fromEntries(
+          grantableConsentFields.map((field) => [field, z.literal(true).optional()]),
+        ) as Record<(typeof grantableConsentFields)[number], z.ZodOptional<z.ZodLiteral<true>>>,
+      )
+      .strict()
+      .refine((value) => Object.values(value).some((entry) => entry === true), {
+        message: "At least one consent field must be granted.",
+      }),
+  })
+  .strict();
+
+export const helixSharedLiveRoomFloorReleaseRequestSchema = z
+  .object({
+    room_id: helixSharedLiveRoomIdSchema,
+    floor_epoch: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const helixSharedLiveRoomFloorAcquireRequestSchema = z
+  .object({
+    room_id: helixSharedLiveRoomIdSchema,
+    lease_ms: z.number().int().min(1_000).max(60_000).optional(),
   })
   .strict();
 
@@ -166,6 +244,18 @@ export type HelixSharedLiveRoomCreateRequest = z.infer<
 >;
 export type HelixSharedLiveRoomPresenceSetRequest = z.infer<
   typeof helixSharedLiveRoomPresenceSetRequestSchema
+>;
+export type HelixSharedLiveRoomConsentRevokeRequest = z.infer<
+  typeof helixSharedLiveRoomConsentRevokeRequestSchema
+>;
+export type HelixSharedLiveRoomConsentGrantRequest = z.infer<
+  typeof helixSharedLiveRoomConsentGrantRequestSchema
+>;
+export type HelixSharedLiveRoomFloorReleaseRequest = z.infer<
+  typeof helixSharedLiveRoomFloorReleaseRequestSchema
+>;
+export type HelixSharedLiveRoomFloorAcquireRequest = z.infer<
+  typeof helixSharedLiveRoomFloorAcquireRequestSchema
 >;
 export type HelixSharedLiveRoomSourceCreateRequest = z.infer<
   typeof helixSharedLiveRoomSourceCreateRequestSchema
@@ -259,6 +349,62 @@ export type HelixSharedLiveRoomPresenceSetReceipt = NonAuthoritativeReceipt & {
   room: HelixSharedRealtimeRoom;
 };
 
+export type HelixSharedLiveRoomConsentRevokeReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY;
+  content_role: "room_control_receipt_not_assistant_answer";
+  room: HelixSharedRealtimeRoom;
+  changed_fields: Array<keyof HelixSharedRealtimeRoomConsentPatch>;
+  authority_delta: "reduced_only";
+};
+
+export type HelixSharedLiveRoomConsentGrantReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY;
+  content_role: "room_control_receipt_not_assistant_answer";
+  room: HelixSharedRealtimeRoom;
+  changed_fields: Array<keyof HelixSharedRealtimeRoomConsentPatch>;
+  delegation_ref: string;
+  authority_delta: "increased_bounded";
+};
+
+export type HelixSharedLiveRoomFloorProjection = {
+  participant_id: string | null;
+  epoch: number;
+  acquired_at: string | null;
+  lease_expires_at: string | null;
+};
+
+export type HelixSharedLiveRoomFloorInspectReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_FLOOR_INSPECT_CAPABILITY;
+  content_role: "room_control_observation_not_assistant_answer";
+  room_id: string;
+  floor: HelixSharedLiveRoomFloorProjection | null;
+};
+
+export type HelixSharedLiveRoomFloorReleaseReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_FLOOR_RELEASE_CAPABILITY;
+  content_role: "room_control_receipt_not_assistant_answer";
+  room: HelixSharedRealtimeRoom;
+  released: boolean;
+  requested_floor_epoch: number;
+  floor: HelixSharedLiveRoomFloorProjection;
+  authority_delta: "reduced_only";
+};
+
+export type HelixSharedLiveRoomFloorAcquireReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_FLOOR_ACQUIRE_CAPABILITY;
+  content_role: "room_control_receipt_not_assistant_answer";
+  room: HelixSharedRealtimeRoom;
+  granted: true;
+  floor: HelixSharedLiveRoomFloorProjection;
+  delegation_ref: string;
+  authority_delta: "increased_bounded";
+};
+
 export type HelixSharedLiveRoomSourceListReceipt = NonAuthoritativeReceipt & {
   schema: typeof HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_RECEIPT_SCHEMA;
   operation: typeof HELIX_SHARED_LIVE_ROOM_SOURCE_LIST_CAPABILITY;
@@ -324,6 +470,9 @@ export type HelixSharedLiveRoomAgentReceipt =
   | HelixSharedLiveRoomInspectReceipt
   | HelixSharedLiveRoomCreateReceipt
   | HelixSharedLiveRoomPresenceSetReceipt
+  | HelixSharedLiveRoomConsentRevokeReceipt
+  | HelixSharedLiveRoomFloorInspectReceipt
+  | HelixSharedLiveRoomFloorReleaseReceipt
   | HelixSharedLiveRoomSourceListReceipt
   | HelixSharedLiveRoomSourceCreateReceipt
   | HelixSharedLiveRoomRunBindReceipt
@@ -344,6 +493,10 @@ export const helixSharedLiveRoomControlErrorCodeSchema = z.enum([
   "https_required",
   "confirmation_required",
   "confirmation_invalid",
+  "room_mcp_delegation_identity_unavailable",
+  "room_mcp_delegation_identity_mismatch",
+  "room_mcp_delegation_verifier_unavailable",
+  "room_mcp_delegation_rejected",
   "account_policy_blocked",
   "run_not_found",
   "room_not_found",
@@ -395,6 +548,11 @@ export const helixSharedLiveRoomErrorSchema = z
     request_id: z.string().nullable(),
     retryable: z.boolean(),
     details: z.record(z.unknown()).optional(),
+    content_role: z.literal("room_control_error_not_assistant_answer"),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
   })
   .strict();
 

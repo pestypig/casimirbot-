@@ -17,6 +17,12 @@ describe("Helix Ask Realtime failure presentation", () => {
     ],
     ["microphone_permission_denied", "Microphone permission was denied", true],
     [
+      "browser_media_api_unavailable",
+      "Microphone capture is unavailable in this browser",
+      false,
+    ],
+    ["microphone_not_found", "No microphone was found", true],
+    [
       "openai_realtime_provider_http_400_invalid_request_error",
       "OpenAI rejected the Realtime session setup",
       false,

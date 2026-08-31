@@ -23,10 +23,50 @@ final class FabricServerPairingInboxTest {
             FabricServerPairingInbox.consume(inbox, System.currentTimeMillis());
 
         assertEquals("Z4ZD-X2JJ", result.code());
+        assertNull(result.pairingEndpoint());
         assertFalse(Files.exists(inbox));
         assertFalse(
             Files.exists(inbox.resolveSibling(inbox.getFileName() + ".processing"))
         );
+    }
+
+    @Test
+    void consumesCurrentLoopbackEndpointFromOpaqueEnvelope() throws Exception {
+        Path inbox = tempDir.resolve(FabricServerPairingInbox.FILE_NAME);
+        Files.writeString(
+            inbox,
+            "{\"schema\":\"casimirbot.local_server_pairing_handoff.v1\"," +
+            "\"command\":\"/helix pair Z4ZD-X2JJ\"," +
+            "\"pairing_endpoint\":\"http://127.0.0.1:60826/api/environment-connectors/v1/pairing/redeem\"}"
+        );
+
+        FabricServerPairingInbox.PollResult result =
+            FabricServerPairingInbox.consume(inbox, System.currentTimeMillis());
+
+        assertEquals("Z4ZD-X2JJ", result.code());
+        assertEquals(
+            "http://127.0.0.1:60826/api/environment-connectors/v1/pairing/redeem",
+            result.pairingEndpoint()
+        );
+        assertFalse(Files.exists(inbox));
+    }
+
+    @Test
+    void rejectsEndpointEnvelopeOutsideExactLoopbackRedeemRoute() throws Exception {
+        Path inbox = tempDir.resolve(FabricServerPairingInbox.FILE_NAME);
+        Files.writeString(
+            inbox,
+            "{\"schema\":\"casimirbot.local_server_pairing_handoff.v1\"," +
+            "\"command\":\"/helix pair Z4ZD-X2JJ\"," +
+            "\"pairing_endpoint\":\"https://example.com/api/environment-connectors/v1/pairing/redeem\"}"
+        );
+
+        FabricServerPairingInbox.PollResult result =
+            FabricServerPairingInbox.consume(inbox, System.currentTimeMillis());
+
+        assertNull(result.code());
+        assertEquals("server_pairing_inbox_invalid", result.failureCode());
+        assertFalse(Files.exists(inbox));
     }
 
     @Test

@@ -40,9 +40,10 @@ terminal completion.
   control-plane poll; process launch alone is reported as `starting` or
   `degraded`. App shutdown stops the exact supervised tunnel child.
 - Window creation denies popups and navigation away from the local origin.
-- The Electron session denies browser permission checks/requests, device
-  permissions, and renderer-initiated downloads. Signed updates use only the
-  main-process updater.
+- The Electron session admits microphone audio only for the exact private
+  CasimirBot loopback renderer origin. Camera/video, off-origin browser
+  permission checks/requests, device permissions, and renderer-initiated
+  downloads remain denied. Signed updates use only the main-process updater.
 
 ## Runtime surfaces
 

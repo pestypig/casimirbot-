@@ -1,0 +1,42 @@
+{
+  "schema": "helix.minecraft.rec2a_a0_summary.v1",
+  "recorded_on": "2026-08-29",
+  "program_sha256": "8D71CE6C1A0159CD3FD03E2FE14E58E268300642C52177A355112D2A750307F5",
+  "installed_player_agent_jar_sha256": "AB2663106EB8C512D696A2A1787355D8BA7B9EC107D6231FC6509740D1CEF9D1",
+  "controller_artifact_version": "1.3.1",
+  "control": {
+    "workflow_id": "direct_player_action_workflow:401dd018-3254-4c8d-bd0c-f93e27357f44",
+    "workflow_state": "succeeded",
+    "tick_index": 397,
+    "interrupt_count": 0,
+    "executed_action_count": 1,
+    "consumed_item_count": 0,
+    "inventory_mutations_performed": 0,
+    "world_mutations_performed": 0,
+    "attack_pulses": 34,
+    "controls_released": true
+  },
+  "treatment": {
+    "workflow_id": "direct_player_action_workflow:4b3286f7-b513-4fa5-934d-fa612a87083c",
+    "workflow_state": "succeeded",
+    "tick_index": 635,
+    "interrupt_count": 1,
+    "executed_action_count": 5,
+    "consumed_item_count": 1,
+    "inventory_mutations_performed": 2,
+    "world_mutations_performed": 0,
+    "disengagement": {
+      "combat_mode": "disengage_to_distance",
+      "attack_pulses": 0,
+      "minimum_hostile_distance": 7.045321941375732,
+      "safe_separation_reached": true,
+      "terminal_tick_index": 212
+    },
+    "consume_terminal_tick_index": 248,
+    "resumed_combat_attack_pulses": 28,
+    "controls_released": true
+  },
+  "claim_ceiling": "direct_native_fabric_a0_only",
+  "authenticated_mcp_a1_complete": false
+}
+

@@ -73,7 +73,9 @@ public final class HelixFabricSensorMod implements ModInitializer {
                 pairAsync(
                     activeServer.createCommandSourceStack(),
                     result.code(),
-                    ConnectorPairingClient.LOCAL_PAIRING_ENDPOINT
+                    result.pairingEndpoint() != null
+                        ? result.pairingEndpoint()
+                        : FabricSensorConfigLoader.loadPairingEndpoint(LOGGER)
                 );
             } else if (!result.failureCode().isBlank()) {
                 LOGGER.warning(

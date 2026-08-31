@@ -6,21 +6,30 @@ Status: draft shared provider capability behind the Shared Live Rooms policy.
 
 Expose the existing Shared Live Room lifecycle through exact provider-neutral
 workstation capabilities without creating another room store, agent loop,
-authentication path, event journal, or terminal writer. The six capabilities
+authentication path, event journal, or terminal writer. The capabilities
 read fresh evidence from one exactly bound room, list and inspect rooms, create
-a room idempotently, and let a policy-admitted owner list or create
+a room idempotently, let a participant revoke their own room-data consent,
+inspect the current speaking-floor epoch, release only their matching floor, and
+let a policy-admitted owner list or create
 observation-only source bindings when the active room-source experiment admits
 their account.
 
 ## Owner
 
 - Capability ids: `room.evidence.read_bound`, `room.list`, `room.inspect`,
-  `room.create`, `room.source.list`, and `room.source.create`.
+  `room.create`, `room.consent.revoke`, `room.consent.grant`,
+  `room.source.list`, and `room.source.create`, plus `room.floor.inspect`,
+  `room.floor.release`, and `room.floor.acquire`.
 - Panel: none; these are shared control-service capabilities.
 - Permission profiles: `read` for list/inspect and `act` for create.
 - Account availability: developers and explicitly admitted public-experiment
   user sessions. Source control remains owner-only.
 - `room.create` and `room.source.create` require explicit confirmation.
+- `room.consent.grant` requires the signed one-use Shared Live Room MCP
+  delegation receipt; it never accepts the workstation confirmation audience.
+- `room.floor.release` is authority-reducing and exact-epoch bound;
+  `room.floor.acquire` requires the same MCP delegation protocol and a bounded
+  floor lease.
 
 ## Admission
 
@@ -38,6 +47,9 @@ their account.
   previous-turn artifact cannot clear the hard gate.
 - Mutations require an affirmative operator command and a stable
   `idempotency_key`.
+- `room.consent.revoke` derives the participant from the authenticated
+  principal, accepts only literal `false` values, and rejects an empty patch or
+  any consent grant before the domain handler runs.
 - Source controls require an admitted room owner and the room-source policy
   flag. Account type alone is not the grant.
 - These workstation controls are not placed in Agent API `database_scope`.
@@ -58,6 +70,17 @@ fall through to a shell or source connector.
   identity comes from the active external continuation policy and binding.
 - `room.inspect`: exact opaque `room_id`.
 - `room.create`: required `idempotency_key`; optional bounded `title`.
+- `room.consent.revoke`: exact opaque `room_id`, required
+  `idempotency_key`, and one or more own-consent fields set only to `false`.
+- `room.consent.grant`: exact opaque `room_id`, required `idempotency_key`, one
+  or more own-consent fields set only to `true`, and a signed exact-input
+  delegation artifact.
+- `room.floor.inspect`: exact opaque `room_id`.
+- `room.floor.release`: exact opaque `room_id` and the nonnegative
+  `floor_epoch` returned by inspection; no participant or runtime identity.
+- `room.floor.acquire`: exact opaque `room_id`, optional 1-60 second lease,
+  stable idempotency key, and signed exact-input delegation; no caller-supplied
+  participant, runtime, client, session, or thread identity.
 - `room.source.list`: exact opaque `room_id`.
 - `room.source.create`: exact `room_id`, required `idempotency_key`, and
   optional bounded world/adapter/label/TTL metadata.
@@ -83,6 +106,20 @@ reference, never mutation or reactivation of the revoked row.
   `helix.shared_live_room.bound_room_evidence_observation.v1`.
 - `room.inspect` emits `helix.shared_live_room.inspect_receipt.v1`.
 - `room.create` emits `helix.shared_live_room.create_receipt.v1`.
+- `room.consent.revoke` emits
+  `helix.shared_live_room.consent_revoke_receipt.v1` with exact changed fields
+  and `authority_delta=reduced_only`.
+- `room.consent.grant` emits
+  `helix.shared_live_room.consent_grant_receipt.v1` with exact changed fields,
+  delegation reference, and `authority_delta=increased_bounded`.
+- `room.floor.inspect` emits
+  `helix.shared_live_room.floor_inspect_receipt.v1`.
+- `room.floor.release` emits
+  `helix.shared_live_room.floor_release_receipt.v1` with requested epoch,
+  release result, resulting floor, and `authority_delta=reduced_only`.
+- `room.floor.acquire` emits
+  `helix.shared_live_room.floor_acquire_receipt.v1` with the bounded current
+  floor, delegation reference, and `authority_delta=increased_bounded`.
 - `room.source.list` emits
   `helix.shared_live_room.source_list_receipt.v1`.
 - `room.source.create` emits
@@ -125,6 +162,9 @@ Canonical terminal-authority evaluation
 ## Tests
 
 - exact room lifecycle and idempotent replay
+- own-consent revocation calls the same control/domain handler used by the
+  browser route, replays without a second mutation, and rejects every `true`
+  value at MCP schema admission
 - tenant/account/profile spoof fields rejected by closed input schemas
 - current membership and owner source policy rechecked
 - negated, quoted, historical, future, conditional, and mixed intents do not

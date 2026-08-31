@@ -81,7 +81,8 @@ public final class FabricConnectorRuntime implements AutoCloseable {
             config,
             logger,
             runtimeStatus,
-            () -> active.set(false)
+            () -> active.set(false),
+            DesktopServiceEndpointResolver::resolve
         );
         this.probeExecutor = new FabricProbeExecutor(
             server,
@@ -345,6 +346,15 @@ public final class FabricConnectorRuntime implements AutoCloseable {
                 } else if (error != null) {
                     logger.warning(
                         "Helix Fabric Sensor snapshot transport failed."
+                    );
+                } else if (response != null) {
+                    logger.warning(
+                        "Helix Fabric Sensor snapshot was rejected: " +
+                        response.failureSummary()
+                    );
+                } else {
+                    logger.warning(
+                        "Helix Fabric Sensor snapshot returned no receipt."
                     );
                 }
             });

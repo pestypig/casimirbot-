@@ -103,6 +103,7 @@ export type HelixLocalSupervisorPresence = {
   client_session_ref: string;
   conversation_thread_ref: string;
   authenticated_profile_ref: string;
+  authenticated_mcp_client_ref: string | null;
   declared_objective_summary: string;
   declared_objective_is_verified: false;
   lifecycle_basis: "authenticated_client_heartbeat";
@@ -111,6 +112,38 @@ export type HelixLocalSupervisorPresence = {
   room_ref: string | null;
   environment_ref: string | null;
   run_ref: string | null;
+  verified_room_identity: {
+    basis: "server_verified";
+    room_ref: string;
+    participant_ref: string;
+    verification_ref: string;
+  } | null;
+  verified_connector_identity: {
+    basis: "server_verified";
+    environment_ref: string;
+    connector_installation_ref: string;
+    source_ref: string;
+    producer_epoch_ref: string;
+    verification_ref: string;
+  } | null;
+  verified_retained_runtime_identity: {
+    basis: "server_verified";
+    run_ref: string;
+    run_version: number;
+    run_room_binding_ref: string;
+    run_room_binding_version: number;
+    verification_ref: string;
+  } | null;
+  verified_execution_lease_identity: {
+    basis: "server_verified";
+    execution_lease_ref: string;
+    workflow_ref: string;
+    action_authority_ref: string;
+    participant_ref: string;
+    source_ref: string;
+    lease_expires_at: string;
+    verification_ref: string;
+  } | null;
   blocker_summary: string | null;
   observed_at: string;
   heartbeat_expires_at: string;

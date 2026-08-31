@@ -3,6 +3,7 @@ import {
   buildHelixModelContextEconomyReport,
   buildHelixModelPromptContext,
   compactAgentStepObservationPacketForModel,
+  compactMoralGraphReflectionArtifactForModel,
   compactRouteOrTerminalContractForModel,
 } from "../services/helix-ask/model-context-economy";
 
@@ -62,6 +63,117 @@ describe("Helix Ask context economy", () => {
       precedence_reason: "repo evidence is required before synthesis",
     });
     expect(compact).not.toHaveProperty("forbidden_terminal_kinds");
+  });
+
+  it("re-enters Moral Graph mediation questions without promoting them to verdicts", () => {
+    const packet = compactMoralGraphReflectionArtifactForModel({
+      turnId: "turn-moral-mediation",
+      userRequested: "Does this reflect personal ambition or an institution preserving itself?",
+      artifact: {
+        artifact_id: "artifact:moral-mediation",
+        kind: "helix_moral_graph_reflection_tool_result",
+        payload: {
+          moralReflectionMediation: {
+            artifactId: "moral_reflection_mediation_packet",
+            reflectionId: "reflection:test",
+            objectiveSourceOptions: [
+              "person_declared",
+              "person_inferred",
+              "role_prescribed",
+              "institutionally_incentivized",
+              "mutually_reinforced",
+              "unknown",
+            ],
+            objectiveSourceStatus: "unresolved",
+            evidenceOrderBoundary: {
+              kind: "external_verification_first",
+              reason: "Verify the public claim before moral synthesis.",
+              requiredBeforeStrongClaim: ["source_identity", "event_freshness"],
+              advisory_only: true,
+            },
+            steps: [
+              {
+                id: "objective_source_attribution",
+                question: "Is the objective personal, role-prescribed, institutionally incentivized, mutually reinforced, or unknown?",
+                missingEvidence: ["declared_objective", "institutional_incentives"],
+              },
+              {
+                id: "developmental_freedom",
+                question: "Can the person revise a prior position without permanent identity judgment?",
+                missingEvidence: ["present_position", "revision_evidence"],
+              },
+            ],
+            synthesisProtocol: [
+              "Separate observations from inference.",
+              "Do not force symmetry across unequal power.",
+            ],
+          },
+        },
+      },
+    });
+
+    expect(packet).toMatchObject({
+      observation_ref: "artifact:moral-mediation",
+      source: "tool",
+      source_target: "moral_graph_reflection",
+      status: "succeeded",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(packet?.found.join(" ")).toContain("objective_source_attribution");
+    expect(packet?.found.join(" ")).toContain("external_verification_first");
+    expect(packet?.missing_or_uncertain).toEqual(expect.arrayContaining(["source_identity", "revision_evidence"]));
+    expect(packet?.proves.join(" ")).toContain("Separate observations from inference");
+    expect(JSON.stringify(packet)).not.toContain("moral verdict");
+  });
+
+  it("keeps cross-domain bridge boundaries ahead of irrelevant moral questions", () => {
+    const packet = compactMoralGraphReflectionArtifactForModel({
+      turnId: "turn-theory-moral-boundary",
+      userRequested: "What can a coherence lifetime illuminate morally?",
+      artifact: {
+        artifact_id: "artifact:theory-moral-boundary",
+        kind: "helix_moral_graph_reflection_tool_result",
+        payload: {
+          moralReflectionMediation: {
+            artifactId: "moral_reflection_mediation_packet",
+            reflectionId: "reflection:theory-moral-boundary",
+            objectiveSourceOptions: ["person_declared", "unknown"],
+            evidenceOrderBoundary: {
+              kind: "theory_ideology_bridge_first",
+              reason: "Establish the cross-domain analogy boundary before moral synthesis.",
+              requiredBeforeStrongClaim: ["physical_claim_maturity_and_replication", "naturalistic_fallacy_boundary"],
+              advisory_only: true,
+            },
+            steps: [
+              {
+                id: "observation_claim_boundary",
+                priority: "primary",
+                question: "Which physical claims are replicated and which mapping is analogy only?",
+                missingEvidence: ["replication_status"],
+              },
+              {
+                id: "objective_source_attribution",
+                priority: "available",
+                question: "Who owns the objective?",
+                missingEvidence: ["objective_source"],
+              },
+            ],
+            synthesisProtocol: ["Do not derive moral authority from biological persistence."],
+          },
+        },
+      },
+    });
+
+    expect(packet?.found.join(" ")).toContain("theory_ideology_bridge_first");
+    expect(packet?.found.join(" ")).toContain("observation_claim_boundary");
+    expect(packet?.found.join(" ")).not.toContain("Objective source remains unresolved");
+    expect(packet?.found.join(" ")).not.toContain("Who owns the objective");
+    expect(packet?.missing_or_uncertain).toEqual(expect.arrayContaining([
+      "physical_claim_maturity_and_replication",
+      "naturalistic_fallacy_boundary",
+    ]));
   });
 
   it("builds composer context from compact observations and excludes raw debug", () => {

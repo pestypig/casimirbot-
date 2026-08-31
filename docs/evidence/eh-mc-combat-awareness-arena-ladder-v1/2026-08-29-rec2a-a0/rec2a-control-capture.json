@@ -1,0 +1,2082 @@
+{
+  "scenario_id": "minecraft_rec2a_control_v1",
+  "lane": "direct_codex",
+  "action_kind": "execute_reactive_program",
+  "prompt": "Continue combat without a preplanned recovery action; no perturbation is introduced.",
+  "starting_state": {
+    "air": 300,
+    "connected": true,
+    "crafting_grid": "2x2",
+    "dimension": "minecraft:overworld",
+    "equipped_items": {
+      "main_hand": "minecraft:iron_sword",
+      "off_hand": "minecraft:shield"
+    },
+    "focus": {
+      "kind": "miss",
+      "reachable": false
+    },
+    "food": 19,
+    "health": 20,
+    "horizontal_collision": false,
+    "in_lava": false,
+    "in_water": false,
+    "inventory_counts": {
+      "minecraft:bowl": 1,
+      "minecraft:brown_mushroom": 1,
+      "minecraft:iron_sword": 1,
+      "minecraft:red_mushroom": 1,
+      "minecraft:shield": 1
+    },
+    "maximum_air": 300,
+    "nearby_hazard_types": [
+      "hostile"
+    ],
+    "nearby_portal_kinds": [],
+    "on_fire": false,
+    "on_ground": true,
+    "pitch": -0.7,
+    "raw_nbt_included": false,
+    "saturation": 0,
+    "state_schema": "helix.minecraft.player_fluid_state.v1",
+    "submerged": false,
+    "swimming": false,
+    "trajectory_forecast": {
+      "applicable": true,
+      "collision_predicted": false,
+      "final_position": {
+        "x": 7.7,
+        "y": 60.936655239083755,
+        "z": -0.8
+      },
+      "final_velocity": {
+        "x": 0,
+        "y": -0.7811331063075538,
+        "z": 0
+      },
+      "horizon_ticks": 10,
+      "initial_position": {
+        "x": 7.7,
+        "y": 65,
+        "z": -0.8
+      },
+      "initial_velocity": {
+        "x": 0,
+        "y": -0.0784000015258789,
+        "z": 0
+      },
+      "model_schema": "helix.minecraft.short_horizon_trajectory.v1",
+      "reason": "airborne_vanilla_approximation"
+    },
+    "vertical_velocity": -0.0784000015258789,
+    "x": 7.7,
+    "y": 65,
+    "yaw": 79.95,
+    "z": -0.8
+  },
+  "capability_contract": {
+    "capability_id": "com.casimirbot.minecraft.player.guardian.execute",
+    "capability_version": 1,
+    "control_engine": "native_fabric",
+    "manual_override_required": true,
+    "postcondition_verification_required": true,
+    "local_reference_lane": true
+  },
+  "source_artifact_refs": [
+    "minecraft_client_log_sha256:c8af8bb1d0732d5af8c6baa4110e28bb4f87aadaffcfc07c97d441f9a9f37c43",
+    "direct_diagnostic_workflow:direct_player_action_workflow:401dd018-3254-4c8d-bd0c-f93e27357f44"
+  ],
+  "selected_capability_id": "com.casimirbot.minecraft.player.guardian.execute",
+  "normalized_arguments": {
+    "completion_policy": {
+      "cancel_remaining_on_settle": true,
+      "mode": "all_required"
+    },
+    "execution_plane": "player_embodiment",
+    "interrupts": [
+      {
+        "activate_lane_id": "lane:latent-recovery",
+        "cancel_lane_ids": [
+          "lane:opening-combat"
+        ],
+        "condition": {
+          "condition_kind": "health_at_least",
+          "health": 16
+        },
+        "debounce_ticks": 1,
+        "interrupt_id": "interrupt:recovery-health-threshold",
+        "max_activations": 1,
+        "priority": 220,
+        "trigger_when": "not_satisfied"
+      }
+    ],
+    "lanes": [
+      {
+        "activation": "immediate",
+        "lane_id": "lane:opening-combat",
+        "lane_kind": "safety",
+        "nodes": [
+          {
+            "action": {
+              "action_kind": "combat_guard",
+              "approach_policy": "local_reroute_bounded",
+              "combat_mode": "engage",
+              "cover_policy": "none",
+              "friendly_fire": false,
+              "hostile_entity_type_ids": [
+                "minecraft:zombie"
+              ],
+              "max_acquisition_distance": 20,
+              "max_approach_ticks": 360,
+              "max_attack_pulses": 64,
+              "max_cover_ticks": 0,
+              "max_duration_ms": 30000,
+              "max_evasion_ticks": 0,
+              "max_shield_hold_ticks": 0,
+              "max_target_switches": 8,
+              "minimum_attack_cooldown": 0.9,
+              "projectile_evasion_horizon_ticks": 8,
+              "projectile_response": "none",
+              "require_line_of_sight": true,
+              "retreat_start_distance": 2.5,
+              "retreat_stop_distance": 4.5,
+              "retreat_when_hostile_count_at_least": 2,
+              "shield_hand": "none",
+              "stop_below_health": 5,
+              "target_commit_ticks": 8
+            },
+            "earliest_tick": 0,
+            "node_id": "node:opening-fight",
+            "node_kind": "action",
+            "on_failure": "node:opening-combat-failed",
+            "on_success": "node:opening-combat-succeeded",
+            "on_timeout": "node:opening-combat-failed",
+            "timeout_ticks": 600
+          },
+          {
+            "node_id": "node:opening-combat-succeeded",
+            "node_kind": "terminal",
+            "reason_code": "fight_completed_without_recovery",
+            "terminal_outcome": "succeeded"
+          },
+          {
+            "node_id": "node:opening-combat-failed",
+            "node_kind": "terminal",
+            "reason_code": "opening_combat_failed",
+            "terminal_outcome": "failed"
+          }
+        ],
+        "priority": 100,
+        "required": true,
+        "resource_ceiling": [
+          "camera",
+          "locomotion",
+          "main_hand",
+          "off_hand",
+          "native_workflow",
+          "safety"
+        ],
+        "start_node_id": "node:opening-fight"
+      },
+      {
+        "activation": "interrupt_only",
+        "lane_id": "lane:latent-recovery",
+        "lane_kind": "inventory",
+        "nodes": [
+          {
+            "action": {
+              "action_kind": "combat_guard",
+              "approach_policy": "none",
+              "combat_mode": "disengage_to_distance",
+              "cover_policy": "none",
+              "friendly_fire": false,
+              "hostile_entity_type_ids": [
+                "minecraft:zombie"
+              ],
+              "max_acquisition_distance": 20,
+              "max_approach_ticks": 0,
+              "max_attack_pulses": 1,
+              "max_cover_ticks": 0,
+              "max_duration_ms": 10000,
+              "max_evasion_ticks": 0,
+              "max_shield_hold_ticks": 0,
+              "max_target_switches": 8,
+              "minimum_attack_cooldown": 1,
+              "projectile_evasion_horizon_ticks": 8,
+              "projectile_response": "none",
+              "require_line_of_sight": true,
+              "retreat_start_distance": 3,
+              "retreat_stop_distance": 7,
+              "retreat_when_hostile_count_at_least": 1,
+              "shield_hand": "none",
+              "stop_below_health": 5,
+              "target_commit_ticks": 0
+            },
+            "earliest_tick": 0,
+            "node_id": "node:disengage",
+            "node_kind": "action",
+            "on_failure": "node:recovery-failed",
+            "on_success": "node:separation-verified",
+            "on_timeout": "node:recovery-failed",
+            "timeout_ticks": 200
+          },
+          {
+            "checkpoint_id": "checkpoint:recovery-separation",
+            "condition": {
+              "condition_kind": "hazard_clear",
+              "hazard_kinds": [
+                "hostile"
+              ],
+              "radius": 6
+            },
+            "earliest_tick": 0,
+            "node_id": "node:separation-verified",
+            "node_kind": "checkpoint",
+            "on_satisfied": "node:recipe-ready",
+            "on_timeout": "node:recovery-failed",
+            "wait_up_to_ticks": 10
+          },
+          {
+            "checkpoint_id": "checkpoint:latent-stew-recipe-ready",
+            "condition": {
+              "condition_kind": "recipe_craftable",
+              "expected": true,
+              "output_item_id": "minecraft:mushroom_stew"
+            },
+            "earliest_tick": 0,
+            "node_id": "node:recipe-ready",
+            "node_kind": "checkpoint",
+            "on_satisfied": "node:craft-one",
+            "on_timeout": "node:recovery-failed",
+            "wait_up_to_ticks": 20
+          },
+          {
+            "action": {
+              "action_kind": "craft",
+              "count": 1,
+              "output_item_id": "minecraft:mushroom_stew"
+            },
+            "earliest_tick": 0,
+            "node_id": "node:craft-one",
+            "node_kind": "action",
+            "on_failure": "node:recovery-failed",
+            "on_success": "node:stew-present",
+            "on_timeout": "node:recovery-failed",
+            "timeout_ticks": 80
+          },
+          {
+            "checkpoint_id": "checkpoint:latent-stew-present",
+            "condition": {
+              "condition_kind": "inventory_count_at_least",
+              "count": 1,
+              "item_id": "minecraft:mushroom_stew"
+            },
+            "earliest_tick": 0,
+            "node_id": "node:stew-present",
+            "node_kind": "checkpoint",
+            "on_satisfied": "node:consume-one",
+            "on_timeout": "node:recovery-failed",
+            "wait_up_to_ticks": 20
+          },
+          {
+            "action": {
+              "action_kind": "consume",
+              "count": 1,
+              "expected_remainder_item_id": "minecraft:bowl",
+              "hand": "main_hand",
+              "item_id": "minecraft:mushroom_stew",
+              "max_duration_ms": 5000,
+              "minimum_food_gain": 1,
+              "stop_below_health": 5
+            },
+            "earliest_tick": 0,
+            "node_id": "node:consume-one",
+            "node_kind": "action",
+            "on_failure": "node:recovery-failed",
+            "on_success": "node:food-recovered",
+            "on_timeout": "node:recovery-failed",
+            "timeout_ticks": 100
+          },
+          {
+            "checkpoint_id": "checkpoint:latent-food-recovered",
+            "condition": {
+              "condition_kind": "food_at_least",
+              "food": 18
+            },
+            "earliest_tick": 0,
+            "node_id": "node:food-recovered",
+            "node_kind": "checkpoint",
+            "on_satisfied": "node:resume-health-safe",
+            "on_timeout": "node:recovery-failed",
+            "wait_up_to_ticks": 20
+          },
+          {
+            "checkpoint_id": "checkpoint:latent-resume-health-safe",
+            "condition": {
+              "condition_kind": "health_at_least",
+              "health": 10
+            },
+            "earliest_tick": 0,
+            "node_id": "node:resume-health-safe",
+            "node_kind": "checkpoint",
+            "on_satisfied": "node:reequip-weapon",
+            "on_timeout": "node:recovery-failed",
+            "wait_up_to_ticks": 40
+          },
+          {
+            "action": {
+              "action_kind": "equip",
+              "destination": "main_hand",
+              "item_id": "minecraft:iron_sword"
+            },
+            "earliest_tick": 0,
+            "node_id": "node:reequip-weapon",
+            "node_kind": "action",
+            "on_failure": "node:recovery-failed",
+            "on_success": "node:resume-fight",
+            "on_timeout": "node:recovery-failed",
+            "timeout_ticks": 40
+          },
+          {
+            "action": {
+              "action_kind": "combat_guard",
+              "approach_policy": "local_reroute_bounded",
+              "combat_mode": "engage",
+              "cover_policy": "none",
+              "friendly_fire": false,
+              "hostile_entity_type_ids": [
+                "minecraft:zombie"
+              ],
+              "max_acquisition_distance": 20,
+              "max_approach_ticks": 360,
+              "max_attack_pulses": 64,
+              "max_cover_ticks": 0,
+              "max_duration_ms": 25000,
+              "max_evasion_ticks": 0,
+              "max_shield_hold_ticks": 0,
+              "max_target_switches": 8,
+              "minimum_attack_cooldown": 0.9,
+              "projectile_evasion_horizon_ticks": 8,
+              "projectile_response": "none",
+              "require_line_of_sight": true,
+              "retreat_start_distance": 2.5,
+              "retreat_stop_distance": 4.5,
+              "retreat_when_hostile_count_at_least": 1,
+              "shield_hand": "none",
+              "stop_below_health": 5,
+              "target_commit_ticks": 8
+            },
+            "earliest_tick": 0,
+            "node_id": "node:resume-fight",
+            "node_kind": "action",
+            "on_failure": "node:recovery-failed",
+            "on_success": "node:recovery-succeeded",
+            "on_timeout": "node:recovery-failed",
+            "timeout_ticks": 500
+          },
+          {
+            "node_id": "node:recovery-succeeded",
+            "node_kind": "terminal",
+            "reason_code": "latent_combat_recovery_completed",
+            "terminal_outcome": "succeeded"
+          },
+          {
+            "node_id": "node:recovery-failed",
+            "node_kind": "terminal",
+            "reason_code": "latent_combat_recovery_failed",
+            "terminal_outcome": "failed"
+          }
+        ],
+        "priority": 220,
+        "required": false,
+        "resource_ceiling": [
+          "camera",
+          "locomotion",
+          "hotbar",
+          "main_hand",
+          "off_hand",
+          "inventory",
+          "native_workflow"
+        ],
+        "start_node_id": "node:disengage"
+      }
+    ],
+    "max_total_ticks": 900,
+    "mutation_scope": {
+      "allowed_block_ids": [],
+      "allowed_regions": [],
+      "combat_allowed": true,
+      "max_block_mutations": 0,
+      "max_inventory_transfers": 3,
+      "world_mutation_allowed": false
+    },
+    "program_id": "program:combat-latent-recovery-rec2a-v1",
+    "program_schema": "helix.minecraft.reactive_program.v1",
+    "races": [],
+    "resident_guardian_coverage": [],
+    "ruleset": "survival_tas",
+    "scheduler_engine": "native_fabric_concurrent"
+  },
+  "admission_status": "not_applicable",
+  "execution_outcome": "succeeded",
+  "normalized_progress": [
+    {
+      "sequence": 0,
+      "event_type": "workflow.started",
+      "workflow_state": "running",
+      "progress_fraction": 0,
+      "measurements": {},
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 1,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 0
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 0
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 0,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 2,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.021111111111111112,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 19
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 19
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 19,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 3,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.043333333333333335,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 39
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 39
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 39,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 4,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.06555555555555556,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 59
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 59
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 59,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 5,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.08777777777777777,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 79
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 79
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 79,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 6,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.11,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 99
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 99
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 99,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 7,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.1322222222222222,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 119
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 119
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 119,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 8,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.15444444444444444,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 139
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 139
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 139,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 9,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.17666666666666667,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 159
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 159
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 159,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 10,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.1988888888888889,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 179
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 179
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 179,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 11,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.22111111111111112,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 199
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 199
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 199,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 12,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.24333333333333335,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 219
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 219
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 219,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 13,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.26555555555555554,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 239
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 239
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 239,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 14,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.2877777777777778,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 259
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 259
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 259,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 15,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.31,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 279
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 279
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 279,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 16,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.3322222222222222,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 299
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 299
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 299,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 17,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.35444444444444445,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 319
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 319
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 319,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 18,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.37666666666666665,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 339
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 339
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 339,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 19,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.3988888888888889,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 359
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 359
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 359,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 20,
+      "event_type": "workflow.progress",
+      "workflow_state": "running",
+      "progress_fraction": 0.4211111111111111,
+      "measurements": {
+        "action_receipt_count": 0,
+        "action_receipts": [],
+        "active_lane_count": 1,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": false,
+        "executed_action_count": 0,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": false,
+            "held_resources": [
+              "camera",
+              "native_workflow",
+              "off_hand",
+              "main_hand",
+              "locomotion"
+            ],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-fight",
+            "state": "running",
+            "tick_index": 379
+          },
+          {
+            "controls_released": false,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "dormant",
+            "tick_index": 379
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {},
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": false,
+        "reason_code": "reactive_program_running",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 379,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": false
+    },
+    {
+      "sequence": 21,
+      "event_type": "workflow.succeeded",
+      "workflow_state": "succeeded",
+      "progress_fraction": 1,
+      "measurements": {
+        "action_receipt_count": 1,
+        "action_receipts": [
+          {
+            "action_kind": "combat_guard",
+            "attack_pulses": 34,
+            "combat_mode": "engage",
+            "eligible_hostile_count": 0,
+            "inventory_mutations_performed": 0,
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "minimum_hostile_distance": -1,
+            "outcome": "succeeded",
+            "safe_separation_reached": false,
+            "summary": "No admitted hostile remains in the bounded combat envelope.",
+            "tick_index": 397,
+            "world_mutations_performed": 0
+          }
+        ],
+        "active_lane_count": 0,
+        "collected_count": 0,
+        "condition_observation_count": 1,
+        "condition_observations": [
+          {
+            "condition_kind": "health_at_least",
+            "node_id": "interrupt:recovery-health-threshold",
+            "satisfied": true,
+            "tick_index": 0
+          }
+        ],
+        "consumed_item_count": 0,
+        "controls_released": true,
+        "executed_action_count": 1,
+        "interrupt_count": 0,
+        "inventory_mutations_performed": 0,
+        "lanes": [
+          {
+            "controls_released": true,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:opening-combat",
+            "lane_kind": "safety",
+            "node_id": "node:opening-combat-succeeded",
+            "state": "succeeded",
+            "tick_index": 397
+          },
+          {
+            "controls_released": true,
+            "held_resources": [],
+            "iteration": 0,
+            "lane_id": "lane:latent-recovery",
+            "lane_kind": "inventory",
+            "node_id": "node:disengage",
+            "state": "canceled",
+            "tick_index": 397
+          }
+        ],
+        "max_concurrent_lane_count": 1,
+        "node_outcomes": {
+          "node:disengage": "canceled",
+          "node:opening-combat-succeeded": "succeeded",
+          "node:opening-fight": "succeeded"
+        },
+        "parallel_tick_count": 0,
+        "placement_action_success_count": 0,
+        "placement_mutation_success_count": 0,
+        "placement_prediction_count": 0,
+        "placement_predictions": [],
+        "player_interaction_performed": false,
+        "player_motion_performed": false,
+        "produced_count": 0,
+        "program_id": "program:combat-latent-recovery-rec2a-v1",
+        "program_schema": "helix.minecraft.reactive_program.v1",
+        "race_outcome_count": 0,
+        "race_outcomes": [],
+        "reactive_program_completed": true,
+        "reason_code": "reactive_program_succeeded",
+        "resource_conflict_count": 0,
+        "satisfied_checkpoint_ids": [],
+        "tick_index": 397,
+        "transferred_count": 0,
+        "world_mutations_performed": 0
+      },
+      "manual_override_detected": false,
+      "controls_released": true
+    }
+  ],
+  "postcondition_status": "satisfied",
+  "observation_refs": [
+    "direct_diagnostic_observation:direct_player_action_workflow:401dd018-3254-4c8d-bd0c-f93e27357f44:21"
+  ],
+  "observation_reentered": false,
+  "final_candidate_text": null,
+  "final_candidate_support_refs": [],
+  "route_product_text": null,
+  "route_product_support_refs": [],
+  "terminal_outcome": "not_applicable",
+  "terminal_authority_status": "not_applicable",
+  "terminal_writer_text": null,
+  "terminal_writer_support_refs": [],
+  "visible_text": null,
+  "voice_projection_status": "not_applicable",
+  "voice_text": null,
+  "created_at": "2026-08-30T03:30:13.651561600Z",
+  "hidden_reasoning_included": false
+}

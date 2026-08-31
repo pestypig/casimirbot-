@@ -41,6 +41,72 @@ describe("desktop Electron session security", () => {
     expect(preventDefault).toHaveBeenCalledOnce();
   });
 
+  it("allows audio-only media capture for the exact private renderer origin", () => {
+    let permissionCheck: ((...args: any[]) => boolean) | null = null;
+    let permissionRequest:
+      | ((...args: any[]) => void)
+      | null = null;
+    let devicePermission: ((...args: unknown[]) => boolean) | null = null;
+    const targetSession = {
+      setPermissionCheckHandler(handler: typeof permissionCheck) {
+        permissionCheck = handler;
+      },
+      setPermissionRequestHandler(handler: typeof permissionRequest) {
+        permissionRequest = handler;
+      },
+      setDevicePermissionHandler(handler: typeof devicePermission) {
+        devicePermission = handler;
+      },
+      on() {
+        return this;
+      },
+    } as unknown as Session;
+    const trustedOrigin = "http://127.0.0.1:43117";
+    const webContents = { getURL: () => `${trustedOrigin}/desktop` };
+
+    installDesktopSessionSecurity(targetSession, {
+      getTrustedRendererOrigin: () => trustedOrigin,
+    });
+
+    expect(permissionCheck?.(
+      webContents,
+      "media",
+      trustedOrigin,
+      { mediaType: "audio" },
+    )).toBe(true);
+    expect(permissionCheck?.(
+      webContents,
+      "media",
+      trustedOrigin,
+      { mediaType: "video" },
+    )).toBe(false);
+    expect(permissionCheck?.(
+      webContents,
+      "media",
+      "http://127.0.0.1:43118",
+      { mediaType: "audio" },
+    )).toBe(false);
+
+    const audioCallback = vi.fn();
+    permissionRequest?.(
+      webContents,
+      "media",
+      audioCallback,
+      { requestingUrl: `${trustedOrigin}/desktop`, mediaTypes: ["audio"] },
+    );
+    expect(audioCallback).toHaveBeenCalledWith(true);
+
+    const cameraCallback = vi.fn();
+    permissionRequest?.(
+      webContents,
+      "media",
+      cameraCallback,
+      { requestingUrl: `${trustedOrigin}/desktop`, mediaTypes: ["video"] },
+    );
+    expect(cameraCallback).toHaveBeenCalledWith(false);
+    expect(devicePermission?.()).toBe(false);
+  });
+
   it("keeps risky renderer features explicitly disabled", async () => {
     const mainSource = await readFile(
       path.resolve("apps/desktop/src/main.ts"),
@@ -67,6 +133,45 @@ describe("desktop Electron session security", () => {
     expect(mainSource).toContain("shell.openExternal(");
     expect(mainSource).not.toContain("codex plugin marketplace add");
     expect(mainSource).not.toContain("codex plugin add");
+  });
+
+  it("admits the full MCP tunnel only after native developer-account revalidation", async () => {
+    const mainSource = await readFile(
+      path.resolve("apps/desktop/src/main.ts"),
+      "utf8",
+    );
+    expect(mainSource).toContain("parseDesktopMcpTunnelStartRequest(input)");
+    expect(mainSource).toContain(
+      "const account = await resolveActiveDesktopAccount(runtime, event.sender.session)",
+    );
+    expect(mainSource).toContain('request.scope === "full_helix_agent"');
+    expect(mainSource).toContain('account.accountType !== "developer"');
+    expect(mainSource).toContain("mcp_tunnel_full_developer_account_required");
+    expect(mainSource).toContain(
+      "return tunnelController.start(account.sessionId, request.scope)",
+    );
+  });
+
+  it("auto-starts only the configured read-only tunnel after native developer revalidation", async () => {
+    const mainSource = await readFile(
+      path.resolve("apps/desktop/src/main.ts"),
+      "utf8",
+    );
+    const executorSource = await readFile(
+      path.resolve("apps/desktop/src/mcp-tunnel-transition-executor.ts"),
+      "utf8",
+    );
+    expect(mainSource).toContain(
+      "autoStartConfiguredDesktopMcpTunnelReadOnly({",
+    );
+    expect(mainSource).toContain("return resolveActiveDesktopAccount(");
+    expect(executorSource).toContain('account.accountType !== "developer"');
+    expect(executorSource).toContain(
+      '"local_supervisor_coordination_and_device_check"',
+    );
+    expect(executorSource).not.toContain(
+      'input.controller.start(account.sessionId, "full_helix_agent")',
+    );
   });
 
   it("bounds desktop service startup and requires full packaged readiness", async () => {

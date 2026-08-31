@@ -868,6 +868,8 @@ roomSourceIngressRouter.post(
       if (capabilityDescriptors.length > 0) {
         await materializeLegacyRoomSourceConnector({
           ownerProfileId: activeClaim.binding.owner_profile_id,
+          installedDeviceId:
+            process.env.HELIX_DESKTOP_DEVICE_ID?.trim() || null,
           roomSourceBindingId: activeClaim.binding.binding_id,
           credentialId: activeClaim.credentialId,
           roomId: activeClaim.binding.room_id,

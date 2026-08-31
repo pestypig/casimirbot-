@@ -58,6 +58,22 @@ final class FabricSensorConfigLoaderTest {
     }
 
     @Test
+    void localRepairUsesTheConfiguredPairingEndpoint() {
+        Map<String, Object> config = new LinkedHashMap<>(
+            FabricSensorConfigLoader.defaultTemplate()
+        );
+        config.put(
+            "pairing_endpoint",
+            "http://127.0.0.1:64969/api/environment-connectors/v1/pairing/redeem"
+        );
+
+        assertEquals(
+            "http://127.0.0.1:64969/api/environment-connectors/v1/pairing/redeem",
+            FabricSensorConfigLoader.pairingEndpointFromMap(config)
+        );
+    }
+
+    @Test
     void admitsOnlyBoundLoopbackOrHttpsConfiguration() {
         Map<String, Object> loopback = new LinkedHashMap<>(
             FabricSensorConfigLoader.defaultTemplate()

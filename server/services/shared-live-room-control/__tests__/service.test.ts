@@ -189,6 +189,12 @@ type HarnessOverrides = {
   listedBindings?: HelixRoomSourceBinding[];
   credentialDelivery?: SharedLiveRoomControlDependencies["credentialDelivery"];
   deferredSourceBindingStore?: SharedLiveRoomControlDependencies["deferredSourceBindingStore"];
+  readRuntime?: SharedLiveRoomControlDependencies["readRuntime"];
+  readFloor?: SharedLiveRoomControlDependencies["readFloor"];
+  releaseFloor?: SharedLiveRoomControlDependencies["releaseFloor"];
+  claimFloor?: SharedLiveRoomControlDependencies["claimFloor"];
+  afterFloorRelease?: SharedLiveRoomControlDependencies["afterFloorRelease"];
+  afterFloorAcquire?: SharedLiveRoomControlDependencies["afterFloorAcquire"];
 };
 
 const createHarness = async (overrides: HarnessOverrides = {}) => {
@@ -238,6 +244,32 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
         ],
       }),
   );
+  const patchConsent = vi.fn(
+    async (input: {
+      roomId: string;
+      profileId: string;
+      consentPatch: Record<string, boolean>;
+    }) => {
+      const current = room();
+      return room({
+        room_id: input.roomId,
+        self_participant_id: `participant:${input.profileId}`,
+        participants: [
+          {
+            ...current.participants[0]!,
+            participant_id: `participant:${input.profileId}`,
+            consent: {
+              ...current.participants[0]!.consent,
+              ...input.consentPatch,
+              consent_version: current.participants[0]!.consent.consent_version + 1,
+              consent_receipt_ref: "consent:test-revoke",
+              updated_at: NOW,
+            },
+          },
+        ],
+      });
+    },
+  );
   const deferredSourceBindingStore = overrides.deferredSourceBindingStore ?? {
     createSourceBindingWithoutCredential: vi.fn(async () =>
       sourceBinding({
@@ -270,6 +302,7 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
       readMembership,
       listSourceBindings,
       updatePresence,
+      patchConsent,
     },
     deferredSourceBindingStore,
     credentialDelivery,
@@ -277,6 +310,12 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
     guestHostingAllowed: () => true,
     withProfileAdmissionLock: async (_profileId, run) => run(),
     projectRoom: async (value) => value,
+    readRuntime: overrides.readRuntime,
+    readFloor: overrides.readFloor,
+    releaseFloor: overrides.releaseFloor,
+    claimFloor: overrides.claimFloor,
+    afterFloorRelease: overrides.afterFloorRelease,
+    afterFloorAcquire: overrides.afterFloorAcquire,
   });
   return {
     pool,
@@ -287,6 +326,7 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
     readMembership,
     listSourceBindings,
     updatePresence,
+    patchConsent,
     deferredSourceBindingStore,
     credentialDelivery,
   };
@@ -327,6 +367,170 @@ describe("SharedLiveRoomControlService", () => {
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
+    });
+  });
+
+  it("idempotently revokes only the authenticated actor's own consent", async () => {
+    const harness = await createHarness();
+    const request = {
+      room_id: ROOM_ID,
+      consent: {
+        microphone_to_model: false as const,
+        screen_to_model: false as const,
+      },
+    };
+    const first = await harness.service.revokeOwnConsent({
+      actor: actor(),
+      idempotencyKey: "consent-revoke-001",
+      request,
+    });
+    const replay = await harness.service.revokeOwnConsent({
+      actor: actor(),
+      idempotencyKey: "consent-revoke-001",
+      request,
+    });
+
+    expect(harness.patchConsent).toHaveBeenCalledTimes(1);
+    expect(harness.patchConsent).toHaveBeenCalledWith({
+      roomId: ROOM_ID,
+      profileId: "profile-a",
+      consentPatch: request.consent,
+    });
+    expect(first).toMatchObject({
+      idempotencyReplayed: false,
+      body: {
+        schema: "helix.shared_live_room.consent_revoke_receipt.v1",
+        operation: "room.consent.revoke",
+        changed_fields: ["microphone_to_model", "screen_to_model"],
+        authority_delta: "reduced_only",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
+    expect(replay).toMatchObject({
+      idempotencyReplayed: true,
+      body: first.body,
+    });
+  });
+
+  it("idempotently grants only explicit own-consent fields after adapter delegation", async () => {
+    const harness = await createHarness();
+    const request = { room_id: ROOM_ID, consent: { microphone_to_model: true as const } };
+    const first = await harness.service.grantOwnConsent({ actor: actor(), idempotencyKey: "consent-grant-001", request, delegationRef: "room-delegation:001" });
+    const replay = await harness.service.grantOwnConsent({ actor: actor(), idempotencyKey: "consent-grant-001", request, delegationRef: "room-delegation:001" });
+    expect(harness.patchConsent).toHaveBeenCalledTimes(1);
+    expect(harness.patchConsent).toHaveBeenCalledWith({ roomId: ROOM_ID, profileId: "profile-a", consentPatch: request.consent });
+    expect(first).toMatchObject({ idempotencyReplayed: false, body: { operation: "room.consent.grant", changed_fields: ["microphone_to_model"], delegation_ref: "room-delegation:001", authority_delta: "increased_bounded", assistant_answer: false, terminal_eligible: false } });
+    expect(replay).toMatchObject({ idempotencyReplayed: true, body: first.body });
+  });
+
+  it("routes first-party and delegated floor acquisition through the same claim handler", async () => {
+    const claimFloor = vi.fn(() => ({
+      ok: true,
+      granted: true,
+      error: null,
+      floor: { participant_id: "participant:profile-a", epoch: 3, acquired_at: NOW, lease_expires_at: "2026-07-26T19:00:30.000Z" },
+    })) as unknown as NonNullable<SharedLiveRoomControlDependencies["claimFloor"]>;
+    const readRuntime = vi.fn(() => ({ runtime_id: "runtime:001", state: "bridge_active", transport_owner: "room_media_bridge" })) as unknown as NonNullable<SharedLiveRoomControlDependencies["readRuntime"]>;
+    const harness = await createHarness({
+      claimFloor,
+      readRuntime,
+      roomMembership: membership({
+        consent: {
+          ...buildDefaultHelixSharedRealtimeRoomConsent(),
+          microphone_to_model: true,
+        },
+      }),
+    });
+    const uiRoom = await harness.service.acquireOwnFloorFromFirstPartyUi({ actor: actor({ authKind: "first_party_session" }), request: { room_id: ROOM_ID } });
+    expect(uiRoom.room_id).toBe(ROOM_ID);
+    const result = await harness.service.acquireOwnFloor({ actor: actor(), idempotencyKey: "floor-acquire-001", request: { room_id: ROOM_ID, lease_ms: 15_000 }, delegationRef: "room-delegation:floor-001" });
+    expect(claimFloor).toHaveBeenCalledTimes(2);
+    expect(claimFloor).toHaveBeenLastCalledWith(expect.objectContaining({ roomId: ROOM_ID, runtimeId: "runtime:001", participantId: "participant:profile-a", microphoneToModelAuthorized: true, leaseMs: 15_000 }));
+    expect(result.body).toMatchObject({ operation: "room.floor.acquire", granted: true, delegation_ref: "room-delegation:floor-001", authority_delta: "increased_bounded", terminal_eligible: false });
+  });
+
+  it("rejects consent grants before calling the room domain handler", async () => {
+    const harness = await createHarness();
+    await expectControlError(
+      harness.service.revokeOwnConsent({
+        actor: actor(),
+        idempotencyKey: "consent-grant-blocked-001",
+        request: {
+          room_id: ROOM_ID,
+          consent: { microphone_to_model: true },
+        },
+      }),
+      400,
+      "invalid_request",
+    );
+    expect(harness.patchConsent).not.toHaveBeenCalled();
+  });
+
+  it("inspects an exact floor epoch and releases only the actor's matching floor", async () => {
+    const floor = {
+      participant_id: "participant:profile-a",
+      epoch: 7,
+      acquired_at: NOW,
+      lease_expires_at: "2026-07-26T19:00:30.000Z",
+    };
+    const readFloor = vi.fn(() => floor);
+    const releaseFloor = vi.fn(() => ({
+      ok: true as const,
+      error: null,
+      released: true,
+      floor: {
+        participant_id: null,
+        epoch: 7,
+        acquired_at: null,
+        lease_expires_at: null,
+      },
+      runtime: room().runtime,
+    }));
+    const afterFloorRelease = vi.fn();
+    const harness = await createHarness({
+      readRuntime: vi.fn(() => ({
+        ...room().runtime,
+        runtime_id: "shared_room_runtime:runtime-001",
+        state: "host_transport_active",
+      })),
+      readFloor,
+      releaseFloor: releaseFloor as SharedLiveRoomControlDependencies["releaseFloor"],
+      afterFloorRelease,
+    });
+
+    const inspected = await harness.service.inspectFloor({
+      actor: actor(),
+      roomId: ROOM_ID,
+    });
+    const released = await harness.service.releaseOwnFloor({
+      actor: actor(),
+      request: { room_id: ROOM_ID, floor_epoch: inspected.floor?.epoch },
+    });
+
+    expect(inspected).toMatchObject({
+      operation: "room.floor.inspect",
+      room_id: ROOM_ID,
+      floor: { participant_id: "participant:profile-a", epoch: 7 },
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(releaseFloor).toHaveBeenCalledWith({
+      roomId: ROOM_ID,
+      runtimeId: "shared_room_runtime:runtime-001",
+      participantId: "participant:profile-a",
+      epoch: 7,
+    });
+    expect(afterFloorRelease).toHaveBeenCalledTimes(1);
+    expect(released).toMatchObject({
+      operation: "room.floor.release",
+      released: true,
+      requested_floor_epoch: 7,
+      floor: { participant_id: null, epoch: 7 },
+      authority_delta: "reduced_only",
+      assistant_answer: false,
+      terminal_eligible: false,
     });
   });
 

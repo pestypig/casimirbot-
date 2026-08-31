@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -54,6 +54,47 @@ describe("local player pairing handoff", () => {
       "config",
       "helix-fabric-player-agent.pairing-inbox",
     ), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("targets the player directory owned by the authenticated desktop profile", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
+    roots.push(root);
+    const runDirectory = path.join(root, "combat-c0-server");
+    const playerGameDirectory = path.join(root, ".minecraft-helix-c0");
+    await mkdir(path.join(runDirectory, "config"), { recursive: true });
+    await writeFile(path.join(runDirectory, "server.properties"), "server-port=25566\n");
+    await mkdir(path.join(playerGameDirectory, "config"), { recursive: true });
+    await mkdir(path.join(playerGameDirectory, "mods"), { recursive: true });
+    const storePath = path.join(root, "profiles.json");
+    await writeFile(storePath, JSON.stringify({
+      schema: "casimirbot.local_minecraft_run_profiles/2",
+      profiles: [{
+        owner_profile_id: "profile:owner",
+        run_directory: runDirectory,
+        player_game_directory: playerGameDirectory,
+        label: "C0 arena",
+      }],
+    }));
+    const previousStore = process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE;
+    process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE = storePath;
+    try {
+      await expect(stageLocalMinecraftPlayerPairing({
+        appDataPath: root,
+        ownerProfileId: "profile:owner",
+        command: "/helix-player pair Z4ZD-X2JJ",
+      })).resolves.toEqual({ status: "player_pairing_inbox_staged" });
+    } finally {
+      if (previousStore === undefined) {
+        delete process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE;
+      } else {
+        process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE = previousStore;
+      }
+    }
+    await expect(readFile(path.join(
+      playerGameDirectory,
+      "config",
+      "helix-fabric-player-agent.pairing-inbox",
+    ), "utf8")).resolves.toBe("/helix-player pair Z4ZD-X2JJ");
   });
 
   it("rejects relative or filesystem-root game directories", async () => {

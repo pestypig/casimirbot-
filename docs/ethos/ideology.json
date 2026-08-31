@@ -547,6 +547,13 @@
         "uncertainty",
         "evidence"
       ],
+      "aliases": [
+        "presupposed conclusion",
+        "public ridicule",
+        "AI roast",
+        "borrowed AI authority",
+        "judgment before inquiry"
+      ],
       "children": [],
       "links": [
         {
@@ -638,7 +645,13 @@
         "inherited norm",
         "cliche belief",
         "ego trapdoor",
-        "self image trap"
+        "self image trap",
+        "permanent identity judgment",
+        "previous position as permanent identity",
+        "person forbidden to grow",
+        "identity fixation",
+        "earlier statement",
+        "current position"
       ],
       "children": [
         "inherited-conditioning-check",
@@ -2004,7 +2017,10 @@
         "observer exposure",
         "witness exposure",
         "accountability domain",
-        "financial record is not moral worth"
+        "financial record is not moral worth",
+        "accountability is not permanent identity",
+        "past statement is not total character",
+        "previous position may be revised"
       ],
       "children": [],
       "links": [

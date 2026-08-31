@@ -813,7 +813,7 @@ validated the user.
 
 Configure an Auth0 API whose identifier exactly matches
 `HELIX_AGENT_OAUTH_AUDIENCE` (`https://casimirbot.com/mcp` for production), use
-RS256 access tokens, define `helix.rooms.read`,
+RS256 access tokens, define `helix.rooms.read`, `helix.rooms.manage`,
 `helix.environment_actions.read`, and `helix.environment_actions.write`, enable
 manual Client ID Metadata Document registration, and import the OpenAI-hosted
 CIMD URL presented for the MCP client. A Device Check-only client receives only

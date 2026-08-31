@@ -72,6 +72,9 @@ import { migration070 } from "./migrations/070_installed_security_devices";
 import { migration071 } from "./migrations/071_brokerage_reactive_live_shadow";
 import { migration072 } from "./migrations/072_brokerage_reactive_shadow_acceptance";
 import { migration073 } from "./migrations/073_billing_entitlement_ledger";
+import { migration074 } from "./migrations/074_mcp_evidence_observations";
+import { migration075 } from "./migrations/075_shared_live_room_mcp_delegation_replay";
+import { migration076 } from "./migrations/076_environment_connector_installed_nodes";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -148,6 +151,9 @@ const MIGRATIONS = [
   migration071,
   migration072,
   migration073,
+  migration074,
+  migration075,
+  migration076,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

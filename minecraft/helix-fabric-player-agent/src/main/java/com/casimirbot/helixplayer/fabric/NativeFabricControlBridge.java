@@ -937,6 +937,9 @@ final class NativeFabricControlBridge implements ControlBridge {
         } else if ("combat_guard".equals(actionKind)) {
             combatGuardian.begin(new MinecraftCombatGuardian.Profile(
                 strings(arguments.get("hostile_entity_type_ids")),
+                arguments.containsKey("combat_mode")
+                    ? string(arguments.get("combat_mode"))
+                    : "engage",
                 number(arguments.get("max_acquisition_distance"), 16),
                 number(arguments.get("minimum_attack_cooldown"), 0.9),
                 integer(arguments.get("max_attack_pulses"), 64),
@@ -1896,6 +1899,22 @@ final class NativeFabricControlBridge implements ControlBridge {
         }
 
         @Override
+        public void orientAway(MinecraftCombatGuardian.Target target) {
+            LocalPlayer player = minecraft.player;
+            if (player == null) return;
+            double awayX = player.getX() - target.x();
+            double awayZ = player.getZ() - target.z();
+            double length = Math.sqrt(awayX * awayX + awayZ * awayZ);
+            if (length < 1.0e-8) return;
+            lookAt(
+                player.getX() + (awayX / length) * 10.0,
+                player.getEyeY(),
+                player.getZ() + (awayZ / length) * 10.0,
+                30.0F
+            );
+        }
+
+        @Override
         public boolean move(
             MinecraftCombatGuardian.MovementMode mode,
             MinecraftCombatGuardian.ProjectileThreat threat,
@@ -1955,6 +1974,9 @@ final class NativeFabricControlBridge implements ControlBridge {
                 }
             }
             MovementInput resolvedInput = movementInputForWorldDirection(player, direction);
+            if (mode == MinecraftCombatGuardian.MovementMode.RETREAT && resolvedInput.forward()) {
+                resolvedInput = new MovementInput(true, false, false, false, false, true);
+            }
             applyMovement(resolvedInput);
             movementDenialReason = "none";
             movementInput = movementInputLabel(resolvedInput);

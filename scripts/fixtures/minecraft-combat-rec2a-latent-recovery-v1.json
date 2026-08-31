@@ -1,0 +1,321 @@
+{
+  "action_kind": "execute_reactive_program",
+  "program_schema": "helix.minecraft.reactive_program.v1",
+  "program_id": "program:combat-latent-recovery-rec2a-v1",
+  "ruleset": "survival_tas",
+  "execution_plane": "player_embodiment",
+  "scheduler_engine": "native_fabric_concurrent",
+  "max_total_ticks": 900,
+  "completion_policy": {
+    "mode": "all_required",
+    "cancel_remaining_on_settle": true
+  },
+  "mutation_scope": {
+    "world_mutation_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 3,
+    "allowed_block_ids": [],
+    "allowed_regions": [],
+    "combat_allowed": true
+  },
+  "resident_guardian_coverage": [],
+  "lanes": [
+    {
+      "lane_id": "lane:opening-combat",
+      "lane_kind": "safety",
+      "priority": 100,
+      "required": true,
+      "activation": "immediate",
+      "resource_ceiling": [
+        "camera",
+        "locomotion",
+        "main_hand",
+        "off_hand",
+        "native_workflow",
+        "safety"
+      ],
+      "start_node_id": "node:opening-fight",
+      "nodes": [
+        {
+          "node_id": "node:opening-fight",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 600,
+          "action": {
+            "action_kind": "combat_guard",
+            "combat_mode": "engage",
+            "hostile_entity_type_ids": ["minecraft:zombie"],
+            "max_acquisition_distance": 20,
+            "require_line_of_sight": true,
+            "minimum_attack_cooldown": 0.9,
+            "max_attack_pulses": 64,
+            "max_target_switches": 8,
+            "target_commit_ticks": 8,
+            "retreat_start_distance": 2.5,
+            "retreat_stop_distance": 4.5,
+            "retreat_when_hostile_count_at_least": 2,
+            "max_duration_ms": 30000,
+            "stop_below_health": 5,
+            "friendly_fire": false,
+            "approach_policy": "local_reroute_bounded",
+            "max_approach_ticks": 360,
+            "cover_policy": "none",
+            "max_cover_ticks": 0,
+            "projectile_response": "none",
+            "projectile_evasion_horizon_ticks": 8,
+            "max_evasion_ticks": 0,
+            "shield_hand": "none",
+            "max_shield_hold_ticks": 0
+          },
+          "on_success": "node:opening-combat-succeeded",
+          "on_failure": "node:opening-combat-failed",
+          "on_timeout": "node:opening-combat-failed"
+        },
+        {
+          "node_id": "node:opening-combat-succeeded",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "fight_completed_without_recovery"
+        },
+        {
+          "node_id": "node:opening-combat-failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "opening_combat_failed"
+        }
+      ]
+    },
+    {
+      "lane_id": "lane:latent-recovery",
+      "lane_kind": "inventory",
+      "priority": 220,
+      "required": false,
+      "activation": "interrupt_only",
+      "resource_ceiling": [
+        "camera",
+        "locomotion",
+        "hotbar",
+        "main_hand",
+        "off_hand",
+        "inventory",
+        "native_workflow"
+      ],
+      "start_node_id": "node:disengage",
+      "nodes": [
+        {
+          "node_id": "node:disengage",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 200,
+          "action": {
+            "action_kind": "combat_guard",
+            "combat_mode": "disengage_to_distance",
+            "hostile_entity_type_ids": ["minecraft:zombie"],
+            "max_acquisition_distance": 20,
+            "require_line_of_sight": true,
+            "minimum_attack_cooldown": 1,
+            "max_attack_pulses": 1,
+            "max_target_switches": 8,
+            "target_commit_ticks": 0,
+            "retreat_start_distance": 3,
+            "retreat_stop_distance": 7,
+            "retreat_when_hostile_count_at_least": 1,
+            "max_duration_ms": 10000,
+            "stop_below_health": 5,
+            "friendly_fire": false,
+            "approach_policy": "none",
+            "max_approach_ticks": 0,
+            "cover_policy": "none",
+            "max_cover_ticks": 0,
+            "projectile_response": "none",
+            "projectile_evasion_horizon_ticks": 8,
+            "max_evasion_ticks": 0,
+            "shield_hand": "none",
+            "max_shield_hold_ticks": 0
+          },
+          "on_success": "node:separation-verified",
+          "on_failure": "node:recovery-failed",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:separation-verified",
+          "node_kind": "checkpoint",
+          "earliest_tick": 0,
+          "checkpoint_id": "checkpoint:recovery-separation",
+          "condition": {
+            "condition_kind": "hazard_clear",
+            "hazard_kinds": ["hostile"],
+            "radius": 6
+          },
+          "wait_up_to_ticks": 10,
+          "on_satisfied": "node:recipe-ready",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:recipe-ready",
+          "node_kind": "checkpoint",
+          "earliest_tick": 0,
+          "checkpoint_id": "checkpoint:latent-stew-recipe-ready",
+          "condition": {
+            "condition_kind": "recipe_craftable",
+            "output_item_id": "minecraft:mushroom_stew",
+            "expected": true
+          },
+          "wait_up_to_ticks": 20,
+          "on_satisfied": "node:craft-one",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:craft-one",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 80,
+          "action": {
+            "action_kind": "craft",
+            "output_item_id": "minecraft:mushroom_stew",
+            "count": 1
+          },
+          "on_success": "node:stew-present",
+          "on_failure": "node:recovery-failed",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:stew-present",
+          "node_kind": "checkpoint",
+          "earliest_tick": 0,
+          "checkpoint_id": "checkpoint:latent-stew-present",
+          "condition": {
+            "condition_kind": "inventory_count_at_least",
+            "item_id": "minecraft:mushroom_stew",
+            "count": 1
+          },
+          "wait_up_to_ticks": 20,
+          "on_satisfied": "node:consume-one",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:consume-one",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 100,
+          "action": {
+            "action_kind": "consume",
+            "item_id": "minecraft:mushroom_stew",
+            "count": 1,
+            "hand": "main_hand",
+            "max_duration_ms": 5000,
+            "stop_below_health": 5,
+            "minimum_food_gain": 1,
+            "expected_remainder_item_id": "minecraft:bowl"
+          },
+          "on_success": "node:food-recovered",
+          "on_failure": "node:recovery-failed",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:food-recovered",
+          "node_kind": "checkpoint",
+          "earliest_tick": 0,
+          "checkpoint_id": "checkpoint:latent-food-recovered",
+          "condition": {
+            "condition_kind": "food_at_least",
+            "food": 18
+          },
+          "wait_up_to_ticks": 20,
+          "on_satisfied": "node:resume-health-safe",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:resume-health-safe",
+          "node_kind": "checkpoint",
+          "earliest_tick": 0,
+          "checkpoint_id": "checkpoint:latent-resume-health-safe",
+          "condition": {
+            "condition_kind": "health_at_least",
+            "health": 10
+          },
+          "wait_up_to_ticks": 40,
+          "on_satisfied": "node:reequip-weapon",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:reequip-weapon",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 40,
+          "action": {
+            "action_kind": "equip",
+            "item_id": "minecraft:iron_sword",
+            "destination": "main_hand"
+          },
+          "on_success": "node:resume-fight",
+          "on_failure": "node:recovery-failed",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:resume-fight",
+          "node_kind": "action",
+          "earliest_tick": 0,
+          "timeout_ticks": 500,
+          "action": {
+            "action_kind": "combat_guard",
+            "combat_mode": "engage",
+            "hostile_entity_type_ids": ["minecraft:zombie"],
+            "max_acquisition_distance": 20,
+            "require_line_of_sight": true,
+            "minimum_attack_cooldown": 0.9,
+            "max_attack_pulses": 64,
+            "max_target_switches": 8,
+            "target_commit_ticks": 8,
+            "retreat_start_distance": 2.5,
+            "retreat_stop_distance": 4.5,
+            "retreat_when_hostile_count_at_least": 1,
+            "max_duration_ms": 25000,
+            "stop_below_health": 5,
+            "friendly_fire": false,
+            "approach_policy": "local_reroute_bounded",
+            "max_approach_ticks": 360,
+            "cover_policy": "none",
+            "max_cover_ticks": 0,
+            "projectile_response": "none",
+            "projectile_evasion_horizon_ticks": 8,
+            "max_evasion_ticks": 0,
+            "shield_hand": "none",
+            "max_shield_hold_ticks": 0
+          },
+          "on_success": "node:recovery-succeeded",
+          "on_failure": "node:recovery-failed",
+          "on_timeout": "node:recovery-failed"
+        },
+        {
+          "node_id": "node:recovery-succeeded",
+          "node_kind": "terminal",
+          "terminal_outcome": "succeeded",
+          "reason_code": "latent_combat_recovery_completed"
+        },
+        {
+          "node_id": "node:recovery-failed",
+          "node_kind": "terminal",
+          "terminal_outcome": "failed",
+          "reason_code": "latent_combat_recovery_failed"
+        }
+      ]
+    }
+  ],
+  "races": [],
+  "interrupts": [
+    {
+      "interrupt_id": "interrupt:recovery-health-threshold",
+      "priority": 220,
+      "condition": {
+        "condition_kind": "health_at_least",
+        "health": 16
+      },
+      "trigger_when": "not_satisfied",
+      "debounce_ticks": 1,
+      "activate_lane_id": "lane:latent-recovery",
+      "cancel_lane_ids": ["lane:opening-combat"],
+      "max_activations": 1
+    }
+  ]
+}

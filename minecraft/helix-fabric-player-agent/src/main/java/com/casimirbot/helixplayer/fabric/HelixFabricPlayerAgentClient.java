@@ -4,19 +4,30 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import com.casimirbot.helixsensor.pairing.ConnectorPairingClient;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
+import java.util.Locale;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +38,8 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
     private Minecraft minecraft;
     private volatile PlayerActionRuntime runtime;
     private volatile PlayerInteractionClient interactionClient;
+    private final RealtimeTexturePackDebugRenderState realtimeTexturePackDebugRenderState =
+        new RealtimeTexturePackDebugRenderState();
     private final AtomicBoolean connectorOperation = new AtomicBoolean(false);
     private int pairingInboxTicks;
     private int diagnosticInboxTicks;
@@ -43,6 +56,14 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         replaceRuntime(initialConfig.action(), initialConfig.interaction());
         restoreDiagnosticInboxScope();
         PlayerActionClientCommands.register(this);
+        HudElementRegistry.attachElementBefore(
+            VanillaHudElements.CHAT,
+            ResourceLocation.fromNamespaceAndPath(
+                "helix_fabric_player_agent",
+                "realtime_texture_pack_debug"
+            ),
+            (graphics, tickCounter) -> renderRealtimeTexturePackDebugHud(graphics)
+        );
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             runtime.tick();
             pollPairingInbox();
@@ -53,12 +74,20 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         WorldRenderEvents.START.register(context -> {
             PlayerActionRuntime active = runtime;
             if (active != null) active.renderFrame(System.nanoTime());
+            // Presentation-only debug seam. It observes an already-admitted
+            // envelope and deliberately performs no texture/provider effect.
+            realtimeTexturePackDebugRenderState.renderFrame(
+                System.nanoTime(),
+                System.currentTimeMillis()
+            );
+            updateRealtimeTexturePackTargetMatch();
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             PlayerActionRuntime active = runtime;
             if (active != null) active.close();
             PlayerInteractionClient interaction = interactionClient;
             if (interaction != null) interaction.close();
+            realtimeTexturePackDebugRenderState.reset();
         });
         LOGGER.info(initialConfig.action().ready()
             ? "Helix Fabric Player Agent loaded with a separately paired action authority."
@@ -67,6 +96,57 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
 
     PlayerActionController controllerForIntegration() {
         return runtime == null ? null : runtime.controllerForIntegration();
+    }
+
+    void admitRealtimeTexturePackDebugProjection(Map<String, Object> projection) {
+        realtimeTexturePackDebugRenderState.admit(projection, System.currentTimeMillis());
+    }
+
+    private void updateRealtimeTexturePackTargetMatch() {
+        if (!realtimeTexturePackDebugRenderState.active() || minecraft.level == null ||
+            !(minecraft.hitResult instanceof BlockHitResult hit)) {
+            realtimeTexturePackDebugRenderState.clearTargetMatch();
+            return;
+        }
+        BlockPos position = hit.getBlockPos();
+        BlockState state = minecraft.level.getBlockState(position);
+        String blockType = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+        String blockState = canonicalBlockState(state);
+        String dimensionId = minecraft.level.dimension().location().toString();
+        try {
+            realtimeTexturePackDebugRenderState.matchTargetBlock(
+                dimensionId,
+                position.getX(), position.getY(), position.getZ(),
+                blockType, blockState, System.currentTimeMillis()
+            );
+        } catch (IllegalArgumentException invalidProjectionMatch) {
+            realtimeTexturePackDebugRenderState.clearTargetMatch();
+        }
+    }
+
+    private void renderRealtimeTexturePackDebugHud(GuiGraphics graphics) {
+        realtimeTexturePackDebugRenderState.hudSnapshot(System.currentTimeMillis()).ifPresent(snapshot -> {
+            graphics.fill(6, 6, 226, 34, 0xB0000000);
+            graphics.drawString(
+                minecraft.font,
+                "Realtime Texture Pack debug | instances " + snapshot.materialInstanceCount() +
+                    " | slots " + snapshot.distinctVariationSlotCount(),
+                10, 10, 0xFFFFFFFF, false
+            );
+            String target = snapshot.targetedVariationSlot() == null
+                ? "target: no matched projected block"
+                : "target: " + snapshot.targetedMaterialFamily() + " / variation " + snapshot.targetedVariationSlot();
+            graphics.drawString(minecraft.font, target, 10, 22, 0xFF80E8FF, false);
+        });
+    }
+
+    private static String canonicalBlockState(BlockState state) {
+        if (state.getValues().isEmpty()) return "default";
+        return state.getValues().entrySet().stream()
+            .sorted(Comparator.comparing(entry -> entry.getKey().getName()))
+            .map(entry -> entry.getKey().getName() + ":" +
+                String.valueOf(entry.getValue()).toLowerCase(Locale.ROOT))
+            .collect(Collectors.joining("."));
     }
 
     void pairAsync(String code, String endpointOverride) {

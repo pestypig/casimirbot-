@@ -9,10 +9,12 @@ import {
 import type {
   MaterializedEnvironmentConnectorBinding,
 } from "./legacy-source-bridge";
+import { installedDeviceRef } from "../../helix-account/installed-security-store";
 
 type ActiveConnectorRow = {
   environment_binding_id: string;
   installation_id: string;
+  installed_device_id: string | null;
   package_version_id: string;
   device_id: string;
   catalog_snapshot_id: string;
@@ -55,6 +57,7 @@ export const listActiveEnvironmentConnectorBindings = async (input: {
       SELECT
         b.environment_binding_id,
         b.installation_id,
+        i.installed_device_id,
         i.package_version_id,
         b.device_id,
         c.catalog_snapshot_id,
@@ -123,6 +126,9 @@ export const listActiveEnvironmentConnectorBindings = async (input: {
     return [{
       packageVersionId: row.package_version_id,
       installationId: row.installation_id,
+      installedNodeRef: row.installed_device_id
+        ? installedDeviceRef(row.installed_device_id)
+        : "installed_node:unbound",
       deviceId: row.device_id,
       environmentBindingId: row.environment_binding_id,
       catalogSnapshot: helixEnvironmentCatalogSnapshotSchema.parse({

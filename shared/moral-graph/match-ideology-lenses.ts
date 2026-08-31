@@ -17,6 +17,8 @@ const EXACT_NODE_ID_SCORE = 1;
 const EXACT_LABEL_OR_ALIAS_SCORE = 0.9;
 const TAG_ACTION_REFERENCE_SCORE = 0.75;
 const LIKELY_KEYWORD_OVERLAP_SCORE = 0.5;
+const LOW_INFORMATION_KEYWORD_TOKENS = new Set(["present", "position"]);
+const LOW_INFORMATION_STANDALONE_TAGS = new Set(["response"]);
 
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[_-]+/g, " ").replace(/[^a-z0-9]+/g, " ").trim();
@@ -138,7 +140,8 @@ export function matchIdeologyLenses(graph: IdeologyGraph, inputText: string): Id
       continue;
     }
 
-    const tag = (node.tags ?? []).find((entry) => phraseMatches(normalizedText, entry));
+    const tag = (node.tags ?? []).find((entry) =>
+      !LOW_INFORMATION_STANDALONE_TAGS.has(normalize(entry)) && phraseMatches(normalizedText, entry));
     if (tag) {
       mergeBestMatch(exactByNode, node, TAG_ACTION_REFERENCE_SCORE, [`tag match: ${tag}`], graph);
       continue;
@@ -157,7 +160,9 @@ export function matchIdeologyLenses(graph: IdeologyGraph, inputText: string): Id
     }
 
     const keywords = nodeKeywords(node);
-    const overlap = [...inputTokens].filter((token) => token.length > 3 && keywords.has(token));
+    const overlap = [...inputTokens].filter(
+      (token) => token.length > 3 && !LOW_INFORMATION_KEYWORD_TOKENS.has(token) && keywords.has(token),
+    );
     if (overlap.length >= 2) {
       mergeBestMatch(
         likelyByNode,

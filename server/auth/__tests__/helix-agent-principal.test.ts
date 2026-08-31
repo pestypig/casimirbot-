@@ -1,15 +1,22 @@
 import type { Request } from "express";
 import { SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildHelixAccountCapabilityPolicy } from
+  "@shared/helix-account-session";
 import {
   HELIX_AGENT_RUN_DEVELOPER_SCOPE,
   HELIX_AGENT_RUN_READ_SCOPE,
   HELIX_AGENT_RUN_WRITE_SCOPE,
 } from "@shared/contracts/helix-agent-api.v1";
+import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from
+  "@shared/contracts/helix-shared-live-room-agent.v1";
 
 const databaseMocks = vi.hoisted(() => ({
   ensureDatabase: vi.fn(),
   query: vi.fn(),
+}));
+const accountSessionMocks = vi.hoisted(() => ({
+  getAccountSessionById: vi.fn(),
 }));
 
 vi.mock("../../db/client", () => ({
@@ -19,11 +26,16 @@ vi.mock("../../db/client", () => ({
     query: (...args: unknown[]) => databaseMocks.query(...args),
   }),
 }));
+vi.mock("../../services/helix-account/account-session-store", () => ({
+  getAccountSessionById: (...args: unknown[]) =>
+    accountSessionMocks.getAccountSessionById(...args),
+}));
 
 import {
   DefaultHelixAgentAccessTokenVerifier,
   requireHelixAgentApiScope,
   resolveHelixAgentApiPrincipal,
+  resolveHelixDesktopMcpPrincipal,
   type HelixAgentAccessTokenVerifier,
   type HelixAgentVerifiedToken,
 } from "../helix-agent-principal";
@@ -40,6 +52,9 @@ const relevantEnvironmentKeys = [
   "HELIX_AGENT_ALLOW_LOCAL_HS256",
   "HELIX_AGENT_LOCAL_JWT_SECRET",
   "HELIX_DEVELOPER_PROFILE_IDS",
+  "CASIMIR_DESKTOP_HOST",
+  "CASIMIR_DESKTOP_SESSION_SECRET",
+  "HELIX_DESKTOP_DEVICE_ID",
 ] as const;
 
 const originalEnvironment = Object.fromEntries(
@@ -103,6 +118,7 @@ const requestWithHeaders = (
 ): Request =>
   ({
     get: (name: string) => headers[name.toLowerCase()],
+    headers,
   }) as unknown as Request;
 
 const verifiedToken = (
@@ -145,6 +161,7 @@ beforeEach(() => {
   databaseMocks.query.mockReset().mockResolvedValue({
     rows: [linkedAccount()],
   });
+  accountSessionMocks.getAccountSessionById.mockReset();
 });
 
 afterEach(() => {
@@ -402,6 +419,7 @@ describe("resolveHelixAgentApiPrincipal", () => {
       subjectId: "subject-linked",
       accountProfileId: "profile-1",
       accountType: "user",
+      mcpClientRef: expect.stringMatching(/^oauth_client:[a-f0-9]{64}$/),
       oauthClientRef: expect.stringMatching(/^oauth_client:[a-f0-9]{64}$/),
       tokenExpiresAt: token.expiresAt,
       accountContext: {
@@ -428,6 +446,67 @@ describe("resolveHelixAgentApiPrincipal", () => {
         "subject-linked",
       ],
     );
+  });
+
+  it("derives a stable opaque MCP client identity for native desktop delegation", async () => {
+    const desktopSecret = "desktop-test-secret-that-is-at-least-32-characters";
+    const sessionId = "account_session:native-client-session";
+    process.env.CASIMIR_DESKTOP_HOST = "1";
+    process.env.CASIMIR_DESKTOP_SESSION_SECRET = desktopSecret;
+    process.env.HELIX_DESKTOP_DEVICE_ID =
+      "desktop_device_abcdefghijklmnopqrstuv";
+    accountSessionMocks.getAccountSessionById.mockResolvedValue({
+      schema: "helix.account_session.v1",
+      session_id: sessionId,
+      profile: {
+        profile_id: "profile-native",
+        display_name: "Native User",
+        email: null,
+        auth_mode: "local_dev",
+        account_type: "developer",
+        provider: "local_dev",
+        provider_alias: "local_dev",
+        provider_subject: "profile-native",
+        picture_url: null,
+        created_at: "2026-08-29T00:00:00.000Z",
+        updated_at: "2026-08-29T00:00:00.000Z",
+      },
+      account_policy: buildHelixAccountCapabilityPolicy("developer"),
+      status: "active",
+      memory_scope: "profile",
+      created_at: "2026-08-29T00:00:00.000Z",
+      updated_at: "2026-08-29T00:00:00.000Z",
+      expires_at: null,
+    });
+    const request = requestWithHeaders({
+      host: "127.0.0.1:65190",
+      "x-casimir-desktop-session": desktopSecret,
+      "x-casimir-desktop-account-session": sessionId,
+    });
+
+    const first = await resolveHelixDesktopMcpPrincipal(request, [
+      "helix.rooms.read",
+      "helix.rooms.manage",
+    ]);
+    const second = await resolveHelixDesktopMcpPrincipal(request, [
+      "helix.rooms.read",
+      "helix.rooms.manage",
+    ]);
+
+    expect(first).toMatchObject({
+      accountProfileId: "profile-native",
+      oauthClientRef: null,
+      mcpClientRef: expect.stringMatching(
+        /^mcp_client:native_desktop:[a-f0-9]{64}$/,
+      ),
+    });
+    expect(first.mcpClientRef).toBe(second.mcpClientRef);
+    expect(first.mcpClientRef).not.toContain("profile-native");
+    expect(first.mcpClientRef).not.toContain(sessionId);
+    expect(first.scopes).toEqual(new Set([
+      "helix.rooms.read",
+      "helix.rooms.manage",
+    ]));
   });
 
   it("preserves the Google provider family while retaining its exact alias", async () => {
@@ -510,6 +589,7 @@ describe("resolveHelixAgentApiPrincipal", () => {
       ),
     );
     expect(withoutDeveloperScope.accountType).toBe("user");
+    expect(withoutDeveloperScope.trustedDeveloperProfile).toBe(true);
 
     const withDeveloperScope = await resolveHelixAgentApiPrincipal(
       request,
@@ -524,6 +604,42 @@ describe("resolveHelixAgentApiPrincipal", () => {
       ),
     );
     expect(withDeveloperScope.accountType).toBe("developer");
+    expect(withDeveloperScope.trustedDeveloperProfile).toBe(true);
+  });
+
+  it("unlocks only the room experiment for an exact room OAuth scope", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.HELIX_DEVELOPER_PROFILE_IDS = "subject-developer";
+    databaseMocks.query.mockResolvedValue({
+      rows: [
+        linkedAccount({
+          profile_id: "profile-developer",
+          account_type: "developer",
+        }),
+      ],
+    });
+
+    const principal = await resolveHelixAgentApiPrincipal(
+      requestWithHeaders({ authorization: "Bearer access-token" }),
+      verifierDouble(
+        verifiedToken({
+          subject: "subject-developer",
+          scopes: new Set([HELIX_SHARED_LIVE_ROOM_READ_SCOPE]),
+        }),
+      ),
+    );
+
+    expect(principal.accountType).toBe("user");
+    expect(principal.trustedDeveloperProfile).toBe(true);
+    expect(principal.accountContext.account_policy?.feature_flags).toContain(
+      "shared_realtime_rooms",
+    );
+    expect(principal.accountContext.account_policy?.locked_features).not.toContain(
+      "shared_realtime_rooms",
+    );
+    expect(principal.accountContext.account_policy?.locked_features).toContain(
+      "developer_workstation_panels",
+    );
   });
 });
 

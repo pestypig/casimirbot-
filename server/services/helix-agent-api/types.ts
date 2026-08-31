@@ -11,6 +11,14 @@ export type HelixAgentApiPrincipal = {
   subjectId: string;
   accountProfileId: string;
   accountType: HelixAccountType;
+  /**
+   * Server-verified profile classification before OAuth scope attenuation.
+   * This never grants generic developer capabilities; a capability must still
+   * require its own exact OAuth scope and any separate native delegation.
+   */
+  trustedDeveloperProfile?: boolean;
+  /** Stable server-derived reference to the authenticated MCP client, never its secret. */
+  mcpClientRef?: string | null;
   /** Stable server-derived reference to the signed OAuth client, never its secret. */
   oauthClientRef?: string | null;
   scopes: ReadonlySet<string>;

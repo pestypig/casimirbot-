@@ -6,10 +6,10 @@ Capability or component: One room may consume separately owned, capability-narro
 Lifecycle stage: node registration → profile connection enrollment → room grant → participant and subject binding → capability resolution → admission → host execution → normalization → evidence re-entry → principal Runtime Codex synthesis → terminal eligibility → shared presentation
 Reaction timescale: on-demand observation and short semantic replanning; `monitor_only` only through an exact finite profile-scoped monitor; local reflex remains connector-owned
 Authority owner: each signed-in profile owns its installed node, environment connections, local subjects, grants, revocation, and mutation ceilings; the room owner owns room membership and may accept or remove references but never owns member credentials; Helix owns exact node, profile, room, participant, environment, source, world, subject, connector-epoch, capability, lease, provenance, and terminal admission; Runtime Codex owns cross-source interpretation and strategy; each connector executes only its admitted local operation
-Current maturity: projected
-Target maturity: deterministically verified for two profiles, two installed-node identities, one room, and separately revocable read-only capability grants
-Required evidence: exact node/profile/connection/room/member/environment/source/world/subject/epoch binding; one-host-many-member and two-host-one-room fixtures; capability-specific consent; stable server-derived routing; credential and private-endpoint exclusion; independent grant expiry and revocation; subject-binding freshness; cross-host evidence identity; single principal reasoning path; one terminal writer; serialized mutation admission; disconnect, reconnect, stale epoch, wrong host, wrong member, wrong subject, and poisoned-projection regressions; and a later signed-install live acceptance artifact
-Explicit non-goals: no room-wide ambient device access; no host filesystem, shell, process, credential store, desktop, private network, Minecraft account, or arbitrary program access; no implicit permission union; no credential transfer; no room ownership of profile connections; no inference that room owner, connection owner, participant, player, beneficiary, and authority subject are the same; no automatic action authority from observation; no competing agent loop, execution arbiter, mutation writer, or terminal writer; no claim that current single-host room contracts prove live multi-host federation
+Current maturity: deterministically verified through M2.1 two-host read-only federation and bounded advisory fan-out; live same-device dual-EXE rehearsal and live cross-device acceptance remain unperformed
+Target maturity: live accepted for one same-device dual-EXE rehearsal with two isolated profile/node/credential boundaries, followed by a separately evidenced live cross-device acceptance before installed release integration
+Required evidence: exact node/profile/connection/room/member/environment/source/world/subject/epoch binding; one-host-many-member and two-host-one-room fixtures; two isolated EXE data roots and installed-node identities for the rehearsal; capability-specific consent; stable server-derived routing; model-provider, MCP-client, and connector credential separation; credential and private-endpoint exclusion; independent grant expiry and revocation; subject-binding freshness; cross-node evidence identity; single principal reasoning path; one terminal writer; serialized mutation admission; disconnect, reconnect, stale epoch, wrong host, wrong member, wrong subject, and poisoned-projection regressions; a same-device dual-EXE live artifact; and a later two-physical-device signed-install acceptance artifact
+Explicit non-goals: no room-wide ambient device access; no host filesystem, shell, process, credential store, desktop, private network, Minecraft account, or arbitrary program access; no implicit permission union; no credential or login-session transfer; no room ownership of profile connections; no inference that room owner, connection owner, participant, player, beneficiary, and authority subject are the same; no automatic action authority from observation; no competing agent loop, execution arbiter, mutation writer, or terminal writer; no claim that two EXEs on one operating-system host prove physical-host isolation, network-partition recovery, independent OS secure stores, or live cross-device acceptance
 Downstream gate unlocked: none; this packet reserves a representative installed-node G8 acceptance surface and does not independently close G8
 
 ## Decision
@@ -172,11 +172,13 @@ receipts, steering requests, cancellations, and supported products may converge.
 
 ## Staged execution program
 
-This packet is executed in order. `M0` is complete with deterministic evidence
-and `M1` is complete with keyed live acceptance evidence. `M2` is eligible for
-a later explicit assignment but is not authorized by this M1 closure; `M3`
-through `M7` remain blocked until the preceding phase records its required
-evidence. A
+This packet is executed in order. `M0` is complete with deterministic evidence,
+`M1` is complete with keyed live acceptance evidence, `M2` is complete with
+deterministic two-node isolation evidence, and `M2.1` is complete with bounded
+advisory fan-out evidence. `M3-R` is the active same-device dual-EXE rehearsal.
+`M3-X` preserves the deferred two-physical-device acceptance requirement;
+`M4` through `M6` may proceed after M3-R, while `M7` and G8 release evaluation
+remain blocked on M3-X as well as their other named prerequisites. A
 phase may perform design clarification for later phases, but it must not add a
 later phase's live authority, catalog exposure, connector behavior, or maturity
 claim.
@@ -186,12 +188,14 @@ claim.
 | M0 | complete — 2026-08-26 deterministic fixture | Provider-neutral one-host/two-member read grant and deterministic lifecycle | deterministically verified |
 | M1 | complete — 2026-08-27 keyed live acceptance | One-host/two-member UI and live read-only acceptance | live accepted |
 | M1.1 | complete — 2026-08-27 deterministic restart coordination | Owner-approved local-supervisor drain, one-use restart authorization, epoch rotation, and reconnect revalidation | deterministically verified |
-| M2 | not assigned — M1 prerequisite satisfied | Two installed-node identities and separately owned read grants in one deterministic room | deterministically verified |
-| M3 | blocked by M2 | One principal turn synthesizes fresh evidence from both live hosts with failure isolation | live accepted |
-| M4 | blocked by M3 | Two Minecraft participants bind and observe separate player subjects | deterministically verified, then live accepted |
+| M2 | complete — 2026-08-29 deterministic federation | Two installed-node identities and separately owned read grants in one deterministic room | deterministically verified |
+| M2.1 | complete — 2026-08-29 deterministic advisory fan-out | Bounded owner-authored node/room advisories fan out to exact eligible client sessions with per-recipient delivery and acknowledgement | deterministically verified |
+| M3-R | active — same-device dual-EXE rehearsal; 2026-08-29 preflight established native node A only | Two isolated installed EXEs on one computer contribute separately owned reads to one principal turn with process/grant failure isolation | live accepted for the same-device dual-EXE surface only |
+| M3-X | deferred until a second physical device is available; blocked by M3-R | Repeat the M3 journey across two physical hosts, including host/network failure and independent secure-store boundaries | live accepted |
+| M4 | blocked by M3-R | Two Minecraft participants bind and observe separate player subjects | deterministically verified, then live accepted |
 | M5 | blocked by M4 | Two independently granted finite Player Embodiment authorities | deterministically verified |
 | M6 | blocked by M5 | One serialized cooperative action plus independently revocable monitoring and control release | integrated accepted |
-| M7 | blocked by M6 and EH-NFO-1 | A generic non-Minecraft adapter participates in the same room federation and installed-node release journey | integrated accepted candidate; G8 closure remains separate |
+| M7 | blocked by M6, M3-X, and EH-NFO-1 | A generic non-Minecraft adapter participates in the same room federation and installed-node release journey | integrated accepted candidate; G8 closure remains separate |
 
 ### Advancement rule
 
@@ -819,12 +823,199 @@ M2 Codex goal:
 > identity-substitution and fallback path. Do not implement live cross-host
 > synthesis or any mutation.
 
-### M3 — live cross-host evidence synthesis
+#### M2 deterministic acceptance record — 2026-08-29
+
+M2 binds environment connector installations to the existing profile-owned
+installed-device security identity instead of treating a connector package
+installation as a computer. Room grants freeze the resulting opaque
+`installed_node_ref`, and both owner and member authorization now resolve the
+current connection server-side before admitting a read. The earlier owner
+shortcut no longer bypasses exact room membership, node, connection, source,
+producer epoch, capability, readiness, or profile checks. Unbound legacy
+installations remain representable for migration but project
+`installed_node_unbound` and cannot create a ready room grant.
+
+The deterministic federation fixture places node A/profile A/connection A and
+node B/profile B/connection B in one room while deliberately advertising the
+same capability from both connections. Exact observations retain distinct
+node, connection, source, epoch, and fixture facts. Wrong-owner, wrong-node,
+wrong-connection, wrong-source, wrong-epoch, wrong-capability, departed-member,
+and stale-policy substitutions fail closed; there is no newest-node,
+nearest-node, label, or capability-name fallback. Reordered fixture input is
+stable. Suspending, rotating, recovering, expiring, revoking, or removing B
+does not change A's active identity, epoch, policy revision, grant, or result.
+
+Verification evidence:
+
+- migration, deterministic lifecycle, two-node federation, and database-backed
+  room-grant suites: 27/27 tests passed;
+- strict room capability schemas continue to exclude credentials, private
+  endpoints, native subjects, hidden reasoning, raw content, mutation,
+  answer, and terminal authority; and
+- the environment-harness documentation audit passed after this record.
+
+The repository-wide TypeScript command remains noisy from pre-existing errors
+outside the M2 surfaces, so it is not claimed as a passing M2 gate. M2 performs
+no live two-host run, cross-host synthesis, advisory fan-out, resource
+telemetry, Minecraft action, concurrent execution, generic-device publication,
+mutation, competing runtime, or second terminal writer. M2.1 is not started by
+this record.
+
+### M2.1 — bounded node advisory fan-out
+
+Objective: let an authenticated installed-node owner or room manager publish
+one bounded operational advisory to every exact eligible Codex client attached
+to a selected current service epoch or room without turning message text into
+execution, evidence, mutation, restart, or terminal authority.
+
+The server resolves the audience. The publisher may select only an opaque
+current service-epoch or room reference it is authorized to manage; it may not
+submit an arbitrary list of profile or client identities. Publication freezes
+an exact recipient snapshot and creates one delivery identity per recipient so
+each client reads and acknowledges only its own copy. An eligible client that
+attaches after publication may receive the still-current advisory under a
+separate deterministic late-attach rule, but a disconnected, revoked,
+wrong-room, wrong-node, stale-epoch, or expired client must not receive it.
+
+Implementation scope:
+
+- define strict advisory-envelope, audience-snapshot, per-recipient delivery,
+  acknowledgement, and expiry schemas;
+- admit only `service_epoch` and `room` audience classes resolved from
+  server-owned identity and current authorization;
+- preserve publisher profile, authenticated MCP client, service epoch, room,
+  creation time, expiry, advisory basis, and immutable recipient-set
+  provenance without exposing credentials, private endpoints, host paths, or
+  hidden reasoning;
+- label operator-authored resource guidance as `owner_declared`, never as
+  measured host telemetry or verified resource pressure;
+- materialize bounded recipient-specific inbox entries with independent
+  delivery and acknowledgement state;
+- surface current notices through the ordinary attach/reconnect and
+  coordination-read lifecycle rather than creating a private agent wake,
+  sampling, or completion loop;
+- require TTL, size, recipient-count, active-notice, history, deduplication,
+  and replay bounds;
+- preserve `advisory_only=true`, `execution_requested=false`,
+  `authority_transfer=false`, `evidence_satisfied=false`, and terminal and
+  answer authority false even when the summary resembles a command; and
+- prove deterministic service-local and two-node room-scoped routing before
+  M3-R attempts live same-device dual-EXE delivery.
+
+Required deterministic evidence:
+
+1. Every active eligible recipient receives exactly one delivery identity.
+2. One recipient cannot read or acknowledge another recipient's delivery.
+3. Duplicate publication with the same publisher idempotency key is stable;
+   conflicting replay fails closed.
+4. Wrong-profile, wrong-client, wrong-room, wrong-node, and stale-service-epoch
+   publication or delivery attempts fail closed.
+5. Disconnect, room departure, grant revocation, expiry, and node removal stop
+   future delivery without altering another node or recipient.
+6. Reconnect preserves an exact pending delivery for the same derived client;
+   a different continuation receives a separate identity only when the frozen
+   audience and late-attach policy admit it.
+7. Command-like advisory text remains inert and cannot start, stop, replace,
+   vote on, or grant authority over a process, connector, run, or lease.
+8. Resource-warning text is projected as owner-declared guidance unless a
+   separately governed read-only host-resource observer supplies normalized
+   measured evidence.
+9. Bounded-load tests prove recipient and history caps without unbounded
+   per-agent memory growth.
+
+An intended normalized example is:
+
+> Node-owner resource advisory: Conserve workstation memory. Prefer attaching
+> to the existing installed-node harness instead of starting another node. Use
+> local-supervisor presence and relay coordination before beginning
+> resource-intensive work. This notice is advisory and grants no process or
+> execution authority.
+
+M2.1 does not add ambient RAM/process inspection, arbitrary broadcast, push
+delivery into a closed Codex task, automatic goal changes, democratic restart,
+cross-room messaging, mutation, a second execution arbiter, or a second
+terminal writer. Live same-device delivery remains M3-R evidence, and physical
+cross-device delivery remains M3-X evidence.
+
+M2.1 Codex goal:
+
+> Execute only M2.1 of EH-G8 Shared Room Multi-Host Capability Federation v1
+> after M2 evidence. Add deterministic, bounded owner advisory fan-out for one
+> exact service epoch or room, with server-resolved recipients,
+> recipient-specific delivery and acknowledgement, reconnect/late-attach
+> rules, expiry, deduplication, and fail-closed identity isolation. Keep every
+> advisory inert and label resource guidance as owner-declared. Do not inspect
+> ambient host resources, push into closed tasks, implement live cross-host
+> delivery, change goals, restart processes, grant authority, or begin M3-R.
+
+#### M2.1 deterministic acceptance record — 2026-08-29
+
+M2.1 adds strict owner-declared advisory, server-resolved audience snapshot,
+recipient-specific delivery, acknowledgement, expiry, replay, and late-attach
+contracts. A publisher supplies only an exact `service_epoch` or `room`
+audience reference; a server-owned authorization resolves the eligible clients
+and freezes the initial recipient set. The request schema has no arbitrary
+recipient-list field. Each delivery binds the exact profile, authenticated MCP
+client, derived client session, service instance, installed node, and room when
+applicable. A recipient cannot read or acknowledge another recipient's copy.
+
+The deterministic fixture covers a service-local audience on node A and a
+room audience spanning nodes A and B. It proves exact replay stability,
+conflicting replay rejection, reconnect continuity for the same derived client,
+separate deterministic late-attach identity, grant-revocation, room-departure,
+disconnect, node-removal and stale-service isolation, and independent survival
+of unaffected recipients. Recipient, active-advisory, TTL, summary-size,
+history, deduplication and replay bounds are explicit. Private endpoints,
+credentials and host paths are rejected from normalized advisory text.
+
+Every envelope and delivery preserves `advisory_only=true`,
+`execution_requested=false`, `authority_transfer=false`,
+`evidence_satisfied=false`, and mutation, process-control, restart-vote,
+goal-change, answer and terminal authority false. Resource warnings are
+`owner_declared` and explicitly contain no measured resource evidence. The
+command-like fixture asking clients to stop the server, change goals and grant
+authority remains inert.
+
+Verification evidence:
+
+- M2.1 fan-out suite: 8/8 tests passed;
+- focused fan-out, presence, relay, restart-coordination and HTTP-route battery:
+  28/28 tests passed; and
+- the environment-harness documentation audit passed after this record.
+
+The existing MCP coordination suite has one unrelated stale catalog-list
+expectation because another present tool, `helix_evidence_observation_get`, is
+not included in that test's expected list; its other ten tests pass. M2.1 does
+not repair or claim that concurrent catalog change. The fan-out service is a
+deterministic contract and ordinary inbox/reconnect seam, not a live public MCP
+broadcast: a future promotion must inject the installed-node owner or room
+manager authorization and current audience resolver into the packaged node.
+M2.1 performs no ambient RAM/process inspection, private task wake, automatic
+goal change, restart vote or execution, live cross-host delivery, mutation,
+second arbiter, second terminal writer, M2.2 host-resource admission, or M3-R
+same-device dual-EXE synthesis. M3-R is not started by this record.
+
+### M3-R — same-device dual-EXE evidence synthesis rehearsal
 
 Objective: prove that one natural prompt can require fresh evidence from two
-live installed nodes, that both exact results re-enter one principal Runtime
-Codex turn, and that failure or revocation of one host does not corrupt the
-other.
+live, isolated installed EXE instances on one Windows computer, that both exact
+results re-enter one principal Runtime Codex turn, and that termination,
+disconnect, or revocation of one instance does not corrupt the other.
+
+The two instances must use different native data roots, profile sessions,
+installed-node identities, service epochs, MCP-client identities when used,
+profile connections, connector credentials, producer epochs, and room grants.
+They may share one Shared Live Room and one protected provider/tunnel broker.
+The broker may use model-provider authorization on behalf of the admitted
+principal reasoning turn, but neither EXE, profile, room member, connector, nor
+MCP client receives another profile's login session, OAuth token, provider key,
+connector credential, or private endpoint.
+
+This rehearsal proves multi-profile, multi-process, routing, grant, evidence
+re-entry, process-failure, reconnect, and terminal-writer behavior on the
+available workstation. It does not prove physical-host failure isolation,
+network partition behavior, independent operating-system secure stores, clock
+independence, or live cross-device operation.
 
 Required journey:
 
@@ -841,13 +1032,88 @@ profiles A and B authenticate on nodes A and B
 → A-only follow-up remains available
 ```
 
-M3 Codex goal:
+M3-R Codex goal:
 
-> Execute only M3 of EH-G8 Shared Room Multi-Host Capability Federation v1
-> after M2 evidence. Prove one live, natural, cross-host read-only synthesis
-> with exact re-entry, failure isolation, reconnect, independent revocation,
-> and one terminal writer. Stop at the first lifecycle divergence and do not
-> add Player Embodiment authority.
+> Execute only M3-R of EH-G8 Shared Room Multi-Host Capability Federation v1
+> after M2.1 evidence. Launch or attach two isolated installed EXE instances on
+> one computer, authenticate different CasimirBot profiles, bind different
+> installed-node and connector identities, and prove one live natural read-only
+> synthesis with exact re-entry, process/grant failure isolation, reconnect,
+> independent revocation, and one terminal writer. One protected provider or
+> tunnel broker may serve the principal turn, but do not share login sessions,
+> raw credentials, local data roots, or authority. Stop at the first lifecycle
+> divergence and do not add Player Embodiment authority.
+
+#### M3 umbrella live preflight checkpoint — 2026-08-29
+
+M3-R is assigned but not accepted. The keyed development service was healthy and
+reported an exact service-instance and workspace identity, but its sanitized
+local-supervisor projection identified the process as `external_process` with
+`one_instance_enforced=false`. The installed-account-services boundary rejected
+the preflight with `installed_node_required`, and the installed-security
+boundary rejected it with `desktop_required`. This is the first lifecycle
+divergence because M3-R requires separately owned installed-node identities
+before room or evidence admission.
+
+The persisted candidate room retained two remembered participants, but both
+were away, both lacked current consent, its runtime was idle, and its transport
+owner was unbound. The visible connector inventory contained twelve legacy
+devices and zero installations bound to a current installed-node identity.
+Therefore, the room establishes neither two live hosts nor two exact current
+node/profile/client/connection/source/producer-epoch read paths. No synthetic
+second node, newest/nearest/label/capability fallback, natural cross-host
+prompt, evidence substitution, mutation, or terminal answer was admitted.
+
+The sanitized checkpoint is recorded at
+`docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-live-preflight.json`.
+M3-R remains active at its prior `deterministically verified` capability maturity;
+`live accepted` is not claimed and M4 remains blocked. The next admissible run
+must begin with two active native installed-node supervisors, bind one exact
+read-only connector installation to each node, authenticate the separate owner
+profiles and MCP clients, and only then establish current room grants and issue
+the natural two-source prompt.
+
+A follow-up native preflight found the installed Windows EXE already running.
+Its installed-node supervisor and credential isolation both projected `ready`,
+the registered node `device:sha256:27b9475bb93cea3fb7235343c0c405e1`
+was active, and the local developer profile was authenticated. This resolves
+the earlier node-A native-supervisor uncertainty, but it does not admit an M3-R
+read: the desktop MCP tunnel was limited to read-only coordination, while the
+only paired environment device was a legacy Minecraft connector that was
+offline, contact-stale, probe-blocked, and not bound to the current installed
+node. No separately owned native node B was present.
+
+The second sanitized checkpoint is recorded at
+`docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-native-node-a-preflight.json`.
+M3-R therefore remains active and unaccepted. The next admissible progress is
+to bind one fresh read-only connector to native node A and launch a second
+installed EXE with a separate data root, profile session, node identity, and
+connector identity on the same computer. Remembered profiles, a second window
+over the same data root, a coordination-only tunnel, or a legacy connector
+cannot substitute for the second isolated instance.
+
+### M3-X — deferred physical cross-device acceptance
+
+Objective: repeat the accepted M3-R journey on two physical computers and add
+the failure modes that one workstation cannot establish: physical-host loss,
+network partition and recovery, independently protected native stores, and
+separate host supervision.
+
+M3-X reuses the M3-R room, identity, grant, evidence-re-entry, independent
+revocation, and single-writer contracts without widening authority. M3-X is not
+required to begin M4 through M6 on the same-device development surface, but it
+is required before M7 may claim integrated installed-node acceptance and before
+this packet contributes cross-device evidence to G8 release evaluation.
+
+M3-X Codex goal:
+
+> Execute only M3-X of EH-G8 Shared Room Multi-Host Capability Federation v1
+> after M3-R acceptance and when two physical computers are available. Repeat
+> the natural two-source read-only synthesis across separately supervised hosts
+> and prove host loss, network interruption, reconnect, independent secure
+> credential custody, exact evidence re-entry, independent revocation, and one
+> terminal writer. Do not infer acceptance from the same-device rehearsal and
+> do not add Player Embodiment authority.
 
 ### M4 — two-player Minecraft observation
 
@@ -867,7 +1133,7 @@ Required evidence:
 M4 Codex goal:
 
 > Execute only M4 of EH-G8 Shared Room Multi-Host Capability Federation v1
-> after M3 acceptance. Prove two-player observation and subject isolation in
+> after M3-R acceptance. Prove two-player observation and subject isolation in
 > one Minecraft room. Do not pair or grant Player Embodiment, World Authority,
 > or workstation control.
 
@@ -964,7 +1230,9 @@ advance phases or enable broader authority.
 
 1. One installed host supplies a read-only observation to two authorized room members.
 2. A non-host member benefits from the room Runtime Codex result without receiving the host credential or private endpoint.
-3. Two installed nodes attach different read-only connections to one room.
+3. Two installed nodes attach different read-only connections to one room;
+   the same-device rehearsal uses isolated EXE data roots and the cross-device
+   acceptance later repeats the journey on two physical hosts.
 4. One principal turn materializes fresh evidence from both exact connections.
 5. Revoking node B's room grant leaves node A's unrelated grant active.
 6. Disconnecting or rotating one connector produces a typed stale/offline/epoch failure only for that connection.
@@ -979,9 +1247,25 @@ advance phases or enable broader authority.
 15. Observations and receipts remain nonterminal; one principal candidate and terminal writer remain.
 16. No credential, native player ID, private network route, host path, process, or hidden reasoning enters room or MCP projections.
 
-## Live acceptance reservation
+## Live acceptance reservations
 
-The later signed-install journey is:
+The M3-R same-device reservation is:
+
+```text
+launch EXE A with native data root A and sign in profile A
+→ launch EXE B with native data root B and sign in profile B
+→ register different installed-node, client, connection, connector and epoch identities
+→ let one protected provider/tunnel broker serve the admitted principal turn
+→ join one Shared Live Room as distinct members
+→ attach and grant one narrowed read from each instance
+→ execute one natural prompt requiring both current observations
+→ re-enter both exact results and project one supported answer
+→ terminate, revoke and reconnect B without corrupting A
+→ prove no login session, OAuth token, provider key or connector credential crossed boundaries
+```
+
+This artifact may accept only the exact same-device dual-EXE surface. The later
+signed-install cross-device journey is:
 
 ```text
 install and sign in node A under profile A

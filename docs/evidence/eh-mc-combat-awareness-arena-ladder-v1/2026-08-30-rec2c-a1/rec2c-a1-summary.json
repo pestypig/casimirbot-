@@ -1,0 +1,90 @@
+{
+  "schema": "helix.minecraft_combat_rec2c_exploratory_summary.v2",
+  "acceptance_status": "exploratory_not_accepted",
+  "workflow_ref": "environment_action_workflow:7e6cbf20-d74b-4687-9aa3-4e86f375418f",
+  "evidence_ref": "environment_action_evidence:1b90f6aa98e3fba5f8f855078cf98383395736b52",
+  "starting_health": 17.0,
+  "opponent_count": 5,
+  "opponent_type": "minecraft:zombie",
+  "interrupt_count": 1,
+  "consume_completed_tick": 33,
+  "consumed_item_id": "minecraft:golden_apple",
+  "consumed_count": 1,
+  "reequip_completed_tick": 33,
+  "combat_terminal_tick": 179,
+  "attack_pulses": 13,
+  "remaining_hostile_count": 0,
+  "terminal_health": 20.0,
+  "terminal_absorption": 4.0,
+  "controls_released": true,
+  "damage_during_use_proven": false,
+  "measurement_increment": {
+    "adapter_artifact_version": "0.4.1",
+    "jar_sha256": "497BE8BC50B02AC2C2AC7B25334462E5ED9CCF5A8EF0FD192573D7010D0518E3",
+    "workflow_ref": "environment_action_workflow:af6f96d0-597a-45f6-bba1-5bb0775b50c3",
+    "evidence_ref": "environment_action_evidence:51d89b2f944ca96aecf3f8d06b841e3b7538f8ff2",
+    "opponent_count": 5,
+    "opponent_variant": "baby_zombie",
+    "consume_use_ticks": 31,
+    "minimum_health_during_use": 17.0,
+    "observed_health_loss_during_use": 0.0,
+    "health_loss_event_count_during_use": 0,
+    "combat_terminal_tick": 250,
+    "attack_pulses": 19
+  },
+  "full_health_reactive_probes": [
+    {
+      "opponent_count": 7,
+      "workflow_ref": "environment_action_workflow:7d420a26-c5ed-4b6d-aea6-9d23da6ce97f",
+      "evidence_ref": "environment_action_evidence:aa945799855ee882dd8bf3a260aedad0c8e6a30e9",
+      "duration_ticks": 121,
+      "attack_pulses": 11,
+      "interrupt_count": 0,
+      "outcome": "succeeded"
+    },
+    {
+      "opponent_count": 11,
+      "workflow_ref": "environment_action_workflow:79941ee6-850e-47d8-a33d-00574983640e",
+      "evidence_ref": "environment_action_evidence:04c92ef5a669b30ed33b8543cae7305b93cff1b64",
+      "duration_ticks": 229,
+      "attack_pulses": 20,
+      "interrupt_count": 0,
+      "outcome": "succeeded"
+    },
+    {
+      "opponent_count": 15,
+      "workflow_ref": "environment_action_workflow:abd5d926-cab4-4a5a-b54a-eff87f1b27fb",
+      "evidence_ref": "environment_action_evidence:7c514bc74b4a6cb76148ca5bc314807905f00f596",
+      "duration_ticks": 373,
+      "attack_pulses": 32,
+      "interrupt_count": 0,
+      "outcome": "succeeded"
+    },
+    {
+      "opponent_count": 16,
+      "workflow_ref": "environment_action_workflow:8a9096ca-ea6b-45d0-b174-a7588af6011e",
+      "evidence_ref": "environment_action_evidence:cf4275889a66a70aaaa54b161f87f7690cbc4abf5",
+      "duration_ticks": 397,
+      "attack_pulses": 34,
+      "interrupt_count": 0,
+      "outcome": "succeeded"
+    }
+  ],
+  "sustained_pressure_probe": {
+    "opponent_count": 5,
+    "opponent_variant": "baby_zombie_speed_iii_strength_ii_resistance_ii",
+    "workflow_ref": "environment_action_workflow:825a21ca-b2a3-4a3b-9a1a-3bcca5673f0b",
+    "evidence_ref": "environment_action_evidence:a0923034fddbbfda132d3d9b29c0b7c1d3d52d2bd",
+    "duration_ticks": 289,
+    "attack_pulses": 25,
+    "interrupt_count": 0,
+    "outcome": "succeeded"
+  },
+  "remaining_required_evidence": [
+    "source_attributed_damage_during_use",
+    "hazard_safe_terminal_settlement",
+    "five_trials_per_breakpoint_rung",
+    "matched_skilled_human_baseline",
+    "contextual_actionable_threat_admission"
+  ]
+}

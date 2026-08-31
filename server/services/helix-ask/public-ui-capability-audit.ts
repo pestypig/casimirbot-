@@ -5,6 +5,7 @@ import {
 import {
   HELIX_PUBLIC_UI_AGENT_CATALOG_SCHEMA,
   HELIX_PUBLIC_UI_AUTHORITY_BINDINGS,
+  HELIX_PUBLIC_UI_MCP_BINDINGS,
   HELIX_PUBLIC_UI_SURFACE_CATALOG,
   type HelixPublicUiAuthorityState,
   type HelixPublicUiControlCatalogEntry,
@@ -57,6 +58,7 @@ export type HelixPublicUiAgentCatalog = {
   surfaces: typeof HELIX_PUBLIC_UI_SURFACE_CATALOG;
   controls: typeof HELIX_PUBLIC_UI_CONTROL_CATALOG;
   capabilities: HelixPublicUiCapabilityAuditRow[];
+  mcp_bindings: typeof HELIX_PUBLIC_UI_MCP_BINDINGS;
   orphan_capability_ids: string[];
   control_binding_failures: HelixPublicUiControlBindingFailure[];
   content_role: "public_ui_catalog_observation_not_assistant_answer";
@@ -183,12 +185,15 @@ export const auditHelixPublicUserUiCapabilities = (): HelixPublicUiCapabilityAud
 
     const routeBinding = routeBindingByCapabilityId.get(capabilityId);
     if (routeBinding) {
+      const routeSurface = HELIX_PUBLIC_UI_SURFACE_CATALOG.find(
+        (surface) => surface.surface_id === routeBinding.surface_id,
+      );
       rows.push({
         capability_id: capabilityId,
         authority_state: "route_owned",
         command_surface_id: "helix.ask",
         projection_surface_id: routeBinding.surface_id,
-        account_scope: "user",
+        account_scope: routeSurface?.account_scope ?? "user",
         interaction_kind: routeBinding.interaction_kind,
         permission_profile_required: routeBinding.permission_profile_required,
         requires_confirmation: routeBinding.requires_confirmation,
@@ -233,6 +238,7 @@ export const buildHelixPublicUiAgentCatalog = (): HelixPublicUiAgentCatalog => {
     surfaces: HELIX_PUBLIC_UI_SURFACE_CATALOG,
     controls: HELIX_PUBLIC_UI_CONTROL_CATALOG,
     capabilities: capabilityAudit.rows,
+    mcp_bindings: HELIX_PUBLIC_UI_MCP_BINDINGS,
     orphan_capability_ids: capabilityAudit.orphan_capability_ids,
     control_binding_failures: capabilityAudit.control_binding_failures,
     content_role: "public_ui_catalog_observation_not_assistant_answer",

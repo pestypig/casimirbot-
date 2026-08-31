@@ -109,3 +109,75 @@ Codex MCP client reconnected to the new service but retained its turn-start
 tool catalog, so the new tool was not callable in that same turn. This is a
 catalog-refresh/client-turn boundary, not a failure of source-only pairing or a
 reason to weaken identity.
+
+## 2026-08-30 installed-EXE C0 endpoint migration finding
+
+The installed EXE was relaunched with the bounded `combat-c0-server` profile
+selector and its governed native tunnel reached **Full developer MCP** through
+an explicit short-lived developer delegation. The owner UI then staged an
+opaque local sensing repair into the correct C0 server inbox without exposing
+the one-time code or granting command authority.
+
+That live handoff isolated a second bootstrap defect before source admission.
+The inbox consumer discarded the staged file correctly but forced
+`ConnectorPairingClient.LOCAL_PAIRING_ENDPOINT`, so it ignored the connector's
+persisted `pairing_endpoint` and attempted the retired fixed-port service. The
+normal `/helix pair` path already used the persisted endpoint; only the opaque
+same-host inbox path diverged.
+
+The inbox path now resolves the endpoint through
+`FabricSensorConfigLoader.loadPairingEndpoint`, matching the explicit command
+path. A pure map-level regression assertion covers preservation of the
+installed EXE's ephemeral loopback pairing endpoint. This change does not
+broaden the allowed endpoint policy, return a credential, grant World
+Authority or Player Embodiment, or claim live source acceptance. Live
+acceptance still requires rebuilding and installing the sensor, restarting the
+C0 server, repeating the opaque handoff, and observing a fresh exact-binding
+heartbeat with command authority absent.
+
+### Bounded live recovery result
+
+The repaired `HelixFabricSensor-0.3.0.jar` passed its Java 21 `test remapJar`
+build, was installed into the disposable C0 profile with the preceding artifact
+retained as a backup, and the server restarted on `127.0.0.1:25566` with
+`helix_combat_c0_world`. Because the packaged desktop child still filters out
+the live server-profile selector, the new unread inbox first landed under the
+packaged runtime. It was moved without inspection into the verified C0 config
+directory while still inside its two-minute validity window.
+
+The server then logged pairing success, restarted the sensor in read-only mode,
+admitted the manifest, and separately confirmed that the command lane remained
+disabled. Owner-scoped Device Check observed the replacement binding online
+and fresh, probe-ready, with all 12 read capabilities and no blockers. The room,
+source, and world identities matched the active room projection, and DatDamPig
+rejoined the C0 arena at `(-4.5, 65.0, 0.5)`.
+
+This restores C0 sensing and proves the endpoint-migration repair live. It does
+not promote the overall profile-native handoff capability to `live accepted`:
+the installed EXE must still persist or safely select the external live server
+profile so the governed handoff lands there without a manual opaque transfer.
+No World Authority, Player Embodiment, Minecraft command, or combat hazard was
+enabled during this recovery.
+
+## 2026-08-31 profile-owned player-directory live acceptance
+
+The installed profile registry now distinguishes its dedicated Fabric server
+directory from its local Fabric player game directory. Registry schema v2
+migrates v1 server-only entries and stores optional `player_game_directory`
+under the authenticated owner profile. Device Check exposes separate native
+selectors, and both browser/API and MCP player handoffs resolve the exact
+owner-profile player directory before any legacy environment fallback.
+
+Focused registry, resolver and handoff verification passed: 3 files, 8 tests.
+The desktop host build and client production build passed, and the packaged
+installer was rebuilt and installed. In the installed app the owner saved
+`C:\Users\dan\AppData\Roaming\.minecraft-helix-c0`; a subsequent MCP opaque
+player handoff was consumed immediately by that running client. Its log
+reported player-action pairing success, and the governed readiness projection
+reported an admitted 21-capability manifest with a fresh active heartbeat.
+No pairing code or connector credential entered MCP output, terminal output,
+chat or an artifact.
+
+This promotes only the owner-scoped local player-directory routing slice to
+`live accepted`. Source/server profile routing retains its prior maturity, and
+combat outcomes remain governed by the separate arena packet.

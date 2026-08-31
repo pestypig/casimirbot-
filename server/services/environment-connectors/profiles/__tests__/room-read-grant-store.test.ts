@@ -11,6 +11,9 @@ import {
 } from "../../../../routes/environment-connector-platform";
 import { listEnvironmentConnectorDeviceChecks } from
   "../../devices/device-check";
+import { readLocalSupervisorEnvironmentIdentity } from
+  "../../bindings/local-supervisor-identity-reader";
+import { installedDeviceRef } from "../../../helix-account/installed-security-store";
 import {
   authorizeRoomReadGrant,
   createRoomReadGrant,
@@ -31,6 +34,8 @@ const WORLD = "minecraft:test:room-grant";
 const ADMISSION = "environment_adapter_admission:room-grant";
 const PACKAGE_VERSION = "connector_package_version:room-grant";
 const INSTALLATION = "connector_installation:room-grant";
+const INSTALLED_DEVICE = "desktop_device_room_grant_owner";
+const INSTALLED_NODE = installedDeviceRef(INSTALLED_DEVICE);
 const DEVICE = "connector_device:room-grant";
 const DEVICE_CREDENTIAL = "connector_device_credential:room-grant";
 const CONNECTION = "environment_binding:room-grant";
@@ -98,12 +103,18 @@ const seed = async (): Promise<void> => {
     ],
   );
   await db.query(
+    `INSERT INTO helix_installed_devices
+       (profile_id, device_id, label, platform, status, registered_at, last_seen_at)
+     VALUES ($1,$2,'Owner workstation','windows','active',$3,$3);`,
+    [OWNER, INSTALLED_DEVICE, NOW.toISOString()],
+  );
+  await db.query(
     `INSERT INTO helix_environment_connector_installations
        (installation_id, owner_profile_id, package_version_id,
-        granted_capability_ids, status)
-     VALUES ($1,$2,$3,$4::jsonb,'active');`,
+        granted_capability_ids, status, installed_device_id)
+     VALUES ($1,$2,$3,$4::jsonb,'active',$5);`,
     [INSTALLATION, OWNER, PACKAGE_VERSION,
-      JSON.stringify([HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY])],
+      JSON.stringify([HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY]), INSTALLED_DEVICE],
   );
   await db.query(
     `INSERT INTO helix_environment_connector_devices
@@ -142,7 +153,7 @@ const authorizeAsMember = (overrides: Partial<Parameters<typeof authorizeRoomRea
     requestingParticipantId: MEMBER_PARTICIPANT,
     connectionOwnerProfileId: OWNER,
     connectionRef: CONNECTION,
-    installedNodeRef: INSTALLATION,
+    installedNodeRef: INSTALLED_NODE,
     sourceRef: SOURCE,
     producerEpochRef: EPOCH,
     capabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
@@ -177,6 +188,74 @@ describe("room read grant store", () => {
     vi.unstubAllEnvs();
   });
 
+  it("resolves one canonical owner/grantee source epoch and rejects stale or departed identity", async () => {
+    await expect(readLocalSupervisorEnvironmentIdentity({
+      roomId: ROOM,
+      profileId: OWNER,
+      participantId: OWNER_PARTICIPANT,
+      environmentBindingId: CONNECTION,
+      now: NOW,
+    })).resolves.toEqual({
+      roomId: ROOM,
+      participantId: OWNER_PARTICIPANT,
+      environmentBindingId: CONNECTION,
+      connectorInstallationId: INSTALLATION,
+      sourceId: SOURCE,
+      producerEpochRef: EPOCH,
+    });
+    await expect(readLocalSupervisorEnvironmentIdentity({
+      roomId: ROOM,
+      profileId: MEMBER,
+      participantId: MEMBER_PARTICIPANT,
+      environmentBindingId: CONNECTION,
+      now: NOW,
+    })).resolves.toBeNull();
+    await createRoomReadGrant({
+      roomId: ROOM,
+      ownerProfileId: OWNER,
+      ownerParticipantId: OWNER_PARTICIPANT,
+      connectionRef: CONNECTION,
+      capabilityIds: [HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY],
+      expiresInMinutes: 60,
+      now: NOW,
+    });
+    await expect(readLocalSupervisorEnvironmentIdentity({
+      roomId: ROOM,
+      profileId: MEMBER,
+      participantId: MEMBER_PARTICIPANT,
+      environmentBindingId: CONNECTION,
+      now: NOW,
+    })).resolves.toMatchObject({
+      sourceId: SOURCE,
+      producerEpochRef: EPOCH,
+    });
+    await getPool().query(
+      `UPDATE helix_environment_connector_devices
+       SET producer_epoch_ref = 'producer_epoch:rotated'
+       WHERE device_id = $1;`,
+      [DEVICE],
+    );
+    await expect(readLocalSupervisorEnvironmentIdentity({
+      roomId: ROOM,
+      profileId: MEMBER,
+      participantId: MEMBER_PARTICIPANT,
+      environmentBindingId: CONNECTION,
+      now: NOW,
+    })).resolves.toBeNull();
+    await getPool().query(
+      `UPDATE helix_shared_realtime_room_members SET presence = 'left'
+       WHERE room_id = $1 AND profile_id = $2;`,
+      [ROOM, OWNER],
+    );
+    await expect(readLocalSupervisorEnvironmentIdentity({
+      roomId: ROOM,
+      profileId: OWNER,
+      participantId: OWNER_PARTICIPANT,
+      environmentBindingId: CONNECTION,
+      now: NOW,
+    })).resolves.toBeNull();
+  });
+
   it("shares a sanitized read capability, persists admission, and revokes without disconnecting the host", async () => {
     const ownerBefore = await listRoomSharedCapabilities({
       roomId: ROOM, requestingProfileId: OWNER, requestingIsOwner: true, now: NOW,
@@ -184,6 +263,7 @@ describe("room read grant store", () => {
     expect(ownerBefore.available_connections).toHaveLength(1);
     expect(ownerBefore.available_connections[0]).toMatchObject({
       owner_profile_ref: OWNER,
+      installed_node_ref: INSTALLED_NODE,
       connection_ref: CONNECTION,
       ready: true,
       action_class: "none",
@@ -307,7 +387,7 @@ describe("room read grant store", () => {
       { producerEpochRef: "producer_epoch:wrong" },
     ]) {
       await expect(authorizeAsMember(overrides)).rejects.toMatchObject({
-        code: "room_read_grant_not_found",
+        code: "room_read_grant_identity_mismatch",
       });
     }
     await getPool().query(
@@ -316,8 +396,38 @@ describe("room read grant store", () => {
       [ROOM, MEMBER],
     );
     await expect(authorizeAsMember()).rejects.toMatchObject({
-      code: "room_read_grant_not_found",
+      code: "room_read_grant_identity_mismatch",
     });
+  });
+
+  it("validates the owner's exact node, source, epoch, capability, and room membership", async () => {
+    const exact = {
+      roomId: ROOM,
+      requestingProfileId: OWNER,
+      requestingParticipantId: OWNER_PARTICIPANT,
+      connectionOwnerProfileId: OWNER,
+      connectionRef: CONNECTION,
+      installedNodeRef: INSTALLED_NODE,
+      sourceRef: SOURCE,
+      producerEpochRef: EPOCH,
+      capabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+      turnId: "turn:owner-exact",
+      toolCallId: "tool_call:owner-exact",
+      now: NOW,
+    } as const;
+    await expect(authorizeRoomReadGrant(exact)).resolves.toEqual({
+      basis: "connection_owner", grantRef: null, policyRevision: 1,
+    });
+    for (const override of [
+      { installedNodeRef: "device:sha256:00000000000000000000000000000000" },
+      { sourceRef: "source:wrong" },
+      { producerEpochRef: "producer_epoch:wrong" },
+      { capabilityId: "com.casimirbot.minecraft.unsupported.read" },
+    ]) {
+      await expect(authorizeRoomReadGrant({ ...exact, ...override })).rejects.toMatchObject({
+        code: "room_read_grant_identity_mismatch",
+      });
+    }
   });
 
   it("admits two concurrent read-only chat turns without merging their audit identity", async () => {
