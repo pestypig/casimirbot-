@@ -1,0 +1,73 @@
+{
+  "schema": "casimirbot.eh_g8_pna2_source_delivery_and_hosting_handoff.v1",
+  "recorded_at": "2026-09-01T02:06:28.1143844Z",
+  "program_gate": "G8",
+  "workstream": "provider-neutral external-agent onboarding",
+  "capability": "PNA2",
+  "lifecycle_stage": "client authorization and source admission",
+  "result": "source_delivered_hosted_materialization_pending",
+  "source_delivery": {
+    "branch": "main",
+    "local_head": "e9d5e0a1c432f0f9f6220669a1db39907756da63",
+    "remote_main": "e9d5e0a1c432f0f9f6220669a1db39907756da63",
+    "commit_subject": "chore: checkpoint current development state",
+    "local_remote_match": true
+  },
+  "focused_acceptance": {
+    "test_files_passed": 14,
+    "tests_passed": 122,
+    "tests_failed": 0,
+    "execution_mode": "forks_single_worker_memory_bounded",
+    "interrupted_wait_recovery": "The first serial invocation emitted passing results for 12 files and 109 tests before its tool session was interrupted. The only two not-yet-emitted UI files were rerun together and passed 13/13, yielding the same complete 14-file 122/122 gate.",
+    "helix_ask_discipline_quick": "PASS_no_ask_sensitive_changes",
+    "environment_harness_docs_audit": "PASS_G8"
+  },
+  "public_metadata_probe": {
+    "observed_at": "2026-09-01T02:06:28.1143844Z",
+    "base_url": "https://casimirbot.com",
+    "responses": [
+      {
+        "path": "/.well-known/oauth-protected-resource/mcp",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "expected_content_type": "application/json",
+        "result": "failed_closed_stale_website_shell"
+      },
+      {
+        "path": "/.well-known/oauth-protected-resource/mcp/device-check",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "expected_content_type": "application/json",
+        "result": "failed_closed_stale_website_shell"
+      },
+      {
+        "path": "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "expected_content_type": "application/json",
+        "result": "failed_closed_stale_website_shell"
+      }
+    ]
+  },
+  "hosting_handoff": {
+    "provider": "Replit",
+    "authenticated_project_observed": "https://replit.com/@pestypig/CasimirBot",
+    "project_title_observed": "CasimirBot - Replit",
+    "deployment_action_taken": false,
+    "browser_control_result": "The authenticated project was identified, but the full Replit workspace did not expose an inspectable deployment panel before repeated bounded browser-control timeouts.",
+    "next_operator_surface": "Open the CasimirBot project's Deployments view so the exact current deployment and publish action can be inspected before production mutation."
+  },
+  "authority_and_secret_boundary": {
+    "provider_app_chat_control_claimed": false,
+    "hidden_reasoning_recorded": false,
+    "credential_value_recorded": false,
+    "oauth_token_recorded": false,
+    "production_deployment_inferred_from_git_push": false,
+    "terminal_authority_changed": false
+  },
+  "remaining_required_evidence": [
+    "production deployment of reviewed commit e9d5e0a1c432f0f9f6220669a1db39907756da63",
+    "all three public protected-resource metadata paths returning their exact JSON contracts",
+    "signed installed current-release connection, restart, disconnect, and reactivation acceptance"
+  ]
+}

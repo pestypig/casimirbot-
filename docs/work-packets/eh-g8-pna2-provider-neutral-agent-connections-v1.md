@@ -308,3 +308,27 @@ Signed-in browser visual acceptance was not substituted with an unkeyed server:
 the in-app browser controller could not initialize its local kernel-assets
 runtime. The production client build and jsdom keyboard/focus/status tests pass,
 but a rendered installed-node UI observation remains unclaimed.
+
+## 2026-09-01 source-delivery and hosting handoff
+
+The complete current working-tree checkpoint was reviewed for credential-shaped
+content, committed as `e9d5e0a1c432f0f9f6220669a1db39907756da63`, pushed to
+`origin/main`, and verified byte-for-byte by matching local and remote commit
+identities. This closes the earlier source-delivery omission without treating a
+Git push as a production deployment or signed release.
+
+The memory-bounded Stage 2 release gate remains green at 122/122 focused tests
+across 14 files. `npm run helix:ask:discipline:quick` passed with no Ask-sensitive
+changes, and `npm run helix:environment-harness:docs-audit` passed at G8. The new
+immutable checkpoint is
+`docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-source-delivery-and-replit-handoff.json`.
+
+The public route failure remains unchanged after source delivery: the base MCP,
+Device Check, and local-supervisor coordination protected-resource metadata
+paths each return `200 text/html` with the website shell instead of their JSON
+contracts. The authenticated Replit project was identified at
+`https://replit.com/@pestypig/CasimirBot`, but no deployment mutation was made;
+the full workspace did not expose an inspectable deployment panel before the
+bounded browser-control attempts timed out. PNA2 therefore remains
+`deterministically verified`. Production route materialization and the signed
+installed-current-release journey remain required for promotion.
