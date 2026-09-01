@@ -7,6 +7,9 @@ import {
   assertReleaseSliceIdentity,
   auditReleaseSlice,
 } from "./release-slice-audit-lib.mjs";
+import signingConfig from "./release-signing-config.cjs";
+
+const { RELEASE_SIGNING_BACKENDS, resolveReleaseSigning } = signingConfig;
 
 const desktopRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -46,9 +49,12 @@ if (releaseSliceReport.verdict !== "PASS") {
   fail(`release slice audit failed: ${releaseSliceReport.violations.join("; ")}`);
 }
 
-requiredEnvironment("CSC_LINK");
-requiredEnvironment("CSC_KEY_PASSWORD");
-requiredEnvironment("WINDOWS_PUBLISHER_NAME");
+const releaseSigning = resolveReleaseSigning({ releaseMode: true });
+if (releaseSigning.backend === RELEASE_SIGNING_BACKENDS.AZURE) {
+  requiredEnvironment("AZURE_TENANT_ID");
+  requiredEnvironment("AZURE_CLIENT_ID");
+  requiredEnvironment("AZURE_SUBSCRIPTION_ID");
+}
 requiredEnvironment("CASIMIR_ADAPTER_VERIFY_URL");
 
 const packageJson = JSON.parse(
@@ -115,5 +121,5 @@ if (sha256(lockBytes) !== runtimeManifest.desktopLockfileSha256) {
 }
 
 console.log(
-  `[desktop-release-preflight] PASS tag=${expectedTag} commit=${sourceCommit} closure=staged_verified runtime_manifest_sha256=${sha256(runtimeManifestBytes)} release_slice_sha256=${releaseSliceReport.manifestSha256}`,
+  `[desktop-release-preflight] PASS tag=${expectedTag} commit=${sourceCommit} signing_backend=${releaseSigning.backend} closure=staged_verified runtime_manifest_sha256=${sha256(runtimeManifestBytes)} release_slice_sha256=${releaseSliceReport.manifestSha256}`,
 );

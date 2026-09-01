@@ -178,19 +178,54 @@ within its 512 MiB limit.
 ## Production prerequisites
 
 Configure the GitHub `desktop-production` environment with required reviewer
-approval and configure these secrets:
+approval and administrator bypass disabled. Both the Windows build/verification
+job and the final publish job use this environment. A reviewer might therefore
+receive one approval request before signing and another before publication;
+neither job may be moved outside the protected environment merely to remove
+that explicit boundary.
 
-- `WINDOWS_CSC_LINK`
-- `WINDOWS_CSC_KEY_PASSWORD`
-- `WINDOWS_PUBLISHER_NAME` (the exact certificate publisher identity)
-- `CASIMIR_ADAPTER_VERIFY_URL`
-- `CASIMIR_TRACE_EXPORT_URL` when it cannot be derived from the adapter URL
+Select exactly one signing backend with the environment variable
+`CASIMIR_DESKTOP_SIGNING_BACKEND`:
+
+- `azure` is the preferred ordinary release path. It uses Microsoft Azure
+  Artifact Signing (formerly Trusted Signing), keeps the signing key in the
+  managed HSM-backed service, and authenticates GitHub Actions with OIDC. Add
+  these non-secret environment variables:
+  - `WINDOWS_PUBLISHER_NAME` (the exact subject preview from the Public Trust
+    certificate profile);
+  - `AZURE_TENANT_ID`;
+  - `AZURE_CLIENT_ID`;
+  - `AZURE_SUBSCRIPTION_ID`;
+  - `AZURE_ARTIFACT_SIGNING_ENDPOINT` (the exact regional
+    `https://*.codesigning.azure.net` endpoint);
+  - `AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME`; and
+  - `AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME`.
+- `pfx` is the Advanced/manual compatibility path. Add
+  `WINDOWS_PUBLISHER_NAME` as an environment variable and configure the
+  `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD` environment secrets.
+
+For Azure, create one Entra application or service principal with a federated
+identity credential restricted to the GitHub environment subject
+`repo:pestypig/casimirbot-:environment:desktop-production` and audience
+`api://AzureADTokenExchange`. Grant only **Artifact Signing Certificate Profile
+Signer** at the selected certificate-profile scope. Do not create or store an
+`AZURE_CLIENT_SECRET`; the pinned `azure/login` action establishes the
+short-lived OIDC session, and Electron Builder uses Azure's authenticated
+credential chain during each signing pass.
+
+Configure the remaining release secrets:
+
+- `CASIMIR_ADAPTER_VERIFY_URL`;
+- `CASIMIR_TRACE_EXPORT_URL` when it cannot be derived from the adapter URL;
+  and
 - `CASIMIR_VERIFY_TOKEN` and `CASIMIR_VERIFY_TENANT` when auth/tenant isolation
-  is enabled
+  is enabled.
 
-Never print or place signing material, adapter tokens, or connector credentials
-in the repository, build logs, runtime manifest, update metadata, or release
-notes.
+Never print or place signing material, OIDC tokens, adapter tokens, or connector
+credentials in the repository, build logs, runtime manifest, update metadata,
+or release notes. Azure tenant, client, subscription, endpoint, account,
+profile, and certificate-subject identifiers are public release configuration,
+not model or runtime authority.
 
 ## Safe release-slice convergence
 
@@ -288,8 +323,8 @@ that external acceptance.
 3. The `Desktop Release` workflow installs both lockfiles, performs the bounded
    client build, builds/stages the host, and runs focused tests.
 4. Preflight verifies tag-to-commit identity, a clean checkout, source hashes,
-   release-slice identity, dependency closure, signing inputs, and the adapter
-   endpoint.
+   release-slice identity, dependency closure, an explicit `azure` or `pfx`
+   signing backend, its backend-specific inputs, and the adapter endpoint.
 5. The workflow creates a signed NSIS installer and verifies Authenticode plus
    every updater SHA-512 in `latest.yml`; built, staged, and packaged renderer
    tree identities must match before signature verification proceeds.

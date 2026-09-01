@@ -1,0 +1,77 @@
+{
+  "schema": "helix.pna2.desktop_cloud_signing_infrastructure_acceptance.v1",
+  "captured_at": "2026-09-01T20:17:51.596Z",
+  "program_gate": "G8",
+  "capability": "PNA2 signed-current desktop release infrastructure",
+  "maturity": "deterministically verified",
+  "implementation_status": "working_tree_verified_uncommitted",
+  "signing_contract": {
+    "ordinary_backend": "azure",
+    "advanced_backend": "pfx",
+    "backend_selection": "explicit_fail_closed",
+    "unsigned_release_permitted": false,
+    "self_signed_release_permitted": false,
+    "azure_private_key_exported": false,
+    "azure_client_secret_required": false,
+    "github_authentication": "environment_bound_oidc",
+    "electron_builder_version": "26.15.3",
+    "electron_builder_schema_validation": {
+      "azure": "passed",
+      "pfx": "passed"
+    }
+  },
+  "github_environment": {
+    "repository": "pestypig/casimirbot-",
+    "name": "desktop-production",
+    "required_reviewers": ["pestypig"],
+    "prevent_self_review": false,
+    "administrator_bypass": false,
+    "environment_secrets_present_at_capture": false,
+    "environment_variables_present_at_capture": false
+  },
+  "verification": {
+    "focused_signing_release_slice_and_casimir_receipt": {
+      "files": 3,
+      "tests_passed": 29,
+      "tests_failed": 0
+    },
+    "complete_stage2_release_battery": {
+      "files": 15,
+      "tests_passed": 133,
+      "tests_failed": 0
+    },
+    "desktop_release_slice": {
+      "verdict": "PASS",
+      "owned_files": 165,
+      "owned_changed": 11,
+      "shared_hunk_review_paths": 3,
+      "outside_changes_untouched": 287,
+      "staged_files": 0
+    },
+    "environment_harness_docs_audit": "PASS",
+    "helix_ask_discipline_quick": "PASS",
+    "casimir_adapter": {
+      "verdict": "PASS",
+      "first_fail": null,
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_integrity": "OK",
+      "status": "GREEN"
+    }
+  },
+  "open_requirements": [
+    "Create an Azure Artifact Signing Basic account under an owner-controlled Azure subscription.",
+    "Complete Public Trust identity validation and create the certificate profile.",
+    "Create the least-scope Entra federated identity and profile-scoped signer role.",
+    "Configure the protected GitHub environment variables and required Casimir release secrets.",
+    "Push an explicitly approved immutable desktop version tag and approve the protected workflow.",
+    "Verify Authenticode, updater hashes, Casimir receipt, installation, and the connection/restart/disconnect/reactivation journey on the signed release."
+  ],
+  "non_authority": {
+    "provider_app_chat_control": false,
+    "hidden_reasoning_access": false,
+    "environment_authority_from_signing": false,
+    "answer_authority_from_signing": false,
+    "terminal_authority_from_signing": false
+  },
+  "secret_values_captured": false
+}

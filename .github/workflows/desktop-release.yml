@@ -7,10 +7,12 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   build-verify:
     runs-on: windows-latest
+    environment: desktop-production
     timeout-minutes: 60
     steps:
       - name: Checkout tagged source
@@ -81,6 +83,7 @@ jobs:
           tests/vite-lucide-direct-imports.spec.ts
           tests/vite-production-runtime-vendors.spec.ts
           tests/desktop-host-security.spec.ts
+          tests/desktop-release-signing.spec.ts
           tests/desktop-release-slice.spec.ts
           tests/desktop-service-environment.spec.ts
           tests/desktop-casimir-gate-receipt.spec.ts
@@ -123,14 +126,29 @@ jobs:
         shell: pwsh
         run: npm run helix:environment-harness:docs-audit
 
+      - name: Authenticate to Azure for Artifact Signing
+        if: ${{ vars.CASIMIR_DESKTOP_SIGNING_BACKEND == 'azure' }}
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
       - name: Release preflight
         shell: pwsh
         env:
           CASIMIR_DESKTOP_RELEASE: "1"
+          CASIMIR_DESKTOP_SIGNING_BACKEND: ${{ vars.CASIMIR_DESKTOP_SIGNING_BACKEND }}
           RELEASE_TAG: ${{ github.ref_name }}
           CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+          WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME || secrets.WINDOWS_PUBLISHER_NAME }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
           CASIMIR_ADAPTER_VERIFY_URL: ${{ secrets.CASIMIR_ADAPTER_VERIFY_URL }}
         run: npm --prefix apps/desktop run release:preflight
 
@@ -138,9 +156,16 @@ jobs:
         shell: pwsh
         env:
           CASIMIR_DESKTOP_RELEASE: "1"
+          CASIMIR_DESKTOP_SIGNING_BACKEND: ${{ vars.CASIMIR_DESKTOP_SIGNING_BACKEND }}
           CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+          WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME || secrets.WINDOWS_PUBLISHER_NAME }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ vars.AZURE_ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
         run: >-
           npm --prefix apps/desktop exec electron-builder --
           --config electron-builder.config.cjs
@@ -157,7 +182,7 @@ jobs:
       - name: Verify Authenticode signatures
         shell: pwsh
         env:
-          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+          WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME || secrets.WINDOWS_PUBLISHER_NAME }}
         run: >-
           & apps/desktop/scripts/verify-authenticode.ps1
           -ReleaseDirectory apps/desktop/release
@@ -167,7 +192,7 @@ jobs:
       - name: Verify updater metadata and hashes
         shell: pwsh
         env:
-          WINDOWS_PUBLISHER_NAME: ${{ secrets.WINDOWS_PUBLISHER_NAME }}
+          WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME || secrets.WINDOWS_PUBLISHER_NAME }}
         run: npm --prefix apps/desktop run release:verify-artifacts
 
       - name: Casimir adapter release gate

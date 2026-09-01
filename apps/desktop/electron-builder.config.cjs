@@ -1,11 +1,6 @@
 const releaseMode = process.env.CASIMIR_DESKTOP_RELEASE === "1";
-const publisherName = process.env.WINDOWS_PUBLISHER_NAME?.trim();
-
-if (releaseMode && !publisherName) {
-  throw new Error(
-    "WINDOWS_PUBLISHER_NAME is required for a signed desktop release",
-  );
-}
+const { resolveReleaseSigning } = require("./scripts/release-signing-config.cjs");
+const releaseSigning = resolveReleaseSigning({ releaseMode });
 
 module.exports = {
   appId: "com.casimirbot.desktop",
@@ -49,7 +44,7 @@ module.exports = {
     artifactName: "CasimirBot-${version}-${arch}-setup.${ext}",
     forceCodeSigning: releaseMode,
     verifyUpdateCodeSignature: true,
-    ...(publisherName ? { publisherName: [publisherName] } : {}),
+    ...releaseSigning.electronBuilderWin,
   },
   nsis: {
     oneClick: false,

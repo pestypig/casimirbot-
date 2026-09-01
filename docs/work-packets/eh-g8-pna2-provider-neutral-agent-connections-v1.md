@@ -365,3 +365,46 @@ GitHub desktop-release workflow has not produced a reviewer-approved signed
 current installer and that signed install has not repeated the connection,
 restart, disconnect, and reactivation journey. Metadata acceptance grants no
 provider-chat, hidden-reasoning, environment, answer, or terminal authority.
+
+## 2026-09-01 signed-release infrastructure continuation
+
+The repository's original release workflow required an exportable Windows
+`.pfx`, but the owner has no code-signing certificate. The supported path is now
+an explicit fail-closed signing-backend contract. `azure` uses Microsoft Azure
+Artifact Signing through Electron Builder's pinned native
+`azureSignOptions` integration and GitHub OIDC; `pfx` remains the Advanced/manual
+compatibility path. A release must select exactly one backend, provide the exact
+certificate publisher identity, and satisfy backend-specific preflight. An
+unsigned or self-signed substitute is not accepted.
+
+The `desktop-production` GitHub environment now exists with `pestypig` as the
+required reviewer and administrator bypass disabled. The build/verification job
+now references that protected environment so its variables and secrets are
+actually in scope; the separated publish job retains the same protection and
+the build job retains read-only repository permissions. Azure authentication
+uses a short-lived environment-bound OIDC assertion and grants no model,
+provider, MCP, environment, answer, or terminal authority. No Azure client
+secret or certificate private key belongs in GitHub, the repository, the EXE,
+or model context.
+
+This is release-infrastructure implementation, not signed-install acceptance.
+PNA2 remains `deterministically verified` until the owner completes Azure Public
+Trust identity validation, the exact environment variables and Casimir release
+secrets are configured, a reviewer-approved tag produces valid Authenticode and
+Casimir receipts, and the installed connection/restart/disconnect/reactivation
+journey passes on that immutable release.
+
+Deterministic verification for this continuation:
+
+```text
+Azure/PFX signing plus release-slice/Casimir receipt battery: 3 files, 29 tests passed
+complete Stage 2 release battery: 15 files, 133 tests passed
+pinned Electron Builder 26.15.3 schema validation: Azure and PFX configurations passed
+desktop release-slice audit: passed; 165 owned files, 11 owned changes, 3 shared hunk-review paths, 287 outside changes untouched, 0 staged
+environment-harness documentation audit: passed at G8
+Helix Ask discipline quick guard: passed; no Ask-sensitive file was changed by this continuation
+Casimir adapter verification: PASS; certificate hash 6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45; integrity OK; status GREEN
+```
+
+The sanitized immutable checkpoint is
+`docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-desktop-cloud-signing-infrastructure-acceptance.json`.
