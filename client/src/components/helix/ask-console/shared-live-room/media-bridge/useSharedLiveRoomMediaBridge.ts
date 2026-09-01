@@ -11,12 +11,14 @@ import {
 import {
   INITIAL_SHARED_LIVE_ROOM_MEDIA_BRIDGE_PROJECTION,
   type SharedLiveRoomMediaBridgeProjection,
+  type SharedLiveRoomProviderAttachmentMode,
 } from "./RoomMediaBridgeContracts";
 
 export const useSharedLiveRoomMediaBridge = (input: {
   room: HelixSharedRealtimeRoom | null;
   self: HelixSharedRealtimeRoomParticipant | null;
   realtimeSessionId: string | null;
+  providerAttachmentMode?: SharedLiveRoomProviderAttachmentMode;
   api: HelixSharedLiveRoomApi;
 }): {
   projection: SharedLiveRoomMediaBridgeProjection;
@@ -35,6 +37,7 @@ export const useSharedLiveRoomMediaBridge = (input: {
         input.room.room_id,
         input.self.participant_id,
         input.realtimeSessionId ?? "participant:no-provider-session",
+        input.providerAttachmentMode ?? "required",
       ].join("|")
     : null;
   const beginClose = useCallback((
@@ -87,6 +90,7 @@ export const useSharedLiveRoomMediaBridge = (input: {
       room: input.room,
       self: input.self,
       realtimeSessionId: input.realtimeSessionId,
+      providerAttachmentMode: input.providerAttachmentMode,
       api: input.api,
       onProjection: setProjection,
     });
@@ -98,6 +102,7 @@ export const useSharedLiveRoomMediaBridge = (input: {
     bridgeIdentity,
     input.api,
     input.realtimeSessionId,
+    input.providerAttachmentMode,
     input.room,
     input.self,
   ]);

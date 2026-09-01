@@ -7,7 +7,8 @@
 3. Codex opens the packaged `casimirbot-device-check` plugin and asks the user
    to install it.
 4. Codex opens Auth0 Universal Login and asks for the least-privilege
-   `helix.rooms.read` grant.
+   `helix.rooms.read` grant plus the non-capability `offline_access` session
+   continuity scope.
 5. Codex can call only `helix_environment_device_check` at
    `https://casimirbot.com/mcp/device-check`.
 
@@ -23,6 +24,11 @@ configuration, handles Codex session tokens, or embeds the Codex runtime.
 - Enable Auth0's manual Client ID Metadata Document registration and import the
   OpenAI-hosted CIMD URL presented for this MCP client.
 - Grant that client user-delegated access to `helix.rooms.read` only.
+- Enable **Allow Offline Access** for the exact Auth0 API and allow the exact
+  public Codex MCP client to request `offline_access`. Verify that an initial
+  authorization-code exchange returns a refresh token to Codex. The refresh
+  token remains in the external client's credential custody and must never be
+  copied into CasimirBot, a chat, logs, or acceptance evidence.
 - Configure Universal Login and a test user that is allowed to receive that
   permission.
 - Create a separate **Native** Auth0 application for CasimirBot desktop account
@@ -191,7 +197,8 @@ HELIX_AGENT_OAUTH_PROVIDER=auth0
 HELIX_AGENT_OAUTH_ALGORITHMS=RS256
 HELIX_AGENT_OAUTH_TENANT_CLAIM=https://casimirbot.com/tenant_id
 HELIX_AGENT_OAUTH_NATIVE_CLIENT_ID=<public-native-client-id>
-HELIX_AGENT_OAUTH_LINK_SCOPE=openid profile
+HELIX_AGENT_OAUTH_LINK_SCOPE=openid profile helix.friends_parties
+HELIX_FRIENDS_PARTIES_COORDINATION_ORIGIN=https://casimirbot.com
 HELIX_AGENT_ALLOWED_HOSTS=casimirbot.com
 HELIX_AGENT_ALLOWED_ORIGINS=https://casimirbot.com
 ```
@@ -200,6 +207,16 @@ The provider alias must exactly match the alias persisted by the trusted
 account-link adapter. The token subject and signed tenant must map to an active
 CasimirBot profile and active agent binding; a valid Auth0 token alone is not
 account admission.
+
+`helix.friends_parties` is a first-party coordination-session scope, not an
+MCP tool or environment-action scope. The exact Native/public client may
+exchange that verified proof for a domain `HttpOnly` session whose database
+expiry is capped by the access-token expiry. The installed native broker holds
+that cookie only in memory and proxies only `/api/agi/friends-parties`; it does
+not return the Auth0 bearer or domain cookie to the renderer, loopback service,
+model, logs, or durable state. If the exact HTTPS coordination origin, scope,
+native client, or broker grant is absent, the installed Friends & Parties route
+fails closed.
 
 For the installed desktop pilot, the native host overrides
 `CASIMIR_PUBLIC_BASE_URL` with the exact per-launch `127.0.0.1` service origin.
@@ -245,8 +262,13 @@ active, but `oauth_ready: true` does not prove the external OAuth flow works.
 Keep `.agents/plugins/marketplace.json` at `NOT_AVAILABLE` until all checks pass:
 
 - `GET /.well-known/oauth-protected-resource/mcp/device-check` returns JSON
-  with the canonical audience, the exact Auth0 issuer, and only
-  `helix.rooms.read`.
+  with the canonical audience, the exact Auth0 issuer, the single capability
+  scope `helix.rooms.read`, and the non-capability session-continuity scope
+  `offline_access`.
+- Auth0 issues a refresh token when Codex requests the advertised
+  `offline_access` scope, Codex retains it across an app restart, and a harmless
+  Device Check succeeds without another login. `offline_access` is never
+  accepted as tool, environment, mutation, answer, or terminal authority.
 - An unauthenticated request to `/mcp/device-check` returns a `401` challenge
   whose `resource_metadata` points to that narrow metadata URL.
 - Authenticated `initialize` and `tools/list` return exactly

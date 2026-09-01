@@ -20,6 +20,7 @@ import {
 import {
   createHelixAgentApiRouter,
   createHelixAgentProtectedResourceMetadataRouter,
+  HELIX_AGENT_OAUTH_OFFLINE_ACCESS_SCOPE,
 } from "../helix-agent-api";
 import { createHelixMcpRouter } from "../helix-mcp";
 import { createHelixRunMcpServer } from "../../mcp/helix-run-mcp-server";
@@ -469,6 +470,7 @@ describe("Helix agent REST transport", () => {
             HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE,
             HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
             HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
+            HELIX_AGENT_OAUTH_OFFLINE_ACCESS_SCOPE,
           ]),
         ),
         bearer_methods_supported: ["header"],
@@ -558,7 +560,10 @@ describe("Helix agent REST transport", () => {
     expect(response.body).toEqual({
       resource: "https://agent.example/mcp",
       authorization_servers: ["https://tenant.auth0.com/"],
-      scopes_supported: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      scopes_supported: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_AGENT_OAUTH_OFFLINE_ACCESS_SCOPE,
+      ],
       bearer_methods_supported: ["header"],
       resource_documentation:
         "https://agent.example/docs/architecture/helix-agent-api-v1.md",

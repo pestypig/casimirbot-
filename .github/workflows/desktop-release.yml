@@ -99,6 +99,30 @@ jobs:
           client/src/pages/__tests__/download.spec.tsx
           --pool=forks --maxWorkers=1
 
+      - name: Run provider-neutral Agent Connections release gate
+        shell: pwsh
+        run: >-
+          node --max-old-space-size=1024 ./node_modules/vitest/vitest.mjs run
+          shared/__tests__/helix-agent-client-profile.spec.ts
+          shared/__tests__/helix-agent-client-readiness.spec.ts
+          server/routes/__tests__/agent-connections.test.ts
+          client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx
+          client/src/components/agent-access/__tests__/agentConnectionSetupState.spec.ts
+          client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx
+          tests/desktop-codex-plugin.spec.ts
+          server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts
+          server/services/local-supervisor/__tests__/local-supervisor-coordination.test.ts
+          server/services/helix-account/__tests__/auth0-native-account-link.test.ts
+          server/services/helix-account/__tests__/agent-account-link-store.test.ts
+          server/routes/__tests__/desktop-auth0-account-link.test.ts
+          server/routes/__tests__/helix-agent-transports.test.ts
+          tests/desktop-release-slice.spec.ts
+          --pool=forks --maxWorkers=1
+
+      - name: Audit provider-neutral Agent Connections documentation
+        shell: pwsh
+        run: npm run helix:environment-harness:docs-audit
+
       - name: Release preflight
         shell: pwsh
         env:

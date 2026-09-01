@@ -80,6 +80,7 @@ const createHarness = () => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   });
+  const coordinationBootstrap = vi.fn(async () => undefined);
   const controller = new Auth0NativeAccountLinkController({
     store: { createLinkIntent, completeLinkIntent },
     verifier,
@@ -87,6 +88,7 @@ const createHarness = () => {
     now: () => new Date("2026-08-11T20:00:00.000Z"),
     randomBytes: (size) => Buffer.alloc(size, 7),
     config: () => config,
+    coordinationBootstrap,
   });
   return {
     controller,
@@ -94,6 +96,7 @@ const createHarness = () => {
     completeLinkIntent,
     verifier,
     exchange,
+    coordinationBootstrap,
   };
 };
 
@@ -134,6 +137,7 @@ describe("Auth0 native account-link controller", () => {
     expect(harness.completeLinkIntent).toHaveBeenCalledWith({
       session,
       state,
+      reactivate: true,
       identity: {
         issuer: config.issuer,
         audience: config.audience,
@@ -143,6 +147,11 @@ describe("Auth0 native account-link controller", () => {
       },
     });
     expect(receipt.bearer_included).toBe(false);
+    expect(harness.coordinationBootstrap).toHaveBeenCalledWith({
+      accessToken: "verified-access-token-value",
+      localProfileId: session.profileId,
+      localSessionId: session.sessionId,
+    });
     await expect(harness.controller.complete(callback)).rejects.toMatchObject({
       code: "link_intent_not_found",
     });

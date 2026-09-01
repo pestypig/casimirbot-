@@ -113,6 +113,10 @@ import {
   type DesktopProviderCredentialBroker,
 } from "./provider-credential-broker";
 import {
+  startDesktopFriendsPartiesCoordinationBroker,
+  type DesktopFriendsPartiesCoordinationBroker,
+} from "./friends-parties-coordination-broker";
+import {
   startDesktopMcpTunnelTransitionBroker,
   type DesktopMcpTunnelTransitionBroker,
   type DesktopMcpTunnelTransitionBrokerRequest,
@@ -158,6 +162,7 @@ type DesktopRuntime = {
   secret: string;
   port: number;
   providerCredentialBroker: DesktopProviderCredentialBroker;
+  friendsPartiesCoordinationBroker: DesktopFriendsPartiesCoordinationBroker | null;
   mcpTransitionBroker: DesktopMcpTunnelTransitionBroker;
 };
 
@@ -467,6 +472,16 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
     await startDesktopProviderCredentialBroker({
       keyring: providerCredentialKeyring,
     });
+  const coordinationOrigin =
+    process.env.HELIX_FRIENDS_PARTIES_COORDINATION_ORIGIN?.trim() ?? "";
+  const friendsPartiesCoordinationBroker = coordinationOrigin
+    ? await startDesktopFriendsPartiesCoordinationBroker({
+        remoteOrigin: coordinationOrigin,
+      }).catch(async (error) => {
+        await providerCredentialBroker.close();
+        throw error;
+      })
+    : null;
   const startupJournal = createStartupJournal(userDataPath);
   const readyReceiptPath = resolveReadyReceiptPath(userDataPath);
   clearReadyReceipt(readyReceiptPath);
@@ -502,6 +517,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
       },
     }).catch(async (error) => {
       await providerCredentialBroker.close();
+      await friendsPartiesCoordinationBroker?.close();
       throw error;
     });
   let child: ChildProcessByStdio<null, Readable, Readable>;
@@ -518,6 +534,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
             serviceOrigin: origin,
             providerCredentialBroker,
             mcpTransitionBroker,
+            friendsPartiesCoordinationBroker,
             deviceId: deviceIdentity.deviceId,
           }),
         ELECTRON_RUN_AS_NODE: "1",
@@ -537,6 +554,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
     );
   } catch (error) {
     await providerCredentialBroker.close();
+    await friendsPartiesCoordinationBroker?.close();
     await mcpTransitionBroker.close();
     throw error;
   }
@@ -564,6 +582,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
     secret,
     port,
     providerCredentialBroker,
+    friendsPartiesCoordinationBroker,
     mcpTransitionBroker,
   } satisfies DesktopRuntime;
 
@@ -587,6 +606,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
       await Promise.race([childExited, delay(5_000)]);
     }
     await providerCredentialBroker.close();
+    await friendsPartiesCoordinationBroker?.close();
     await mcpTransitionBroker.close();
     throw new Error(`${message}. Startup log: ${startupJournal.filePath}`);
   }
@@ -1253,6 +1273,7 @@ const stopDesktopService = (): void => {
   desktopRuntime = null;
   if (!runtime) return;
   void runtime.providerCredentialBroker.close();
+  void runtime.friendsPartiesCoordinationBroker?.close();
   void runtime.mcpTransitionBroker.close();
   if (runtime.child.exitCode === null) runtime.child.kill();
 };

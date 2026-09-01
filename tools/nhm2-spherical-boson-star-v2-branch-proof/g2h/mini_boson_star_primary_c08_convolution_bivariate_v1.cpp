@@ -56,6 +56,22 @@ void reset(Output &output) {
     output.retained_order = 0U;
 }
 
+void reset(CoefficientAttribution &attribution) {
+    arb_zero(attribution.integrated_centered_component);
+    arb_zero(attribution.boundary_centered_component);
+    arb_zero(attribution.reconstructed_coefficient);
+    arb_zero(attribution.direct_integrated_radius_sum);
+    arb_zero(attribution.boundary_radius_sum);
+    arb_zero(attribution.f_source_hull_radius_bound);
+    arb_zero(attribution.gprime_source_hull_radius_bound);
+    attribution.target_degree = 0U;
+    attribution.integrated_terms_observed = 0U;
+    attribution.boundary_terms_observed = 0U;
+    attribution.evaluated = false;
+    attribution.final_reconstruction_equal = false;
+    attribution.observation_only = true;
+}
+
 bool all_finite(const BallVector &values) {
     for (const auto &value : values.values)
         if (!arb_is_finite(&value)) return false;
@@ -254,6 +270,27 @@ PreparedMoments::PreparedMoments() {
     arb_zero(u_right);
 }
 
+CoefficientAttribution::CoefficientAttribution() {
+    arb_init(integrated_centered_component);
+    arb_init(boundary_centered_component);
+    arb_init(reconstructed_coefficient);
+    arb_init(direct_integrated_radius_sum);
+    arb_init(boundary_radius_sum);
+    arb_init(f_source_hull_radius_bound);
+    arb_init(gprime_source_hull_radius_bound);
+    reset(*this);
+}
+
+CoefficientAttribution::~CoefficientAttribution() {
+    arb_clear(gprime_source_hull_radius_bound);
+    arb_clear(f_source_hull_radius_bound);
+    arb_clear(boundary_radius_sum);
+    arb_clear(direct_integrated_radius_sum);
+    arb_clear(reconstructed_coefficient);
+    arb_clear(boundary_centered_component);
+    arb_clear(integrated_centered_component);
+}
+
 PreparedMoments::~PreparedMoments() {
     for (auto &value : values) arb_clear(&value);
     arb_clear(u_right);
@@ -309,7 +346,9 @@ bool prepare_moments(arb_srcptr u_left_value, arb_srcptr u_right_value,
 }
 
 bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
-                   Output *output, Result *result) {
+                   Output *output, Result *result,
+                   unsigned attribution_degree,
+                   CoefficientAttribution *attribution) {
     if (result == nullptr) return false;
     *result = Result{};
     if (output == nullptr) {
@@ -317,11 +356,17 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
         return false;
     }
     reset(*output);
+    if (attribution != nullptr) {
+        reset(*attribution);
+        attribution->target_degree = attribution_degree;
+    }
     if (!exact_finite(input.target_left) || !exact_finite(input.target_right)
         || !exact_finite(input.u_left) || !exact_finite(input.u_right)
         || !finite(input.g_at_zero) || input.f_jet >= kJetCount
         || input.gprime_jet >= kJetCount
-        || !contains_target_order(input.target_order)) {
+        || !contains_target_order(input.target_order)
+        || (attribution != nullptr
+            && attribution_degree > input.target_order)) {
         fail(result, FailureDetail::invalid_component_order_or_boundary);
         return false;
     }
@@ -395,8 +440,12 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
         fill_powers(right_powers, input.u_right);
     }
     BallVector global_t(static_cast<std::size_t>(maximum_u_power) + 1U);
-    arb_t moment, product, term, next;
+    BallVector direct_radius_sums(
+        attribution == nullptr ? 0U
+                               : static_cast<std::size_t>(maximum_u_power) + 1U);
+    arb_t moment, product, term, next, radius;
     arb_init(moment); arb_init(product); arb_init(term); arb_init(next);
+    arb_init(radius);
     bool algebra_ok = true;
     for (unsigned a = 0U; a <= max_f_order && algebra_ok; ++a) {
         for (unsigned b = 0U; b <= max_g_order; ++b) {
@@ -414,10 +463,18 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
             const unsigned t_degree = a + b + 1U;  // Full t Jacobian.
             arb_add(next, global_t.at(t_degree), term, kPrecisionBits);
             arb_set(global_t.at(t_degree), next);
+            if (attribution != nullptr && t_degree >= attribution_degree) {
+                arb_get_rad_arb(radius, term);
+                arb_add(next, direct_radius_sums.at(t_degree), radius,
+                        kPrecisionBits);
+                arb_set(direct_radius_sums.at(t_degree), next);
+                ++attribution->integrated_terms_observed;
+            }
             ++result->factorized_product_terms;
         }
     }
-    arb_clear(next); arb_clear(term); arb_clear(product); arb_clear(moment);
+    arb_clear(radius); arb_clear(next); arb_clear(term); arb_clear(product);
+    arb_clear(moment);
     if (!algebra_ok || !all_finite(global_t)) {
         fail(result, FailureDetail::nonfinite_algebra);
         return false;
@@ -450,6 +507,33 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
             ++result->centered_translation_terms;
         }
     }
+    if (attribution != nullptr) {
+        arb_set(attribution->integrated_centered_component,
+                centered.at(attribution_degree));
+        arb_set(attribution->reconstructed_coefficient,
+                centered.at(attribution_degree));
+        arb_t radius_scale, radius_contribution, radius_next;
+        arb_init(radius_scale); arb_init(radius_contribution);
+        arb_init(radius_next);
+        for (unsigned global_degree = attribution_degree;
+             global_degree < global_t.values.size(); ++global_degree) {
+            arb_pow_ui(center_power, output->target_center,
+                       static_cast<ulong>(global_degree - attribution_degree),
+                       kPrecisionBits);
+            multiply_binomial(radius_scale,
+                              direct_radius_sums.at(global_degree),
+                              global_degree, attribution_degree);
+            arb_abs(radius_scale, radius_scale);
+            arb_mul(radius_contribution, radius_scale, center_power,
+                    kPrecisionBits);
+            arb_abs(radius_contribution, radius_contribution);
+            arb_add(radius_next, attribution->direct_integrated_radius_sum,
+                    radius_contribution, kPrecisionBits);
+            arb_set(attribution->direct_integrated_radius_sum, radius_next);
+        }
+        arb_clear(radius_next); arb_clear(radius_contribution);
+        arb_clear(radius_scale);
+    }
 
     // F(t)G(0) uses the current left-centered F panel, translated exactly to
     // xi=t-t_center by t-target_left=half_width+xi.
@@ -471,6 +555,27 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
             arb_add(accumulated, centered.at(xi_degree), contribution,
                     kPrecisionBits);
             arb_set(centered.at(xi_degree), accumulated);
+            if (attribution != nullptr
+                && xi_degree == attribution_degree) {
+                arb_add(accumulated,
+                        attribution->boundary_centered_component,
+                        contribution, kPrecisionBits);
+                arb_set(attribution->boundary_centered_component,
+                        accumulated);
+                arb_add(accumulated,
+                        attribution->reconstructed_coefficient,
+                        contribution, kPrecisionBits);
+                arb_set(attribution->reconstructed_coefficient,
+                        accumulated);
+                arb_t boundary_radius;
+                arb_init(boundary_radius);
+                arb_get_rad_arb(boundary_radius, contribution);
+                arb_add(accumulated, attribution->boundary_radius_sum,
+                        boundary_radius, kPrecisionBits);
+                arb_set(attribution->boundary_radius_sum, accumulated);
+                arb_clear(boundary_radius);
+                ++attribution->boundary_terms_observed;
+            }
             ++result->centered_translation_terms;
         }
     }
@@ -492,6 +597,20 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
     output->retained_order = retained_order;
     for (unsigned degree = 0U; degree <= retained_order; ++degree)
         arb_set(output->coefficient(degree), centered.at(degree));
+    if (attribution != nullptr) {
+        if (attribution_degree > retained_order) {
+            fail(result, FailureDetail::invalid_component_order_or_boundary);
+            return false;
+        }
+        arb_set(attribution->f_source_hull_radius_bound,
+                output->f_source_hull_radius_bound);
+        arb_set(attribution->gprime_source_hull_radius_bound,
+                output->gprime_source_hull_radius_bound);
+        attribution->final_reconstruction_equal = arb_equal(
+            attribution->reconstructed_coefficient,
+            output->coefficient(attribution_degree));
+        attribution->evaluated = true;
+    }
 
     arb_t magnitude, power, tail_term, tail_sum, tail_next;
     arb_init(magnitude); arb_init(power); arb_init(tail_term);
@@ -530,12 +649,25 @@ bool evaluate_impl(const Input &input, const PreparedMoments *prepared,
 }
 
 bool evaluate(const Input &input, Output *output, Result *result) {
-    return evaluate_impl(input, nullptr, output, result);
+    return evaluate_impl(input, nullptr, output, result, 0U, nullptr);
 }
 
 bool evaluate_prepared(const Input &input, const PreparedMoments &prepared,
                        Output *output, Result *result) {
-    return evaluate_impl(input, &prepared, output, result);
+    return evaluate_impl(input, &prepared, output, result, 0U, nullptr);
+}
+
+bool evaluate_prepared_attributed(
+    const Input &input, const PreparedMoments &prepared,
+    unsigned target_degree, Output *output, Result *result,
+    CoefficientAttribution *attribution) {
+    if (attribution == nullptr) {
+        if (result != nullptr)
+            fail(result, FailureDetail::missing_output);
+        return false;
+    }
+    return evaluate_impl(input, &prepared, output, result, target_degree,
+                         attribution);
 }
 
 const char *failure_detail_name(FailureDetail detail) {

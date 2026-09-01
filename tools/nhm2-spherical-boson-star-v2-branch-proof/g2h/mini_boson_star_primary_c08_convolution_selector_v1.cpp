@@ -25,6 +25,7 @@ struct ParallelPanel {
     ledger::Output g_coverage;
     jet::Output output;
     jet::CoefficientDecomposition decomposition;
+    jet::bivariate::CoefficientAttribution slot3_attribution;
     jet::Result result{};
     AccumulationStatus status = AccumulationStatus::parallel_resource_failure;
     bool jet_attempted = false;
@@ -52,11 +53,20 @@ struct DecompositionAccumulator {
     arb_t nonboundary_panel_radius_sum;
     arb_t total_elementary_radius_sum;
     arb_t maximum_elementary_radius;
+    arb_t slot3_f_source_hull_radius_sum;
+    arb_t slot3_gprime_source_hull_radius_sum;
+    arb_t slot3_direct_integrated_radius_sum;
+    arb_t slot3_boundary_radius_sum;
+    arb_t slot3_integrated_component_radius_sum;
+    arb_t slot3_boundary_component_radius_sum;
     std::size_t maximum_elementary_panel_ordinal = 0U;
     std::size_t maximum_elementary_slot = 0U;
     std::size_t elementary_terms_observed = 0U;
+    std::size_t slot3_integrated_terms_observed = 0U;
+    std::size_t slot3_boundary_terms_observed = 0U;
     bool have_maximum = false;
     bool all_panel_reconstructions_equal = true;
+    bool all_slot3_reconstructions_equal = true;
 
     DecompositionAccumulator() {
         for (auto &value : slot_radius_sums) {
@@ -73,9 +83,27 @@ struct DecompositionAccumulator {
         arb_zero(total_elementary_radius_sum);
         arb_init(maximum_elementary_radius);
         arb_zero(maximum_elementary_radius);
+        arb_init(slot3_f_source_hull_radius_sum);
+        arb_zero(slot3_f_source_hull_radius_sum);
+        arb_init(slot3_gprime_source_hull_radius_sum);
+        arb_zero(slot3_gprime_source_hull_radius_sum);
+        arb_init(slot3_direct_integrated_radius_sum);
+        arb_zero(slot3_direct_integrated_radius_sum);
+        arb_init(slot3_boundary_radius_sum);
+        arb_zero(slot3_boundary_radius_sum);
+        arb_init(slot3_integrated_component_radius_sum);
+        arb_zero(slot3_integrated_component_radius_sum);
+        arb_init(slot3_boundary_component_radius_sum);
+        arb_zero(slot3_boundary_component_radius_sum);
     }
 
     ~DecompositionAccumulator() {
+        arb_clear(slot3_boundary_component_radius_sum);
+        arb_clear(slot3_integrated_component_radius_sum);
+        arb_clear(slot3_boundary_radius_sum);
+        arb_clear(slot3_direct_integrated_radius_sum);
+        arb_clear(slot3_gprime_source_hull_radius_sum);
+        arb_clear(slot3_f_source_hull_radius_sum);
         arb_clear(maximum_elementary_radius);
         arb_clear(total_elementary_radius_sum);
         arb_clear(nonboundary_panel_radius_sum);
@@ -466,9 +494,10 @@ void evaluate_parallel_panel(const Input &input, unsigned exponent,
                     jet::kJetCount, boundary};
                 panel.jet_attempted = true;
                 accepted = decompose
-                    ? jet::evaluate_prepared_decomposed(
+                    ? jet::evaluate_prepared_decomposed_slot3_attributed(
                         jet_input, target_degree, target_jet, &panel.output,
-                        &panel.result, &panel.decomposition)
+                        &panel.result, &panel.decomposition,
+                        &panel.slot3_attribution)
                     : jet::evaluate_prepared(jet_input, &panel.output,
                                              &panel.result);
                 panel.status = accepted
@@ -626,6 +655,50 @@ AccumulationStatus accumulate_candidate_parallel(
                     ++decomposition.elementary_terms_observed;
                 }
                 if (status != AccumulationStatus::accepted) break;
+                if (!panel.slot3_attribution.evaluated
+                    || panel.slot3_attribution.target_degree != target_degree
+                    || !panel.slot3_attribution.final_reconstruction_equal) {
+                    status = AccumulationStatus::nonfinite_or_geometry_failure;
+                    break;
+                }
+                const auto accumulate_slot3 = [&](arb_ptr destination,
+                                                  arb_srcptr source) {
+                    arb_add(next, destination, source, kPrecisionBits);
+                    arb_set(destination, next);
+                };
+                accumulate_slot3(
+                    decomposition.slot3_f_source_hull_radius_sum,
+                    panel.slot3_attribution.f_source_hull_radius_bound);
+                accumulate_slot3(
+                    decomposition.slot3_gprime_source_hull_radius_sum,
+                    panel.slot3_attribution.gprime_source_hull_radius_bound);
+                accumulate_slot3(
+                    decomposition.slot3_direct_integrated_radius_sum,
+                    panel.slot3_attribution.direct_integrated_radius_sum);
+                accumulate_slot3(
+                    decomposition.slot3_boundary_radius_sum,
+                    panel.slot3_attribution.boundary_radius_sum);
+                arb_get_rad_arb(
+                    radius,
+                    panel.slot3_attribution.integrated_centered_component);
+                accumulate_slot3(
+                    decomposition.slot3_integrated_component_radius_sum,
+                    radius);
+                arb_get_rad_arb(
+                    radius,
+                    panel.slot3_attribution.boundary_centered_component);
+                accumulate_slot3(
+                    decomposition.slot3_boundary_component_radius_sum,
+                    radius);
+                decomposition.slot3_integrated_terms_observed +=
+                    panel.slot3_attribution.integrated_terms_observed;
+                decomposition.slot3_boundary_terms_observed +=
+                    panel.slot3_attribution.boundary_terms_observed;
+                decomposition.all_slot3_reconstructions_equal =
+                    decomposition.all_slot3_reconstructions_equal
+                    && arb_equal(
+                        panel.slot3_attribution.reconstructed_coefficient,
+                        panel.decomposition.term(3U));
                 if (!arb_equal(reconstructed_panel,
                                panel.output.coefficient(target_degree,
                                                         target_jet))) {
@@ -765,6 +838,25 @@ AccumulationStatus accumulate_candidate_parallel(
                 decomposition.maximum_elementary_panel_ordinal;
             observation->maximum_elementary_slot =
                 decomposition.maximum_elementary_slot;
+            observation->slot3_attribution_evaluated = true;
+            observation->slot3_integrated_terms_observed =
+                decomposition.slot3_integrated_terms_observed;
+            observation->slot3_boundary_terms_observed =
+                decomposition.slot3_boundary_terms_observed;
+            observation->all_slot3_reconstructions_equal =
+                decomposition.all_slot3_reconstructions_equal;
+            observation->slot3_f_source_hull_radius_sum = decimal_ball(
+                decomposition.slot3_f_source_hull_radius_sum);
+            observation->slot3_gprime_source_hull_radius_sum = decimal_ball(
+                decomposition.slot3_gprime_source_hull_radius_sum);
+            observation->slot3_direct_integrated_radius_sum = decimal_ball(
+                decomposition.slot3_direct_integrated_radius_sum);
+            observation->slot3_boundary_radius_sum = decimal_ball(
+                decomposition.slot3_boundary_radius_sum);
+            observation->slot3_integrated_component_radius_sum = decimal_ball(
+                decomposition.slot3_integrated_component_radius_sum);
+            observation->slot3_boundary_component_radius_sum = decimal_ball(
+                decomposition.slot3_boundary_component_radius_sum);
         }
     }
     arb_clear(final_to_elementary_ratio);

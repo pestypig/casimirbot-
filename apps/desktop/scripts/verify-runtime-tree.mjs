@@ -3,6 +3,10 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertReleaseSliceIdentity } from "./release-slice-audit-lib.mjs";
+import {
+  assertNoRequiredCodexRuntimePackage,
+  assertProviderNeutralRuntimeTree,
+} from "./provider-neutral-runtime-guard-lib.mjs";
 
 const desktopRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -95,6 +99,34 @@ const packedManifestPath = path.join(
 const stagedManifestBytes = await readFile(stagedManifestPath);
 const packedManifestBytes = await readFile(packedManifestPath);
 const manifest = JSON.parse(stagedManifestBytes.toString("utf8"));
+assertNoRequiredCodexRuntimePackage(manifest.requiredRuntimePackages);
+const providerNeutralRuntimeReceipts = Object.fromEntries(
+  await Promise.all([
+    ["staged", path.join(desktopRoot, "runtime")],
+    ["packed", path.join(
+      desktopRoot,
+      "release",
+      "win-unpacked",
+      "resources",
+      "runtime",
+    )],
+  ].map(async ([label, root]) => [
+    label,
+    await assertProviderNeutralRuntimeTree(root),
+  ])),
+);
+if (
+  manifest.providerNeutralAgentBoundary?.bundledAgentRuntime !== false ||
+  manifest.providerNeutralAgentBoundary?.requiredAgentRuntimePackage !== false ||
+  manifest.providerNeutralAgentBoundary?.codexMarketplaceClassification !==
+    "release_required_client_adapter" ||
+  manifest.providerNeutralAgentBoundary?.auditedFileCountBeforeManifest !==
+    providerNeutralRuntimeReceipts.staged.fileCount - 1 ||
+  providerNeutralRuntimeReceipts.staged.fileCount !==
+    providerNeutralRuntimeReceipts.packed.fileCount
+) {
+  throw new Error("Desktop provider-neutral agent boundary receipt is invalid");
+}
 const releaseSliceManifestBytes = await readFile(
   path.join(desktopRoot, "release-slice.v1.json"),
 );

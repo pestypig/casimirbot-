@@ -13,6 +13,7 @@ import {
 import type {
   SharedLiveRoomMediaBridgeFailure,
   SharedLiveRoomMediaBridgeProjection,
+  SharedLiveRoomProviderAttachmentMode,
 } from "./RoomMediaBridgeContracts";
 import { createSharedLiveRoomTranscriptDataChannel } from
   "./RoomTranscriptDataChannel";
@@ -58,11 +59,14 @@ export const createSharedLiveRoomMediaBridge = (input: {
   room: HelixSharedRealtimeRoom;
   self: HelixSharedRealtimeRoomParticipant;
   realtimeSessionId: string | null;
+  providerAttachmentMode?: SharedLiveRoomProviderAttachmentMode;
   api: HelixSharedLiveRoomApi;
   onProjection(projection: SharedLiveRoomMediaBridgeProjection): void;
   iceServers?: RTCIceServer[];
 }): SharedLiveRoomMediaBridge => {
   const role = input.self.role === "owner" ? "owner" : "participant";
+  const providerAttachmentMode = input.providerAttachmentMode ?? "required";
+  const providerAttached = providerAttachmentMode === "required";
   let room = input.room;
   let peer = findPeer(room, input.self.participant_id);
   let connection: RTCPeerConnection | null = null;
@@ -85,6 +89,7 @@ export const createSharedLiveRoomMediaBridge = (input: {
   let projection: SharedLiveRoomMediaBridgeProjection = {
     state: "idle",
     role,
+    provider_attachment_mode: providerAttachmentMode,
     peer_audio_connected: false,
     remote_audio_playback_ready: false,
     provider_input_mixed: false,
@@ -128,7 +133,7 @@ export const createSharedLiveRoomMediaBridge = (input: {
     channel: transcriptChannel,
   });
   const connectOwnerModelMixer = async (participantTrack: MediaStreamTrack): Promise<void> => {
-    if (role !== "owner" || mixer || !localMicrophone) return;
+    if (!providerAttached || role !== "owner" || mixer || !localMicrophone) return;
     const boundary = readHelixAskLiveMediaBoundary(input.realtimeSessionId);
     if (!boundary) return terminateForMediaFailure("live_media_boundary_unavailable");
     try {
@@ -159,7 +164,7 @@ export const createSharedLiveRoomMediaBridge = (input: {
     syncFloor();
   };
   const syncFloor = (): void => {
-    if (!mixer || !peer) return;
+    if (!providerAttached || !mixer || !peer) return;
     const activeId = room.runtime.active_speaker_participant_id;
     const owner = room.participants.find((participant) => participant.role === "owner");
     const participant = room.participants.find((candidate) => candidate.role === "participant");
@@ -184,7 +189,9 @@ export const createSharedLiveRoomMediaBridge = (input: {
       ownedClonedTracks.push(ownerTrack);
       connection.addTrack(ownerTrack, new MediaStream([ownerTrack]));
     }
-    const boundary = readHelixAskLiveMediaBoundary(input.realtimeSessionId);
+    const boundary = providerAttached
+      ? readHelixAskLiveMediaBoundary(input.realtimeSessionId)
+      : null;
     const providerTrack = (boundary?.readProviderOutputStream() as MediaStream | null)
       ?.getAudioTracks()[0]
       ?.clone();
@@ -199,23 +206,23 @@ export const createSharedLiveRoomMediaBridge = (input: {
     if (closePromise) return closePromise;
     closed = true;
     peerRecovery?.close();
-    const floorRelease = room.runtime.active_speaker_participant_id ===
+    const floorRelease = providerAttached && room.runtime.active_speaker_participant_id ===
       input.self.participant_id
       ? input.api.releaseFloor(room.room_id).catch(() => null)
       : Promise.resolve(null);
-    const runtimeDemotion = role === "owner"
+    const runtimeDemotion = providerAttached && role === "owner"
       ? input.api.deactivateMediaBridge(room.room_id).catch(() => null)
       : Promise.resolve(null);
     signaling?.close(notifyPeer);
     closePromise = (async () => {
-      if (role === "owner" && mixer) {
+      if (providerAttached && role === "owner" && mixer) {
         const boundary = readHelixAskLiveMediaBoundary(input.realtimeSessionId);
         await boundary?.restoreProviderInputAudioTrack().catch(() => false);
       }
       await mixer?.close().catch(() => undefined);
       mixer = null;
       for (const track of ownedClonedTracks) track.stop();
-      if (role === "participant") {
+      if (role === "participant" || !providerAttached) {
         localMicrophone?.getTracks().forEach((track) => track.stop());
       }
       audioPlayback?.close();
@@ -266,7 +273,7 @@ export const createSharedLiveRoomMediaBridge = (input: {
         return fail("microphone_consent_required");
       }
       update({ state: "waiting_for_peer", failure: null });
-      if (role === "owner") {
+      if (role === "owner" && providerAttached) {
         const boundary = readHelixAskLiveMediaBoundary(input.realtimeSessionId);
         const stream = boundary?.readOwnerMicrophoneStream() as MediaStream | null;
         if (!boundary) return fail("live_media_boundary_unavailable");
@@ -278,7 +285,9 @@ export const createSharedLiveRoomMediaBridge = (input: {
             audio: microphoneConstraints,
           });
         } catch {
-          return fail("participant_microphone_unavailable");
+          return fail(role === "owner"
+            ? "owner_microphone_unavailable"
+            : "participant_microphone_unavailable");
         }
       }
       connection = new RTCPeerConnection({
@@ -307,12 +316,12 @@ export const createSharedLiveRoomMediaBridge = (input: {
       };
       connection.ontrack = (event) => {
         audioPlayback?.attach(event.track);
-        if (role === "owner") void connectOwnerModelMixer(event.track);
+        if (role === "owner" && providerAttached) void connectOwnerModelMixer(event.track);
       };
-      if (role === "owner") {
+      if (role === "owner" && providerAttached) {
         transcriptChannel.attach(connection.createDataChannel("helix-room-events"));
         transcriptFanout.start();
-      } else {
+      } else if (role === "participant" && providerAttached) {
         connection.ondatachannel = (event) => transcriptChannel.attach(event.channel);
       }
       connection.onconnectionstatechange = () => {
@@ -327,7 +336,7 @@ export const createSharedLiveRoomMediaBridge = (input: {
             peer_audio_connected: true,
             failure: playbackBlocked ? "remote_audio_playback_blocked" : null,
           });
-          if (role === "owner") {
+          if (role === "owner" && providerAttached) {
             void input.api.activateMediaBridge(room.room_id)
               .catch(() => {
                 fail("signaling_failed");
@@ -372,15 +381,17 @@ export const createSharedLiveRoomMediaBridge = (input: {
         !peer ||
         currentSelf.presence !== "present" ||
         !currentSelf.consent.microphone_to_room ||
-        !currentSelf.consent.model_audio_output ||
         !peer.consent.microphone_to_room ||
-        !peer.consent.model_audio_output
+        (providerAttached && (
+          !currentSelf.consent.model_audio_output ||
+          !peer.consent.model_audio_output
+        ))
       ) {
         void close(false);
         return;
       }
       transcriptChannel.syncConsent();
-      if (role === "owner") {
+      if (role === "owner" && providerAttached) {
         const boundary = readHelixAskLiveMediaBoundary(input.realtimeSessionId);
         update({
           provider_input_enabled: boundary?.readProviderInputEnabled() === true,
@@ -388,6 +399,7 @@ export const createSharedLiveRoomMediaBridge = (input: {
       }
       syncFloor();
       if (
+        providerAttached &&
         role === "owner" &&
         connection &&
         !providerOutputForwarded &&

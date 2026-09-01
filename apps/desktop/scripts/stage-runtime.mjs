@@ -3,6 +3,10 @@ import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promi
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateReleaseSliceManifest } from "./release-slice-audit-lib.mjs";
+import {
+  assertNoRequiredCodexRuntimePackage,
+  assertProviderNeutralRuntimeTree,
+} from "./provider-neutral-runtime-guard-lib.mjs";
 
 const desktopRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -81,6 +85,7 @@ const hashTree = async (root) => {
 const serviceDependencies = JSON.parse(
   await readFile(path.join(desktopRoot, "dist", "service-dependencies.json"), "utf8"),
 );
+assertNoRequiredCodexRuntimePackage(serviceDependencies.requiredRuntimePackages);
 const desktopPackage = JSON.parse(
   await readFile(path.join(desktopRoot, "package.json"), "utf8"),
 );
@@ -176,6 +181,10 @@ for (const [source, targetRelative] of tunnelPayloads) {
   await writeFile(target, bytes);
 }
 
+const providerNeutralRuntimeAudit = await assertProviderNeutralRuntimeTree(
+  runtimeRoot,
+);
+
 const clientRoot = path.join(runtimeRoot, "dist", "public");
 const codexMarketplaceRoot = path.join(runtimeRoot, "codex-marketplace");
 const runtimeManifest = {
@@ -203,6 +212,12 @@ const runtimeManifest = {
   requiredRuntimePackages: serviceDependencies.requiredRuntimePackages,
   requiredDataAssets,
   dependencyClosureStatus: "staged_verified",
+  providerNeutralAgentBoundary: {
+    bundledAgentRuntime: false,
+    requiredAgentRuntimePackage: false,
+    codexMarketplaceClassification: "release_required_client_adapter",
+    auditedFileCountBeforeManifest: providerNeutralRuntimeAudit.fileCount,
+  },
 };
 
 await writeFile(

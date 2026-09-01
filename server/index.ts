@@ -82,6 +82,7 @@ import { HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE } from
 import { agentRunObserverRouter } from "./routes/agent-run-observer";
 import { createHelixAgentAccountBindingsRouter } from
   "./routes/helix-agent-account-bindings";
+import { createAgentConnectionsRouter } from "./routes/agent-connections";
 import { createDesktopAuth0AccountLinkRouter } from
   "./routes/desktop-auth0-account-link";
 import {
@@ -736,6 +737,9 @@ app.use(
 // Agent-binding readiness and revocation are first-party account-session
 // operations. Mount them before the optional legacy bearer middleware so
 // ENABLE_AUTH does not silently replace their documented cookie boundary.
+app.use("/api/account", createAgentConnectionsRouter({
+  coordinationStore: localSupervisorCoordinationStore,
+}));
 app.use("/api/account", createHelixAgentAccountBindingsRouter());
 // Native Auth0 PKCE linking is a separate app-only admission lane. It never
 // accepts a client secret or a public callback and is guarded by the exact

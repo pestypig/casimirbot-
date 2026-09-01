@@ -221,6 +221,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { discordLinkRouter } = await import("./routes/discord-link");
   app.use(discordLinkRouter);
   const { accountSessionRouter } = await import("./routes/account-session");
+  const { friendsPartiesCoordinationSessionRouter } = await import(
+    "./routes/friends-parties-coordination-session"
+  );
   const { createInstalledAccountServicesRouter } = await import(
     "./routes/installed-account-services"
   );
@@ -240,6 +243,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/auth", googleAuthRouter);
   app.use("/api/auth", auth0WebAuthRouter);
   app.use("/api/account", accountSessionRouter);
+  app.use("/api/account", friendsPartiesCoordinationSessionRouter);
   app.use("/api/account", createInstalledAccountServicesRouter());
   app.use("/api/account", createDesktopAuth0StepUpRouter());
   app.use("/api", desktopReleaseRouter);
@@ -345,6 +349,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     const { runtimeParityRouter } = await import("./routes/agi.runtime-parity");
     const { workstationToolGatewayRouter } = await import("./routes/agi.workstation-tool-gateway");
     const { sharedRealtimeRoomRouter } = await import("./routes/agi.realtime-room/index");
+    const { friendsPartiesRouter } = await import("./routes/agi.friends-parties");
     const { realtimeSessionRouter } = await import("./routes/agi.realtime-session");
     const { runtimeGoalsRouter } = await import("./routes/agi.runtime-goals");
     const { discordRouter } = await import("./routes/discord");
@@ -377,6 +382,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     // Must precede the personal Realtime router so room participants cannot
     // start a second model call outside the room-owned session.
     app.use("/api/agi", sharedRealtimeRoomRouter);
+    app.use("/api/agi", friendsPartiesRouter);
     app.use("/api/agi", realtimeSessionRouter);
     app.use("/api/agi", runtimeGoalsRouter);
     const enableTraceApi = flagEnabled(process.env.ENABLE_TRACE_API, false);

@@ -1,0 +1,100 @@
+{
+  "schema": "casimirbot.eh_g8_pna2_agent_connections_disconnect_reactivation_acceptance.v1",
+  "recorded_at": "2026-09-01T01:03:00.000Z",
+  "client_profile": "codex_app",
+  "desktop_artifact": {
+    "kind": "fresh_unpacked_current_source_build",
+    "system_installer_used": false,
+    "agent_connections_panel_present": true,
+    "react_render_stable_after_profile_storage_selector_repair": true
+  },
+  "connection_proof_before_disconnect": {
+    "active_profile_binding": true,
+    "device_check_read_alone_advanced_readiness": false,
+    "authenticated_presence_probe_advanced_readiness": true,
+    "catalog_probe": "current",
+    "chat_attachment": "current",
+    "continuation": "polling",
+    "thread_visibility": "tool_activity_only"
+  },
+  "profile_binding_revocation": {
+    "two_step_confirmation_present": true,
+    "consequence_copy_present": true,
+    "user_confirmed_at_action_time": true,
+    "binding_status_after": "revoked",
+    "active_binding_after": false,
+    "hidden_endpoint_bypass_attempted": false
+  },
+  "first_reactivation_attempt": {
+    "fresh_native_pkce_authorization_completed": true,
+    "result": "failed",
+    "ui_error": "Auth0 account linking did not complete. You can try again.",
+    "root_cause": "native PKCE completion omitted the binding store's explicit reactivate flag"
+  },
+  "repair": {
+    "file": "server/services/helix-account/auth0-native-account-link.ts",
+    "behavior": "fresh user-started native PKCE completion passes reactivate=true to completeLinkIntent",
+    "authority_expanded": false,
+    "credential_handling_changed": false
+  },
+  "verification": {
+    "targeted_test_files_passed": 3,
+    "targeted_tests_passed": 18,
+    "desktop_host_build_passed": true,
+    "desktop_runtime_stage_passed": true,
+    "fresh_unpacked_package_passed": true,
+    "second_native_pkce_authorization_completed": true,
+    "binding_status_after_reactivation": "active",
+    "authenticated_presence_registered": true,
+    "final_agent_connections_state": "connected",
+    "final_catalog_probe": "current",
+    "final_chat_attachment": "current",
+    "final_continuation": "polling"
+  },
+  "release_boundary_checks": {
+    "checked_at": "2026-09-01T01:08:22.683Z",
+    "public_metadata_origin": "https://casimirbot.com",
+    "public_metadata_results": [
+      {
+        "path": "/.well-known/oauth-protected-resource/mcp",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "result": "website_spa_not_protected_resource_json"
+      },
+      {
+        "path": "/.well-known/oauth-protected-resource/mcp/device-check",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "result": "website_spa_not_protected_resource_json"
+      },
+      {
+        "path": "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "result": "website_spa_not_protected_resource_json"
+      }
+    ],
+    "source_metadata_route_test_file": "server/routes/__tests__/helix-agent-transports.test.ts",
+    "source_metadata_route_tests_passed": 21,
+    "fresh_unpacked_artifact_authenticode_status": "NotSigned",
+    "signed_installed_release_journey_repeated": false
+  },
+  "secret_exclusion": {
+    "bearer_included": false,
+    "refresh_token_included": false,
+    "oauth_subject_included": false,
+    "raw_claims_included": false,
+    "credential_included": false
+  },
+  "authority_ceiling": {
+    "environment_authority": false,
+    "mutation_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "hidden_reasoning_included": false
+  },
+  "remaining_release_items": [
+    "public_protected_resource_metadata_json_routing",
+    "signed_installed_current_desktop_release_validation"
+  ]
+}

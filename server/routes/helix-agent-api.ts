@@ -675,6 +675,7 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
   dependencies: Pick<RouterDependencies, "verifier"> & {
     resourcePaths?: readonly string[];
     scopes?: readonly string[];
+    sessionContinuityScopes?: readonly string[];
     additionalResourcePaths?: readonly string[];
     additionalScopes?: readonly string[];
     useLoopbackRequestResource?: boolean;
@@ -697,6 +698,14 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
     HELIX_AGENT_RUN_DEVELOPER_SCOPE,
     ...HELIX_AGENT_DATABASE_OAUTH_SCOPES,
     ...(dependencies.additionalScopes ?? []),
+  ];
+  // Codex prefers the protected resource's advertised scopes during OAuth
+  // login. `offline_access` is session continuity only: tools never require it
+  // and it grants no Helix capability, environment, answer, or terminal
+  // authority. Advertising it lets an OAuth provider issue the refresh token
+  // that a stored Codex MCP connection needs after the access token expires.
+  const sessionContinuityScopes = dependencies.sessionContinuityScopes ?? [
+    HELIX_AGENT_OAUTH_OFFLINE_ACCESS_SCOPE,
   ];
   router.get(
     resourcePaths,
@@ -721,7 +730,10 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
         res.json({
           resource,
           authorization_servers: [verifier.authorizationServer()],
-          scopes_supported: Array.from(new Set(scopes)),
+          scopes_supported: Array.from(new Set([
+            ...scopes,
+            ...sessionContinuityScopes,
+          ])),
           bearer_methods_supported: ["header"],
           resource_documentation: `${base}/docs/architecture/helix-agent-api-v1.md`,
         });
@@ -733,3 +745,5 @@ export const createHelixAgentProtectedResourceMetadataRouter = (
   router.use(handleHelixAgentApiError);
   return router;
 };
+
+export const HELIX_AGENT_OAUTH_OFFLINE_ACCESS_SCOPE = "offline_access" as const;

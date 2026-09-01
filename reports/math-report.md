@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-08-31T14:22:04.195Z
+Generated: 2026-09-01T01:17:32.182Z
 Registry entries: 323
 
 ## Coverage by Stage
@@ -18,6 +18,7 @@ Registry entries: 323
 - server/routes/agi.chat.ts
 - server/routes/agi.contributions.ts
 - server/routes/agi.demonstration.ts
+- server/routes/agi.friends-parties.ts
 - server/routes/agi.moral-graph.ts
 - server/routes/agi.plan.ancillary.ts
 - server/routes/agi.realtime-session.ts
@@ -33,7 +34,7 @@ Registry entries: 323
 
 ## Unstaged Stage Suggestions
 - diagnostic: 3
-- reduced-order: 12
+- reduced-order: 13
 - exploratory: 5
 - default: exploratory
 
@@ -65,8 +66,8 @@ none
 - tests considered: 2
 
 ## Auto-discovered Dependencies
-- nodes: 3307
-- edges: 7989
+- nodes: 3330
+- edges: 8047
 
 ## Stage Violations (Edges)
 none

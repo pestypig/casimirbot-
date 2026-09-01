@@ -181,20 +181,30 @@ bool add_elementary(const Input &input, std::size_t f_jet,
                     std::size_t g_jet, std::size_t destination_jet,
                     const std::vector<std::size_t> &f_ordinals,
                     const std::vector<std::size_t> &g_ordinals,
-                    const bivariate::PreparedMoments *prepared,
-                    Output &output, Result &result,
-                    CoefficientDecomposition *decomposition,
-                    std::size_t decomposition_slot) {
+                     const bivariate::PreparedMoments *prepared,
+                     Output &output, Result &result,
+                     CoefficientDecomposition *decomposition,
+                     std::size_t decomposition_slot,
+                     bivariate::CoefficientAttribution *attribution,
+                     std::size_t attribution_slot) {
     bivariate::Input predecessor{input.f_ledger, input.gprime_ledger,
         input.target_left, input.target_right, input.target_order,
         input.u_left, input.u_right, f_jet, g_jet,
         input.g_at_zero_jets + g_jet};
     bivariate::Output elementary;
     bivariate::Result predecessor_result{};
+    const bool attribute_this_term = attribution != nullptr
+        && decomposition != nullptr
+        && destination_jet == decomposition->target_jet
+        && decomposition_slot == attribution_slot;
     const bool predecessor_accepted = prepared == nullptr
         ? bivariate::evaluate(predecessor, &elementary, &predecessor_result)
-        : bivariate::evaluate_prepared(predecessor, *prepared, &elementary,
-                                       &predecessor_result);
+        : attribute_this_term
+            ? bivariate::evaluate_prepared_attributed(
+                predecessor, *prepared, decomposition->target_degree,
+                &elementary, &predecessor_result, attribution)
+            : bivariate::evaluate_prepared(predecessor, *prepared, &elementary,
+                                           &predecessor_result);
     if (!predecessor_accepted)
         return false;
     if (result.elementary_convolutions == 0U) {
@@ -300,7 +310,9 @@ arb_srcptr Output::remainder(std::size_t jet) const {
 
 bool evaluate_impl(const Input &input, bool use_prepared_moments,
                    Output *output, Result *result,
-                   CoefficientDecomposition *decomposition) {
+                   CoefficientDecomposition *decomposition,
+                   bivariate::CoefficientAttribution *attribution,
+                   std::size_t attribution_slot) {
     if (result == nullptr) return false;
     *result = Result{};
     if (output == nullptr) {
@@ -355,8 +367,8 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
     }
 
     if (!add_elementary(input, value_jet(), value_jet(), value_jet(),
-                        f_ordinals, g_ordinals, prepared, *output, *result,
-                        nullptr, 0U)) {
+                         f_ordinals, g_ordinals, prepared, *output, *result,
+                         nullptr, 0U, nullptr, 0U)) {
         fail(result, FailureDetail::bivariate_predecessor);
         return false;
     }
@@ -364,11 +376,11 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
     for (std::size_t a = 0U; a < kParameterCount; ++a) {
         const std::size_t first = first_jet(a);
         if (!add_elementary(input, first, value_jet(), first,
-                            f_ordinals, g_ordinals, prepared, *output, *result,
-                            nullptr, 0U)
+                             f_ordinals, g_ordinals, prepared, *output, *result,
+                             nullptr, 0U, nullptr, 0U)
             || !add_elementary(input, value_jet(), first, first,
                                f_ordinals, g_ordinals, prepared, *output,
-                               *result, nullptr, 0U)) {
+                               *result, nullptr, 0U, nullptr, 0U)) {
             fail(result, FailureDetail::nonfinite_remainder_or_assembly);
             return false;
         }
@@ -379,19 +391,23 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
             const std::size_t destination = second_jet(a, b);
             if (!add_elementary(input, destination, value_jet(), destination,
                                 f_ordinals, g_ordinals, prepared, *output,
-                                *result, decomposition, 0U)
+                                *result, decomposition, 0U, attribution,
+                                attribution_slot)
                 || !add_elementary(input, first_jet(a), first_jet(b),
                                    destination, f_ordinals, g_ordinals,
                                    prepared, *output, *result,
-                                   decomposition, 1U)
+                                   decomposition, 1U, attribution,
+                                   attribution_slot)
                 || !add_elementary(input, first_jet(b), first_jet(a),
                                    destination, f_ordinals, g_ordinals,
                                    prepared, *output, *result,
-                                   decomposition, 2U)
+                                   decomposition, 2U, attribution,
+                                   attribution_slot)
                 || !add_elementary(input, value_jet(), destination,
                                    destination, f_ordinals, g_ordinals,
                                    prepared, *output, *result,
-                                   decomposition, 3U)) {
+                                   decomposition, 3U, attribution,
+                                   attribution_slot)) {
                 fail(result, FailureDetail::nonfinite_remainder_or_assembly);
                 return false;
             }
@@ -432,11 +448,11 @@ bool evaluate_impl(const Input &input, bool use_prepared_moments,
 }
 
 bool evaluate(const Input &input, Output *output, Result *result) {
-    return evaluate_impl(input, false, output, result, nullptr);
+    return evaluate_impl(input, false, output, result, nullptr, nullptr, 0U);
 }
 
 bool evaluate_prepared(const Input &input, Output *output, Result *result) {
-    return evaluate_impl(input, true, output, result, nullptr);
+    return evaluate_impl(input, true, output, result, nullptr, nullptr, 0U);
 }
 
 bool evaluate_prepared_decomposed(
@@ -451,7 +467,26 @@ bool evaluate_prepared_decomposed(
     }
     decomposition->target_degree = target_degree;
     decomposition->target_jet = target_jet;
-    return evaluate_impl(input, true, output, result, decomposition);
+    return evaluate_impl(input, true, output, result, decomposition, nullptr,
+                         0U);
+}
+
+bool evaluate_prepared_decomposed_slot3_attributed(
+    const Input &input, unsigned target_degree, std::size_t target_jet,
+    Output *output, Result *result, CoefficientDecomposition *decomposition,
+    bivariate::CoefficientAttribution *slot3_attribution) {
+    if (decomposition == nullptr || slot3_attribution == nullptr
+        || target_jet < second_jet(0U, 0U)
+        || target_jet > second_jet(kParameterCount - 1U,
+                                   kParameterCount - 1U)) {
+        if (result != nullptr)
+            fail(result, FailureDetail::invalid_jet_inventory);
+        return false;
+    }
+    decomposition->target_degree = target_degree;
+    decomposition->target_jet = target_jet;
+    return evaluate_impl(input, true, output, result, decomposition,
+                         slot3_attribution, 3U);
 }
 
 const char *failure_detail_name(FailureDetail detail) {

@@ -1,0 +1,79 @@
+{
+  "schema": "casimirbot.eh_g8_pna2_installed_codex_refresh_continuity_checkpoint.v1",
+  "recorded_at": "2026-08-31T23:59:41.032Z",
+  "client_profile": "codex_app",
+  "installed_plugin": "CasimirBot Device Check v2",
+  "initial_blocker": {
+    "code": "oauth_refresh_token_missing",
+    "recovery": "TRIGGER_REAUTHENTICATION",
+    "reproduced_after_login_and_restart": true
+  },
+  "first_divergence": {
+    "canonical_api_offline_access_enabled_before": false,
+    "installed_tunnel_api_offline_access_enabled_before": false,
+    "authorization_server_advertised_offline_access": true,
+    "authorization_server_advertised_refresh_token_grant": true
+  },
+  "repair": {
+    "canonical_api_offline_access_enabled": true,
+    "installed_tunnel_api_offline_access_enabled": true,
+    "both_settings_verified_after_reload": true,
+    "fresh_user_reauthentication_completed": true,
+    "capability_scope_added": false,
+    "helix_authority_expanded": false
+  },
+  "pre_restart": {
+    "device_check_outcome": "succeeded",
+    "provenance_valid": true,
+    "payload_sha256": "sha256:1ab3e8cdc686df87f8ae67331d76fa5c486287d044f05bb9e3b18de22064d3c2",
+    "authenticated_presence_registered": true,
+    "conversation_thread_basis": "client_declared",
+    "client_session_basis": "server_derived"
+  },
+  "post_restart": {
+    "login_between_restart_and_probe": false,
+    "device_check_outcome": "succeeded",
+    "provenance_valid": true,
+    "payload_sha256": "sha256:2922f1d438c420d91f8b9be4fcd56c3cf126756473d4b268fab43d068b8c502c",
+    "authenticated_presence_heartbeat_succeeded": true,
+    "same_service_instance": true,
+    "same_authenticated_mcp_client": true,
+    "same_declared_conversation_thread": true
+  },
+  "presence_disconnect_reconnect": {
+    "disconnect_receipt_succeeded": true,
+    "active_after_disconnect": false,
+    "lifecycle_state_after_disconnect": "disconnected",
+    "heartbeat_expired_immediately": true,
+    "resource_claims_retained": false,
+    "authenticated_reconnect_succeeded": true,
+    "active_after_reconnect": true
+  },
+  "installed_desktop_revocation_ui": {
+    "agent_access_panel_present": true,
+    "active_binding_projection_present": true,
+    "agent_connections_flow_present": false,
+    "disconnect_control_present": false,
+    "hidden_endpoint_bypass_attempted": false,
+    "disposition": "requires_current_desktop_rebuild_before_live_profile_binding_revocation"
+  },
+  "secret_exclusion": {
+    "bearer_included": false,
+    "refresh_token_included": false,
+    "oauth_subject_included": false,
+    "raw_claims_included": false,
+    "credential_included": false
+  },
+  "authority_ceiling": {
+    "environment_authority": false,
+    "mutation_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "hidden_reasoning_included": false
+  },
+  "remaining_live_items": [
+    "public_protected_resource_metadata_json_routing",
+    "current_installed_desktop_build_with_agent_connections_ui",
+    "explicit_profile_binding_revocation_and_reconnect_journey"
+  ]
+}

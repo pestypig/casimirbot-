@@ -1,0 +1,119 @@
+{
+  "schema": "casimirbot.eh_g8_pna2_stage2_completion_audit.v1",
+  "recorded_at": "2026-09-01T01:19:56.512Z",
+  "program_gate": "G8",
+  "workstream": "provider-neutral external-agent onboarding",
+  "capability": "PNA2",
+  "overall_result": "release_acceptance_pending",
+  "requirements": [
+    {
+      "requirement": "versioned_external_agent_client_profile_contract",
+      "result": "proven",
+      "evidence": ["shared/helix-agent-client-profile.ts", "shared/__tests__/helix-agent-client-profile.spec.ts"]
+    },
+    {
+      "requirement": "codex_app_and_standard_mcp_profiles",
+      "result": "proven",
+      "evidence": ["helix.agent_client_profile.v1", "codex_app", "standard_mcp"]
+    },
+    {
+      "requirement": "ordinary_user_resumable_guided_setup_without_secret_or_protocol_copying",
+      "result": "proven",
+      "evidence": ["client/src/components/agent-access/AgentConnectionSetup.tsx", "client/src/components/agent-access/agentConnectionSetupState.ts", "current-source unpacked Windows acceptance"]
+    },
+    {
+      "requirement": "advanced_manual_setup_preserved",
+      "result": "proven",
+      "evidence": ["client/src/components/workstation/AgentAccessPanel.tsx", "client/src/components/agent-access/AgentAccessGuide.tsx"]
+    },
+    {
+      "requirement": "shared_sanitized_server_authoritative_readiness",
+      "result": "proven",
+      "evidence": ["server/routes/agent-connections.ts", "server/routes/__tests__/agent-connections.test.ts"]
+    },
+    {
+      "requirement": "deterministic_recovery_profile_ownership_catalog_sync_and_revocation",
+      "result": "proven",
+      "evidence": ["14 focused test files / 122 tests passed", "2026-08-31-agent-connections-disconnect-reactivation-acceptance.json"]
+    },
+    {
+      "requirement": "keyboard_focus_status_announcement_and_compact_layout",
+      "result": "proven_at_deterministic_and_current_source_unpacked_maturity",
+      "evidence": ["client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx", "client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx", "production client build"]
+    },
+    {
+      "requirement": "no_provider_chat_control_hidden_reasoning_or_authority_expansion",
+      "result": "proven",
+      "evidence": ["helix.agent_connection_status.v1 fixed false authority flags", "profile manifest fixed false capability flags", "Helix Ask discipline quick static checks passed"]
+    },
+    {
+      "requirement": "installed_codex_and_independent_standard_client_acceptance",
+      "result": "proven_for_existing_tunnel_and_current_source_unpacked_build",
+      "evidence": ["2026-08-31-installed-codex-refresh-continuity-checkpoint.json", "2026-08-31-independent-client-live-checkpoint.json", "2026-08-31-agent-connections-disconnect-reactivation-acceptance.json"]
+    }
+  ],
+  "verification": {
+    "focused_test_files_passed": 14,
+    "focused_tests_passed": 122,
+    "release_slice_test_files_passed": 1,
+    "release_slice_tests_passed": 13,
+    "release_slice_audit": "PASS",
+    "release_slice_owned_files": 161,
+    "release_slice_shared_hunk_review_files": 12,
+    "release_slice_outside_changes_preserved": true,
+    "release_slice_outside_change_count": "dynamic_dirty_worktree_not_a_release_claim",
+    "release_slice_staged_files": 0,
+    "environment_harness_docs_audit": "PASS",
+    "helix_ask_discipline_quick": "PASS_with_unrelated_dirty_tree_classification_warning",
+    "source_metadata_transport_tests_passed": 21,
+    "desktop_release_workflow_yaml": "valid",
+    "desktop_release_workflow_stage2_gate": "before_release_preflight_and_signing",
+    "production_metadata_smoke_guard": "all_three_routes_and_least_scope_expectations_present",
+    "production_metadata_smoke_syntax_check": "PASS",
+    "production_metadata_smoke_runtime_attempt": "failed_closed_before_server_start_because_existing_dist_belonged_to_an_older_commit",
+    "casimir_release_verification": {
+      "run_id": "2605",
+      "verdict": "PASS",
+      "first_fail": null,
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "certificate_integrity": "OK",
+      "certificate_status": "GREEN"
+    }
+  },
+  "release_boundary": {
+    "public_metadata_json_routing": "failed_live_probe_returns_website_html",
+    "public_host_observation": "apex_and_metadata_responses_terminate_at_google_frontend",
+    "routing_inference": "hosted_deployment_or_edge_route_is_stale_relative_to_the_passing_source_contract",
+    "public_metadata_paths_checked": [
+      "/.well-known/oauth-protected-resource/mcp",
+      "/.well-known/oauth-protected-resource/mcp/device-check",
+      "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination"
+    ],
+    "source_metadata_route_contract": "passes",
+    "local_current_source_artifact_authenticode": "NotSigned",
+    "github_desktop_release_workflow": "active_with_zero_runs",
+    "github_releases_observed": 0,
+    "local_code_signing_certificate_available": false,
+    "local_signing_environment_available": false,
+    "signed_installed_current_release_acceptance": "missing"
+  },
+  "source_delivery_boundary": {
+    "local_head": "654c4a829d9cfa333cc87d89de75d686b3103b2c",
+    "remote_main": "654c4a829d9cfa333cc87d89de75d686b3103b2c",
+    "stage2_changes_committed": false,
+    "production_deployment_attempted": false,
+    "reason": "the canonical worktree contains extensive overlapping user work; no commit, push, production deployment, or release signing was inferred"
+  },
+  "remaining_required_evidence": [
+    "reviewed_stage2_commit_and_hosted_metadata_route_deployment",
+    "public_protected_resource_metadata_json_live_probe",
+    "reviewer_approved_signed_desktop_release_workflow_run",
+    "signed_installed_current_release_connection_restart_disconnect_reactivation_acceptance"
+  ],
+  "secret_exclusion": {
+    "credential_value_recorded": false,
+    "oauth_token_recorded": false,
+    "signing_material_recorded": false,
+    "hidden_reasoning_recorded": false
+  }
+}

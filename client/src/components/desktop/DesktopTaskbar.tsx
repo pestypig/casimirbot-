@@ -1,5 +1,5 @@
 import React from "react";
-import { AppWindow, ChevronUp } from "lucide-react";
+import { AppWindow, ChevronUp, CircleDot } from "lucide-react";
 import { TaskbarShelf } from "@/components/desktop/TaskbarPanel";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
@@ -22,6 +22,7 @@ import {
   CommandItem,
   CommandList
 } from "@/components/ui/command";
+import { CasimirGuideOverlay } from "@/components/workstation/guide/CasimirGuideOverlay";
 
 type DesktopTaskbarProps = {
   onOpenPanel?: (panelId: string) => void;
@@ -35,9 +36,30 @@ export function DesktopTaskbar({
   showWindowTabs = true
 }: DesktopTaskbarProps) {
   const { open } = useDesktopStore();
+  const { focus } = useDesktopStore();
+  const [guideOpen, setGuideOpen] = React.useState(false);
   const handleOpenTaskbarPanel = React.useCallback(() => open("taskbar"), [open]);
+  const handleOpenPanel = React.useCallback((panelId: string) => {
+    if (onOpenPanel) onOpenPanel(panelId);
+    else {
+      open(panelId);
+      focus(panelId);
+    }
+  }, [focus, onOpenPanel, open]);
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        setGuideOpen((current) => !current);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
+    <>
     <div className="fixed bottom-0 left-0 right-0 h-12">
       <div className="relative flex h-full items-center gap-3 overflow-hidden border-t border-primary/45 bg-background/82 px-3 text-foreground shadow-[0_-18px_55px_hsl(var(--primary)/0.22)] backdrop-blur-xl">
         <div
@@ -54,6 +76,11 @@ export function DesktopTaskbar({
         />
         <div className="relative flex w-full items-center gap-3">
           {showStart ? <HelixStartLauncher onOpenPanel={onOpenPanel} /> : null}
+          <Button size="sm" variant="outline" onClick={() => setGuideOpen(true)}
+            className="relative flex items-center gap-2 rounded-full border-cyan-400/45 bg-card/70 px-3 text-[12px] font-semibold uppercase tracking-wide text-cyan-200"
+            aria-label="Open Casimir Guide">
+            <CircleDot className="h-4 w-4" /> Guide
+          </Button>
           <div className="flex-1 overflow-hidden">
             <TaskbarShelf
               variant="fixed"
@@ -64,6 +91,8 @@ export function DesktopTaskbar({
         </div>
       </div>
     </div>
+    <CasimirGuideOverlay open={guideOpen} onClose={() => setGuideOpen(false)} onOpenPanel={handleOpenPanel} />
+    </>
   );
 }
 
@@ -124,6 +153,7 @@ function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) =
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
       <PopoverTrigger asChild>
         <Button
+          id="helix-start-button"
           size="sm"
           variant="outline"
           className="flex items-center gap-2 rounded-full border-primary/55 bg-card/70 px-4 text-[13px] font-semibold uppercase tracking-wide text-primary shadow-[0_0_18px_hsl(var(--primary)/0.32)] transition-colors hover:bg-card/90"

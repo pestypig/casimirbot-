@@ -1,0 +1,127 @@
+{
+  "schema": "casimirbot.eh_g8_pna1_deterministic_acceptance.v1",
+  "captured_at": "2026-08-31",
+  "program_gate": "G8",
+  "work_packet": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+  "capability": "PNA1 packaging, UX, and readiness boundary",
+  "maturity": "deterministically verified",
+  "source_commit": "654c4a829d9cfa333cc87d89de75d686b3103b2c",
+  "boundary": {
+    "base_exe_bundled_agent_runtime": false,
+    "base_exe_required_agent_runtime_package": false,
+    "codex_marketplace_classification": "release_required_client_adapter",
+    "required_runtime_packages": {
+      "sharp": "0.34.3"
+    },
+    "staged_file_count_before_manifest": 621,
+    "provider_runtime_credentials_inspected": false,
+    "hidden_reasoning_inspected": false
+  },
+  "acceptance": [
+    {
+      "check": "readiness_contract_and_runtime_guard_battery",
+      "command": "npx vitest run shared/__tests__/helix-agent-client-readiness.spec.ts tests/desktop-provider-neutral-runtime-guard.spec.ts --pool=forks",
+      "status": "passed",
+      "test_files": 2,
+      "tests": 12
+    },
+    {
+      "check": "desktop_host_build",
+      "command": "npm --prefix apps/desktop run build:host",
+      "status": "passed",
+      "service_sha256": "6ba3eda0f652f6bb49a076ef7b6c1677db1a057b93627f1c1fac557f892d0cc1",
+      "unrelated_existing_warnings": 4
+    },
+    {
+      "check": "staged_runtime_guard",
+      "command": "npm --prefix apps/desktop run stage:runtime",
+      "status": "passed",
+      "dependency_closure": "staged_verified"
+    },
+    {
+      "check": "isolated_no_agent_service",
+      "command": "npm --prefix apps/desktop run smoke:service-boundary",
+      "status": "passed",
+      "facts": [
+        "missing desktop session rejected",
+        "wrong desktop session rejected",
+        "authorized loopback accepted",
+        "release status failed closed",
+        "local public-user state isolated",
+        "developer-only device inventory policy closed",
+        "absent Codex binary and home created no provider runtime state"
+      ]
+    },
+    {
+      "check": "windows_directory_package",
+      "command": "npx electron-builder --config electron-builder.config.cjs --dir",
+      "status": "passed"
+    },
+    {
+      "check": "staged_and_packed_runtime_tree",
+      "command": "npm --prefix apps/desktop run verify:runtime-tree",
+      "status": "passed",
+      "runtime_manifest_sha256": "d8a7628ced9d51ecc2bc84e3b546f9ca6b0b4c5159e25c47f9208fa971893cb3",
+      "renderer_files": 612,
+      "renderer_sha256": "ea3915c8a6d806f23ba28348533ae2f64e9d2ad7b604974ac8e94a587a5fe87d",
+      "codex_client_adapter_files": 4,
+      "codex_client_adapter_sha256": "acce58ed91b7f72b2c8ae1999f1e43506ff85027f2e42f8a99ccdd69952cb820",
+      "tunnel_client_version": "0.0.13",
+      "tunnel_client_sha256": "83f08fb39b1c154747debd31b81b65dd4ee834cacf5a073b6301b2688699bc76"
+    },
+    {
+      "check": "helix_ask_discipline_quick",
+      "command": "npm run helix:ask:discipline:quick",
+      "status": "passed",
+      "sensitive_changed_files": 0
+    },
+    {
+      "check": "environment_harness_docs_audit",
+      "command": "npm run helix:environment-harness:docs-audit",
+      "status": "passed",
+      "active_gate": "G8",
+      "failures": 0
+    }
+  ],
+  "first_divergence_and_repair": {
+    "stage": "packaged_runtime_receipt_comparison",
+    "reason": "staging counted the runtime immediately before runtime-manifest.json was written while verification included the manifest itself",
+    "disposition": "receipt field renamed to auditedFileCountBeforeManifest and verification now compares the explicit pre-manifest count plus one",
+    "post_repair_exact_check": "passed"
+  },
+  "variety_scorecard": {
+    "no_agent_useful_state": { "passed": 1, "attempted": 1, "empirical_pass_ratio": 1.0 },
+    "independent_readiness_axes": { "passed": 3, "attempted": 3, "empirical_pass_ratio": 1.0 },
+    "sanitized_non_answer_projection": { "passed": 1, "attempted": 1, "empirical_pass_ratio": 1.0 },
+    "forbidden_runtime_variants": { "passed": 6, "attempted": 6, "empirical_pass_ratio": 1.0 },
+    "actual_staged_and_packed_tree": { "passed": 1, "attempted": 1, "empirical_pass_ratio": 1.0 }
+  },
+  "not_accepted": [
+    {
+      "check": "packaged_gui_launch_smoke",
+      "command": "npm --prefix apps/desktop run smoke:packaged-launch",
+      "status": "not_run_resource_guard",
+      "reason": "unchanged minimum 4 GiB free physical-memory guard refused startup",
+      "product_failure_inferred": false,
+      "safety_threshold_weakened": false
+    },
+    {
+      "check": "signed_installer_external_user_journey",
+      "status": "not_in_stage_1_scope"
+    },
+    {
+      "check": "live_provider_or_keyed_helix_turn",
+      "status": "not_required_for_packaging_and_readiness_contract"
+    }
+  ],
+  "source_sha256": {
+    "shared/helix-agent-client-readiness.ts": "28ca2fd85c79f991cf63fab2cad61401d75417f84b6e2c5bc6da15478553190f",
+    "shared/__tests__/helix-agent-client-readiness.spec.ts": "f71b55564e8628028a1d04eb53f3b3ac743d0098f8ce239c46a5520ab9e86ed7",
+    "apps/desktop/scripts/provider-neutral-runtime-guard-lib.mjs": "2543a824149c931288a76a8c2c4eb69383e8ee05f1a7f921e0c67ca23acf7794",
+    "apps/desktop/scripts/stage-runtime.mjs": "76514293548def2f9ca2b9932c15a0f2c73158c051d0e4820359adff0f102ee8",
+    "apps/desktop/scripts/verify-runtime-tree.mjs": "16b5f3b1e6adbcfdd5dfa7a8384dce1bf19da3fb63e35938d48f3d09d3e32cd4",
+    "apps/desktop/scripts/smoke-service-boundary.mjs": "143a6d0ad155c5dae72e93e11cc284f9fe004817880eafec87b2ee82524ae58a",
+    "tests/desktop-provider-neutral-runtime-guard.spec.ts": "2e829cee98b091868f20551038629cc7742467d33dfc7b1ab884556ff9e710e5"
+  },
+  "claim_boundary": "This evidence verifies only PNA Stage 1A. It does not prove provider-app session control, hidden reasoning access, setup-wizard usability, cross-client conformance, live external-agent continuation, signed-installer acceptance, or G8 release readiness."
+}

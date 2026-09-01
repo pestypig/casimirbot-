@@ -1522,6 +1522,30 @@ export async function signInWebAccountSession(input: {
   };
 }
 
+export async function boundAccountSessionExpiry(input: {
+  sessionId: string;
+  expiresAt: string;
+}): Promise<void> {
+  const sessionId = normalize(input.sessionId);
+  const expiresAtMs = Date.parse(input.expiresAt);
+  if (!sessionId || !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+    throw new Error("account_session_expiry_invalid");
+  }
+  await ensureDatabase();
+  await getPool().query(
+    `
+      UPDATE helix_account_sessions
+      SET expires_at = CASE
+        WHEN expires_at IS NULL OR expires_at > $2 THEN $2
+        ELSE expires_at
+      END,
+      updated_at = now()
+      WHERE session_id = $1 AND status = 'active';
+    `,
+    [sessionId, new Date(expiresAtMs)],
+  );
+}
+
 export async function getAccountCapabilityPolicy(sessionId?: string | null): Promise<HelixAccountCapabilityPolicy> {
   const session = sessionId ? await getAccountSessionById(sessionId) : null;
   return session?.account_policy ?? getDefaultAccountCapabilityPolicy();

@@ -52,7 +52,58 @@ describe("local supervisor agent coordination", () => {
       },
     ]);
     expect(store.listPresence().every((entry) => entry.answer_authority === false)).toBe(true);
+    expect(store.listPresence()[0].thread_observability_bridge).toEqual({
+      supported_levels: ["tool_activity_only"],
+      requested_level: "tool_activity_only",
+      checkpoint_publication: null,
+      declaration_basis: "authenticated_client_declaration",
+      provider_thread_content_included: false,
+      hidden_reasoning_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
     expect(store.listRecommendations()).toEqual([]);
+  });
+
+  it("stores a bounded checkpoint capability declaration without treating it as activity proof", () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:0123456789abcdef0123456789abcdef",
+    );
+    const result = store.registerOrHeartbeat({
+      profileRef: "profile:a",
+      accountSessionId: "session:a",
+      authenticatedMcpClientRef: "oauth_client:a",
+      presence: {
+        client_session_ref: "client:a",
+        conversation_thread_ref: "thread:a",
+        declared_objective_summary: "Publish bounded public checkpoints.",
+        lifecycle_state: "active",
+        resource_claims: [],
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only", "checkpoint_publish"],
+          requested_level: "checkpoint_publish",
+          checkpoint_publication: {
+            freshness_window_seconds: 120,
+            retention: "current_session",
+            revocation: "independent",
+          },
+        },
+        heartbeat_ttl_seconds: 60,
+      },
+    });
+    expect(result.thread_observability_bridge).toMatchObject({
+      requested_level: "checkpoint_publish",
+      checkpoint_publication: {
+        freshness_window_seconds: 120,
+        retention: "current_session",
+        revocation: "independent",
+      },
+      declaration_basis: "authenticated_client_declaration",
+      provider_thread_content_included: false,
+      hidden_reasoning_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
   });
 
   it("delivers an ordered idempotent handoff, target-only acknowledgement, and release notice", () => {

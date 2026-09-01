@@ -5,6 +5,25 @@ import {
   type HelixMcpEvidenceCapabilityDescriptor,
 } from "./contracts/helix-mcp-evidence-capability.v1";
 import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from "./contracts/helix-shared-live-room-agent.v1";
+import { HELIX_ENVIRONMENT_ACTION_READ_SCOPE } from "./helix-environment-action";
+import {
+  HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_SCHEMA,
+} from "./helix-minecraft-companion-mcp";
+import {
+  HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_SCHEMA,
+} from "./helix-minecraft-companion-follow-mcp";
+import {
+  HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_SCHEMA,
+} from "./helix-minecraft-companion-custody-mcp";
 
 /**
  * Provider-neutral MCP evidence descriptors adopted through MEC-2 and later.
@@ -15,6 +34,190 @@ import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from "./contracts/helix-shared-live
  * negatives, and focused parity evidence are all named.
  */
 export const HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTORS = [
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: "helix.minecraft.companion_room_custody_evidence.inspect",
+    capability_version: 1,
+    mcp_tool_name: HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_READ_TOOL,
+    semantic_family: "environment.minecraft.companion_custody_evidence",
+    handler_id: "helix.minecraft.companion_room_custody_evidence.handler",
+    handler_contract_version: HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_SCHEMA,
+    admission_profiles: [{
+      surface: "private_companion_c2_b_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+      ],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "evidence_support",
+      description:
+        "Supports exact private C2 custody evidence and current owner-room admission only; it grants no inventory execution.",
+    },
+  },
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: "helix.minecraft.companion_custody_evidence.inspect",
+    capability_version: 1,
+    mcp_tool_name: HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_READ_TOOL,
+    semantic_family: "environment.minecraft.companion_custody_evidence",
+    handler_id: "helix.minecraft.companion_custody_evidence.handler",
+    handler_contract_version: HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_SCHEMA,
+    admission_profiles: [{
+      surface: "private_companion_c2_a1_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+      ],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "evidence_support",
+      description:
+        "Supports exact private C2 inventory/equipment custody evidence only; it grants no inventory execution.",
+    },
+  },
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: "helix.minecraft.companion_room_follow_evidence.inspect",
+    capability_version: 1,
+    mcp_tool_name: HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_READ_TOOL,
+    semantic_family: "environment.minecraft.companion_follow_evidence",
+    handler_id: "helix.minecraft.companion_room_follow_evidence.handler",
+    handler_contract_version: HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_SCHEMA,
+    admission_profiles: [{
+      surface: "private_companion_c1_b_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+      ],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "evidence_support",
+      description:
+        "Supports exact private C1 follow-controller evidence and current owner-room admission only.",
+    },
+  },
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: "helix.minecraft.companion_follow_evidence.inspect",
+    capability_version: 1,
+    mcp_tool_name: HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_READ_TOOL,
+    semantic_family: "environment.minecraft.companion_follow_evidence",
+    handler_id: "helix.minecraft.companion_follow_evidence.handler",
+    handler_contract_version: HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_SCHEMA,
+    admission_profiles: [{
+      surface: "private_companion_c1_a1_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+      ],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "evidence_support",
+      description: "Supports exact private C1 follow-controller evidence only.",
+    },
+  },
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id:
+      "helix.minecraft.companion_room_presence_evidence.inspect",
+    capability_version: 1,
+    mcp_tool_name:
+      HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+    semantic_family:
+      "environment.minecraft.companion_room_presence_evidence",
+    handler_id:
+      "helix.minecraft.companion_room_presence_evidence.handler",
+    handler_contract_version:
+      HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_SCHEMA,
+    admission_profiles: [{
+      surface: "private_companion_c0_b_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+      ],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "evidence_support",
+      description:
+        "Supports only the exact private C0 cleanup observation and its current owner-room admission.",
+    },
+  },
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: "helix.minecraft.companion_presence_evidence.inspect",
+    capability_version: 1,
+    mcp_tool_name: HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+    semantic_family: "environment.minecraft.companion_presence_evidence",
+    handler_id: "helix.minecraft.companion_presence_evidence.handler",
+    handler_contract_version:
+      HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_SCHEMA,
+    admission_profiles: [{
+      surface: "private_companion_c0_a1_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
+      ],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "evidence_support",
+      description: "Supports only exact private C0 companion incarnation and cleanup evidence re-entry.",
+    },
+  },
   {
     schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
     capability_id: "helix.public_ui.catalog.inspect",

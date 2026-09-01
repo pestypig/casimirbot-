@@ -258,6 +258,21 @@ const BASE_PANELS: PanelDefinition[] = [
     mobileReady: true,
   },
   {
+    id: "friends-parties",
+    title: "Friends & Voice Parties",
+    loader: load(() => import("@/components/workstation/friends-parties")),
+    defaultSize: { w: 980, h: 700 },
+    defaultPosition: { x: 140, y: 90 },
+    endpoints: [
+      "GET /api/agi/friends-parties",
+      "POST /api/agi/friends-parties/friendships",
+      "POST /api/agi/friends-parties/parties",
+      "POST /api/agi/friends-parties/parties/:partyId/media/signals",
+    ],
+    keywords: ["friends", "party", "voice", "chat", "GPT Live"],
+    mobileReady: true,
+  },
+  {
     id: "taskbar",
     title: "Taskbar",
     loader: load(() => import("@/components/desktop/TaskbarPanel")),

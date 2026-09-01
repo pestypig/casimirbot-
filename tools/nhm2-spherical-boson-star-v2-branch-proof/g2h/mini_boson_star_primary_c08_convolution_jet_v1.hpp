@@ -125,6 +125,14 @@ bool evaluate_prepared_decomposed(
     const Input &input, unsigned target_degree, std::size_t target_jet,
     Output *output, Result *result, CoefficientDecomposition *decomposition);
 
+// Additive H2-P8I surface. It preserves the P8E decomposition and ordinary
+// coefficient arithmetic while binding the P8H predecessor attribution only
+// to slot 3 (value_jet * ordered-second_jet).
+bool evaluate_prepared_decomposed_slot3_attributed(
+    const Input &input, unsigned target_degree, std::size_t target_jet,
+    Output *output, Result *result, CoefficientDecomposition *decomposition,
+    bivariate::CoefficientAttribution *slot3_attribution);
+
 const char *failure_detail_name(FailureDetail detail);
 
 }  // namespace nhm2::g2h_e_s5::primary_c08_convolution_jet_v1

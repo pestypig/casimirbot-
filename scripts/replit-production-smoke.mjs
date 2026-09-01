@@ -240,6 +240,51 @@ const main = async () => {
       "OAuth protected-resource metadata returned an unexpected authorization server",
     );
 
+    const deviceCheckProtectedResource = await readJson(
+      baseUrl,
+      "/.well-known/oauth-protected-resource/mcp/device-check",
+      { headers: forwardedHttpsHeaders },
+    );
+    assert(
+      deviceCheckProtectedResource.resource === "https://casimirbot.com/mcp",
+      "Device Check protected-resource metadata returned an unexpected resource",
+    );
+    assert(
+      deviceCheckProtectedResource.authorization_servers?.[0] ===
+        "https://auth.example.invalid",
+      "Device Check protected-resource metadata returned an unexpected authorization server",
+    );
+    assert(
+      deviceCheckProtectedResource.scopes_supported?.includes("helix.rooms.read"),
+      "Device Check protected-resource metadata omitted its least read scope",
+    );
+
+    const coordinationProtectedResource = await readJson(
+      baseUrl,
+      "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
+      { headers: forwardedHttpsHeaders },
+    );
+    assert(
+      coordinationProtectedResource.resource === "https://casimirbot.com/mcp",
+      "Coordination protected-resource metadata returned an unexpected resource",
+    );
+    assert(
+      coordinationProtectedResource.authorization_servers?.[0] ===
+        "https://auth.example.invalid",
+      "Coordination protected-resource metadata returned an unexpected authorization server",
+    );
+    for (const scope of [
+      "helix.rooms.read",
+      "helix.rooms.manage",
+      "helix.desktop.tunnel.transition.request",
+      "helix.desktop.tunnel.transition.execute",
+    ]) {
+      assert(
+        coordinationProtectedResource.scopes_supported?.includes(scope),
+        `Coordination protected-resource metadata omitted ${scope}`,
+      );
+    }
+
     const initializeResponse = await fetchWithTimeout(`${baseUrl}/mcp`, {
       method: "POST",
       headers: {
@@ -328,6 +373,8 @@ const main = async () => {
         robots: robotsResponse.status,
         sitemap: sitemapResponse.status,
         oauth_protected_resource: 200,
+        oauth_device_check_protected_resource: 200,
+        oauth_coordination_protected_resource: 200,
         mcp_unauthenticated: initializeResponse.status,
         agent_runs_unauthenticated: restResponse.status,
         account_session: session.ok === false ? "response_error" : 200,

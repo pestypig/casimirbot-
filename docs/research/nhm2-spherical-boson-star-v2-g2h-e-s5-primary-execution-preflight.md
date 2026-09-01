@@ -235,8 +235,141 @@ stale. C1 is exhausted. C2 repaired those two source members but omitted the
 required observability fixture from extracted-archive preflight. The additive
 C2-R1 successor now preserves all C2 members, adds the fixture and durable
 preexecution evidence binding, reproduces binary `14140897...1bad6`, passes the
-extracted fixture 17/17 and passes independent proposal audit 28/28. No C2-R1
-VM or numerical process exists; fresh exact cloud authorization is required.
+extracted fixture 17/17 and passes independent proposal audit 28/28. Its exactly
+authorized N2 process ran once, emitted monotone progress through at least
+35,840/65,536 panels and automatically stopped at
+`2026-08-31T10:25:26.239-07:00`. The stopped-disk rescue then recovered the
+immutable terminal archive `60cb3bf0...977ad`; the original and helper VMs are
+stopped. After two preserved representational audit failures, the fixed-
+220-digit-context reader authenticates the result 22/22 at
+`afda5b93...f4c5c`. The candidate-neutral P8G evidence replay passes 13/13 at
+`c44bd6ed...96764d` and independently separates a real outer accumulation gap
+that is nevertheless insufficient for the width rail: the elementary sum and
+slot 3 alone both remain strictly above threshold. The next bounded lead is
+P8H attribution of slot 3 `value_jet * second_jet(1,2)`; no scientific rerun is
+authorized.
+P8H now closes its bivariate observation surface at fixture maturity: two
+11/11 runs are byte-identical, ordinary and attributed Arb outputs are exact,
+the final coefficient reconstructs exactly, predecessor regressions remain
+19/19 and 13/13, and independent audit passes 37/37 at
+`263ff183...dc6d91c`. No representative input was evaluated. P8I parent-path
+binding is the next bounded lead; execution remains unauthorized.
+P8I now binds the P8H attribution only to slot 3 in the existing jet/selector
+path. Its bounded two-panel fixture passes 14/14 twice with byte-identical output,
+ordinary and attributed selector outputs and results are exact, all slot-3
+reconstructions are exact, and only fixed aggregate receipt fields are retained.
+It observes 2,172 integrated terms and 44 boundary terms; the P8E regression
+remains 13/13. Independent audit passes 33/33 at `42d09751...6bb6aee`.
+No representative input was evaluated. A candidate-neutral P8J representative
+attribution decision packet is the next bounded lead; execution remains
+unauthorized until separately frozen and approved.
+The P8I current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2597 `PASS/GREEN` with
+certificate `6e84f965...e12a4e45` and integrity true.
+P8J-R2 now freezes the sole candidate-neutral representative attribution
+proposal at `82a6a67c...8a433a`. It reconstructs the existing C2-R1 base plus a
+17-entry additive overlay, passes the overlay manifest 16/16, result-audit
+self-test 6/6, unchanged P8I fixture 14/14, offline no-network builds,
+controller syntax and required target binary `d40c6e51...21de9d6`.
+Independent proposal audit passes 41/41 at `b3527500...6b2739`. The target was
+not executed and no VM or upload was created. Separate exact authorization is
+required for the one bounded 65,536-panel process; until then all scientific
+and authority locks remain unchanged.
+The P8J-R2 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2598 `PASS/GREEN`, trace
+`adapter:799da142-41d4-4c8f-a4a5-6df60b3bba0a`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole R2 creation request then stopped before resource creation with
+`ZONE_RESOURCE_POOL_EXHAUSTED` for `n2-standard-32` in `us-central1-a`.
+Post-failure inspection confirms no VM or disk exists; no build, fixture or
+scientific process ran. R2 is exhausted. The separately frozen R3 successor at
+`7e82bd86...6cc34b` changes only the VM name and zone to `us-central1-b`,
+retains the existing Cloud Shell archives, and passes static audit 36/36 at
+`b6dff537...5b321a3`. Its sole authorized creation attempt also returned
+`ZONE_RESOURCE_POOL_EXHAUSTED`; the post-failure guard confirms no VM or disk
+was created in `us-central1-b`. The R3 result at `21dafa88...7d46dd7` passes
+independent audit 25/25 at `2713dac1...9a1099`. R3 is exhausted, no scientific
+process ran, and a third cloud successor requires a new capacity strategy and
+separate operator decision.
+The terminal R3 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2600 `PASS/GREEN`,
+trace `adapter:6487410a-426b-4e5c-9c74-1ee2c6b5ef96`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+P8J-R4 now freezes the separately researched cross-region successor at
+`2510cae2...8c23d9f`. Read-only project inventory confirms sufficient unused
+global and regional N2 quota, exact `n2-standard-32` definitions outside
+`us-central1`, and zero non-terminated instances; it does not claim live
+capacity. R4 therefore preserves every scientific and runtime binding and
+changes only the VM name and zone to deterministic `us-east1-b`. Independent
+static audit passes 49/49 at `633a36f9...c3ab17`. No R4 VM, disk, upload,
+build or process was created, and the sole attempt requires separate exact
+operator authorization.
+The R4 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP 18/18
+files and 179/179 tests, and Casimir adapter run 2601 `PASS/GREEN`, trace
+`adapter:6425c65a-3bbb-44a0-80b7-fc3283c2e5db`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole authorized R4 creation request then stopped on
+`ZONE_RESOURCE_POOL_EXHAUSTED` in `us-east1-b`. Its Google insert operation is
+`DONE` with HTTP 503, and the exact VM remains absent. The R4 immutable result
+at `9c368edd...0839fbe` passes independent audit 29/29 at
+`55a2c379...8f153`. R4 is exhausted with zero VM, disk, build, scientific
+process or candidate activity; another provisioning strategy requires a new
+researched packet and separate operator decision.
+The terminal R4 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2602 `PASS/GREEN`,
+trace `adapter:6ac262b4-703a-4cef-974c-d203e58eab8c`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+P8J-R5 now freezes the separately researched alternate-family successor at
+`bc883b8f...1ae06ea`. Flex-start is unavailable for the CPU-only families and
+Spot preemption is incompatible with the uninterrupted one-shot evidence
+contract. The selected `c4-standard-32` retains 32 x86 vCPUs, uses the
+previously demonstrated `us-central1-a` C4 pool and changes only the required
+boot storage to 30 GB `hyperdisk-balanced`; all scientific/build bindings stay
+unchanged. Read-only inventory confirms machine definition and sufficient
+visible CPU quota, not live capacity. Independent static audit passes 54/54 at
+`f5101809...5bde91`. No R5 cloud action occurred and its sole attempt requires
+separate exact operator authorization.
+The frozen R5 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2603 `PASS/GREEN`,
+trace `adapter:dc93be34-6f27-43f0-a30e-3d4695e0a568`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole R5 creation attempt then stopped before resource creation on the
+authenticated C4-family quota: `CPUS_PER_VM_FAMILY` is 24 in `us-central1`,
+below the frozen 32-vCPU request. Google operation
+`operation-1788223864323-65a6150363ded-20ec0738-1f295ce4` is `DONE` with
+HTTP 403 and `QUOTA_EXCEEDED`; the exact VM is absent. The immutable result is
+`0e8534f6...c7dfa0c` and independent audit passes 31/31 at
+`8c87a7ca...ee6dc9`. R5 is exhausted with zero VM, disk, build, numerical
+process or candidate activity. Another strategy requires separate research,
+freezing and operator authorization.
+The terminal R5 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2604 `PASS/GREEN`,
+trace `adapter:04e0c609-cf90-4290-97c6-78cec388cfe3`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+P8J-R6 now freezes the quota-compatible C2D successor at
+`f0a2aab6...962d878`. Authenticated inventory exposes `C2D_CPUS` 100/0 in
+the five inspected US regions and defines `c2d-standard-32` at 32 vCPUs and
+131,072 MiB in `us-central1-a`. It preserves the exact x86, 32-CPU,
+scientific, build and evidence bindings while returning boot storage to
+supported 30 GB `pd-balanced`; the official planning rate is
+`$1.452768/hour`. Independent static audit passes 37/37 at
+`06a680b6...cd967e`. No R6 cloud action occurred and its sole attempt requires
+separate exact operator authorization.
+The frozen R6 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2605 `PASS/GREEN`,
+trace `adapter:ec9799bc-e26b-4134-9066-25622280a24c`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole R6 creation attempt then passed archive, absence and C2D 100/0 quota
+guards but stopped before resource creation on `c2d-standard-32` zonal
+stockout. Operation `operation-1788226130354-65a61d7471f99-ec7f6b23-e02e7642`
+is `DONE` with HTTP 503 and `ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS`; the
+exact VM is absent. Result `2cf0ef29...27f7b68` passes independent audit 28/28
+at `0ac59b69...ed50775`. R6 is exhausted with zero VM, disk, build, numerical
+process or candidate activity.
+The R2/R3 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2599 `PASS/GREEN`, trace
+`adapter:282c7fcd-777d-4cce-bee8-4c4389cafb23`, with certificate
+`6e84f965...e12a4e45` and integrity true.
 The separately frozen result-only P8F auditor passes 4/4 synthetic fixtures and
 precommits a strict outer-accumulation, boundary, unique-slot or distributed
 classification without reading the active evidence root. It selects nothing

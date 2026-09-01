@@ -56,6 +56,10 @@ $rootProcess = $null
 $minFreePhysicalGiB = [double]::PositiveInfinity
 $maxCommitPercent = 0.0
 $listenerCount = 0
+$friendsCoordinationConfigured = -not [string]::IsNullOrWhiteSpace(
+  $env:HELIX_FRIENDS_PARTIES_COORDINATION_ORIGIN
+)
+$expectedLoopbackListeners = if ($friendsCoordinationConfigured) { 4 } else { 3 }
 $userDataFileCount = 0
 $processCount = 0
 $readyReceiptValid = $false
@@ -148,7 +152,7 @@ try {
     }
   } until (
     (
-      $listenerCount -eq 2 -and
+      $listenerCount -eq $expectedLoopbackListeners -and
       $userDataFileCount -gt 0 -and
       $readyReceiptValid -and
       $serviceListenerVerified
@@ -160,9 +164,9 @@ try {
   if ($rootProcess.HasExited) {
     throw "Packaged application exited before verification completed."
   }
-  if ($listenerCount -ne 2) {
+  if ($listenerCount -ne $expectedLoopbackListeners) {
     throw (
-      "Expected the service and credential-broker loopback listeners, " +
+      "Expected $expectedLoopbackListeners service/native-broker loopback listeners, " +
       "found $listenerCount."
     )
   }
@@ -199,6 +203,11 @@ try {
     Verdict = "PASS"
     Processes = $processCount
     LoopbackListeners = $listenerCount
+    FriendsCoordinationBroker = if ($friendsCoordinationConfigured) {
+      "PASS"
+    } else {
+      "NOT_CONFIGURED"
+    }
     IsolatedUserDataFiles = $userDataFileCount
     FullReadinessReceipt = "PASS"
     ServiceListenerReceipt = "PASS"

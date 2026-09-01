@@ -7,6 +7,71 @@ export const HELIX_LOCAL_SUPERVISOR_RELAY_SCHEMA =
 export const HELIX_LOCAL_SUPERVISOR_RECOMMENDATION_SCHEMA =
   "helix.local_supervisor_recommendation.v1" as const;
 
+export const HELIX_THREAD_OBSERVABILITY_BRIDGE_LEVELS = [
+  "tool_activity_only",
+  "checkpoint_publish",
+  "continuation_ready",
+] as const;
+
+export const helixThreadObservabilityBridgeLevelSchema = z.enum(
+  HELIX_THREAD_OBSERVABILITY_BRIDGE_LEVELS,
+);
+
+export const helixThreadObservabilityBridgeDeclarationSchema = z.object({
+  supported_levels: z.array(helixThreadObservabilityBridgeLevelSchema)
+    .min(1)
+    .max(3),
+  requested_level: helixThreadObservabilityBridgeLevelSchema,
+  checkpoint_publication: z.object({
+    freshness_window_seconds: z.number().int().min(15).max(3600),
+    retention: z.enum(["current_session", "profile_durable"]),
+    revocation: z.literal("independent"),
+  }).strict().nullable(),
+}).strict().superRefine((value, context) => {
+  if (new Set(value.supported_levels).size !== value.supported_levels.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["supported_levels"],
+      message: "observability_levels_must_be_unique",
+    });
+  }
+  if (
+    value.supported_levels.includes("continuation_ready") &&
+    !value.supported_levels.includes("checkpoint_publish")
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["supported_levels"],
+      message: "continuation_requires_checkpoint_support",
+    });
+  }
+  if (!value.supported_levels.includes(value.requested_level)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["requested_level"],
+      message: "requested_observability_level_must_be_supported",
+    });
+  }
+  const checkpointRequested = value.requested_level !== "tool_activity_only";
+  if (checkpointRequested !== Boolean(value.checkpoint_publication)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["checkpoint_publication"],
+      message: "checkpoint_policy_must_match_requested_level",
+    });
+  }
+});
+
+export type HelixThreadObservabilityBridgeDeclaration = z.infer<
+  typeof helixThreadObservabilityBridgeDeclarationSchema
+>;
+
+export const HELIX_TOOL_ACTIVITY_ONLY_DECLARATION = Object.freeze({
+  supported_levels: ["tool_activity_only"] as ["tool_activity_only"],
+  requested_level: "tool_activity_only" as const,
+  checkpoint_publication: null,
+});
+
 const opaqueRef = z.string().trim().min(3).max(320)
   .refine((value) => !/[\r\n\t]/u.test(value), "opaque_ref_must_be_single_line")
   .refine((value) => !/(?:https?:\/\/|bearer\s|token=|password=|community=)/iu.test(value), "private_value_forbidden");
@@ -63,6 +128,10 @@ export const helixLocalSupervisorPresenceInputSchema = z.object({
   environment_ref: opaqueRef.nullable().optional(),
   run_ref: opaqueRef.nullable().optional(),
   blocker_summary: z.string().trim().max(240).nullable().optional(),
+  thread_observability_bridge:
+    helixThreadObservabilityBridgeDeclarationSchema.default(
+      HELIX_TOOL_ACTIVITY_ONLY_DECLARATION,
+    ),
   heartbeat_ttl_seconds: z.number().int().min(15).max(180).default(60),
 }).strict();
 
@@ -108,6 +177,13 @@ export type HelixLocalSupervisorPresence = {
   declared_objective_is_verified: false;
   lifecycle_basis: "authenticated_client_heartbeat";
   lifecycle_state: z.infer<typeof helixLocalSupervisorLifecycleStateSchema>;
+  thread_observability_bridge?: HelixThreadObservabilityBridgeDeclaration & {
+    declaration_basis: "authenticated_client_declaration";
+    provider_thread_content_included: false;
+    hidden_reasoning_included: false;
+    answer_authority: false;
+    terminal_eligible: false;
+  };
   resource_claims: z.infer<typeof helixLocalSupervisorResourceClaimSchema>[];
   room_ref: string | null;
   environment_ref: string | null;

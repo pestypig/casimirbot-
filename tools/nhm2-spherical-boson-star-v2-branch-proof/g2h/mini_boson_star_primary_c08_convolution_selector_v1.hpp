@@ -169,6 +169,16 @@ struct CoefficientDecompositionObservation {
     std::string maximum_elementary_radius;
     std::size_t maximum_elementary_panel_ordinal = 0U;
     std::size_t maximum_elementary_slot = 0U;
+    bool slot3_attribution_evaluated = false;
+    std::size_t slot3_integrated_terms_observed = 0U;
+    std::size_t slot3_boundary_terms_observed = 0U;
+    bool all_slot3_reconstructions_equal = false;
+    std::string slot3_f_source_hull_radius_sum;
+    std::string slot3_gprime_source_hull_radius_sum;
+    std::string slot3_direct_integrated_radius_sum;
+    std::string slot3_boundary_radius_sum;
+    std::string slot3_integrated_component_radius_sum;
+    std::string slot3_boundary_component_radius_sum;
     bool observation_only = true;
     bool threshold_unchanged = true;
     bool reduction_order_unchanged = true;

@@ -1,4 +1,5 @@
 export type SharedLiveRoomMediaBridgeRole = "owner" | "participant";
+export type SharedLiveRoomProviderAttachmentMode = "required" | "detached";
 
 export type SharedLiveRoomMediaBridgeState =
   | "idle"
@@ -25,6 +26,7 @@ export type SharedLiveRoomMediaBridgeFailure =
 export type SharedLiveRoomMediaBridgeProjection = {
   state: SharedLiveRoomMediaBridgeState;
   role: SharedLiveRoomMediaBridgeRole;
+  provider_attachment_mode: SharedLiveRoomProviderAttachmentMode;
   peer_audio_connected: boolean;
   remote_audio_playback_ready: boolean;
   provider_input_mixed: boolean;
@@ -48,6 +50,7 @@ export const INITIAL_SHARED_LIVE_ROOM_MEDIA_BRIDGE_PROJECTION:
 SharedLiveRoomMediaBridgeProjection = {
   state: "idle",
   role: "participant",
+  provider_attachment_mode: "required",
   peer_audio_connected: false,
   remote_audio_playback_ready: false,
   provider_input_mixed: false,

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T14:22:04.195Z",
+  "generatedAt": "2026-09-01T01:17:32.182Z",
   "registryCount": 323,
   "coverage": {
     "exploratory": {
@@ -347,7 +347,7 @@
     }
   },
   "unstaged": {
-    "count": 20,
+    "count": 21,
     "modules": [
       "modules/gr/gr-diagnostics.ts",
       "modules/warp/warp-metric-adapter.ts",
@@ -357,6 +357,7 @@
       "server/routes/agi.chat.ts",
       "server/routes/agi.contributions.ts",
       "server/routes/agi.demonstration.ts",
+      "server/routes/agi.friends-parties.ts",
       "server/routes/agi.moral-graph.ts",
       "server/routes/agi.plan.ancillary.ts",
       "server/routes/agi.realtime-session.ts",
@@ -382,6 +383,7 @@
         "server/routes/agi.chat.ts",
         "server/routes/agi.contributions.ts",
         "server/routes/agi.demonstration.ts",
+        "server/routes/agi.friends-parties.ts",
         "server/routes/agi.moral-graph.ts",
         "server/routes/agi.plan.ancillary.ts",
         "server/routes/agi.realtime-session.ts",
@@ -457,8 +459,8 @@
     ]
   },
   "autoGraph": {
-    "nodeCount": 3307,
-    "edgeCount": 7989
+    "nodeCount": 3330,
+    "edgeCount": 8047
   },
   "evidenceProfiles": [
     {

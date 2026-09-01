@@ -1,0 +1,30 @@
+ARG BUILDER_IMAGE=nhm2-g2h-s4-primary-fixture-builder:v2@sha256:9e94d19f9014938b510e95c776778d164cce120777adfc2d495c1812de5221a1
+ARG RUNTIME_IMAGE=nhm2-g2h-primary-proof:v2@sha256:8334e9777fd7cb9405d8878b243d0196f3e45d9d51d82df159452dcb430159ab
+
+FROM ${BUILDER_IMAGE} AS builder
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_ledger_v1.hpp /src/mini_boson_star_primary_c08_convolution_ledger_v1.hpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_ledger_v1.cpp /src/mini_boson_star_primary_c08_convolution_ledger_v1.cpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_bivariate_v1.hpp /src/mini_boson_star_primary_c08_convolution_bivariate_v1.hpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_bivariate_v1.cpp /src/mini_boson_star_primary_c08_convolution_bivariate_v1.cpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_jet_v1.hpp /src/mini_boson_star_primary_c08_convolution_jet_v1.hpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_jet_v1.cpp /src/mini_boson_star_primary_c08_convolution_jet_v1.cpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_selector_v1.hpp /src/mini_boson_star_primary_c08_convolution_selector_v1.hpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_convolution_selector_v1.cpp /src/mini_boson_star_primary_c08_convolution_selector_v1.cpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8e_decomposition_fixture_v1.cpp /src/mini_boson_star_primary_c08_h2_p8e_decomposition_fixture_v1.cpp
+COPY tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8i_selector_slot3_attribution_fixture_v1.cpp /src/mini_boson_star_primary_c08_h2_p8i_selector_slot3_attribution_fixture_v1.cpp
+RUN g++ -std=c++20 -O2 -fno-fast-math -fno-common -Wall -Wextra -Werror \
+      -pthread \
+      -o /usr/local/bin/mini-boson-star-primary-c08-h2-p8i-selector-slot3-attribution-fixture-v1 \
+      /src/mini_boson_star_primary_c08_convolution_ledger_v1.cpp \
+      /src/mini_boson_star_primary_c08_convolution_bivariate_v1.cpp \
+      /src/mini_boson_star_primary_c08_convolution_jet_v1.cpp \
+      /src/mini_boson_star_primary_c08_convolution_selector_v1.cpp \
+      /src/mini_boson_star_primary_c08_h2_p8i_selector_slot3_attribution_fixture_v1.cpp \
+      -lflint-arb -lflint -lgmp -lmpfr
+
+FROM ${RUNTIME_IMAGE}
+COPY --from=builder \
+  /usr/local/bin/mini-boson-star-primary-c08-h2-p8i-selector-slot3-attribution-fixture-v1 \
+  /usr/local/bin/mini-boson-star-primary-c08-h2-p8i-selector-slot3-attribution-fixture-v1
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/mini-boson-star-primary-c08-h2-p8i-selector-slot3-attribution-fixture-v1"]

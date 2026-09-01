@@ -113,4 +113,36 @@ describe("Shared Live Room media bridge hook", () => {
     await waitFor(() => expect(bridge.close).toHaveBeenCalledOnce());
     expect(bridge.syncRoom).not.toHaveBeenCalledWith(secondRoom);
   });
+
+  it("constructs an explicit provider-detached bridge for human-only voice", async () => {
+    const bridge = {
+      start: vi.fn(async () => undefined),
+      syncRoom: vi.fn(),
+      resumePlayback: vi.fn(async () => true),
+      close: vi.fn(async () => undefined),
+    };
+    mocks.createBridge.mockReturnValue(bridge);
+    const room = { room_id: "room:human-voice" } as HelixSharedRealtimeRoom;
+    const self = {
+      participant_id: "participant:owner",
+      role: "owner",
+    } as HelixSharedRealtimeRoomParticipant;
+    const api = {} as HelixSharedLiveRoomApi;
+    const { result } = renderHook(() => useSharedLiveRoomMediaBridge({
+      room,
+      self,
+      realtimeSessionId: null,
+      providerAttachmentMode: "detached",
+      api,
+    }));
+
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(mocks.createBridge).toHaveBeenCalledWith(expect.objectContaining({
+      realtimeSessionId: null,
+      providerAttachmentMode: "detached",
+    }));
+    expect(bridge.start).toHaveBeenCalledOnce();
+  });
 });

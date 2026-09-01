@@ -170,6 +170,8 @@
     "helix:minecraft:player-g2-parity": "tsx scripts/helix-minecraft-player-g2-parity-audit.ts",
     "helix:minecraft:player-mcp-capture": "tsx scripts/helix-minecraft-player-mcp-capture.ts",
     "helix:environment-harness:docs-audit": "tsx scripts/audit-environment-harness-work-program.ts",
+    "helix:friends-voice-party:f5": "vitest run server/__tests__/friends-voice-party-schema.test.ts server/__tests__/friends-voice-party-dual-broker-acceptance.test.ts server/routes/__tests__/friends-parties-coordination-session.test.ts tests/desktop-friends-parties-coordination-broker.spec.ts client/src/components/workstation/friends-parties/__tests__/VoicePartyMediaBridge.spec.ts client/src/components/workstation/friends-parties/__tests__/VoicePartyMediaSignaling.spec.ts tests/helix-friends-voice-party-f5-acceptance.spec.ts --pool=forks",
+    "helix:friends-voice-party:f5:physical-harness": "tsx scripts/helix-friends-voice-party-f5-acceptance.ts",
     "helix:mcp-evidence:audit": "tsx scripts/audit-helix-mcp-evidence-capabilities.ts --summary",
     "helix:public-ui:audit": "tsx scripts/annotate-helix-public-ui-control-ids.ts && tsx scripts/classify-helix-public-ui-controls.ts && tsx scripts/generate-helix-public-ui-control-catalog.ts && tsx scripts/audit-helix-public-ui-affordances.ts --summary && tsx scripts/audit-helix-public-ui-capabilities.ts --summary",
     "helix:minecraft:player-trace": "tsx scripts/helix-minecraft-player-differential-capture.ts",

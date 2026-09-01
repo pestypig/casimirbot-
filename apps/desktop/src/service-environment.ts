@@ -73,6 +73,10 @@ export const buildDesktopServiceEnvironment = (input: {
     origin: string;
     token: string;
   }>;
+  friendsPartiesCoordinationBroker: Readonly<{
+    origin: string;
+    token: string;
+  }> | null;
   deviceId: string;
 }): NodeJS.ProcessEnv => {
   if (!input.userDataPath.trim()) {
@@ -144,6 +148,31 @@ export const buildDesktopServiceEnvironment = (input: {
       "Desktop MCP transition broker token must be exactly 32 base64url bytes",
     );
   }
+  let friendsPartiesCoordinationBrokerOrigin: URL | null = null;
+  let friendsPartiesCoordinationBrokerToken: string | null = null;
+  if (input.friendsPartiesCoordinationBroker) {
+    friendsPartiesCoordinationBrokerOrigin = new URL(
+      input.friendsPartiesCoordinationBroker.origin,
+    );
+    friendsPartiesCoordinationBrokerToken =
+      input.friendsPartiesCoordinationBroker.token.trim();
+    if (
+      friendsPartiesCoordinationBrokerOrigin.protocol !== "http:" ||
+      friendsPartiesCoordinationBrokerOrigin.hostname !== "127.0.0.1" ||
+      !friendsPartiesCoordinationBrokerOrigin.port ||
+      friendsPartiesCoordinationBrokerOrigin.username ||
+      friendsPartiesCoordinationBrokerOrigin.password ||
+      friendsPartiesCoordinationBrokerOrigin.pathname !== "/" ||
+      friendsPartiesCoordinationBrokerOrigin.search ||
+      friendsPartiesCoordinationBrokerOrigin.hash ||
+      !/^[A-Za-z0-9_-]{43}$/u.test(friendsPartiesCoordinationBrokerToken) ||
+      Buffer.from(friendsPartiesCoordinationBrokerToken, "base64url").length !== 32
+    ) {
+      throw new Error(
+        "Desktop Friends & Parties coordination broker is invalid",
+      );
+    }
+  }
   const deviceId = input.deviceId.trim();
   if (!/^desktop_device_[A-Za-z0-9_-]{22}$/u.test(deviceId)) {
     throw new Error("Desktop device identity is invalid");
@@ -180,6 +209,16 @@ export const buildDesktopServiceEnvironment = (input: {
     mcpTransitionBrokerOrigin.origin;
   environment.HELIX_DESKTOP_MCP_TRANSITION_BROKER_TOKEN =
     mcpTransitionBrokerToken;
+  environment.HELIX_FRIENDS_PARTIES_COORDINATION_REQUIRED = "1";
+  if (
+    friendsPartiesCoordinationBrokerOrigin &&
+    friendsPartiesCoordinationBrokerToken
+  ) {
+    environment.HELIX_FRIENDS_PARTIES_COORDINATION_BROKER_ORIGIN =
+      friendsPartiesCoordinationBrokerOrigin.origin;
+    environment.HELIX_FRIENDS_PARTIES_COORDINATION_BROKER_TOKEN =
+      friendsPartiesCoordinationBrokerToken;
+  }
   environment.HELIX_DESKTOP_DEVICE_ID = deviceId;
   // The service receives only the native-owned profile registry location.
   // Individual run directories are selected by the signed-in profile through

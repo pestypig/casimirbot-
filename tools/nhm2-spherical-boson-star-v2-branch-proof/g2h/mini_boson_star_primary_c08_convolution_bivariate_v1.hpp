@@ -99,6 +99,31 @@ struct PreparedMoments {
     arb_srcptr moment(unsigned a, unsigned b) const;
 };
 
+// H2-P8H observation-only attribution for one retained coefficient. The
+// ordinary coefficient arithmetic is unchanged; these aggregates are written
+// only after or alongside the same immutable operands and are never consulted
+// by acceptance or failure control flow.
+struct CoefficientAttribution {
+    arb_t integrated_centered_component;
+    arb_t boundary_centered_component;
+    arb_t reconstructed_coefficient;
+    arb_t direct_integrated_radius_sum;
+    arb_t boundary_radius_sum;
+    arb_t f_source_hull_radius_bound;
+    arb_t gprime_source_hull_radius_bound;
+    unsigned target_degree = 0U;
+    std::size_t integrated_terms_observed = 0U;
+    std::size_t boundary_terms_observed = 0U;
+    bool evaluated = false;
+    bool final_reconstruction_equal = false;
+    bool observation_only = true;
+
+    CoefficientAttribution();
+    ~CoefficientAttribution();
+    CoefficientAttribution(const CoefficientAttribution &) = delete;
+    CoefficientAttribution &operator=(const CoefficientAttribution &) = delete;
+};
+
 bool prepare_moments(arb_srcptr u_left, arb_srcptr u_right,
                      unsigned maximum_f_order, unsigned maximum_g_order,
                      PreparedMoments *prepared);
@@ -115,6 +140,13 @@ bool evaluate(const Input &input, Output *output, Result *result);
 // beta_moment constructions.
 bool evaluate_prepared(const Input &input, const PreparedMoments &prepared,
                        Output *output, Result *result);
+
+// Additive H2-P8H surface. It preserves evaluate_prepared exactly and records
+// a bounded attribution for one requested retained coefficient.
+bool evaluate_prepared_attributed(
+    const Input &input, const PreparedMoments &prepared,
+    unsigned target_degree, Output *output, Result *result,
+    CoefficientAttribution *attribution);
 
 const char *failure_detail_name(FailureDetail detail);
 

@@ -5,10 +5,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
-import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
-import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
 public final class SpikeCompanionEntity extends PathfinderMob {
@@ -32,8 +28,7 @@ public final class SpikeCompanionEntity extends PathfinderMob {
 
     @Override
     protected void registerGoals() {
-        goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 0.8D));
-        goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        // C1 keeps autonomous behavior empty. Only one admitted resident
+        // controller may assert native movement or look controls.
     }
 }

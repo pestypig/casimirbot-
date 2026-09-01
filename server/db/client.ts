@@ -44,6 +44,16 @@ const localPersistenceTables = [
   "helix_account_credentials",
   "helix_account_sign_in_attempts",
   "helix_email_outbox",
+  // Account-scoped social state and two-person parties must survive an
+  // installed EXE restart. Restore profiles before relationships and parties
+  // before their members/invites so foreign-key ownership remains explicit.
+  "helix_social_profiles",
+  "helix_friendships",
+  "helix_social_blocks",
+  "helix_social_presence",
+  "helix_voice_parties",
+  "helix_voice_party_members",
+  "helix_voice_party_invites",
   // Brokerage OAuth and the encrypted provider credential bundle are local
   // workstation state. Restore the owner-scoped connection before any room
   // binding, sanitized observation, paper ledger, or attended-live receipt.

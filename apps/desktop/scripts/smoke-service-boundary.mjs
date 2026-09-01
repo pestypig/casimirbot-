@@ -122,6 +122,8 @@ const child = spawn(
       HELIX_LOCAL_DB_PATH: localDatabasePath,
       HELIX_LOCAL_PG_MEM_PERSIST: "1",
       HELIX_LOCAL_PG_MEM_WRITE_MODE: "immediate",
+      CODEX_BIN: path.join(smokeStateRoot, "absent-agent", "codex.exe"),
+      CODEX_HOME: path.join(smokeStateRoot, "absent-agent", "home"),
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
@@ -220,8 +222,16 @@ try {
   if (snapshot.includes(secret)) {
     throw new Error("Desktop session boundary secret entered the local database snapshot");
   }
+  try {
+    await access(path.join(smokeStateRoot, "absent-agent"));
+    throw new Error("No-agent smoke unexpectedly created provider runtime state");
+  } catch (error) {
+    if (error?.message === "No-agent smoke unexpectedly created provider runtime state") {
+      throw error;
+    }
+  }
   console.log(
-    `[desktop-smoke] PASS loopback=${origin} missing=401 wrong=401 authorized=200 release=closed local_state=isolated device_check=policy_closed`,
+    `[desktop-smoke] PASS loopback=${origin} missing=401 wrong=401 authorized=200 release=closed local_state=isolated device_check=policy_closed no_agent=useful`,
   );
 } catch (error) {
   if (captured.trim()) console.error(captured.trim());

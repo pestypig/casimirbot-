@@ -1,0 +1,48 @@
+{
+  "schema": "casimirbot.eh_g8_pna2_independent_client_live_checkpoint.v1",
+  "recorded_at": "2026-08-31T20:03:46.634Z",
+  "program_gate": "G8",
+  "capability": "PNA2",
+  "client_profile": "standard_mcp",
+  "endpoint_variant": "full_harness",
+  "transport": "streamable_http",
+  "authentication": "oauth_authorization_code_pkce",
+  "authenticated_discovery": {
+    "tool": "helix_client_authorization_status",
+    "schema": "helix.client_authorization_readiness.v1",
+    "capability_profile": "g8-monitor",
+    "ready": true,
+    "required_scope_count": 5,
+    "granted_required_scope_count": 5,
+    "missing_scope_count": 0,
+    "recovery_action": "none"
+  },
+  "catalog_call": {
+    "tool": "helix_environment_device_check",
+    "schema": "helix.environment_connector.device_check_list.v1",
+    "device_count": 15,
+    "credential_included": false,
+    "raw_content_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "security": {
+    "bearer_recorded": false,
+    "oauth_subject_recorded": false,
+    "raw_claims_recorded": false,
+    "provider_thread_content_recorded": false,
+    "hidden_reasoning_recorded": false
+  },
+  "claim_ceiling": {
+    "independent_oauth_client_authenticated_discovery": true,
+    "independent_full_harness_catalog_call": true,
+    "coordination_only_presence_proven": false,
+    "client_brand_verified": false,
+    "installed_codex_acceptance": false,
+    "checkpoint_publication_observed": false,
+    "continuation_transport_proven": false,
+    "environment_authority_granted_by_connection": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  }
+}

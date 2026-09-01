@@ -6,7 +6,13 @@
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": [
-      "com.casimirbot.helixcompanion.spike.gametest.CompanionFeasibilityGameTests"
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionFeasibilityGameTests",
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionPresenceGameTests",
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionFollowGameTests",
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionInventoryCustodyGameTests"
+    ],
+    "fabric-client-gametest": [
+      "com.casimirbot.helixcompanion.spike.gametest.RealClientMiningOracleGameTest"
     ]
   },
   "depends": {

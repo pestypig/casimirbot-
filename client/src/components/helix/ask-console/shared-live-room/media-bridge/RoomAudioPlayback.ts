@@ -1,6 +1,7 @@
 export type SharedLiveRoomAudioPlayback = {
   attach(track: MediaStreamTrack): void;
   resume(): Promise<boolean>;
+  setMuted(muted: boolean): void;
   close(): void;
 };
 
@@ -36,6 +37,9 @@ export const createSharedLiveRoomAudioPlayback = (input: {
       void resume();
     },
     resume,
+    setMuted(muted) {
+      if (!closed) audio.muted = muted;
+    },
     close() {
       if (closed) return;
       closed = true;

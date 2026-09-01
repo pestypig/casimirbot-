@@ -181,6 +181,42 @@ import {
   helixEnvironmentProbeObservationSchema,
 } from "@shared/helix-environment-connector";
 import {
+  HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_SCHEMA,
+  helixMinecraftCompanionPresenceEvidenceReadRequestSchema,
+  helixMinecraftCompanionPresenceEvidenceSchema,
+  helixMinecraftCompanionRoomPresenceEvidenceReadRequestSchema,
+  helixMinecraftCompanionRoomPresenceEvidenceSchema,
+  type HelixMinecraftCompanionPresenceEvidence,
+  type HelixMinecraftCompanionPresenceEvidenceReadRequest,
+} from "@shared/helix-minecraft-companion-mcp";
+import {
+  HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_SCHEMA,
+  helixMinecraftCompanionFollowEvidenceReadRequestSchema,
+  helixMinecraftCompanionFollowEvidenceSchema,
+  helixMinecraftCompanionRoomFollowEvidenceReadRequestSchema,
+  helixMinecraftCompanionRoomFollowEvidenceSchema,
+  type HelixMinecraftCompanionFollowEvidence,
+  type HelixMinecraftCompanionFollowEvidenceReadRequest,
+} from "@shared/helix-minecraft-companion-follow-mcp";
+import {
+  HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_SCHEMA,
+  helixMinecraftCompanionCustodyEvidenceReadRequestSchema,
+  helixMinecraftCompanionCustodyEvidenceSchema,
+  helixMinecraftCompanionRoomCustodyEvidenceReadRequestSchema,
+  helixMinecraftCompanionRoomCustodyEvidenceSchema,
+  type HelixMinecraftCompanionCustodyEvidence,
+  type HelixMinecraftCompanionCustodyEvidenceReadRequest,
+} from "@shared/helix-minecraft-companion-custody-mcp";
+import {
   HELIX_BROKERAGE_READ_GATEWAY_ERROR_SCHEMA,
   HELIX_ROBINHOOD_READ_CAPABILITY_IDS,
   HELIX_ROBINHOOD_READ_ONLY_UPSTREAM_TOOLS,
@@ -371,6 +407,7 @@ import {
   helixLocalSupervisorLifecycleStateSchema,
   helixLocalSupervisorRelayTypeSchema,
   helixLocalSupervisorResourceClaimInputSchema,
+  helixThreadObservabilityBridgeDeclarationSchema,
 } from "@shared/helix-local-supervisor-coordination";
 import {
   HelixLocalSupervisorCoordinationError,
@@ -386,6 +423,21 @@ import {
   type LocalSupervisorEnvironmentIdentity,
 } from
   "../services/environment-connectors/bindings/local-supervisor-identity-reader";
+import {
+  PrivateCompanionPresenceEvidenceError,
+  resolvePrivateCompanionPresenceMcpRuntime,
+} from
+  "../services/environment-connectors/resident-control/private-companion-presence-evidence-reader";
+import {
+  PrivateCompanionFollowEvidenceError,
+  resolvePrivateCompanionFollowMcpRuntime,
+} from
+  "../services/environment-connectors/resident-control/private-companion-follow-evidence-reader";
+import {
+  PrivateCompanionCustodyEvidenceError,
+  resolvePrivateCompanionCustodyMcpRuntime,
+} from
+  "../services/environment-connectors/resident-control/private-companion-custody-evidence-reader";
 
 type RecordLike = Record<string, unknown>;
 
@@ -779,6 +831,18 @@ export type HelixEnvironmentActionControlMcpExecutor =
   typeof executeEnvironmentActionControlGatewayCapability;
 export type HelixEnvironmentProbeMcpExecutor =
   typeof executeEnvironmentProbeGatewayCapability;
+export type HelixMinecraftCompanionPresenceEvidenceReader = (input: {
+  ownerProfileId: string;
+  request: HelixMinecraftCompanionPresenceEvidenceReadRequest;
+}) => Promise<HelixMinecraftCompanionPresenceEvidence>;
+export type HelixMinecraftCompanionFollowEvidenceReader = (input: {
+  ownerProfileId: string;
+  request: HelixMinecraftCompanionFollowEvidenceReadRequest;
+}) => Promise<HelixMinecraftCompanionFollowEvidence>;
+export type HelixMinecraftCompanionCustodyEvidenceReader = (input: {
+  ownerProfileId: string;
+  request: HelixMinecraftCompanionCustodyEvidenceReadRequest;
+}) => Promise<HelixMinecraftCompanionCustodyEvidence>;
 export type HelixBrokerageReadMcpExecutor =
   typeof executeBrokerageReadGatewayCapability;
 export type HelixBrokerageReadAcceptanceRunner = (input: {
@@ -1946,6 +2010,27 @@ const toolError = (
   const normalized =
     error instanceof HelixAgentApiServiceError
       ? error
+      : error instanceof PrivateCompanionPresenceEvidenceError
+        ? new HelixAgentApiServiceError(
+            error.statusCode,
+            error.code,
+            error.message,
+            error.statusCode >= 500 || error.statusCode === 409,
+          )
+      : error instanceof PrivateCompanionFollowEvidenceError
+        ? new HelixAgentApiServiceError(
+            error.statusCode,
+            error.code,
+            error.message,
+            error.statusCode >= 500 || error.statusCode === 409,
+          )
+      : error instanceof PrivateCompanionCustodyEvidenceError
+        ? new HelixAgentApiServiceError(
+            error.statusCode,
+            error.code,
+            error.message,
+            error.statusCode >= 500 || error.statusCode === 409,
+          )
       : new HelixAgentApiServiceError(
           500,
           "internal_error",
@@ -3086,6 +3171,15 @@ export const createHelixMcpServer = (input: {
   environmentActionExecutor?: HelixEnvironmentActionMcpExecutor;
   environmentActionControlExecutor?: HelixEnvironmentActionControlMcpExecutor;
   environmentProbeExecutor?: HelixEnvironmentProbeMcpExecutor;
+  privateCompanionPresenceMcpEnabled?: boolean;
+  minecraftCompanionPresenceEvidenceReader?:
+    HelixMinecraftCompanionPresenceEvidenceReader;
+  privateCompanionFollowMcpEnabled?: boolean;
+  minecraftCompanionFollowEvidenceReader?:
+    HelixMinecraftCompanionFollowEvidenceReader;
+  privateCompanionCustodyMcpEnabled?: boolean;
+  minecraftCompanionCustodyEvidenceReader?:
+    HelixMinecraftCompanionCustodyEvidenceReader;
   brokerageReadExecutor?: HelixBrokerageReadMcpExecutor;
   brokerageReadAcceptanceRunner?: HelixBrokerageReadAcceptanceRunner;
   brokerageLiveAcceptanceReadinessReader?:
@@ -3119,6 +3213,27 @@ export const createHelixMcpServer = (input: {
     input.deviceCheckService ?? buildEnvironmentConnectorDeviceCheckList;
   const evidenceStore = input.mcpEvidenceObservationStore ??
     createPostgresHelixMcpEvidenceObservationStore();
+  const defaultPrivateCompanionPresenceRuntime =
+    input.privateCompanionPresenceMcpEnabled === undefined &&
+    input.minecraftCompanionPresenceEvidenceReader === undefined
+      ? resolvePrivateCompanionPresenceMcpRuntime({
+          ownerProfileId: input.principal.accountProfileId,
+        })
+      : null;
+  const defaultPrivateCompanionFollowRuntime =
+    input.privateCompanionFollowMcpEnabled === undefined &&
+    input.minecraftCompanionFollowEvidenceReader === undefined
+      ? resolvePrivateCompanionFollowMcpRuntime({
+          ownerProfileId: input.principal.accountProfileId,
+        })
+      : null;
+  const defaultPrivateCompanionCustodyRuntime =
+    input.privateCompanionCustodyMcpEnabled === undefined &&
+    input.minecraftCompanionCustodyEvidenceReader === undefined
+      ? resolvePrivateCompanionCustodyMcpRuntime({
+          ownerProfileId: input.principal.accountProfileId,
+        })
+      : null;
   const executionLeaseClaimReader =
     input.localSupervisorExecutionLeaseClaimReader ??
       readEnvironmentActionExecutionLeaseClaim;
@@ -3518,9 +3633,7 @@ export const createHelixMcpServer = (input: {
   registerMcpEvidenceObservationGetTool({
     server,
     principal: input.principal,
-    requiredScope: coordinationOnly
-      ? HELIX_SHARED_LIVE_ROOM_READ_SCOPE
-      : HELIX_AGENT_RUN_READ_SCOPE,
+    requiredScope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
     resourceMetadataPath: coordinationOnly
       ? HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH
       : undefined,
@@ -3667,6 +3780,8 @@ export const createHelixMcpServer = (input: {
           environment_ref: localSupervisorOptionalRefSchema,
           run_ref: localSupervisorOptionalRefSchema,
           blocker_summary: z.string().trim().max(240).nullable().optional(),
+          thread_observability_bridge:
+            helixThreadObservabilityBridgeDeclarationSchema.optional(),
           heartbeat_ttl_seconds: z.number().int().min(15).max(180).default(60),
         }).strict(),
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -3846,6 +3961,7 @@ export const createHelixMcpServer = (input: {
             environment_ref: args.environment_ref,
             run_ref: args.run_ref,
             blocker_summary: args.blocker_summary,
+            thread_observability_bridge: args.thread_observability_bridge,
             heartbeat_ttl_seconds: args.heartbeat_ttl_seconds,
           },
           verifiedResourceClaims: verifiedClaims,
@@ -4497,6 +4613,762 @@ export const createHelixMcpServer = (input: {
     deviceCheckService,
     evidenceStore,
   });
+
+  const companionPresenceEvidenceReader =
+    input.minecraftCompanionPresenceEvidenceReader ??
+    defaultPrivateCompanionPresenceRuntime?.reader;
+  const exactOwnerScopedPrivateCompanionPresenceToolEnabled =
+    defaultPrivateCompanionPresenceRuntime?.enabled === true &&
+    Boolean(defaultPrivateCompanionPresenceRuntime.reader);
+  const injectedPrivateCompanionPresenceToolEnabled =
+    input.privateCompanionPresenceMcpEnabled === true &&
+    input.principal.accountType === "developer" &&
+    Boolean(input.minecraftCompanionPresenceEvidenceReader);
+  const privateCompanionPresenceToolEnabled =
+    exactOwnerScopedPrivateCompanionPresenceToolEnabled ||
+    injectedPrivateCompanionPresenceToolEnabled;
+  if (privateCompanionPresenceToolEnabled) {
+    const readCompanionPresenceEvidence = companionPresenceEvidenceReader!;
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+      {
+        title: "Read private C0 companion presence evidence",
+        description:
+          "Reads one exact, owner-scoped C0 companion incarnation and complete cleanup receipt for authenticated MCP evidence re-entry. This private developer test tool cannot spawn, control, mine, grant authority, or enter the public catalog.",
+        inputSchema: helixMinecraftCompanionPresenceEvidenceReadRequestSchema,
+        // Keep the private A1 wire envelope open to the shared typed MCP error
+        // projection as well as the strictly parsed success evidence below.
+        outputSchema: z.object({}).passthrough(),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(
+        HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+          const payload = helixMinecraftCompanionPresenceEvidenceSchema.parse(
+            await readCompanionPresenceEvidence({
+              ownerProfileId: input.principal.accountProfileId,
+              request,
+            }),
+          );
+          if (
+            JSON.stringify(payload.identity) !== JSON.stringify(request.identity)
+          ) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "companion_presence_identity_mismatch",
+              "The requested companion identity is stale or does not match the observed C0 evidence.",
+              true,
+            );
+          }
+          const mcpEvidence = buildHelixMcpEvidenceObservation({
+            descriptor: requireMcpEvidenceDescriptor(
+              HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+            ),
+            request,
+            payload,
+            producerRef:
+              `casimirbot-profile:${input.principal.accountProfileId}`,
+            subjectRefs: [
+              `account-profile:${input.principal.accountProfileId}`,
+              payload.identity.companion_id,
+              payload.identity.actor_entity_id,
+              payload.identity.actor_incarnation_id,
+              payload.identity.environment_id,
+              payload.identity.world_id,
+              payload.identity.connector_epoch,
+              payload.cleanup_receipt.cleanup_id,
+            ],
+            summary:
+              "Observed one exact private C0 companion incarnation and its complete cleanup receipt for Codex evidence re-entry.",
+            payloadSchema:
+              HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_SCHEMA,
+            supportRefs: Array.from(new Set([
+              ...payload.cleanup_receipt.evidence_refs,
+              ...payload.presence.evidence_refs,
+            ])),
+            observedAt: payload.cleanup_receipt.completed_at,
+            freshness: {
+              state: "not_applicable",
+              ageMs: null,
+              expiresAt: null,
+            },
+          });
+          await evidenceStore.put({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            toolName:
+              HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+            observation: mcpEvidence,
+          });
+          return { evidence: payload, mcp_evidence: mcpEvidence };
+        },
+      ),
+    );
+
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+      {
+        title: "Read room-bound private C0 companion presence evidence",
+        description:
+          "Projects one exact, owner-scoped C0 companion cleanup observation into the caller's current keyed Helix room. Membership and owner role are rechecked on every call; closing or leaving the room revokes access. This read-only private acceptance tool cannot spawn, follow, control, mine, mutate, answer, or become terminal.",
+        inputSchema:
+          helixMinecraftCompanionRoomPresenceEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(
+        HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+          let inspected;
+          try {
+            inspected = await roomControlService.inspectRoom({
+              actor: roomActor,
+              roomId: request.room_id,
+            });
+          } catch (error) {
+            if (
+              error instanceof SharedLiveRoomControlError &&
+              (error.code === "room_not_found" || error.code === "room_closed")
+            ) {
+              throw new HelixAgentApiServiceError(
+                410,
+                "companion_presence_room_revoked",
+                "The room-bound companion evidence admission has been revoked.",
+                false,
+              );
+            }
+            throw error;
+          }
+          const room = inspected.room;
+          const self = room.participants.find(
+            (participant) =>
+              participant.participant_id === room.self_participant_id,
+          );
+          if (!self || self.role !== "owner") {
+            throw new HelixAgentApiServiceError(
+              403,
+              "companion_presence_room_owner_required",
+              "Only the current room owner may project this private companion evidence.",
+              false,
+            );
+          }
+          if (room.status === "closed" || self.presence === "left") {
+            throw new HelixAgentApiServiceError(
+              410,
+              "companion_presence_room_revoked",
+              "The room-bound companion evidence admission has been revoked.",
+              false,
+            );
+          }
+          const payload = helixMinecraftCompanionPresenceEvidenceSchema.parse(
+            await readCompanionPresenceEvidence({
+              ownerProfileId: input.principal.accountProfileId,
+              request: { identity: request.identity },
+            }),
+          );
+          if (
+            JSON.stringify(payload.identity) !==
+              JSON.stringify(request.identity)
+          ) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "companion_presence_identity_mismatch",
+              "The requested companion identity is stale or does not match the observed C0 evidence.",
+              true,
+            );
+          }
+          const roomEvidence =
+            helixMinecraftCompanionRoomPresenceEvidenceSchema.parse({
+              schema:
+                HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_SCHEMA,
+              capability_id: payload.capability_id,
+              room_id: room.room_id,
+              owner_profile_ref: input.principal.accountProfileId,
+              requesting_participant_ref: self.participant_id,
+              room_role: "owner",
+              room_status: room.status,
+              observation_origin: "room_projection",
+              admission_basis: "room_owner_private_config",
+              evidence: payload,
+              identity_match: true,
+              room_binding_active: true,
+              read_only: true,
+              commands_executed: 0,
+              side_effects: false,
+              environment_mutated: false,
+              public_capability_exposed: false,
+              execution_authority: false,
+              mutation_authority: false,
+              mining_authorized: false,
+              credential_included: false,
+              private_endpoint_included: false,
+              hidden_reasoning_included: false,
+              content_role:
+                "minecraft_companion_room_presence_evidence_not_assistant_answer",
+              reentry_required: true,
+              answer_authority: false,
+              assistant_answer: false,
+              terminal_eligible: false,
+            });
+          const mcpEvidence = buildHelixMcpEvidenceObservation({
+            descriptor: requireMcpEvidenceDescriptor(
+              HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+            ),
+            request,
+            payload: roomEvidence,
+            producerRef:
+              `casimirbot-room:${room.room_id}:profile:${input.principal.accountProfileId}`,
+            subjectRefs: [
+              room.room_id,
+              self.participant_id,
+              `account-profile:${input.principal.accountProfileId}`,
+              payload.identity.companion_id,
+              payload.identity.actor_entity_id,
+              payload.identity.actor_incarnation_id,
+              payload.identity.environment_id,
+              payload.identity.world_id,
+              payload.identity.connector_epoch,
+              payload.cleanup_receipt.cleanup_id,
+            ],
+            summary:
+              "Projected one exact private C0 companion incarnation and complete cleanup receipt into its current owner room for Codex evidence re-entry.",
+            payloadSchema:
+              HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_SCHEMA,
+            supportRefs: Array.from(new Set([
+              ...payload.cleanup_receipt.evidence_refs,
+              ...payload.presence.evidence_refs,
+            ])),
+            observedAt: payload.cleanup_receipt.completed_at,
+            freshness: {
+              state: "not_applicable",
+              ageMs: null,
+              expiresAt: null,
+            },
+          });
+          await evidenceStore.put({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            toolName:
+              HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+            observation: mcpEvidence,
+          });
+          return { room_evidence: roomEvidence, mcp_evidence: mcpEvidence };
+        },
+      ),
+    );
+  }
+
+  const companionFollowEvidenceReader =
+    input.minecraftCompanionFollowEvidenceReader ??
+    defaultPrivateCompanionFollowRuntime?.reader;
+  const exactOwnerScopedPrivateCompanionFollowToolEnabled =
+    defaultPrivateCompanionFollowRuntime?.enabled === true &&
+    Boolean(defaultPrivateCompanionFollowRuntime.reader);
+  const injectedPrivateCompanionFollowToolEnabled =
+    input.privateCompanionFollowMcpEnabled === true &&
+    input.principal.accountType === "developer" &&
+    Boolean(input.minecraftCompanionFollowEvidenceReader);
+  const privateCompanionFollowToolEnabled =
+    exactOwnerScopedPrivateCompanionFollowToolEnabled ||
+    injectedPrivateCompanionFollowToolEnabled;
+  if (privateCompanionFollowToolEnabled) {
+    const readCompanionFollowEvidence = companionFollowEvidenceReader!;
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_READ_TOOL,
+      {
+        title: "Read private C1 companion follow evidence",
+        description:
+          "Reads exact owner-scoped C1 follow-controller evidence for authenticated MCP re-entry. This private developer tool cannot command the actor, mutate Minecraft, use inventory, mine, fight, answer, or enter the public catalog.",
+        inputSchema: helixMinecraftCompanionFollowEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(
+        HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+          const payload = helixMinecraftCompanionFollowEvidenceSchema.parse(
+            await readCompanionFollowEvidence({
+              ownerProfileId: input.principal.accountProfileId,
+              request,
+            }),
+          );
+          const exact =
+            JSON.stringify(payload.identity) === JSON.stringify(request.identity) &&
+            payload.controller_artifact_hash === request.controller_artifact_hash;
+          if (!exact) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "companion_follow_identity_mismatch",
+              "The requested companion identity or controller artifact is stale.",
+              true,
+            );
+          }
+          const mcpEvidence = buildHelixMcpEvidenceObservation({
+            descriptor: requireMcpEvidenceDescriptor(
+              HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_READ_TOOL,
+            ),
+            request,
+            payload,
+            producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+            subjectRefs: [
+              `account-profile:${input.principal.accountProfileId}`,
+              payload.identity.companion_id,
+              payload.identity.actor_entity_id,
+              payload.identity.actor_incarnation_id,
+              payload.identity.environment_id,
+              payload.identity.world_id,
+              payload.identity.connector_epoch,
+              payload.controller_profile_id,
+              payload.controller_artifact_hash,
+            ],
+            summary:
+              "Observed exact private C1 follow-controller evidence for Codex re-entry.",
+            payloadSchema: HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_SCHEMA,
+            supportRefs: payload.support_refs,
+            observedAt: payload.observed_at,
+            freshness: { state: "not_applicable", ageMs: null, expiresAt: null },
+          });
+          await evidenceStore.put({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            toolName: HELIX_MINECRAFT_COMPANION_FOLLOW_EVIDENCE_READ_TOOL,
+            observation: mcpEvidence,
+          });
+          return { evidence: payload, mcp_evidence: mcpEvidence };
+        },
+      ),
+    );
+
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_READ_TOOL,
+      {
+        title: "Read room-bound private C1 companion follow evidence",
+        description:
+          "Projects exact C1 follow-controller evidence into its current owner room. Membership and owner role are rechecked on every call; closure or departure revokes access. It is read-only and grants no companion or game authority.",
+        inputSchema: helixMinecraftCompanionRoomFollowEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(
+        HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+          let inspected;
+          try {
+            inspected = await roomControlService.inspectRoom({
+              actor: roomActor,
+              roomId: request.room_id,
+            });
+          } catch (error) {
+            if (
+              error instanceof SharedLiveRoomControlError &&
+              (error.code === "room_not_found" || error.code === "room_closed")
+            ) {
+              throw new HelixAgentApiServiceError(
+                410,
+                "companion_follow_room_revoked",
+                "The room-bound C1 evidence admission has been revoked.",
+                false,
+              );
+            }
+            throw error;
+          }
+          const room = inspected.room;
+          const self = room.participants.find(
+            (participant) => participant.participant_id === room.self_participant_id,
+          );
+          if (!self || self.role !== "owner") {
+            throw new HelixAgentApiServiceError(
+              403,
+              "companion_follow_room_owner_required",
+              "Only the current room owner may project private C1 evidence.",
+              false,
+            );
+          }
+          if (room.status === "closed" || self.presence === "left") {
+            throw new HelixAgentApiServiceError(
+              410,
+              "companion_follow_room_revoked",
+              "The room-bound C1 evidence admission has been revoked.",
+              false,
+            );
+          }
+          const payload = helixMinecraftCompanionFollowEvidenceSchema.parse(
+            await readCompanionFollowEvidence({
+              ownerProfileId: input.principal.accountProfileId,
+              request: {
+                identity: request.identity,
+                controller_artifact_hash: request.controller_artifact_hash,
+              },
+            }),
+          );
+          const exact =
+            JSON.stringify(payload.identity) === JSON.stringify(request.identity) &&
+            payload.controller_artifact_hash === request.controller_artifact_hash;
+          if (!exact) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "companion_follow_identity_mismatch",
+              "The requested companion identity or controller artifact is stale.",
+              true,
+            );
+          }
+          const roomEvidence = helixMinecraftCompanionRoomFollowEvidenceSchema.parse({
+            schema: HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_SCHEMA,
+            capability_id: payload.capability_id,
+            room_id: room.room_id,
+            owner_profile_ref: input.principal.accountProfileId,
+            requesting_participant_ref: self.participant_id,
+            room_role: "owner",
+            room_status: room.status,
+            observation_origin: "room_projection",
+            admission_basis: "room_owner_private_config",
+            evidence: payload,
+            exact_identity_match: true,
+            room_binding_active: true,
+            read_only: true,
+            commands_executed: 0,
+            side_effects: false,
+            environment_mutated: false,
+            public_capability_exposed: false,
+            execution_authority: false,
+            mutation_authority: false,
+            inventory_authority: false,
+            mining_authorized: false,
+            combat_authorized: false,
+            credential_included: false,
+            private_endpoint_included: false,
+            hidden_reasoning_included: false,
+            content_role:
+              "minecraft_companion_room_follow_evidence_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          });
+          const mcpEvidence = buildHelixMcpEvidenceObservation({
+            descriptor: requireMcpEvidenceDescriptor(
+              HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_READ_TOOL,
+            ),
+            request,
+            payload: roomEvidence,
+            producerRef:
+              `casimirbot-room:${room.room_id}:profile:${input.principal.accountProfileId}`,
+            subjectRefs: [
+              room.room_id,
+              self.participant_id,
+              `account-profile:${input.principal.accountProfileId}`,
+              payload.identity.companion_id,
+              payload.identity.actor_entity_id,
+              payload.identity.actor_incarnation_id,
+              payload.identity.environment_id,
+              payload.identity.world_id,
+              payload.identity.connector_epoch,
+              payload.controller_profile_id,
+              payload.controller_artifact_hash,
+            ],
+            summary:
+              "Projected exact private C1 follow-controller evidence into its current owner room for Codex re-entry.",
+            payloadSchema: HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_SCHEMA,
+            supportRefs: payload.support_refs,
+            observedAt: payload.observed_at,
+            freshness: { state: "not_applicable", ageMs: null, expiresAt: null },
+          });
+          await evidenceStore.put({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            toolName: HELIX_MINECRAFT_COMPANION_ROOM_FOLLOW_EVIDENCE_READ_TOOL,
+            observation: mcpEvidence,
+          });
+          return { room_evidence: roomEvidence, mcp_evidence: mcpEvidence };
+        },
+      ),
+    );
+  }
+
+  const companionCustodyEvidenceReader =
+    input.minecraftCompanionCustodyEvidenceReader ??
+    defaultPrivateCompanionCustodyRuntime?.reader;
+  const privateCompanionCustodyToolEnabled =
+    (defaultPrivateCompanionCustodyRuntime?.enabled === true &&
+      input.principal.accountType === "developer" &&
+      Boolean(defaultPrivateCompanionCustodyRuntime.reader)) ||
+    (input.privateCompanionCustodyMcpEnabled === true &&
+      input.principal.accountType === "developer" &&
+      Boolean(input.minecraftCompanionCustodyEvidenceReader));
+  if (privateCompanionCustodyToolEnabled) {
+    const readCompanionCustodyEvidence = companionCustodyEvidenceReader!;
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_READ_TOOL,
+      {
+        title: "Read private C2 companion custody evidence",
+        description:
+          "Reads exact owner-scoped C2 inventory/equipment custody evidence for authenticated MCP re-entry. This private developer tool is read-only and grants no inventory execution, mining, crafting, combat, World, answer, or terminal authority.",
+        inputSchema: helixMinecraftCompanionCustodyEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(
+        HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+          const payload = helixMinecraftCompanionCustodyEvidenceSchema.parse(
+            await readCompanionCustodyEvidence({
+              ownerProfileId: input.principal.accountProfileId,
+              request,
+            }),
+          );
+          const exact =
+            JSON.stringify(payload.identity) === JSON.stringify(request.identity) &&
+            payload.controller_artifact_hash === request.controller_artifact_hash &&
+            payload.custody_revision === request.custody_revision;
+          if (!exact) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "companion_custody_identity_or_revision_mismatch",
+              "The requested companion identity, controller artifact, or custody revision is stale.",
+              true,
+            );
+          }
+          const mcpEvidence = buildHelixMcpEvidenceObservation({
+            descriptor: requireMcpEvidenceDescriptor(
+              HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_READ_TOOL,
+            ),
+            request,
+            payload,
+            producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+            subjectRefs: [
+              `account-profile:${input.principal.accountProfileId}`,
+              payload.identity.companion_id,
+              payload.identity.actor_entity_id,
+              payload.identity.actor_incarnation_id,
+              payload.identity.environment_id,
+              payload.identity.world_id,
+              payload.identity.connector_epoch,
+              payload.controller_profile_id,
+              payload.controller_artifact_hash,
+              `custody-revision:${payload.custody_revision}`,
+            ],
+            summary:
+              "Observed exact private C2 companion inventory/equipment custody evidence for Codex re-entry.",
+            payloadSchema: HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_SCHEMA,
+            supportRefs: payload.support_refs,
+            observedAt: payload.observed_at,
+            freshness: { state: "not_applicable", ageMs: null, expiresAt: null },
+          });
+          await evidenceStore.put({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            toolName: HELIX_MINECRAFT_COMPANION_CUSTODY_EVIDENCE_READ_TOOL,
+            observation: mcpEvidence,
+          });
+          return { evidence: payload, mcp_evidence: mcpEvidence };
+        },
+      ),
+    );
+
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_READ_TOOL,
+      {
+        title: "Read room-bound private C2 companion custody evidence",
+        description:
+          "Projects exact C2 inventory/equipment custody evidence into its current owner room. Membership and owner role are rechecked on every call; closure or departure revokes access. It is read-only and grants no inventory execution, mining, crafting, combat, World, answer, or terminal authority.",
+        inputSchema: helixMinecraftCompanionRoomCustodyEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(
+        HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+          let inspected;
+          try {
+            inspected = await roomControlService.inspectRoom({
+              actor: roomActor,
+              roomId: request.room_id,
+            });
+          } catch (error) {
+            if (
+              error instanceof SharedLiveRoomControlError &&
+              (error.code === "room_not_found" || error.code === "room_closed")
+            ) {
+              throw new HelixAgentApiServiceError(
+                410,
+                "companion_custody_room_revoked",
+                "The room-bound C2 evidence admission has been revoked.",
+                false,
+              );
+            }
+            throw error;
+          }
+          const room = inspected.room;
+          const self = room.participants.find(
+            (participant) => participant.participant_id === room.self_participant_id,
+          );
+          if (!self || self.role !== "owner") {
+            throw new HelixAgentApiServiceError(
+              403,
+              "companion_custody_room_owner_required",
+              "Only the current room owner may project private C2 evidence.",
+              false,
+            );
+          }
+          if (room.status === "closed" || self.presence === "left") {
+            throw new HelixAgentApiServiceError(
+              410,
+              "companion_custody_room_revoked",
+              "The room-bound C2 evidence admission has been revoked.",
+              false,
+            );
+          }
+          const payload = helixMinecraftCompanionCustodyEvidenceSchema.parse(
+            await readCompanionCustodyEvidence({
+              ownerProfileId: input.principal.accountProfileId,
+              request: {
+                identity: request.identity,
+                controller_artifact_hash: request.controller_artifact_hash,
+                custody_revision: request.custody_revision,
+              },
+            }),
+          );
+          const exact =
+            JSON.stringify(payload.identity) === JSON.stringify(request.identity) &&
+            payload.controller_artifact_hash === request.controller_artifact_hash &&
+            payload.custody_revision === request.custody_revision;
+          if (!exact) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "companion_custody_identity_or_revision_mismatch",
+              "The requested companion identity, controller artifact, or custody revision is stale.",
+              true,
+            );
+          }
+          const roomEvidence = helixMinecraftCompanionRoomCustodyEvidenceSchema.parse({
+            schema: HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_SCHEMA,
+            capability_id: payload.capability_id,
+            room_id: room.room_id,
+            owner_profile_ref: input.principal.accountProfileId,
+            requesting_participant_ref: self.participant_id,
+            room_role: "owner",
+            room_status: room.status,
+            observation_origin: "room_projection",
+            admission_basis: "room_owner_private_config",
+            evidence: payload,
+            exact_identity_match: true,
+            exact_revision_match: true,
+            room_binding_active: true,
+            read_only: true,
+            commands_executed: 0,
+            side_effects: false,
+            environment_mutated: false,
+            public_capability_exposed: false,
+            execution_authority: false,
+            inventory_execution_authority: false,
+            mining_authority: false,
+            crafting_authority: false,
+            combat_authority: false,
+            world_authority: false,
+            credential_included: false,
+            private_endpoint_included: false,
+            hidden_reasoning_included: false,
+            content_role:
+              "minecraft_companion_room_custody_evidence_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          });
+          const mcpEvidence = buildHelixMcpEvidenceObservation({
+            descriptor: requireMcpEvidenceDescriptor(
+              HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_READ_TOOL,
+            ),
+            request,
+            payload: roomEvidence,
+            producerRef:
+              `casimirbot-room:${room.room_id}:profile:${input.principal.accountProfileId}`,
+            subjectRefs: [
+              room.room_id,
+              self.participant_id,
+              `account-profile:${input.principal.accountProfileId}`,
+              payload.identity.companion_id,
+              payload.identity.actor_entity_id,
+              payload.identity.actor_incarnation_id,
+              payload.identity.environment_id,
+              payload.identity.world_id,
+              payload.identity.connector_epoch,
+              payload.controller_profile_id,
+              payload.controller_artifact_hash,
+              `custody-revision:${payload.custody_revision}`,
+            ],
+            summary:
+              "Projected exact private C2 inventory/equipment custody evidence into its current owner room for Codex re-entry.",
+            payloadSchema: HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_SCHEMA,
+            supportRefs: payload.support_refs,
+            observedAt: payload.observed_at,
+            freshness: { state: "not_applicable", ageMs: null, expiresAt: null },
+          });
+          await evidenceStore.put({
+            owner: {
+              tenantId: input.principal.tenantId,
+              accountProfileId: input.principal.accountProfileId,
+            },
+            toolName: HELIX_MINECRAFT_COMPANION_ROOM_CUSTODY_EVIDENCE_READ_TOOL,
+            observation: mcpEvidence,
+          });
+          return { room_evidence: roomEvidence, mcp_evidence: mcpEvidence };
+        },
+      ),
+    );
+  }
 
   server.registerTool(
     "helix_environment_subject_list",
@@ -7213,7 +8085,7 @@ export const createHelixMcpServer = (input: {
     new Map<string, RequiredOAuthScopes>([
       ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_public_ui_catalog", HELIX_AGENT_RUN_READ_SCOPE],
-      ["helix_evidence_observation_get", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_realtime_texture_pack_inspect", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_realtime_texture_pack_control", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_realtime_texture_pack_visual_direction_control", HELIX_AGENT_RUN_WRITE_SCOPE],
@@ -7224,6 +8096,18 @@ export const createHelixMcpServer = (input: {
       ["helix_run_fetch_evidence", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_run_list_events", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_environment_device_check", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ...(privateCompanionPresenceToolEnabled
+        ? [
+            [
+              HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
+              HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+            ] as const,
+            [
+              HELIX_MINECRAFT_COMPANION_ROOM_PRESENCE_EVIDENCE_READ_TOOL,
+              HELIX_MINECRAFT_STATUS_MCP_SCOPES,
+            ] as const,
+          ]
+        : []),
       ["helix_environment_subject_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_subject_select", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_create", HELIX_MINECRAFT_ACTION_MCP_SCOPES],

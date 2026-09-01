@@ -49,3 +49,14 @@ tasks.processResources {
 tasks.test {
     useJUnitPlatform()
 }
+
+// Keep focused acceptance lanes reproducible without editing the registered
+// GameTest catalog. Example: -PgametestFilter=companion_inventory_custody
+if (project.hasProperty("gametestFilter")) {
+    tasks.named<JavaExec>("runGameTest") {
+        systemProperty(
+            "fabric-api.gametest.filter",
+            project.property("gametestFilter").toString()
+        )
+    }
+}

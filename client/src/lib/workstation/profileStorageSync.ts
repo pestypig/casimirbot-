@@ -567,8 +567,12 @@ function maybeReloadAfterRestore(profileId: string, appliedCount: number): void 
 }
 
 export function useProfileStorageSync(): void {
-  const registrySnapshot = useWorkspaceMemoryRegistryStore((state) =>
-    state.buildRegistrySnapshot(),
+  const registryArtifacts = useWorkspaceMemoryRegistryStore((state) =>
+    state.artifacts,
+  );
+  const registrySnapshot = React.useMemo(
+    () => useWorkspaceMemoryRegistryStore.getState().buildRegistrySnapshot(),
+    [registryArtifacts],
   );
   const [profileId, setProfileId] = React.useState<string | null>(null);
   const [attachConsentTick, setAttachConsentTick] = React.useState(0);

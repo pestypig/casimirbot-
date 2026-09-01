@@ -96,6 +96,7 @@ export const HELIX_DEVELOPER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "developer_workstation_panels",
     "docs_viewer_print_pdf_export",
     "experimental_panels",
+    "friends_parties",
     "runtime_agent_controls",
     "room_source_ingress",
     "shared_realtime_rooms",
@@ -177,6 +178,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
   ],
   feature_flags: [
     "docs_viewer_print_pdf_export",
+    "friends_parties",
     "profile_connections",
     "stable_workstation_panels",
     "locked_dev_features_visible",

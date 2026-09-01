@@ -8,6 +8,8 @@ import {
   DESKTOP_AUTH0_ACCOUNT_LINK_START_SCHEMA,
   type DesktopAuth0AccountLinkStartReceipt,
 } from "@shared/desktop-auth0-account-link";
+import { HELIX_FRIENDS_PARTIES_COORDINATION_SCOPE } from
+  "@shared/helix-friends-voice-party";
 import {
   HelixAgentAccountLinkError,
   helixAgentAccountLinkStore,
@@ -15,6 +17,8 @@ import {
   type HelixAgentAccountLinkStore,
 } from "./agent-account-link-store";
 import { HelixAgentApiServiceError } from "../helix-agent-api/errors";
+import { bootstrapDesktopFriendsPartiesCoordination } from
+  "../helix-social/friends-parties-coordination-client";
 
 type FetchLike = typeof fetch;
 
@@ -89,7 +93,8 @@ export const resolveAuth0NativeAccountLinkConfig = (
   const audience = normalized(env.HELIX_AGENT_OAUTH_AUDIENCE);
   const providerAlias = normalized(env.HELIX_AGENT_OAUTH_PROVIDER).toLowerCase();
   const clientId = normalized(env.HELIX_AGENT_OAUTH_NATIVE_CLIENT_ID);
-  const scope = normalized(env.HELIX_AGENT_OAUTH_LINK_SCOPE) || "openid profile";
+  const scope = normalized(env.HELIX_AGENT_OAUTH_LINK_SCOPE) ||
+    `openid profile ${HELIX_FRIENDS_PARTIES_COORDINATION_SCOPE}`;
   if (!issuer || !audience || providerAlias !== "auth0" || !clientId) {
     throw new Auth0NativeAccountLinkError(
       503,
@@ -221,6 +226,7 @@ export class Auth0NativeAccountLinkController {
       now?: () => Date;
       randomBytes?: (size: number) => Buffer;
       config?: () => Auth0NativeAccountLinkConfig;
+      coordinationBootstrap?: typeof bootstrapDesktopFriendsPartiesCoordination;
     } = {},
   ) {}
 
@@ -417,9 +423,14 @@ export class Auth0NativeAccountLinkController {
         "The verified Auth0 identity does not match the account-link profile.",
       );
     }
-    return this.store().completeLinkIntent({
+    const receipt = await this.store().completeLinkIntent({
       session: pending.session,
       state,
+      // Reaching this point requires a fresh native PKCE authorization that
+      // the signed-in user explicitly started from Agent Connections. Treat
+      // that completed authorization as the store's required reactivation
+      // consent when the same profile binding was previously revoked.
+      reactivate: true,
       identity: {
         issuer: verified.issuer,
         audience: config.audience,
@@ -428,6 +439,15 @@ export class Auth0NativeAccountLinkController {
         subject: verified.subject,
       },
     });
+    await (
+      this.dependencies.coordinationBootstrap ??
+      bootstrapDesktopFriendsPartiesCoordination
+    )({
+      accessToken,
+      localProfileId: pending.session.profileId,
+      localSessionId: pending.session.sessionId,
+    });
+    return receipt;
   }
 }
 

@@ -776,6 +776,69 @@ describe("Helix MCP local-supervisor coordination", () => {
     ]);
   });
 
+  it("negotiates a bounded Thread Observability Bridge declaration through MCP", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:45454545454545454545454545454545",
+    );
+    const client = await connect(
+      store,
+      principal("profile:observability", "oauth_client:observability"),
+    );
+    const result = await client.callTool({
+      name: "helix_local_supervisor_presence_update",
+      arguments: {
+        client_continuation_ref: "codex_thread:observability",
+        declared_objective_summary: "Publish bounded public checkpoints.",
+        lifecycle_state: "active",
+        resource_claims: [],
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only", "checkpoint_publish"],
+          requested_level: "checkpoint_publish",
+          checkpoint_publication: {
+            freshness_window_seconds: 120,
+            retention: "current_session",
+            revocation: "independent",
+          },
+        },
+        heartbeat_ttl_seconds: 60,
+      },
+    });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect((result.structuredContent as any).presence)
+      .toMatchObject({
+        thread_observability_bridge: {
+          requested_level: "checkpoint_publish",
+          checkpoint_publication: {
+            freshness_window_seconds: 120,
+            retention: "current_session",
+            revocation: "independent",
+          },
+          declaration_basis: "authenticated_client_declaration",
+          provider_thread_content_included: false,
+          hidden_reasoning_included: false,
+          answer_authority: false,
+          terminal_eligible: false,
+        },
+      });
+
+    const invalid = await client.callTool({
+      name: "helix_local_supervisor_presence_update",
+      arguments: {
+        client_continuation_ref: "codex_thread:invalid-observability",
+        declared_objective_summary: "Claim an unsupported continuation.",
+        lifecycle_state: "active",
+        resource_claims: [],
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only"],
+          requested_level: "continuation_ready",
+          checkpoint_publication: null,
+        },
+        heartbeat_ttl_seconds: 60,
+      },
+    });
+    expect(invalid.isError).toBe(true);
+  });
+
   it("binds collision authority to the exact server-owned execution lease", async () => {
     const store = new HelixLocalSupervisorCoordinationStore(
       "service_instance:55555555555555555555555555555555",

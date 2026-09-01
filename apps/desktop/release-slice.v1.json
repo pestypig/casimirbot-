@@ -10,9 +10,14 @@
     "auth0/actions/casimirbot-post-login.cjs",
     "client/src/components/agent-access/AgentAccountBindingReadiness.tsx",
     "client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx",
+    "client/src/components/agent-access/AgentConnectionSetup.tsx",
+    "client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx",
+    "client/src/components/agent-access/agentConnectionSetupState.ts",
+    "client/src/components/agent-access/__tests__/agentConnectionSetupState.spec.ts",
     "client/src/components/DesktopUpdatePanel.tsx",
     "client/src/components/DeviceCheckPanel.tsx",
     "client/src/components/workstation/InstalledServicesPanel.tsx",
+    "client/src/components/workstation/AgentAccessPanel.tsx",
     "client/src/components/workstation/LocalHarnessPanel.tsx",
     "client/src/components/workstation/__tests__/InstalledServicesPanel.spec.tsx",
     "client/src/components/workstation/__tests__/LocalHarnessPanel.spec.tsx",
@@ -29,19 +34,27 @@
     "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
     "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
     "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json",
+    "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+    "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+    "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+    "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+    "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
     "scripts/vite-lucide-direct-imports.ts",
     "scripts/vite-production-runtime-vendors.ts",
+    "scripts/replit-production-smoke.mjs",
     "server/__tests__/desktop-release-status.test.ts",
     "server/__tests__/helix.public-ui-capability-audit.test.ts",
     "server/auth/__tests__/helix-agent-principal.test.ts",
     "server/auth/helix-agent-principal.ts",
     "server/mcp/__tests__/helix-mcp-device-check.test.ts",
+    "server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts",
     "server/routes/__tests__/environment-connector-platform.test.ts",
     "server/routes/__tests__/desktop-auth0-account-link.test.ts",
     "server/routes/__tests__/desktop-auth0-step-up.test.ts",
     "server/routes/__tests__/helix-agent-account-bindings.test.ts",
     "server/routes/__tests__/helix-agent-transports.test.ts",
     "server/routes/__tests__/installed-account-services.test.ts",
+    "server/routes/__tests__/agent-connections.test.ts",
     "server/routes/__tests__/stripe-sandbox-webhook.test.ts",
     "server/routes/__tests__/stripe-sandbox-acceptance.test.ts",
     "server/routes/desktop-auth0-account-link.ts",
@@ -49,6 +62,7 @@
     "server/routes/desktop-release.ts",
     "server/routes/helix-agent-account-bindings.ts",
     "server/routes/installed-account-services.ts",
+    "server/routes/agent-connections.ts",
     "server/routes/stripe-sandbox-webhook.ts",
     "server/security/__tests__/desktop-session.test.ts",
     "server/security/desktop-session.ts",
@@ -69,14 +83,21 @@
     "server/services/helix-account/installed-security-store.ts",
     "server/services/helix-account/billing-entitlement-store.ts",
     "server/services/helix-account/stripe-sandbox-client.ts",
+    "server/services/local-supervisor/__tests__/local-supervisor-coordination.test.ts",
+    "server/services/local-supervisor/local-supervisor-coordination.ts",
     "shared/__tests__/desktop-update.spec.ts",
     "shared/__tests__/helix-installed-account-services.spec.ts",
     "shared/__tests__/runtime-surface.spec.ts",
+    "shared/__tests__/helix-agent-client-profile.spec.ts",
+    "shared/__tests__/helix-agent-client-readiness.spec.ts",
     "shared/desktop-release.ts",
     "shared/desktop-update.ts",
     "shared/helix-environment-device-check.ts",
     "shared/helix-installed-account-services.ts",
     "shared/helix-billing-entitlement.ts",
+    "shared/helix-agent-client-profile.ts",
+    "shared/helix-agent-client-readiness.ts",
+    "shared/helix-local-supervisor-coordination.ts",
     "shared/runtime-surface.ts",
     "shared/codex-plugin.ts",
     "shared/desktop-mcp-tunnel.ts",
@@ -116,7 +137,12 @@
     {
       "path": "client/src/components/desktop/DesktopTaskbar.tsx",
       "purpose": "Production graph direct Lucide imports",
-      "requiredMarkers": ["import { AppWindow, ChevronUp } from \"lucide-react\""]
+      "requiredMarkers": ["AppWindow", "ChevronUp", "from \"lucide-react\""]
+    },
+    {
+      "path": "client/src/lib/workstation/profileStorageSync.ts",
+      "purpose": "Stable workspace registry subscription required by the installed Agent Connections journey",
+      "requiredMarkers": ["const registryArtifacts = useWorkspaceMemoryRegistryStore", "useWorkspaceMemoryRegistryStore.getState().buildRegistrySnapshot()"]
     },
     {
       "path": "client/src/components/desktop/TaskbarPanel.tsx",
@@ -181,12 +207,12 @@
     {
       "path": "server/index.ts",
       "purpose": "Loopback child env isolation, HTTP session guard, and raw signed Stripe sandbox webhook boundary",
-      "requiredMarkers": ["shouldLoadLocalEnvFile", "createDesktopSessionGuard", "createStripeSandboxWebhookRouter"]
+      "requiredMarkers": ["shouldLoadLocalEnvFile", "createDesktopSessionGuard", "createStripeSandboxWebhookRouter", "createAgentConnectionsRouter"]
     },
     {
       "path": "server/mcp/helix-mcp-server.ts",
       "purpose": "OAuth-protected read-only Codex Device Check tool",
-      "requiredMarkers": ["helix_environment_device_check"]
+      "requiredMarkers": ["helix_environment_device_check", "helix_local_supervisor_presence_update"]
     },
     {
       "path": "server/routes.ts",
@@ -212,6 +238,11 @@
       "path": "shared/helix-account-session.ts",
       "purpose": "Public local-harness visibility and developer-only installed service management policy boundary",
       "requiredMarkers": ["\"local-harness\"", "installed_service_management"]
+    },
+    {
+      "path": "shared/helix-mcp-evidence-capability-registry.ts",
+      "purpose": "Provider-neutral local-supervisor coordination catalog evidence",
+      "requiredMarkers": ["local_supervisor_coordination_mcp"]
     },
     {
       "path": "tests/startup-config.spec.ts",

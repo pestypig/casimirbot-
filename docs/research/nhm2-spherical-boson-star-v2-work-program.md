@@ -373,8 +373,186 @@ an inert intermediate. The [C2-R1 cloud proposal](./nhm2-spherical-boson-star-v2
 preserves all 55 C2 members and adds the two fixture files plus separately
 named runtime/evidence bindings. Its 60-entry archive `fa8d8c99...36978`
 reproduces binary `14140897...1bad6`, the extracted fixture passes 17/17, and
-its independent proposal audit passes 28/28. No C2-R1 cloud resource has been
-created or started; a fresh exact authorization is required.
+its independent proposal audit passes 28/28. Its exactly authorized N2 process
+then ran once, emitted monotone 1,024-panel progress through at least
+35,840/65,536, and automatically stopped the VM at
+`2026-08-31T10:25:26.239-07:00`. Repeated read-only serial queries remained
+unavailable. The separately frozen
+[C2-R1 stopped-disk rescue proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-c2-r1-stopped-disk-rescue-proposal.md)
+at `288fc634...bebc0a` passes 14/14 and binds only a snapshot-derived read-only
+clone, one temporary `e2-small` helper, deterministic evidence recovery and the
+unchanged result-only auditor. Its exact rescue completed: archive
+`60cb3bf0...977ad` agrees at every hop, the helper is stopped and all resources
+are retained. The [rescue result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-c2-r1-stopped-disk-rescue-result.md)
+records one exit-0, non-timeout payload that reports all 65,536 panels and
+`status=PASS`. The predecessor auditor correctly fails closed 12/23 at
+`6f39c2b4...391f`. The separately versioned C2-R1 reader then preserves two
+representational failures: 20/22 at `43e55c50...81fb7` from omitting FLINT's
+documented midpoint ulp, and 20/22 at `cf031c80...6b9ff` from constructing
+80-digit endpoints under Decimal's 28-digit default context. The additive
+fixed-220-digit-context reader passes self-test 4/4 and independent definition
+audit 15/15; its one application to unchanged evidence passes 22/22 at
+`afda5b93...f4c5c` and selects
+`P8G_OUTER_ACCUMULATION_ARITHMETIC_LEAD` by strict interval separation.
+No numerical retry, candidate work or authority promotion is permitted; the
+selected successor is a candidate-neutral P8G outer-accumulation arithmetic
+definition and bounded diagnostic only.
+That [P8G evidence replay](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8g-outer-accumulation-evidence-replay.md)
+now closes without numerical re-execution. Its manufactured classifications
+pass 6/6, its application to the authenticated C2-R1 result passes 13/13 at
+`c44bd6ed...96764d`, and its independent definition audit passes 21/21. The
+outer ordinal accumulation contributes more than 99.9988% of the final-minus-
+elementary gap, but the elementary sum itself remains strictly 1.0256787... of
+the unchanged rail and slot 3 alone is also strictly above the rail. Therefore
+an outer-only arithmetic optimization cannot produce a pass. The next bounded
+lead is candidate-neutral P8H attribution of slot 3,
+`value_jet * second_jet(1,2)`, through operand hulls, prepared moments,
+summation and remainder propagation; no scientific rerun or authority is
+unlocked.
+The [P8H slot-3 attribution](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8h-slot3-upstream-enclosure-attribution.md)
+now implements the bounded bivariate observation surface. Its two hardened
+manufactured runs pass 11/11 with byte-identical output, exact ordinary/
+attributed Arb equality, exact final reconstruction, 1,086 integrated terms
+and 22 boundary terms. The predecessor bivariate fixture remains 19/19 and P8E
+remains 13/13. Independent source/build/runtime audit passes 37/37 at
+`263ff183...dc6d91c`. No representative input or candidate was evaluated. The
+next eligible lead is candidate-neutral P8I binding of this attribution only to
+slot 3 in the read-only jet/selector parent path, with bounded aggregation and
+fixture equivalence required before any representative execution proposal.
+The P8H current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2596 `PASS/GREEN` with
+certificate `6e84f965...e12a4e45` and integrity true.
+The [P8I selector-path binding](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8i-selector-slot3-attribution-binding.md)
+now closes that implementation prerequisite. Its two-panel manufactured fixture
+passes 14/14 twice with byte-identical output, exact ordinary/attributed selector
+equality, exact slot-3 reconstruction, 2,172 integrated terms and 44 boundary
+terms. The P8E regression remains 13/13, and the independent source/build/runtime
+audit passes 33/33 at `42d09751...6bb6aee`. No representative input or candidate
+was evaluated. The next eligible lead is a candidate-neutral P8J decision packet
+for one bounded representative attribution run; this status does not itself
+authorize execution.
+The P8I current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2597 `PASS/GREEN` with
+certificate `6e84f965...e12a4e45` and integrity true.
+The [P8J-R2 representative attribution proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r2-representative-attribution-cloud-execution-proposal.md)
+is now the sole next execution decision. It freezes one candidate-neutral
+65,536-panel, 32-thread observation-only run using the unchanged P8I selector
+binding. Exact base-plus-overlay reconstruction passes manifest 16/16, P8J
+audit self-test 6/6, P8I fixture 14/14, offline builds, controller syntax and
+the required target binary identity. Independent proposal audit passes 41/41
+at `b3527500...6b2739`. The representative executable was not started. A
+separate exact authorization is required before any VM, upload or process;
+result classification alone may select only the smallest separately versioned
+H2 repair proposal.
+The P8J-R2 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2598 `PASS/GREEN`, trace
+`adapter:799da142-41d4-4c8f-a4a5-6df60b3bba0a`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The exact R2 authorization then rehashed both Cloud Shell archives and issued
+the sole creation request. Google returned `ZONE_RESOURCE_POOL_EXHAUSTED` for
+`n2-standard-32` in `us-central1-a`; the post-failure guard confirms no VM or
+disk was created. R2 is exhausted as infrastructure preexecution evidence, not
+a scientific result. The [R3 zone-only successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r3-zone-capacity-successor-proposal.md)
+changes only the VM name and zone to `us-central1-b`, reuses the two retained
+hash-bound archives without another upload, and passes independent static audit
+36/36 at `b6dff537...5b321a3`. Its exact authorization then rehashed both
+archives and issued the sole R3 creation request. Google again returned
+`ZONE_RESOURCE_POOL_EXHAUSTED`, now in `us-central1-b`; post-failure inspection
+confirms no VM or disk exists. The [R3 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r3-cloud-preexecution-result.md)
+passes independent audit 25/25 at `2713dac1...9a1099`. R3 is exhausted, no
+scientific process ran, and no automatic third cloud successor is eligible.
+The terminal R3 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2600 `PASS/GREEN`,
+trace `adapter:6487410a-426b-4e5c-9c74-1ee2c6b5ef96`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The separately researched
+[P8J-R4 cross-region capacity successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r4-region-capacity-successor-proposal.md)
+is now frozen at `2510cae2...8c23d9f`. Authenticated read-only inventory
+separates quota from live capacity: `CPUS_ALL_REGIONS` is 32/0, each inventoried
+region has at least 100 unused N2 CPUs, `n2-standard-32` is defined in all
+enumerated successor zones, and no non-terminated instance exists. Following
+Google's least-disruptive resource-availability guidance, R4 preserves the
+machine, image, disk, archives, binaries, fixture, controller, one-process
+boundary and ceilings while selecting deterministic cross-region zone
+`us-east1-b`. Independent static audit passes 49/49 at `633a36f9...c3ab17`.
+No R4 cloud resource or scientific process exists; separate exact authorization
+is required for its sole creation attempt.
+The R4 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP 18/18
+files and 179/179 tests, and Casimir adapter run 2601 `PASS/GREEN`, trace
+`adapter:6425c65a-3bbb-44a0-80b7-fc3283c2e5db`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole R4 creation request then returned `ZONE_RESOURCE_POOL_EXHAUSTED` for
+`n2-standard-32` in cross-region zone `us-east1-b`. Google operation
+`operation-1788220914081-65a60a05d1d9a-15dcfdd8-56b86984` is `DONE` with
+HTTP 503, and post-failure inspection confirms the exact VM is absent. The
+[R4 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r4-cloud-preexecution-result.md)
+is immutable at `9c368edd...0839fbe` and passes independent audit 29/29 at
+`55a2c379...8f153`. R4 is exhausted; no VM, disk, build, scientific process or
+candidate activity occurred. No automatic further cloud successor is eligible.
+The terminal R4 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2602 `PASS/GREEN`,
+trace `adapter:6ac262b4-703a-4cef-974c-d203e58eab8c`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The separately researched
+[P8J-R5 C4-family successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r5-c4-capacity-successor-proposal.md)
+is frozen at `bc883b8f...1ae06ea`. Official provisioning constraints eliminate
+Flex-start for CPU-only N2/C4, reject preemptible Spot for the uninterrupted
+one-shot evidence contract, and leave an alternate on-demand machine family as
+the smallest successor. Read-only project inventory binds `c4-standard-32` at
+32 vCPUs/122,880 MiB in the selected zone, generic CPU quota 200/0 and global
+quota 32/0. R5 selects previously demonstrated C4 zone `us-central1-a`, changes
+only the machine family and required boot disk to 30 GB
+`hyperdisk-balanced`, and preserves every scientific/build/evidence binding.
+The official planning rate is `$1.58136/hour`, with 90,000 seconds and `$42.00`
+as aggregate ceilings. Independent static audit passes 54/54 at
+`f5101809...5bde91`. No R5 resource or process exists; exact authorization is
+required for its sole creation attempt.
+The frozen R5 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2603 `PASS/GREEN`,
+trace `adapter:dc93be34-6f27-43f0-a30e-3d4695e0a568`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole R5 creation attempt then stopped before resource creation on the
+previously hidden C4-family regional quota: `CPUS_PER_VM_FAMILY` is 24 in
+`us-central1`, below the frozen 32-vCPU request. Google operation
+`operation-1788223864323-65a6150363ded-20ec0738-1f295ce4` is `DONE` with
+HTTP 403 and `QUOTA_EXCEEDED`. The exact VM remains absent. The immutable
+[R5 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r5-cloud-preexecution-result.md)
+is `0e8534f6...c7dfa0c` and its independent audit passes 31/31 at
+`8c87a7ca...ee6dc9`. R5 is exhausted; no VM, disk, build, numerical process or
+candidate activity occurred. A quota-compatible successor requires separate
+research, freezing and operator authorization.
+The terminal R5 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2604 `PASS/GREEN`,
+trace `adapter:04e0c609-cf90-4290-97c6-78cec388cfe3`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The separately researched
+[P8J-R6 C2D successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r6-c2d-quota-compatible-successor-proposal.md)
+is frozen at `f0a2aab6...962d878`. Authenticated regional inventory exposes
+`C2D_CPUS` 100/0 in five inspected US regions, and exact machine inventory
+binds `c2d-standard-32` at 32 vCPUs/131,072 MiB in the selected
+`us-central1-a` zone. C2D preserves x86 execution and the 32-CPU controller,
+supports 30 GB `pd-balanced`, and has an official planning rate of
+`$1.452768/hour`; all scientific/build/evidence bindings remain unchanged.
+Independent static audit passes 37/37 at `06a680b6...cd967e`. No R6 resource
+or process exists; exact authorization is required for its sole attempt.
+The frozen R6 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter run 2605 `PASS/GREEN`,
+trace `adapter:ec9799bc-e26b-4134-9066-25622280a24c`, with certificate
+`6e84f965...e12a4e45` and integrity true.
+The sole R6 creation attempt passed exact archive, absence and C2D 100/0 quota
+guards, then stopped before resource creation on an authenticated
+`c2d-standard-32` stockout in `us-central1-a`. Google operation
+`operation-1788226130354-65a61d7471f99-ec7f6b23-e02e7642` is `DONE` with
+HTTP 503 and `ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS`. The exact VM remains
+absent. The immutable
+[R6 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r6-cloud-preexecution-result.md)
+is `2cf0ef29...27f7b68` and independent audit passes 28/28 at
+`0ac59b69...ed50775`. R6 is exhausted; no VM, disk, build, numerical process
+or candidate activity occurred.
+The R2/R3 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
+18/18 files and 179/179 tests, and Casimir adapter run 2599 `PASS/GREEN`, trace
+`adapter:282c7fcd-777d-4cce-bee8-4c4389cafb23`, with certificate
+`6e84f965...e12a4e45` and integrity true.
 The result-only
 [P8F audit definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-result-audit-definition.md)
 is frozen before terminal output. Its exact auditor passes 4/4 synthetic
@@ -382,8 +560,8 @@ PASS/FAIL/timeout/corruption fixtures and preregisters a strict, tolerance-free
 outer-accumulation/boundary/slot/distributed decision. It cannot inspect or
 control the active process and has not read the live evidence root. A separate
 static definition audit passes 31/31 with receipt `6ad6d18d...bbbca`.
-The C2-R1 verification checkpoint is math 323/323, WARP 18/18 files and
-179/179 tests, and Casimir adapter run 2591 `PASS/GREEN` with certificate
+The current P8G verification checkpoint is math 323/323, WARP 18/18 files and
+179/179 tests, and Casimir adapter run 2595 `PASS/GREEN` with certificate
 `6e84f965...e12a4e45` and integrity true.
 Its active S5-A
 [`formal-germ subtraction definition review`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a-formal-germ-subtraction-definition-review.md)

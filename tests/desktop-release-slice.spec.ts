@@ -26,6 +26,47 @@ const readManifest = async () => validateReleaseSliceManifest(
 );
 
 describe("desktop release slice audit", () => {
+  it("fails the production smoke if any Stage 2 metadata route falls through", async () => {
+    const source = await readFile(
+      path.join(repoRoot, "scripts/replit-production-smoke.mjs"),
+      "utf8",
+    );
+    for (const route of [
+      "/.well-known/oauth-protected-resource/mcp",
+      "/.well-known/oauth-protected-resource/mcp/device-check",
+      "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
+    ]) {
+      expect(source).toContain(route);
+    }
+    expect(source).toContain("oauth_device_check_protected_resource");
+    expect(source).toContain("oauth_coordination_protected_resource");
+  });
+
+  it("runs the Stage 2 Agent Connections gate before desktop signing", async () => {
+    const workflow = await readFile(
+      path.join(repoRoot, ".github/workflows/desktop-release.yml"),
+      "utf8",
+    );
+    const stage2Gate = workflow.indexOf(
+      "Run provider-neutral Agent Connections release gate",
+    );
+    const releasePreflight = workflow.indexOf("Release preflight");
+    const signing = workflow.indexOf("Build signed NSIS installer");
+    expect(stage2Gate).toBeGreaterThan(-1);
+    expect(stage2Gate).toBeLessThan(releasePreflight);
+    expect(releasePreflight).toBeLessThan(signing);
+    for (const contract of [
+      "helix-agent-client-profile.spec.ts",
+      "agent-connections.test.ts",
+      "AgentConnectionSetup.spec.tsx",
+      "helix-mcp-local-supervisor-coordination.test.ts",
+      "helix-agent-transports.test.ts",
+    ]) {
+      expect(workflow).toContain(contract);
+    }
+    expect(workflow).toContain("helix:environment-harness:docs-audit");
+  });
+
   it("stages, packages, and verifies the one shared Minecraft lifecycle provider", async () => {
     const [stageSource, packagerSource, verifierSource] = await Promise.all([
       readFile(
@@ -60,8 +101,21 @@ describe("desktop release slice audit", () => {
     expect(manifest.ownedFiles).toContain(
       ".github/workflows/desktop-release.yml",
     );
+    expect(manifest.ownedFiles).toEqual(expect.arrayContaining([
+      "client/src/components/agent-access/AgentConnectionSetup.tsx",
+      "client/src/components/workstation/AgentAccessPanel.tsx",
+      "scripts/replit-production-smoke.mjs",
+      "server/routes/agent-connections.ts",
+      "shared/helix-agent-client-profile.ts",
+    ]));
     expect(manifest.sharedFiles.map((entry) => entry.path)).toContain(
       "server/mcp/helix-mcp-server.ts",
+    );
+    expect(manifest.sharedFiles.map((entry) => entry.path)).toEqual(
+      expect.arrayContaining([
+        "client/src/lib/workstation/profileStorageSync.ts",
+        "shared/helix-mcp-evidence-capability-registry.ts",
+      ]),
     );
   });
 
