@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs/promises";
+import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -94,6 +95,40 @@ const readJson = async (baseUrl, pathname, init = {}) => {
   const text = await response.text();
   if (!response.ok) throw new Error(`${pathname} returned HTTP ${response.status}: ${text.slice(0, 800)}`);
   return JSON.parse(text);
+};
+
+const readJsonWithExactHost = async (baseUrl, pathname, headers = {}) => {
+  const target = new URL(pathname, baseUrl);
+  return await new Promise((resolve, reject) => {
+    const request = http.request(target, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...headers,
+      },
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        const status = response.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          reject(new Error(`${pathname} returned HTTP ${status}: ${text.slice(0, 800)}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(text));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    request.setTimeout(15_000, () => {
+      request.destroy(new Error(`${pathname} timed out`));
+    });
+    request.once("error", reject);
+    request.end();
+  });
 };
 
 const waitForFingerprint = async ({ baseUrl, child, logs }) => {
@@ -231,21 +266,21 @@ const main = async () => {
       "/sitemap.xml omitted /agent-access",
     );
 
-    const protectedResource = await readJson(
+    const protectedResource = await readJsonWithExactHost(
       baseUrl,
       "/.well-known/oauth-protected-resource/mcp",
       { headers: forwardedHttpsHeaders },
     );
     assert(
       protectedResource.resource === "https://casimirbot.com/mcp",
-      "OAuth protected-resource metadata returned an unexpected resource",
+      `OAuth protected-resource metadata returned an unexpected resource: ${JSON.stringify(protectedResource.resource)}`,
     );
     assert(
       protectedResource.authorization_servers?.[0] === "https://auth.example.invalid",
       "OAuth protected-resource metadata returned an unexpected authorization server",
     );
 
-    const deviceCheckProtectedResource = await readJson(
+    const deviceCheckProtectedResource = await readJsonWithExactHost(
       baseUrl,
       "/.well-known/oauth-protected-resource/mcp/device-check",
       { headers: forwardedHttpsHeaders },
@@ -264,7 +299,7 @@ const main = async () => {
       "Device Check protected-resource metadata omitted its least read scope",
     );
 
-    const coordinationProtectedResource = await readJson(
+    const coordinationProtectedResource = await readJsonWithExactHost(
       baseUrl,
       "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
       { headers: forwardedHttpsHeaders },
