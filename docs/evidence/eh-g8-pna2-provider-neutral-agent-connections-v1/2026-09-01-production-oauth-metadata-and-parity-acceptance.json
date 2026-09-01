@@ -1,0 +1,116 @@
+{
+  "schema": "casimirbot.eh_g8_pna2_production_oauth_metadata_and_parity_acceptance.v1",
+  "recorded_at": "2026-09-01T19:26:24.089Z",
+  "program_gate": "G8",
+  "workstream": "provider-neutral external-agent onboarding",
+  "capability": "PNA2",
+  "lifecycle_stage": "production OAuth metadata and deployment parity",
+  "result": "production_oauth_metadata_live_accepted_signed_installer_pending",
+  "git_authority": {
+    "replit_agent_state_hygiene_commit": "f08f11576237b4b7c2f44d2592a3f09577eb14bb",
+    "published_authority_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+    "published_checkpoint_tree_matches_hygiene_commit": true,
+    "tracked_replit_agent_state_entries_removed": 1601,
+    "product_references_to_replit_agent_state": 0,
+    "replit_worktree_clean_before_publish": true,
+    "remote_main_matches_published_authority": true
+  },
+  "production_oauth_configuration": {
+    "provider": "auth0",
+    "configuration_keys": [
+      "HELIX_AGENT_OAUTH_ISSUER",
+      "HELIX_AGENT_OAUTH_AUDIENCE",
+      "HELIX_AGENT_OAUTH_PROVIDER",
+      "HELIX_AGENT_OAUTH_JWKS_URL",
+      "HELIX_AGENT_OAUTH_ALGORITHMS",
+      "HELIX_AGENT_OAUTH_TENANT_CLAIM",
+      "HELIX_AGENT_OAUTH_NATIVE_CLIENT_ID",
+      "HELIX_AGENT_OAUTH_LINK_SCOPE"
+    ],
+    "app_secrets_saved": 8,
+    "production_secrets_synchronized": 8,
+    "production_secrets_out_of_sync_after_synchronization": 0,
+    "credential_values_recorded": false,
+    "oauth_tokens_recorded": false
+  },
+  "deployment_recovery": {
+    "initial_bundle_handoff": "transient_failure_after_build_security_and_production_smoke_passed",
+    "temporary_production_rows": "not_persisted_and_correctly_failed_live_as_auth_not_configured",
+    "durable_recovery": "saved_as_app_secrets_then_explicitly_synchronized_each_out_of_sync_secret_into_production",
+    "strict_authority_recovery": "pushed_content_identical_replit_publish_checkpoint_then_refetched_origin_main_before_final_publish",
+    "final_security_check": "PASS",
+    "final_build": "PASS",
+    "final_bundle": "PASS",
+    "final_promote": "PASS"
+  },
+  "public_metadata_probe": {
+    "observed_at": "2026-09-01T19:25:00Z",
+    "expected_resource": "https://casimirbot.com/mcp",
+    "authorization_server": "https://dev-pfgv4lwpqy3soxoy.us.auth0.com/",
+    "responses": [
+      {
+        "base_url": "https://casimir-bot-pestypig.replit.app",
+        "path": "/.well-known/oauth-protected-resource/mcp",
+        "status": 200,
+        "result": "exact_json_contract_present"
+      },
+      {
+        "base_url": "https://casimir-bot-pestypig.replit.app",
+        "path": "/.well-known/oauth-protected-resource/mcp/device-check",
+        "status": 200,
+        "result": "exact_json_contract_present"
+      },
+      {
+        "base_url": "https://casimir-bot-pestypig.replit.app",
+        "path": "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
+        "status": 200,
+        "result": "exact_json_contract_present"
+      },
+      {
+        "base_url": "https://casimirbot.com",
+        "path": "/.well-known/oauth-protected-resource/mcp",
+        "status": 200,
+        "result": "exact_json_contract_present"
+      },
+      {
+        "base_url": "https://casimirbot.com",
+        "path": "/.well-known/oauth-protected-resource/mcp/device-check",
+        "status": 200,
+        "result": "exact_json_contract_present"
+      },
+      {
+        "base_url": "https://casimirbot.com",
+        "path": "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
+        "status": 200,
+        "result": "exact_json_contract_present"
+      }
+    ]
+  },
+  "deployment_parity": {
+    "schema": "helix.replit_deployment_parity.v1",
+    "checked_at": "2026-09-01T19:26:24.089Z",
+    "ok": true,
+    "expected_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+    "targets": [
+      "https://casimir-bot-pestypig.replit.app",
+      "https://casimirbot.com"
+    ],
+    "artifact_contract_sha256": "sha256:8d44fe570c6fae77c1b8cd29c8d1ce2e967ac1495210e23339ca77eb8bb7a1c7",
+    "experience_contract_sha256": "sha256:c45aa0665f1cbcb8c12636cb2edb115f3ff419a9c7f609cf4f003cf4e3f826d1",
+    "deployment_contract_sha256": "sha256:c549764594610428257c707a37e51fc03523896ae6eeb651ec5794648d717092",
+    "mismatches": [],
+    "model_invoked": false,
+    "secret_values_captured": false
+  },
+  "authority_boundary": {
+    "provider_app_chat_control_claimed": false,
+    "hidden_reasoning_recorded": false,
+    "terminal_authority_changed": false,
+    "environment_authority_changed": false,
+    "metadata_acceptance_implies_authenticated_client_acceptance": false
+  },
+  "remaining_required_evidence": [
+    "reviewer_approved_signed desktop release workflow run",
+    "signed installed current-release connection restart disconnect and reactivation acceptance"
+  ]
+}

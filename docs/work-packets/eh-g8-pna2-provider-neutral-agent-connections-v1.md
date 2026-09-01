@@ -332,3 +332,36 @@ the full workspace did not expose an inspectable deployment panel before the
 bounded browser-control attempts timed out. PNA2 therefore remains
 `deterministically verified`. Production route materialization and the signed
 installed-current-release journey remain required for promotion.
+
+## 2026-09-01 production OAuth metadata and parity acceptance
+
+The production OAuth metadata boundary is now live accepted. Replit's first
+production-secret entry path displayed the eight rows only temporarily; after
+promotion, both public hosts truthfully remained `auth_not_configured`. The
+durable recovery saved the exact variables as Replit App Secrets and then used
+the Publishing panel's explicit **8 secrets out of sync** controls to add each
+one to the isolated production environment. No credential value or OAuth token
+was copied into repository evidence.
+
+The Replit workspace also tracked 1,601 ignored Agent-state files. Commit
+`f08f11576237b4b7c2f44d2592a3f09577eb14bb` removes only those paths from Git
+tracking while preserving the local files and leaving zero product references.
+Replit's later `Published your App` checkpoint was content-identical and became
+the exact remote authority at
+`42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4`. The final publish passed security,
+build, bundle, and promotion.
+
+All three protected-resource metadata paths now return their JSON contracts
+with HTTP 200 on both `https://casimir-bot-pestypig.replit.app` and
+`https://casimirbot.com`. `npm run replit:deployment:parity` passed against both
+targets with the exact published commit, identical artifact, experience, and
+deployment contract hashes, zero mismatches, no model invocation, and no
+captured secret values. Immutable evidence is
+`docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json`.
+
+This closes the hosted protected-resource metadata prerequisite. PNA2 remains
+`deterministically verified`, not `integrated accepted`, because the public
+GitHub desktop-release workflow has not produced a reviewer-approved signed
+current installer and that signed install has not repeated the connection,
+restart, disconnect, and reactivation journey. Metadata acceptance grants no
+provider-chat, hidden-reasoning, environment, answer, or terminal authority.
