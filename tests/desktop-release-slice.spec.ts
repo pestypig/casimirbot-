@@ -44,6 +44,7 @@ describe("desktop release slice audit", () => {
     expect(source).toContain('"X-Forwarded-Proto": "https"');
     expect(source).toContain("readJsonWithExactHost");
     expect(source).toContain("http.request");
+    expect(source).not.toContain("{ headers: forwardedHttpsHeaders }");
   });
 
   it("runs the Stage 2 Agent Connections gate before desktop signing", async () => {

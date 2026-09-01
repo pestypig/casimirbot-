@@ -269,7 +269,7 @@ const main = async () => {
     const protectedResource = await readJsonWithExactHost(
       baseUrl,
       "/.well-known/oauth-protected-resource/mcp",
-      { headers: forwardedHttpsHeaders },
+      forwardedHttpsHeaders,
     );
     assert(
       protectedResource.resource === "https://casimirbot.com/mcp",
@@ -283,7 +283,7 @@ const main = async () => {
     const deviceCheckProtectedResource = await readJsonWithExactHost(
       baseUrl,
       "/.well-known/oauth-protected-resource/mcp/device-check",
-      { headers: forwardedHttpsHeaders },
+      forwardedHttpsHeaders,
     );
     assert(
       deviceCheckProtectedResource.resource === "https://casimirbot.com/mcp",
@@ -302,7 +302,7 @@ const main = async () => {
     const coordinationProtectedResource = await readJsonWithExactHost(
       baseUrl,
       "/.well-known/oauth-protected-resource/mcp/local-supervisor-coordination",
-      { headers: forwardedHttpsHeaders },
+      forwardedHttpsHeaders,
     );
     assert(
       coordinationProtectedResource.resource === "https://casimirbot.com/mcp",
