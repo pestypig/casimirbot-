@@ -156,6 +156,11 @@ const main = async () => {
   child.stderr.on("data", appendLog);
   const baseUrl = `http://127.0.0.1:${port}`;
   const forwardedHttpsHeaders = {
+    // Connect to the local compiled process while exercising the same
+    // canonical Host/protocol identity that the public Replit edge forwards.
+    // Leaving Host as 127.0.0.1 would intentionally select the separate
+    // loopback-resource contract and make this public-route smoke ambiguous.
+    "Host": "casimirbot.com",
     "X-Forwarded-Proto": "https",
   };
 

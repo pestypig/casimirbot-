@@ -40,6 +40,8 @@ describe("desktop release slice audit", () => {
     }
     expect(source).toContain("oauth_device_check_protected_resource");
     expect(source).toContain("oauth_coordination_protected_resource");
+    expect(source).toContain('"Host": "casimirbot.com"');
+    expect(source).toContain('"X-Forwarded-Proto": "https"');
   });
 
   it("runs the Stage 2 Agent Connections gate before desktop signing", async () => {
