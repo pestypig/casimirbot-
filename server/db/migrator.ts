@@ -77,6 +77,7 @@ import { migration075 } from "./migrations/075_shared_live_room_mcp_delegation_r
 import { migration076 } from "./migrations/076_environment_connector_installed_nodes";
 import { migration077 } from "./migrations/077_friends_voice_parties";
 import { migration078 } from "./migrations/078_environment_action_result_control_release_check";
+import { migration079 } from "./migrations/079_linked_provider_exact_unique_constraint";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -158,6 +159,7 @@ const MIGRATIONS = [
   migration076,
   migration077,
   migration078,
+  migration079,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {
