@@ -1,0 +1,97 @@
+{
+  "schema": "helix.environment_time.deterministic_acceptance.v1",
+  "recorded_at": "2026-09-03T07:30:00-04:00",
+  "program_gate": "G8",
+  "work_packet": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+  "scope": {
+    "stages": ["ET0", "ET1", "ET2", "ET3", "ET4", "ET5"],
+    "maturity": "deterministically verified",
+    "classification": [
+      "intent arbitration",
+      "source admission",
+      "tool admission",
+      "evidence normalization",
+      "evidence re-entry",
+      "follow-up reasoning",
+      "terminal authority",
+      "presentation",
+      "adapter-owned execution"
+    ]
+  },
+  "implementation": {
+    "shared_contract": {
+      "path": "shared/helix-environment-time.ts",
+      "sha256": "90fb7315a37cd3872ffec0d3d973108612402f7cf015b8ced4e9a6db4ae24702"
+    },
+    "append_only_ledger": {
+      "path": "server/services/environment-connectors/temporal-plans/environment-time-ledger.ts",
+      "sha256": "a9c1e56e3bfaf2362d7d46279fed1c062307c06b48ae455e9caf94012e9146c3"
+    },
+    "minecraft_compatibility_compiler": {
+      "path": "server/services/environment-connectors/temporal-plans/minecraft-environment-time-compiler.ts",
+      "sha256": "af8aeb5269183e8b260df8a8a23214404bc48b3cb76961ef3f4eaef27381f757"
+    }
+  },
+  "positive_evidence": [
+    "Three distinct clock domains, canonical plan hashing, finite acyclic graph validation, lane/resource declarations, watermarks, effect ceilings, postconditions and fail-closed currentness are executable contracts.",
+    "Append-only hash-linked lifecycle reduction, exact idempotency, checkpoint-bound extension/replacement, stabilization, authority-reducing cancellation and fresh reconnect admission were exercised deterministically.",
+    "Progressive affordance snapshots derive available, blocked, materially changed and expired deltas without strategy, execution, answer or terminal authority.",
+    "Interrupt receipts derive fixed priority, next-decision and release semantics; finalized speech capture is measured separately from provider-neutral post-finalization feedback spans.",
+    "Minecraft compilation preserves admitted action arguments, tick windows, branches, checkpoints and outcome targets over the existing serial and reactive schemas; unsupported abort/cancel/timeout semantics fail closed instead of being approximated.",
+    "Existing Fabric sequence and concurrent scheduler contracts and native GameTests remained green without modifying either engine."
+  ],
+  "negative_evidence": [
+    "No live Minecraft ET6 capacity claim was made; horizon, queue depth, continuous-control ratio and latency percentiles remain unmeasured.",
+    "No second-adapter ET7 conformance claim was made.",
+    "No installed EXE, GPT Live or multi-surface ET8 acceptance claim was made.",
+    "The compatibility compiler does not invent resident interrupt lanes or adapter strategy; plans whose semantics cannot be represented exactly are rejected.",
+    "Lifecycle events, frontiers, interrupt receipts and feedback records remain nonterminal observations and do not gain execution or answer authority."
+  ],
+  "verification": [
+    {
+      "command": "npx vitest run shared/__tests__/helix-environment-time.spec.ts server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks",
+      "result": "pass",
+      "tests": 35
+    },
+    {
+      "command": "npx vitest run server/__tests__/minecraft-fluid-sequence-contract.test.ts server/__tests__/minecraft-fluid-micro-course-fixture.test.ts server/__tests__/minecraft-reactive-program-contract.test.ts server/__tests__/minecraft-reactive-program-evidence.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks",
+      "result": "pass",
+      "tests": 37
+    },
+    {
+      "command": "gradlew test --tests com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest --tests com.casimirbot.helixplayer.fabric.ConcurrentReactiveSchedulerTest (Java 21)",
+      "result": "pass",
+      "required_game_tests": 5
+    },
+    {
+      "command": "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks",
+      "result": "pass",
+      "tests": 31
+    },
+    {
+      "command": "npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks",
+      "result": "pass",
+      "tests": 36
+    },
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass_with_classification_warning",
+      "note": "Static checks passed. The dirty checkout contains pre-existing sensitive Helix changes; the inferred classification is recorded in this artifact."
+    },
+    {
+      "command": "npm run build:server",
+      "result": "pass_with_pre_existing_warnings",
+      "warnings": 4
+    }
+  ],
+  "authority": {
+    "adapter_strategy_authority": false,
+    "automatic_replay": false,
+    "execution_authority_from_receipt": false,
+    "answer_authority_from_receipt": false,
+    "terminal_eligible": false,
+    "credentials_included": false,
+    "hidden_reasoning_included": false
+  },
+  "next_stage": "ET6 live Minecraft capacity qualification is a separate follow-up after this deterministic ET0-ET5 implementation goal."
+}
