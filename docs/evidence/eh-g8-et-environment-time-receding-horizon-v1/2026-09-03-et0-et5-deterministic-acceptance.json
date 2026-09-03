@@ -1,6 +1,6 @@
 {
   "schema": "helix.environment_time.deterministic_acceptance.v1",
-  "recorded_at": "2026-09-03T07:30:00-04:00",
+  "recorded_at": "2026-09-03T07:28:37-04:00",
   "program_gate": "G8",
   "work_packet": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
   "scope": {
