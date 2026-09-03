@@ -329,6 +329,12 @@ inputs and the existing typed workflows are executable. The named
 Authority, while `copilot_speedrun` is guidance-only. Naming either future
 ruleset in the player sequence is a typed admission failure.
 
+The provider-neutral parent for clocks, rolling plan watermarks, progressive
+affordance frontiers and interruption timing is
+`docs/architecture/helix-environment-time-action-planning-v1.md`. Minecraft's
+sequence and concurrent guardian are the capacity reference and compilation
+target; their tick vocabulary must not leak into the shared contract.
+
 Branch, event, interrupt and checkpoint conditions may read only a bounded vocabulary: tick,
 grounded pose, position, health, food, inventory/resource counts, equipped
 items/tools, current-focus kind and reachability, exact block state, current

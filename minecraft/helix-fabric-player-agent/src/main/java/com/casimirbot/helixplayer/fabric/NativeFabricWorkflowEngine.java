@@ -67,6 +67,9 @@ final class NativeFabricWorkflowEngine {
     private int noTargetTicks;
     private int pendingTicks;
     private double initialDistance = -1;
+    private Double workflowStartX;
+    private Double workflowStartY;
+    private Double workflowStartZ;
     private BlockPos blockTarget;
     private Direction blockTargetFace;
     private MiningTargetAffordance.ApproachPose blockApproach;
@@ -132,6 +135,12 @@ final class NativeFabricWorkflowEngine {
         this.actionKind = actionKind;
         this.arguments = arguments;
         this.controlEngine = controlEngine;
+        LocalPlayer player = minecraft.player;
+        if (player != null) {
+            workflowStartX = player.getX();
+            workflowStartY = player.getY();
+            workflowStartZ = player.getZ();
+        }
         String countedItem = switch (actionKind) {
             case "collect" -> text(arguments, "item_or_block_id");
             case "craft" -> text(arguments, "output_item_id");
@@ -425,6 +434,7 @@ final class NativeFabricWorkflowEngine {
         measurements.put("last_replan_reason", nativeNavigationLastReplanReason);
         measurements.put("controls_released_on_replan", true);
         measurements.put("mutation_policy", "movement_only");
+        addWorkflowMotionMeasurements(measurements, minecraft.player);
         if (nativeNavigationPlan != null) {
             measurements.put(
                 "planner_status",
@@ -446,6 +456,25 @@ final class NativeFabricWorkflowEngine {
             );
         }
         return measurements;
+    }
+
+    private void addWorkflowMotionMeasurements(
+        Map<String, Object> measurements,
+        LocalPlayer player
+    ) {
+        if (
+            player == null || workflowStartX == null ||
+            workflowStartY == null || workflowStartZ == null
+        ) return;
+        double dx = player.getX() - workflowStartX;
+        double dy = player.getY() - workflowStartY;
+        double dz = player.getZ() - workflowStartZ;
+        double displacement = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        measurements.put("workflow_displacement_blocks", displacement);
+        measurements.put("final_x", player.getX());
+        measurements.put("final_y", player.getY());
+        measurements.put("final_z", player.getZ());
+        measurements.put("player_motion_performed", displacement >= 0.01);
     }
 
     private WorkflowStep baritoneNavigate(long actionTicks) {
@@ -1973,9 +2002,13 @@ final class NativeFabricWorkflowEngine {
         );
         if (!safety.decision().admitted()) {
             bridge.applyMovement(MovementInput.released());
+            LinkedHashMap<String, Object> measurements = new LinkedHashMap<>(
+                safety.measurements()
+            );
+            addWorkflowMotionMeasurements(measurements, player);
             return WorkflowStep.failed(
                 "Native locomotion stopped before asserting forward control because the local safety envelope refused the next step.",
-                safety.measurements()
+                measurements
             );
         }
         bridge.lookAt(x, y + 0.5, z, 18.0F);
@@ -2201,6 +2234,9 @@ final class NativeFabricWorkflowEngine {
         noTargetTicks = 0;
         pendingTicks = 0;
         initialDistance = -1;
+        workflowStartX = null;
+        workflowStartY = null;
+        workflowStartZ = null;
         blockTarget = null;
         blockTargetFace = null;
         blockApproach = null;

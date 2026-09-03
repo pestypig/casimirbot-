@@ -157,6 +157,26 @@ const principal = (): HelixAgentApiPrincipal => {
   };
 };
 
+const nativeDesktopPrincipalWithoutExpiry = (): HelixAgentApiPrincipal => {
+  const value = principal();
+  return {
+    ...value,
+    issuer: "urn:casimirbot:desktop-session",
+    mcpClientRef: `mcp_client:native_desktop:${"d".repeat(64)}`,
+    oauthClientRef: null,
+    tokenExpiresAt: null,
+    accountContext: {
+      ...value.accountContext,
+      trusted_account_session: true,
+      account_session: {
+        ...value.accountContext.account_session!,
+        status: "active",
+        expires_at: null,
+      },
+    },
+  };
+};
+
 const goal: HelixEnvironmentDurableGoalProjection = {
   schema: HELIX_ENVIRONMENT_DURABLE_GOAL_PROJECTION_SCHEMA,
   goal_id: "environment_goal:monitor",
@@ -517,6 +537,71 @@ describe("Helix MCP environment monitor", () => {
         operation: "environment.monitor.revoke",
         lease: { status: "revoked" },
       });
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("grants an authenticated native desktop client only its requested finite monitor lease when the local session has no expiry", async () => {
+    const connection = await connect(nativeDesktopPrincipalWithoutExpiry());
+    try {
+      const authorization = await connection.client.callTool({
+        name: "helix_client_authorization_status",
+        arguments: { capability_profile: "g8-monitor" },
+      });
+      expect(authorization.isError, JSON.stringify(authorization)).not.toBe(true);
+
+      const created = await connection.client.callTool({
+        name: "helix_environment_monitor_create",
+        arguments: {
+          room_id: ROOM_ID,
+          goal_id: goal.goal_id,
+          client_continuation_ref: "codex_task:native-desktop",
+          event_families: ["actor", "hazard"],
+          expires_in_seconds: 90,
+        },
+      });
+      expect(created.isError, JSON.stringify(created)).not.toBe(true);
+      expect(connection.monitorStore.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({
+            mcp_client_id: `mcp_client:native_desktop:${"d".repeat(64)}`,
+          }),
+        }),
+      );
+      const expiresAt = Date.parse(
+        (connection.monitorStore.create.mock.calls[0]?.[0] as { expiresAt: string })
+          .expiresAt,
+      );
+      expect(expiresAt - Date.now()).toBeGreaterThan(80_000);
+      expect(expiresAt - Date.now()).toBeLessThanOrEqual(90_000);
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("still rejects an external OAuth client whose token has no verified expiry", async () => {
+    const externalWithoutExpiry = principal();
+    externalWithoutExpiry.tokenExpiresAt = null;
+    const connection = await connect(externalWithoutExpiry);
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_environment_monitor_create",
+        arguments: {
+          room_id: ROOM_ID,
+          goal_id: goal.goal_id,
+          client_continuation_ref: "codex_task:external-unbounded",
+          event_families: ["actor"],
+          expires_in_seconds: 90,
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        error: "monitor_run_unavailable",
+      });
+      expect(connection.monitorStore.create).not.toHaveBeenCalled();
     } finally {
       await connection.client.close();
       await connection.server.close();

@@ -10,6 +10,14 @@ import { migration026 } from "../../../db/migrations/026_helix_accounts";
 import { migration032 } from "../../../db/migrations/032_helix_agent_api";
 import { HelixAgentApiService, HelixAgentApiServiceError } from "../service";
 import { HelixAgentRunStore } from "../run-store";
+import { HelixMcpEvidenceObservationStoreError } from
+  "../../mcp-evidence/observation-store";
+import { buildHelixMcpEvidenceObservation } from
+  "../../mcp-evidence/observation";
+import { getHelixMcpEvidenceCapabilityDescriptor } from
+  "@shared/helix-mcp-evidence-capability-registry";
+import type { HelixMcpEvidenceObservation } from
+  "@shared/contracts/helix-mcp-evidence-capability.v1";
 import type {
   HelixAgentApiPrincipal,
   HelixAgentRunTurnExecutor,
@@ -145,6 +153,30 @@ const continueRequest = (
     ...overrides,
   });
 
+const eligibleObservation = (): HelixMcpEvidenceObservation => {
+  const descriptor = getHelixMcpEvidenceCapabilityDescriptor(
+    "helix_minecraft_player_action",
+  );
+  if (!descriptor) throw new Error("minecraft_action_descriptor_missing");
+  return buildHelixMcpEvidenceObservation({
+    descriptor,
+    request: { action: "look" },
+    payload: { outcome: "succeeded" },
+    producerRef: "minecraft:test",
+    summary: "The admitted Minecraft look action succeeded.",
+    payloadSchema: "helix.minecraft.player_action_result.v1",
+    observedAt: "2026-07-26T19:00:00.000Z",
+    freshness: {
+      state: "fresh",
+      ageMs: 0,
+      expiresAt: "2026-07-26T19:05:00.000Z",
+    },
+    retainedUntil: "2026-07-27T19:00:00.000Z",
+    observationRefFactory: () =>
+      "mcp_observation:verified-minecraft-status",
+  });
+};
+
 const serviceHarness = async (
   options: {
     executor?: HelixAgentRunTurnExecutor;
@@ -160,6 +192,10 @@ const serviceHarness = async (
     scopeAllowlist?: ReadonlySet<string>;
     pool?: Pool;
     store?: HelixAgentRunStore;
+    validateExternalObservationRef?: (input: {
+      principal: HelixAgentApiPrincipal;
+      observationRef: string;
+    }) => Promise<HelixMcpEvidenceObservation>;
   } = {},
 ) => {
   const pool = options.pool ?? (await createPool());
@@ -172,11 +208,153 @@ const serviceHarness = async (
     databaseScopePolicies: options.scopePolicies ?? new Map(),
     databaseScopeAllowlist: options.scopeAllowlist ?? new Set(),
     turnTimeoutMs: 1_000,
+    validateExternalObservationRef:
+      options.validateExternalObservationRef ?? (async () => eligibleObservation()),
   });
   return { pool, service };
 };
 
 describe("HelixAgentApiService", () => {
+  it("re-enters owner-scoped MCP observations without running the model or granting terminal authority", async () => {
+    const turn = buildExecutor();
+    const validateExternalObservationRef = vi.fn(async () => eligibleObservation());
+    const { service } = await serviceHarness({
+      executor: turn.executor,
+      validateExternalObservationRef,
+    });
+    const actor = principal();
+    const started = await service.startRun({
+      principal: actor,
+      idempotencyKey: "external-reentry-start",
+      request: startRequest(),
+    });
+
+    const reentered = await service.reenterEvidence({
+      principal: actor,
+      runId: started.body.run_id,
+      idempotencyKey: "external-reentry-observation",
+      request: {
+        expected_version: started.body.version,
+        observation_refs: ["mcp_observation:verified-minecraft-status"],
+      },
+    });
+
+    expect(validateExternalObservationRef).toHaveBeenCalledWith({
+      principal: actor,
+      observationRef: "mcp_observation:verified-minecraft-status",
+    });
+    expect(turn.executeTurn).not.toHaveBeenCalled();
+    expect(reentered.body).toMatchObject({
+      version: 2,
+      lifecycle_status: "waiting",
+      completion_status: "needs_more_evidence",
+      terminal_authority_status: "not_evaluated",
+      budget: { steps_used: 0 },
+      evidence: {
+        observation_refs: ["mcp_observation:verified-minecraft-status"],
+        evidence_refs: ["mcp_observation:verified-minecraft-status"],
+        receipt_refs: [],
+        provider_terminal_candidate_ref: null,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    const events = await service.listEvents({
+      principal: actor,
+      runId: started.body.run_id,
+      afterSeq: 0,
+      limit: 10,
+    });
+    expect(events.events.at(-1)).toMatchObject({
+      event_type: "evidence_reentered",
+      payload: {
+        evidence_is_terminal_answer: false,
+        model_continuation_executed: false,
+        environment_action_executed: false,
+      },
+    });
+  });
+
+  it("rejects unavailable external observations before mutating the run", async () => {
+    const turn = buildExecutor();
+    const { service } = await serviceHarness({
+      executor: turn.executor,
+      validateExternalObservationRef: async () => {
+        throw new HelixMcpEvidenceObservationStoreError(
+          "observation_owner_mismatch",
+          "foreign owner",
+        );
+      },
+    });
+    const actor = principal();
+    const started = await service.startRun({
+      principal: actor,
+      idempotencyKey: "external-reentry-reject-start",
+      request: startRequest(),
+    });
+
+    await expect(service.reenterEvidence({
+      principal: actor,
+      runId: started.body.run_id,
+      idempotencyKey: "external-reentry-foreign",
+      request: {
+        expected_version: started.body.version,
+        observation_refs: ["mcp_observation:foreign"],
+      },
+    })).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+      details: { failure_code: "observation_owner_mismatch" },
+    });
+    expect(turn.executeTurn).not.toHaveBeenCalled();
+    expect((await service.inspectRun({
+      principal: actor,
+      runId: started.body.run_id,
+    })).version).toBe(1);
+  });
+
+  it("rejects an observation that tries to carry answer authority", async () => {
+    const turn = buildExecutor();
+    const observation = eligibleObservation();
+    const { service } = await serviceHarness({
+      executor: turn.executor,
+      validateExternalObservationRef: async () => ({
+        ...observation,
+        authority: {
+          ...observation.authority,
+          answer_authority: true,
+        },
+      }) as unknown as HelixMcpEvidenceObservation,
+    });
+    const actor = principal();
+    const started = await service.startRun({
+      principal: actor,
+      idempotencyKey: "external-reentry-authority-start",
+      request: startRequest(),
+    });
+
+    await expect(service.reenterEvidence({
+      principal: actor,
+      runId: started.body.run_id,
+      idempotencyKey: "external-reentry-authority-invalid",
+      request: {
+        expected_version: started.body.version,
+        observation_refs: [observation.observation_ref],
+      },
+    })).rejects.toMatchObject({
+      status: 409,
+      code: "invalid_request",
+      details: {
+        failure_code: "observation_authority_invalid",
+      },
+    });
+    expect(turn.executeTurn).not.toHaveBeenCalled();
+  });
+
   it("rejects protected credential material before run persistence or model entry", async () => {
     const turn = buildExecutor();
     const { service } = await serviceHarness({ executor: turn.executor });

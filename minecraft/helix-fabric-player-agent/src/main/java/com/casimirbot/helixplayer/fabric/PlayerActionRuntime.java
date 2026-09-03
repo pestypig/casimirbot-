@@ -122,6 +122,14 @@ final class PlayerActionRuntime implements AutoCloseable {
             // The server can no longer admit the immutable evidence sequence
             // for this producer epoch. Never continue acting while terminal
             // evidence is stranded behind that boundary.
+            if (eventStreamResyncRequiresWorkflowStop(
+                true,
+                controller.activeWorkflowId()
+            )) {
+                controller.connectorOffline(
+                    "The Helix evidence stream requires a fresh pairing; the active workflow was stopped and every client control was released."
+                );
+            }
             bridge.releaseAll();
         } else if (activeControlPlaneFailureRequiresStop(
             activeEnvelope != null,
@@ -1246,9 +1254,35 @@ final class PlayerActionRuntime implements AutoCloseable {
         boolean actionAppliedBeforeManualOverride,
         Map<String, Object> measurements
     ) {
+        boolean hasExplicitEffectMeasurement = measurements.containsKey(
+            "side_effects_performed"
+        ) || measurements.containsKey(
+            "player_motion_performed"
+        ) || measurements.containsKey(
+            "player_interaction_performed"
+        ) || measurements.containsKey(
+            "inventory_mutation_performed"
+        ) || measurements.containsKey(
+            "world_mutation_performed"
+        );
+        boolean measuredEffect = Boolean.TRUE.equals(
+            measurements.get("side_effects_performed")
+        ) || Boolean.TRUE.equals(
+            measurements.get("player_motion_performed")
+        ) || Boolean.TRUE.equals(
+            measurements.get("player_interaction_performed")
+        ) || Boolean.TRUE.equals(
+            measurements.get("inventory_mutation_performed")
+        ) || Boolean.TRUE.equals(
+            measurements.get("world_mutation_performed")
+        );
         return executionStarted &&
             actionAppliedBeforeManualOverride &&
-            !Boolean.TRUE.equals(measurements.get("effect_prevented"));
+            (
+                hasExplicitEffectMeasurement
+                    ? measuredEffect
+                    : !Boolean.TRUE.equals(measurements.get("effect_prevented"))
+            );
     }
 
     private Map<String, Object> manifest() {
@@ -1558,6 +1592,13 @@ final class PlayerActionRuntime implements AutoCloseable {
             activeWorkflowId != null &&
             transportError != null &&
             !transportError.isBlank();
+    }
+
+    static boolean eventStreamResyncRequiresWorkflowStop(
+        boolean resyncRequired,
+        String activeWorkflowId
+    ) {
+        return resyncRequired && activeWorkflowId != null;
     }
 
     static String connectorHeartbeatStatus(

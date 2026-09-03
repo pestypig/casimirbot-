@@ -192,13 +192,12 @@ const connect = async (input: {
 };
 
 describe("private authenticated MCP C2 companion custody evidence", () => {
-  it("is feature-gated, developer-only, and scope-gated", async () => {
+  it("keeps injected readers developer-only and scope-gated", async () => {
     const reader = vi.fn(async () => EVIDENCE);
     for (const entry of [
       { enabled: false, principal: principal(), reader },
       { enabled: true, principal: principal(), reader: undefined },
       { enabled: true, principal: principal("user"), reader },
-      { enabled: undefined, principal: principal("user"), reader: undefined },
     ]) {
       const connection = await connect(entry);
       try {

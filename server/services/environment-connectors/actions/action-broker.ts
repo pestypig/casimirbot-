@@ -454,6 +454,7 @@ export type EnvironmentActionConnectorScope =
   | "action.control.write";
 
 export type EnvironmentActionConnectorClaim = {
+  ownerProfileId: string;
   authorityId: string;
   credentialId: string;
   connectorInstallationId: string;
@@ -529,6 +530,7 @@ export const authenticateEnvironmentActionConnector = async (input: {
     );
   });
   return {
+    ownerProfileId: row.owner_profile_id,
     authorityId: row.action_authority_id,
     credentialId: row.credential_id,
     connectorInstallationId: row.connector_installation_id!,
@@ -4150,9 +4152,7 @@ export const awaitEnvironmentActionObservation = async (input: {
       const db = await readSharedRealtimeRoomDatabase();
       await db.query(
         `UPDATE helix_environment_action_requests
-         SET status = CASE
-           WHEN status IN ('leased', 'running') THEN 'failed'
-           ELSE 'timed_out' END,
+         SET status = 'timed_out',
            cancellation_reason = 'deadline_expired_no_automatic_replay',
            completed_at = now(), updated_at = now()
          WHERE action_request_id = $1

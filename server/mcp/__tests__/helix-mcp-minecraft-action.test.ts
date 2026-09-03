@@ -165,6 +165,7 @@ const connect = async (input: {
   extendAuthority?: HelixEnvironmentActionAuthorityLeaseExtender;
   reasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
 }) => {
+  const putMcpEvidence = vi.fn(async () => undefined);
   const roomControlService = {
     inspectRoom: vi.fn(async () => ({
       room: { self_participant_id: "participant:mcp-self" },
@@ -186,6 +187,10 @@ const connect = async (input: {
     environmentProbeExecutor: input.executeProbe,
     environmentActionAuthorityLeaseExtender: input.extendAuthority,
     environmentReasoningRoleService: input.reasoningRoleService,
+    mcpEvidenceObservationStore: {
+      put: putMcpEvidence,
+      get: vi.fn(),
+    } as never,
   });
   const client = new Client(
     { name: "helix-minecraft-action-mcp-test", version: "1.0.0" },
@@ -196,6 +201,7 @@ const connect = async (input: {
   await client.connect(clientTransport);
   return {
     client,
+    putMcpEvidence,
     close: async () => {
       await client.close();
       await server.close();
@@ -651,10 +657,30 @@ describe("Helix MCP Minecraft action boundary", () => {
           assistant_answer: false,
           terminal_eligible: false,
         },
+        mcp_evidence: {
+          schema: "helix.mcp_evidence_observation.v1",
+          capability_id: "helix.minecraft.player_action.observe_result",
+          payload_schema: HELIX_ENVIRONMENT_ACTION_OBSERVATION_SCHEMA,
+          authority: {
+            agent_executable: false,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            reentry_required: true,
+          },
+        },
         answer_authority: false,
         assistant_answer: false,
         terminal_eligible: false,
       });
+      expect(connection.putMcpEvidence).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: "helix_minecraft_player_action",
+          observation: expect.objectContaining({
+            capability_id: "helix.minecraft.player_action.observe_result",
+          }),
+        }),
+      );
       expect(executeAction).toHaveBeenCalledWith(expect.objectContaining({
         capabilityId: HELIX_MINECRAFT_PLAYER_JUMP_CAPABILITY,
         arguments: { count: 1 },

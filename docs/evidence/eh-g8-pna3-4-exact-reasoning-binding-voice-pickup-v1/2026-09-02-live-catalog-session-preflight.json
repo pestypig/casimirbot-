@@ -1,0 +1,403 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.4 exact reasoning-task binding and voice pickup",
+  "recorded_at": "2026-09-02",
+  "maturity": "deterministically verified",
+  "program_context": {
+    "program_gate": "G8 — environment-harness release evaluation",
+    "workstream": "provider-neutral external-agent correlation and reverse steering",
+    "capability_or_component": "PNA3.4 — exact principal reasoning-task binding, truthful Helix chat destination, and GPT Live steering pickup",
+    "lifecycle_stage": "source admission, with continuation delivery, evidence normalization, evidence re-entry, and presentation as supporting stages",
+    "reaction_timescale": "none for binding and projection; short semantic replanning after an external reasoning client acknowledges a steering event",
+    "authority_owner": "The user owns provider-task selection and attachment; the external reasoning runtime owns its task lifecycle; CasimirBot owns exact binding identity, steering admission, evidence, effects, cancellation, and truthful delivery state.",
+    "current_maturity": "deterministically verified",
+    "target_maturity": "live accepted on one current-source developer node",
+    "required_evidence": "Exact task claim, finalized GPT Live pickup and acknowledgement, admitted Minecraft capability, observation re-entry, terminal agreement, revocation, and stale pickup rejection.",
+    "explicit_non_goals": [
+      "Codex UI puppeteering",
+      "automatic or unsupported provider-task creation",
+      "hidden reasoning or transcript capture",
+      "steering receipt answer, execution, evidence, or terminal authority"
+    ],
+    "downstream_gate_unlocked": "none from this preflight"
+  },
+  "attempt": {
+    "codex_thread_id": "01a060f9-ebfd-7251-9fd3-479a01dd3c40",
+    "client_continuation_ref": "codex-thread:01a060f9-ebfd-7251-9fd3-479a01dd3c40:pna3.4",
+    "canonical_server": "http://127.0.0.1:1522",
+    "server_restarted_or_replaced": true,
+    "server_restart_path": "approved opaque keyed launcher against the canonical workspace",
+    "unkeyed_server_used": false,
+    "operator_codex_restart_count": 2,
+    "codex_ui_puppeteering_used": false
+  },
+  "positive_evidence": {
+    "keyed_server_health": {
+      "api_account_session_status": 200,
+      "api_helix_pipeline_status": 200,
+      "api_agi_agent_providers_status": 200,
+      "post_codex_restart_observation": "Port 1522 initially refused connections because the prior launcher process did not survive the app restart. The approved opaque keyed launcher restored the canonical server, which reached app ready before these 200 responses."
+    },
+    "full_mcp_authorization": {
+      "g2_action_ready": true,
+      "g2_action_missing_scopes": [],
+      "g8_monitor_ready": true,
+      "g8_monitor_missing_scopes": [],
+      "credential_included": false,
+      "bearer_included": false,
+      "raw_claims_included": false
+    },
+    "source_registration_audit": {
+      "reasoning_store_constructed_in_server_index": true,
+      "full_mcp_registration_present": true,
+      "coordination_mcp_registration_present": true,
+      "oauth_catalog_scope_maps_present_on_both_surfaces": true,
+      "coordination_route_passes_reasoning_store_to_server": true
+    },
+    "client_configuration_repair": {
+      "diagnosis": "The persisted casimirbot_g2_a1_local enabled_tools allowlist ended at helix_room_presence_set and omitted all local-supervisor and reasoning-binding tools.",
+      "endpoint_unchanged": "http://127.0.0.1:1522/mcp",
+      "oauth_material_changed": false,
+      "added_tools": [
+        "helix_local_supervisor_presence_update",
+        "helix_local_supervisor_coordination_read",
+        "helix_local_supervisor_presence_disconnect",
+        "helix_reasoning_task_binding_claim",
+        "helix_reasoning_steering_read",
+        "helix_reasoning_steering_acknowledge"
+      ],
+      "persisted_configuration_verified_with": "codex mcp get casimirbot_g2_a1_local",
+      "duplicate_project_alias": {
+        "name": "casimirbot_local",
+        "same_keyed_port": true,
+        "authorization_status_before_repair": "Not logged in",
+        "disabled": true,
+        "reason": "Prevent an unauthenticated project alias from competing with the authenticated full-MCP identity for the same keyed endpoint."
+      },
+      "current_task_catalog_refreshed": true
+    },
+    "live_catalog_and_exact_binding": {
+      "required_reasoning_tools_present": true,
+      "local_supervisor_tools_present": true,
+      "continuation_ref": "codex-thread:01a060f9-ebfd-7251-9fd3-479a01dd3c40:pna3.4",
+      "service_instance_ref": "service_instance:b9bcdbb99fb7ee9a9f81deba76547c74",
+      "client_session_ref": "supervisor_client:48a04a128618a91c53bfc8b9f4e3e2b5",
+      "negotiated_observability_level": "continuation_ready",
+      "exact_claims_succeeded": true,
+      "highest_observed_binding_epoch": 24,
+      "latest_observed_binding_id": "reasoning_binding:a35b6f56e2771bed46f179977a3736f1",
+      "helix_conversation_id": "19713475-9932-400d-a53b-4b0ac2915375",
+      "principal_role": "principal",
+      "continuation_transport": "polling",
+      "exact_bound_read_succeeded": true,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "execution_authority": false,
+      "evidence_authority": false,
+      "answer_authority": false,
+      "terminal_eligible": false,
+      "current_source_bundle_observed_before_server_reload": "/assets/index-DdkiA180.js",
+      "current_binding_server_lookup_implemented": true,
+      "current_binding_server_lookup_live_result_after_keyed_reload": "reasoning_binding_not_found",
+      "current_binding_server_lookup_authority_flags_false": true,
+      "binding_store_after_keyed_reload": "empty_ephemeral_store"
+    },
+    "verification": [
+      {
+        "command": "npx vitest run shared/__tests__/helix-agent-client-profile.spec.ts server/routes/__tests__/agent-connections.test.ts server/services/local-supervisor/__tests__/local-supervisor-coordination.test.ts server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx --pool=forks",
+        "result": "pass",
+        "test_files": 5,
+        "tests_passed": 48
+      },
+      {
+        "command": "npm run helix:ask:discipline:quick",
+        "result": "pass",
+        "notes": "Static checks passed; the guard reported the pre-existing dirty-worktree inferred classifications and a classification_not_declared warning."
+      },
+      {
+        "command": "npm run helix:environment-harness:docs-audit",
+        "result": "pass",
+        "active_gate": "G8",
+        "capability_status_rows_checked": 37,
+        "failures": []
+      },
+      {
+        "command": "npx vitest run server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts --pool=forks",
+        "result": "pass",
+        "test_files": 1,
+        "tests_passed": 18,
+        "notes": "Run after repairing the dropped reasoningTaskBindingStore dependency in the coordination MCP route."
+      },
+      {
+        "command": "npm run build:server",
+        "result": "pass",
+        "notes": "Server bundle completed with four pre-existing duplicate-key/case warnings."
+      },
+      {
+        "command": "npx vitest run client/src/components/helix/ask-console/__tests__/HelixAskBoundAgentDestination.spec.tsx --pool=forks",
+        "result": "pass",
+        "test_files": 1,
+        "tests_passed": 1,
+        "notes": "Regression covers a binding completed after shell mount and multiple legacy sessions sharing one context."
+      },
+      {
+        "command": "node --max-old-space-size=2304 ./node_modules/vite/bin/vite.js build",
+        "result": "pass",
+        "notes": "Rebuilt the served client without restarting or replacing the keyed server."
+      },
+      {
+        "command": "npx vitest run client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx client/src/components/helix/ask-console/__tests__/HelixAskBoundAgentDestination.spec.tsx server/routes/__tests__/agent-connections.test.ts server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts --pool=forks",
+        "result": "pass",
+        "test_files": 5,
+        "tests_passed": 37,
+        "notes": "Current-worktree rerun after adding signed-in exact-conversation lookup and browser-side revocation."
+      },
+      {
+        "command": "npm run build:client",
+        "result": "pass",
+        "notes": "Current-source client bundle includes the server-owned exact-conversation lookup path."
+      },
+      {
+        "command": "npm run helix:ask:discipline:quick",
+        "result": "pass",
+        "notes": "Static checks passed; the guard reported inferred dirty-worktree classifications and classification_not_declared."
+      },
+      {
+        "command": "npm run helix:environment-harness:docs-audit",
+        "result": "pass",
+        "active_gate": "G8",
+        "capability_status_rows_checked": 37,
+        "acceptance_claims_checked": 14,
+        "failures": []
+      },
+      {
+        "command": "npm run helix:ask:discipline:full",
+        "result": "pass",
+        "notes": "Prompt-solving prelude and four adversarial shards passed; API-parity fixed rail and four scenario shards passed; live-source continuation routing passed 26/26; live-source identity audit passed 9/9; server build passed with four pre-existing warnings."
+      }
+    ]
+  },
+  "negative_evidence": {
+    "required_reasoning_tools_in_task_catalog": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true
+    },
+    "local_supervisor_presence": {
+      "initial_300_second_attempt": "rejected before execution because the connector schema maximum is 180 seconds",
+      "bounded_180_second_device_check_attempt": "McpServerError: Session terminated",
+      "bounded_180_second_device_check_v2_attempt": "McpServerError: Session terminated",
+      "coordination_read_after_registration_attempt": "McpServerError: Session terminated",
+      "presence_registered": true,
+      "later_continuation_ready_registration": "succeeded on the exact authenticated full-MCP client with a 180-second current-session checkpoint policy"
+    },
+    "post_restart_same_task_session": {
+      "reasoning_tools_present_after_operator_restart": true,
+      "device_check_authorization_probe_after_keyed_host_recovery": "McpServerError: Session terminated",
+      "device_check_presence_probe_after_keyed_host_recovery": "McpServerError: Session terminated",
+      "installed_plugin_reconnect_result": "No current-task catalog adoption; the callable Device Check sessions remained terminated and the three full-MCP reasoning tools remained absent.",
+      "exact_connector_distinction": "The installed Device Check plugin is not the custom full MCP server casimirbot_g2_a1_local at http://127.0.0.1:1522/mcp. Reconnecting one is not evidence that the other reloaded.",
+      "second_restart_precondition_failure": "The second Codex restart again terminated the agent-owned keyed launcher. Port 1522 refused all three health probes while Codex enumerated MCP servers, so the full local server could not load its catalog.",
+      "keyed_host_restored_after_second_restart": true,
+      "post_repair_full_endpoint_request": "The keyed /mcp endpoint received a request without an OAuth bearer or valid native desktop delegation and rejected it with native_desktop_delegation_required. This is correct fail-closed behavior, not an authenticated reconnect.",
+      "new_task_requested": false,
+      "additional_codex_restart_requested": false,
+      "final_same_task_custom_mcp_restart_performed_by_operator": true,
+      "final_same_task_custom_mcp_restart_result": "The next task turn exposed zero casimirbot_g2_a1_local tools and none of the exact claim/read/acknowledge tools.",
+      "final_restart_endpoint_precondition": "inconclusive: the agent-owned keyed launcher process and its observation handle had ended by the next turn, and all three port-1522 probes refused connections",
+      "repeat_restart_requested": false,
+      "catalog_adoption_failure_claimed": true,
+      "persistent_server_next_turn_health": {
+        "api_account_session_status": 200,
+        "api_helix_pipeline_status": 200,
+        "api_agi_agent_providers_status": 200,
+        "detached_launcher_alive": true,
+        "detached_server_alive": true
+      },
+      "persistent_server_next_turn_catalog": {
+        "casimirbot_g2_a1_local_tool_count": 0,
+        "exact_reasoning_tool_count": 0,
+        "automatic_mcp_request_observed_after_ready": false
+      }
+    },
+    "coordination_route_wiring_defect": {
+      "observed": true,
+      "cause": "server/index.ts supplied reasoningTaskBindingStore to createHelixMcpRouter but omitted it from the createHelixMcpServer call for the local-supervisor coordination surface.",
+      "repaired": true,
+      "authority_gained_by_repair": false
+    },
+    "codex_runtime_diagnostic": {
+      "source": "credential-redacted local Codex structured log query",
+      "authenticated_server_initialized": true,
+      "initialized_server_name": "casimirbot_g2_a1_local",
+      "initialized_tool_capability_list_changed": true,
+      "all_servers_available_during_initial_catalog_build": true,
+      "server_client_cancelled_immediately_after_initialization": true,
+      "later_turn_resolution": "omitting MCP server without an exact ready client",
+      "recent_config_mcp_server_reload_request_observed": false,
+      "resource_list_method_not_found_is_nonfatal": true,
+      "credential_or_raw_token_included": false,
+      "interpretation": "The failure is Codex client readiness/startup cancellation, not absence of the server registration or OAuth-enabled configuration."
+    },
+    "first_divergent_lifecycle_stage": "Codex host catalog adoption for an enabled custom MCP server while its keyed endpoint is independently healthy",
+    "classification": "historical exact live binding accepted; current source lookup is live and fail-closed; finalized GPT Live pickup, Minecraft execution, evidence re-entry, revocation, and stale-pickup rejection remain unproven",
+    "reason": "This exact task previously exposed the claim/read/acknowledge tools, published continuation-ready presence, and claimed and read principal bindings through epoch 24. The browser bundle was verified current, but cross-panel state did not truthfully project the active binding. The repair now performs an authenticated server-owned lookup by exact Helix conversation and is live on the keyed server; after the server restart cleared the ephemeral store it correctly returns reasoning_binding_not_found with no authority. The configured casimirbot_g2_a1_local allowlist still contains all three tools, but this task's current callable catalog exposes only the separate Device Check surfaces. The operator's one same-task restart was initially inconclusive because the temporary keyed launcher had ended. A corrected detached launcher then reached app ready and survived the next turn with both processes alive and all three health probes returning 200. During that independently healthy interval this task still exposed zero custom-server tools, zero exact reasoning tools, and the keyed log showed no automatic MCP request or relist. This is now a confirmed Codex host catalog-adoption blocker, not a CasimirBot route, OAuth allowlist, browser, or server-health failure. No repeat restart is requested. The accidental diagnostic text was submitted through ordinary Helix Ask, not the bound-agent route, and produced no environment execution. No typed bound steering, finalized voice delivery, environment action, or terminal result is inferred."
+  },
+  "live_acceptance": {
+    "exact_binding_proven": true,
+    "finalized_gpt_live_pickup_proven": false,
+    "steering_acknowledgement_proven": false,
+    "minecraft_action_proven": false,
+    "observation_reentry_proven": false,
+    "revocation_proven": false,
+    "stale_pickup_rejection_proven": false,
+    "promotion_allowed": false
+  },
+  "authority_claims": {
+    "provider_task_created": false,
+    "provider_delivery_proven": false,
+    "steering_receipt_answer_authority": false,
+    "steering_receipt_execution_authority": false,
+    "steering_receipt_evidence_authority": false,
+    "steering_receipt_terminal_authority": false,
+    "hidden_reasoning_included": false,
+    "credential_included": false
+  },
+  "pre_action_reasoning_sequence": {
+    "accepted_design": true,
+    "stage_1": "Send the answerable typed or finalized-transcript instruction through Helix Ask to the exact bound Codex task.",
+    "stage_2": "Read and acknowledge the steering event on that exact binding; the receipt remains non-answer, non-execution, non-evidence, and non-terminal.",
+    "stage_3": "Re-enter the completed Codex result into the governed Helix turn before separately admitting any Minecraft capability.",
+    "stage_4": "Execute only the capability admitted by current room, player, world, connector-epoch, and action-authority state; re-enter the fresh observation before synthesis.",
+    "typed_bound_probe_sent": false,
+    "finalized_voice_probe_sent": false,
+    "minecraft_capability_admitted": false
+  },
+  "recovery_contract_correction": {
+    "previous_new_task_loop_rejected": true,
+    "supported_codex_core_operation": "config/mcpServer/reload",
+    "operation_semantics": "Reload configuration from disk and queue MCP refresh for already-loaded tasks on their next active turn.",
+    "current_shell_has_app_server_control_handle": false,
+    "provider_app_ui_automation_used": false,
+    "temporary_command_session_server_lifetime_defect_observed": true,
+    "detached_keyed_launcher_started": true,
+    "detached_launcher_first_attempt": "failed before server start because Windows split the workspace argument at its first space",
+    "detached_launcher_corrected_attempt": "app ready observed; launcher and server process independently alive; all three health probes returned 200",
+    "post_ready_unsolicited_mcp_retry_observed": false,
+    "product_recovery_order": [
+      "in-place MCP reload for the same task",
+      "one Codex restart followed by reopening the same task when the build exposes no reload control",
+      "typed unsupported catalog-refresh boundary instead of repeated replacement tasks"
+    ],
+    "verification": [
+      {
+        "command": "npx vitest run client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx --pool=forks",
+        "result": "pass",
+        "test_files": 1,
+        "tests_passed": 5
+      },
+      {
+        "command": "npm run helix:ask:discipline:quick",
+        "result": "pass"
+      },
+      {
+        "command": "npm run helix:environment-harness:docs-audit",
+        "result": "pass",
+        "active_gate": "G8",
+        "failures": []
+      }
+    ]
+  },
+  "durable_native_transport_repair": {
+    "implemented": true,
+    "classification": "native transport supervision and presentation",
+    "automatic_scope": "local_supervisor_coordination_and_device_check",
+    "full_helix_agent_automatically_restored": false,
+    "retry_delays_ms": [1000, 5000, 15000],
+    "maximum_attempts": 3,
+    "same_exact_account_session_required": true,
+    "developer_revalidation_required_each_attempt": true,
+    "cancellation_precedence": [
+      "operator_stop",
+      "credentials_reconfigured",
+      "credentials_cleared",
+      "scope_transition",
+      "lease_restoration",
+      "application_quit"
+    ],
+    "exhaustion_projection": "manualInterventionRequired=true",
+    "codex_ui_automation_used": false,
+    "catalog_adoption_claimed": false,
+    "authority_gained_by_repair": false,
+    "verification": [
+      {
+        "command": "npx vitest run tests/desktop-mcp-tunnel.spec.ts tests/desktop-mcp-tunnel-transition-executor.spec.ts tests/desktop-mcp-tunnel-recovery-supervisor.spec.ts client/src/components/__tests__/DeviceCheckPanel.spec.tsx --pool=forks",
+        "result": "pass",
+        "test_files": 4,
+        "tests_passed": 21
+      },
+      {
+        "command": "npx tsc -p apps/desktop/tsconfig.json --noEmit",
+        "result": "pass"
+      },
+      {
+        "command": "node apps/desktop/scripts/build-host.mjs",
+        "result": "pass",
+        "notes": "Host and bundled service built; four pre-existing duplicate-key/case warnings remain outside this repair."
+      },
+      {
+        "command": "npm run helix:ask:discipline:quick",
+        "result": "pass",
+        "notes": "Static checks passed with the known dirty-worktree classification_not_declared warning."
+      },
+      {
+        "command": "npm run helix:environment-harness:docs-audit",
+        "result": "pass",
+        "active_gate": "G8",
+        "capability_status_rows_checked": 37,
+        "acceptance_claims_checked": 14,
+        "failures": []
+      },
+      {
+        "command": "npm run typecheck",
+        "result": "inconclusive",
+        "notes": "The default repository-wide TypeScript process exhausted its approximately 4 GB Node heap without reporting a type diagnostic."
+      },
+      {
+        "command": "node --max-old-space-size=8192 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+        "result": "fail",
+        "notes": "The high-memory retry reached the dirty checkout's existing broad TypeScript diagnostics outside this focused recovery slice; focused desktop typecheck and production builds pass."
+      },
+      {
+        "command": "npm run build:client",
+        "result": "pass",
+        "notes": "Production client build passed with pre-existing dependency and chunk-size warnings."
+      }
+    ]
+  },
+  "post_durable_repair_same_task_probe": {
+    "observed_at": "2026-09-02T15:08:03.244Z",
+    "keyed_server_health": {
+      "api_account_session_status": 200,
+      "api_helix_pipeline_status": 200,
+      "api_agi_agent_providers_status": 200
+    },
+    "exact_custom_reasoning_tools_present": false,
+    "installed_device_check_presence_update": "McpServerError: Session terminated",
+    "installed_device_check_v2_presence_update": "McpServerError: Session terminated",
+    "presence_registered": false,
+    "native_transition_attempted": false,
+    "native_transition_reason": "A transition request requires a live exact MCP presence; declarations from a terminated connector are not execution authority.",
+    "config_registration": {
+      "server_name": "casimirbot_g2_a1_local",
+      "enabled": true,
+      "endpoint": "http://127.0.0.1:1522/mcp",
+      "exact_reasoning_tools_allowlisted": true
+    },
+    "supported_attachable_host_reload_handle_found": false,
+    "codex_ui_automation_used": false,
+    "classification": "verified negative live transport and catalog-adoption evidence",
+    "acceptance_promoted": false
+  },
+  "required_recovery": "Do not ask the operator to repeat MCP or Codex restarts. The persistent healthy-endpoint retest confirms a managed Codex host catalog-adoption blocker: this task performed no automatic custom-server connection or relist. Recovery requires a supported host-owned MCP reload/adoption interface or a future durable native integration; the CasimirBot MCP server cannot grant itself client connectivity, and provider-app UI automation is forbidden. Keep the existing deterministic and historical exact-binding evidence, but leave finalized voice pickup, Minecraft action, evidence re-entry, revocation, stale-pickup rejection, and promotion unproven until a later current task genuinely exposes the three exact tools."
+}

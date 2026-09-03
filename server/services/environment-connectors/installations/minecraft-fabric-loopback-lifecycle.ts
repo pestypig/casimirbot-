@@ -63,7 +63,9 @@ const lifecycleScriptPath = (): string => {
   return candidate;
 };
 
-const parseReceipt = (stdout: string): HelixMinecraftLocalLifecycleReceipt => {
+export const parseMinecraftLocalLifecycleReceipt = (
+  stdout: string,
+): HelixMinecraftLocalLifecycleReceipt => {
   const lines = stdout
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -140,7 +142,7 @@ const defaultRunner: MinecraftLocalLifecycleRunner = async (input) => {
         encoding: "utf8",
       },
     );
-    return parseReceipt(result.stdout);
+    return parseMinecraftLocalLifecycleReceipt(result.stdout);
   } catch (error) {
     throw normalizeFailure(error);
   }

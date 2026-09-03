@@ -1,0 +1,170 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.5 finite agent onboarding and recovery",
+  "recorded_at": "2026-09-03",
+  "maturity": "deterministically verified",
+  "classification": [
+    "source admission",
+    "evidence normalization",
+    "presentation",
+    "Codex-owned runtime behavior at an external host/catalog boundary"
+  ],
+  "implementation": {
+    "one_start_harness_entry": true,
+    "native_full_scope_requires_explicit_click": true,
+    "browser_node_readiness_only": true,
+    "existing_binding_rehydrated": true,
+    "same_task_recovery_contract": "client_restart_or_reconnect",
+    "replacement_task_loop_required": false,
+    "native_recovery_max_attempts": 3,
+    "diagnostic_export_sanitized": true,
+    "provider_task_created": false,
+    "codex_ui_automation_used": false,
+    "credential_included": false,
+    "hidden_reasoning_included": false,
+    "environment_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "browser_node_acceptance": {
+    "origin": "http://127.0.0.1:1522",
+    "keyed_service_restarted": false,
+    "start_harness_visible": true,
+    "native_mutation_available": false,
+    "resulting_step": "connect_current_codex_task",
+    "persisted_later_step_start_harness_visible": true,
+    "persisted_later_step_diagnosis_settled": true,
+    "replacement_task_requested": false,
+    "diagnostic_copy_status": "Sanitized onboarding diagnostics copied."
+  },
+  "resource_management": {
+    "minecraft_client_closed": true,
+    "minecraft_launcher_closed": true,
+    "minecraft_loopback_server_closed_after_zero_player_connections": true,
+    "keyed_server_restarted": false,
+    "keyed_server_health_after_reclamation": {
+      "account_session": 200,
+      "helix_pipeline": 200,
+      "agent_providers": 200
+    },
+    "product_memory_guard_weakened": false
+  },
+  "verification": [
+    {
+      "scope": "finite onboarding, Agent Access, and Codex profile",
+      "result": "pass",
+      "test_files": 3,
+      "tests_passed": 16
+    },
+    {
+      "scope": "onboarding, profile, native tunnel, transition executor, and bounded recovery supervisor",
+      "result": "pass",
+      "test_files": 6,
+      "tests_passed": 36
+    },
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass"
+    },
+    {
+      "command": "npm run helix:environment-harness:docs-audit",
+      "result": "pass",
+      "active_gate": "G8",
+      "failures": 0
+    },
+    {
+      "command": "npx tsc -p apps/desktop/tsconfig.json --noEmit",
+      "result": "pass"
+    },
+    {
+      "command": "npm run build:client",
+      "result": "pass_with_existing_bundle_warnings"
+    },
+    {
+      "command": "npm --prefix apps/desktop run pack:dir",
+      "result": "pass"
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:service-boundary",
+      "result": "pass",
+      "authorized_status": 200,
+      "missing_authorization_status": 401,
+      "wrong_authorization_status": 401,
+      "release_status": "closed",
+      "local_state": "isolated"
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:packaged-launch",
+      "result": "pass",
+      "processes": 4,
+      "loopback_listeners": 3,
+      "full_readiness_receipt": "pass",
+      "service_listener_receipt": "pass",
+      "provider_credential_key_vault": "pass",
+      "protocol_registration_preserved": true,
+      "minimum_free_physical_gib": 3.64,
+      "maximum_commit_percent": 56.2,
+      "guard_weakened": false
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:agent-onboarding",
+      "result": "pass",
+      "native_bridge": "pass",
+      "start_harness_settled": "pass",
+      "diagnostic_sanitization": "pass",
+      "tunnel_status": "unconfigured",
+      "tunnel_scope": "local_supervisor_coordination_and_device_check",
+      "elapsed_ms": 11527,
+      "full_tunnel_success_claimed": false
+    }
+  ],
+  "remaining_acceptance": {
+    "successful_isolated_packaged_launch": true,
+    "installed_native_start_harness_observed": true,
+    "time_to_ready_measured": false,
+    "signed_in_full_tunnel_live_acceptance": false,
+    "deterministic_promotion": true
+  },
+  "completion_audit": [
+    {
+      "requirement": "one Start Harness entry point",
+      "status": "proven",
+      "evidence": "16/16 focused component/profile tests, persisted-step live browser observation, and packaged Electron smoke"
+    },
+    {
+      "requirement": "automatic safe readiness diagnosis and harness-owned recovery",
+      "status": "proven",
+      "evidence": "authenticated readiness routing plus native transition and recovery-supervisor suites"
+    },
+    {
+      "requirement": "exact task and binding restoration",
+      "status": "proven",
+      "evidence": "reasoning-binding rehydration/revoke component fixture plus PNA3.4 live-accepted lifecycle evidence"
+    },
+    {
+      "requirement": "catalog-staleness guidance without replacement-task loops",
+      "status": "proven",
+      "evidence": "Codex profile recovery contract, stale-catalog fixture, and live same-task browser copy"
+    },
+    {
+      "requirement": "EXE and node parity",
+      "status": "proven",
+      "evidence": "live keyed node browser diagnosis plus rebuilt packaged launch and packaged real-renderer onboarding smokes"
+    },
+    {
+      "requirement": "bounded retries",
+      "status": "proven",
+      "evidence": "three-attempt native recovery exhaustion suite and diagnostic projection"
+    },
+    {
+      "requirement": "truthful authority boundaries and diagnostic export",
+      "status": "proven",
+      "evidence": "pure diagnostic fixture and packaged clipboard smoke assert no provider task, UI automation, credentials, hidden reasoning, answer authority, or terminal eligibility"
+    },
+    {
+      "requirement": "focused acceptance evidence and canonical documentation",
+      "status": "proven",
+      "evidence": "this evidence record, PNA3.5 work packet, G8 backlink, passing discipline guard and passing documentation audit"
+    }
+  ]
+}

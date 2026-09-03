@@ -74,6 +74,7 @@ import {
   environmentDurableGoalStore,
   isEnvironmentDurableGoalError,
 } from "../../services/environment-connectors/goals";
+import { environmentMonitorStore } from "../../services/environment-connectors/monitoring/environment-monitor-store";
 
 const environmentCookieBoundary = new FirstPartyCookieBoundary({
   codePrefix: "room_environment_cookie",
@@ -522,6 +523,108 @@ const durableGoalReceipt = (goal: unknown) => ({
   terminal_eligible: false,
   raw_content_included: false,
 });
+
+const playReadinessRequestSchema = z.object({
+  objective_text: z.string().trim().min(1).max(1_000),
+}).strict();
+
+sharedRealtimeRoomEnvironmentRouter.post(
+  "/realtime/rooms/:roomId/environments/:environmentBindingId/play-readiness",
+  environmentRoute(async (req, res) => {
+    const account = await requireSharedRoomAccount(req);
+    environmentCookieBoundary.enforceAccountRateLimit(res, account.profileId);
+    const membership = await readMembership(req.params.roomId, account);
+    const parsed = playReadinessRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        schema: "helix.minecraft.play_readiness.v1",
+        ok: false,
+        error: "minecraft_play_objective_invalid",
+        durable_goal_ready: false,
+        semantic_monitor_ready: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      });
+      return;
+    }
+    const environments = await listRoomEnvironmentProjections({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+    });
+    const environment = environments.find(
+      (entry) => entry.environment_binding_id === req.params.environmentBindingId,
+    );
+    if (!environment || environment.connection_status !== "active") {
+      res.status(404).json({
+        schema: "helix.minecraft.play_readiness.v1",
+        ok: false,
+        error: "minecraft_play_environment_not_current",
+        durable_goal_ready: false,
+        semantic_monitor_ready: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      });
+      return;
+    }
+    const goals = await environmentDurableGoalStore.listForRoom({
+      roomId: req.params.roomId,
+      profileId: account.profileId,
+      participantId: membership.participantId,
+      sourceId: environment.source_id,
+      worldId: environment.world_id,
+      roomSourceBindingId: environment.room_source_binding_id,
+      limit: 8,
+    });
+    const objectiveText = parsed.data.objective_text.trim();
+    const goal = goals.find(
+      (entry) =>
+        entry.objective.objective_text.trim() === objectiveText &&
+        !["completed", "canceled"].includes(entry.status),
+    ) ?? null;
+    const monitors = goal
+      ? await environmentMonitorStore.listForEnvironment({
+          profileId: account.profileId,
+          roomId: req.params.roomId,
+          environmentBindingId: environment.environment_binding_id,
+          sourceId: environment.source_id,
+          worldId: environment.world_id,
+          subjectRef: goal.identity.subject_binding_id,
+          limit: 16,
+        })
+      : [];
+    const monitor = goal
+      ? monitors.find(
+          (entry) =>
+            entry.status === "active" &&
+            entry.identity.goal_id === goal.goal_id &&
+            entry.identity.producer_epoch_ref === goal.identity.producer_epoch_ref &&
+            entry.identity.policy_revision === goal.identity.authority_policy_version,
+        ) ?? null
+      : null;
+    res.json({
+      schema: "helix.minecraft.play_readiness.v1",
+      ok: true,
+      error: null,
+      durable_goal_ready: Boolean(goal),
+      semantic_monitor_ready: Boolean(monitor),
+      goal_id: goal?.goal_id ?? null,
+      monitor_id: monitor?.monitor_id ?? null,
+      message: monitor
+        ? "The exact objective has a current durable goal and active semantic monitor."
+        : goal
+          ? "The exact objective has a current durable goal; its active semantic monitor is not yet verified."
+          : "The exact objective does not yet have a current durable goal.",
+      content_role: "minecraft_play_readiness_not_assistant_answer",
+      reentry_required: true,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
 
 sharedRealtimeRoomEnvironmentRouter.post(
   "/realtime/rooms/:roomId/environments/:environmentBindingId/durable-goals",

@@ -139,6 +139,54 @@ const buildServerHandoff = (
 };
 
 describe("Helix Ask Realtime provider event handler", () => {
+  it("offers a finalized GPT Live transcript to the exact bound-agent destination before normal Ask routing", async () => {
+    const postEvent = vi.fn();
+    const launchPrompt = vi.fn();
+    const offerFinalizedSteering = vi.fn(() => true);
+    const handler = createHelixAskRealtimeProviderEventHandler({
+      realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only",
+      postEvent,
+      launchPrompt,
+      offerFinalizedSteering,
+    });
+    const providerEvent = {
+      type: "conversation.item.input_audio_transcription.completed",
+      event_id: "event:transcript:bound-agent",
+      transcript: "Acknowledge this advisory on the exact bound task.",
+    };
+
+    const result = await handler.handle(providerEvent);
+
+    expect(offerFinalizedSteering).toHaveBeenCalledWith({
+      clientEventRef:
+        "gpt-live:realtime:test:event:transcript:bound-agent",
+      transcript: "Acknowledge this advisory on the exact bound task.",
+    });
+    expect(postEvent).not.toHaveBeenCalled();
+    expect(launchPrompt).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      event_kind: "input_transcript_final",
+      reentry_status: "reentered",
+      worker_dispatch_kind: "bound_agent_steering",
+      worker_dispatch_state: "exact_binding_dispatch_requested",
+      worker_turn_dispatched: false,
+      runtime_goal_wake_requested: false,
+      tool_execution_attempted: false,
+      workstation_action_executed: false,
+      answer_authority: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+
+    expect(await handler.handle(providerEvent)).toMatchObject({
+      reentry_status: "blocked",
+      blocked_reason: "duplicate_realtime_transcript_event",
+    });
+    expect(offerFinalizedSteering).toHaveBeenCalledTimes(1);
+  });
+
   it("requires a transcript observation receipt before read-only Ask re-entry", async () => {
     const serverHandoff = buildServerHandoff("obs:realtime:transcript:test");
     const postEvent = vi.fn(async () => ({

@@ -5,6 +5,7 @@ import { migration059 } from "../../../../db/migrations/059_environment_durable_
 import { helixEnvironmentDurableGoalSha256 } from "@shared/helix-environment-durable-goal";
 import {
   EnvironmentDurableGoalStore,
+  resolveCurrentEnvironmentDurableGoalIdentity,
   resolveEnvironmentDurableGoalEvidence,
   type EnvironmentDurableGoalEvidenceResolution,
 } from "../durable-goal-store";
@@ -138,6 +139,67 @@ const createHarness = async () => {
 };
 
 describe("EnvironmentDurableGoalStore", () => {
+  it("resolves a public subject reference to the server-owned native identity", async () => {
+    const memory = newDb();
+    const { Pool } = memory.adapters.createPg();
+    const pool = new Pool();
+    try {
+      await pool.query(`
+        CREATE TABLE helix_environment_connector_bindings (
+          environment_binding_id text PRIMARY KEY, owner_profile_id text,
+          installation_id text, device_id text, room_source_binding_id text,
+          room_id text, source_id text, world_id text, status text
+        );
+        CREATE TABLE helix_room_environment_subject_bindings (
+          subject_binding_id text PRIMARY KEY, environment_binding_id text,
+          participant_id text, subject_native_id text, subject_ref text,
+          status text, updated_at timestamptz
+        );
+        CREATE TABLE helix_environment_action_authorities (
+          action_authority_id text PRIMARY KEY, environment_binding_id text,
+          participant_id text, subject_binding_id text, status text,
+          policy_version integer, expires_at timestamptz
+        );
+        CREATE TABLE helix_environment_action_connector_manifests (
+          manifest_id text PRIMARY KEY, action_authority_id text,
+          producer_epoch_ref text, status text, received_at timestamptz,
+          expires_at timestamptz
+        );
+        INSERT INTO helix_environment_connector_bindings VALUES
+          ('environment:one', 'profile:owner', 'installation:one', 'device:one',
+           'source-binding:one', 'room:one', 'source:one', 'world:one', 'active');
+        INSERT INTO helix_room_environment_subject_bindings VALUES
+          ('subject:one', 'environment:one', 'participant:one', 'native:private',
+           'environment_subject_binding:public', 'active', now());
+        INSERT INTO helix_environment_action_authorities VALUES
+          ('authority:one', 'environment:one', 'participant:one', 'subject:one',
+           'active', 7, '2099-01-01T00:00:00.000Z');
+        INSERT INTO helix_environment_action_connector_manifests VALUES
+          ('manifest:one', 'authority:one', 'epoch:one', 'active', now(), NULL);
+      `);
+      await expect(resolveCurrentEnvironmentDurableGoalIdentity(
+        pool as unknown as Queryable,
+        {
+          ownerProfileId: "profile:owner",
+          roomId: "room:one",
+          participantId: "participant:one",
+          environmentBindingId: "environment:one",
+          subjectNativeId: "environment_subject_binding:public",
+          actionAuthorityId: "authority:one",
+          runId: "run:one",
+          turnId: "turn:one",
+        },
+      )).resolves.toMatchObject({
+        subject_binding_id: "subject:one",
+        subject_native_id: "native:private",
+        action_authority_id: "authority:one",
+        producer_epoch_ref: "epoch:one",
+      });
+    } finally {
+      await pool.end();
+    }
+  });
+
   it("resolves a complete digest evidence set without touching unrelated legacy action-result tables", async () => {
     const memory = newDb();
     const { Pool } = memory.adapters.createPg();

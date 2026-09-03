@@ -46,12 +46,14 @@ import {
   HELIX_AGENT_RUN_WRITE_SCOPE,
   helixAgentCancelRequestSchema,
   helixAgentContinueRequestSchema,
+  helixAgentEvidenceReentryRequestSchema,
   helixAgentEvidenceBundleSchema,
   helixAgentRunEventSchema,
   helixAgentRunSchema,
   helixAgentStartRequestSchema,
   type HelixAgentCancelRequest,
   type HelixAgentContinueRequest,
+  type HelixAgentEvidenceReentryRequest,
   type HelixAgentStartRequest,
 } from "@shared/contracts/helix-agent-api.v1";
 import {
@@ -128,6 +130,12 @@ import {
   type HelixEnvironmentActionAuthority,
   type HelixEnvironmentActionConnectorReadiness,
 } from "@shared/helix-environment-action";
+import {
+  HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+  helixMinecraftLocalLifecycleRequestSchema,
+  helixMinecraftLocalLifecycleReceiptSchema,
+  type HelixMinecraftLocalLifecycleReceipt,
+} from "@shared/helix-minecraft-local-lifecycle";
 import {
   helixEnvironmentCommandAuthoritySchema,
   helixEnvironmentCommandAuthoritySettingsSchema,
@@ -216,6 +224,18 @@ import {
   type HelixMinecraftCompanionCustodyEvidence,
   type HelixMinecraftCompanionCustodyEvidenceReadRequest,
 } from "@shared/helix-minecraft-companion-custody-mcp";
+import {
+  HELIX_MINECRAFT_COMPANION_MINING_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_MINING_EVIDENCE_SCHEMA,
+  HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_READ_TOOL,
+  HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_SCHEMA,
+  helixMinecraftCompanionMiningEvidenceReadRequestSchema,
+  helixMinecraftCompanionMiningEvidenceSchema,
+  helixMinecraftCompanionRoomMiningEvidenceReadRequestSchema,
+  helixMinecraftCompanionRoomMiningEvidenceSchema,
+  type HelixMinecraftCompanionMiningEvidence,
+  type HelixMinecraftCompanionMiningEvidenceReadRequest,
+} from "@shared/helix-minecraft-companion-mining-mcp";
 import {
   HELIX_BROKERAGE_READ_GATEWAY_ERROR_SCHEMA,
   HELIX_ROBINHOOD_READ_CAPABILITY_IDS,
@@ -365,11 +385,16 @@ import {
   "../services/environment-connectors/pairing/local-server-pairing-handoff";
 import {
   configureEnvironmentActionAuthority,
+  emergencyStopEnvironmentActionAuthority,
   extendEnvironmentActionAuthorityLease,
   isEnvironmentActionAuthorityError,
   readEnvironmentActionAuthorities,
   readEnvironmentActionConnectorReadiness,
 } from "../services/environment-connectors/actions/authority-store";
+import {
+  executeMinecraftFabricLoopbackLifecycle,
+} from
+  "../services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle";
 import {
   configureEnvironmentCommandAuthority,
   isEnvironmentCommandAuthorityError,
@@ -415,6 +440,10 @@ import {
   type HelixLocalSupervisorVerifiedIdentity,
 } from "../services/local-supervisor/local-supervisor-coordination";
 import {
+  HelixReasoningTaskBindingError,
+  type HelixReasoningTaskBindingStore,
+} from "../services/local-supervisor/reasoning-task-binding-store";
+import {
   readEnvironmentActionExecutionLeaseClaim,
   type EnvironmentActionExecutionLeaseClaim,
 } from "../services/environment-connectors/actions/action-broker";
@@ -438,6 +467,11 @@ import {
   resolvePrivateCompanionCustodyMcpRuntime,
 } from
   "../services/environment-connectors/resident-control/private-companion-custody-evidence-reader";
+import {
+  PrivateCompanionMiningEvidenceError,
+  resolvePrivateCompanionMiningMcpRuntime,
+} from
+  "../services/environment-connectors/resident-control/private-companion-mining-evidence-reader";
 
 type RecordLike = Record<string, unknown>;
 
@@ -495,6 +529,12 @@ type HelixRunContinueToolArguments = {
   run_id: string;
   idempotency_key: string;
   request: HelixAgentContinueRequest;
+};
+
+type HelixRunEvidenceReentryToolArguments = {
+  run_id: string;
+  idempotency_key: string;
+  request: HelixAgentEvidenceReentryRequest;
 };
 
 type HelixRunCancelToolArguments = {
@@ -843,6 +883,10 @@ export type HelixMinecraftCompanionCustodyEvidenceReader = (input: {
   ownerProfileId: string;
   request: HelixMinecraftCompanionCustodyEvidenceReadRequest;
 }) => Promise<HelixMinecraftCompanionCustodyEvidence>;
+export type HelixMinecraftCompanionMiningEvidenceReader = (input: {
+  ownerProfileId: string;
+  request: HelixMinecraftCompanionMiningEvidenceReadRequest;
+}) => Promise<HelixMinecraftCompanionMiningEvidence>;
 export type HelixBrokerageReadMcpExecutor =
   typeof executeBrokerageReadGatewayCapability;
 export type HelixBrokerageReadAcceptanceRunner = (input: {
@@ -909,6 +953,8 @@ export type HelixEnvironmentActionAuthorityLeaseExtender =
   typeof extendEnvironmentActionAuthorityLease;
 export type HelixEnvironmentActionAuthorityConfigurator =
   typeof configureEnvironmentActionAuthority;
+export type HelixEnvironmentActionAuthorityRevoker =
+  typeof emergencyStopEnvironmentActionAuthority;
 export type HelixEnvironmentCommandAuthorityConfigurator =
   typeof configureEnvironmentCommandAuthority;
 export type HelixEnvironmentActionAuthorityInspector = (input: {
@@ -919,6 +965,9 @@ export type HelixEnvironmentActionAuthorityInspector = (input: {
   authorities: HelixEnvironmentActionAuthority[];
   connectorReadiness: HelixEnvironmentActionConnectorReadiness[];
 }>;
+export type HelixMinecraftLocalLifecycleRunner = (input: {
+  request: { address: string };
+}) => Promise<HelixMinecraftLocalLifecycleReceipt>;
 export type HelixEnvironmentPlayerPairLocalHandoff = (input: {
   roomId: string;
   ownerProfileId: string;
@@ -1022,7 +1071,9 @@ type McpSdkRequestHandlerInternals = {
 const jsonObjectSchema = z.object({}).passthrough();
 const projectedRunSchema = helixAgentRunSchema.partial().passthrough();
 
-const runMutationOutputSchema = (operation: "start" | "continue" | "cancel") =>
+const runMutationOutputSchema = (
+  operation: "start" | "continue" | "reenter_evidence" | "cancel",
+) =>
   z
     .object({
       operation: z.literal(operation),
@@ -1344,6 +1395,7 @@ const minecraftPlayerActionOutputSchema = z
     summary: z.string(),
     idempotency_replayed: z.boolean(),
     observation: helixEnvironmentActionObservationSchema,
+    mcp_evidence: helixMcpEvidenceObservationSchema.nullable(),
     answer_authority: z.literal(false),
     assistant_answer: z.literal(false),
     terminal_eligible: z.literal(false),
@@ -1676,6 +1728,44 @@ const environmentActionAuthorityConfigureOutputSchema = z
     authority: helixEnvironmentActionAuthoritySchema,
     content_role: z.literal(
       "environment_action_authority_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentActionAuthorityRevokeOutputSchema = z
+  .object({
+    operation: z.literal("environment.action_authority.revoke"),
+    room_id: helixSharedLiveRoomIdSchema,
+    authority: helixEnvironmentActionAuthoritySchema,
+    emergency_control_request: jsonObjectSchema,
+    content_role: z.literal(
+      "environment_action_authority_revocation_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const minecraftLocalLifecycleLaunchOutputSchema = z
+  .object({
+    operation: z.literal(
+      HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+    ),
+    room_id: helixSharedLiveRoomIdSchema,
+    environment_binding_id: z.string().trim().min(1).max(320),
+    action_authority_id: z.string().trim().min(1).max(320),
+    status: z.literal("connected"),
+    receipt: helixMinecraftLocalLifecycleReceiptSchema,
+    authority_widened: z.literal(false),
+    credential_included: z.literal(false),
+    content_role: z.literal(
+      "minecraft_local_lifecycle_observation_not_assistant_answer",
     ),
     reentry_required: z.literal(true),
     answer_authority: z.literal(false),
@@ -2025,6 +2115,13 @@ const toolError = (
             error.statusCode >= 500 || error.statusCode === 409,
           )
       : error instanceof PrivateCompanionCustodyEvidenceError
+        ? new HelixAgentApiServiceError(
+            error.statusCode,
+            error.code,
+            error.message,
+            error.statusCode >= 500 || error.statusCode === 409,
+          )
+      : error instanceof PrivateCompanionMiningEvidenceError
         ? new HelixAgentApiServiceError(
             error.statusCode,
             error.code,
@@ -2750,11 +2847,13 @@ const ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES = new Map<
   ["helix_environment_subject_select", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
   ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_environment_action_authority_revoke", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_environment_command_authority_configure", HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES],
   ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_environment_source_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
   ["helix_environment_server_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
   ["helix_environment_action_authority_extend", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_minecraft_local_lifecycle_launch", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_minecraft_actor_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
   ["helix_minecraft_player_action", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_minecraft_workflow_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
@@ -2989,6 +3088,20 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
   }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  server.registerTool("helix_environment_action_authority_revoke", {
+    title: "Emergency-stop an exact player-action authority",
+    description:
+      "Revokes one exact Player Embodiment lease and queues control release for its active workflows. It cannot widen authority or become an assistant answer.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+      action_authority_id: z.string().trim().min(1).max(320),
+      reason: z.string().trim().min(1).max(1_000),
+    }).strict(),
+    outputSchema: environmentActionAuthorityRevokeOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
   server.registerTool("helix_environment_command_authority_configure", {
     title: "Configure current world command authority",
     description:
@@ -3056,6 +3169,21 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
     }).strict(),
     outputSchema: environmentActionAuthorityExtendOutputSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  server.registerTool("helix_minecraft_local_lifecycle_launch", {
+    title: "Launch and join the local Fabric play session",
+    description:
+      "Launches or reuses the prepared same-host Fabric client and joins the loopback server only under an exact current Player Embodiment lease. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+      action_authority_id: z.string().trim().min(1).max(320),
+      operator_confirmation: z.literal(true),
+      request: helixMinecraftLocalLifecycleRequestSchema,
+    }).strict(),
+    outputSchema: minecraftLocalLifecycleLaunchOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
   }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
   server.registerTool("helix_minecraft_actor_status", {
@@ -3140,13 +3268,24 @@ export type DesktopMcpTunnelTransitionExecutor = (input: {
   nativeReceiptRef: string;
 }>;
 
+export type HelixMcpToolLifecycleObservation = Readonly<{
+  toolName: string;
+  outcome: "succeeded" | "failed";
+  occurredAt: string;
+  observedAt: string;
+}>;
+
 export const createHelixMcpServer = (input: {
   principal: HelixAgentApiPrincipal;
   surface?: "full" | "local_supervisor_coordination";
   service?: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
+  mcpToolLifecycleObserver?: (
+    observation: HelixMcpToolLifecycleObservation,
+  ) => Promise<void> | void;
   localSupervisorExecutionLeaseClaimReader?:
     HelixLocalSupervisorExecutionLeaseClaimReader;
   localSupervisorEnvironmentIdentityReader?:
@@ -3180,6 +3319,9 @@ export const createHelixMcpServer = (input: {
   privateCompanionCustodyMcpEnabled?: boolean;
   minecraftCompanionCustodyEvidenceReader?:
     HelixMinecraftCompanionCustodyEvidenceReader;
+  privateCompanionMiningMcpEnabled?: boolean;
+  minecraftCompanionMiningEvidenceReader?:
+    HelixMinecraftCompanionMiningEvidenceReader;
   brokerageReadExecutor?: HelixBrokerageReadMcpExecutor;
   brokerageReadAcceptanceRunner?: HelixBrokerageReadAcceptanceRunner;
   brokerageLiveAcceptanceReadinessReader?:
@@ -3194,9 +3336,11 @@ export const createHelixMcpServer = (input: {
   environmentMonitorSemanticSource?: HelixEnvironmentMonitorSemanticSourcePort;
   environmentActionAuthorityInspector?: HelixEnvironmentActionAuthorityInspector;
   environmentActionAuthorityConfigurator?: HelixEnvironmentActionAuthorityConfigurator;
+  environmentActionAuthorityRevoker?: HelixEnvironmentActionAuthorityRevoker;
   environmentCommandAuthorityConfigurator?: HelixEnvironmentCommandAuthorityConfigurator;
   environmentActionAuthorityLeaseExtender?: HelixEnvironmentActionAuthorityLeaseExtender;
   environmentPlayerPairLocalHandoff?: HelixEnvironmentPlayerPairLocalHandoff;
+  minecraftLocalLifecycleRunner?: HelixMinecraftLocalLifecycleRunner;
   environmentSourcePairLocalHandoff?: HelixEnvironmentSourcePairLocalHandoff;
   environmentServerPairLocalHandoff?: HelixEnvironmentServerPairLocalHandoff;
   mcpEvidenceObservationStore?: HelixMcpEvidenceObservationStorePort;
@@ -3231,6 +3375,13 @@ export const createHelixMcpServer = (input: {
     input.privateCompanionCustodyMcpEnabled === undefined &&
     input.minecraftCompanionCustodyEvidenceReader === undefined
       ? resolvePrivateCompanionCustodyMcpRuntime({
+          ownerProfileId: input.principal.accountProfileId,
+        })
+      : null;
+  const defaultPrivateCompanionMiningRuntime =
+    input.privateCompanionMiningMcpEnabled === undefined &&
+    input.minecraftCompanionMiningEvidenceReader === undefined
+      ? resolvePrivateCompanionMiningMcpRuntime({
           ownerProfileId: input.principal.accountProfileId,
         })
       : null;
@@ -3286,12 +3437,18 @@ export const createHelixMcpServer = (input: {
   const actionAuthorityConfigurator =
     input.environmentActionAuthorityConfigurator ??
       configureEnvironmentActionAuthority;
+  const actionAuthorityRevoker =
+    input.environmentActionAuthorityRevoker ??
+      emergencyStopEnvironmentActionAuthority;
   const commandAuthorityConfigurator =
     input.environmentCommandAuthorityConfigurator ??
       configureEnvironmentCommandAuthority;
   const actionAuthorityLeaseExtender =
     input.environmentActionAuthorityLeaseExtender ??
       extendEnvironmentActionAuthorityLease;
+  const minecraftLocalLifecycleRunner =
+    input.minecraftLocalLifecycleRunner ??
+      executeMinecraftFabricLoopbackLifecycle;
   const playerPairLocalHandoff =
     input.environmentPlayerPairLocalHandoff ??
     (async (request) => {
@@ -3417,6 +3574,39 @@ export const createHelixMcpServer = (input: {
       "mcp_client_identity_required",
       403,
       "The request does not identify an authenticated MCP client.",
+    );
+  };
+  const isAuthenticatedNativeDesktopPrincipal = (): boolean =>
+    input.principal.issuer === "urn:casimirbot:desktop-session" &&
+    input.principal.oauthClientRef == null &&
+    input.principal.mcpClientRef?.startsWith("mcp_client:native_desktop:") === true &&
+    input.principal.accountContext.trusted_account_session === true &&
+    input.principal.accountContext.account_session?.status === "active";
+  const resolveFiniteMcpAuthorizationExpiry = (inputValue: {
+    now: Date;
+    requestedLeaseSeconds: number;
+  }): string => {
+    const tokenExpiresMs = Date.parse(input.principal.tokenExpiresAt ?? "");
+    if (Number.isFinite(tokenExpiresMs) && tokenExpiresMs > inputValue.now.getTime()) {
+      return new Date(Math.min(
+        tokenExpiresMs,
+        inputValue.now.getTime() + inputValue.requestedLeaseSeconds * 1_000,
+      )).toISOString();
+    }
+    // The native desktop transport authenticates every call with the active
+    // local account session and an installation-derived MCP client identity.
+    // Developer sessions may intentionally have no wall-clock expiry. Give
+    // that exact first-party principal only the caller-requested finite lease;
+    // external OAuth principals remain required to carry a verified expiry.
+    if (isAuthenticatedNativeDesktopPrincipal()) {
+      return new Date(
+        inputValue.now.getTime() + inputValue.requestedLeaseSeconds * 1_000,
+      ).toISOString();
+    }
+    throw new EnvironmentMonitorStoreError(
+      "monitor_run_unavailable",
+      409,
+      "The monitor cannot outlive an absent or expired MCP authorization.",
     );
   };
   const requireLocalSupervisorClientRef = (): string => {
@@ -3552,6 +3742,14 @@ export const createHelixMcpServer = (input: {
           structuredContent: value,
         };
       }
+      if (error instanceof HelixReasoningTaskBindingError) {
+        return toolError(new HelixAgentApiServiceError(
+          error.status,
+          error.code,
+          "The exact reasoning-task binding request was rejected.",
+          error.status >= 500,
+        ), requiredScopes);
+      }
       return toolError(error, requiredScopes);
     }
   };
@@ -3615,6 +3813,47 @@ export const createHelixMcpServer = (input: {
       ].join(" "),
     },
   );
+
+  if (input.mcpToolLifecycleObserver) {
+    type ToolHandler = (...args: unknown[]) => unknown | Promise<unknown>;
+    type RegisterTool = (
+      name: string,
+      config: Record<string, unknown>,
+      handler: ToolHandler,
+    ) => unknown;
+    const registerTool = server.registerTool.bind(server) as unknown as RegisterTool;
+    const instrumentedServer = server as unknown as { registerTool: RegisterTool };
+    instrumentedServer.registerTool = (name, config, handler) =>
+      registerTool(name, config, async (...args) => {
+        const occurredAt = new Date().toISOString();
+        let outcome: HelixMcpToolLifecycleObservation["outcome"] = "failed";
+        try {
+          const result = await handler(...args);
+          outcome =
+            result &&
+            typeof result === "object" &&
+            "isError" in result &&
+            (result as { isError?: unknown }).isError === true
+              ? "failed"
+              : "succeeded";
+          return result;
+        } finally {
+          try {
+            await input.mcpToolLifecycleObserver?.({
+              toolName: name,
+              outcome,
+              occurredAt,
+              observedAt: new Date().toISOString(),
+            });
+          } catch (error) {
+            console.warn(
+              "[helix-mcp] operator activity projection failed",
+              error instanceof Error ? error.name : "unknown_error",
+            );
+          }
+        }
+      });
+  }
 
   const localSupervisorContinuationSchema = z.string().trim().min(3).max(320)
     .refine((value) => !/[\r\n\t]/u.test(value))
@@ -3766,6 +4005,111 @@ export const createHelixMcpServer = (input: {
 
   if (input.localSupervisorCoordinationStore) {
     const coordinationStore = input.localSupervisorCoordinationStore;
+    const reasoningStore = input.reasoningTaskBindingStore;
+    if (reasoningStore) {
+      server.registerTool(
+        "helix_reasoning_task_binding_claim",
+        {
+          title: "Claim this exact task's Helix reasoning binding",
+          description: "Consumes one operator-issued show-once handle for this authenticated MCP client and exact continuation. It does not expose provider-private reasoning or grant execution authority.",
+          inputSchema: z.object({
+            client_continuation_ref: localSupervisorContinuationSchema,
+            claim_handle: z.string().trim().min(16).max(512),
+          }).strict(),
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+        },
+        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, () => {
+          requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+          const identity = localSupervisorIdentity(args.client_continuation_ref);
+          coordinationStore.authenticateClient({
+            profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId,
+            clientSessionRef: identity.clientSessionRef,
+          });
+          const binding = reasoningStore.claim({
+            profileRef: input.principal.accountProfileId,
+            authenticatedMcpClientRef: identity.authenticatedClientRef,
+            clientSessionRef: identity.clientSessionRef,
+            claimHandle: args.claim_handle,
+          });
+          return { ok: true, binding, ...localSupervisorFlags };
+        }),
+      );
+
+      server.registerTool(
+        "helix_reasoning_steering_read",
+        {
+          title: "Read steering for this exact bound reasoning task",
+          description: "Returns bounded operator steering only for this authenticated MCP client, exact continuation, and active binding. Steering is advisory and is not execution evidence or an assistant answer.",
+          inputSchema: z.object({
+            client_continuation_ref: localSupervisorContinuationSchema,
+            reasoning_binding_id: localSupervisorContinuationSchema,
+            binding_epoch: z.number().int().positive(),
+            after_cursor: z.number().int().nonnegative().default(0),
+          }).strict(),
+          annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
+        },
+        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, () => {
+          requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
+          const identity = localSupervisorIdentity(args.client_continuation_ref);
+          coordinationStore.authenticateClient({
+            profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId,
+            clientSessionRef: identity.clientSessionRef,
+          });
+          return {
+            ok: true,
+            reasoning_binding_id: args.reasoning_binding_id,
+            deliveries: reasoningStore.read({
+              profileRef: input.principal.accountProfileId,
+              clientSessionRef: identity.clientSessionRef,
+              bindingId: args.reasoning_binding_id,
+              bindingEpoch: args.binding_epoch,
+              afterCursor: args.after_cursor,
+            }),
+            ...localSupervisorFlags,
+          };
+        }),
+      );
+
+      server.registerTool(
+        "helix_reasoning_steering_acknowledge",
+        {
+          title: "Acknowledge steering picked up by this exact task",
+          description: "Acknowledges one current steering event for this exact active binding. Acknowledgement grants no environment, evidence, answer, or terminal authority.",
+          inputSchema: z.object({
+            client_continuation_ref: localSupervisorContinuationSchema,
+            reasoning_binding_id: localSupervisorContinuationSchema,
+            binding_epoch: z.number().int().positive(),
+            steering_event_ref: localSupervisorContinuationSchema,
+          }).strict(),
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+        },
+        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, () => {
+          requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+          const identity = localSupervisorIdentity(args.client_continuation_ref);
+          coordinationStore.authenticateClient({
+            profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId,
+            clientSessionRef: identity.clientSessionRef,
+          });
+          return {
+            ok: true,
+            event: reasoningStore.acknowledge({
+              profileRef: input.principal.accountProfileId,
+              clientSessionRef: identity.clientSessionRef,
+              bindingId: args.reasoning_binding_id,
+              bindingEpoch: args.binding_epoch,
+              eventRef: args.steering_event_ref,
+            }),
+            ...localSupervisorFlags,
+          };
+        }),
+      );
+    }
     server.registerTool(
       "helix_local_supervisor_presence_update",
       {
@@ -4340,6 +4684,11 @@ export const createHelixMcpServer = (input: {
         ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ...(input.reasoningTaskBindingStore ? [
+          ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+          ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+          ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ] as Array<[string, RequiredOAuthScopes]> : []),
         ...ROOM_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
         ...ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
         ...(input.desktopMcpTunnelTransitionStore ? [
@@ -4350,6 +4699,196 @@ export const createHelixMcpServer = (input: {
       ]),
     );
     return server;
+  }
+
+  const companionMiningEvidenceReader =
+    input.minecraftCompanionMiningEvidenceReader ??
+    defaultPrivateCompanionMiningRuntime?.reader;
+  const exactOwnerScopedPrivateCompanionMiningToolEnabled =
+    defaultPrivateCompanionMiningRuntime?.enabled === true &&
+    Boolean(defaultPrivateCompanionMiningRuntime.reader);
+  const injectedPrivateCompanionMiningToolEnabled =
+    input.privateCompanionMiningMcpEnabled === true &&
+    input.principal.accountType === "developer" &&
+    Boolean(input.minecraftCompanionMiningEvidenceReader);
+  if (exactOwnerScopedPrivateCompanionMiningToolEnabled || injectedPrivateCompanionMiningToolEnabled) {
+    const readCompanionMiningEvidence = companionMiningEvidenceReader!;
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_MINING_EVIDENCE_READ_TOOL,
+      {
+        title: "Read private C3 companion mining evidence",
+        description:
+          "Reads exact owner-scoped C3 Survival-mining evidence for authenticated MCP re-entry. It is read-only and grants no mining execution, exploration, crafting, combat, commands, World, answer, or terminal authority.",
+        inputSchema: helixMinecraftCompanionMiningEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        const payload = helixMinecraftCompanionMiningEvidenceSchema.parse(
+          await readCompanionMiningEvidence({
+            ownerProfileId: input.principal.accountProfileId,
+            request,
+          }),
+        );
+        const exact = JSON.stringify(payload.identity) === JSON.stringify(request.identity)
+          && payload.controller_artifact_hash === request.controller_artifact_hash
+          && payload.custody_revision === request.custody_revision;
+        if (!exact) throw new HelixAgentApiServiceError(
+          409, "companion_mining_identity_or_revision_mismatch",
+          "The requested C3 identity, controller artifact, or custody revision is stale.", true,
+        );
+        const supportRefs = payload.case_receipts.map(
+          (receipt) => `fabric-gametest:${receipt.game_test_id}`,
+        );
+        const mcpEvidence = buildHelixMcpEvidenceObservation({
+          descriptor: requireMcpEvidenceDescriptor(HELIX_MINECRAFT_COMPANION_MINING_EVIDENCE_READ_TOOL),
+          request,
+          payload,
+          producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+          subjectRefs: [
+            `account-profile:${input.principal.accountProfileId}`,
+            payload.identity.companion_id, payload.identity.actor_entity_id,
+            payload.identity.actor_incarnation_id, payload.identity.environment_id,
+            payload.identity.world_id, payload.identity.connector_epoch,
+            payload.controller_profile_id, payload.controller_artifact_hash,
+            `custody-revision:${payload.custody_revision}`,
+          ],
+          summary: "Observed exact private C3 Survival-mining evidence for Codex re-entry.",
+          payloadSchema: HELIX_MINECRAFT_COMPANION_MINING_EVIDENCE_SCHEMA,
+          supportRefs,
+          observedAt: payload.observed_at,
+          freshness: { state: "not_applicable", ageMs: null, expiresAt: null },
+        });
+        await evidenceStore.put({
+          owner: { tenantId: input.principal.tenantId, accountProfileId: input.principal.accountProfileId },
+          toolName: HELIX_MINECRAFT_COMPANION_MINING_EVIDENCE_READ_TOOL,
+          observation: mcpEvidence,
+        });
+        return { evidence: payload, mcp_evidence: mcpEvidence };
+      }),
+    );
+
+    server.registerTool(
+      HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_READ_TOOL,
+      {
+        title: "Read room-bound private C3 companion mining evidence",
+        description:
+          "Projects exact C3 evidence into its current owner room. Room closure or departure revokes access. It grants no mining execution or broader authority.",
+        inputSchema: helixMinecraftCompanionRoomMiningEvidenceReadRequestSchema,
+        outputSchema: z.object({}).passthrough(),
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
+      },
+      async (request) => callTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
+        let inspected;
+        try {
+          inspected = await roomControlService.inspectRoom({ actor: roomActor, roomId: request.room_id });
+        } catch (error) {
+          if (error instanceof SharedLiveRoomControlError
+            && (error.code === "room_not_found" || error.code === "room_closed")) {
+            throw new HelixAgentApiServiceError(
+              410, "companion_mining_room_revoked",
+              "The room-bound C3 evidence admission has been revoked.", false,
+            );
+          }
+          throw error;
+        }
+        const room = inspected.room;
+        const self = room.participants.find(
+          (participant) => participant.participant_id === room.self_participant_id,
+        );
+        if (!self || self.role !== "owner") throw new HelixAgentApiServiceError(
+          403, "companion_mining_room_owner_required",
+          "Only the current room owner may project private C3 evidence.", false,
+        );
+        if (room.status === "closed" || self.presence === "left") throw new HelixAgentApiServiceError(
+          410, "companion_mining_room_revoked",
+          "The room-bound C3 evidence admission has been revoked.", false,
+        );
+        const payload = helixMinecraftCompanionMiningEvidenceSchema.parse(
+          await readCompanionMiningEvidence({
+            ownerProfileId: input.principal.accountProfileId,
+            request: {
+              identity: request.identity,
+              controller_artifact_hash: request.controller_artifact_hash,
+              custody_revision: request.custody_revision,
+            },
+          }),
+        );
+        const exact = JSON.stringify(payload.identity) === JSON.stringify(request.identity)
+          && payload.controller_artifact_hash === request.controller_artifact_hash
+          && payload.custody_revision === request.custody_revision;
+        if (!exact) throw new HelixAgentApiServiceError(
+          409, "companion_mining_identity_or_revision_mismatch",
+          "The requested C3 identity, controller artifact, or custody revision is stale.", true,
+        );
+        const roomEvidence = helixMinecraftCompanionRoomMiningEvidenceSchema.parse({
+          schema: HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_SCHEMA,
+          capability_id: payload.capability_id,
+          room_id: room.room_id,
+          owner_profile_ref: input.principal.accountProfileId,
+          requesting_participant_ref: self.participant_id,
+          room_role: "owner",
+          room_status: room.status,
+          observation_origin: "room_projection",
+          admission_basis: "room_owner_private_config",
+          evidence: payload,
+          exact_identity_match: true,
+          exact_revision_match: true,
+          room_binding_active: true,
+          read_only: true,
+          commands_executed: 0,
+          side_effects: false,
+          environment_mutated: false,
+          public_capability_exposed: false,
+          execution_authority: false,
+          mining_execution_authority: false,
+          crafting_authority: false,
+          combat_authority: false,
+          world_authority: false,
+          credential_included: false,
+          private_endpoint_included: false,
+          hidden_reasoning_included: false,
+          content_role: "minecraft_companion_room_mining_evidence_not_assistant_answer",
+          reentry_required: true,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        });
+        const supportRefs = payload.case_receipts.map(
+          (receipt) => `fabric-gametest:${receipt.game_test_id}`,
+        );
+        const mcpEvidence = buildHelixMcpEvidenceObservation({
+          descriptor: requireMcpEvidenceDescriptor(HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_READ_TOOL),
+          request,
+          payload: roomEvidence,
+          producerRef: `casimirbot-room:${room.room_id}:profile:${input.principal.accountProfileId}`,
+          subjectRefs: [
+            room.room_id, self.participant_id,
+            `account-profile:${input.principal.accountProfileId}`,
+            payload.identity.companion_id, payload.identity.actor_entity_id,
+            payload.identity.actor_incarnation_id, payload.identity.environment_id,
+            payload.identity.world_id, payload.identity.connector_epoch,
+            payload.controller_profile_id, payload.controller_artifact_hash,
+            `custody-revision:${payload.custody_revision}`,
+          ],
+          summary: "Projected exact private C3 mining evidence into its current owner room for Codex re-entry.",
+          payloadSchema: HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_SCHEMA,
+          supportRefs,
+          observedAt: payload.observed_at,
+          freshness: { state: "not_applicable", ageMs: null, expiresAt: null },
+        });
+        await evidenceStore.put({
+          owner: { tenantId: input.principal.tenantId, accountProfileId: input.principal.accountProfileId },
+          toolName: HELIX_MINECRAFT_COMPANION_ROOM_MINING_EVIDENCE_READ_TOOL,
+          observation: mcpEvidence,
+        });
+        return { room_evidence: roomEvidence, mcp_evidence: mcpEvidence };
+      }),
+    );
   }
 
   server.registerTool(
@@ -4365,7 +4904,7 @@ export const createHelixMcpServer = (input: {
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: false,
       },
       _meta: oauthToolMeta(HELIX_SHARED_LIVE_ROOM_READ_SCOPE),
@@ -4376,12 +4915,18 @@ export const createHelixMcpServer = (input: {
           input.principal,
           HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
         );
-        const authorizationExpiresAt = input.principal.tokenExpiresAt?.trim();
-        if (!authorizationExpiresAt) {
+        const now = new Date();
+        let authorizationExpiresAt: string;
+        try {
+          authorizationExpiresAt = resolveFiniteMcpAuthorizationExpiry({
+            now,
+            requestedLeaseSeconds: 3_600,
+          });
+        } catch {
           throw new HelixAgentApiServiceError(
             401,
             "unauthorized",
-            "The bearer token has no verified expiry.",
+            "The MCP authorization has no verified finite lease boundary.",
             false,
           );
         }
@@ -4424,6 +4969,92 @@ export const createHelixMcpServer = (input: {
         });
         return {
           operation: "start",
+          idempotency_replayed: result.idempotencyReplayed,
+          run: result.body,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_run_evidence_reenter",
+    {
+      title: "Re-enter authenticated evidence into a durable Helix run",
+      description:
+        "Attaches only still-valid, owner-scoped MCP observation references to the exact durable run for its next Helix Ask continuation. It does not accept raw receipt text, execute a tool, sample a model, create or select a provider task, answer, or grant terminal authority.",
+      inputSchema: z
+        .object({
+          run_id: runIdSchema,
+          idempotency_key: idempotencyKeySchema,
+          request: helixAgentEvidenceReentryRequestSchema,
+        })
+        .strict(),
+      outputSchema: runMutationOutputSchema("reenter_evidence"),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+    },
+    async ({
+      run_id,
+      idempotency_key,
+      request,
+    }: HelixRunEvidenceReentryToolArguments) =>
+      callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_WRITE_SCOPE);
+        for (const observationRef of request.observation_refs) {
+          let observation;
+          try {
+            observation = await evidenceStore.get({
+              owner: {
+                tenantId: input.principal.tenantId,
+                accountProfileId: input.principal.accountProfileId,
+              },
+              observationRef,
+            });
+          } catch (error) {
+            if (!(error instanceof HelixMcpEvidenceObservationStoreError)) {
+              throw error;
+            }
+            const status = error.code === "observation_owner_mismatch" ? 403
+              : error.code === "observation_not_found" ? 404
+              : error.code === "observation_corrupt" ? 500
+              : 410;
+            throw new HelixAgentApiServiceError(
+              status,
+              error.code === "observation_corrupt" ? "internal_error" : "not_found",
+              "The requested MCP observation is not eligible for exact run re-entry.",
+              false,
+              { observation_ref: observationRef },
+            );
+          }
+          if (
+            !observation.provenance.valid ||
+            observation.authority.assistant_answer !== false ||
+            observation.authority.answer_authority !== false ||
+            observation.authority.agent_executable !== false ||
+            observation.authority.terminal_eligible !== false ||
+            observation.authority.reentry_required !== true
+          ) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "invalid_request",
+              "The requested MCP observation does not preserve the evidence-only authority boundary.",
+              false,
+              { observation_ref: observationRef },
+            );
+          }
+        }
+        const result = await service.reenterEvidence({
+          principal: input.principal,
+          runId: run_id,
+          idempotencyKey: idempotency_key,
+          request,
+        });
+        return {
+          operation: "reenter_evidence",
           idempotency_replayed: result.idempotencyReplayed,
           run: result.body,
         };
@@ -4490,7 +5121,7 @@ export const createHelixMcpServer = (input: {
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: false,
       },
       _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
@@ -5124,13 +5755,16 @@ export const createHelixMcpServer = (input: {
   const companionCustodyEvidenceReader =
     input.minecraftCompanionCustodyEvidenceReader ??
     defaultPrivateCompanionCustodyRuntime?.reader;
+  const exactOwnerScopedPrivateCompanionCustodyToolEnabled =
+    defaultPrivateCompanionCustodyRuntime?.enabled === true &&
+    Boolean(defaultPrivateCompanionCustodyRuntime.reader);
+  const injectedPrivateCompanionCustodyToolEnabled =
+    input.privateCompanionCustodyMcpEnabled === true &&
+    input.principal.accountType === "developer" &&
+    Boolean(input.minecraftCompanionCustodyEvidenceReader);
   const privateCompanionCustodyToolEnabled =
-    (defaultPrivateCompanionCustodyRuntime?.enabled === true &&
-      input.principal.accountType === "developer" &&
-      Boolean(defaultPrivateCompanionCustodyRuntime.reader)) ||
-    (input.privateCompanionCustodyMcpEnabled === true &&
-      input.principal.accountType === "developer" &&
-      Boolean(input.minecraftCompanionCustodyEvidenceReader));
+    exactOwnerScopedPrivateCompanionCustodyToolEnabled ||
+    injectedPrivateCompanionCustodyToolEnabled;
   if (privateCompanionCustodyToolEnabled) {
     const readCompanionCustodyEvidence = companionCustodyEvidenceReader!;
     server.registerTool(
@@ -5990,6 +6624,56 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_environment_action_authority_revoke",
+    {
+      title: "Emergency-stop an exact player-action authority",
+      description:
+        "Revokes one exact Player Embodiment lease and queues control release for its active workflows. This authority-reducing operation cannot widen permissions, launch Minecraft, or become an assistant answer.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        reason: z.string().trim().min(1).max(1_000),
+      }).strict(),
+      outputSchema: environmentActionAuthorityRevokeOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const stopped = await actionAuthorityRevoker({
+          roomId: argumentsValue.room_id,
+          profileId: input.principal.accountProfileId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          reason: argumentsValue.reason,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.action_authority.revoke",
+            room_id: argumentsValue.room_id,
+            authority: stopped.authority,
+            emergency_control_request: stopped.controlRequest,
+            content_role:
+              "environment_action_authority_revocation_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
     "helix_environment_command_authority_configure",
     {
       title: "Configure current world command authority",
@@ -6264,6 +6948,109 @@ export const createHelixMcpServer = (input: {
             authority,
             content_role:
               "environment_action_authority_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_minecraft_local_lifecycle_launch",
+    {
+      title: "Launch and join the local Fabric play session",
+      description:
+        "Launches or reuses the prepared same-host Fabric client and joins the loopback server only under an exact current Player Embodiment lease and explicit operator confirmation. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence for Codex re-entry.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        operator_confirmation: z.literal(true),
+        request: helixMinecraftLocalLifecycleRequestSchema,
+      }).strict(),
+      outputSchema: minecraftLocalLifecycleLaunchOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        if (
+          !input.principal.accountContext.trusted_account_session ||
+          input.principal.accountType !== "developer"
+        ) {
+          throw new HelixAgentApiServiceError(
+            403,
+            "minecraft_local_lifecycle_account_policy_blocked",
+            "A signed-in developer account on the local Helix service is required.",
+            false,
+          );
+        }
+        const inspected = await actionAuthorityInspector({
+          roomId: argumentsValue.room_id,
+          profileId: input.principal.accountProfileId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+        });
+        const authority = inspected.authorities.find((entry) =>
+          entry.action_authority_id === argumentsValue.action_authority_id &&
+          entry.room_id === argumentsValue.room_id &&
+          entry.environment_binding_id === argumentsValue.environment_binding_id
+        );
+        if (!authority) {
+          throw new HelixAgentApiServiceError(
+            404,
+            "minecraft_local_lifecycle_authority_not_found",
+            "The exact Player Embodiment authority was not found.",
+            false,
+          );
+        }
+        if (
+          authority.status !== "active" ||
+          (authority.expires_at !== null &&
+            Date.parse(authority.expires_at) <= Date.now())
+        ) {
+          throw new HelixAgentApiServiceError(
+            409,
+            "minecraft_local_lifecycle_authority_inactive",
+            "The exact Player Embodiment authority is not current and active.",
+            false,
+          );
+        }
+        if (authority.domain_adapter !== "minecraft.fabric_client.v1") {
+          throw new HelixAgentApiServiceError(
+            409,
+            "minecraft_local_lifecycle_authority_incompatible",
+            "The exact active authority is not a Fabric player-client lease.",
+            false,
+          );
+        }
+        const receipt = helixMinecraftLocalLifecycleReceiptSchema.parse(
+          await minecraftLocalLifecycleRunner({
+            request: argumentsValue.request,
+          }),
+        );
+        return {
+          ok: true,
+          value: {
+            operation:
+              HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
+            room_id: argumentsValue.room_id,
+            environment_binding_id: argumentsValue.environment_binding_id,
+            action_authority_id: argumentsValue.action_authority_id,
+            status: "connected",
+            receipt,
+            authority_widened: false,
+            credential_included: false,
+            content_role:
+              "minecraft_local_lifecycle_observation_not_assistant_answer",
             reentry_required: true,
             answer_authority: false,
             assistant_answer: false,
@@ -6668,19 +7455,11 @@ export const createHelixMcpServer = (input: {
             "The monitor must bind the authenticated participant to one exact authorized durable run.",
           );
         }
-        const tokenExpiresMs = Date.parse(input.principal.tokenExpiresAt ?? "");
         const now = new Date();
-        if (!Number.isFinite(tokenExpiresMs) || tokenExpiresMs <= now.getTime()) {
-          throw new EnvironmentMonitorStoreError(
-            "monitor_run_unavailable",
-            409,
-            "The monitor cannot outlive an absent or expired MCP authorization.",
-          );
-        }
-        const expiresAt = new Date(Math.min(
-          tokenExpiresMs,
-          now.getTime() + argumentsValue.expires_in_seconds * 1_000,
-        )).toISOString();
+        const expiresAt = resolveFiniteMcpAuthorizationExpiry({
+          now,
+          requestedLeaseSeconds: argumentsValue.expires_in_seconds,
+        });
         const identity: HelixEnvironmentMonitorIdentity = {
           owner_profile_id: input.principal.accountProfileId,
           mcp_client_id: requireMonitorClientRef(),
@@ -7390,6 +8169,66 @@ export const createHelixMcpServer = (input: {
             reentryObservationRef: execution.observation.evidence_ref,
           });
         }
+        let mcpEvidence =
+          execution.ok &&
+          execution.status === "completed" &&
+          execution.observation.outcome === "succeeded" &&
+          execution.observation.provenance_valid &&
+          execution.observation.eligible_for_current_turn_reentry
+            ? buildHelixMcpEvidenceObservation({
+                descriptor: requireMcpEvidenceDescriptor(
+                  "helix_minecraft_player_action",
+                ),
+                request: {
+                  room_id,
+                  perception_semantic_fingerprint:
+                    perception_semantic_fingerprint ?? null,
+                  principal_turn_id: principal_turn_id ?? null,
+                  environment_label: environment_label ?? null,
+                  action,
+                },
+                payload: execution.observation,
+                producerRef:
+                  `casimirbot-profile:${input.principal.accountProfileId}`,
+                subjectRefs: [
+                  `account-profile:${input.principal.accountProfileId}`,
+                  room_id,
+                  execution.observation.action_request_ref,
+                  execution.observation.workflow_ref,
+                ],
+                summary:
+                  "Observed one admitted Minecraft player-action result for exact durable-run re-entry.",
+                payloadSchema: execution.observation.schema,
+                supportRefs: [
+                  execution.observation.evidence_ref,
+                  ...execution.observation.postcondition_evidence_refs,
+                ],
+                observedAt: execution.observation.observed_at,
+                freshness: {
+                  state: "fresh",
+                  ageMs: 0,
+                  expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+                },
+              })
+            : null;
+        if (mcpEvidence) {
+          try {
+            await evidenceStore.put({
+              owner: {
+                tenantId: input.principal.tenantId,
+                accountProfileId: input.principal.accountProfileId,
+              },
+              toolName: "helix_minecraft_player_action",
+              observation: mcpEvidence,
+            });
+          } catch (error) {
+            console.warn(
+              "[helix-mcp] Minecraft action completed but its durable MCP evidence projection failed",
+              error instanceof Error ? error.name : "unknown_error",
+            );
+            mcpEvidence = null;
+          }
+        }
         return {
           ok: execution.ok,
           value: {
@@ -7400,6 +8239,7 @@ export const createHelixMcpServer = (input: {
             summary: execution.summary,
             idempotency_replayed: execution.idempotentReplay ?? false,
             observation: execution.observation,
+            mcp_evidence: mcpEvidence,
             answer_authority: false,
             assistant_answer: false,
             terminal_eligible: false,
@@ -8084,6 +8924,7 @@ export const createHelixMcpServer = (input: {
     server,
     new Map<string, RequiredOAuthScopes>([
       ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_run_evidence_reenter", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_public_ui_catalog", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_realtime_texture_pack_inspect", HELIX_AGENT_RUN_READ_SCOPE],
@@ -8116,11 +8957,13 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_action_authority_revoke", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_command_authority_configure", HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES],
       ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_source_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_environment_server_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_environment_action_authority_extend", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_minecraft_local_lifecycle_launch", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_minecraft_actor_status", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_minecraft_situation_probe", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_environment_monitor_create", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
@@ -8160,6 +9003,11 @@ export const createHelixMcpServer = (input: {
       ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ...(input.reasoningTaskBindingStore ? [
+        ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+        ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ] as Array<[string, RequiredOAuthScopes]> : []),
     ]),
   );
   return server;

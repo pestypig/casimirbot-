@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 
 export type HelixAskSurfaceComposerPanelProps = {
+  destination?: ReactNode;
   voiceLevelMonitor?: ReactNode;
   moodAvatar: ReactNode;
   actionToolbar: ReactNode;
@@ -9,6 +10,7 @@ export type HelixAskSurfaceComposerPanelProps = {
 };
 
 export function HelixAskSurfaceComposerPanel({
+  destination = null,
   voiceLevelMonitor = null,
   moodAvatar,
   actionToolbar,
@@ -19,6 +21,7 @@ export function HelixAskSurfaceComposerPanel({
     <>
       {voiceLevelMonitor}
       <div className="relative z-[80] flex flex-col gap-2 px-4 py-3">
+        {destination}
         <div className="flex flex-wrap items-center gap-3">
           {moodAvatar}
           {actionToolbar}

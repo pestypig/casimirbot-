@@ -41,6 +41,46 @@ afterEach(() => {
 });
 
 describe("HelixAskMinimalRuntimeShell", () => {
+  it("creates one local Helix chat from the first submitted message without claiming provider-task creation", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("local-helix-chat")
+      .mockReturnValueOnce("first-message-turn")
+      .mockReturnValueOnce("first-message-user")
+      .mockReturnValueOnce("first-message-assistant");
+    const runTurn = vi.fn(async (payload) => ({
+      selected_final_answer: "Local Helix response.",
+      turn_id: payload.turnId,
+    }));
+
+    render(<HelixAskMinimalRuntimeShell contextId="ctx:first-message" runTurn={runTurn} />);
+
+    expect(Object.keys(useAgiChatStore.getState().sessions)).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Ask Helix"), {
+      target: { value: "Create this local conversation" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit prompt" }));
+
+    await waitFor(() => expect(screen.getByText("Local Helix response.")).toBeTruthy());
+    const state = useAgiChatStore.getState();
+    expect(Object.keys(state.sessions)).toEqual(["local-helix-chat"]);
+    expect(state.activeId).toBe("local-helix-chat");
+    expect(state.sessions["local-helix-chat"]).toMatchObject({
+      contextId: "ctx:first-message",
+      title: "Create this local conversation",
+    });
+    expect(runTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "local-helix-chat",
+        workspace_context_snapshot: expect.objectContaining({
+          sessionId: "local-helix-chat",
+        }),
+      }),
+      expect.any(Function),
+    );
+    expect(screen.getByText(/Helix Ask governed turn/i)).toBeTruthy();
+    expect(screen.queryByText(/provider task created/i)).toBeNull();
+  });
+
   it("enables the shared recrowned carousel when minimal-runtime controls overflow", async () => {
     const observers: ResizeObserverMock[] = [];
     class ResizeObserverMock implements ResizeObserver {
@@ -760,8 +800,11 @@ describe("HelixAskMinimalRuntimeShell", () => {
       />,
     );
 
-    expect(screen.getByTestId("helix-ask-minimal-runtime-shell")).toBeTruthy();
-    expect(screen.getByTestId("helix-ask-minimal-runtime-shell").parentElement).toHaveClass("min-h-0");
+    const minimalShell = await screen.findByTestId(
+      "helix-ask-minimal-runtime-shell",
+    );
+    expect(minimalShell).toBeTruthy();
+    expect(minimalShell.parentElement).toHaveClass("min-h-0");
     expect(screen.getByTestId("helix-ask-goal-pill")).toHaveTextContent("Recrown visible console surface");
     expect(screen.getByTestId("helix-ask-steering-queue")).toHaveTextContent("Docs context handoff");
     expect(screen.getByText("notes.md")).toBeTruthy();

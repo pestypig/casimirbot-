@@ -38,7 +38,7 @@ export type MissionBoardEvent = {
   ts: string;
   evidenceRefs: string[];
   timerId?: string;
-  timerKind?: "countdown" | "deadline";
+  timerKind?: "countdown" | "deadline" | "stale_window";
   timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
   timerDueTs?: string;
   derivedFromEventId?: string;
@@ -49,6 +49,11 @@ export type MissionBoardEvent = {
   gapSummary?: string;
   gapSeverity?: "low" | "medium" | "high" | "critical";
   gapResolvedAt?: string;
+  certaintyClass?: "confirmed" | "reasoned" | "hypothesis" | "unknown";
+  failReason?: string;
+  suppressionReason?: string;
+  lastVerifiedAt?: string;
+  traceId?: string;
 };
 
 type MissionApiError = {
@@ -74,11 +79,12 @@ export async function fetchMissionSnapshot(missionId: string): Promise<MissionBo
 
 export async function fetchMissionEvents(
   missionId: string,
-  options?: { cursor?: number; limit?: number },
+  options?: { cursor?: number; limit?: number; tail?: boolean },
 ): Promise<{ events: MissionBoardEvent[]; nextCursor: number | null }> {
   const params = new URLSearchParams();
   if (Number.isFinite(options?.cursor)) params.set("cursor", String(options?.cursor));
   if (Number.isFinite(options?.limit)) params.set("limit", String(options?.limit));
+  if (options?.tail) params.set("tail", "1");
   const query = params.toString();
   const response = await fetch(
     `/api/mission-board/${encodeURIComponent(missionId)}/events${query ? `?${query}` : ""}`,

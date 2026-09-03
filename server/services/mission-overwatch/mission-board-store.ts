@@ -11,7 +11,7 @@ export type MissionBoardStoredEvent = {
   toState?: string;
   evidenceRefs: string[];
   timerId?: string;
-  timerKind?: "countdown" | "deadline";
+  timerKind?: "countdown" | "deadline" | "stale_window";
   timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
   timerDueTs?: string;
   derivedFromEventId?: string;
@@ -30,6 +30,10 @@ export type MissionBoardStoredEvent = {
   gapSeverity?: "low" | "medium" | "high" | "critical";
   gapOpenedAt?: string;
   gapResolvedAt?: string;
+  certaintyClass?: "confirmed" | "reasoned" | "hypothesis" | "unknown";
+  failReason?: string;
+  suppressionReason?: string;
+  lastVerifiedAt?: string;
 };
 
 type MissionBoardStore = {
@@ -96,6 +100,10 @@ const readPayload = (
   gapSeverity?: unknown;
   gapOpenedAt?: unknown;
   gapResolvedAt?: unknown;
+  certaintyClass?: unknown;
+  failReason?: unknown;
+  suppressionReason?: unknown;
+  lastVerifiedAt?: unknown;
 } => {
   if (!value) return {};
   if (typeof value === "object") {
@@ -122,6 +130,10 @@ const readPayload = (
       gapSeverity?: unknown;
       gapOpenedAt?: unknown;
       gapResolvedAt?: unknown;
+      certaintyClass?: unknown;
+      failReason?: unknown;
+      suppressionReason?: unknown;
+      lastVerifiedAt?: unknown;
     };
   }
   if (typeof value === "string") {
@@ -149,6 +161,10 @@ const readPayload = (
         gapSeverity?: unknown;
         gapOpenedAt?: unknown;
         gapResolvedAt?: unknown;
+        certaintyClass?: unknown;
+        failReason?: unknown;
+        suppressionReason?: unknown;
+        lastVerifiedAt?: unknown;
       };
       if (parsed && typeof parsed === "object") {
         return parsed;
@@ -192,7 +208,12 @@ const rowToEvent = (row: MissionBoardRow): MissionBoardStoredEvent => {
     toState: typeof payload.toState === "string" ? payload.toState : undefined,
     evidenceRefs: normalizeEvidenceRefs(payload.evidenceRefs),
     timerId: typeof payload.timerId === "string" ? payload.timerId : undefined,
-    timerKind: payload.timerKind === "countdown" || payload.timerKind === "deadline" ? payload.timerKind : undefined,
+    timerKind:
+      payload.timerKind === "countdown" ||
+      payload.timerKind === "deadline" ||
+      payload.timerKind === "stale_window"
+        ? payload.timerKind
+        : undefined,
     timerStatus:
       payload.timerStatus === "scheduled" ||
       payload.timerStatus === "running" ||
@@ -235,6 +256,16 @@ const rowToEvent = (row: MissionBoardRow): MissionBoardStoredEvent => {
         : undefined,
     gapOpenedAt: typeof payload.gapOpenedAt === "string" ? payload.gapOpenedAt : undefined,
     gapResolvedAt: typeof payload.gapResolvedAt === "string" ? payload.gapResolvedAt : undefined,
+    certaintyClass:
+      payload.certaintyClass === "confirmed" ||
+      payload.certaintyClass === "reasoned" ||
+      payload.certaintyClass === "hypothesis" ||
+      payload.certaintyClass === "unknown"
+        ? payload.certaintyClass
+        : undefined,
+    failReason: typeof payload.failReason === "string" ? payload.failReason : undefined,
+    suppressionReason: typeof payload.suppressionReason === "string" ? payload.suppressionReason : undefined,
+    lastVerifiedAt: typeof payload.lastVerifiedAt === "string" ? payload.lastVerifiedAt : undefined,
   };
 };
 
@@ -297,6 +328,10 @@ const dbStore: MissionBoardStore = {
           gapSeverity: event.gapSeverity ?? null,
           gapOpenedAt: event.gapOpenedAt ?? event.ts ?? null,
           gapResolvedAt: event.gapResolvedAt ?? null,
+          certaintyClass: event.certaintyClass ?? null,
+          failReason: event.failReason ?? null,
+          suppressionReason: event.suppressionReason ?? null,
+          lastVerifiedAt: event.lastVerifiedAt ?? null,
         }),
       ],
     );

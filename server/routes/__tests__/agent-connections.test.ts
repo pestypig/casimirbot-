@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { HelixLocalSupervisorPresence } from "@shared/helix-local-supervisor-coordination";
 import type { HelixAgentAccountBindingProjection } from "../../services/helix-account/agent-account-link-store";
 import { createAgentConnectionsRouter } from "../agent-connections";
+import { HelixReasoningTaskBindingStore } from
+  "../../services/local-supervisor/reasoning-task-binding-store";
 
 const SESSION_ID = "session-owned";
 const PROFILE_ID = "profile-owned";
@@ -66,6 +68,7 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
     serviceInstanceRef: SERVICE_REF,
     listPresence: vi.fn(() => input?.presence ?? [presence()]),
   };
+  const reasoningStore = new HelixReasoningTaskBindingStore(coordinationStore);
   const resolveSession = vi.fn(async () => ({
     session_id: SESSION_ID,
     profile: { profile_id: PROFILE_ID },
@@ -74,9 +77,10 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
   app.use("/api/account", createAgentConnectionsRouter({
     bindingStore: { listBindings } as never,
     coordinationStore,
+    reasoningBindingStore: reasoningStore,
     resolveSession,
   }));
-  return { app, listBindings, coordinationStore, resolveSession };
+  return { app, listBindings, coordinationStore, reasoningStore, resolveSession };
 };
 
 const getReadiness = (app: express.Express, profile = "codex_app") =>
@@ -85,6 +89,23 @@ const getReadiness = (app: express.Express, profile = "codex_app") =>
     .set("Cookie", `helix_session=${SESSION_ID}`);
 
 describe("owner-scoped AI app connection readiness", () => {
+  it("does not apply its small JSON parser to sibling account routes", async () => {
+    const { app } = setup();
+    app.post(
+      "/api/account/profile-storage/snapshot",
+      express.json({ limit: "256kb" }),
+      (req, res) => res.status(200).json({ bytes: req.body.payload.length }),
+    );
+
+    const payload = "x".repeat(32 * 1024);
+    const response = await request(app)
+      .post("/api/account/profile-storage/snapshot")
+      .send({ payload })
+      .expect(200);
+
+    expect(response.body).toEqual({ bytes: payload.length });
+  });
+
   it("requires a signed-in profile and a supported client profile", async () => {
     const { app, listBindings } = setup();
     await request(app)
@@ -124,6 +145,7 @@ describe("owner-scoped AI app connection readiness", () => {
         client_presence: "online",
         catalog_sync: "current",
         thread_attachment: "attached",
+        continuation_readiness: "unavailable",
       },
     });
     const serialized = JSON.stringify(response.body).toLowerCase();
@@ -185,6 +207,34 @@ describe("owner-scoped AI app connection readiness", () => {
       hidden_reasoning_included: false,
       activity_completeness_claimed: false,
     });
+    expect(response.body.readiness.continuation_readiness).toBe("monitor_only");
+  });
+
+  it("projects polling only for a task that explicitly declares continuation readiness", async () => {
+    const { app } = setup({
+      presence: [presence({
+        thread_observability_bridge: {
+          supported_levels: [
+            "tool_activity_only",
+            "checkpoint_publish",
+            "continuation_ready",
+          ],
+          requested_level: "continuation_ready",
+          checkpoint_publication: {
+            freshness_window_seconds: 120,
+            retention: "current_session",
+            revocation: "independent",
+          },
+          declaration_basis: "authenticated_client_declaration",
+          provider_thread_content_included: false,
+          hidden_reasoning_included: false,
+          answer_authority: false,
+          terminal_eligible: false,
+        },
+      })],
+    });
+    const response = await getReadiness(app).expect(200);
+    expect(response.body.readiness.continuation_readiness).toBe("polling");
   });
 
   it("filters another profile, another node, stale, and unauthenticated presence", async () => {
@@ -234,5 +284,154 @@ describe("owner-scoped AI app connection readiness", () => {
       raw_claims_included: false,
     });
     expect(JSON.stringify(response.body)).not.toContain("secret-subject");
+  });
+
+  it("issues a show-once exact-task claim and dispatches typed and GPT Live steering through one route", async () => {
+    const harness = setup({
+      presence: [presence({
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only", "checkpoint_publish", "continuation_ready"],
+          requested_level: "continuation_ready",
+          checkpoint_publication: {
+            freshness_window_seconds: 120,
+            retention: "current_session",
+            revocation: "independent",
+          },
+          declaration_basis: "authenticated_client_declaration",
+          provider_thread_content_included: false,
+          hidden_reasoning_included: false,
+          answer_authority: false,
+          terminal_eligible: false,
+        },
+      })],
+    });
+    const claim = await request(harness.app)
+      .post("/api/account/session/agent-connections/reasoning-bindings/claims")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .send({
+        client_session_ref: "client-session-owned",
+        helix_conversation_id: "helix-chat-owned",
+        mission_id: "mission-owned",
+        run_id: "run-owned",
+      })
+      .expect(201);
+    expect(claim.headers["cache-control"]).toBe("no-store");
+    expect(claim.body.binding).toMatchObject({
+      status: "pending_claim",
+      continuation_transport: "polling",
+      hidden_reasoning_included: false,
+    });
+    expect(claim.body.claim_handle).toMatch(/^reasoning_claim:/);
+    const binding = harness.reasoningStore.claim({
+      profileRef: PROFILE_ID,
+      authenticatedMcpClientRef: "mcp-client-owned",
+      clientSessionRef: "client-session-owned",
+      claimHandle: claim.body.claim_handle,
+    });
+    const current = await request(harness.app)
+      .get("/api/account/session/agent-connections/reasoning-bindings/current")
+      .query({ helix_conversation_id: "helix-chat-owned" })
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .expect(200);
+    expect(current.body.binding).toMatchObject({
+      reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch,
+      status: "active",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    const latest = await request(harness.app)
+      .get("/api/account/session/agent-connections/reasoning-bindings/current")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .expect(200);
+    expect(latest.body.binding).toMatchObject({
+      reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch,
+      helix_conversation_id: "helix-chat-owned",
+      status: "active",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    const currentDispatch = await request(harness.app)
+      .post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .send({
+        helix_conversation_id: "helix-chat-owned",
+        client_event_ref: "current-event",
+        origin: "typed",
+        instruction_text: "Private current-binding steering text",
+      })
+      .expect(202);
+    expect(currentDispatch.body.binding).toMatchObject({
+      reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch,
+      status: "active",
+    });
+    expect(currentDispatch.body.event).toMatchObject({
+      origin: "typed",
+      delivery_state: "pending",
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(JSON.stringify(currentDispatch.body)).not.toContain("Private current-binding");
+    await request(harness.app)
+      .post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .send({
+        helix_conversation_id: "helix-chat-other",
+        client_event_ref: "wrong-chat-event",
+        origin: "typed",
+        instruction_text: "Must not fall back to the latest binding",
+      })
+      .expect(404);
+    for (const [origin, ref] of [["typed", "typed-event"], ["gpt_live_finalized", "voice-event"]] as const) {
+      const dispatched = await request(harness.app)
+        .post("/api/account/session/agent-connections/reasoning-bindings/steering")
+        .set("Cookie", `helix_session=${SESSION_ID}`)
+        .send({
+          reasoning_binding_id: binding.reasoning_binding_id,
+          binding_epoch: binding.binding_epoch,
+          client_event_ref: ref,
+          origin,
+          instruction_text: `Private ${origin} steering text`,
+        })
+        .expect(202);
+      expect(dispatched.body.event).toMatchObject({ origin, delivery_state: "pending" });
+      expect(JSON.stringify(dispatched.body)).not.toContain(`Private ${origin}`);
+    }
+    const deliveries = harness.reasoningStore.read({
+      profileRef: PROFILE_ID,
+      clientSessionRef: "client-session-owned",
+      bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch,
+    });
+    expect(deliveries.map((entry) => entry.event.origin)).toEqual([
+      "typed",
+      "typed",
+      "gpt_live_finalized",
+    ]);
+    harness.reasoningStore.acknowledge({
+      profileRef: PROFILE_ID,
+      clientSessionRef: "client-session-owned",
+      bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch,
+      eventRef: deliveries[0].event.steering_event_ref,
+    });
+    const inspected = await request(harness.app)
+      .get(
+        `/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(binding.reasoning_binding_id)}` +
+          `/steering/${encodeURIComponent(deliveries[0].event.steering_event_ref)}`,
+      )
+      .query({ binding_epoch: binding.binding_epoch })
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .expect(200);
+    expect(inspected.body.event).toMatchObject({
+      delivery_state: "acknowledged",
+      provider_thread_content_included: false,
+      hidden_reasoning_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(JSON.stringify(inspected.body)).not.toContain("Private typed steering text");
   });
 });

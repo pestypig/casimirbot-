@@ -32,7 +32,7 @@ type MissionBoardEvent = {
   toState?: string;
   evidenceRefs: string[];
   timerId?: string;
-  timerKind?: "countdown" | "deadline";
+  timerKind?: "countdown" | "deadline" | "stale_window";
   timerStatus?: "scheduled" | "running" | "expired" | "cancelled" | "completed";
   timerDueTs?: string;
   derivedFromEventId?: string;
@@ -50,6 +50,10 @@ type MissionBoardEvent = {
   gapSummary?: string;
   gapSeverity?: "low" | "medium" | "high" | "critical";
   gapResolvedAt?: string;
+  certaintyClass?: "confirmed" | "reasoned" | "hypothesis" | "unknown";
+  failReason?: string;
+  suppressionReason?: string;
+  lastVerifiedAt?: string;
 };
 
 type MissionBoardSnapshot = {
@@ -100,7 +104,7 @@ const actionSchema = z.object({
 
 const timerPayloadSchema = z.object({
   timerId: z.string().trim().min(1).max(200),
-  timerKind: z.enum(["countdown", "deadline"]).default("countdown"),
+  timerKind: z.enum(["countdown", "deadline", "stale_window"]).default("countdown"),
   status: z.enum(["scheduled", "running", "expired", "cancelled", "completed"]),
   dueTs: z.string().datetime(),
   derivedFromEventId: z.string().trim().min(1).max(200).optional(),
@@ -124,6 +128,10 @@ const contextEventSchema = z.object({
   gapSummary: z.string().trim().min(1).max(500).optional(),
   gapSeverity: z.enum(["low", "medium", "high", "critical"]).optional(),
   gapResolvedAt: z.string().datetime().optional(),
+  certaintyClass: z.enum(["confirmed", "reasoned", "hypothesis", "unknown"]).default("unknown"),
+  failReason: z.string().trim().min(1).max(200).optional(),
+  suppressionReason: z.string().trim().min(1).max(200).optional(),
+  lastVerifiedAt: z.string().datetime().optional(),
 });
 
 const ackSchema = z.object({
@@ -209,6 +217,10 @@ const getMissionEvents = async (missionId: string): Promise<MissionBoardEvent[]>
       gapSummary: event.gapSummary,
       gapSeverity: event.gapSeverity,
       gapResolvedAt: event.gapResolvedAt,
+      certaintyClass: event.certaintyClass,
+      failReason: event.failReason,
+      suppressionReason: event.suppressionReason,
+      lastVerifiedAt: event.lastVerifiedAt,
     });
   }
   return normalized.sort((a, b) => {
@@ -355,19 +367,23 @@ missionBoardRouter.get("/:missionId/events", async (req, res) => {
   }
 
   const limit = parseLimit(req.query.limit, 50);
+  const tail = req.query.tail === "1" || req.query.tail === "true";
   const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
   const cursor = cursorRaw ? Number(cursorRaw) : 0;
   const offset = Number.isFinite(cursor) ? Math.max(0, Math.floor(cursor)) : 0;
 
   try {
     const events = await getMissionEvents(missionId);
-    const slice = events.slice(offset, offset + limit);
-    const nextCursor = offset + slice.length < events.length ? offset + slice.length : null;
+    const resolvedOffset = tail ? Math.max(0, events.length - limit) : offset;
+    const slice = events.slice(resolvedOffset, resolvedOffset + limit);
+    const nextCursor = tail
+      ? null
+      : resolvedOffset + slice.length < events.length ? resolvedOffset + slice.length : null;
 
     return res.json({
       missionId,
       events: slice,
-      cursor: offset,
+      cursor: resolvedOffset,
       nextCursor,
     });
   } catch (error) {
@@ -483,6 +499,10 @@ missionBoardRouter.post("/:missionId/context-events", async (req, res) => {
     gapSummary: payload.gapSummary,
     gapSeverity: payload.gapSeverity,
     gapResolvedAt: payload.gapResolvedAt,
+    certaintyClass: payload.certaintyClass,
+    failReason: payload.failReason,
+    suppressionReason: payload.suppressionReason,
+    lastVerifiedAt: payload.lastVerifiedAt,
   };
 
   try {

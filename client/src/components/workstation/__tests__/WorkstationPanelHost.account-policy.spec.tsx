@@ -58,6 +58,23 @@ describe("WorkstationPanelHost account policy", () => {
     expect(screen.queryByText(/reserved for developer mode/i)).toBeNull();
   });
 
+  it("keeps the motorcycle HUD engineering lab developer-only", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ account_policy: HELIX_USER_ACCOUNT_POLICY }),
+      })),
+    );
+    await fetchAccountCapabilityPolicy();
+
+    render(<WorkstationPanelHost panelId="motorcycle-hud-lab" />);
+
+    expect(screen.getByText("Motorcycle HUD Lab is locked")).toBeTruthy();
+    expect(screen.getByText(/reserved for developer mode/i)).toBeTruthy();
+    expect(screen.queryByTestId("motorcycle-hud-lab")).toBeNull();
+  });
+
   it("renders the safe local harness status surface for public users", async () => {
     vi.stubGlobal("React", React);
     vi.stubGlobal(

@@ -238,6 +238,113 @@ public final class CompanionInventoryCustody {
         }
     }
 
+    /**
+     * Atomically settles one already-completed, player-semantic Survival break
+     * into the canonical companion inventory. The caller owns rollback of the
+     * world prestate if this transaction is rejected; this method owns all
+     * canonical tool/drop state and its exact custody revision.
+     */
+    public Receipt settleMining(
+        String transactionId,
+        CompanionPresenceRuntime.ActionLease lease,
+        long expectedRevision,
+        int toolSlot,
+        ItemStack expectedToolBefore,
+        int toolDamageDelta,
+        List<ItemStack> drops,
+        BooleanSupplier backendCommit
+    ) {
+        Objects.requireNonNull(expectedToolBefore);
+        Objects.requireNonNull(drops);
+        if (toolSlot < -1 || toolSlot >= actor.canonicalInventory().getContainerSize()) {
+            throw new CustodyException("mining_tool_slot_denied");
+        }
+        String dropIdentity = drops.stream()
+            .map(CompanionInventoryCustody::stackIdentity)
+            .sorted()
+            .reduce("", (left, right) -> left + ';' + right);
+        String transactionFingerprint = "mining|" + expectedRevision + '|' + toolSlot
+            + '|' + stackIdentity(expectedToolBefore) + '|' + toolDamageDelta + '|' + dropIdentity;
+        Receipt replay = replay(transactionId, transactionFingerprint);
+        if (replay != null) return replay;
+        validate(transactionId, lease, expectedRevision, 1);
+
+        ItemStack currentTool = toolSlot < 0
+            ? ItemStack.EMPTY
+            : actor.canonicalInventory().getItem(toolSlot).copy();
+        if (!ItemStack.matches(currentTool, expectedToolBefore)) {
+            throw new CustodyException("canonical_mining_tool_prestate_mismatch");
+        }
+        if (toolDamageDelta < 0 || (toolDamageDelta > 0 && !currentTool.isDamageableItem())) {
+            throw new CustodyException("mining_tool_wear_invalid");
+        }
+
+        SimpleContainer settledInventory = new SimpleContainer(actor.canonicalInventory().getContainerSize());
+        restoreContainer(settledInventory, copyContainer(actor.canonicalInventory()));
+        boolean toolBroke = false;
+        if (toolSlot >= 0 && toolDamageDelta > 0) {
+            ItemStack settledTool = currentTool.copy();
+            int damageAfter = settledTool.getDamageValue() + toolDamageDelta;
+            toolBroke = damageAfter >= settledTool.getMaxDamage();
+            if (toolBroke) settledTool = ItemStack.EMPTY;
+            else settledTool.setDamageValue(damageAfter);
+            settledInventory.setItem(toolSlot, settledTool);
+        }
+        int dropCount = 0;
+        for (ItemStack drop : drops) {
+            if (drop == null || drop.isEmpty()) continue;
+            ItemStack remainder = drop.copy();
+            dropCount += remainder.getCount();
+            for (int slot = 0; slot < settledInventory.getContainerSize() && !remainder.isEmpty(); slot++) {
+                ItemStack existing = settledInventory.getItem(slot);
+                if (!settledInventory.canPlaceItem(slot, remainder)) continue;
+                if (!existing.isEmpty() && !ItemStack.isSameItemSameComponents(existing, remainder)) continue;
+                int room = remainder.getMaxStackSize() - (existing.isEmpty() ? 0 : existing.getCount());
+                if (room <= 0) continue;
+                int moved = Math.min(room, remainder.getCount());
+                merge(settledInventory, slot, remainder, moved);
+                remainder.shrink(moved);
+            }
+            if (!remainder.isEmpty()) throw new CustodyException("companion_inventory_full");
+        }
+
+        StateSnapshot before = snapshot(null);
+        String beforeHash = stateHash(null);
+        try {
+            restoreContainer(actor.canonicalInventory(), copyContainer(settledInventory));
+            requireBackendCommit(backendCommit);
+            long beforeRevision = revision;
+            revision++;
+            Receipt receipt = new Receipt(
+                transactionId,
+                toolBroke ? "mining_settlement_tool_broke" : "mining_settlement",
+                beforeRevision,
+                revision,
+                toolSlot,
+                -1,
+                "drops:" + dropIdentity,
+                -toolDamageDelta,
+                dropCount,
+                beforeHash,
+                stateHash(null),
+                false,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false
+            );
+            settled.put(transactionId, new SettledTransaction(transactionFingerprint, receipt));
+            return receipt;
+        } catch (RuntimeException failure) {
+            restore(before, null);
+            throw rollbackFailure(failure, beforeHash, stateHash(null));
+        }
+    }
+
     public PersistentState snapshotForRestart(DeathPolicy deathPolicy) {
         if (released) throw new CustodyException("companion_custody_released");
         return new PersistentState(

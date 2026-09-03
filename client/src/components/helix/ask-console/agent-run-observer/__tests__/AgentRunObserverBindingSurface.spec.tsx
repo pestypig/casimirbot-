@@ -235,6 +235,54 @@ describe("AgentRunObserverBindingSurface", () => {
     expect(view.queryByText("chat-claim:shown-once")).toBeNull();
   });
 
+  it.each([404, 410])(
+    "clears an already unavailable binding locally when disconnect returns %s",
+    async (status) => {
+      const key = "helix.agent-run-observer.binding.v1:chat-selected";
+      mocks.disconnectBinding.mockRejectedValueOnce(
+        new AgentRunObserverApiError({
+          code: status === 404 ? "not_found" : "binding_expired",
+          status,
+          message: status === 404
+            ? "Observer binding not found."
+            : "The observer binding has expired.",
+        }),
+      );
+      const view = render(
+        <AgentRunObserverBindingSurface contextId="desktop" />,
+      );
+      fireEvent.click(
+        await view.findByRole("button", {
+          name: "Authorize selected chat",
+        }),
+      );
+      expect(await view.findByText("chat-claim:shown-once")).toBeInTheDocument();
+      window.sessionStorage.setItem(
+        key,
+        JSON.stringify({
+          bindingRef: "chat-binding:opaque-1",
+          chatSessionId: "chat-selected",
+        }),
+      );
+
+      fireEvent.click(view.getByRole("button", { name: "Disconnect" }));
+
+      await waitFor(() =>
+        expect(mocks.disconnectBinding).toHaveBeenCalledWith(
+          "chat-binding:opaque-1",
+        ),
+      );
+      expect(
+        await view.findByRole("button", {
+          name: "Authorize selected chat",
+        }),
+      ).toBeInTheDocument();
+      expect(window.localStorage.getItem(key)).toBeNull();
+      expect(window.sessionStorage.getItem(key)).toBeNull();
+      expect(view.queryByRole("alert")).toBeNull();
+    },
+  );
+
   it("self-heals a durable binding from a previous browser profile after an inspect 404", async () => {
     const key = "helix.agent-run-observer.binding.v1:chat-selected";
     const otherKey = "helix.agent-run-observer.binding.v1:chat-other";

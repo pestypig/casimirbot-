@@ -1268,8 +1268,9 @@ SHA-256 is
 the compiled controller artifact reports
 `sha256:f6809cdd3289f37515335a1d9c597b3f6c615380cbe4a90de306857ca890e6ba`.
 
-The private MCP implementation now exposes two developer/profile-gated,
-read-only tools when the exact expiring hash-pinned configuration is active:
+The private MCP implementation now exposes two exact-profile-gated, read-only
+tools when the expiring hash-pinned configuration is active. Explicitly
+injected readers remain developer-only:
 
 - `helix_minecraft_companion_custody_evidence_read` for A1 exact evidence
   re-entry; and
@@ -1317,4 +1318,409 @@ Fabric mechanics, OAuth scopes, keyed service, private reader, or room policy.
 Until the two C2 tools are projected into this exact authenticated task, live
 A1/B and exact observation re-entry remain unproved.
 
-**PASS — deterministic direct-Fabric C2 mechanics. A1/B OPEN. STOP before C3.**
+The next catalog audit recovered the authenticated MCP projection and exposed
+the accepted C0 presence and C1 follow readers, but still omitted only the two
+C2 custody readers. The keyed UI concurrently identified the active session as
+`profile:g2-a1-codex` with its local developer profile. Code comparison found
+the first exact divergence: unlike C0 and C1, C2 applied the generic
+`developer` account-type check to the exact owner-scoped private-config branch
+as well as the injected-reader branch. C2 now follows the established private
+admission contract: an exact expiring owner-profile configuration may project
+the read-only tools, while an injected reader remains developer-only. The
+focused MCP and reader suites pass 7/7 after this repair. The retained keyed
+server was stopped normally and relaunched through the approved opaque
+launcher; the patched canonical checkout reached `[express] app ready` on
+port 1522. No Minecraft, installed EXE, or Docker process was restarted. Live
+A1/B still awaits the post-reload Codex MCP catalog refresh and therefore is
+not yet claimed.
+
+## C2 A1 authenticated-MCP execution record — 2026-08-31
+
+After the exact-profile private admission repair and one supported Codex MCP
+catalog refresh, both C2 custody tools were present in the authenticated task.
+The private A1 reader admitted the frozen actor identity, controller artifact
+`sha256:f6809cdd3289f37515335a1d9c597b3f6c615380cbe4a90de306857ca890e6ba`
+and custody revision `5`. It returned the hash-pinned 4/4 Fabric receipt with
+zero duplication or loss and stored observation:
+
+`mcp_evidence_observation:helix.minecraft.companion_custody_evidence.inspect:0226e974-934c-4c85-885b-2e13d6f0fa71`
+
+Exact retrieval by that opaque reference succeeded with valid provenance. The
+re-entered payload retained false public exposure, execution, inventory
+execution, mining, crafting, combat, World, answer and terminal authority.
+
+Immutable record:
+
+`artifacts/eh-mc-companion-survival-party-v1/A1/c2-custody-mcp-live/attempt-1/manifest.json`
+
+Its SHA-256 is
+`7bc2a68eb8241e00d1b2a1ace01fab508c633e330c9ceef17fa3f340e2aa6d73`.
+
+**PASS — private authenticated-MCP C2 A1.**
+
+## C2 B keyed-Helix owner-room execution record — 2026-08-31
+
+The exact C2 projection succeeded in dedicated owner room
+`shared_realtime_room:0fae8e23-3bd3-4a20-8bd7-7cdc8eb4cfd1` and stored
+observation:
+
+`mcp_evidence_observation:helix.minecraft.companion_room_custody_evidence.inspect:0a0765f5-e1ec-4b42-adaa-a6c44f95c212`
+
+Exact re-entry succeeded with valid provenance, current owner role, exact
+identity/revision matching, active room admission, zero commands and no
+environment mutation. A deliberately stale custody revision `6` failed with
+`companion_custody_identity_or_revision_mismatch`, `retryable=true`.
+
+With the user's exact confirmation, the browser lifecycle control closed only
+that dedicated room. Room inspection reported `closed`; an identical C2 read
+then failed with `companion_custody_room_revoked`, `retryable=false`. A new
+owner room,
+`shared_realtime_room:4c89cd3f-926e-4e24-8ee6-268bbdb6a27d`, admitted the
+same read-only projection and exact re-entry of fresh observation:
+
+`mcp_evidence_observation:helix.minecraft.companion_room_custody_evidence.inspect:1c8142e8-855c-45ee-b0e7-153637af4a8c`
+
+The reconnect room remains open solely as an inert acceptance artifact. It
+holds no environment binding, inventory execution, mining, crafting, combat,
+World, answer or terminal authority.
+
+Immutable record:
+
+`artifacts/eh-mc-companion-survival-party-v1/B/c2-custody-keyed-helix/attempt-1/manifest.json`
+
+Its SHA-256 is
+`6ddaaaa83997dfdc353c83c2f70a5168f87fe7e8fa42fb510ac5859c73ae996e`.
+
+**PASS — keyed owner-room C2 projection, stale denial, revocation and fresh
+inert reconnect.**
+
+## C2 decision and stop
+
+**PRIVATE C2 A0/A1/B IS LIVE ACCEPTED. STOP before C3 survival locomotion.**
+
+This closes only transactional companion inventory/equipment custody and its
+private evidence tripath. It does not authorize public companion custody,
+inventory execution through MCP, survival locomotion, mining, crafting,
+combat, World authority, answer authority or terminal authority.
+
+## C3 / S5 exact Survival mining implementation packet
+
+Program gate: G8 — environment-harness release evaluation; S5 after privately accepted C2 A0/A1/B
+Workstream: Deterministic exact-target Minecraft companion Survival mining
+Capability or component: `resident.minecraft.companion-mining.v1` over the accepted player-semantic backend and C2 canonical custody
+Lifecycle stage: Exact admission -> tick-local progress -> interrupt or atomic block/drop/tool settlement -> release -> evidence re-entry
+Reaction timescale: One Minecraft server tick for lease, target, reach and interruption checks; event-driven Codex target and priority changes
+Authority owner: The owner room admits the finite action; the Fabric arbiter owns the effect lease and settlement; Codex owns semantic intent only
+Current maturity: `live accepted` for the private C3 A0/A1/B slice and matched real-client differential
+Target maturity: `live accepted` for private C3 A0/A1/B plus one matched real-client differential
+Required evidence: Dirt by hand; stone with wooden pickaxe; wrong-tool no-drop; durability and breakage; Haste, Mining Fatigue, submerged and airborne timing; protection cancellation; target replacement; knockback/range loss; lease expiry; Emergency Stop; restart before settlement; exact block/drop/C2 revision settlement; retry/stale/revoked isolation; authenticated observation re-entry; matched real-client first-divergence trace
+Explicit non-goals: No arbitrary exploration, target selection, crafting, combat, commands, World Authority, public capability, answer authority or terminal authority; no instant or command-based block breaking; no C4 gather/craft
+Downstream gate unlocked: C4/S6 bounded gather and craft only after all C3 paths pass
+
+The exact admitted target is immutable for one mining action. A replacement at
+the same position is a stale prestate, not a new implicit target. Lease expiry,
+Emergency Stop, protection denial, target replacement and reach loss must abort
+before mutation and leave zero late drops or wear. Successful settlement owns
+one custody revision and couples the normal Survival block result, its exact
+drops and tool wear/breakage into one idempotent receipt. Screenshots remain
+supplemental; structured block, entity, tool and custody postconditions are the
+authority for promotion.
+
+**C3 is privately live accepted. No public C3 authority is promoted.**
+
+### C3 A0 implementation checkpoint — 2026-08-31
+
+The accepted player-semantic backend now feeds one revisioned C2 custody
+settlement. A successful normal Survival break couples tool wear or breakage and
+the exact spawned drops into the visible companion inventory, removes the
+settled item entities and emits a mining-only receipt. A rejected settlement
+restores the exact block prestate, removes the unowned just-created drops and
+leaves canonical inventory and custody revision unchanged. The progress loop
+also accepts a deterministic per-step guard so lease, target, reach and
+Emergency Stop changes abort before completion without waiting for Codex.
+
+Seven frozen Fabric cases now pass under one compiled controller artifact:
+
+- stone with a wooden pickaxe, one cobblestone and one durability;
+- stale custody rollback with zero orphan drops;
+- last-durability tool breakage without duplication;
+- lease expiry, target replacement, range loss and Emergency Stop guards;
+- dirt by hand, stone by hand with no drop, and Fabric protection cancellation;
+- restart between break and settlement, stale-incarnation denial, then fresh
+  settlement under the rotated incarnation; and
+- the exact modifier matrix, with grounded stone at 23 ticks, Haste I at 19,
+  Mining Fatigue I at 75, submerged at 113 and airborne at 113, followed by
+  exactly five cobblestone, five tool wear and five custody commits.
+
+The first tool-break run failed because its reporting code inferred breakage
+from the final tool slot being empty. The atomic transaction legitimately
+reused that slot for the cobblestone, so the inference was replaced by the
+settlement receipt's explicit operation. The unchanged economy assertions then
+passed. One attempted class-prefix filter matched zero tests and is explicitly
+excluded from evidence. The complete unfiltered server run passed all 33
+registered Fabric GameTests, including all seven frozen C3 cases. The range
+guard was then re-run by applying actual knockback and the resulting entity
+movement before the next tick-local guard; that exact filtered test also
+passed.
+
+The compiled three-class controller artifact is
+`sha256:49ac23c2031e6d67899e3b13b91c506c804edbc41213374d29d3285a7174765d`.
+The resulting immutable A0 payload is
+`artifacts/eh-mc-companion-survival-party-v1/A1/runtime/current-mining-evidence.json`
+with SHA-256
+`f78800c0bc8c1c27d917ea51c8247c3216788085d32509ff412828af6723cc75`.
+It records seven of seven frozen cases, custody revision `3`, exact actor,
+incarnation, environment, world and connector-epoch identity, zero late or
+duplicate effects, zero duplication or loss, and every broader-authority
+negative required by this packet.
+
+### C3 real-client differential — 2026-08-31
+
+The existing real-client oracle used actual held mouse input in Survival mode
+against stone with a wooden pickaxe. It passed at 23 action ticks with one
+durability and one cobblestone, exactly matching the A0 semantic backend. The
+before and after screenshots are supplemental evidence; the structured tick,
+drop and wear deltas are all zero and `first_divergence` is null. No command or
+World Authority participated.
+
+Immutable record:
+
+`artifacts/eh-mc-companion-survival-party-v1/real-client-differential/c3-stone-wood-pick/attempt-1/manifest.json`
+
+### C3 private MCP A1 and owner-room B implementation checkpoint — 2026-08-31
+
+Two exact-profile-gated, read-only MCP tools now exist behind the private
+expiring hash-pinned configuration:
+
+- `helix_minecraft_companion_mining_evidence_read`; and
+- `helix_minecraft_companion_room_mining_evidence_read`.
+
+The first re-enters the exact A0 identity, controller hash and custody revision.
+The second additionally rechecks current room membership, owner role and room
+status on every call. Neither tool can execute mining, mutate an environment,
+run a command, expose a public capability or acquire crafting, combat, World,
+answer or terminal authority. Injected readers remain developer-only.
+
+Focused private-reader and MCP acceptance passes eleven of eleven checks across
+the unchanged C2 regression, the C3 hash/owner/expiry/integrity reader suite and
+the C3 MCP suite. The ordered C3 B trace proves participant denial, stale
+revision denial, current-owner admission, exact stored-observation re-entry,
+revocation after closing the same room on the same connection, and a fresh
+inert owner reconnect. These are deterministic contract acceptances; they are
+not relabeled as live A1/B evidence.
+
+Deterministic immutable records:
+
+- `artifacts/eh-mc-companion-survival-party-v1/A1/c3-mining-mcp-deterministic/attempt-1/manifest.json`,
+  SHA-256 `66241ed7c09ac5229285aa9e9ffe89e2ebf99c81e2400aff74f8c23c4aadfcd0`;
+  and
+- `artifacts/eh-mc-companion-survival-party-v1/B/c3-mining-owner-room-deterministic/attempt-1/manifest.json`,
+  SHA-256 `c81f08fb792871525ab0d5a6753493836ce101c74d590631ada50419e6cf2069`.
+
+The remaining live boundary is deployment/catalog freshness. The installed EXE
+tunnel is authenticated and its client/chat attachment is current, but that
+installed service predates the C3 tools. The separate source-worktree listener
+also predates C3. Canonical preflight validates its ready exact-workspace
+receipt but fails closed with `supervisor_not_enforcing`, because it reports
+`external_process` rather than an enforcing keyed launcher receipt. Per the
+supervisor contract, this task did not terminate or replace that listener and
+did not inspect opaque launcher credentials. Live A1/B therefore remain open
+until an enforcing signed/opaque launcher can start the patched source service
+and the current Codex task receives the resulting catalog.
+
+### C3 patched installed-node deployment checkpoint — 2026-08-31
+
+The remaining deployment boundary was then crossed without replacing the
+non-enforcing port-1522 listener. The current worktree was packaged as the same
+`com.casimirbot.desktop` product identity. Runtime-tree verification passed
+with tunnel-client `0.0.13`; the isolated packaged service-boundary smoke passed
+missing/wrong authentication denial, authorized access and closed release.
+The exact packaged hashes are:
+
+- bundled service: `5ada568905beb97ca0992e3e2c030a977eb42afc6786f1718c1b3592ac02eb9d`;
+- runtime manifest: `4487ed4fde3a69572aedeeac6fe08877a619a105f19e1de1a42f985e3b7825dd`;
+- unpacked CasimirBot executable:
+  `b577737961b7e13c1cdf5da0a3a5b36c81cad69761c1df0906e7173a43d465d1`;
+  and
+- tunnel client: `83f08fb39b1c154747debd31b81b65dd4ee834cacf5a073b6301b2688699bc76`.
+
+Only the resident installed CasimirBot tree was stopped; Minecraft, Docker,
+Chrome, unrelated Node processes and the port-1522 listener were untouched.
+The patched unpacked EXE launched, reused the existing encrypted workstation
+profile and tunnel configuration, started its verified tunnel client, and the
+already-authenticated MCP connection reconnected successfully. Exact inspection
+of the retained C2 owner room succeeded after the service-epoch change.
+
+A dedicated current-owner C3 room was then created through authenticated MCP:
+
+`shared_realtime_room:300b085f-017d-4406-a164-130ec462f871`
+
+It is an inert one-owner room with no environment binding, command execution or
+broader authority. This turn's callable-tool snapshot was established before
+the patched EXE started, so it cannot yet name the newly deployed C3 readers.
+The next refreshed continuation must perform exact A1 read/re-entry and the B
+stale/revoke/reconnect sequence. No additional server or EXE restart is
+required.
+
+The first automatic continuation after deployment retained the Codex desktop
+task's pre-deployment callable-tool snapshot, so neither C3 reader was callable
+even though the patched node remained live. A bounded ephemeral `codex exec`
+acceptance client was then attempted with read-only sandboxing and exactly the
+two allowed A1 read/re-entry calls. It failed before any tool execution with a
+typed native-delegation boundary: the configured localhost MCP alias rejected
+that new process because it did not hold the Codex desktop tunnel delegation.
+The client returned `MCP_TOOL_UNAVAILABLE`; no observation was created and no
+room or environment mutation occurred. This proves that a transient CLI cannot
+borrow the desktop task's private tunnel identity and must not be used as an
+authentication bypass.
+
+The remaining first divergence is therefore a supported Codex desktop MCP
+catalog renegotiation for this exact task. After that reconnect, the patched
+node and dedicated owner room are already in place; execute A1 exact read and
+observation retrieval, then B stale denial, owner read/re-entry, room closure,
+post-close denial and fresh owner reconnect. Do not rebuild or restart
+CasimirBot again unless the patched node itself becomes unhealthy.
+
+### C3 full-tunnel transition checkpoint — 2026-09-01
+
+After a Codex desktop restart, the task still received the 69-tool Device Check
+transition-shadow catalog and the older direct localhost alias still exposed
+only the accepted C2 custody/follow readers. Live calls proved the distinction:
+`helix_client_authorization_status` was absent, room inspection returned
+`full_mcp_transition_required`, and supervisor coordination rejected the
+unregistered continuation. The patched EXE itself remained healthy on its
+authenticated loopback listeners; port 1522 was not stopped or replaced.
+
+The first-party Device Check panel then showed the actual native transport state
+as `Ready · tunnel-client 0.0.13 · Read-only coordination`. The read-only tunnel
+was stopped through that panel and immediately restarted with the product's
+explicit `Start full developer MCP` control. The panel then reported
+`Ready · tunnel-client 0.0.13 · Full developer MCP`. No credential was read,
+copied or exposed, and this transport-only change granted no room, environment,
+command, answer or terminal authority.
+
+The same already-advertised room-inspection call then crossed the full surface:
+instead of the transition-shadow error it returned the canonical
+`room_not_found` for the prior in-memory C3 room. A replacement inert owner room
+was created on the current full-MCP service instance:
+
+`shared_realtime_room:41c09948-f941-4e9e-a2c6-8b748b4abae7`
+
+It has one owner, no participant grant, no environment binding and no command
+authority. A later exact catalog read identified a deeper admission boundary:
+the full tunnel principal still projected `account_type: user`. The C3 mining
+descriptors are intentionally `developer`-only, so their absence was correct
+account policy rather than a stale full-tunnel catalog.
+
+The installed account panel showed the retained local password profile
+`qte-demo-dev@casimirbot.local`. The workstation's trusted
+`HELIX_DEVELOPER_PROFILE_IDS` allowlist already contains that exact identity,
+but the retained password session predates the production-policy admission and
+its stored account row remains `user`. The EXE was cleanly relaunched with the
+same exact per-process allowlist; Minecraft, Docker, Chrome and the unrelated
+port-1522 listener were not touched. Production recalculates the stored account
+type only during an authenticated sign-in, so the remaining operator boundary
+is one manual local-account sign-out/sign-in. Password entry must not be
+automated or copied through Codex. After that sign-in, re-open or verify `Full
+developer MCP`, then renegotiate the Codex MCP catalog and run the frozen A1 and
+B sequences.
+
+An alternate remote alias to `https://casimirbot.com/mcp` was tested because
+the source-tree discovery page names it as the release endpoint. The deployed
+origin currently serves the website HTML shell at `/mcp` and at the OAuth
+discovery locations, so Codex client registration failed before authorization
+with a non-JSON registration response. The temporary alias was removed. This
+was a release-path deployment gap, not an authentication denial and not a C3
+mechanics failure.
+
+### C3 packaged-evidence root repair — 2026-09-01
+
+Pre-sign-in acceptance preparation found one additional packaged-host
+divergence: the private C3 reader defaulted to `process.cwd()`, while a packaged
+desktop service runs beneath `resources/runtime` and intentionally does not
+ship the machine-specific private acceptance config or evidence. Therefore an
+otherwise developer-admitted installed tunnel would still disable C3 with
+`companion_mining_private_mcp_config_unavailable`.
+
+The reader now accepts the explicit
+`HELIX_PRIVATE_COMPANION_C3_WORKSPACE_ROOT` operator boundary, and the desktop
+host inherits only that credential-free path alongside the exact developer
+identity allowlist. Existing containment, bounded-regular-file, schema,
+expiry, owner-profile, evidence-hash, identity, controller-hash and custody-
+revision checks remain mandatory. The private config was retargeted from the
+retired localhost OAuth profile to the exact retained installed profile
+`user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF`; no additional profile was admitted.
+The deterministic MCP test now derives its owner from that private config
+instead of hard-coding a machine identity.
+
+Focused verification passed 16/16 across the private reader, authenticated C3
+MCP server and desktop service-environment boundary. The unpacked EXE was
+rebuilt and the isolated packaged service smoke passed. The runtime verifier
+reported a renderer-source mismatch because the root `dist/public` tree changed
+after staging; the staged and packed trees matched each other exactly at
+`1a0e4fdf156f02387f08d7a9c9c6a69033edf38b5b42b94d9e6a297050ab2d2a`.
+That concurrent renderer receipt is not accepted as a clean full-package gate
+and must be rerun after the unrelated renderer writer settles. It does not
+change the focused C3 service evidence above.
+
+**PASS — C3 A0, deterministic authenticated-MCP A1/B contracts and matched
+real-client differential. PATCHED EXE LIVE; MANUAL DEVELOPER SESSION
+REAUTHENTICATION AND LIVE A1/B TOOL CALLS REMAIN OPEN.**
+
+### C3 authenticated A1 and keyed owner-room B live acceptance — 2026-09-01
+
+The installed CasimirBot developer tunnel was reauthenticated and its refreshed
+Codex catalog exposed both exact C3 readers. The private A1 call admitted the
+frozen actor identity, controller artifact and custody revision without mining,
+command or environment authority. It returned all seven immutable cases with
+zero duplication or loss and stored:
+
+`mcp_evidence_observation:helix.minecraft.companion_mining_evidence.inspect:510bf16c-a8ef-4ec1-a7e2-22dcae713ed5`
+
+Exact observation re-entry succeeded through `helix_evidence_observation_get`
+and stored retrieval observation
+`mcp_evidence_observation:helix.mcp_evidence.observation.retrieve:ebcd0d0c-fc07-47d8-b9c9-85549b05f088`.
+
+The B sequence used the dedicated inert current-owner room:
+
+`shared_realtime_room:41c09948-f941-4e9e-a2c6-8b748b4abae7`
+
+The room had one present owner, no participant grant, no environment binding,
+no command authority and no active model runtime. A stale custody revision was
+rejected with `companion_mining_identity_or_revision_mismatch`. The exact
+current identity and revision then admitted the same immutable physical
+evidence and stored:
+
+`mcp_evidence_observation:helix.minecraft.companion_room_mining_evidence.inspect:38ef501c-927d-4d9e-95e4-8cdd157eeaa8`
+
+Its exact re-entry succeeded and stored retrieval observation
+`mcp_evidence_observation:helix.mcp_evidence.observation.retrieve:53c386be-5e4c-4a8f-8a95-6eeb6d783837`.
+
+After explicit operator confirmation, only that inert C3 room was closed through
+the product room lifecycle. Inspection reported `status=closed`, runtime
+`state=closed` and a non-null `closed_at`. The identical C3 room-bound read then
+failed before physical evidence admission with typed, non-retryable
+`companion_mining_room_revoked`.
+
+A fresh successor owner room proved reconnect without ambient carryover:
+
+`shared_realtime_room:ecbdb0fe-938a-4c59-93f3-3a8e2c4e2b92`
+
+Independent inspection reported `waiting_for_participant`, one present owner,
+all consent false, an idle unbound runtime and no environment or command
+authority. The old room remains closed and revoked. The successor remains open
+only as an inert acceptance artifact.
+
+The authorization-status diagnostic route separately rejected both otherwise
+working connectors because their bearer tokens projected no verified expiry.
+That route-specific diagnostic defect did not admit or execute any capability
+and did not affect the successful protected A1/B calls above; it remains a
+release-hardening issue rather than a C3 acceptance dependency.
+
+**PASS — PRIVATE C3 A0/A1/B AND THE MATCHED REAL-CLIENT DIFFERENTIAL ARE LIVE
+ACCEPTED. STOP BEFORE C4/S6 GATHER AND CRAFT.**
+
+This result authorizes only the exact private read-only evidence tripath for the
+frozen Survival mining micro-course. It does not expose a public mining
+capability or grant arbitrary exploration, target selection, gather/craft,
+combat, commands, World Authority, answer authority or terminal authority.

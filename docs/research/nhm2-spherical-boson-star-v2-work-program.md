@@ -2,9 +2,9 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G2H-E-S5 — inert primary execution-preflight decision**
+Active program gate: **G2H-E-S5-A4 — P8P observer progress and turnaround calibration**
 
-Status date: **August 30, 2026**
+Status date: **September 2, 2026**
 
 This document preserves the complete scientific objective while identifying the
 single gate that repository agents are permitted to treat as the current
@@ -26,8 +26,24 @@ Its subordinate staged delivery checklist is
 [`nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md`](./nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md);
 the checklist does not replace this canonical roadmap and its post-S5 rows are
 downstream forecasts only.
-The current bounded A4 corrective handoff is the
-[`H2 performance-successor packet`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-performance-successor-handoff.md).
+A separately versioned, nonperturbing apparatus-side planning lane is defined
+by the
+[`NHM2 source-to-experiment closure parallel work packet v1`](./nhm2-source-to-experiment-closure-parallel-work-packet-v1.md).
+It may prepare versioned contracts, candidate-neutral fixtures, prediction/
+falsifier definitions and the 447-provenance migration without evaluating the
+selected mini-boson-star member or changing P8P. It is apparatus-side input for
+a future BMR-I decision, not a second active program gate and not evidence for
+G3, physical viability, propulsion or transport.
+The current bounded A4 decision surface is the inert
+[`P8P observer progress and turnaround calibration`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-observer-progress-turnaround-calibration.md),
+selected by the completed
+[`P8O representative term/radius decision`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8o-representative-term-radius-decision-packet.md),
+which follows the completed
+[`P8N selector-path term/radius binding`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8n-selector-term-radius-binding.md),
+the
+[`P8M term/radius attribution fixture`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8m-term-radius-attribution-fixture.md),
+which follows the preserved
+[`P8K/P8L result adjudication`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8k-p8l-result-adjudication.md).
 Both serial H2 executions are now stopped with available partial evidence
 preserved. H2-P3 exact equivalence passes at 1/2/4/8/16 threads, including
 deterministic repeated 16-thread replay. The
@@ -549,10 +565,467 @@ absent. The immutable
 is `2cf0ef29...27f7b68` and independent audit passes 28/28 at
 `0ac59b69...ed50775`. R6 is exhausted; no VM, disk, build, numerical process
 or candidate activity occurred.
-The R2/R3 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
-18/18 files and 179/179 tests, and Casimir adapter run 2599 `PASS/GREEN`, trace
-`adapter:282c7fcd-777d-4cce-bee8-4c4389cafb23`, with certificate
+The separately researched
+[P8J-R7 regional single-VM bulk successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r7-regional-bulk-capacity-successor-proposal.md)
+is frozen at `1a2ac30f...f7469e`. It changes only provisioning: one regional
+`bulkInsert` request in `us-east1`, one predefined name, `count=1`,
+`min-count=1`, and `ANY_SINGLE_ZONE` allow Google to select among the three
+official C2D zones using available capacity. The exact `c2d-standard-32`
+machine, 30 GB `pd-balanced` disk, retained archives, build, fixture, binary,
+32-CPU process, ceilings, evidence ABI and all scientific/authority locks are
+unchanged. Independent static audit passes 42/42 at
+`00ffdfd4...158794b`. The sole authorized regional request selected
+`us-east1-c` but returned `VM_MIN_COUNT_NOT_REACHED` and
+`ZONE_RESOURCE_POOL_EXHAUSTED` because the exact 30 GB `pd-balanced` disk was
+unavailable. The immutable
+[R7 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r7-cloud-preexecution-result.md)
+is `948b2655...2556b5`; independent result audit passes 34/34 at
+`4804f4c7...65ca2ad`. The exact VM and disk remain absent, no build, fixture or
+numerical process ran, and R7 is exhausted. A storage-capacity successor must
+be separately researched and frozen; no automatic retry or substitution is
+authorized.
+The operator-confirmed
+[cloud cleanup](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-cloud-cleanup-result-20260831.md)
+then permanently removed eight superseded P4/P5 or completed-rescue VMs and
+twelve exact boot/clone disks, releasing 280 GB of nominal provisioned
+capacity. Post-check inventory retains six terminated source/audit VMs with
+their disks and all five READY snapshots. Authenticated local evidence remains
+unchanged; no VM started and no numerical or candidate process ran.
+The terminal R7 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter `PASS/GREEN`, trace
+`adapter:8317712f-4090-4e1d-8a00-0abd8c16fec2`, with certificate
 `6e84f965...e12a4e45` and integrity true.
+The separately researched
+[P8J-R8 storage-capacity successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r8-pd-standard-regional-capacity-successor-proposal.md)
+is frozen at `fd73febf...81b83`. R8 preserves the exact regional C2D request,
+retained archives, offline build, P8I fixture, P8J binary, 32-CPU
+representative attribution process, cost/runtime ceilings, evidence ABI and
+all scientific/authority locks from R7. It changes only the 30 GB boot-disk
+type from `pd-balanced` to C2D-supported `pd-standard`, directly testing the
+authenticated R7 `persistent_disk_availability` failure without changing the
+scientific calculation. Independent static audit passes 50/50 at
+`7ce6b0ff...d8ae4`. No R8 VM, disk, build, fixture or numerical process exists;
+its sole regional request requires separate exact operator authorization.
+The frozen R8 current-head checkpoint is math 323/323, root-to-leaf PASS,
+required WARP tests 8/8 files and 36/36 tests, and Casimir adapter run 5
+`PASS/GREEN`, trace `adapter:7a2cc478-df71-4d86-ad50-edba6c4b4f1e`, with
+certificate `6e84f965...e12a4e45` and integrity true.
+The sole authorized R8 attempt then stopped before preexecution admission.
+Browser terminal entry retained an earlier unsent partial prefix and
+concatenated it to the complete read-only guard; Bash returned
+`syntax error in conditional expression` and `syntax error near ';'` while
+parsing the compound line. No guard or `gcloud` query executed, and the sole
+regional `bulk create` request was never submitted. The immutable
+[R8 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r8-cloud-preexecution-result.md)
+is `28f66693...9abc43`; independent result audit passes 23/23 at
+`c99563ed...4af5d3`. R8 is exhausted with zero VM, disk, build, fixture,
+numerical process or candidate activity. Its `pd-standard` capacity hypothesis
+remains unobserved; any atomic command-transport successor must be separately
+versioned and frozen.
+The separately versioned
+[P8J-R9 atomic command-transport successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r9-atomic-command-transport-successor-proposal.md)
+is frozen at `f652f5af...1509a`. Its 7,132-byte orchestrator
+`7007992e...8e379` contains exactly one unchanged regional allocation request,
+one two-archive transfer, one remote setup and one fail-closed stop path. The
+9,512-character base64 representation is split into 30 observable cumulative
+chunks. The exact 33-command ledger is `4c94a957...a8d54`; definition audit
+passes 27/27 and independent proposal audit passes 29/29 at
+`f9844e2f...3c01ad`. Browser admission required the terminal textbox DOM value
+to equal each ledger command byte-for-byte before its sole Enter. The authorized
+protocol reconstructed all 7,132 bytes, passed preexecution, and allocated the
+exact `c2d-standard-32` VM in `us-east1-c` with a 30 GB `pd-standard` disk. SCP
+and Docker installation completed. The remote one-shot controller then became
+inactive before the five-second guard, returning outer exit `3`; fail-stop
+returned the VM to `TERMINATED`. The 9,037-byte Cloud Shell evidence archive is
+preserved locally at `ffe56577...f665`. No long numerical result is inferred
+and R9 is exhausted. The separately frozen
+[P8J-R10 stopped-disk rescue](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r10-stopped-disk-rescue-proposal.md)
+selects only read-only recovery of controller evidence from a snapshot-derived
+clone. Its rescue procedure is `387637b2...5cf`, its proposal is
+`45e8cc5c...2e36`, and its independent audit passes 14/14. Preparation created
+no recovery resource, numerical process, candidate ingress or authority.
+The result-only
+[P8J-R10 recovery audit](../../scripts/nhm2_g2h_e_s5_c08_h2_p8j_r10_recovery_result_audit.py)
+passes 16/16 on the immutable stopped-disk archive
+`c6a193fb...5dbf`. It classifies R9 as `environment/build`: both archived
+base images loaded with the preregistered identities, but the digest-qualified
+`FROM` token attempted a registry pull before any fixture build or numerical
+process. The separately versioned R11 controller
+`867f4b20...7a01` repairs only that offline image binding, and its definition
+audit passes 21/21 at `91cd993b...d463`. R11 crossed the former binding
+blocker and entered the fixture build, but its Cloud Shell launcher sent
+`SIGTERM` while the long-running `Type=oneshot` service was correctly still
+`activating`; immutable R11 recovery archive `0a350e53...6f88` and independent
+R12 audit 16/16 at `334a4c7b...2306` classify that result as
+`command transport / controller handoff`. R13 changes only that five-second
+handoff guard. Its definition audit passes 15/15 at `ff748905...5355`. Its sole
+bounded execution then completed all 65,536 candidate-neutral panels without
+timeout and automatically stopped. The
+[R14 stopped-disk recovery](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r14-stopped-disk-rescue.md)
+preserved the terminal record through a snapshot-derived read-only clone; the
+[R14 terminal result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8j-r14-terminal-result.md)
+passes independent recovery audit 37/37 at `a0ee190e...dc96864`.
+Execution, fixture and exact reconstruction pass, but the width rail remains a
+strict scientific failure: final radius/threshold is
+`1.025898515806916...`, and the direct integrated slot-3 contribution alone is
+`1.020137126125156...` of threshold. The exact boundary component is zero and
+the `gprime` hull strictly exceeds the `f` hull, selecting
+`P8J_DIRECT_INTEGRATION_GPRIME_HULL_ASYMMETRY_LEAD`. The frozen result auditor's
+preserved 4/9 failure is representational: it projected the manufactured
+1,086-term panel count onto the structurally derived 16,638-term representative
+panel and rejected a valid exact-zero boundary ball. It remains unchanged. The
+separately versioned P8K corrected replay passes 11/11 at receipt
+`a14cbb66...af4fc1`; P8L evidence localization passes 16/16 at
+`631cead0...5e98a`; and independent deterministic adjudication passes 29/29 at
+`1b83c284...c8ad7`. Strict interval comparison proves that neither the
+combined source-hull scale nor the integrated/direct translation gap can
+individually explain or close the direct excess. The P8M direct
+polynomial/moment term-radius fixture now passes 12/12 twice with exact
+ordinary/observed equality, 1,086 terms across 63 global degrees and finite
+nonnegative origin channels. The corrected independent audit passes 42/42 at
+receipt `b1a18eb7...525d09`; unchanged P8H and P8I regressions pass 11/11 and
+14/14. The channels are overlapping influence envelopes, not an additive
+causal decomposition. P8N now binds them exclusively to P8I slot 3 after the
+unchanged selector producer succeeds. Its fixed 514-bucket manufactured
+fixture passes 15/15 twice with exact ordinary/observed Output and Result
+equality, exact P8I count and six-aggregate agreement, 2,172 terms across 63
+populated degrees and deterministic 1-thread/2-thread replay. The first audit
+is preserved at 44/45 because its line-sensitive capacity predicate missed the
+multiline declaration; the versioned correction passes 45/45 at receipt
+`6a132349...3f5074a`. P8O independently authenticates that a complete
+representative receipt would be evidence-distinguishable, but current P8N adds
+an uncalibrated serial 65,536-panel phase covering exactly 1,090,387,968 term
+observations and exposes no observer progress callback. Its versioned decision
+audit passes 40/40 at `15b7db5b...a214928` and selects the inert P8P progress/
+turnaround calibration lead instead of freezing a broad multi-day full-run
+proposal. No calibration or representative rerun is eligible under P8O/P8P
+itself; all authority locks remain false.
+P8P now adds a separately versioned, return-free `noexcept` observer callback
+around immutable P8N. Its strict manufactured fixture passes 16/16 with exact
+callback-disabled/callback-enabled equality for complete Output and Result,
+every P8I field, all 514 degree buckets, six origin totals, term counts and
+success/failure chronology. The corrected independent definition audit passes
+47/47 at receipt `e280a99c...aabd`; the preserved first audit is 46/47 due only
+to a whitespace-sensitive documentation predicate. The separately frozen
+P=1024 cloud-calibration proposal is candidate-neutral and has a 26/26
+preexecution audit at receipt `39152066...835b`. The current checkpoint is math
+323/323, WARP 18/18 files and 179/179 tests, and Casimir adapter run 2614
+`PASS/GREEN` with certificate `6e84f965...e45` and integrity true. No
+calibration process or cloud resource has been created;
+separate authorization remains required. Its preregistered P8Q classifier may
+only decide whether one P=65,536 observation is resource-bounded and proposal-
+ready or whether algorithmic performance work remains necessary. It cannot
+authorize that full run or promote scientific authority.
+Cloud Shell quota exhaustion subsequently blocked the original staging route
+before resource creation. A transport-only browser-SSH amendment is frozen at
+`373cc75f...db682` and independently cleared 37/37 at receipt
+`0a94a294...af0d`. It changes only the authenticated two-archive ingress and
+stopped-VM serial recovery route; the P8P calculation, resource ceilings,
+single-process rule, P8Q classifier and all authority locks remain unchanged.
+The amendment checkpoint passes math 323/323, WARP 18/18 files and 179/179
+tests, and Casimir adapter run 2615 `PASS/GREEN` with certificate
+`6e84f965...e45` and integrity true.
+The separately authorized browser-SSH attempt then stopped before resource
+creation because the authenticated public-image selector did not offer the
+frozen `debian-12-bookworm-v20260817` image; exact filtering returned no match.
+The immutable [P8P browser-SSH preexecution result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-browser-ssh-preexecution-result.md)
+therefore classifies the attempt as
+`BLOCKED_PREEXECUTION_EXACT_IMAGE_UNAVAILABLE_IN_BROWSER_UI`: zero VM, upload,
+Docker installation, calibration or P8Q decision occurred. The inert
+[P8P-R1 host-image correction](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r1-browser-image-binding-correction.md)
+changes only the host image to the currently selectable exact Debian 12
+`v20260826` binding. It grants no execution authority and requires separate
+authorization.
+The separately authorized R1 creation attempt was then consumed exactly once.
+Google rejected the exact `c2d-standard-32` allocation in `us-east1-c` with
+`ZONE_RESOURCE_POOL_EXHAUSTED` seven seconds after submission. The immutable
+[P8P-R1 cloud preexecution result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r1-cloud-preexecution-result.md)
+at raw SHA-256 `53ccf71d...4540708` records operation
+`5705384745999434684` and classifies R1 as
+`BLOCKED_PREEXECUTION_ZONE_RESOURCE_POOL_EXHAUSTED`: no usable VM or disk,
+upload, Docker installation, build, calibration, result audit or P8Q decision
+occurred. R1 is exhausted under the frozen first-failure/no-retry rule. A
+separately versioned and authorized capacity successor is required; no retry or
+resource substitution is implied.
+The R1 result is now independently checked 11/11 at raw result SHA-256
+`53ccf71d...4540708`. The separately versioned
+[P8P-R2 zone-capacity successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r2-zone-capacity-successor-proposal.md)
+is frozen at raw SHA-256 `0068d40d...bde483e` and independently audited 20/20.
+It changes only the predefined VM name and placement from exhausted
+`us-east1-c` to the previously unused supported C2D pool `us-east1-d`; the
+machine, image, 30 GB `pd-standard` disk, browser-SSH transport, two archives,
+offline build, executable, sole P=1024 workload, receipts, ceilings, result
+auditor, P8Q rule and authority locks remain unchanged. R2 has created no
+resource and started no process. Its one creation/calibration attempt requires
+separate exact authorization; no retry or fallback is implied.
+The additive
+[P8P-R2 browser guest ledger](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r2-browser-guest-ledger.md)
+is frozen at raw SHA-256 `fd84d024...0048188`. Its exact 2,845-byte shell
+ledger is `d7f98f54...f536a6`, passes local `bash -n`, and independently audits
+21/21. It fixes guest identity, both archive hashes, all three absence guards,
+base-before-overlay extraction, all 11 manifest entries, the all-false
+authority object, narrow Debian `docker.io` admission and exactly one terminal
+controller invocation. It is not a third upload and has not been executed.
+R2 still requires separate creation authorization and an action-time Docker
+installation confirmation before the ledger may be entered.
+The separately authorized R2 attempt then created the exact VM in `us-east1-d`,
+authenticated its frozen C2D/image/disk bindings and connected through browser
+SSH. The first 236,492,800-byte base-archive transfer ended with
+`Transferred 0 items` and `Failed`. Under the first-failure rule, no Retry or
+second upload occurred, the guest ledger was not entered, Docker and the P=1024
+process never started, and the VM was returned to `Stopped`. The immutable
+[R2 upload result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r2-browser-upload-preexecution-result.md)
+at SHA-256 `f2157dc1...ca518a` passes independent audit 14/14. R2 is exhausted
+as infrastructure/preexecution evidence. The next eligible lead is only a
+separately frozen archive-ingress successor; P8Q remains unevaluated and no
+retry, alternate transport, numerical execution or authority promotion is
+implied.
+The candidate-neutral
+[P8P-R3 chunked browser-ingress successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r3-chunked-browser-ingress-successor-proposal.md)
+was frozen at SHA-256 `b85d4db9...2d61e5c` and independently audited 19/19.
+It changes only transport: the unchanged 236,492,800-byte base archive is
+bound as fifteen ordered parts no larger than 16 MiB, with the unchanged
+overlay as the sixteenth staged file, and guest reconstruction must reproduce
+the original base byte count and SHA-256 before the unchanged controller is
+eligible. The exact authorization materialized and verified all sixteen local
+files and created the exact R3 VM in `us-east1-d`. The first browser-SSH
+surface then failed with `Supplied fingerprint does not match current metadata
+fingerprint.` First failure was terminal: no Retry, Troubleshoot, upload,
+guest command, Docker installation, build or numerical process occurred, and
+the VM was returned to `Stopped`. The immutable
+[R3 SSH-fingerprint result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r3-ssh-fingerprint-preexecution-result.md)
+is `BLOCKED_PREEXECUTION_INSTANCE_METADATA_FINGERPRINT_CONFLICT`; it applies only
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`. R3 is exhausted. The next eligible
+lead is a separately frozen fresh-page metadata successor. Google documents the
+exact message as an optimistic-lock conflict on the metadata-content
+fingerprint, not an SSH host-key mismatch; offline host-key attestation is not
+selected. P8Q remains unevaluated and no scientific or authority promotion is
+implied. The result is independently audited 20/20 at raw SHA-256
+`25278b2a...d96289`; the auditor is `9e8edda4...ac244d`. The terminal R3
+checkpoint is math 323/323, WARP 18/18 files and 179/179 tests, and Casimir
+adapter run 2619 `PASS/GREEN`, trace
+`adapter:73caeae1-3ef9-4697-91ee-49d11e27f82d`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+The candidate-neutral
+[P8P-R4 fresh-metadata successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r4-fresh-metadata-browser-ssh-successor-proposal.md)
+is frozen at SHA-256 `5202340a...69055e` and independently audits 20/20 at
+auditor SHA-256 `86451281...821040`. It preserves the exact stopped R3 VM,
+sixteen staged files, scientific bytes, controller, executable, resource and
+runtime ceilings, evidence ABI, first-failure rule and P8Q classifier. It
+changes only the browser metadata transaction: one separately authorized
+restart must be followed by one freshly reloaded exact instance Details page
+and one new browser-SSH surface using the current metadata version. No R4
+resource action or process has occurred; separate billable-action authorization
+is required. The R4 checkpoint is math 323/323, WARP 18/18 files and 179/179
+tests, and Casimir adapter run 2620 `PASS/GREEN`, trace
+`adapter:bb7796f1-8813-48cd-a8c9-dfb0d93a19e1`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+The separately authorized R4 attempt then restarted the exact retained VM once,
+freshly reloaded its authenticated Details page and opened exactly one new
+browser-SSH surface. SSH succeeded as `pestypig`; the remote absence guard
+returned `R4_REMOTE_ABSENT_16`. The browser's visible Upload control and its
+confirmed multiple-file input did not produce a filechooser during the one
+bounded selection attempt. No file was selected, zero bytes were transmitted,
+and first failure was terminal. No fallback, guest ledger, Docker installation,
+build or P=1024 process occurred. The exact VM is confirmed stopped. The
+immutable [R4 browser-filechooser result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r4-browser-filechooser-preexecution-result.md)
+is `BLOCKED_PREEXECUTION_BROWSER_FILECHOOSER_UNAVAILABLE / R4 EXHAUSTED` at
+SHA-256 `a7cefb80...a0c8f` and independently audits 23/23; the auditor is
+`2a0f74af...6d464`. Only `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies.
+The next eligible lead is a separately frozen transport-admission successor
+after the Chrome extension's file-upload permission is verified. P8Q remains
+unevaluated and all authority remains false.
+The terminal R4 checkpoint passes math 323/323, WARP 18/18 files and 179/179
+tests, and Casimir adapter run 2616 `PASS/GREEN`, trace
+`adapter:1d41d774-bd56-4e57-856a-4e4e1ebc22f9`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+The read-only successor diagnosis confirms the active Chrome `Default` profile
+has the ChatGPT extension installed and enabled at version
+`1.26.827.12125_0`, with `newAllowFileAccess=true`, permissions not withheld
+and the native-host binding correct. R4 was therefore not blocked by a disabled
+file-access setting. The transport-only
+[P8P-R5 native-picker successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r5-native-file-picker-successor-proposal.md)
+is frozen at SHA-256 `650806a5...6e3b03` and independently audits 29/29; the
+auditor is `8c06f0ef...a81edd`. It preserves the exact stopped VM, sixteen
+staged files, scientific bytes, controller, executable, ceilings, evidence ABI
+and P8Q rule. It changes only file selection from the unavailable embedded
+filechooser event to one bounded native Windows file-open dialog. No VM was
+started, no upload or process occurred, and separate exact execution
+authorization remains required.
+The R5 proposal checkpoint passes math 323/323, WARP 18/18 files and 179/179
+tests, and Casimir adapter run 2617 `PASS/GREEN`, trace
+`adapter:c2f671b7-b421-4aac-a24d-7cd6495584f8`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+The separately authorized R5 attempt then restarted the exact retained VM once,
+freshly reloaded its authenticated Details page and reached exactly one
+browser-SSH prompt as `pestypig`. The connection dropped while the exact remote
+absence guard was being submitted, before any authenticated guard marker.
+First failure was terminal. No picker, selected file, upload byte, Docker
+action, reconstruction, build, P=1024 process or result audit occurred, and the
+exact VM is confirmed stopped. The immutable
+[R5 SSH-drop result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r5-ssh-drop-preexecution-result.md)
+is `BLOCKED_PREEXECUTION_SSH_CONNECTION_DROPPED_DURING_REMOTE_GUARD / R5
+EXHAUSTED` at SHA-256 `f078b95a...9ef34` and independently audits 27/27; the
+corrected auditor is `33120f4d...3f02`. Only
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies. The next eligible lead is one
+separately frozen SSH-stability-gated transport successor; P8Q remains
+unevaluated and every authority lock remains false.
+The transport-only
+[P8P-R6 SSH-stability-gated native-picker successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r6-ssh-stability-native-picker-successor-proposal.md)
+is frozen at SHA-256 `5b230476...c2e2e` and independently audits 24/24; the
+corrected auditor is `6bb6c47f...8edb0`. R6 preserves every scientific,
+resource, evidence and P8Q binding. It adds only one harmless authenticated SSH
+round-trip marker, a 30-second passive stability interval and a single native
+terminal-entry path before the unchanged guard and one-picker sequence. No VM,
+upload, Docker action or process was started; separate exact execution
+authorization remains required.
+The frozen R6 current-head checkpoint passes math 323/323, WARP 18/18 files and
+179/179 tests, and Casimir adapter run 2621 `PASS/GREEN`, trace
+`adapter:ecedc941-7f35-4ff6-9247-a8441a59f488`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+R6 was executed once and exhausted before guest boot when Google reported
+`c2d-standard-32` unavailable in `us-east1-d`. The immutable
+[R6 capacity result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r6-zone-capacity-preexecution-result.md)
+is `6d9dafe5...a7826f` and independently audits 23/23 at auditor
+`978ec227...e6269`. No SSH, upload, Docker, build or numerical process
+occurred; only `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies.
+The frozen
+[P8P-R7 retained-P8J environment successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r7-retained-p8j-environment-successor-proposal.md)
+is `78186ed4...55a974` and independently audits 31/31. It binds the retained
+stopped P8J-R9 instance `1920090043510946854` in `us-east1-c`, avoiding a new
+capacity request and reducing ingress to the unchanged 134,656-byte P8P
+overlay plus a 2,971-byte ledger. It changes no scientific input or P8Q rule,
+starts no resource by itself and awaits separate billable-action confirmation.
+The R7 current-head checkpoint passes math 323/323, WARP 18/18 files and
+179/179 tests, and Casimir adapter run 2626 `PASS/GREEN`, trace
+`adapter:e6d84c1d-f91b-4e25-989f-0984a9fcdec8`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+R7 then failed before Google start submission because local Windows control
+could not resolve input geometry for the visible `Start / Resume` element. A
+fresh read between attempts proved the exact VM remained stopped. The
+immutable
+[R7 preexecution result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r7-ui-control-preexecution-result.md)
+is `09e87815...d50ef4` and independently audits 16/16 at auditor
+`db173846...3119c0`. No VM boot, SSH, upload, Docker, build or calculation
+occurred; only `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies.
+The frozen
+[P8P-R8 Cloud Shell start successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r8-cloudshell-start-successor-proposal.md)
+is `0972a2d5...925ab5` and independently audits 20/20. It changes only the
+unexecutable UI start control to one exact 120-byte authenticated Cloud Shell
+start command `94dfefa6...87219`; all resource, ingress, scientific, evidence,
+P8Q and authority bindings remain unchanged. No resource was started and
+separate billable-action authorization is required.
+The frozen R8 checkpoint passes math 323/323, WARP 18/18 files and 179/179
+tests, and Casimir adapter run 2627 `PASS/GREEN`, trace
+`adapter:0fc2247e-2afd-4b96-8817-bff3cc99b915`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+R8 then stopped before command entry because authenticated Cloud Shell exposed
+no usable prompt and twice reported a temporary Cloud Shell limit. The
+immutable
+[R8 preexecution result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r8-cloudshell-limit-preexecution-result.md)
+is `b6890cf5...0de94a5` and independently audits 16/16 at auditor
+`f79f6ca1...dc6e50`. No start request, VM boot, SSH, upload, Docker, build or
+calculation occurred; only `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies.
+The frozen
+[P8P-R9 browser-semantic start successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r9-browser-semantic-start-successor-proposal.md)
+is `a4609527...5252544` and independently audits 20/20. It changes only start
+transport to one semantic accessible `Start / Resume` action in a fresh exact
+Details tab without Windows coordinates; every other R8 binding remains
+unchanged. No resource was started and separate billable-action authorization
+is required.
+The frozen R9 current-head checkpoint passes math 323/323, WARP 18/18 files
+and 179/179 tests, and Casimir adapter run 2628 `PASS/GREEN`, trace
+`adapter:ceeac1ce-2bce-4d9b-a78a-ff446077825c`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+R9 then stopped before page creation because the Chrome browser-control
+provider returned `Browser is not available: chrome`; the subsequent
+read-only inventory exposed no Chrome application or tab. The immutable
+[R9 preexecution result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r9-browser-provider-preexecution-result.md)
+is `72494474...aeb547d` and independently audits 15/15. No Google start
+operation, VM boot, SSH, upload, Docker, build or calculation occurred; only
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies.
+The frozen
+[P8P-R10 IAB authentication preflight](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r10-iab-authentication-preflight.md)
+is `12fe4a98...6494a55` and statically audits 13/13. Its immutable
+[R10 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r10-iab-authentication-preflight-result.md)
+is `e1d47f7a...cebb273` and independently audits 13/13: one read proved the
+in-app browser authenticated, exact retained resource stopped, and one
+collapsed More-actions control present, but no direct Start control. The
+frozen
+[P8P-R11 Start-menu preflight](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r11-iab-start-menu-preflight.md)
+is `7f3882a2...6b2fd8a` and audits 12/12. Its one semantic expansion exposed
+exactly one enabled `Start / Resume` button without activation; the immutable
+[R11 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r11-iab-start-menu-preflight-result.md)
+is `d70b044f...c1b5a9d1` and audits 12/12. No cloud request occurred.
+The frozen
+[P8P-R12 IAB start/calibration successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r12-iab-start-calibration-successor-proposal.md)
+is `5bf120d9...e03be7d4` and statically audits 19/19. It preserves the exact
+retained VM, $9.00/18,000-second ceilings, two-file ingress, existing-Docker
+requirement, one P=1024 controller, evidence, automatic-stop, P8Q and authority
+bindings. No start action has occurred; separate billable action-time
+authorization is required.
+The frozen R12 current-head checkpoint passes math 323/323, WARP 18/18 files
+and 179/179 tests, and Casimir adapter run 2629 `PASS/GREEN`, trace
+`adapter:e012179c-bf55-4a82-8332-f8fe2af4287b`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+R12 then submitted its one authorized exact retained-VM start. The VM did not
+reach a running state, so no SSH, ingress, Docker action, build or calibration
+occurred. The immutable
+[R12 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r12-start-completion-failure-result.md)
+is `20446249...2507e8` and audits 15/15. R13 and R14 bound the corresponding
+Compute Operations row without cloud mutation; the row terminated `DONE` but
+list-level success remained unproven. The one frozen R15 detail inspection,
+packet `26d4709a...105ae9e` at 9/9, then authenticated exact operation
+`operation-1788359293191-65a80d866c37d-36470319-82f52727`, target ID
+`1920090043510946854`, as failed with
+`ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS`: `c2d-standard-32` was unavailable
+in `us-east1-c`. The immutable
+[R15 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r15-operation-detail-result.md)
+preserves that capacity-only terminal cause. R12 through R15 are closed; no
+scientific result exists and only `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`
+applies. The next eligible action is one separately frozen capacity-aware P8P
+successor.
+That successor is the
+[P8P-R16 regional bulk proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r16-regional-bulk-successor-proposal.md).
+It is frozen at SHA-256 `f306ffb3...9dc5169` and independently audits 28/28.
+It replaces the exhausted single-zone restart with one `count=1`,
+`min-count=1`, `ANY_SINGLE_ZONE` regional allocation across the three
+`us-east1` zones and reduces ingress to one hash-bound 236,640,768-byte
+candidate-neutral archive containing its one-shot Cloud Shell orchestrator.
+It changes no scientific input or P8Q rule. No R16
+cloud action has occurred; separate billable action-time authorization is
+required.
+R16 was then exactly authorized and its proposal, archive and orchestrator
+identities were reauthenticated. The sole semantic `Activate Cloud Shell`
+action produced no terminal, panel or new tab after 25 passive seconds and one
+visual confirmation. The immutable
+[R16 preexecution result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r16-cloudshell-surface-preexecution-result.md)
+is SHA-256 `a4694fe2...22d09e9` and independently audits 13/13. It closes R16
+as `BLOCKED_PREEXECUTION_CLOUD_SHELL_SURFACE_NOT_OBSERVED / R16 EXHAUSTED`.
+No upload, command, allocation, VM, Docker action, build or calculation
+occurred; only `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies.
+The separately frozen read-only
+[P8P-R17 standalone Cloud Shell preflight](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r17-standalone-cloudshell-preflight.md)
+is SHA-256 `9d9f6f58...b3c10c75` and audits 11/11. Its one fresh
+standalone Cloud Shell tab reached Google's explicit `Authorize Cloud Shell`
+credential-consent dialog before any terminal input existed. R17 correctly
+did not activate consent. The immutable
+[R17 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r17-standalone-cloudshell-result.md)
+is SHA-256 `2503c7c3...a1e698b3` and independently audits 11/11. No
+command, upload, API request, resource action, build or calculation occurred.
+The next eligible action is the separately frozen
+[R18 one-click consent and authentication successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r18-cloudshell-consent-authentication.md),
+SHA-256 `ea4031ad...6f33f6243`, independently audited 13/13. It permits only
+one consent activation and one read-only account/project health command; P8Q
+remains stopped.
+R18 was authorized, but its initial inventory found only the retained Compute
+Engine Details tab; the standalone Cloud Shell tab required by R18 was absent.
+The immutable
+[R18 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r18-retained-tab-absent-result.md)
+is SHA-256 `d732adeb...f77f6f0` and independently audits 10/10. R18 is
+exhausted before consent, command or cloud action. The separately frozen R19
+fresh-tab successor is now the only eligible transport-authentication action;
+P8Q remains stopped.
 The result-only
 [P8F audit definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8f-result-audit-definition.md)
 is frozen before terminal output. Its exact auditor passes 4/4 synthetic
@@ -560,8 +1033,9 @@ PASS/FAIL/timeout/corruption fixtures and preregisters a strict, tolerance-free
 outer-accumulation/boundary/slot/distributed decision. It cannot inspect or
 control the active process and has not read the live evidence root. A separate
 static definition audit passes 31/31 with receipt `6ad6d18d...bbbca`.
-The current P8G verification checkpoint is math 323/323, WARP 18/18 files and
-179/179 tests, and Casimir adapter run 2595 `PASS/GREEN` with certificate
+The current P8O closure checkpoint is math 323/323, WARP 18/18 files and
+179/179 tests, and Casimir adapter run 2613 `PASS/GREEN`, trace
+`adapter:3c937e86-a7dc-4855-a886-a523f395b206`, with certificate
 `6e84f965...e12a4e45` and integrity true.
 Its active S5-A
 [`formal-germ subtraction definition review`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a-formal-germ-subtraction-definition-review.md)
@@ -722,11 +1196,29 @@ not itself establish any of those claims.
 | What are the exact scientific definitions and numerical thresholds?  | the versioned contracts and source artifacts named by each gate     |
 | What happened in one audit or run?                                   | that immutable audit, receipt, and its exact byte bindings          |
 | What must a repository agent declare before working on this program? | [`AGENTS.md`](../../AGENTS.md)                                      |
+| What apparatus-side theory/experiment work may proceed without perturbing P8P? | [`nhm2-source-to-experiment-closure-parallel-work-packet-v1.md`](./nhm2-source-to-experiment-closure-parallel-work-packet-v1.md) |
 
 Dated overviews and audits are evidence snapshots, not current roadmaps. A green
 certificate for an earlier tree does not certify the current tree. A sealed
 definition is not an executed proof, and a receipt is an observation rather than
 authority to promote a claim.
+
+## Nonperturbing parallel lane: source-to-experiment closure
+
+The source-to-experiment packet is the sole authorized parallel planning lane
+for preparing apparatus-side BMR-I inputs while G2H-E-S5-A4/P8P remains active.
+Its first eligible task is ET0: preserve the historical v1 447-layer scalar
+case while designing a versioned architecture contract that separates scalar-
+equivalent count, geometric count, measured effective count, tensor closure,
+mechanical admissibility, source retention and regional sample sufficiency.
+
+This lane may perform documentation, inventory, schema, candidate-neutral
+fixture and preregistration work that cannot evaluate or perturb the frozen
+mini-boson-star candidate. Any future physics implementation must begin with a
+separate work packet naming its exact semantics, inputs, tests and verification
+gate. Apparatus evidence, architecture selection, experimental execution,
+BMR-I eligibility, G3 and every physical/propulsion/transport authority remain
+false until their own predecessor receipts close.
 
 ## Current position
 

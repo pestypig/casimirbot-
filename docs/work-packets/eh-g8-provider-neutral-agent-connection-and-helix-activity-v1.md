@@ -691,9 +691,22 @@ Exit evidence:
   Check, restart recovery, and one actionable blocker at a time;
 - one independent client/probe completing authenticated discovery.
 
+Deferred release acceptance (2026-09-01): the Stage 2 implementation and
+release battery are deterministically verified, while signed-current-installer
+acceptance remains on the explicit checklist in
+`docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md`. Azure
+Artifact Signing administration is unavailable until the Microsoft account's
+security-information hold ends on 2026-10-01, unless the owner later chooses a
+different trusted signing backend. Deterministic Stage 3 work may proceed
+because it does not depend on the signing provider; no installed-acceptance,
+Stage 5, or G8 release-ready claim may bypass that deferred evidence.
+
 ### Stage 3 — Helix operator and activity surface
 
 Goal: present the same governed lifecycle that the connected agent is using.
+
+Active bounded packet:
+`docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md`.
 
 Work:
 

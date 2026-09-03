@@ -9,6 +9,8 @@ import { buildRealtimeSessionTransportPlan } from "./config";
 const OPENAI_REALTIME_CLIENT_SECRETS_URL = "https://api.openai.com/v1/realtime/client_secrets";
 const DEFAULT_OPENAI_REALTIME_MODEL = "gpt-realtime-2.1";
 const OPENAI_REALTIME_CLIENT_SECRET_TIMEOUT_MS = 10_000;
+const DESKTOP_PROVIDER_CREDENTIAL_BROKER_SCHEMA =
+  "casimir_desktop_provider_credential_broker/1" as const;
 
 const readRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -216,6 +218,115 @@ export const openAiRealtimeSessionAdapterStub: HelixRealtimeSessionAdapter = {
 export const readOpenAiRealtimeApiKey = (env?: NodeJS.ProcessEnv): string | null =>
   readString(env?.OPENAI_API_KEY);
 
+export type DesktopOpenAiRealtimeBrokerConfig = Readonly<{
+  origin: string;
+  token: string;
+}>;
+
+export const readDesktopOpenAiRealtimeBrokerConfig = (
+  env?: NodeJS.ProcessEnv,
+): DesktopOpenAiRealtimeBrokerConfig | null => {
+  if (readString(env?.HELIX_NATIVE_OPENAI_REALTIME_BROKER_ENABLED) !== "1") {
+    return null;
+  }
+  const originValue = readString(env?.HELIX_PROVIDER_CREDENTIAL_BROKER_ORIGIN);
+  const token = readString(env?.HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN);
+  if (!originValue || !token || !/^[A-Za-z0-9_-]{43}$/u.test(token)) return null;
+  try {
+    const origin = new URL(originValue);
+    if (
+      origin.protocol !== "http:" ||
+      origin.hostname !== "127.0.0.1" ||
+      !origin.port ||
+      origin.pathname !== "/" ||
+      origin.username ||
+      origin.password ||
+      origin.search ||
+      origin.hash ||
+      Buffer.from(token, "base64url").length !== 32
+    ) return null;
+    return { origin: origin.origin, token };
+  } catch {
+    return null;
+  }
+};
+
+export const createDesktopBrokerOpenAiRealtimeContractTransport = (
+  config: DesktopOpenAiRealtimeBrokerConfig,
+  fetchImpl: HelixRealtimeFetch = globalThis.fetch as HelixRealtimeFetch,
+): HelixRealtimeOpenAiContractTransport => async (request) => {
+  if (typeof fetchImpl !== "function") {
+    return { ok: false, failureReason: "openai_realtime_transport_not_configured" };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    OPENAI_REALTIME_CLIENT_SECRET_TIMEOUT_MS,
+  );
+  try {
+    const response = await fetchImpl(
+      `${config.origin}/v1/openai/realtime/client-secret`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: request.model,
+          voice: request.voice,
+          safetyIdentifier: request.safetyIdentifier,
+        }),
+        signal: controller.signal,
+      },
+    );
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return {
+        ok: false,
+        failureReason: "openai_realtime_broker_response_invalid",
+      };
+    }
+    const record = readRecord(payload);
+    if (
+      !response.ok ||
+      record.schema !== DESKTOP_PROVIDER_CREDENTIAL_BROKER_SCHEMA ||
+      record.ok !== true
+    ) {
+      return {
+        ok: false,
+        failureReason: readString(record.error) ??
+          `openai_realtime_broker_http_${response.status}`,
+      };
+    }
+    const ephemeralClientSecret = readString(record.ephemeralClientSecret);
+    if (!ephemeralClientSecret) {
+      return {
+        ok: false,
+        failureReason: "openai_realtime_client_secret_missing",
+      };
+    }
+    return {
+      ok: true,
+      providerSessionRef: readString(record.providerSessionRef),
+      ephemeralClientSecret,
+      ephemeralClientSecretExpiresAtMs:
+        readNumber(record.ephemeralClientSecretExpiresAtMs),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      failureReason: readString(readRecord(error).name) === "AbortError"
+        ? "openai_realtime_broker_timeout"
+        : "openai_realtime_broker_unavailable",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const isSafeOpenAiSafetyIdentifier = (value: string | null): value is string =>
   Boolean(value && /^[A-Za-z0-9._:-]{8,128}$/.test(value));
 
@@ -414,7 +525,8 @@ export const createOpenAiRealtimeSessionAdapter = (
       });
     }
     const apiKey = readOpenAiRealtimeApiKey(args.env);
-    if (!apiKey) {
+    const desktopBroker = readDesktopOpenAiRealtimeBrokerConfig(args.env);
+    if (!apiKey && !desktopBroker) {
       return buildAdapterResult({
         action: "start",
         body: args.body,
@@ -453,7 +565,7 @@ export const createOpenAiRealtimeSessionAdapter = (
       });
     }
     const request = {
-      apiKey,
+      apiKey: apiKey ?? "",
       model: readSelectedRealtimeModel(args.body),
       requestedTransport: readRequestedTransport(args.body),
       runtimeAgentMode: readString(readRecord(args.body).runtime_agent_mode ?? readRecord(args.body).runtimeAgentMode),
@@ -463,7 +575,10 @@ export const createOpenAiRealtimeSessionAdapter = (
       clientReceiptRefs: readClientReceiptRefs(args.body),
       voice: readSelectedRealtimeVoice(args.body),
     };
-    const result = await transport(request);
+    const selectedTransport = apiKey
+      ? transport
+      : createDesktopBrokerOpenAiRealtimeContractTransport(desktopBroker!);
+    const result = await selectedTransport(request);
     if (!result.ok) {
       return buildAdapterResult({
         action: "start",

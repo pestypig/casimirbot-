@@ -1,5 +1,5 @@
 export const DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION =
-  "casimir_desktop_mcp_tunnel/3" as const;
+  "casimir_desktop_mcp_tunnel/4" as const;
 
 export const DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER =
   "x-casimir-desktop-account-session" as const;
@@ -59,6 +59,43 @@ export type DesktopMcpTunnelStatus =
   | "stopping"
   | "blocked";
 
+export const DESKTOP_MCP_TUNNEL_RECOVERY_PHASES = [
+  "idle",
+  "scheduled",
+  "revalidating",
+  "restarting",
+  "exhausted",
+] as const;
+
+export type DesktopMcpTunnelRecoveryPhase =
+  (typeof DESKTOP_MCP_TUNNEL_RECOVERY_PHASES)[number];
+
+export const DESKTOP_MCP_TUNNEL_RECOVERY_REASONS = [
+  "process_exit",
+  "health_failed",
+  "account_unavailable",
+  "developer_required",
+  "account_session_changed",
+  "start_failed",
+  "operator_stop",
+  "credentials_reconfigured",
+  "credentials_cleared",
+  "scope_transition",
+] as const;
+
+export type DesktopMcpTunnelRecoveryReason =
+  (typeof DESKTOP_MCP_TUNNEL_RECOVERY_REASONS)[number];
+
+export type DesktopMcpTunnelRecoveryState = Readonly<{
+  phase: DesktopMcpTunnelRecoveryPhase;
+  attemptCount: number;
+  maxAttempts: number;
+  nextAttemptAt: string | null;
+  lastReason: DesktopMcpTunnelRecoveryReason | null;
+  automaticScope: "local_supervisor_coordination_and_device_check";
+  manualInterventionRequired: boolean;
+}>;
+
 export type DesktopMcpTunnelState = Readonly<{
   schemaVersion: typeof DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION;
   transport: "openai_secure_mcp_tunnel";
@@ -73,6 +110,7 @@ export type DesktopMcpTunnelState = Readonly<{
   ready: boolean;
   adminUiAvailable: boolean;
   failureCode: DesktopMcpTunnelFailureCode | null;
+  recovery: DesktopMcpTunnelRecoveryState;
 }>;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -96,6 +134,7 @@ export function parseDesktopMcpTunnelState(
     "ready",
     "adminUiAvailable",
     "failureCode",
+    "recovery",
   ];
   const validStatuses: DesktopMcpTunnelStatus[] = [
     "unconfigured",
@@ -124,6 +163,42 @@ export function parseDesktopMcpTunnelState(
     typeof value.healthy !== "boolean" ||
     typeof value.ready !== "boolean" ||
     typeof value.adminUiAvailable !== "boolean"
+  ) {
+    return null;
+  }
+  if (!isRecord(value.recovery)) return null;
+  const recovery = value.recovery;
+  const recoveryKeys = [
+    "phase",
+    "attemptCount",
+    "maxAttempts",
+    "nextAttemptAt",
+    "lastReason",
+    "automaticScope",
+    "manualInterventionRequired",
+  ];
+  if (
+    Object.keys(recovery).length !== recoveryKeys.length ||
+    recoveryKeys.some((key) => !(key in recovery)) ||
+    !DESKTOP_MCP_TUNNEL_RECOVERY_PHASES.includes(
+      recovery.phase as DesktopMcpTunnelRecoveryPhase,
+    ) ||
+    !Number.isInteger(recovery.attemptCount) ||
+    (recovery.attemptCount as number) < 0 ||
+    !Number.isInteger(recovery.maxAttempts) ||
+    (recovery.maxAttempts as number) < 1 ||
+    (recovery.attemptCount as number) >
+      (recovery.maxAttempts as number) ||
+    (recovery.nextAttemptAt !== null &&
+      (typeof recovery.nextAttemptAt !== "string" ||
+        !Number.isFinite(Date.parse(recovery.nextAttemptAt)))) ||
+    (recovery.lastReason !== null &&
+      !DESKTOP_MCP_TUNNEL_RECOVERY_REASONS.includes(
+        recovery.lastReason as DesktopMcpTunnelRecoveryReason,
+      )) ||
+    recovery.automaticScope !==
+      "local_supervisor_coordination_and_device_check" ||
+    typeof recovery.manualInterventionRequired !== "boolean"
   ) {
     return null;
   }

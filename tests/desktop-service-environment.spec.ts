@@ -48,11 +48,38 @@ describe("desktop service environment", () => {
     );
   });
 
-  it("inherits only the exact developer identity allowlist for pilot policy", () => {
+  it("enables GPT Live through the native broker without exposing the OpenAI key", () => {
+    const environment = buildDesktopServiceEnvironment({
+      processEnv: {
+        OPENAI_API_KEY: "must-remain-native-only",
+      },
+      userDataPath: "C:\\Users\\person\\AppData\\Roaming\\CasimirBot",
+      serviceOrigin: "http://127.0.0.1:43121",
+      providerCredentialBroker: {
+        ...TEST_PROVIDER_CREDENTIAL_BROKER,
+        openAiRealtimeAvailable: true,
+      },
+      mcpTransitionBroker: TEST_MCP_TRANSITION_BROKER,
+      deviceId: TEST_DEVICE_ID,
+    });
+
+    expect(environment.OPENAI_API_KEY).toBeUndefined();
+    expect(environment).toMatchObject({
+      HELIX_NATIVE_OPENAI_REALTIME_BROKER_ENABLED: "1",
+      HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "1",
+      HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
+      HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
+      HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED: "1",
+    });
+  });
+
+  it("inherits only the exact developer pilot policy and bounded C3 evidence root", () => {
     const environment = buildDesktopServiceEnvironment({
       processEnv: {
         HELIX_DEVELOPER_PROFILE_IDS:
           " profile:developer-one,developer@example.com ",
+        HELIX_PRIVATE_COMPANION_C3_WORKSPACE_ROOT:
+          " C:\\acceptance\\canonical-workspace ",
         HELIX_LOCAL_PROFILE_PASSWORD_HASH: "must-not-flow",
         HELIX_LOCAL_PROFILE_PASSWORD: "must-not-flow",
       },
@@ -65,6 +92,9 @@ describe("desktop service environment", () => {
 
     expect(environment.HELIX_DEVELOPER_PROFILE_IDS).toBe(
       "profile:developer-one,developer@example.com",
+    );
+    expect(environment.HELIX_PRIVATE_COMPANION_C3_WORKSPACE_ROOT).toBe(
+      "C:\\acceptance\\canonical-workspace",
     );
     expect(environment.HELIX_LOCAL_PROFILE_PASSWORD_HASH).toBeUndefined();
     expect(environment.HELIX_LOCAL_PROFILE_PASSWORD).toBeUndefined();

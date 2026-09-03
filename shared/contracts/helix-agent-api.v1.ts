@@ -124,6 +124,23 @@ export const helixAgentContinueRequestSchema = z
     });
   });
 
+export const helixAgentEvidenceReentryRequestSchema = z
+  .object({
+    expected_version: z.number().int().positive(),
+    observation_refs: boundedStringArray(64, 320).min(1),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (new Set(value.observation_refs).size === value.observation_refs.length) {
+      return;
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["observation_refs"],
+      message: "Each observation reference may be re-entered at most once per request.",
+    });
+  });
+
 export const helixAgentCancelRequestSchema = z
   .object({
     expected_version: z.number().int().positive(),
@@ -323,6 +340,9 @@ export type HelixAgentStartRequest = z.infer<
 >;
 export type HelixAgentContinueRequest = z.infer<
   typeof helixAgentContinueRequestSchema
+>;
+export type HelixAgentEvidenceReentryRequest = z.infer<
+  typeof helixAgentEvidenceReentryRequestSchema
 >;
 export type HelixAgentCancelRequest = z.infer<
   typeof helixAgentCancelRequestSchema

@@ -371,6 +371,43 @@ final class PlayerActionControllerTest {
             terminal.measurements().get("reason_code")
         );
         assertEquals(3.0, terminal.measurements().get("predicted_drop_blocks"));
+        assertEquals(false, terminal.measurements().get("player_motion_performed"));
+    }
+
+    @Test
+    void nativeNavigationReportsPartialMotionBeforeALaterSafetyRefusal() {
+        FakeBridge bridge = new FakeBridge();
+        List<WorkflowEvent> events = new ArrayList<>();
+        PlayerActionController controller = new PlayerActionController(bridge, events::add);
+        controller.start(request(
+            "navigate_to",
+            Map.of(
+                "destination", Map.of("x", 0.0, "y", 64.0, "z", 8.0),
+                "arrival_radius", 0.25,
+                "allow_sprint", false
+            ),
+            ManualOverridePolicy.CANCEL
+        ));
+
+        controller.tick();
+        bridge.snapshot = snapshot(true, 0.0, 64.0, 3.0, false);
+        bridge.locomotionSafety = new LocomotionSafetyEnvelope.Check(
+            LocomotionSafetyEnvelope.Decision.refuse("locomotion_predicted_drop_exceeded"),
+            Map.of(
+                "reason_code", "locomotion_predicted_drop_exceeded",
+                "predicted_drop_blocks", 3.0,
+                "effect_prevented", true,
+                "controls_released", true
+            )
+        );
+
+        controller.tick();
+
+        assertEquals(State.FAILED, controller.state());
+        WorkflowEvent terminal = events.get(events.size() - 1);
+        assertEquals(true, terminal.measurements().get("player_motion_performed"));
+        assertEquals(3.0, terminal.measurements().get("distance_blocks"));
+        assertEquals(3.0, terminal.measurements().get("final_z"));
     }
 
     @Test

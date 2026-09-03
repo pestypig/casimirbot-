@@ -279,6 +279,11 @@ public final class PlayerActionController {
             reusableWorkflow();
             return;
         }
+        if (actionStartX == null) {
+            actionStartX = snapshot.x();
+            actionStartY = snapshot.y();
+            actionStartZ = snapshot.z();
+        }
         Map<String, Object> destination = object(active.arguments().get("destination"));
         double x = number(destination, "x");
         double y = number(destination, "y");
@@ -340,7 +345,26 @@ public final class PlayerActionController {
                 false
             );
             if (!safety.decision().admitted()) {
-                lastMeasurements = safety.measurements();
+                double traveledX = snapshot.x() - actionStartX;
+                double traveledY = snapshot.y() - actionStartY;
+                double traveledZ = snapshot.z() - actionStartZ;
+                double traveledDistance = Math.sqrt(
+                    traveledX * traveledX +
+                    traveledY * traveledY +
+                    traveledZ * traveledZ
+                );
+                Map<String, Object> measurements = new LinkedHashMap<>(
+                    safety.measurements()
+                );
+                measurements.put("distance_blocks", traveledDistance);
+                measurements.put("final_x", snapshot.x());
+                measurements.put("final_y", snapshot.y());
+                measurements.put("final_z", snapshot.z());
+                measurements.put(
+                    "player_motion_performed",
+                    traveledDistance >= 0.01
+                );
+                lastMeasurements = Map.copyOf(measurements);
                 settle(
                     State.FAILED,
                     "workflow.failed",

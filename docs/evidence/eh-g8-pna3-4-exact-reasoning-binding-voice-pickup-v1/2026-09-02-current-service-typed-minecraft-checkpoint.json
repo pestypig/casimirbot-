@@ -1,0 +1,242 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.4 exact reasoning-task binding and voice pickup",
+  "recorded_at": "2026-09-02",
+  "maturity": "live accepted",
+  "service": {
+    "origin": "http://127.0.0.1:1522",
+    "service_instance_ref": "service_instance:de03b859265ea41f2fccf291bd63c8eb",
+    "keyed": true,
+    "replaced_by_unkeyed_server": false
+  },
+  "continuation": {
+    "client_continuation_ref": "codex:pna3-4:2026-09-02:canonical-continuation",
+    "room_ref": "shared_realtime_room:450c2fd7-5bea-4487-9a2d-4b510fd4e1ca",
+    "room_membership_basis": "server_verified",
+    "retained_run_ref": "run_0ad72769-595f-4c67-8dde-41ba9ac19718",
+    "retained_run_basis": "server_created_owner_scoped",
+    "supervisor_lifecycle_completed_at": "2026-09-03T00:06:32.290Z",
+    "supervisor_presence_disconnected_at": "2026-09-03T00:06:32.963Z",
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "exact_reasoning_binding": {
+    "binding_id": "reasoning_binding:8c7ad5250b3edb2becaa4feafb182bbc",
+    "binding_epoch": 1,
+    "helix_conversation_id": "19713475-9932-400d-a53b-4b0ac2915375",
+    "provider_task_hash_prefix": "3cbec759",
+    "mission_id": null,
+    "run_id": null,
+    "provider_task_created": false,
+    "exact_binding_proven": true
+  },
+  "typed_steering": {
+    "event_id": "reasoning_steering:95152ddff4415c822471d7515b17a1c9",
+    "cursor": 1,
+    "origin": "typed",
+    "advisory_only": true,
+    "execution_requested": false,
+    "acknowledged_at": "2026-09-02T22:36:36.550Z",
+    "pickup_proven": true,
+    "acknowledgement_proven": true,
+    "gpt_live_voice_evidence": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "minecraft_action": {
+    "environment_binding_id": "environment_binding:legacy:9910caee8091d404f4b5c55697c0e2bb14e4a7f5",
+    "capability_id": "com.casimirbot.minecraft.player.look",
+    "idempotency_key": "pna3-4-live-look-right-10-20260902-2320",
+    "outcome": "succeeded",
+    "ticks": 5,
+    "requested_yaw_delta_degrees": 10,
+    "applied_yaw_delta_degrees": 10,
+    "yaw_error_degrees": 0,
+    "pitch_error_degrees": 0,
+    "controls_released": true,
+    "inventory_mutated": false,
+    "world_mutated": false,
+    "action_evidence_ref": "environment_action_evidence:23db48a88a2ea27198e3e377f455ee6657d10504e",
+    "mcp_observation_ref": "mcp_evidence_observation:helix.minecraft.player_action.observe_result:76702b25-2568-4f15-b1a6-d78efec662b9",
+    "provenance_valid": true,
+    "eligible_for_reentry": true,
+    "exact_run_reentry_proven": true,
+    "reentry_run_id": "run_0ad72769-595f-4c67-8dde-41ba9ac19718",
+    "reentry_version_before": 1,
+    "reentry_version_after": 2,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "followup_reentry_and_action_attempts": [
+      {
+        "operation": "helix_run_evidence_reenter",
+        "run_id": "run_437dd769-f785-4328-90fc-fc5b71a8cd9b",
+        "expected_version": 1,
+        "outcome": "rejected",
+        "reason": "observation_stale",
+        "run_evidence_changed": false
+      },
+      {
+        "operation": "minecraft.player.action",
+        "observed_at": "2026-09-02T23:13:37.913Z",
+        "outcome": "subject_binding_required",
+        "reason": "preceding_action_authority_expired",
+        "side_effects_performed": false,
+        "mcp_observation_created": false
+      },
+      {
+        "operation": "minecraft.player.action",
+        "observed_at": "2026-09-02T23:14:13.269Z",
+        "action_evidence_ref": "environment_action_evidence:363dd20bc11bd45af14bb6700fbf8f4acb8502cb0",
+        "outcome": "request_canceled",
+        "manual_override_reason": "screen_open",
+        "duration_ticks": 0,
+        "controls_released": true,
+        "side_effects_performed": false,
+        "mcp_observation_created": false
+      },
+      {
+        "operation": "minecraft.player.action",
+        "observed_at": "2026-09-02T23:19:54.295Z",
+        "action_evidence_ref": "environment_action_evidence:23db48a88a2ea27198e3e377f455ee6657d10504e",
+        "outcome": "succeeded",
+        "duration_ticks": 5,
+        "applied_yaw_delta_degrees": 10,
+        "yaw_error_degrees": 0,
+        "controls_released": true,
+        "inventory_mutated": false,
+        "world_mutated": false,
+        "mcp_observation_ref": "mcp_evidence_observation:helix.minecraft.player_action.observe_result:76702b25-2568-4f15-b1a6-d78efec662b9"
+      },
+      {
+        "operation": "helix_run_evidence_reenter",
+        "run_id": "run_0ad72769-595f-4c67-8dde-41ba9ac19718",
+        "expected_version": 1,
+        "outcome": "admitted",
+        "resulting_version": 2,
+        "answer_authority": false,
+        "terminal_eligible": false
+      }
+    ]
+  },
+  "fresh_voice_binding": {
+    "binding_id": "reasoning_binding:0155d17305cfe0f7d13496012be4a268",
+    "binding_epoch": 2,
+    "provider_task_hash_prefix": "3cbec759",
+    "mission_id": null,
+    "run_id": null,
+    "gpt_live_runtime_state": "listening",
+    "gpt_live_microphone_enabled": true,
+    "finalized_voice_event_observed": true,
+    "pickup_observed": true,
+    "acknowledgement_observed": true,
+    "inbox_state_before_operator_speech": "empty",
+    "accepted_voice_event": {
+      "event_id": "reasoning_steering:50139de1ce653c9c2ad358ed28b1ce1c",
+      "cursor": 11,
+      "client_event_ref": "gpt-live:realtime:admitted:ed55194b318a01ea:event_EJogOn8fphJGBKOtCgvVy",
+      "origin": "gpt_live_finalized",
+      "instruction_text": "What have we completed so far, and what is next?",
+      "acknowledged_at": "2026-09-02T23:31:02.764Z",
+      "advisory_only": true,
+      "execution_requested": false,
+      "evidence_satisfied": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "incidental_provider_finalized_events_acknowledged": 7,
+    "ordinary_prompt_requested_after_acceptance": "What have we completed so far, and what should we do next?",
+    "ordinary_prompt_observed": true
+  },
+  "revocation_lifecycle": {
+    "binding_id": "reasoning_binding:0155d17305cfe0f7d13496012be4a268",
+    "binding_epoch": 2,
+    "revoked_at": "2026-09-02T23:37:06.606Z",
+    "authoritative_status_after_revoke": "revoked",
+    "stale_pickup_after_cursor": 11,
+    "stale_pickup_outcome": "rejected",
+    "stale_pickup_error": "reasoning_binding_revoked",
+    "stale_pickup_retryable": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "bounded_run_continuation": {
+    "run_id": "run_0ad72769-595f-4c67-8dde-41ba9ac19718",
+    "expected_version": 2,
+    "resulting_version": 4,
+    "idempotency_key": "pna3-4-final-lifecycle-continuation-20260902-v2",
+    "idempotency_replayed": false,
+    "solver_path_completed": true,
+    "completion_status": "blocked",
+    "lifecycle_status": "waiting",
+    "failure_code": "terminal_boundary_ineligible",
+    "terminal_authority_status": "blocked",
+    "minecraft_observation_retained": true,
+    "observation_refs": [
+      "mcp_evidence_observation:helix.minecraft.player_action.observe_result:76702b25-2568-4f15-b1a6-d78efec662b9"
+    ],
+    "raw_provider_payload_included": false,
+    "chain_of_thought_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "interpretation": "The bounded solver continuation ran over the re-entered Minecraft observation and truthfully failed closed at terminal authority because the separately audited binding, steering, acknowledgement, revocation, and stale-rejection facts were not normalized into this run. The failure is negative lifecycle evidence, not an assistant answer."
+  },
+  "post_join_negative": {
+    "player_label": "DatDamPig",
+    "subject_binding_id": "environment_subject_binding:58017ac5-a75c-441b-98db-b7eba66c9435",
+    "producer_epoch_ref": "adapter_epoch:302b30ee0df43451d78cc61b7313492a6b6f09b9",
+    "actor_status_outcome": "permission_revoked",
+    "reason": "room_read_grant_identity_mismatch",
+    "installed_device_identity_present": false,
+    "provenance_valid": false,
+    "eligible_for_reentry": false
+  },
+  "verification": [
+    {
+      "command": "npm run helix:ask:discipline:full",
+      "result": "pass",
+      "coverage": {
+        "active_adversarial_prompt_tests": 31,
+        "fixed_rail_api_parity_tests": 15,
+        "sharded_api_parity_tests": 16,
+        "live_source_continuation_routing_tests": 26,
+        "live_source_identity_audit_tests": 9,
+        "server_build": "pass_with_four_pre_existing_warnings"
+      }
+    },
+    {
+      "scope": "focused reasoning, MCP, discovery, transport, connector, and client batteries",
+      "result": "pass",
+      "test_files": 11,
+      "tests_passed": 115
+    },
+    {
+      "command": "npx vitest run client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx client/src/components/__tests__/helix-ask-realtime-provider-event-handler.spec.ts client/src/components/helix/ask-console/__tests__/HelixAskBoundAgentDestination.spec.tsx --pool=forks",
+      "result": "pass",
+      "test_files": 3,
+      "tests_passed": 34,
+      "coverage": "provider-finalized exact-bound dispatch, duplicate suppression, no receipt authority, and active-binding rehydration/revocation after reload"
+    },
+    {
+      "command": "npm run typecheck:mcp-evidence",
+      "result": "pass"
+    },
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass"
+    },
+    {
+      "command": "npm run helix:environment-harness:docs-audit",
+      "result": "pass"
+    }
+  ],
+  "remaining_acceptance": {
+    "exact_run_evidence_reentry_and_continuation": "reentry_and_bounded_continuation_proven_terminal_boundary_failed_closed",
+    "fresh_revoke_and_stale_pickup_rejection": true,
+    "finalized_gpt_live_pickup_and_acknowledgement": true,
+    "gpt_live_blocker": null,
+    "pna3_4_promoted": true,
+    "promotion_pending": null,
+    "promotion_basis": "Exact provider-task binding, natural finalized GPT Live pickup and acknowledgement, separately admitted Minecraft player-look execution, normalized observation re-entry, exact revocation, stale pickup rejection, bounded fail-closed continuation, focused tests, full discipline, builds, MCP evidence typecheck, and documentation audit all passed on the keyed current-source developer node."
+  }
+}

@@ -6,12 +6,14 @@ import {
   HELIX_AGENT_RUN_WRITE_SCOPE,
   helixAgentCancelRequestSchema,
   helixAgentContinueRequestSchema,
+  helixAgentEvidenceReentryRequestSchema,
   helixAgentEvidenceBundleSchema,
   helixAgentRunEventSchema,
   helixAgentRunSchema,
   helixAgentStartRequestSchema,
   type HelixAgentCancelRequest,
   type HelixAgentContinueRequest,
+  type HelixAgentEvidenceReentryRequest,
   type HelixAgentStartRequest,
 } from "@shared/contracts/helix-agent-api.v1";
 import { requireHelixAgentApiScope } from "../auth/helix-agent-scope";
@@ -33,6 +35,12 @@ type HelixRunContinueToolArguments = {
   run_id: string;
   idempotency_key: string;
   request: HelixAgentContinueRequest;
+};
+
+type HelixRunEvidenceReentryToolArguments = {
+  run_id: string;
+  idempotency_key: string;
+  request: HelixAgentEvidenceReentryRequest;
 };
 
 type HelixRunCancelToolArguments = {
@@ -77,7 +85,9 @@ type McpSdkRequestHandlerInternals = {
 
 const projectedRunSchema = helixAgentRunSchema.partial().passthrough();
 
-const runMutationOutputSchema = (operation: "start" | "continue" | "cancel") =>
+const runMutationOutputSchema = (
+  operation: "start" | "continue" | "reenter_evidence" | "cancel",
+) =>
   z
     .object({
       operation: z.literal(operation),
@@ -308,6 +318,7 @@ export const HELIX_RUN_MCP_TOOL_SCOPES: ReadonlyMap<
   RequiredOAuthScopes
 > = new Map([
   ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
+  ["helix_run_evidence_reenter", HELIX_AGENT_RUN_WRITE_SCOPE],
   ["helix_run_continue", HELIX_AGENT_RUN_WRITE_SCOPE],
   ["helix_run_cancel", HELIX_AGENT_RUN_WRITE_SCOPE],
   ["helix_run_inspect", HELIX_AGENT_RUN_READ_SCOPE],
@@ -331,6 +342,12 @@ export type HelixRunMcpServicePort = {
     runId: string;
     idempotencyKey: string;
     request: HelixAgentContinueRequest;
+  }): Promise<{ body: unknown; idempotencyReplayed: boolean }>;
+  reenterEvidence(input: {
+    principal: HelixAgentApiPrincipal;
+    runId: string;
+    idempotencyKey: string;
+    request: HelixAgentEvidenceReentryRequest;
   }): Promise<{ body: unknown; idempotencyReplayed: boolean }>;
   cancelRun(input: {
     principal: HelixAgentApiPrincipal;
@@ -404,6 +421,49 @@ export const createHelixRunMcpServer = (
         });
         return {
           operation: "start",
+          idempotency_replayed: result.idempotencyReplayed,
+          run: result.body,
+        };
+      }),
+  );
+
+  server.registerTool(
+    "helix_run_evidence_reenter",
+    {
+      title: "Re-enter authenticated evidence into a durable Helix run",
+      description:
+        "Attaches only still-valid, owner-scoped MCP observation references to the exact durable run for its next Helix Ask continuation. It does not accept raw receipt text, execute a tool, sample a model, create or select a provider task, answer, or grant terminal authority.",
+      inputSchema: z
+        .object({
+          run_id: runIdSchema,
+          idempotency_key: idempotencyKeySchema,
+          request: helixAgentEvidenceReentryRequestSchema,
+        })
+        .strict(),
+      outputSchema: runMutationOutputSchema("reenter_evidence"),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+    },
+    async ({
+      run_id,
+      idempotency_key,
+      request,
+    }: HelixRunEvidenceReentryToolArguments) =>
+      callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+        requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_WRITE_SCOPE);
+        const result = await service.reenterEvidence({
+          principal: input.principal,
+          runId: run_id,
+          idempotencyKey: idempotency_key,
+          request,
+        });
+        return {
+          operation: "reenter_evidence",
           idempotency_replayed: result.idempotencyReplayed,
           run: result.body,
         };

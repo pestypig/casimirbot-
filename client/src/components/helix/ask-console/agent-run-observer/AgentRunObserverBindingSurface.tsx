@@ -462,7 +462,14 @@ export function AgentRunObserverBindingSurface({
     setDisconnecting(true);
     setRequestError(null);
     try {
-      await agentRunObserverApi.disconnectBinding(binding.binding_ref);
+      try {
+        await agentRunObserverApi.disconnectBinding(binding.binding_ref);
+      } catch (error) {
+        const alreadyDetached =
+          error instanceof AgentRunObserverApiError &&
+          (error.status === 404 || error.status === 410);
+        if (!alreadyDetached) throw error;
+      }
       removeStoredAgentRunObserverBinding(
         boundChatSessionId,
         binding.binding_ref,

@@ -31,6 +31,7 @@ type ToolDefinition = RecordLike & {
 
 const TOOL_SCOPES = new Map<string, string | readonly string[]>([
   ["helix_run_start", HELIX_AGENT_RUN_WRITE_SCOPE],
+  ["helix_run_evidence_reenter", HELIX_AGENT_RUN_WRITE_SCOPE],
   ["helix_run_continue", HELIX_AGENT_RUN_WRITE_SCOPE],
   ["helix_run_cancel", HELIX_AGENT_RUN_WRITE_SCOPE],
   ["helix_run_inspect", HELIX_AGENT_RUN_READ_SCOPE],
@@ -63,6 +64,7 @@ const protectedService = () => {
     startRun: vi.fn(),
     inspectRun: vi.fn(),
     continueRun: vi.fn(),
+    reenterEvidence: vi.fn(),
     cancelRun: vi.fn(),
     listEvents: vi.fn(),
     fetchEvidence: vi.fn(),

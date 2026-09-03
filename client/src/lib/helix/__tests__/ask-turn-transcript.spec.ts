@@ -243,6 +243,47 @@ describe("Helix Ask turn transcript projection", () => {
     expect(rows.some((row) => row.meta.includes("source final_response_backfill"))).toBe(true);
   });
 
+  it("does not present provider token deltas as numbered agent steps", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-native-delta-filter",
+      content: "The governed final answer.",
+      debug: {
+        turn_transcript_events: [
+          {
+            id: "native-delta-1",
+            type: "model_decision",
+            source_event_type: "codex_native_agent_message_delta",
+            event_source: "live",
+            provider_native_event_type: "item/agentMessage/delta",
+            text: "agent: target",
+            status: "running",
+          },
+          {
+            id: "native-completed-1",
+            type: "model_decision",
+            source_event_type: "codex_native_agent_message_completed",
+            event_source: "live",
+            provider_native_event_type: "item/agentMessage/completed",
+            text: "Codex completed its public message.",
+            status: "completed",
+          },
+          {
+            id: "terminal-1",
+            type: "final_answer",
+            source_event_type: "terminal_answer",
+            event_source: "live",
+            text: "The governed final answer.",
+            status: "completed",
+          },
+        ],
+      },
+    });
+
+    expect(rows.some((row) => row.text.includes("agent: target"))).toBe(false);
+    expect(rows.some((row) => row.text.includes("completed its public message"))).toBe(true);
+    expect(rows.some((row) => row.text.includes("governed final answer"))).toBe(true);
+  });
+
   it("does not clip terminal answer transcript events in the console stream", () => {
     const longFinal = `Final answer starts.\n${"agent-output ".repeat(80)}\nFinal answer ends.`;
 

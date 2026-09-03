@@ -306,6 +306,7 @@ CasimirBot exposes one provider-neutral durable agent-run service through:
 The MCP server's core durable-run tools are:
 
 - `helix_run_start`;
+- `helix_run_evidence_reenter`;
 - `helix_run_continue`;
 - `helix_run_inspect`;
 - `helix_run_fetch_evidence`;
@@ -316,10 +317,12 @@ The authenticated MCP `tools/list` response is the source of truth for the
 complete catalog, including any Shared Live Room tools. Each tool declares its
 required OAuth scope, which is enforced again when the tool is called.
 
-Starting a run creates durable state and returns an opaque `run_id`;
-`helix_run_continue` advances that same run through bounded, versioned turns.
-External results re-enter Helix as evidence and cannot bypass source admission,
-proof gates, or canonical terminal-answer authority.
+Starting a run creates durable state and returns an opaque `run_id`.
+`helix_run_evidence_reenter` attaches only owner-scoped, integrity-checked MCP
+observation references without executing a capability or model turn, and
+`helix_run_continue` then advances that same run through a bounded, versioned
+Ask turn. External results cannot bypass source admission, proof gates, or
+canonical terminal-answer authority.
 
 The Streamable HTTP catalog supplies input/output schemas, safety annotations,
 and per-tool OAuth security schemes. Missing-scope calls return a typed MCP

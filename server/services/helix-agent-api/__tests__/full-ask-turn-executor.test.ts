@@ -7,6 +7,7 @@ import { createSharedLiveRoomConversationContextReader } from "../../shared-live
 const mocks = vi.hoisted(() => ({
   executeExternalTurn: vi.fn(),
   getActiveRunChatBinding: vi.fn(),
+  appendCapabilityLifecycle: vi.fn(),
 }));
 
 const executorInput = (
@@ -67,6 +68,7 @@ const createExecutor = (): FullHelixAskTurnExecutor =>
     readConversationContext: createSharedLiveRoomConversationContextReader({
       getActiveRunChatBinding: mocks.getActiveRunChatBinding,
     }),
+    appendCapabilityLifecycle: mocks.appendCapabilityLifecycle,
   });
 
 describe("FullHelixAskTurnExecutor cooperative cancellation", () => {
@@ -75,6 +77,13 @@ describe("FullHelixAskTurnExecutor cooperative cancellation", () => {
     mocks.executeExternalTurn.mockResolvedValue(failedExternalResult);
     mocks.getActiveRunChatBinding.mockReset();
     mocks.getActiveRunChatBinding.mockResolvedValue(null);
+    mocks.appendCapabilityLifecycle.mockReset();
+    mocks.appendCapabilityLifecycle.mockResolvedValue({
+      stream_ref: "operator_activity_stream:one",
+      node_ref: "agent_api_principal:one",
+      events: [],
+      replayed: [],
+    });
   });
 
   it("does not enter Helix Ask when the turn was already cancelled", async () => {
@@ -101,6 +110,55 @@ describe("FullHelixAskTurnExecutor cooperative cancellation", () => {
         subject_id: input.principal.subjectId,
         oauth_scopes: input.principal.scopes,
         account_policy: input.principal.accountContext.account_policy,
+      }),
+    );
+  });
+
+  it("persists an admitted capability lifecycle as non-answer operator activity", async () => {
+    const controller = new AbortController();
+    const input = executorInput(controller.signal);
+    input.principal.oauthClientRef = "oauth_client:codex";
+    input.principal.mcpClientRef = "mcp_client:codex";
+    mocks.executeExternalTurn.mockResolvedValueOnce({
+      ...failedExternalResult,
+      payload: {
+        ...failedExternalResult.payload,
+        capability_lifecycle_ledger: {
+          schema: "helix.capability_lifecycle_ledger.v1",
+          turn_id: input.turnId,
+          capability_plan_id: "capability_plan:one",
+          capability_result_id: "capability_result:one",
+          stages: [{
+            stage: "planned",
+            status: "succeeded",
+            refs: [],
+            reason: "planned",
+          }],
+          failure_codes: [],
+          ok: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    });
+
+    await createExecutor().executeTurn(input);
+
+    expect(mocks.appendCapabilityLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: {
+          tenantId: input.principal.tenantId,
+          issuer: input.principal.issuer,
+          subjectId: input.principal.subjectId,
+          accountProfileId: input.principal.accountProfileId,
+        },
+        runId: input.runId,
+        oauthClientRef: "oauth_client:codex",
+        clientSessionRef: null,
+        ledger: expect.objectContaining({
+          schema: "helix.capability_lifecycle_ledger.v1",
+          assistant_answer: false,
+        }),
       }),
     );
   });

@@ -92,8 +92,13 @@ describe("Helix external-agent client profiles", () => {
     expect(codex.silent_configuration_mutation).toBe(false);
     expect(codex.endpoint_path).toBe("/mcp/local-supervisor-coordination");
     expect(codex.optional_device_check_surface).toBe("codex_plugin_deep_link");
-    expect(codex.catalog_refresh).toBe("new_chat_required");
+    expect(codex.catalog_refresh).toBe("client_restart_or_reconnect");
     expect(codex.provider_owned_steps).toContain("create_or_select_chat");
+    expect(codex.thread_observability_bridge.negotiable_levels).toContain(
+      "continuation_ready",
+    );
+    expect(HELIX_AGENT_CLIENT_PROFILES.standard_mcp.thread_observability_bridge
+      .negotiable_levels).not.toContain("continuation_ready");
   });
 
   it("rejects status projections containing undeclared data", () => {

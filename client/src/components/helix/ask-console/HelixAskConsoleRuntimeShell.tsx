@@ -5,6 +5,7 @@ import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
 import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntimeShellProps";
 import { AgentRunObserverBindingSurface } from
   "./agent-run-observer/AgentRunObserverBindingSurface";
+import { HelixOperatorActivityPanel } from "./HelixOperatorActivityPanel";
 
 const HelixAskLegacyRuntimeBridge = React.lazy(async () => {
   const module = await import("./HelixAskLegacyRuntimeBridge");
@@ -32,10 +33,13 @@ export function HelixAskConsoleRuntimeShell({
   ...props
 }: HelixAskConsoleRuntimeShellProps) {
   const observer = (
-    <AgentRunObserverBindingSurface
-      className="mt-3"
-      contextId={props.contextId}
-    />
+    <>
+      <AgentRunObserverBindingSurface
+        className="mt-3"
+        contextId={props.contextId}
+      />
+      <HelixOperatorActivityPanel />
+    </>
   );
   if (runtimeImplementation === "minimal_runtime_shell") {
     return (

@@ -1,0 +1,109 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.6 Play Minecraft with Helix",
+  "recorded_at": "2026-09-03",
+  "maturity": "deterministically verified",
+  "classification": [
+    "source admission",
+    "tool admission",
+    "presentation",
+    "Codex-owned runtime behavior at the external catalog boundary"
+  ],
+  "packaged_exe": {
+    "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+    "size_bytes": 225533440,
+    "sha256": "9e5e732f4acfef65a66f0004693acabf1629cb88e5c10259aadb0e1600685413",
+    "built_at_utc": "2026-09-03T03:53:18.8526292Z",
+    "renderer_control_surface": "packaged_electron_renderer",
+    "browser_control_surface_used_for_this_checkpoint": false,
+    "codex_ui_automation_used": false
+  },
+  "one_start_harness": {
+    "initial_tunnel_scope": "local_supervisor_coordination_and_device_check",
+    "initial_tunnel_status": "ready",
+    "explicit_start_harness_activated_once": true,
+    "resulting_tunnel_scope": "full_helix_agent",
+    "resulting_tunnel_status": "ready",
+    "tunnel_configured": true,
+    "tunnel_process_running": true,
+    "tunnel_healthy": true,
+    "tunnel_ready": true,
+    "tunnel_client_version": "0.0.13",
+    "recovery_phase": "idle",
+    "recovery_attempt_count": 0,
+    "manual_intervention_required": false,
+    "credential_included": false,
+    "private_endpoint_included": false
+  },
+  "exact_task_presence": {
+    "service_instance_ref": "service_instance:0467c7516179327220f43ff350122557",
+    "client_continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+    "presence_update_succeeded": true,
+    "authenticated_profile_server_verified": true,
+    "authenticated_mcp_client_server_verified": true,
+    "conversation_thread_client_declared": true,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "catalog_observation": {
+    "installed_connector_entries_visible": 143,
+    "local_supervisor_presence_update_visible": true,
+    "required_tools": {
+      "helix_reasoning_task_binding_claim": false,
+      "helix_reasoning_steering_read": false,
+      "helix_reasoning_steering_acknowledge": false
+    },
+    "first_divergence": "codex_loaded_connector_catalog_precedes_current_packaged_service_catalog",
+    "disposition": "one host-owned reconnect of the installed CasimirBot Device Check connector while the same EXE, tunnel, and task remain active",
+    "replacement_task_required": false,
+    "codex_restart_required": false,
+    "repeat_loop_allowed": false
+  },
+  "fail_closed_evidence": {
+    "development_endpoint_stopped": true,
+    "development_endpoint_tool_call_failed_transport": true,
+    "packaged_connector_presence_succeeded": true,
+    "reasoning_binding_claim_attempted_without_catalog_tool": false,
+    "minecraft_started_by_start_harness": false,
+    "environment_authority_granted_by_start_harness": false,
+    "provider_task_created": false,
+    "receipt_promoted_to_answer": false,
+    "steering_acknowledgement_promoted_to_execution": false
+  },
+  "verification": [
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass_with_classification_warning"
+    },
+    {
+      "command": "npm run helix:environment-harness:docs-audit",
+      "result": "pass",
+      "active_gate": "G8",
+      "failures": 0
+    },
+    {
+      "command": "npm --prefix apps/desktop run pack:dir",
+      "result": "pass"
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:agent-onboarding",
+      "result": "pass",
+      "native_bridge": "pass",
+      "start_harness_settled": "pass",
+      "diagnostic_sanitization": "pass"
+    }
+  ],
+  "completion_audit": {
+    "installed_exe_start_harness": "proven",
+    "same_task_installed_connector_presence": "proven",
+    "current_reasoning_binding_catalog_adoption": "not_proven",
+    "exact_reasoning_binding": "not_attempted_on_this_service_epoch",
+    "minecraft_launch_join": "not_attempted_on_this_service_epoch",
+    "natural_chat_and_ingame_parity": "not_attempted_on_this_service_epoch",
+    "action_observation_reentry_terminal_text_voice": "not_attempted_on_this_service_epoch",
+    "final_revoke_and_stale_rejection": "not_attempted_on_this_service_epoch",
+    "live_acceptance_complete": false
+  }
+}

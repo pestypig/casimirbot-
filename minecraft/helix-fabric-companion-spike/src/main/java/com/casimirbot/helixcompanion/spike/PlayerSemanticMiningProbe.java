@@ -61,6 +61,7 @@ public final class PlayerSemanticMiningProbe {
         boolean mechanicsSubjectRegistered,
         boolean aborted,
         boolean blockDestroyed,
+        boolean toolBroke,
         int toolDamageDelta,
         MiningEventProbe.Counts eventCounts,
         int discardedClientUpdatePackets,
@@ -80,6 +81,14 @@ public final class PlayerSemanticMiningProbe {
         public static MiningConditions grounded() {
             return new MiningConditions(true, false, -1, -1);
         }
+    }
+
+    @FunctionalInterface
+    public interface ProgressGuard {
+        ProgressGuard ALLOW = (actionTick, subject, level, target) -> null;
+
+        /** Returns null while current, otherwise one typed interruption code. */
+        String rejectionCode(int actionTick, ServerPlayer subject, ServerLevel level, BlockPos target);
     }
 
     public static Result attempt(
@@ -193,7 +202,8 @@ public final class PlayerSemanticMiningProbe {
             companionId,
             abortAfterActionTicks,
             maximumActionTicks,
-            MiningConditions.grounded()
+            MiningConditions.grounded(),
+            ProgressGuard.ALLOW
         );
     }
 
@@ -206,6 +216,23 @@ public final class PlayerSemanticMiningProbe {
         int abortAfterActionTicks,
         int maximumActionTicks,
         MiningConditions conditions
+    ) {
+        return attemptProgressive(
+            server, level, target, tool, companionId, abortAfterActionTicks,
+            maximumActionTicks, conditions, ProgressGuard.ALLOW
+        );
+    }
+
+    public static ProgressiveResult attemptProgressive(
+        MinecraftServer server,
+        ServerLevel level,
+        BlockPos target,
+        ItemStack tool,
+        String companionId,
+        int abortAfterActionTicks,
+        int maximumActionTicks,
+        MiningConditions conditions,
+        ProgressGuard progressGuard
     ) {
         int onlinePlayersBefore = server.getPlayerList().getPlayerCount();
         UUID profileId = UUID.nameUUIDFromBytes(
@@ -272,6 +299,7 @@ public final class PlayerSemanticMiningProbe {
         MiningEventProbe.Scope events = MiningEventProbe.open(target, false);
         int actionTicks = 1;
         boolean aborted = false;
+        String interruptionCode = null;
         try {
             subject.gameMode.handleBlockBreakAction(
                 target,
@@ -281,6 +309,20 @@ public final class PlayerSemanticMiningProbe {
                 0
             );
             while (!level.getBlockState(target).isAir() && actionTicks < maximumActionTicks) {
+                interruptionCode = progressGuard.rejectionCode(
+                    actionTicks, subject, level, target
+                );
+                if (interruptionCode != null && !interruptionCode.isBlank()) {
+                    subject.gameMode.handleBlockBreakAction(
+                        target,
+                        ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK,
+                        Direction.UP,
+                        level.getMaxY(),
+                        1
+                    );
+                    aborted = true;
+                    break;
+                }
                 if (abortAfterActionTicks > 0 && actionTicks >= abortAfterActionTicks) {
                     subject.gameMode.handleBlockBreakAction(
                         target,
@@ -322,10 +364,13 @@ public final class PlayerSemanticMiningProbe {
                 server.getPlayerList().getPlayer(profileId) != null,
                 aborted,
                 level.getBlockState(target).isAir(),
-                workingTool.getDamageValue() - damageBefore,
+                !tool.isEmpty() && workingTool.isEmpty(),
+                !tool.isEmpty() && workingTool.isEmpty()
+                    ? tool.getMaxDamage() - damageBefore
+                    : workingTool.getDamageValue() - damageBefore,
                 events.counts(),
                 packetSink.discardedPackets(),
-                "none"
+                interruptionCode == null ? "none" : interruptionCode
             );
         } catch (RuntimeException failure) {
             return new ProgressiveResult(
@@ -341,7 +386,10 @@ public final class PlayerSemanticMiningProbe {
                 server.getPlayerList().getPlayer(profileId) != null,
                 aborted,
                 level.getBlockState(target).isAir(),
-                workingTool.getDamageValue() - damageBefore,
+                !tool.isEmpty() && workingTool.isEmpty(),
+                !tool.isEmpty() && workingTool.isEmpty()
+                    ? tool.getMaxDamage() - damageBefore
+                    : workingTool.getDamageValue() - damageBefore,
                 events.counts(),
                 packetSink.discardedPackets(),
                 "progressive_player_interaction_failed:"

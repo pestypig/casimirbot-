@@ -5,7 +5,7 @@ Capability or component: Casimir Guide overlay menu for the installed EXE and we
 Lifecycle stage: presentation
 Reaction timescale: none — the Guide renders governed state and dispatches admitted navigation; it is not a controller.
 Authority owner: Existing Helix account, room, workstation, execution-arbiter, and terminal-authority contracts
-Current maturity: implemented for the base overlay/navigation shell and Friends & Parties Live Room projection; deeper non-social blade content remains specified
+Current maturity: deterministically verified for Slice 1 accessible shell/navigation, Slice 2 policy-aware contextual projection and search, Slice 3 redacted Shared Live Room projection/navigation, the Friends & Parties projection, Slice 5 bounded environment/companion projection, and Slice 6 bounded mission/voice-state projection; native-controller integration remains specified
 Target maturity: deterministically verified for the accessible Guide shell and every supported governed projection
 Required evidence: Reviewed interaction contract, account-policy mapping, room/media and social-party contract mapping, accessible prototype, focused UI tests, and documentation audit
 Explicit non-goals: New execution authority, a second panel system, a private agent loop, an overlay-owned social or media runtime, raw credential display, or a G8 release-ready claim
@@ -14,8 +14,11 @@ Downstream gate unlocked: A bounded Casimir Guide UI implementation packet; no e
 
 # Casimir Guide Menu v1
 
-Status: design specification with an implemented base overlay and social/party
-projection. Focused tests are implementation evidence only; this document does
+Status: design specification with deterministically verified Slice 1 shell,
+Slice 2 contextual projection, Slice 3 Shared Live Room projection/navigation,
+social/party projection behavior, Slice 5 bounded environment/companion
+projection behavior, and Slice 6 bounded mission/voice-state projection.
+Focused tests are implementation evidence only; this document does
 not claim physical cross-device live acceptance, integrated acceptance, or
 release readiness.
 
@@ -220,24 +223,31 @@ The Mission blade projects supported mission state. It must not synthesize a
 mission from unrelated panel text or infer completion from an execution
 receipt.
 
-Recommended initial rows:
+Implemented initial rows:
 
-1. **Current objective** — a one-line supported mission title or `No active
-   mission`.
-2. **Phase and status** — one of the canonical Mission Go Board phases and a
+1. **Mission identity** — the exact mission identifier published by the mounted
+   Helix Ask controller; it is never inferred from panel text or board contents.
+2. **Current objective** — a one-line supported unresolved objective or an
+   explicit unavailable state.
+3. **Phase and status** — one of the canonical Mission Go Board phases and a
    freshness indicator when a board is bound.
-3. **Attention** — the highest-priority unresolved risk or action, with its
-   certainty class preserved.
-4. **Latest result** — only a terminal-eligible supported result; otherwise an
+4. **Attention** — the newest unresolved critical/action event, with its
+   certainty, deterministic fail reason, and voice-suppression reason preserved.
+5. **Evidence and replay** — bounded evidence-reference counts and trace/replay
+   availability; evidence identities and replay execution remain in governed
+   mission surfaces.
+6. **Latest result** — only a terminal-eligible supported result; otherwise an
    explicit pending, failed, stale, or unavailable state.
-5. **Open mission board** — opens the applicable full mission surface when that
+7. **Mission voice state** — read-only context tier, context-session state,
+   voice mode, and mute-while-typing policy from the mounted controller.
+8. **Open mission board** — opens the applicable full mission surface when that
    surface exists and is allowed.
-6. **Team and assignments** — when a canonical team mission exists, shows
+9. **Team and assignments** — when a canonical team mission exists, shows
    `team_id`, mission/objective, companion role/assignment, dependency, and
    resource-reservation summaries without turning an assignment into execution
    authority.
-7. **Task History** — opens `agi-task-history` when permitted.
-8. **Process Graph** — opens `workstation-process-graph` when permitted.
+10. **Task History** — opens `agi-task-history` when permitted.
+11. **Process Graph** — opens `workstation-process-graph` when permitted.
 
 This blade is read-mostly in v1. Acknowledgments, action selection, mission
 phase changes, cancellation, or Emergency Stop require the exact governing
@@ -572,23 +582,26 @@ family. Later accepted profiles receive separate capability rows and detail.
 
 #### Current maturity boundary
 
-The companion-survival packet records private C0 A0/A1/B identity-and-presence
-evidence and an explicit stop before C1/EH-RCC3. The canonical work program
-still classifies the optional companion-entity embodiment as `projected`, and
-the current schemas mark the companion action surface as not publicly exposed
-and not execution-enabled.
+The canonical work program records follow-only EH-RCC3 / C1 as `live accepted`
+across A0/A1/B while retaining the broader optional companion-entity embodiment
+at `projected`. This narrow acceptance does not grant inventory, mining,
+combat, survival interaction, public capability exposure, or Guide-side
+execution authority.
 
-Therefore the v1 Guide specification may:
+Therefore the v1 Guide may:
 
-- reserve the hierarchy, labels, presence-state renderer, evidence detail, and
-  locked/planned presentations;
-- expose private developer evidence only through its already governed
-  developer route; and
-- show that follow/hold is planned or unavailable with the exact maturity or
-  admission reason.
+- show `resident.minecraft.companion-follow.v1` with the exact `live accepted`
+  maturity label;
+- project current presence, incarnation, revision, lease, cleanup, and evidence
+  state only when an authoritative governed runtime supplies those fields; and
+- otherwise render an honest `not projected` or unavailable state without
+  inferring an actor from connector health, room membership, or capability
+  maturity.
 
-It may not advertise, enable, or simulate public follow/hold controls until the
-work program and EH-RCC3 evidence permit that exact capability to advance.
+The Guide does not advertise, enable, or simulate follow/hold controls. Any
+later actionable projection requires the exact runtime actor/incarnation,
+fresh observations, finite leases, admitted principal and target, capability
+declaration, and governing arbiter path required by the active contract.
 
 #### Evidence origins and one-actor boundary
 
@@ -778,9 +791,18 @@ The first implementation should reuse these existing surfaces:
   `client/src/lib/workstation/launchPanelPolicy.ts` for account access;
 - `client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomDialog.tsx`
   and its controller for full room workflows; and
+- `client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomGuideProjection.ts`
+  for the controller-owned, metadata-only Guide snapshot and navigation event;
 - `shared/helix-shared-realtime-room.ts` and
   `shared/helix-shared-realtime-room-media.ts` for existing room consent,
   topology, floor, and WebRTC signaling types;
+- `client/src/store/useLiveAnswerEnvironmentStore.ts` for already-read live
+  monitor state, without creating another monitor refresh loop;
+- `shared/helix-environment-device-check.ts` and the existing read-only Device
+  Check endpoint for a bounded connector/world freshness snapshot;
+- `shared/helix-minecraft-companion-presence.ts` and
+  `shared/helix-resident-controller.ts` for presence, incarnation, lease,
+  cleanup, and currentness semantics; and
 - `apps/desktop/src/active-account-session.ts` for the installed EXE's active,
   server-authenticated profile binding;
 - `shared/helix-resident-controller.ts`,
@@ -816,26 +838,113 @@ authority into a new store.
 
 ### Slice 1 — shell and navigation
 
-- Add the taskbar Guide button and keyboard shortcut.
-- Implement the backdrop, expansion, six blades, focus trap, action legend,
-  reduced motion, and focus restoration.
-- Populate Casimir Guide, Workspace, and System with existing panel routes.
-- Apply current account policy to every destination.
+- Implemented and deterministically verified for the desktop taskbar button and
+  `Ctrl+Shift+G` toggle, modal backdrop and expansion, six labeled blades,
+  keyboard row/blade navigation, `Escape`/`Y` behavior, focus trap, action
+  legend, reduced-motion fallback, and exact prior-focus restoration.
+- Casimir Guide, Workspace, and System destinations resolve through
+  `client/src/lib/desktop/panelRegistry.ts`; an absent route fails closed as
+  unavailable rather than dispatching an invented panel identifier.
+- Every panel destination resolves through
+  `resolveHelixAccountPanelAccess`, starts from the fail-closed user policy,
+  refreshes from the authenticated account session, and reacts to the shared
+  policy-change event. Locked rows remain visible only as non-launchable rows
+  with an account-policy explanation.
+- Focused evidence:
+  `client/src/components/workstation/guide/__tests__/CasimirGuideOverlay.spec.tsx`
+  and
+  `client/src/components/desktop/__tests__/DesktopTaskbar.guide.spec.tsx`.
+  The focused Vitest command covers nine shell, policy, focus, navigation,
+  social-projection, Main Menu, taskbar-button, and keyboard-entry cases.
+- Native controller and touch entry remain outside this slice and must not be
+  inferred from keyboard/mouse evidence; controller parity remains Slice 7.
 
 ### Slice 2 — contextual projection
 
-- Add active panel, recent panels, and safe contextual shortcuts.
-- Add typed available, locked, unavailable, degraded, stale, pending, and
-  failed row presentations.
-- Add localized labels and search.
+- Implemented and deterministically verified for the freeform desktop surface.
+  `useDesktopStore` owns a deduplicated, most-recent-first panel history capped
+  at 24 entries and updates it on open, focus, and restore. The taskbar projects
+  the active registered panel as the most recent open, non-minimized panel, with
+  a highest-z fallback; it filters hidden/taskbar-only routes before passing a
+  five-entry recent list and five-entry pinned-favorite list into the Guide.
+- The Workspace root now offers policy-aware Resume, Recent panels, Favorites,
+  Search panels, and Main Menu rows. Recent and favorite lists are a single
+  nested level, show at most five destinations, and return to the Workspace root
+  on `Escape` before a second `Escape` closes the Guide.
+- Search is bounded to registered, non-hidden, non-taskbar panel routes. It
+  matches localized titles, stable panel identifiers, and registry keywords,
+  returns at most ten rows, admits available destinations, and shows locked
+  destinations only when the launch policy marks them discoverable. A locked
+  result remains non-launchable. `X` enters search only from the Workspace root;
+  letter and arrow shortcuts do not intercept text while the search field owns
+  focus.
+- The default Guide blade ranks Resume first and derives safe navigation-only
+  shortcuts from active documentation/image, environment, or scientific
+  calculator context. Every contextual destination still resolves through the
+  panel registry and current account policy before dispatch.
+- Rows use one typed presentation contract for `available`, `locked`,
+  `unavailable`, `degraded`, `stale`, `pending`, `failed`, `planned`, and
+  `read_only`. Pending and terminally unavailable states are not selectable;
+  degraded, stale, and failed rows may expose a safe navigation or recovery
+  action. Social loading and refresh failure now project `pending` and `failed`
+  instead of collapsing both into an ambiguous unavailable label.
+- All Guide-owned labels use the interface message catalog, while panel titles
+  use `getInterfacePanelTitle`. English source strings and the public German and
+  Arabic catalogs cover the complete Guide message namespace; developer-preview
+  languages retain the standard English fallback until their catalogs advance.
+- Focused evidence:
+  `client/src/components/workstation/guide/__tests__/CasimirGuideOverlay.spec.tsx`,
+  `client/src/components/workstation/guide/__tests__/CasimirGuideRow.spec.tsx`,
+  `client/src/components/workstation/guide/__tests__/CasimirGuideLocalization.spec.ts`,
+  `client/src/components/desktop/__tests__/DesktopTaskbar.guide.spec.tsx`, and
+  `client/src/store/useDesktopStore.recent-panels.spec.ts`. The focused battery
+  covers 20 cases across the Slice 1 and Slice 2 implementation surface.
+- This slice does not claim contextual projection for the workstation layout,
+  controller parity, full Live Room media acceptance, or environment authority.
+  Those remain bounded by their later slices and governing work packets.
 
 ### Slice 3 — Live Room projection
 
-- Project selected room, participants, floor, microphone, GPT attachment,
-  sources, and public results from the existing room controller.
-- Route advanced workflows into the full Shared Live Room dialog.
-- Verify that Guide state does not grant room, source, floor, or environment
-  authority.
+- Implemented and deterministically verified. The existing
+  `useHelixSharedLiveRoom` controller remains the only owner of room polling,
+  media state, consent, floor, runtime, source, result, and mutation workflows.
+  `HelixAskSharedLiveRoomControls` derives and publishes one bounded Guide
+  snapshot from that controller; opening the Guide does not create another
+  room hook or refresh loop.
+- The projection includes only selected room title/status/readiness and update
+  time, participant/presence counts, speaking-floor label, the current member's
+  microphone consent/media state, GPT attachment/runtime/model labels, visual
+  source freshness counts, and public-result count/latest artifact metadata.
+  It deliberately excludes room, participant, source, session, and result
+  identifiers; runtime reference hashes; result text; evidence references;
+  source payloads; credentials; endpoints; and every mutation callback.
+- Shared-room rows are typed read-only, pending, stale, failed, or unavailable
+  projections. Source rows expose counts and freshness only, and public-result
+  rows expose counts/metadata only; neither can satisfy source admission,
+  evidence, terminal eligibility, or answer authority. A room refresh error
+  marks the retained snapshot stale rather than silently presenting it as
+  current authority.
+- `Open full Live Room` closes the Guide and sends a navigation-only event to
+  the already-mounted `HelixAskSharedLiveRoomControls`, which opens the existing
+  `SharedLiveRoomDialog`. The event carries no room ID or requested operation.
+  Consent, floor acquire/release, media connection, source binding, room
+  membership, and environment authority remain available only through their
+  existing governed handlers.
+- The Live Room blade retains the independent Friends & Parties projection, so
+  voice-party microphone/GPT attachment and Shared Live Room microphone/GPT
+  attachment remain visibly distinct. The longer blade body scrolls within the
+  centered overlay instead of expanding beyond the viewport.
+- Focused evidence:
+  `client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomGuideProjection.spec.ts`,
+  `client/src/components/helix/ask-console/shared-live-room/__tests__/HelixAskSharedLiveRoomControls.spec.tsx`,
+  `client/src/components/workstation/guide/__tests__/CasimirGuideOverlay.spec.tsx`,
+  and the Slice 1/2 Guide battery. The focused battery covers 25 cases and
+  asserts redaction of private identifiers, session hashes, result text, and
+  evidence refs; absence of mutation callbacks; read-only row behavior; and
+  navigation into the existing dialog.
+- This evidence does not claim physical dual-EXE media, production TURN,
+  production Auth0/domain, cross-network, integrated, live-accepted, or
+  release-ready status, and it does not close G8.
 
 ### Slice 4 — social and voice-party foundation
 
@@ -852,29 +961,103 @@ authority into a new store.
   projection. The Guide continues to receive only safe party status and links.
 - Keep installed two-EXE media, real restrictive-NAT TURN allocation, and
   physical cross-device acceptance as the explicit F5.4 boundary; do not infer
-  them from same-process ingress or mocked candidate-pair tests. The EXE-local
-  loopback service/database also requires a separately authenticated domain
-  coordination path before Friends & Parties can span installed nodes; the
-  Guide must show that boundary as unavailable rather than implying that a
-  node-local party is globally reachable.
+  them from same-process ingress or mocked candidate-pair tests. The
+  authenticated EXE-to-domain broker path is implemented and deterministically
+  verified, but production Auth0/domain deployment and physical two-device
+  acceptance remain open. The Guide must show those deployment boundaries as
+  unavailable rather than implying that deterministic broker evidence proves
+  global reachability.
 
 ### Slice 5 — Environment and companion projection
 
-- Add the environment → embodiment → actor/incarnation → controller profile →
-  presence/lease → mode/evidence hierarchy.
-- Render exact presence states, observation origins, freshness, cleanup, and
-  planned/read-only/actionable distinctions from typed contracts.
-- Keep `resident.minecraft.companion-follow.v1` non-actionable until its
-  authoritative declaration and EH-RCC3 maturity permit execution.
-- Route all admitted controls through the existing environment capability and
-  arbiter path; do not add local Guide execution state.
+- Implemented and deterministically verified as a bounded presentation and
+  navigation slice. `CasimirGuideEnvironmentProjection` selects the newest
+  already-read Live Answer Environment monitor and a deterministic probe-ready,
+  fresh Device Check connector. Opening the Guide performs one account-gated,
+  read-only Device Check request; it does not start connector, companion, or
+  live-monitor polling.
+- The whitelist includes monitor preset/status/mode, safe source and delta
+  counts, blocked-subgoal count, update time, connector package/adapter/world,
+  health, freshness, readiness, and capability/blocker counts. It excludes
+  device, installation, binding, environment, thread, room, source, subgoal,
+  evidence, and lease identifiers; objectives, summaries, line content,
+  credentials, callbacks, and raw payloads are also absent.
+- The blade preserves the environment → embodiment → actor/incarnation →
+  controller profile → presence/lease → evidence hierarchy. Because no current
+  governed browser projection supplies companion presence, incarnation, lease,
+  or cleanup state, those rows fail closed as `not projected`; connector health
+  and live-monitor state never manufacture an actor.
+- The canonical narrow `resident.minecraft.companion-follow.v1` capability is
+  labeled `Follow-only C1 · live accepted`, but the row is read-only and
+  explicitly exposes no Guide-side follow, hold, mining, inventory, combat, or
+  world action. Broader companion embodiment remains `projected`.
+- Refresh failure with retained connector or monitor observations is rendered
+  `stale`, not current authority. Every evidence row remains observation
+  metadata only with `answer_authority=false` and `terminal_eligible=false`.
+- `Environment controls`, `Device Check`, and `Local Harness` resolve through
+  the existing panel registry and current account policy. The Guide owns no
+  execution callbacks, leases, resident mode, Emergency Stop, release, Player
+  Embodiment, World Authority, or terminal completion path.
+- Focused evidence:
+  `client/src/components/workstation/guide/__tests__/CasimirGuideEnvironmentProjection.spec.ts`,
+  `client/src/components/workstation/guide/__tests__/CasimirGuideOverlay.spec.tsx`,
+  and
+  `client/src/components/workstation/guide/__tests__/CasimirGuideLocalization.spec.ts`.
+  Tests cover deterministic selection, strict redaction, stale retained state,
+  fail-closed companion runtime fields, read-only maturity presentation,
+  policy-aware routing, and German/Arabic Guide namespace coverage.
+- This Slice 5 evidence is `deterministically verified` UI evidence only. It
+  does not advance the broader companion embodiment beyond `projected`, repeat
+  C1 live acceptance, prove public execution, or close G8.
 
 ### Slice 6 — Mission projection
 
-- Bind a real mission identifier and supported Mission Go Board projection.
-- Preserve phase, certainty, evidence, freshness, fail reason, and replay links.
-- Add action and acknowledgment controls only through their canonical API and
-  only in a separately reviewed implementation packet.
+- Implemented and deterministically verified as a bounded read-only projection.
+  `HelixAskPill` publishes its exact `contextId` mission binding plus context
+  tier/session, voice mode, and mute-while-typing policy through
+  `CasimirGuideMissionProjection`; a stable owner token prevents an unmounted
+  older Ask surface from clearing a newer controller binding.
+- Opening the Guide performs one bounded snapshot read and one latest-200 event
+  read from the existing Mission Board API. It creates no polling loop, board
+  store, voice service, acknowledgment handler, replay runner, or mission
+  execution path. An empty event stream is `none`, not a fabricated active
+  mission, even though the snapshot fold has safe defaults.
+- The whitelist preserves exact mission identity, canonical phase/status,
+  unresolved objective, attention text/classification, certainty class, typed
+  fail and voice-suppression reasons, last-verified time, explicit stale-window
+  freshness, evidence-reference count, and trace/replay availability. Event,
+  evidence, objective, and trace identifiers remain in the governed detail
+  surfaces rather than the overlay.
+- The Mission Board event contract now preserves additive `certaintyClass`,
+  `failReason`, `suppressionReason`, and `lastVerifiedAt` metadata through both
+  memory and database stores. It also accepts the specification's
+  `stale_window` timer kind. The `tail=1` read option returns the latest bounded
+  event page so a long mission cannot pair a current snapshot with its oldest
+  attention metadata.
+- Freshness fails closed to `unknown` unless an explicit `stale_window` event
+  establishes a fresh or stale interval. Failed refresh with a retained board
+  is rendered `stale`; failed first read is `failed`. No arbitrary client TTL
+  upgrades board state.
+- Latest result remains explicitly unavailable because the current Mission
+  Board projection carries no authenticated terminal product. The Guide fixes
+  `terminal_eligible=false`, `answer_authority=false`, and all execution,
+  acknowledgment, narration, and replay authority to false.
+- `Task History` and `Process Graph` resolve through the panel registry and
+  active account policy. The full Mission Go Board row remains unavailable
+  until a governed panel route exists; the Guide does not invent one or treat
+  Task History as an execution-capable replay surface.
+- Focused evidence:
+  `client/src/components/workstation/guide/__tests__/CasimirGuideMissionProjection.spec.tsx`,
+  `client/src/components/workstation/guide/__tests__/CasimirGuideOverlay.spec.tsx`,
+  `client/src/components/workstation/guide/__tests__/CasimirGuideLocalization.spec.ts`,
+  and `tests/mission-board.routes.spec.ts`. Tests cover deterministic binding,
+  acknowledgment filtering, explicit freshness, stale retention, strict
+  identifier redaction, metadata persistence, latest-page reads, terminal and
+  mutation-authority boundaries, policy-aware navigation, and German/Arabic
+  namespace coverage.
+- Action and acknowledgment controls remain deferred to a separately reviewed
+  implementation packet and may only use their canonical API and authority
+  contracts. Slice 6 adds none.
 
 ### Slice 7 — native controller integration
 

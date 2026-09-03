@@ -1,0 +1,137 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.4 exact reasoning-task binding and voice pickup",
+  "recorded_at": "2026-09-02",
+  "maturity": "deterministically verified",
+  "program_context": {
+    "program_gate": "G8 — environment-harness release evaluation",
+    "workstream": "provider-neutral external-agent correlation and reverse steering",
+    "capability_or_component": "PNA3.4 — exact principal reasoning-task binding, truthful Helix chat destination, and GPT Live steering pickup",
+    "lifecycle_stage": "source admission, with continuation delivery, evidence normalization, evidence re-entry, and presentation as supporting stages",
+    "reaction_timescale": "none for binding and projection; short semantic replanning after an external reasoning client acknowledges a steering event",
+    "authority_owner": "The user owns provider-task selection and attachment; the external reasoning runtime owns conversation, sampling, tool sequencing, retries, compaction, and completion; CasimirBot owns exact binding identity, source and tool admission, evidence identity, effects, cancellation, and terminal eligibility.",
+    "current_maturity": "deterministically verified",
+    "target_maturity": "live accepted on one current-source developer node",
+    "required_evidence": "Exact task claim, finalized GPT Live pickup and acknowledgement, admitted Minecraft capability, authenticated observation re-entry, revocation, and stale pickup rejection.",
+    "explicit_non_goals": [
+      "Codex UI puppeteering",
+      "automatic or unsupported provider-task creation",
+      "hidden reasoning or transcript capture",
+      "steering receipt answer, execution, evidence, or terminal authority",
+      "a Helix-owned model, generic tool, retry, approval, sandbox, compaction, session, subagent, or completion loop"
+    ],
+    "downstream_gate_unlocked": "none from this development checkpoint"
+  },
+  "change_classification": [
+    "evidence normalization",
+    "evidence re-entry",
+    "follow-up reasoning"
+  ],
+  "implemented_contract": {
+    "ask_prompt_primitive": "helix_run_start",
+    "reasoning_continuation_primitive": "helix_run_continue",
+    "new_evidence_primitive": "helix_run_evidence_reenter",
+    "minecraft_result_projection": "A successful, provenance-valid helix_minecraft_player_action result may be stored as an owner-scoped durable MCP observation envelope.",
+    "reentry_guards": [
+      "exact authenticated owner",
+      "exact run and expected version",
+      "queued or waiting nonterminal run",
+      "stored observation reference only",
+      "no raw receipt payload",
+      "no active operation",
+      "terminal candidate reset before later continuation"
+    ],
+    "authority_flags": {
+      "executes_environment_action": false,
+      "samples_model": false,
+      "creates_or_selects_provider_task": false,
+      "answer_authority": false,
+      "terminal_authority": false
+    }
+  },
+  "live_pre_restart_probe": {
+    "canonical_server": "http://127.0.0.1:1522",
+    "keyed_server_restarted_or_replaced": false,
+    "run_id": "run_fbafed79-3867-473e-9775-e379eb4e02d7",
+    "run_status": "waiting",
+    "terminal_authority_status": "not_evaluated",
+    "room_id": "shared_realtime_room:450c2fd7-5bea-4487-9a2d-4b510fd4e1ca",
+    "minecraft_actor_status_result": "permission_revoked",
+    "minecraft_actor_status_reason": "room_read_grant_identity_mismatch",
+    "provenance_valid": false,
+    "current_turn_reentry_eligible": false,
+    "environment_action_executed": false,
+    "new_tool_live_on_retained_process": false,
+    "retained_service_healthz": {
+      "status_code": 200,
+      "ready": true,
+      "app_ready": true,
+      "artifacts_ready": true
+    },
+    "notes": "The retained keyed process predates this source patch. A later controlled rebuild/restart and MCP catalog adoption are required for live proof of the new tool."
+  },
+  "verification": [
+    {
+      "scope": "contract, service, MCP catalog, discovery, transport, and Minecraft focused tests",
+      "result": "pass",
+      "test_files": 6,
+      "tests_passed": 56,
+      "notes": "Includes an adversarial rejection test for an observation that attempts to carry answer authority through the standalone durable-run service boundary."
+    },
+    {
+      "command": "npm run typecheck:mcp-evidence",
+      "result": "pass"
+    },
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass",
+      "notes": "Static checks passed; the dirty-worktree classifier warned that classification was not supplied through the optional environment variable. The classification is recorded in this evidence."
+    },
+    {
+      "command": "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks",
+      "result": "pass",
+      "tests_passed": 31
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "fail",
+      "classification": "pre-existing dirty-checkout failures outside the focused MCP evidence surfaces"
+    },
+    {
+      "command": "npm run build:server",
+      "result": "pass",
+      "notes": "Four pre-existing duplicate-key or duplicate-case warnings remained."
+    },
+    {
+      "command": "npm --prefix apps/desktop run pack:dir",
+      "result": "pass",
+      "artifacts": {
+        "casimirbot_exe_sha256": "ee459ae5afd9ac55bb21e522a3953e50b3f18cbd4bb7293d27f7f17238fb9755",
+        "app_asar_sha256": "4d1fec67c4153c4fb127326574df6eb935fcf8f196919293d214195528a33e5c",
+        "runtime_manifest_sha256": "5975d8399d6f1b73926f9e015822ce08c2b39fbcbfeece4c933a28dceebd2959"
+      }
+    },
+    {
+      "command": "npm --prefix apps/desktop run verify:runtime-tree",
+      "result": "pass"
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:service-boundary",
+      "result": "pass",
+      "notes": "Isolated loopback service rejected missing and wrong authority with 401 and admitted the authorized request with 200."
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:packaged-launch",
+      "result": "not_run_after_preflight",
+      "reason": "minecraft_launch_memory_ceiling equivalent packaged-smoke guard: at least 4 GiB physical headroom required; 2.30 GiB was free",
+      "guard_bypassed": false
+    }
+  ],
+  "remaining_acceptance": {
+    "fresh_current_source_minecraft_action_and_mcp_observation": false,
+    "live_exact_run_evidence_reentry": false,
+    "finalized_gpt_live_pickup_and_acknowledgement": false,
+    "gpt_live_blocker": "OpenAI Realtime invalid_api_key",
+    "pna3_4_promoted": false
+  }
+}

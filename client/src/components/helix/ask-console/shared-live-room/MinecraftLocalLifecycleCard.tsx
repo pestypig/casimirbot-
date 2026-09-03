@@ -15,6 +15,37 @@ type LifecycleResponse = {
   };
 };
 
+export type MinecraftLocalLifecycleResult = Readonly<{
+  launcherAction: string;
+  connectionAction: string;
+  serverAddress: string;
+}>;
+
+export const launchMinecraftLocalLifecycle = async (): Promise<MinecraftLocalLifecycleResult> => {
+  const response = await fetch(ENDPOINT, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      address: "localhost:25565",
+      operator_confirmation: true,
+    }),
+  });
+  const body = (await response.json().catch(() => null)) as
+    | LifecycleResponse
+    | null;
+  if (!response.ok || body?.ok !== true) {
+    throw new Error(
+      body?.message ?? body?.error ?? "Minecraft lifecycle request failed.",
+    );
+  }
+  return {
+    launcherAction: body.receipt?.launcher_action ?? "client ready",
+    connectionAction: body.receipt?.connection_action ?? "joined",
+    serverAddress: body.receipt?.server_address ?? "localhost:25565",
+  };
+};
+
 export function MinecraftLocalLifecycleCard() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -25,27 +56,10 @@ export function MinecraftLocalLifecycleCard() {
     setMessage(null);
     setOk(false);
     try {
-      const response = await fetch(ENDPOINT, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: "localhost:25565",
-          operator_confirmation: true,
-        }),
-      });
-      const body = (await response.json().catch(() => null)) as
-        | LifecycleResponse
-        | null;
-      if (!response.ok || body?.ok !== true) {
-        throw new Error(
-          body?.message ?? body?.error ?? "Minecraft lifecycle request failed.",
-        );
-      }
-      const receipt = body.receipt;
+      const receipt = await launchMinecraftLocalLifecycle();
       setOk(true);
       setMessage(
-        `Connected to ${receipt?.server_address ?? "localhost:25565"} (${receipt?.launcher_action ?? "client ready"}, ${receipt?.connection_action ?? "joined"}).`,
+        `Connected to ${receipt.serverAddress} (${receipt.launcherAction}, ${receipt.connectionAction}).`,
       );
     } catch (error) {
       setMessage(

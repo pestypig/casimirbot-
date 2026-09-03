@@ -1,0 +1,93 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "packet": "eh-g8-pna3-6-play-minecraft-with-helix-v1",
+  "observed_at": "2026-09-03T04:34:00.000Z",
+  "classification": [
+    "tool_admission",
+    "presentation",
+    "host_boundary"
+  ],
+  "installed_executable": {
+    "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+    "size_bytes": 225533440,
+    "sha256": "1c0eb70a58af92d60c713337119cdd85649d020a546f34f3ba9697c2f75b5fec",
+    "built_at_utc": "2026-09-03T04:33:08Z"
+  },
+  "deterministic_verification": {
+    "focused_tests": {
+      "files": 3,
+      "tests": 27,
+      "passed": 27,
+      "failed": 0
+    },
+    "server_build": "pass",
+    "client_build": "pass",
+    "desktop_pack_dir": "pass",
+    "helix_ask_discipline_quick": "pass_with_dirty_tree_classification_warning",
+    "environment_harness_docs_audit": "pass"
+  },
+  "mcp_control_coverage": {
+    "start_harness": [
+      "helix_desktop_tunnel_transition_request",
+      "helix_desktop_tunnel_transition_inspect",
+      "helix_desktop_tunnel_transition_execute"
+    ],
+    "player_configuration": [
+      "helix_environment_subject_select",
+      "helix_environment_action_authority_configure"
+    ],
+    "fabric_launch_join": "helix_minecraft_local_lifecycle_launch",
+    "private_player_pairing": "helix_environment_player_pair_local",
+    "goal_monitoring": [
+      "helix_environment_goal_create",
+      "helix_environment_goal_inspect",
+      "helix_environment_monitor_create",
+      "helix_environment_monitor_read",
+      "helix_environment_monitor_acknowledge"
+    ],
+    "gameplay_and_reentry": [
+      "helix_minecraft_situation_probe",
+      "helix_minecraft_player_action",
+      "helix_run_evidence_reenter"
+    ],
+    "stop_and_revoke": [
+      "helix_minecraft_workflow_control",
+      "helix_environment_action_authority_revoke",
+      "helix_environment_monitor_revoke"
+    ]
+  },
+  "negative_evidence": {
+    "launch_without_operator_confirmation": "rejected_before_runner",
+    "launch_with_wrong_authority": "rejected_before_runner",
+    "launch_with_revoked_authority": "rejected_before_runner",
+    "launch_with_non_fabric_authority": "rejected_before_runner",
+    "startup_environment_authority": false,
+    "credentials_in_output": false,
+    "hidden_reasoning_included": false,
+    "codex_ui_automated": false,
+    "receipt_answer_authority": false,
+    "receipt_terminal_eligible": false
+  },
+  "installed_exe_observation": {
+    "service_instance_ref": "service_instance:ae5727b0f172fa4440b24f45d6b19489",
+    "continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+    "presence": "server_verified",
+    "transport": "openai_secure_mcp_tunnel",
+    "scope": "full_helix_agent",
+    "status": "ready",
+    "healthy": true,
+    "process_running": true,
+    "recovery_phase": "idle",
+    "manual_intervention_required": false,
+    "environment_authority_granted_by_start": false
+  },
+  "remaining_live_acceptance": {
+    "catalog_refresh_after_final_exe_build": "required_once",
+    "exact_reasoning_binding_on_final_service_epoch": "open",
+    "natural_play_request_to_admitted_action": "open",
+    "fresh_observation_reentry": "open",
+    "same_result_text_and_voice": "open",
+    "stale_pickup_after_revoke": "open",
+    "goal_complete": false
+  }
+}

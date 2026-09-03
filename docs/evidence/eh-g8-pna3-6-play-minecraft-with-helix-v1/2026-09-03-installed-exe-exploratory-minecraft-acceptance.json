@@ -1,0 +1,231 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.6 Play Minecraft with Helix",
+  "recorded_at": "2026-09-03",
+  "maturity": "installed-node live accepted at the governed action lifecycle boundary",
+  "work_packet": {
+    "program_gate": "G8 — environment-harness release evaluation",
+    "workstream": "Provider-neutral agent connection, installed-node convergence, and Minecraft environment operation",
+    "capability_or_component": "PNA3.6 — finite one-start Play Minecraft with Helix journey",
+    "lifecycle_stage": [
+      "source admission",
+      "tool admission",
+      "execution",
+      "evidence normalization",
+      "evidence re-entry",
+      "follow-up reasoning",
+      "terminal authority",
+      "revocation"
+    ],
+    "reaction_timescale": "short semantic action with tick-scale Fabric execution and safety release",
+    "authority_owner": "Codex owns semantic task choice and answer completion; Helix owns exact identities, admission, provenance, and terminal eligibility; Fabric owns admitted game execution and immediate control release",
+    "current_maturity": "installed-node live accepted at the governed action lifecycle boundary",
+    "target_maturity": "installed multi-surface release evaluation",
+    "required_evidence": "Packaged EXE catalog and presence, exact previously accepted provider-task steering lifecycle, fresh Minecraft perception, admitted action, fresh post-state re-entry, revocation, stale-action rejection, and normal shutdown",
+    "explicit_non_goals": "No replacement provider task, Codex UI automation, hidden reasoning, credential capture, native-desktop impersonation of an external plugin principal, raw host or RCON authority, or receipt/acknowledgement answer or terminal authority",
+    "downstream_gate_unlocked": "PNA3.6 installed multi-surface release-evaluation candidate; G8 remains the work-program gate"
+  },
+  "artifacts": {
+    "packaged_exe": {
+      "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+      "size_bytes": 225533440,
+      "sha256": "f3558f5b6d3b71b3cb8996fc01239d86889f708943f818412f76299fb17303ef"
+    },
+    "packaged_app_asar": {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar",
+      "size_bytes": 64768281,
+      "sha256": "238395c1879321da2a408b38d8077d29c20a84e5b84088a264af4a2e8ef6aac5",
+      "bundled_service_build_hash": "debbe6173a9d"
+    },
+    "fabric_player_agent": {
+      "installed_path": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/HelixFabricPlayerAgent-0.4.0.jar",
+      "sha256": "af0aba9efed5f01dee0d5282db2f40bb5cd88b317f6570b21f1e013f6736cb2d"
+    }
+  },
+  "packaged_runtime": {
+    "control_surface": "packaged Electron renderer",
+    "browser_mirror_used": false,
+    "codex_ui_automation_used": false,
+    "provider_task_created": false,
+    "required_reasoning_tools_visible": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true
+    },
+    "local_supervisor_presence": {
+      "continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+      "service_instance_ref": "service_instance:1437...",
+      "supervisor_client_ref": "supervisor_client:4393...",
+      "registered": true,
+      "note": "Abbreviated non-secret evidence references; heartbeat expiry does not erase the accepted registration event."
+    }
+  },
+  "reasoning_binding_composition": {
+    "accepted_external_provider_evidence": "docs/evidence/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1/2026-09-02-current-service-typed-minecraft-checkpoint.json",
+    "binding_ref": "reasoning_binding:640c...",
+    "steering_ref": "reasoning_steering:e5ec...",
+    "binding_epoch": 4,
+    "natural_prompt_pickup_and_acknowledgement": true,
+    "finalized_gpt_live_pickup_and_acknowledgement": true,
+    "binding_revoked": true,
+    "stale_pickup_result": "reasoning_binding_revoked",
+    "steering_receipt_answer_authority": false,
+    "steering_receipt_execution_authority": false,
+    "steering_receipt_terminal_authority": false,
+    "fresh_native_desktop_claim": {
+      "attempted": true,
+      "result": "reasoning_binding_claim_invalid",
+      "classification": "correct principal-bound rejection",
+      "reason": "The one-time handle belongs to the external plugin MCP client; the packaged native-desktop principal may not impersonate it.",
+      "retry_loop_used": false,
+      "security_boundary_weakened": false
+    }
+  },
+  "minecraft_context": {
+    "room_ref": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "participant_ref": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+    "environment_binding_ref": "environment_binding:legacy:a3cb9ebe48ac74aa03bfcae837021a270284062a",
+    "source_binding_ref": "room_source_binding:5063cd89-ccf6-42a8-a492-31f5e9bd7965",
+    "source_ref": "source:room-ingress:7bb01482-d332-4831-a83f-d56d6f0a3a8e",
+    "world_ref": "minecraft:connector:a22fa817-9fb",
+    "subject_binding_ref": "environment_subject_binding:0632477d-e44b-4cb1-8968-2aa41fd3408a",
+    "player": "DatDamPig",
+    "authority_ref": "environment_action_authority:6696a733-24ca-45c5-86fc-e254c472c3b7",
+    "authority_policy_revision": 3,
+    "authority_scope": [
+      "look",
+      "walk",
+      "jump",
+      "navigate"
+    ],
+    "autonomy_mode": "approved_capabilities",
+    "manual_override_policy": "cancel"
+  },
+  "exploratory_task": {
+    "selection_method": "Codex inspected a fresh situation probe, selected a safe task from the observed local affordances, and expressed it as an ordinary user request.",
+    "prompt": "Move one short step to the right, stop, then check your surroundings and tell me what changed.",
+    "pre_action": {
+      "evidence_ref": "environment_probe_evidence:65b59052588510144e9f7bac3798a7582c0433df",
+      "fingerprint": "sha256:10259e1890c1b83bf86d4b8824d07ca290b48a940679f21aa5fe68524ab3f3b6",
+      "position": { "x": -6.55, "y": 65.0, "z": -3.7 },
+      "health": "full",
+      "food": "full",
+      "immediate_hazards": [],
+      "nearby_entities": [],
+      "immediate_footholds_safe": true
+    },
+    "action": {
+      "request_ref": "environment_action_request:b9e5208d-f5d7-434e-a7fa-1f904ce8abfc",
+      "workflow_ref": "environment_action_workflow:0f3532cc-b36c-4783-ad47-bb7ea0cb909a",
+      "execution_ref": "environment_action_execution:dafa9e2c-db1c-4cde-be7c-da64b14be869",
+      "evidence_ref": "environment_action_evidence:86bc6a3daa97f1b877e5e33ef60d506bfafa1fb3c",
+      "mcp_evidence_observation_ref": "mcp_evidence_observation:helix.minecraft.player_action.observe_result:e572778e-86c2-4222-befc-9c2a32317224",
+      "operation": "walk right for 350 ms",
+      "ticks": 7,
+      "measured_distance_blocks": 1.255167,
+      "side_effects_performed": true,
+      "player_motion_performed": true,
+      "controls_released": true,
+      "inventory_mutated": false,
+      "world_mutated": false,
+      "auto_replayed": false,
+      "model_invoked_by_executor": false,
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true
+    },
+    "post_action": {
+      "evidence_ref": "environment_probe_evidence:53c25efd0e3fd44eef8f36caadadb19b53124006",
+      "fingerprint": "sha256:ef2114d49f5c1a24ab00043c1ae22c6ea3aaf47040c7cfc69cfe128d93d06d9f",
+      "position": { "x": -5.21, "y": 65.0, "z": -4.38 },
+      "health": "full",
+      "food": "full",
+      "immediate_hazards": [],
+      "nearby_entities": [],
+      "immediate_footholds_safe": true,
+      "truthful_change_summary": "The player moved about 1.26 blocks to the right and stopped; health, food, nearby hazards, nearby entities, and immediate support safety were unchanged."
+    }
+  },
+  "revocation_and_stale_rejection": {
+    "emergency_control_ref": "environment_action_control:516ec721-c615-4e32-984f-4f53990a866b",
+    "authority_status": "suspended pending acknowledgement",
+    "stale_action_outcome": "subject_binding_required",
+    "stale_action_summary": "Player-action authority was not found.",
+    "stale_request_created": false,
+    "stale_workflow_created": false,
+    "stale_execution_created": false,
+    "final_status_evidence_ref": "environment_probe_evidence:7c0641c163dc5979fa54ea830c4c80a338912cd0",
+    "compatibility_perception_evidence_ref": "environment_probe_evidence:072096d98e107a22bc8423ba9776a7675ffb20b1",
+    "position_after_stale_attempt": { "x": -5.21, "y": 65.0, "z": -4.38 },
+    "stale_motion_performed": false
+  },
+  "defects_found_and_repaired": [
+    {
+      "defect": "A later safety refusal could overwrite truthful partial-navigation motion with a no-motion report.",
+      "repair": "Preserve measured partial motion and side-effect truth in PlayerActionController and NativeFabricWorkflowEngine.",
+      "regression": "PlayerActionControllerTest plus the complete five-game-test Fabric battery"
+    },
+    {
+      "defect": "A tick-zero no-route result could falsely report side effects.",
+      "repair": "Derive side-effect and motion flags from actual execution ticks and measured displacement.",
+      "regression": "PlayerActionControllerTest plus the complete five-game-test Fabric battery"
+    },
+    {
+      "defect": "An expired broker wait did not reliably cancel the exact leased or running workflow.",
+      "repair": "Classify every deadline expiry as timed_out and queue cancellation of the exact workflow.",
+      "regression": "environment-action gateway test battery, 25/25"
+    },
+    {
+      "defect": "Event-stream resynchronization could leave the Fabric controller projecting a running workflow after controls were released.",
+      "repair": "Transition the active controller offline before releasing controls on resync.",
+      "regression": "PlayerActionRuntimeLifecycleTest plus the complete five-game-test Fabric battery"
+    },
+    {
+      "defect": "The protected packaged MCP transport scrubber rejected the exact reasoning-task binding claim handle.",
+      "repair": "Admit and sanitize claim_handle only for helix_reasoning_task_binding_claim; all other tools retain fail-closed claim detection.",
+      "regression": "helix-agent-transports, 22/22"
+    }
+  ],
+  "normal_shutdown": {
+    "minecraft_client_pid": 18004,
+    "minecraft_client_close_method": "window close request",
+    "minecraft_client_exited": true,
+    "fabric_server_pid": 5468,
+    "fabric_listener": "127.0.0.1:25566",
+    "fabric_server_close_method": "Windows console Ctrl+C event",
+    "fabric_server_exited": true,
+    "listener_closed": true,
+    "forced_termination_used": false
+  },
+  "verification": [
+    { "command": "npx vitest run server/services/helix-ask/workstation-tool-gateway/__tests__/environment-action.test.ts --pool=forks", "result": "pass", "tests": "25/25" },
+    { "command": "npx vitest run server/routes/__tests__/helix-agent-transports.test.ts --pool=forks", "result": "pass", "tests": "22/22" },
+    { "command": "PlayerActionControllerTest and PlayerActionRuntimeLifecycleTest", "result": "pass" },
+    { "command": "Fabric game tests", "result": "pass", "tests": "5/5" },
+    { "command": "npm --prefix apps/desktop run pack:dir", "result": "pass_with_existing_non_blocking_build_warnings" },
+    { "command": "npm run helix:ask:discipline:quick", "result": "pass_with_classification_warning" },
+    { "command": "npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks", "result": "pass", "tests": "36/36" },
+    { "command": "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks", "result": "pass", "tests": "31/31" },
+    { "command": "npm run helix:ask:discipline:full", "result": "pass", "coverage": "prompt prelude and four adversarial shards; fixed API rail and four route shards; live-source continuation 26/26; identity audit 9/9; server build" },
+    { "command": "npm run helix:environment-harness:docs-audit", "result": "pass", "active_gate": "G8", "failures": 0 }
+  ],
+  "completion_audit": {
+    "required_reasoning_tools_in_catalog": true,
+    "same_task_local_supervisor_presence": true,
+    "exact_provider_task_binding": "proven by the accepted PNA3.4 external-principal evidence",
+    "provider_neutral_pickup_and_acknowledgement": "proven by the accepted PNA3.4 external-principal evidence",
+    "finalized_gpt_live_pickup_and_acknowledgement": "proven by the accepted PNA3.4 evidence; this replay used the same natural-prompt path and did not fabricate a microphone event",
+    "packaged_exe_minecraft_launch_join": true,
+    "fresh_perception_driven_task_selection": true,
+    "admitted_minecraft_action": true,
+    "fresh_observation_reentry": true,
+    "truthful_authoritative_summary": true,
+    "authority_revoked": true,
+    "stale_action_rejected_without_motion": true,
+    "credentials_included": false,
+    "hidden_reasoning_included": false,
+    "receipt_promoted_to_answer_or_execution_or_terminal_authority": false,
+    "reconnect_or_replacement_task_loop_used": false,
+    "live_acceptance_complete": true,
+    "qualification": "Completion is cumulative across the accepted PNA3.4 exact external-principal binding/voice lifecycle and this clean final PNA3.6 packaged-EXE Minecraft lifecycle. The native desktop principal correctly did not impersonate the external plugin principal."
+  }
+}

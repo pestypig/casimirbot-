@@ -198,7 +198,7 @@ const PUBLIC_ROOM_SOURCE_CAPABILITY_IDS = [
   HELIX_ENVIRONMENT_DURABLE_GOAL_APPEND_CAPABILITY,
 ] as const;
 
-const buildSharedRealtimeRoomsSessionPolicy = (
+export const buildSharedRealtimeRoomsSessionPolicy = (
   accountType: HelixAccountType,
   options: { guestSession?: boolean } = {},
 ): HelixAccountCapabilityPolicy => {

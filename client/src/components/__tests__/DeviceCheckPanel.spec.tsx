@@ -245,6 +245,15 @@ describe("Device Check panel", () => {
       ready: false,
       adminUiAvailable: false,
       failureCode: null,
+      recovery: {
+        phase: "idle",
+        attemptCount: 0,
+        maxAttempts: 3,
+        nextAttemptAt: null,
+        lastReason: null,
+        automaticScope: "local_supervisor_coordination_and_device_check",
+        manualInterventionRequired: false,
+      },
     };
     const fullState = {
       ...stoppedState,
@@ -285,6 +294,88 @@ describe("Device Check panel", () => {
       name: "Start full developer MCP",
     });
     expect(startMcpTunnel).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(startMcpTunnel).toHaveBeenCalledWith({ scope: "full_helix_agent" }),
+    );
+    expect(await screen.findByText(/Full developer MCP/)).toBeDefined();
+  });
+
+  it("offers one-session full harness permission while automatic read-only transport is active", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        schema: "helix.environment_connector.device_check_list.v1",
+        generated_at: "2026-09-02T15:00:00.000Z",
+        devices: [],
+        content_role: "device_health_observations_not_assistant_answer",
+        credential_included: false,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    })) as unknown as typeof fetch);
+    const readOnlyState = {
+      schemaVersion: DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
+      transport: "openai_secure_mcp_tunnel" as const,
+      access: "developer_private" as const,
+      scope: "local_supervisor_coordination_and_device_check" as const,
+      status: "ready" as const,
+      configured: true,
+      vaultAvailable: true,
+      binaryVersion: "0.0.13",
+      processRunning: true,
+      healthy: true,
+      ready: true,
+      adminUiAvailable: true,
+      failureCode: null,
+      recovery: {
+        phase: "idle" as const,
+        attemptCount: 0,
+        maxAttempts: 3,
+        nextAttemptAt: null,
+        lastReason: null,
+        automaticScope: "local_supervisor_coordination_and_device_check" as const,
+        manualInterventionRequired: false,
+      },
+    };
+    const fullState = {
+      ...readOnlyState,
+      scope: "full_helix_agent" as const,
+    };
+    const startMcpTunnel = vi.fn(async () => fullState);
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => ({
+        schemaVersion: DESKTOP_RUNTIME_SNAPSHOT_SCHEMA_VERSION,
+        surface: "desktop_native",
+        serviceOrigin: window.location.origin,
+        capabilities: {
+          nativeBinaryUpdate: false,
+          localServiceControl: true,
+          localWorkspaceAccess: false,
+          codexMcpRegistration: false,
+          secureCredentialVault: true,
+          deviceAgentControl: false,
+        },
+      })),
+      getMcpTunnelState: vi.fn(async () => readOnlyState),
+      startMcpTunnel,
+      stopMcpTunnel: vi.fn(async () => readOnlyState),
+    });
+
+    const panel = HELIX_PANELS.find((entry) => entry.id === "device-check")!;
+    const loaded = await panel.loader();
+    render(
+      <RuntimeSurfaceProvider>
+        <loaded.default />
+      </RuntimeSurfaceProvider>,
+    );
+
+    const button = await screen.findByRole("button", {
+      name: "Enable full harness for this session",
+    });
     fireEvent.click(button);
     await waitFor(() =>
       expect(startMcpTunnel).toHaveBeenCalledWith({ scope: "full_helix_agent" }),
@@ -364,6 +455,15 @@ describe("Device Check panel", () => {
       ready: false,
       adminUiAvailable: false,
       failureCode: null,
+      recovery: {
+        phase: "idle",
+        attemptCount: 0,
+        maxAttempts: 3,
+        nextAttemptAt: null,
+        lastReason: null,
+        automaticScope: "local_supervisor_coordination_and_device_check",
+        manualInterventionRequired: false,
+      },
     };
     window.casimirDesktop = Object.freeze({
       getRuntimeSnapshot: vi.fn(async () => ({
@@ -387,6 +487,16 @@ describe("Device Check panel", () => {
     const grant = await screen.findByRole("button", {
       name: "Grant 180-second tunnel lease",
     });
+    expect(screen.getByText(/short lease requested below/i)).toBeDefined();
+    const transitionReadsBeforeRefresh = fetchMock.mock.calls.filter(
+      ([url, init]) => url === "/api/desktop/mcp-tunnel-transition/requests" &&
+        (!init?.method || init.method === "GET"),
+    ).length;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(
+      ([url, init]) => url === "/api/desktop/mcp-tunnel-transition/requests" &&
+        (!init?.method || init.method === "GET"),
+    ).length).toBeGreaterThan(transitionReadsBeforeRefresh));
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
     fireEvent.click(grant);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(

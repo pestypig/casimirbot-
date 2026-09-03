@@ -12,6 +12,7 @@ import {
   resolveRealtimeSessionPolicyGate,
 } from "../services/helix-ask/realtime-session/route-boundary";
 import {
+  readDesktopOpenAiRealtimeBrokerConfig,
   readOpenAiRealtimeApiKey,
   selectRealtimeSessionAdapter,
 } from "../services/helix-ask/realtime-session/adapter";
@@ -598,7 +599,8 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
   }
 
   const apiKey = readOpenAiRealtimeApiKey(process.env);
-  if (!apiKey) {
+  const desktopBroker = readDesktopOpenAiRealtimeBrokerConfig(process.env);
+  if (!apiKey && !desktopBroker) {
     return res.status(409).json(buildSdpExchangeResponse({
       ok: false,
       error: "realtime_sdp_exchange_disabled",
@@ -608,21 +610,22 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
   }
 
   const result = await exchangeOpenAiRealtimeSdp({
-    apiKey,
+    apiKey: apiKey ?? "",
     offerSdp,
     model: session.model,
     voice: session.voice,
     safetyIdentifier: session.requesterRef,
-  });
+  }, process.env);
   if (!result.ok || !result.answerSdp) {
     const failureReason = readString(result.failureReason) ?? "openai_realtime_contract_failed";
     const sameCredentialModelsProbe =
+      Boolean(apiKey) &&
       process.env.NODE_ENV === "development" &&
       failureReason.startsWith("openai_realtime_authentication_failed")
-        ? await probeOpenAiApiCredential({ apiKey })
+        ? await probeOpenAiApiCredential({ apiKey: apiKey! })
         : "not_run";
     console.warn(
-      `[realtime-sdp] Provider exchange failed: reason=${failureReason} model=${session.model} credential_source=OPENAI_API_KEY same_credential_models_probe=${sameCredentialModelsProbe}`,
+      `[realtime-sdp] Provider exchange failed: reason=${failureReason} model=${session.model} credential_source=${apiKey ? "OPENAI_API_KEY" : "native_broker"} same_credential_models_probe=${sameCredentialModelsProbe}`,
     );
     return res.status(502).json(buildSdpExchangeResponse({
       ok: false,
@@ -642,7 +645,7 @@ realtimeSessionRouter.post("/realtime/session/:id/sdp", async (req: Request, res
       providerCallRef,
     },
   });
-  const contextSync = result.providerCallId && providerCallRef
+  const contextSync = apiKey && result.providerCallId && providerCallRef
     ? startRealtimeStagePlaySideband({
         realtimeSessionId: session.realtimeSessionId,
         requesterRef: session.requesterRef,

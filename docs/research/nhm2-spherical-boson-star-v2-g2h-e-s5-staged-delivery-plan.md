@@ -57,7 +57,7 @@ authority, or claim authority.
 | BMR-F | downstream/ineligible | Execute the primary lane exactly once | separately authorized immutable primary PASS, FAIL, or partial result |
 | BMR-G | downstream/ineligible | Build, authorize and execute the independent lane | source/runtime-disjoint Rust result with immutable evidence |
 | BMR-H | downstream/ineligible | Decide pair agreement and benchmark acceptance | C15/Q06 and every acceptance gate return authenticated agreement/PASS |
-| BMR-I | downstream/ineligible | Transfer the validated machinery to NHM2 | a separately defined NHM2 source-closure program uses the benchmarked machinery without inheriting star authority |
+| BMR-I | downstream/ineligible | Transfer the validated machinery to NHM2 | the separately defined [`source-to-experiment closure packet`](./nhm2-source-to-experiment-closure-parallel-work-packet-v1.md) supplies authenticated NHM2 apparatus-side inputs and uses the benchmarked machinery without inheriting star authority |
 
 Only one row may be active. A later row may receive planning or nonperturbing
 fixture work only when the work program or active packet expressly permits it.
@@ -394,6 +394,13 @@ material feasibility, propulsion, transport, or physical viability.
 
 Eligibility: BMR-H accepts the benchmark and a separate NHM2 program defines
 the target metric/source/state inputs and claim boundaries.
+
+The apparatus-side planning and evidence dependency is the
+[`NHM2 source-to-experiment closure parallel work packet v1`](./nhm2-source-to-experiment-closure-parallel-work-packet-v1.md).
+Its ET0 documentation/schema work and later candidate-neutral apparatus
+contracts may proceed as the canonical work program's explicitly nonperturbing
+parallel lane. That work does not make BMR-I active, contribute S5 gate credit,
+or inherit any mini-boson-star scientific authority.
 
 Transferable evidence is limited to the validated machinery: constraint solve,
 boundary proof, Hadamard state construction, renormalized mean stress, connected

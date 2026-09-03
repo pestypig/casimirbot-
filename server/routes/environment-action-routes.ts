@@ -17,6 +17,8 @@ import {
   bridgeMinecraftPlayerSituationDigestToLiveMail,
 } from "../services/environment-connectors/live-mail/minecraft-situation-digest-mail-bridge";
 import { readEnvironmentAdapterProfileById } from "../services/situation-room/environment-adapter-registry";
+import { appendEnvironmentEventsToOperatorActivity } from
+  "../services/helix-ask/operator-activity-ingestion";
 
 const sendError = (res: Response, error: unknown): void => {
   if (isEnvironmentActionBrokerError(error)) {
@@ -195,6 +197,12 @@ environmentActionRouter.post(
       claim,
       batch: req.body,
     });
+    const operatorActivity = await appendEnvironmentEventsToOperatorActivity({
+      profileId: claim.ownerProfileId,
+      nodeRef: claim.connectorInstallationId,
+      environmentBindingRef: claim.environmentBindingId,
+      events: recorded.batch.events,
+    });
     const sourceAdapter = readEnvironmentAdapterProfileById(
       claim.sourceAdapterProfileId,
     );
@@ -256,6 +264,10 @@ environmentActionRouter.post(
       digest_id: recorded.digest.digest_id,
       latest_event_sequence: recorded.digest.latest_event_sequence,
       replayed: recorded.replayed,
+      operator_activity_stream_ref: operatorActivity.stream_ref,
+      operator_activity_event_refs: operatorActivity.events.map(
+        (event) => event.activity_event_id,
+      ),
       semantic_wake_bridge: semanticWakeBridge,
       durable_goal_recovery_refs: durableGoalRecoveries.map(
         (goal) => goal.event_refs.at(-1),

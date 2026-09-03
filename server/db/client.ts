@@ -39,6 +39,10 @@ const localPersistenceTables = [
   // Bounded MCP observations survive local restart for owner-scoped Codex
   // re-entry. The envelope contains no credentials or answer authority.
   "helix_mcp_evidence_observations",
+  // Canonical public activity history is durable and owner scoped; the compact
+  // dock remains only a presentation cache over these ordered events.
+  "helix_operator_activity_streams",
+  "helix_operator_activity_events",
   "helix_account_profile_storage",
   "helix_account_events",
   "helix_account_credentials",
@@ -170,6 +174,7 @@ const localPersistenceTables = [
 ] as const;
 const localPersistenceJsonColumns = new Set([
   "helix_mcp_evidence_observations.observation",
+  "helix_operator_activity_events.event_payload",
   "helix_shared_realtime_room_members.consent",
   "helix_shared_realtime_room_events.metadata",
   "helix_room_source_bindings.scopes",

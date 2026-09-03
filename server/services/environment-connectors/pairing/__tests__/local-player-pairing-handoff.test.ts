@@ -97,6 +97,52 @@ describe("local player pairing handoff", () => {
     ), "utf8")).resolves.toBe("/helix-player pair Z4ZD-X2JJ");
   });
 
+  it("discovers the desktop-owned profile store from APPDATA without desktop-only environment injection", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
+    roots.push(root);
+    const runDirectory = path.join(root, "combat-c0-server");
+    const playerGameDirectory = path.join(root, ".minecraft-helix-c0");
+    await mkdir(path.join(runDirectory, "config"), { recursive: true });
+    await writeFile(path.join(runDirectory, "server.properties"), "server-port=25566\n");
+    await mkdir(path.join(playerGameDirectory, "config"), { recursive: true });
+    await mkdir(path.join(playerGameDirectory, "mods"), { recursive: true });
+    const storePath = path.join(
+      root,
+      "@casimirbot",
+      "desktop",
+      "state",
+      "local-minecraft-run-profiles.json",
+    );
+    await mkdir(path.dirname(storePath), { recursive: true });
+    await writeFile(storePath, JSON.stringify({
+      schema: "casimirbot.local_minecraft_run_profiles/2",
+      profiles: [{
+        owner_profile_id: "profile:owner",
+        run_directory: runDirectory,
+        player_game_directory: playerGameDirectory,
+        label: "C0 arena",
+      }],
+    }));
+
+    await expect(stageLocalMinecraftPlayerPairing({
+      appDataPath: root,
+      ownerProfileId: "profile:owner",
+      command: "/helix-player pair Z4ZD-X2JJ",
+    })).resolves.toEqual({ status: "player_pairing_inbox_staged" });
+
+    await expect(readFile(path.join(
+      playerGameDirectory,
+      "config",
+      "helix-fabric-player-agent.pairing-inbox",
+    ), "utf8")).resolves.toBe("/helix-player pair Z4ZD-X2JJ");
+    await expect(readFile(path.join(
+      root,
+      ".minecraft",
+      "config",
+      "helix-fabric-player-agent.pairing-inbox",
+    ), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("rejects relative or filesystem-root game directories", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
     roots.push(root);

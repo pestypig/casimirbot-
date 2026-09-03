@@ -2,7 +2,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { ToolListChangedNotificationSchema } from
   "@modelcontextprotocol/sdk/types.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
 import { HELIX_AGENT_RUN_READ_SCOPE } from
   "@shared/contracts/helix-agent-api.v1";
@@ -23,6 +23,8 @@ import { HelixLocalSupervisorCoordinationStore } from
   "../../services/local-supervisor/local-supervisor-coordination";
 import { DesktopMcpTunnelTransitionStore } from
   "../../services/local-supervisor/desktop-mcp-tunnel-transition-store";
+import { HelixReasoningTaskBindingStore } from
+  "../../services/local-supervisor/reasoning-task-binding-store";
 import {
   HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
   HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
@@ -99,6 +101,183 @@ afterEach(async () => {
 });
 
 describe("Helix MCP local-supervisor coordination", () => {
+  it("claims, reads, and acknowledges steering only through the exact authenticated continuation", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:90909090909090909090909090909090",
+    );
+    const reasoningStore = new HelixReasoningTaskBindingStore(store);
+    const identity = principal("profile:reasoning", "oauth_client:reasoning");
+    const client = await connect(store, identity, {
+      surface: "local_supervisor_coordination",
+      reasoningTaskBindingStore: reasoningStore,
+    });
+    const fullClient = await connect(store, identity, {
+      reasoningTaskBindingStore: reasoningStore,
+    });
+    const catalogs = await Promise.all([
+      client.listTools(),
+      fullClient.listTools(),
+    ]);
+    const expectedSecuritySchemes = new Map<string, unknown>([
+      ["helix_reasoning_task_binding_claim", [{
+        type: "oauth2",
+        scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      }]],
+      ["helix_reasoning_steering_read", [{
+        type: "oauth2",
+        scopes: Array.from(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
+      }]],
+      ["helix_reasoning_steering_acknowledge", [{
+        type: "oauth2",
+        scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      }]],
+    ]);
+    for (const catalog of catalogs) {
+      for (const [toolName, securitySchemes] of expectedSecuritySchemes) {
+        const tool = catalog.tools.find((candidate) => candidate.name === toolName);
+        expect(tool, `missing reasoning tool ${toolName}`).toBeDefined();
+        expect(tool?._meta?.securitySchemes, toolName).toEqual(securitySchemes);
+      }
+    }
+    const continuation = "codex_thread:reasoning-current";
+    const heartbeatResult = await client.callTool({
+      name: "helix_local_supervisor_presence_update",
+      arguments: {
+        client_continuation_ref: continuation,
+        declared_objective_summary: "Pick up operator steering",
+        lifecycle_state: "active",
+        resource_claims: [],
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only", "checkpoint_publish", "continuation_ready"],
+          requested_level: "continuation_ready",
+          checkpoint_publication: {
+            freshness_window_seconds: 120,
+            retention: "current_session",
+            revocation: "independent",
+          },
+        },
+        heartbeat_ttl_seconds: 60,
+      },
+    });
+    const presence = (heartbeatResult.structuredContent as {
+      presence: { client_session_ref: string };
+    }).presence;
+    const issued = reasoningStore.issueClaim({
+      profileRef: identity.accountProfileId,
+      clientSessionRef: presence.client_session_ref,
+      helixConversationId: "helix-chat:reasoning-current",
+      missionId: "mission:reasoning-current",
+      runId: "run:reasoning-current",
+    });
+    const claimed = await client.callTool({
+      name: "helix_reasoning_task_binding_claim",
+      arguments: {
+        client_continuation_ref: continuation,
+        claim_handle: issued.claim_handle,
+      },
+    });
+    expect(claimed.isError).not.toBe(true);
+    const binding = (claimed.structuredContent as {
+      binding: { reasoning_binding_id: string; binding_epoch: number };
+    }).binding;
+    const event = reasoningStore.dispatch({
+      profileRef: identity.accountProfileId,
+      bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch,
+      clientEventRef: "voice-final:mcp-test",
+      origin: "gpt_live_finalized",
+      instructionText: "Inspect the Minecraft player state, then report evidence.",
+    });
+    const read = await client.callTool({
+      name: "helix_reasoning_steering_read",
+      arguments: {
+        client_continuation_ref: continuation,
+        reasoning_binding_id: binding.reasoning_binding_id,
+        binding_epoch: binding.binding_epoch,
+        after_cursor: 0,
+      },
+    });
+    expect(read.isError).not.toBe(true);
+    expect(read.structuredContent).toMatchObject({
+      deliveries: [{
+        event: {
+          steering_event_ref: event.steering_event_ref,
+          origin: "gpt_live_finalized",
+          delivery_state: "pending",
+          execution_requested: false,
+          answer_authority: false,
+        },
+        instruction_text: "Inspect the Minecraft player state, then report evidence.",
+      }],
+      hidden_reasoning_included: false,
+      terminal_eligible: false,
+    });
+    const acknowledged = await client.callTool({
+      name: "helix_reasoning_steering_acknowledge",
+      arguments: {
+        client_continuation_ref: continuation,
+        reasoning_binding_id: binding.reasoning_binding_id,
+        binding_epoch: binding.binding_epoch,
+        steering_event_ref: event.steering_event_ref,
+      },
+    });
+    expect(acknowledged.isError).not.toBe(true);
+    expect(acknowledged.structuredContent).toMatchObject({
+      event: { delivery_state: "acknowledged" },
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    const wrongContinuation = await client.callTool({
+      name: "helix_reasoning_steering_read",
+      arguments: {
+        client_continuation_ref: "codex_thread:wrong-task",
+        reasoning_binding_id: binding.reasoning_binding_id,
+        binding_epoch: binding.binding_epoch,
+        after_cursor: 0,
+      },
+    });
+    expect(wrongContinuation.isError).toBe(true);
+    expect(JSON.stringify(wrongContinuation)).toContain("supervisor_client_not_registered");
+  });
+
+  it("reports ordinary tool lifecycle without exposing arguments or results", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:56565656565656565656565656565656",
+    );
+    const observations: Array<Record<string, unknown>> = [];
+    const observer = vi.fn(async (observation: Record<string, unknown>) => {
+      observations.push(observation);
+    });
+    const client = await connect(
+      store,
+      principal("profile:activity", "oauth_client:activity"),
+      {
+        surface: "local_supervisor_coordination",
+        mcpToolLifecycleObserver: observer,
+      },
+    );
+
+    const result = await heartbeat(
+      client,
+      "codex_thread:private-continuation",
+      "Private objective text must not enter activity.",
+    );
+    expect(result.isError).not.toBe(true);
+    expect(observer).toHaveBeenCalledTimes(1);
+    expect(observations[0]).toMatchObject({
+      toolName: "helix_local_supervisor_presence_update",
+      outcome: "succeeded",
+    });
+    expect(Object.keys(observations[0]).sort()).toEqual([
+      "observedAt",
+      "occurredAt",
+      "outcome",
+      "toolName",
+    ]);
+    expect(JSON.stringify(observations)).not.toContain("private-continuation");
+    expect(JSON.stringify(observations)).not.toContain("Private objective");
+  });
+
   it("pre-advertises exact room and environment schemas while denying every shadow call", async () => {
     const store = new HelixLocalSupervisorCoordinationStore(
       "service_instance:78787878787878787878787878787878",
@@ -576,6 +755,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_environment_action_authority_configure",
       "helix_environment_action_authority_extend",
       "helix_environment_action_authority_inspect",
+      "helix_environment_action_authority_revoke",
       "helix_environment_command_authority_configure",
       "helix_environment_device_check",
       "helix_environment_player_pair_local",
@@ -590,6 +770,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_local_supervisor_relay_acknowledge",
       "helix_local_supervisor_relay_publish",
       "helix_minecraft_actor_status",
+      "helix_minecraft_local_lifecycle_launch",
       "helix_minecraft_player_action",
       "helix_minecraft_workflow_control",
       "helix_minecraft_workflow_status",

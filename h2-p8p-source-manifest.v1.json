@@ -1,0 +1,29 @@
+{
+  "schema": "nhm2.g2h_e_s5.c08_h2_p8p_source_manifest.v1",
+  "candidate_neutral": true,
+  "calibration_panel_count": 1024,
+  "thread_count": 32,
+  "entries": [
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_ledger_v1.hpp", "bytes": 8589, "sha256": "ab645e1aa160b59ad93847ec715ec6994cdea81934b403d4d1687ab963c3c9df"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_ledger_v1.cpp", "bytes": 39178, "sha256": "b118ac50720c88aa35d1222d316f54c31ca2d779ccf5daab2175956e7bee2d8b"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8m_term_radius_attribution_v1.hpp", "bytes": 2196, "sha256": "6170f8c1ae540b782784ccb7272e11fec412b25c19e796606bad7109132a6ad6"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8m_term_radius_attribution_v1.cpp", "bytes": 20358, "sha256": "11b18ea4dd20e2d28423f3934f99e95a3126415b60b418bd64213cf89d24cf97"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8n_selector_term_radius_binding_v1.hpp", "bytes": 2892, "sha256": "77b9aa9c1f7af0fc7f626567bc1a1c4986c2936dd4c873a2a000b4d18048298a"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8n_selector_term_radius_binding_v1.cpp", "bytes": 14269, "sha256": "09b1f707bb1b4c800bb513997f6862c7d503a739f119719947aca1bf38735f3c"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8p_observer_progress_v1.hpp", "bytes": 2155, "sha256": "fded2b6ab3e942820030da0339cff61e4a0a4ce44d97c67e06a9c5425c2980e3"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8p_observer_progress_v1.cpp", "bytes": 16343, "sha256": "ffc2b489255650e3611ae9bd8378de3014d7f0fe661c957d5b27445e7c3f202f"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/mini_boson_star_primary_c08_h2_p8p_turnaround_calibration_v1.cpp", "bytes": 10193, "sha256": "f62b0a98a62ee4098c9af17023b385698e54c65312ead10d5e5897654cf1e968"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/Dockerfile.primary.mini-boson-c08-h2-p8p-turnaround-calibration.v1", "bytes": 1931, "sha256": "1159828fb3a7b69f9b75ecde002b27e6c1442e4c28630c05433559bc8986b570"},
+    {"path": "tools/nhm2-spherical-boson-star-v2-branch-proof/g2h/h2_p8p_turnaround_calibration_cloud_run_v1.sh", "bytes": 4498, "sha256": "5af4b629336e166d07a277ae59b0f9776ac9e86b728e762030f27237ed1c8f5b"}
+  ],
+  "authority": {
+    "candidate": false,
+    "proof": false,
+    "geometry_state": false,
+    "lane": false,
+    "lamp": false,
+    "physical": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

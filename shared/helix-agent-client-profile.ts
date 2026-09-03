@@ -175,7 +175,7 @@ export const HELIX_AGENT_CLIENT_PROFILES = Object.freeze({
       },
     ],
     optional_device_check_surface: "codex_plugin_deep_link",
-    catalog_refresh: "new_chat_required",
+    catalog_refresh: "client_restart_or_reconnect",
     continuation_mode: "polling",
     thread_declaration: "required_for_attachment",
     disconnect_behavior: "revoke_profile_agent_binding",
@@ -183,7 +183,11 @@ export const HELIX_AGENT_CLIENT_PROFILES = Object.freeze({
     provider_owned_steps: ["install_or_add_connection", "oauth_consent", "restart_or_reconnect", "create_or_select_chat", "model_session"],
     thread_observability_bridge: {
       baseline_level: "tool_activity_only",
-      negotiable_levels: ["tool_activity_only", "checkpoint_publish"],
+      negotiable_levels: [
+        "tool_activity_only",
+        "checkpoint_publish",
+        "continuation_ready",
+      ],
       checkpoint_publication: "optional_explicit_client_declaration",
       checkpoint_freshness: "client_declared_bounded_window",
       checkpoint_retention: "current_session_or_profile_durable",

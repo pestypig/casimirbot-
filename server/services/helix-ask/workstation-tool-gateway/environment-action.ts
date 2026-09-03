@@ -960,7 +960,7 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
           workflowId: queued.workflow_id,
           controlKind: "cancel",
           reason:
-            "The owning Helix Ask turn ended before the player-action observation returned.",
+            "The owning Helix Ask turn ended or its action deadline elapsed before the player-action observation returned.",
         })
         .catch(() => null);
     };
@@ -974,6 +974,10 @@ export const executeEnvironmentActionGatewayCapability = async (input: {
         signal: input.signal,
       });
     } catch (error) {
+      if (
+        isEnvironmentActionBrokerError(error) &&
+        error.code === "action_request_expired"
+      ) cancelOnAbort();
       if (abortCancellation) await abortCancellation;
       throw error;
     } finally {

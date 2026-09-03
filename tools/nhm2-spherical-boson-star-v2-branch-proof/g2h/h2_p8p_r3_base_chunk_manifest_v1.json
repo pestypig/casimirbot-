@@ -1,0 +1,37 @@
+{
+  "schema": "nhm2.g2h_e_s5.c08_h2_p8p_r3_base_chunk_manifest.v1",
+  "candidate_neutral": true,
+  "source": {
+    "name": "h2-p8f-c2-r1-cloud-upload-v1.tar",
+    "bytes": 236492800,
+    "sha256": "fa8d8c994b08fe8a31050feb125eb1d6e4ebb33c9f5de18d5f9e189716936978"
+  },
+  "chunk_bytes": 16777216,
+  "chunks": [
+    {"index": 1, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part01", "bytes": 16777216, "sha256": "0cb73faff7aeb9233383eef45e2db886dd55d3a019efa5cd839dca963b431701"},
+    {"index": 2, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part02", "bytes": 16777216, "sha256": "06b6dfb013fc907524efe28043f4a0b512863364e7ba328c00e6441cc8ec10f6"},
+    {"index": 3, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part03", "bytes": 16777216, "sha256": "4ea450f5ee645b50b158d2ef3c7969327a69659e4977352362daea2e877efec5"},
+    {"index": 4, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part04", "bytes": 16777216, "sha256": "e364ee6499a61bdb87eb40a7c252875f59f567894d2c3bcbbbe9f2f9b927c4ea"},
+    {"index": 5, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part05", "bytes": 16777216, "sha256": "ae4f91c13c39e818c40f2ad49da5f5fc19a355f362bae2e4a0acdb2d27682faa"},
+    {"index": 6, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part06", "bytes": 16777216, "sha256": "d76de7266868561c7906c592ba74ac6e259baba5557b337fbe71b96c6480bda3"},
+    {"index": 7, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part07", "bytes": 16777216, "sha256": "9bea4588032c2b530ae345187e8ca89822a4247d5847df9131c022b9d0210f8a"},
+    {"index": 8, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part08", "bytes": 16777216, "sha256": "ed8c6c88fbda6f97ff54086e219b736887defcbbdad3b6950d175ae4c05eae12"},
+    {"index": 9, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part09", "bytes": 16777216, "sha256": "6b4d30a00211e70e75c07bc66ed4f805c6bbc5bc3ebeacf4df34fc40f9c2d069"},
+    {"index": 10, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part10", "bytes": 16777216, "sha256": "b2cf2121126f1481b6203bec32f934bb7bdb77a42c3a3196fb2aa6b8010561d4"},
+    {"index": 11, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part11", "bytes": 16777216, "sha256": "5a0d92136ff0bb2c22e6ea6bbfe60cc3e42b5b85ab40d6dca4f92f14ff004284"},
+    {"index": 12, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part12", "bytes": 16777216, "sha256": "dca7940f7fac657d2d0fd554c4b3d2d4d4681e783c9776ada2d10448eed65a9e"},
+    {"index": 13, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part13", "bytes": 16777216, "sha256": "431d5821a2cea1c05c428512b1ad5992210b428c47c7bdab1d0e909f70a31891"},
+    {"index": 14, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part14", "bytes": 16777216, "sha256": "7149acefde797c1e16293b3f28af3aaed5531ae16bdba7e96d2aed9a2bcc0313"},
+    {"index": 15, "name": "h2-p8f-c2-r1-cloud-upload-v1.tar.part15", "bytes": 1611776, "sha256": "9320437ba8258945d01a12a7200e3fe661f252bd508f9ba2d1d68726c0376146"}
+  ],
+  "authority": {
+    "candidate": false,
+    "proof": false,
+    "geometry_state": false,
+    "lane": false,
+    "lamp": false,
+    "physical": false,
+    "propulsion": false,
+    "transport": false
+  }
+}

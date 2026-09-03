@@ -174,6 +174,7 @@ type SourceCandidateRow = {
   sent_at: Date | string;
   received_at: Date | string;
   response_receipt: unknown;
+  route_key: string;
   credential_id: string;
   producer_epoch: string;
   adapter_admission_id: string;
@@ -298,44 +299,60 @@ const buildAdmission = (row: SourceCandidateRow): HelixRoomSourceAdmission => {
 const receiptMatchesCandidate = (
   row: SourceCandidateRow,
   receipt: unknown,
+  allowHeartbeat: boolean,
 ): receipt is HelixRoomSourceIngressReceipt => {
   const value = asRecord(parseJson(receipt));
   const admission = buildAdmission(row);
   const observation = asRecord(value?.observation_ref);
+  const heartbeatReceipt =
+    allowHeartbeat &&
+    row.route_key === "heartbeat" &&
+    value?.kind === "heartbeat" &&
+    observation?.schema === "helix.room_source_heartbeat_observation.v1" &&
+    observation.source_id === row.source_id &&
+    observation.room_id === row.room_id &&
+    observation.status === "active" &&
+    observation.audit_ok === true &&
+    observation.assistant_answer === false &&
+    observation.terminal_eligible === false &&
+    observation.raw_content_included === false;
   const receiptAdmission = asRecord(observation?.source_admission);
   return Boolean(
     value &&
     value.schema === HELIX_ROOM_SOURCE_INGRESS_RECEIPT_SCHEMA &&
     value.ok === true &&
     value.accepted === true &&
-    value.kind === "world_event_batch" &&
+    (heartbeatReceipt ||
+      (row.route_key === "world-events/batch" &&
+        value.kind === "world_event_batch")) &&
     value.binding_id === row.binding_id &&
     value.room_id === row.room_id &&
     value.source_id === row.source_id &&
     value.world_id === row.world_id &&
     value.request_id === admission.request_id &&
-    receiptAdmission &&
-    receiptAdmission.request_id === admission.request_id &&
-    receiptAdmission.binding_id === admission.binding_id &&
-    receiptAdmission.room_id === admission.room_id &&
-    receiptAdmission.source_id === admission.source_id &&
-    receiptAdmission.world_id === admission.world_id &&
-    receiptAdmission.domain_adapter === admission.domain_adapter &&
-    asRecord(receiptAdmission.adapter_admission)?.admission_id ===
-      admission.adapter_admission?.admission_id &&
-    asRecord(receiptAdmission.adapter_admission)?.adapter_contract_hash ===
-      admission.adapter_admission?.adapter_contract_hash &&
-    asRecord(receiptAdmission.adapter_admission)?.manifest_hash ===
-      admission.adapter_admission?.manifest_hash &&
-    asRecord(receiptAdmission.adapter_admission)?.producer_epoch_ref ===
-      admission.adapter_admission?.producer_epoch_ref &&
-    Array.isArray(receiptAdmission.evidence_refs) &&
-    receiptAdmission.evidence_refs.includes(
-      buildRoomSourceRequestEvidenceRef({
-        bindingId: row.binding_id,
-        requestId: row.request_id,
-      }),
-    ) &&
+    (heartbeatReceipt ||
+      (receiptAdmission &&
+        receiptAdmission.request_id === admission.request_id &&
+        receiptAdmission.binding_id === admission.binding_id &&
+        receiptAdmission.room_id === admission.room_id &&
+        receiptAdmission.source_id === admission.source_id &&
+        receiptAdmission.world_id === admission.world_id &&
+        receiptAdmission.domain_adapter === admission.domain_adapter &&
+        asRecord(receiptAdmission.adapter_admission)?.admission_id ===
+          admission.adapter_admission?.admission_id &&
+        asRecord(receiptAdmission.adapter_admission)?.adapter_contract_hash ===
+          admission.adapter_admission?.adapter_contract_hash &&
+        asRecord(receiptAdmission.adapter_admission)?.manifest_hash ===
+          admission.adapter_admission?.manifest_hash &&
+        asRecord(receiptAdmission.adapter_admission)?.producer_epoch_ref ===
+          admission.adapter_admission?.producer_epoch_ref &&
+        Array.isArray(receiptAdmission.evidence_refs) &&
+        receiptAdmission.evidence_refs.includes(
+          buildRoomSourceRequestEvidenceRef({
+            bindingId: row.binding_id,
+            requestId: row.request_id,
+          }),
+        ))) &&
     value.answer_authority === false &&
     value.assistant_answer === false &&
     value.terminal_eligible === false &&
@@ -351,6 +368,7 @@ const receiptMatchesCandidate = (
  */
 export const listLatestBoundRoomSourceCandidates = async (
   roomId: string,
+  options: { allowHeartbeat?: boolean } = {},
 ): Promise<BoundRoomEvidenceSourceCandidate[]> => {
   const db = await readSharedRealtimeRoomDatabase();
   const { rows } = await db.query<SourceCandidateRow>(
@@ -368,6 +386,7 @@ export const listLatestBoundRoomSourceCandidates = async (
         q.sent_at,
         q.received_at,
         q.response_receipt,
+        q.route_key,
         a.admission_id AS adapter_admission_id,
         a.adapter_profile_id,
         a.adapter_profile_version,
@@ -392,7 +411,7 @@ export const listLatestBoundRoomSourceCandidates = async (
       JOIN helix_room_source_ingress_requests q
         ON q.binding_id = b.binding_id
         AND q.credential_id = c.credential_id
-        AND q.route_key = 'world-events/batch'
+        AND q.route_key = ANY($2::text[])
         AND q.response_status BETWEEN 200 AND 299
         AND q.response_receipt IS NOT NULL
       JOIN helix_environment_adapter_admissions a
@@ -406,7 +425,12 @@ export const listLatestBoundRoomSourceCandidates = async (
       ORDER BY q.received_at DESC
       LIMIT 256;
     `,
-    [roomId],
+    [
+      roomId,
+      options.allowHeartbeat
+        ? ["world-events/batch", "heartbeat"]
+        : ["world-events/batch"],
+    ],
   );
   const newestRequestSeenByBinding = new Set<string>();
   const candidates: BoundRoomEvidenceSourceCandidate[] = [];
@@ -415,7 +439,11 @@ export const listLatestBoundRoomSourceCandidates = async (
     newestRequestSeenByBinding.add(row.binding_id);
     if (
       !isHelixRoomSourceIngressSourceId(row.source_id) ||
-      !receiptMatchesCandidate(row, row.response_receipt)
+      !receiptMatchesCandidate(
+        row,
+        row.response_receipt,
+        options.allowHeartbeat === true,
+      )
     ) {
       continue;
     }

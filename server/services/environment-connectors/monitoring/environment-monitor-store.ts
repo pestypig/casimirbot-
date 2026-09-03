@@ -418,6 +418,42 @@ export class EnvironmentMonitorStore {
     });
   }
 
+  async listForEnvironment(input: {
+    profileId: string;
+    roomId: string;
+    environmentBindingId: string;
+    sourceId: string;
+    worldId: string;
+    subjectRef: string;
+    limit?: number;
+  }): Promise<HelixEnvironmentMonitorLease[]> {
+    return this.transaction(async (db: Queryable) => {
+      const limit = Math.max(1, Math.min(16, Math.floor(input.limit ?? 8)));
+      const result = await db.query<MonitorLeaseRow>(
+        `SELECT * FROM helix_environment_monitor_leases
+          WHERE owner_profile_id=$1 AND room_id=$2
+            AND environment_binding_id=$3 AND source_id=$4 AND world_id=$5
+            AND subject_ref=$6
+          ORDER BY updated_at DESC, created_at DESC
+          LIMIT $7 FOR UPDATE;`,
+        [
+          input.profileId,
+          input.roomId,
+          input.environmentBindingId,
+          input.sourceId,
+          input.worldId,
+          input.subjectRef,
+          limit,
+        ],
+      );
+      const leases: HelixEnvironmentMonitorLease[] = [];
+      for (const row of result.rows) {
+        leases.push(await this.persistExpiryIfNeeded(db, parseLeaseRow(row)));
+      }
+      return leases;
+    });
+  }
+
   async readPendingDeliveries(input: {
     monitorId: string;
     profileId: string;

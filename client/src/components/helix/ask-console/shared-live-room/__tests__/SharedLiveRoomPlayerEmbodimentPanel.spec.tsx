@@ -7,6 +7,12 @@ import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from
   "@shared/helix-minecraft-player-capabilities";
 import { SharedLiveRoomPlayerEmbodimentPanel } from
   "../SharedLiveRoomPlayerEmbodimentPanel";
+import { useAgiChatStore } from "@/store/useAgiChatStore";
+import {
+  HELIX_BOUND_AGENT_STEERING_REQUEST_EVENT,
+  HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
+  type HelixBoundAgentSteeringRequest,
+} from "../../HelixBoundAgentSteeringBridge";
 
 const roomId = "shared_realtime_room:player-ui";
 const environmentId = "environment_binding:player-ui";
@@ -27,6 +33,7 @@ const environment = {
   subject_directory: null,
   self_subject_binding: {
     status: "active",
+    subject_binding_id: "environment_subject_binding:player-ui",
     subject_ref: "environment_subject:player-ui",
     subject_label: "DatDamPig",
   },
@@ -35,6 +42,7 @@ const environment = {
 
 const sourceBinding = {
   binding_id: "room_source_binding:player-ui",
+  status: "active",
   domain_adapter: "minecraft.fabric_mod.v1",
   source_label: "Local Fabric 1.21.8",
 } as never;
@@ -95,12 +103,141 @@ const activeAuthority = (allowedCapabilityIds: string[]) => ({
 
 afterEach(() => {
   cleanup();
+  useAgiChatStore.setState({ activeId: undefined });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe("Shared Live Room Player Embodiment controls", () => {
+  it("runs one explicit finite play activation and waits for exact task acknowledgement", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat:play-ui" });
+    let authority: ReturnType<typeof activeAuthority> | null = null;
+    const requestListener = (event: Event): void => {
+      const detail = (event as CustomEvent<HelixBoundAgentSteeringRequest>).detail;
+      expect(detail.source).toBe("minecraft_play_activation");
+      expect(detail.instructionText).toContain("Exact room: shared_realtime_room:player-ui");
+      expect(detail.instructionText).toContain("Create or restore");
+      window.dispatchEvent(new CustomEvent(
+        HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
+        { detail: { requestId: detail.requestId, deliveryState: "queued" } },
+      ));
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent(
+        HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
+        { detail: { requestId: detail.requestId, deliveryState: "acknowledged" } },
+      )), 0);
+    };
+    window.addEventListener(
+      HELIX_BOUND_AGENT_STEERING_REQUEST_EVENT,
+      requestListener,
+    );
+
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/reasoning-bindings/current")) {
+        return jsonResponse({
+          binding: {
+            reasoning_binding_id: "reasoning_binding:play-ui",
+            helix_conversation_id: "helix-chat:play-ui",
+            status: "active",
+            continuation_transport: "polling",
+            binding_epoch: 4,
+          },
+        });
+      }
+      if (url.endsWith("/action-authorities") && init?.method === "PUT") {
+        authority = activeAuthority(
+          JSON.parse(String(init.body)).allowed_capability_ids,
+        );
+        return jsonResponse(authorityReceipt(authority));
+      }
+      if (url.endsWith("/minecraft/fabric-loopback/launch")) {
+        return jsonResponse({
+          ok: true,
+          receipt: {
+            server_address: "localhost:25565",
+            launcher_action: "launched_client",
+            connection_action: "autojoin_staged",
+          },
+        });
+      }
+      if (url.endsWith("/connector-pairings/local-player-handoff")) {
+        return jsonResponse({
+          ok: true,
+          message: "Local player paired privately.",
+          pairing: null,
+        });
+      }
+      if (url.endsWith("/play-readiness")) {
+        return jsonResponse({
+          schema: "helix.minecraft.play_readiness.v1",
+          ok: true,
+          error: null,
+          message: "The exact objective has a current durable goal and active semantic monitor.",
+          durable_goal_ready: true,
+          semantic_monitor_ready: true,
+          goal_id: "environment_durable_goal:play-ui",
+          monitor_id: "environment_monitor:play-ui",
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        });
+      }
+      if (url.endsWith("/action-authorities")) {
+        return jsonResponse(authorityReceipt(
+          authority,
+          authority ? [{
+            action_authority_id: authority.action_authority_id,
+            state: "ready",
+            ready_for_actions: true,
+            declared_capability_count: authority.allowed_capability_ids.length,
+            available_control_engines: ["native_fabric"],
+            heartbeat_received_at: "2026-09-03T01:00:00.000Z",
+            manual_input_detected: false,
+          }] : [],
+        ));
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <SharedLiveRoomPlayerEmbodimentPanel
+        roomId={roomId}
+        environment={environment}
+        selfParticipantId={participantId}
+        sourceBinding={sourceBinding}
+        isOwner
+      />,
+    );
+
+    fireEvent.click(await screen.findByLabelText(
+      "Acknowledge Minecraft player control for Local Fabric 1.21.8",
+    ));
+    fireEvent.click(screen.getByRole("button", {
+      name: "Play Minecraft with Helix",
+    }));
+
+    expect(await screen.findByText(/acknowledged pickup and is checking/i))
+      .toBeTruthy();
+    expect(await screen.findByText("ready")).toBeTruthy();
+    const calls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(calls.some((url) => url.includes("/reasoning-bindings/current")))
+      .toBe(true);
+    expect(calls.some((url) => url.endsWith("/minecraft/fabric-loopback/launch")))
+      .toBe(true);
+    expect(calls.some((url) => url.endsWith("/connector-pairings/local-player-handoff")))
+      .toBe(true);
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("bearer_token");
+    window.removeEventListener(
+      HELIX_BOUND_AGENT_STEERING_REQUEST_EVENT,
+      requestListener,
+    );
+  });
+
   it("creates a finite exact-capability lease and a separately scoped client pairing", async () => {
     let authority: Record<string, unknown> | null = null;
     const fetchMock = vi.fn(
@@ -334,6 +471,83 @@ describe("Shared Live Room Player Embodiment controls", () => {
     );
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
     expect((combat as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("restores one finite full-gameplay preset from a narrow prior lease", async () => {
+    let authority = activeAuthority([
+      "com.casimirbot.minecraft.player.look",
+    ]);
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      if (String(input).endsWith("/action-authorities") && init?.method === "PUT") {
+        const body = JSON.parse(String(init.body));
+        authority = {
+          ...activeAuthority(body.allowed_capability_ids),
+          autonomy_mode: body.autonomy_mode,
+          manual_override_policy: body.manual_override_policy,
+          expires_at: body.expires_at,
+        };
+      }
+      return jsonResponse(authorityReceipt(authority));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <SharedLiveRoomPlayerEmbodimentPanel
+        roomId={roomId}
+        environment={environment}
+        selfParticipantId={participantId}
+        sourceBinding={sourceBinding}
+        isOwner
+      />,
+    );
+
+    const fullAccess = await screen.findByRole("button", {
+      name: "Full gameplay access",
+    });
+    await waitFor(() => expect(fullAccess.getAttribute("aria-pressed")).toBe("false"));
+    fireEvent.click(fullAccess);
+
+    expect(fullAccess.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText(/Selected: all registered player capabilities/i)).toBeTruthy();
+    expect((screen.getByRole("checkbox", {
+      name: "Combat attack",
+    }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(
+      "Player action approval mode for Local Fabric 1.21.8",
+    ) as HTMLSelectElement).value).toBe("approved_capabilities");
+    expect((screen.getByLabelText(
+      "Player manual override for Local Fabric 1.21.8",
+    ) as HTMLSelectElement).value).toBe("cancel");
+    expect((screen.getByLabelText(
+      "Player action lease duration for Local Fabric 1.21.8",
+    ) as HTMLSelectElement).value).toBe(String(2 * 60 * 60_000));
+
+    const save = screen.getByRole("button", { name: "Save player authority" });
+    expect(save.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByLabelText(
+      "Acknowledge Minecraft player control for Local Fabric 1.21.8",
+    ));
+    fireEvent.click(save);
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input).endsWith("/action-authorities") && init?.method === "PUT",
+      );
+      expect(call).toBeTruthy();
+      const body = JSON.parse(String(call?.[1]?.body));
+      expect(body.allowed_capability_ids).toEqual([
+        ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+      ]);
+      expect(body.autonomy_mode).toBe("approved_capabilities");
+      expect(body.manual_override_policy).toBe("cancel");
+      expect(Date.parse(body.expires_at) - Date.now()).toBeGreaterThan(
+        119 * 60_000,
+      );
+    });
   });
 
   it("distinguishes configured authority from a manifest-and-heartbeat-ready client", async () => {

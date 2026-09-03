@@ -36,6 +36,10 @@ const INHERITED_DESKTOP_OAUTH_PUBLIC_KEYS = [
 // developer identity or default public accounts to developer.
 const INHERITED_DESKTOP_ACCOUNT_POLICY_KEYS = [
   "HELIX_DEVELOPER_PROFILE_IDS",
+  // Credential-free, hash-pinned C3 developer acceptance evidence may live
+  // outside the packaged runtime. The reader still constrains every file to
+  // the canonical root and admits only the exact developer profile in config.
+  "HELIX_PRIVATE_COMPANION_C3_WORKSPACE_ROOT",
 ] as const;
 
 export const DESKTOP_LOCAL_DATABASE_RELATIVE_PATH = path.join(
@@ -68,6 +72,7 @@ export const buildDesktopServiceEnvironment = (input: {
   providerCredentialBroker: Readonly<{
     origin: string;
     token: string;
+    openAiRealtimeAvailable?: boolean;
   }>;
   mcpTransitionBroker: Readonly<{
     origin: string;
@@ -205,6 +210,13 @@ export const buildDesktopServiceEnvironment = (input: {
     providerCredentialBrokerOrigin.origin;
   environment.HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN =
     providerCredentialBrokerToken;
+  if (input.providerCredentialBroker.openAiRealtimeAvailable === true) {
+    environment.HELIX_NATIVE_OPENAI_REALTIME_BROKER_ENABLED = "1";
+    environment.HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED = "1";
+    environment.HELIX_REALTIME_SESSION_ADAPTER_ENABLED = "1";
+    environment.HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED = "1";
+    environment.HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED = "1";
+  }
   environment.HELIX_DESKTOP_MCP_TRANSITION_BROKER_ORIGIN =
     mcpTransitionBrokerOrigin.origin;
   environment.HELIX_DESKTOP_MCP_TRANSITION_BROKER_TOKEN =

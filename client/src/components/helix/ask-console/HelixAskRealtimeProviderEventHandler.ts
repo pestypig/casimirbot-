@@ -25,6 +25,10 @@ import {
   createHelixAskRealtimeParallelDispatchCoordinator,
   type HelixAskRealtimeParallelDispatchSettlement,
 } from "./HelixAskRealtimeParallelDispatchCoordinator";
+import {
+  offerFinalizedVoiceSteering,
+  type HelixVoiceSteeringFinalizedDetail,
+} from "@/lib/helix/voice-steering-finalized";
 
 export const HELIX_REALTIME_BARGE_MIN_SPEECH_MS = 700;
 
@@ -239,6 +243,9 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
   readAudioFocus?: typeof getAudioFocusSnapshot;
   interruptTerminalVoice?: () => boolean;
   parallelDispatchFallbackMs?: number;
+  offerFinalizedSteering?: (
+    detail: HelixVoiceSteeringFinalizedDetail,
+  ) => boolean;
 }): HelixAskRealtimeProviderEventHandler => {
   const consumedEventRefs = new Set<string>();
   const recordedPlaybackReceiptKeys = new Set<string>();
@@ -259,6 +266,8 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
   const readAudioFocus = input.readAudioFocus ?? getAudioFocusSnapshot;
   const interruptTerminalVoice = input.interruptTerminalVoice ?? (() =>
     interruptAudioFocusByKind("helix_terminal_voice"));
+  const offerFinalizedSteering =
+    input.offerFinalizedSteering ?? offerFinalizedVoiceSteering;
   const bargeMinSpeechMs = Math.max(
     0,
     input.bargeMinSpeechMs ?? HELIX_REALTIME_BARGE_MIN_SPEECH_MS,
@@ -685,6 +694,26 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             reentry_required: true,
           },
         ).catch(() => null);
+      }
+      const steeringConsumed = offerFinalizedSteering({
+        clientEventRef: `gpt-live:${input.realtimeSessionId}:${eventRef}`,
+        transcript,
+      });
+      if (steeringConsumed) {
+        const projection = buildProjection({
+          eventRef,
+          type,
+          kind,
+          transcriptCharCount: transcript.length,
+          reentryStatus: "reentered",
+          qualifiedUserInterruption,
+          workerDispatchKind: "bound_agent_steering",
+          workerDispatchState: "exact_binding_dispatch_requested",
+          workerTurnDispatched: false,
+          runtimeGoalWakeRequested: false,
+        });
+        input.onProjection?.(projection);
+        return projection;
       }
       const path = `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/event`;
       try {

@@ -28,6 +28,7 @@ const receipt = {
   status: "connected",
   profile_id: "fabric-loader-1.21.8",
   profile_version: "fabric-loader-0.18.4-1.21.8",
+  isolated_game_directory: true,
   client_process_id: 4242,
   server_address: "localhost:25565",
   launcher_action: "reused_client",

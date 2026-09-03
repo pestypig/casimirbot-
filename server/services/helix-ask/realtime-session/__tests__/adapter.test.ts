@@ -406,6 +406,57 @@ describe("Realtime session adapter boundary", () => {
     expect(JSON.stringify([networkResult, timeoutResult])).not.toContain("server-key-must-not-leak");
   });
 
+  it("uses the native desktop broker without requiring the long-lived key in service env", async () => {
+    const brokerToken = Buffer.alloc(32, 4).toString("base64url");
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        schema: "casimir_desktop_provider_credential_broker/1",
+        ok: true,
+        providerSessionRef: "sess_native_adapter",
+        ephemeralClientSecret: "ephemeral-native-adapter",
+        ephemeralClientSecretExpiresAtMs: 1_788_360_000_000,
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const env = {
+      HELIX_NATIVE_OPENAI_REALTIME_BROKER_ENABLED: "1",
+      HELIX_PROVIDER_CREDENTIAL_BROKER_ORIGIN: "http://127.0.0.1:43122",
+      HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN: brokerToken,
+      HELIX_REALTIME_SESSION_DESCRIPTOR_ENABLED: "1",
+      HELIX_REALTIME_SESSION_ADAPTER_ENABLED: "1",
+      HELIX_REALTIME_SESSION_LIVE_TRANSPORT_ENABLED: "1",
+      HELIX_REALTIME_SESSION_OPENAI_CONTRACT_ENABLED: "1",
+    } as NodeJS.ProcessEnv;
+
+    const result = await createOpenAiRealtimeSessionAdapter().createSession({
+      env,
+      body: {
+        transport: "webrtc",
+        selected_model_or_service: "gpt-realtime-2.1",
+        selected_realtime_voice: "marin",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:43122/v1/openai/realtime/client-secret",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${brokerToken}`,
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      provider_session_ref: "sess_native_adapter",
+      ephemeral_client_secret: "ephemeral-native-adapter",
+      ephemeral_credential_minted: true,
+    });
+    expect(JSON.stringify(result)).not.toContain(brokerToken);
+  });
+
   it("returns a typed contract failure when the injected OpenAI transport rejects the contract", async () => {
     const transport = vi.fn(async () => ({
       ok: false,

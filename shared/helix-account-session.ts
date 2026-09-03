@@ -69,6 +69,7 @@ export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
   "fruition-calculator",
   "helix-noise-gens",
   "live-answer-environment",
+  "motorcycle-hud-lab",
   "mission-ethos",
   "mission-ethos-source",
   "needle-world-roadmap",

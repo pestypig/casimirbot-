@@ -618,6 +618,52 @@ bool diagnose_next_selector_candidate_observable(
         output, result, observation, progress, progress_context);
 }
 
+bool diagnose_next_selector_candidate_term_radius_observed(
+    const Input &input, const Context *context, std::size_t panel_count,
+    std::size_t thread_count, unsigned target_degree, std::size_t target_jet,
+    selector::Output *output, selector::Result *result,
+    selector::CoefficientDecompositionObservation *predecessor_observation,
+    p8n::Observation *observation, p8p::ProgressCallback progress,
+    void *progress_context, p8p::TimingObservation *timing) {
+    if (result == nullptr) return false;
+    *result = selector::Result{};
+    if (context == nullptr || output == nullptr
+        || predecessor_observation == nullptr || observation == nullptr
+        || timing == nullptr || !context->impl_->initialized
+        || context->impl_->terminal_failure) return false;
+    const auto &impl = *context->impl_;
+    std::array<const finite::TaggedLedgerView *, kScalarStateCount> scalar{};
+    if (!valid_inventory(input, &scalar)
+        || input.scalar_ledger_identities != impl.scalar_ids
+        || input.h2_ledger_identity != impl.h2_id) return false;
+    const auto *b = scalar[0];
+    const auto *v = scalar[1];
+    if (b->ledger.model_count != impl.models.size() + 1U) return false;
+    for (std::size_t state = 1U; state < kScalarStateCount; ++state) {
+        if (scalar[state]->ledger.model_count != b->ledger.model_count)
+            return false;
+    }
+    for (std::size_t ordinal = 0U; ordinal < impl.models.size(); ++ordinal) {
+        for (std::size_t state = 0U; state < kScalarStateCount; ++state) {
+            std::string digest;
+            if (!model_digest(scalar[state]->ledger.models[ordinal], &digest)
+                || digest != impl.scalar_source_digests[state][ordinal])
+                return false;
+        }
+    }
+    const std::size_t ordinal = impl.models.size();
+    const ledger::ModelView &target = b->ledger.models[ordinal];
+    const ledger::LedgerView b_prefix{ordinal + 1U, b->ledger.models};
+    const ledger::LedgerView v_prefix{ordinal + 1U, v->ledger.models};
+    const selector::Input selector_input{b_prefix, v_prefix,
+        target.left_endpoint, target.right_endpoint, target.order,
+        kJetCount, impl.b_at_zero.data()};
+    return p8p::evaluate_prepared_candidate_observed(
+        selector_input, panel_count, thread_count, target_degree, target_jet,
+        output, result, predecessor_observation, observation, progress,
+        progress_context, timing);
+}
+
 namespace {
 
 bool append_diagnostic(std::string *output, const std::string &value) {

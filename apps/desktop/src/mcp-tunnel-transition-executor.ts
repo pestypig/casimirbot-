@@ -35,6 +35,46 @@ export type DesktopMcpTunnelReadOnlyAutoStartOutcome = Readonly<{
     | "not_ready";
 }>;
 
+export const startDesktopMcpTunnelForUserSession = async (input: {
+  controller: DesktopMcpTunnelTransitionControllerPort;
+  accountSessionId: string;
+  accountType: "developer" | "user";
+  requestedScope: DesktopMcpTunnelScope;
+}): Promise<DesktopMcpTunnelState> => {
+  if (
+    input.requestedScope === "full_helix_agent" &&
+    input.accountType !== "developer"
+  ) {
+    throw new Error("mcp_tunnel_full_developer_account_required");
+  }
+  const initial = input.controller.getState();
+  if (initial.processRunning && initial.scope === input.requestedScope) {
+    return initial;
+  }
+  if (initial.processRunning) await input.controller.stop();
+  try {
+    const state = await input.controller.start(
+      input.accountSessionId,
+      input.requestedScope,
+    );
+    if (
+      input.requestedScope === "full_helix_agent" &&
+      (!state.ready || state.scope !== "full_helix_agent")
+    ) {
+      throw new Error("mcp_tunnel_requested_scope_not_ready");
+    }
+    return state;
+  } catch (error) {
+    if (input.requestedScope === "full_helix_agent") {
+      await restoreDesktopMcpTunnelReadOnly({
+        controller: input.controller,
+        accountSessionId: input.accountSessionId,
+      }).catch(() => false);
+    }
+    throw error;
+  }
+};
+
 export const autoStartConfiguredDesktopMcpTunnelReadOnly = async (input: {
   controller: DesktopMcpTunnelTransitionControllerPort;
   resolveAccount(): Promise<{

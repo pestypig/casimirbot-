@@ -36,6 +36,7 @@ import type {
   HelixSharedRealtimeRoomParticipant,
 } from "@shared/helix-shared-realtime-room";
 import { SharedLiveRoomPlayerEmbodimentPanel } from "./SharedLiveRoomPlayerEmbodimentPanel";
+import { MinecraftLocalLifecycleCard } from "./MinecraftLocalLifecycleCard";
 
 const sourceBindingsPath = (roomId: string): string =>
   `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/source-bindings`;
@@ -1405,15 +1406,25 @@ export function SharedLiveRoomSourceBindingsPanel({
                     </p>
                   )}
                 </div>
-                {environment.domain_adapter === "minecraft.fabric_mod.v1" &&
-                environment.self_subject_binding?.status === "active" ? (
-                  <SharedLiveRoomPlayerEmbodimentPanel
-                    roomId={roomId}
-                    environment={environment}
-                    selfParticipantId={selfParticipantId}
-                    sourceBinding={sourceBinding}
-                    isOwner={isOwner}
-                  />
+                {environment.domain_adapter === "minecraft.fabric_mod.v1" ? (
+                  environment.self_subject_binding?.status === "active" ? (
+                    <SharedLiveRoomPlayerEmbodimentPanel
+                      roomId={roomId}
+                      environment={environment}
+                      selfParticipantId={selfParticipantId}
+                      sourceBinding={sourceBinding}
+                      isOwner={isOwner}
+                    />
+                  ) : isOwner ? (
+                    <div className="mt-2">
+                      <MinecraftLocalLifecycleCard />
+                      <p className="mt-1 text-[9px] text-cyan-100/60">
+                        Launch or rejoin the prepared local client first. The
+                        full Play Minecraft with Helix activation appears only
+                        after this room verifies the current player.
+                      </p>
+                    </div>
+                  ) : null
                 ) : null}
               </article>
             );

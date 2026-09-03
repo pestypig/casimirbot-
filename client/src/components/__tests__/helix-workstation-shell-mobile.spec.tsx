@@ -79,6 +79,49 @@ describe("HelixWorkstationShell mobile navigation", () => {
     ).toHaveAttribute("data-target-surface", "ask");
   });
 
+  it("renames a saved Helix Ask chat from the keyboard-accessible chat list", () => {
+    render(
+      <HelixWorkstationShell
+        layoutVariant="mobile"
+        initialMobileSurface="workstation"
+        onOpenPanel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Helix Ask chats" }));
+    fireEvent.click(screen.getByRole("button", { name: /Rename Mobile navigation regression/i }));
+    const renameInput = screen.getByRole("textbox", { name: /New name for Mobile navigation regression/i });
+    fireEvent.change(renameInput, { target: { value: "Acceptance chat A" } });
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    expect(useAgiChatStore.getState().sessions[chatId]?.title).toBe(
+      "Acceptance chat A",
+    );
+    expect(screen.getAllByText("Acceptance chat A")).toHaveLength(2);
+  });
+
+  it("clears a saved Helix Ask chat without deleting the chat", () => {
+    useAgiChatStore.getState().addMessage(chatId, {
+      role: "user",
+      content: "Disposable acceptance message",
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      <HelixWorkstationShell
+        layoutVariant="mobile"
+        initialMobileSurface="workstation"
+        onOpenPanel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Helix Ask chats" }));
+    fireEvent.click(screen.getByRole("button", { name: /Clear Disposable acceptance message/i }));
+
+    expect(useAgiChatStore.getState().sessions[chatId]).toBeDefined();
+    expect(useAgiChatStore.getState().sessions[chatId]?.messages).toEqual([]);
+    expect(screen.getByText(/0 messages/i)).toBeInTheDocument();
+  });
+
   it("keeps the surface switch available when Workflow Demo adds a QTE to Ask", async () => {
     render(<HelixWorkstationShell layoutVariant="mobile" onOpenPanel={vi.fn()} />);
 

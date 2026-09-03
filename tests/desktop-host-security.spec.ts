@@ -136,20 +136,38 @@ describe("desktop Electron session security", () => {
   });
 
   it("admits the full MCP tunnel only after native developer-account revalidation", async () => {
-    const mainSource = await readFile(
-      path.resolve("apps/desktop/src/main.ts"),
-      "utf8",
-    );
+    const [mainSource, executorSource] = await Promise.all([
+      readFile(path.resolve("apps/desktop/src/main.ts"), "utf8"),
+      readFile(
+        path.resolve("apps/desktop/src/mcp-tunnel-transition-executor.ts"),
+        "utf8",
+      ),
+    ]);
     expect(mainSource).toContain("parseDesktopMcpTunnelStartRequest(input)");
     expect(mainSource).toContain(
       "const account = await resolveActiveDesktopAccount(runtime, event.sender.session)",
     );
-    expect(mainSource).toContain('request.scope === "full_helix_agent"');
-    expect(mainSource).toContain('account.accountType !== "developer"');
-    expect(mainSource).toContain("mcp_tunnel_full_developer_account_required");
     expect(mainSource).toContain(
-      "return tunnelController.start(account.sessionId, request.scope)",
+      "return startDesktopMcpTunnelForUserSession({",
     );
+    expect(executorSource).toContain('input.requestedScope === "full_helix_agent"');
+    expect(executorSource).toContain('input.accountType !== "developer"');
+    expect(executorSource).toContain("mcp_tunnel_full_developer_account_required");
+  });
+
+  it("reveals an existing hidden desktop window on second-instance activation", async () => {
+    const mainSource = await readFile(
+      path.resolve("apps/desktop/src/main.ts"),
+      "utf8",
+    );
+    expect(mainSource).toContain('app.on("second-instance"');
+    expect(mainSource).toContain(
+      "if (!mainWindow.isVisible()) mainWindow.show();",
+    );
+    expect(mainSource).toContain(
+      "if (mainWindow.isMinimized()) mainWindow.restore();",
+    );
+    expect(mainSource).toContain("mainWindow.focus();");
   });
 
   it("auto-starts only the configured read-only tunnel after native developer revalidation", async () => {
@@ -207,7 +225,12 @@ describe("desktop Electron session security", () => {
     expect(smokeSource).toContain(
       "$ids -contains [uint32]$_.OwningProcess",
     );
-    expect(smokeSource).toContain("$listenerCount -eq 2");
+    expect(smokeSource).toContain(
+      "$expectedLoopbackListeners = if ($friendsCoordinationConfigured) { 4 } else { 3 }",
+    );
+    expect(smokeSource).toContain(
+      "$listenerCount -eq $expectedLoopbackListeners",
+    );
     expect(smokeSource).toContain("ServiceListenerReceipt = \"PASS\"");
     expect(smokeSource).toContain(
       "The ready receipt did not identify exactly one service listener.",

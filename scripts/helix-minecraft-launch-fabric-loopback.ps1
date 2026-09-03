@@ -442,7 +442,10 @@ public static class HelixMinecraftLauncherAutomation {
             uint targetProcessId;
             uint targetThread = GetWindowThreadProcessId(window, out targetProcessId);
             if (targetProcessId != expectedProcessId) {
-                throw new InvalidOperationException("minecraft_launcher_window_identity_mismatch");
+                throw new InvalidOperationException(
+                    "minecraft_launcher_window_identity_mismatch:" +
+                    expectedProcessId + ":" + targetProcessId
+                );
             }
             uint currentThread = GetCurrentThreadId();
             AttachThreadInput(currentThread, oldThread, true);
@@ -523,11 +526,24 @@ public static class HelixMinecraftLauncherAutomation {
                 try {
                     System.Threading.Thread.Sleep(250);
                     IntPtr hit = WindowFromPoint(new POINT { X = x, Y = y });
-                    // GA_ROOT=2. A child rendering HWND is acceptable only
-                    // when its root is the exact launcher window we captured.
-                    if (hit == IntPtr.Zero || GetAncestor(hit, 2) != window) {
+                    // GA_ROOT=2. Current launcher builds may move the rendered
+                    // Play surface into another root HWND owned by the same
+                    // verified launcher process. Accept that exact-process
+                    // reparenting, but keep rejecting every unrelated window.
+                    IntPtr hitRoot = hit == IntPtr.Zero
+                        ? IntPtr.Zero
+                        : GetAncestor(hit, 2);
+                    uint hitProcessId = 0;
+                    if (hitRoot != IntPtr.Zero) {
+                        GetWindowThreadProcessId(hitRoot, out hitProcessId);
+                    }
+                    if (
+                        hit == IntPtr.Zero ||
+                        hitRoot == IntPtr.Zero ||
+                        (hitRoot != window && hitProcessId != expectedProcessId)
+                    ) {
                         throw new InvalidOperationException(
-                            "minecraft_launcher_click_target_occluded"
+                            "minecraft_launcher_click_target_occluded:" + hitProcessId
                         );
                     }
                     SetCursorPos(x, y);
@@ -644,13 +660,25 @@ if ($existingMinecraftClient) {
     } catch {
       $launchFailure = [string]$_.Exception.InnerException.Message
       $lastLaunchFailure = $launchFailure
+      if ($launchFailure -match '^minecraft_launcher_click_target_occluded:([0-9]+)$') {
+        $occludingProcess = Get-Process -Id ([int]$Matches[1]) -ErrorAction SilentlyContinue
+        if (
+          $occludingProcess -and
+          $occludingProcess.ProcessName -eq 'PickerHost' -and
+          $occludingProcess.MainWindowTitle -eq 'Windows Security'
+        ) {
+          $lastLaunchFailure = 'minecraft_launcher_security_prompt_blocked'
+          break
+        }
+      }
       if ($launchFailure -notin @(
         "minecraft_launcher_play_control_not_found",
         "minecraft_launcher_foreground_activation_failed",
-        "minecraft_launcher_click_target_occluded",
         "minecraft_launcher_click_delivery_failed",
         "minecraft_launcher_bounds_unavailable",
         "minecraft_launcher_bounds_invalid"
+      ) -and -not $launchFailure.StartsWith(
+        "minecraft_launcher_click_target_occluded:"
       )) {
         throw
       }

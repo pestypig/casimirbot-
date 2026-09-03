@@ -6,11 +6,13 @@ import {
   HELIX_AGENT_RUN_SCHEMA,
   helixAgentCancelRequestSchema,
   helixAgentContinueRequestSchema,
+  helixAgentEvidenceReentryRequestSchema,
   helixAgentRunSchema,
   helixAgentStartRequestSchema,
   type HelixAgentCancelRequest,
   type HelixAgentCompletionStatus,
   type HelixAgentContinueRequest,
+  type HelixAgentEvidenceReentryRequest,
   type HelixAgentEvidenceBundle,
   type HelixAgentLifecycleStatus,
   type HelixAgentPendingQuestion,
@@ -28,6 +30,13 @@ import {
   type HelixAgentRunOwner,
   type HelixAgentRunRecord,
 } from "./run-store";
+import { appendAgentRunEventsToOperatorActivity } from "../helix-ask/operator-activity-ingestion";
+import { createPostgresHelixMcpEvidenceObservationStore } from
+  "../mcp-evidence/postgres-observation-store";
+import { HelixMcpEvidenceObservationStoreError } from
+  "../mcp-evidence/observation-store";
+import type { HelixMcpEvidenceObservation } from
+  "@shared/contracts/helix-mcp-evidence-capability.v1";
 import type {
   HelixAgentApiPrincipal,
   HelixAgentRunTurnExecutor,
@@ -70,6 +79,10 @@ export type HelixAgentApiServiceDependencies = {
   databaseScopeAllowlist?: ReadonlySet<string>;
   databaseScopePolicies?: ReadonlyMap<string, HelixAgentDatabaseScopePolicy>;
   turnTimeoutMs?: number;
+  validateExternalObservationRef?: (input: {
+    principal: HelixAgentApiPrincipal;
+    observationRef: string;
+  }) => Promise<HelixMcpEvidenceObservation>;
 };
 
 const unique = (values: string[]): string[] =>
@@ -469,16 +482,38 @@ export class HelixAgentApiService {
   private readonly injectedDatabaseScopeAllowlist?: ReadonlySet<string>;
   private readonly injectedDatabaseScopePolicies?: HelixAgentApiServiceDependencies["databaseScopePolicies"];
   private readonly injectedTurnTimeoutMs?: number;
+  private readonly validateExternalObservationRef: NonNullable<
+    HelixAgentApiServiceDependencies["validateExternalObservationRef"]
+  >;
   private readonly activeTurnControllers = new Map<string, AbortController>();
 
   constructor(dependencies: HelixAgentApiServiceDependencies = {}) {
-    this.store = dependencies.store ?? new HelixAgentRunStore();
+    this.store = dependencies.store ?? new HelixAgentRunStore(
+      undefined,
+      async ({ owner, run, events }) => {
+        await appendAgentRunEventsToOperatorActivity({ owner, run, events });
+      },
+    );
     this.executor = dependencies.executor ?? new FullHelixAskTurnExecutor();
     this.now = dependencies.now ?? (() => new Date());
     this.randomId = dependencies.randomId ?? (() => crypto.randomUUID());
     this.injectedDatabaseScopeAllowlist = dependencies.databaseScopeAllowlist;
     this.injectedDatabaseScopePolicies = dependencies.databaseScopePolicies;
     this.injectedTurnTimeoutMs = dependencies.turnTimeoutMs;
+    const defaultEvidenceStore = dependencies.validateExternalObservationRef
+      ? null
+      : createPostgresHelixMcpEvidenceObservationStore();
+    this.validateExternalObservationRef =
+      dependencies.validateExternalObservationRef ??
+      (async ({ principal, observationRef }) => {
+        return defaultEvidenceStore!.get({
+          owner: {
+            tenantId: principal.tenantId,
+            accountProfileId: principal.accountProfileId,
+          },
+          observationRef,
+        });
+      });
   }
 
   private id(prefix: string): string {
@@ -828,6 +863,171 @@ export class HelixAgentApiService {
       );
     }
     return publicRun(run);
+  }
+
+  async reenterEvidence(input: {
+    principal: HelixAgentApiPrincipal;
+    runId: string;
+    idempotencyKey: string;
+    request: HelixAgentEvidenceReentryRequest;
+  }): Promise<HelixAgentMutationResult> {
+    const request = helixAgentEvidenceReentryRequestSchema.parse(input.request);
+    assertNoProtectedAgentInput(request);
+    const owner = ownerFor(input.principal);
+    const existing = await this.store.getRun(owner, input.runId);
+    if (!existing) {
+      throw new HelixAgentApiServiceError(404, "not_found", "Agent run not found.");
+    }
+    const operation = `reenter_evidence:${input.runId}`;
+    const idempotency = await this.acquireMutation({
+      principal: input.principal,
+      operation,
+      idempotencyKey: input.idempotencyKey,
+      validatedRequest: { run_id: input.runId, ...request },
+      runId: input.runId,
+      now: this.now(),
+    });
+    if (idempotency.replay) return idempotency.replay;
+
+    let operationMayHaveTakenEffect = false;
+    try {
+      if (existing.version !== request.expected_version) {
+        throw new HelixAgentApiServiceError(
+          409,
+          "version_conflict",
+          "The run version is stale.",
+          true,
+          { current_version: existing.version },
+        );
+      }
+      if (isTerminalLifecycle(existing.lifecycleStatus)) {
+        throw new HelixAgentApiServiceError(
+          409,
+          "run_not_resumable",
+          `A ${existing.lifecycleStatus} run cannot receive evidence.`,
+        );
+      }
+      for (const observationRef of request.observation_refs) {
+        try {
+          const observation = await this.validateExternalObservationRef({
+            principal: input.principal,
+            observationRef,
+          });
+          if (
+            !observation.provenance.valid ||
+            observation.authority.assistant_answer !== false ||
+            observation.authority.answer_authority !== false ||
+            observation.authority.agent_executable !== false ||
+            observation.authority.terminal_eligible !== false ||
+            observation.authority.raw_content_included !== false ||
+            observation.authority.reentry_required !== true
+          ) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "invalid_request",
+              "The requested MCP observation does not preserve the evidence-only authority boundary.",
+              false,
+              {
+                failure_code: "observation_authority_invalid",
+                observation_ref: observationRef,
+              },
+            );
+          }
+        } catch (error) {
+          if (!(error instanceof HelixMcpEvidenceObservationStoreError)) {
+            throw error;
+          }
+          throw new HelixAgentApiServiceError(
+            error.code === "observation_corrupt" ? 500 : 404,
+            error.code === "observation_corrupt" ? "internal_error" : "not_found",
+            "The requested MCP observation is not eligible for exact run re-entry.",
+            false,
+            {
+              failure_code: error.code,
+              observation_ref: observationRef,
+            },
+          );
+        }
+      }
+      const refs = unique(request.observation_refs);
+      const evidenceBundle: HelixAgentEvidenceBundle = {
+        ...existing.evidenceBundle,
+        observation_refs: unique([
+          ...existing.evidenceBundle.observation_refs,
+          ...refs,
+        ]),
+        evidence_refs: unique([
+          ...existing.evidenceBundle.evidence_refs,
+          ...refs,
+        ]),
+        receipt_refs: existing.evidenceBundle.receipt_refs,
+        provider_terminal_candidate_ref: null,
+        terminal_authority_status: "not_evaluated",
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      };
+      operationMayHaveTakenEffect = true;
+      const updated = await this.store.appendExternalEvidence({
+        owner,
+        runId: input.runId,
+        expectedVersion: request.expected_version,
+        evidenceBundle,
+        observationRefs: refs,
+        eventId: this.id("evt"),
+        now: this.now().toISOString(),
+      });
+      if (!updated) {
+        operationMayHaveTakenEffect = false;
+        const current = await this.store.getRun(owner, input.runId);
+        if (current && current.version !== request.expected_version) {
+          throw new HelixAgentApiServiceError(
+            409,
+            "version_conflict",
+            "The run version is stale.",
+            true,
+            { current_version: current.version },
+          );
+        }
+        throw new HelixAgentApiServiceError(
+          409,
+          "run_not_resumable",
+          "The run cannot receive evidence in its current lifecycle state.",
+        );
+      }
+      const body = publicRun(updated);
+      await this.store.completeIdempotency({
+        owner,
+        operation,
+        keyHash: idempotency.keyHash,
+        requestHash: idempotency.requestHash,
+        runId: updated.runId,
+        status: 200,
+        receipt: body,
+        now: this.now().toISOString(),
+      });
+      return { status: 200, body, idempotencyReplayed: false };
+    } catch (error) {
+      if (operationMayHaveTakenEffect) {
+        await this.store.markIdempotencyOutcomeUnknown({
+          owner,
+          operation,
+          keyHash: idempotency.keyHash,
+          requestHash: idempotency.requestHash,
+          runId: input.runId,
+          now: this.now().toISOString(),
+        });
+      } else {
+        await this.store.abandonIdempotency({
+          owner,
+          operation,
+          keyHash: idempotency.keyHash,
+          requestHash: idempotency.requestHash,
+        });
+      }
+      throw error;
+    }
   }
 
   async continueRun(input: {

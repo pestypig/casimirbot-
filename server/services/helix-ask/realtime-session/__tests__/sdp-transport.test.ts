@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createDesktopBrokerOpenAiRealtimeSdpTransport,
   createDefaultOpenAiRealtimeSdpTransport,
   isValidRealtimeOfferSdp,
   probeOpenAiApiCredential,
@@ -103,6 +104,46 @@ describe("OpenAI Realtime SDP transport", () => {
       failureReason: "realtime_sdp_offer_invalid",
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("exchanges SDP through the native broker without a long-lived key", async () => {
+    const brokerToken = Buffer.alloc(32, 5).toString("base64url");
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        schema: "casimir_desktop_provider_credential_broker/1",
+        ok: true,
+        answerSdp: "v=0\r\nanswer",
+        providerCallId: "rtc_native_123",
+      }),
+    }));
+    const result = await createDesktopBrokerOpenAiRealtimeSdpTransport({
+      origin: "http://127.0.0.1:43122",
+      token: brokerToken,
+    }, fetchMock)({
+      apiKey: "",
+      offerSdp: "v=0\r\noffer",
+      model: "gpt-realtime-2.1",
+      voice: "marin",
+      safetyIdentifier: "requester:realtime:native",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:43122/v1/openai/realtime/sdp",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${brokerToken}`,
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      answerSdp: "v=0\r\nanswer",
+      providerCallId: "rtc_native_123",
+      providerCallRef: expect.stringMatching(/^openai-realtime:call:/u),
+    });
+    expect(JSON.stringify(result)).not.toContain(brokerToken);
   });
 
   it("returns a stable authentication failure for an OpenAI 401", async () => {

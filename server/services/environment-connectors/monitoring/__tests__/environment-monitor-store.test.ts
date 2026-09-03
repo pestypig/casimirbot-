@@ -217,6 +217,22 @@ describe("EnvironmentMonitorStore", () => {
     });
     expect(reconnected.monitor_id).toBe(created.monitor_id);
     expect(reconnected.expires_at).toBe(created.expires_at);
+    expect(await store.listForEnvironment({
+      profileId: identity.owner_profile_id,
+      roomId: identity.room_id!,
+      environmentBindingId: identity.environment_binding_id,
+      sourceId: identity.source_id,
+      worldId: identity.world_id,
+      subjectRef: identity.subject_ref,
+    })).toMatchObject([{ monitor_id: created.monitor_id, status: "active" }]);
+    expect(await store.listForEnvironment({
+      profileId: "profile:other",
+      roomId: identity.room_id!,
+      environmentBindingId: identity.environment_binding_id,
+      sourceId: identity.source_id,
+      worldId: identity.world_id,
+      subjectRef: identity.subject_ref,
+    })).toEqual([]);
     await expect(store.create({
       identity,
       eventFamilies: ["actor", "hazard"],

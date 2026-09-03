@@ -18,6 +18,7 @@
     "verify:runtime-tree": "node scripts/verify-runtime-tree.mjs",
     "smoke:service-boundary": "node scripts/smoke-service-boundary.mjs",
     "smoke:packaged-launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packaged-launch.ps1",
+    "smoke:agent-onboarding": "node scripts/smoke-agent-onboarding.mjs",
     "build": "npm run build:host",
     "pack:dir": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --dir",
     "dist:win": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --win nsis"

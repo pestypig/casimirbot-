@@ -8,6 +8,7 @@ const DISCOVERY_CACHE_CONTROL = "public, max-age=300";
 
 const MCP_CORE_TOOLS = [
   "helix_run_start",
+  "helix_run_evidence_reenter",
   "helix_run_continue",
   "helix_run_inspect",
   "helix_run_fetch_evidence",

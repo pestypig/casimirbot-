@@ -3,16 +3,24 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { DesktopProviderCredentialKeyring } from
   "./provider-credential-key";
+import { buildHelixRealtimeProviderSession } from
+  "../../../shared/helix-realtime-session";
 
 const ALGORITHM = "aes-256-gcm" as const;
 const MAX_REQUEST_BYTES = 256 * 1_024;
 const BROKER_SCHEMA = "casimir_desktop_provider_credential_broker/1" as const;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
+const OPENAI_REALTIME_CLIENT_SECRETS_URL =
+  "https://api.openai.com/v1/realtime/client_secrets" as const;
+const OPENAI_REALTIME_CALLS_URL =
+  "https://api.openai.com/v1/realtime/calls" as const;
+const OPENAI_REALTIME_TIMEOUT_MS = 10_000;
 
 export type DesktopProviderCredentialBroker = Readonly<{
   origin: string;
   token: string;
   activeKeyId: string;
+  openAiRealtimeAvailable: boolean;
   close: () => Promise<void>;
 }>;
 
@@ -203,6 +211,8 @@ const sendJson = (
 export const startDesktopProviderCredentialBroker = async (input: {
   keyring: DesktopProviderCredentialKeyring;
   token?: string;
+  openAiApiKey?: string;
+  fetchImpl?: typeof fetch;
 }): Promise<DesktopProviderCredentialBroker> => {
   const activeKey = keyBytes(input.keyring.activeKey);
   for (const retired of input.keyring.retiredKeys) keyBytes(retired);
@@ -211,6 +221,8 @@ export const startDesktopProviderCredentialBroker = async (input: {
     throw new Error("desktop_provider_credential_broker_token_invalid");
   }
   const activeKeyId = nativeKeyId(activeKey);
+  const openAiApiKey = input.openAiApiKey?.trim() ?? "";
+  const fetchImpl = input.fetchImpl ?? globalThis.fetch;
   const server = http.createServer(async (request, response) => {
     if (request.socket.remoteAddress !== "127.0.0.1") {
       sendJson(response, 403, { ok: false, error: "loopback_required" });
@@ -230,9 +242,9 @@ export const startDesktopProviderCredentialBroker = async (input: {
         });
         return;
       }
-      const aad = typeof body.aad === "string" ? body.aad.trim() : "";
-      if (!aad) throw new Error("provider_credential_aad_required");
       if (request.url === "/v1/encrypt") {
+        const aad = typeof body.aad === "string" ? body.aad.trim() : "";
+        if (!aad) throw new Error("provider_credential_aad_required");
         const envelope = encryptWithKey(body.value, aad, activeKey);
         sendJson(response, 200, {
           schema: BROKER_SCHEMA,
@@ -242,6 +254,8 @@ export const startDesktopProviderCredentialBroker = async (input: {
         return;
       }
       if (request.url === "/v1/decrypt") {
+        const aad = typeof body.aad === "string" ? body.aad.trim() : "";
+        if (!aad) throw new Error("provider_credential_aad_required");
         const encryptedValue = typeof body.encryptedValue === "string"
           ? body.encryptedValue
           : "";
@@ -261,6 +275,202 @@ export const startDesktopProviderCredentialBroker = async (input: {
           schema: BROKER_SCHEMA,
           ok: true,
           value,
+        });
+        return;
+      }
+      if (request.url === "/v1/openai/realtime/client-secret") {
+        if (!openAiApiKey || typeof fetchImpl !== "function") {
+          sendJson(response, 409, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: "openai_realtime_provider_unavailable",
+          });
+          return;
+        }
+        const model = typeof body.model === "string" ? body.model.trim() : "";
+        const voice = typeof body.voice === "string" ? body.voice.trim() : "";
+        const safetyIdentifier = typeof body.safetyIdentifier === "string"
+          ? body.safetyIdentifier.trim()
+          : "";
+        if (!/^gpt-realtime(?:-[A-Za-z0-9._-]+)?$/u.test(model)) {
+          throw new Error("openai_realtime_model_invalid");
+        }
+        if (voice && !/^[A-Za-z0-9._-]{1,64}$/u.test(voice)) {
+          throw new Error("openai_realtime_voice_invalid");
+        }
+        if (
+          safetyIdentifier &&
+          !/^[A-Za-z0-9._:-]{8,128}$/u.test(safetyIdentifier)
+        ) {
+          throw new Error("openai_realtime_safety_identifier_invalid");
+        }
+        const session: Record<string, unknown> = { type: "realtime", model };
+        if (voice) session.audio = { output: { voice } };
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${openAiApiKey}`,
+          "Content-Type": "application/json",
+        };
+        if (safetyIdentifier) {
+          headers["OpenAI-Safety-Identifier"] = safetyIdentifier;
+        }
+        let providerResponse: Response;
+        try {
+          providerResponse = await fetchImpl(OPENAI_REALTIME_CLIENT_SECRETS_URL, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ session }),
+            signal: AbortSignal.timeout(OPENAI_REALTIME_TIMEOUT_MS),
+          });
+        } catch {
+          sendJson(response, 502, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: "openai_realtime_provider_network_error",
+          });
+          return;
+        }
+        if (!providerResponse.ok) {
+          sendJson(response, 502, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: `openai_realtime_provider_http_${providerResponse.status}`,
+          });
+          return;
+        }
+        const providerPayload = await providerResponse.json().catch(() => null) as
+          | Record<string, unknown>
+          | null;
+        const clientSecretRecord = providerPayload?.client_secret &&
+          typeof providerPayload.client_secret === "object"
+          ? providerPayload.client_secret as Record<string, unknown>
+          : {};
+        const ephemeralClientSecret = [
+          providerPayload?.value,
+          providerPayload?.secret,
+          clientSecretRecord.value,
+          clientSecretRecord.secret,
+        ].find((value): value is string =>
+          typeof value === "string" && Boolean(value.trim())
+        )?.trim() ?? "";
+        if (!ephemeralClientSecret) {
+          sendJson(response, 502, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: "openai_realtime_client_secret_missing",
+          });
+          return;
+        }
+        const providerSessionRef = [
+          providerPayload?.id,
+          providerPayload?.session_id,
+          providerPayload?.provider_session_ref,
+        ].find((value): value is string =>
+          typeof value === "string" && Boolean(value.trim())
+        )?.trim() ?? null;
+        const expiresAtMsValue = providerPayload?.expires_at_ms ??
+          clientSecretRecord.expires_at_ms;
+        const expiresAtSecondsValue = providerPayload?.expires_at ??
+          clientSecretRecord.expires_at;
+        const expiresAtMs = typeof expiresAtMsValue === "number" &&
+          Number.isFinite(expiresAtMsValue)
+          ? Math.trunc(expiresAtMsValue)
+          : typeof expiresAtSecondsValue === "number" &&
+              Number.isFinite(expiresAtSecondsValue)
+            ? Math.trunc(expiresAtSecondsValue * 1_000)
+            : null;
+        sendJson(response, 200, {
+          schema: BROKER_SCHEMA,
+          ok: true,
+          providerSessionRef,
+          ephemeralClientSecret,
+          ephemeralClientSecretExpiresAtMs: expiresAtMs,
+        });
+        return;
+      }
+      if (request.url === "/v1/openai/realtime/sdp") {
+        if (!openAiApiKey || typeof fetchImpl !== "function") {
+          sendJson(response, 409, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: "openai_realtime_provider_unavailable",
+          });
+          return;
+        }
+        const offerSdp = typeof body.offerSdp === "string" ? body.offerSdp : "";
+        const model = typeof body.model === "string" ? body.model.trim() : "";
+        const voice = typeof body.voice === "string" ? body.voice.trim() : "";
+        const safetyIdentifier = typeof body.safetyIdentifier === "string"
+          ? body.safetyIdentifier.trim()
+          : "";
+        if (!/^v=0(?:\r?\n)/u.test(offerSdp) || offerSdp.length > 256_000) {
+          throw new Error("realtime_sdp_offer_invalid");
+        }
+        if (!/^gpt-realtime(?:-[A-Za-z0-9._-]+)?$/u.test(model)) {
+          throw new Error("openai_realtime_model_invalid");
+        }
+        if (!/^[A-Za-z0-9._-]{1,64}$/u.test(voice)) {
+          throw new Error("openai_realtime_voice_invalid");
+        }
+        if (
+          safetyIdentifier &&
+          !/^[A-Za-z0-9._:-]{8,128}$/u.test(safetyIdentifier)
+        ) {
+          throw new Error("openai_realtime_safety_identifier_invalid");
+        }
+        const form = new FormData();
+        form.set("sdp", offerSdp);
+        form.set(
+          "session",
+          JSON.stringify(buildHelixRealtimeProviderSession(model, voice)),
+        );
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${openAiApiKey}`,
+        };
+        if (safetyIdentifier) {
+          headers["OpenAI-Safety-Identifier"] = safetyIdentifier;
+        }
+        let providerResponse: Response;
+        try {
+          providerResponse = await fetchImpl(OPENAI_REALTIME_CALLS_URL, {
+            method: "POST",
+            headers,
+            body: form,
+            signal: AbortSignal.timeout(15_000),
+          });
+        } catch {
+          sendJson(response, 502, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: "openai_realtime_provider_network_error",
+          });
+          return;
+        }
+        const answerSdp = await providerResponse.text().catch(() => "");
+        if (!providerResponse.ok) {
+          sendJson(response, 502, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: `openai_realtime_provider_http_${providerResponse.status}`,
+          });
+          return;
+        }
+        if (!/^v=0(?:\r?\n)/u.test(answerSdp) || answerSdp.length > 256_000) {
+          sendJson(response, 502, {
+            schema: BROKER_SCHEMA,
+            ok: false,
+            error: "openai_realtime_answer_sdp_invalid",
+          });
+          return;
+        }
+        const location = providerResponse.headers.get("location");
+        const providerCallId = location?.match(
+          /(?:^|\/)(rtc_[A-Za-z0-9_-]{6,160})(?:[/?#]|$)/u,
+        )?.[1] ?? null;
+        sendJson(response, 200, {
+          schema: BROKER_SCHEMA,
+          ok: true,
+          answerSdp,
+          providerCallId,
         });
         return;
       }
@@ -284,6 +494,7 @@ export const startDesktopProviderCredentialBroker = async (input: {
     origin: `http://127.0.0.1:${address.port}`,
     token,
     activeKeyId,
+    openAiRealtimeAvailable: Boolean(openAiApiKey),
     close: async () => {
       if (closed) return;
       closed = true;

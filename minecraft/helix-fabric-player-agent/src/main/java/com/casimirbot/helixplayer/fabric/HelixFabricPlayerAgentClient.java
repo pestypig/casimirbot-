@@ -11,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.Component;
@@ -472,7 +473,8 @@ public final class HelixFabricPlayerAgentClient implements ClientModInitializer 
         PlayerAutoJoinInbox.AutoJoinRequest request = pendingAutoJoin;
         boolean safeConnectionScreen =
             client.screen instanceof TitleScreen ||
-            client.screen instanceof DisconnectedScreen;
+            client.screen instanceof DisconnectedScreen ||
+            client.screen instanceof JoinMultiplayerScreen;
         if (
             request == null || client.player != null || client.level != null ||
             !safeConnectionScreen

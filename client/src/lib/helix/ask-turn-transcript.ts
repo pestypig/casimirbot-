@@ -371,6 +371,13 @@ function dedupeHelixVisibleTranscriptEvents(events: Record<string, unknown>[]): 
   return out;
 }
 
+function isProviderNativeDeltaEvent(event: Record<string, unknown>): boolean {
+  const providerNativeType = coerceText(
+    event.provider_native_event_type ?? event.providerNativeEventType,
+  ).trim();
+  return /(?:^|[/:.])delta$/i.test(providerNativeType);
+}
+
 const readHelixResolvedTurnSummary = (reply?: HelixAskTranscriptReply | null): Record<string, unknown> | null => {
   const record = readAgentLoopAuditRecord(reply);
   const debugRecord = readAgentLoopAuditRecord(reply?.debug);
@@ -4529,6 +4536,11 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskTranscriptReply): He
     const visibleTranscriptEvents = transcriptEvents.filter((event) => {
         const type = String(event.type ?? "");
         const status = String(event.status ?? "");
+        // Provider-native delta frames are transport fragments, not reasoning or
+        // lifecycle steps. Rendering each token as a numbered row makes the
+        // compact viewport look like an agent-step budget and can expose partial
+        // serialization. Completed native events and governed milestones remain.
+        if (isProviderNativeDeltaEvent(event)) return false;
         if (publicCommentaryRows.length > 0 && (type === "turn_completed" || type === "work_delta")) return false;
         if (publicCommentaryRows.length > 0 && type === "step_started") return false;
         return type !== "question" && type !== "turn_completed" && status !== "superseded";

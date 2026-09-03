@@ -446,3 +446,49 @@ controls. Remaining product work is managed host catalog adoption and a
 profile-owned local connector gateway that survives the installed service's
 per-launch loopback-port changes. Neither catalog publication nor tunnel
 readiness may imply Minecraft sensing or Player Embodiment readiness.
+
+## 2026-09-02 durable native transport self-repair
+
+Change classification: native transport supervision plus presentation. This
+slice does not alter prompt interpretation, source admission, tool admission,
+evidence re-entry, terminal authority, or Codex-owned sampling and execution.
+
+The desktop host now supervises unexpected Secure MCP Tunnel process exits and
+three consecutive failed health probes with a finite read-only recovery policy:
+
+- retries use the fixed bounded schedule 1 second, 5 seconds, then 15 seconds;
+- every attempt re-reads the active first-party account session and requires
+  the same exact session id and `developer` account type that owned the failed
+  tunnel;
+- automatic recovery targets only
+  `local_supervisor_coordination_and_device_check`, including after a failed
+  full-surface process; it never restores `full_helix_agent` authority;
+- operator stop, credential replacement or clear, explicit scope transition, lease restoration,
+  and application quit cancel pending recovery before changing transport;
+- a changed, unavailable, or non-developer account fails closed without
+  starting a process; and
+- three failed starts exhaust the circuit and project
+  `manualInterventionRequired=true` instead of opening another retry, task,
+  application restart, or connector-reconnect loop.
+
+The strict desktop tunnel state is version 4 and includes the recovery phase,
+attempt count, fixed budget, next attempt time, typed last reason, fixed
+read-only automatic scope, and manual-intervention flag. Device Check renders
+that bounded state and explicitly says automatic repair never restores full MCP
+authority. Credentials, bearer material, provider content, and hidden reasoning
+remain absent from the projection.
+
+This repair can restore the native outbound transport so a standards-compliant
+MCP client has a fresh reconnect and relist opportunity. It cannot assert that
+Codex adopted a catalog: `notifications/tools/list_changed` remains advisory,
+and only a subsequently observed client list-tools request or available tool
+catalog is positive adoption evidence. No Codex UI automation or unsupported
+host-control API is introduced.
+
+Focused deterministic verification passes 21/21 across the tunnel boundary,
+transition executor, finite recovery supervisor, and Device Check. The desktop
+TypeScript project passes. The repository-wide TypeScript check remains
+inconclusive on its default invocation because Node exhausted its approximately
+4 GB heap. An 8 GB retry reached the dirty checkout's existing broad TypeScript
+diagnostics outside this recovery slice. The focused desktop project and both
+production builds remain the applicable passing type/build evidence.

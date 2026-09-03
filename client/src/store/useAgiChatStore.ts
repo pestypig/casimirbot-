@@ -10,11 +10,21 @@ export type AppendAgiChatMessageOnceResult = {
   message: ChatMessage | null;
 };
 
+export type AgiReasoningTaskBinding = Readonly<{
+  reasoning_binding_id: string;
+  helix_conversation_id: string;
+  status: "pending_claim" | "active" | "revoked" | "expired" | "superseded";
+  continuation_transport: "polling" | "monitor_only" | "unavailable";
+  binding_epoch: number;
+}>;
+
 interface AgiChatStore {
   sessions: Record<string, ChatSession>;
   activeId?: string;
+  reasoningTaskBindings: Record<string, AgiReasoningTaskBinding>;
   hydrated: boolean;
   setHydrated: (hydrated: boolean) => void;
+  rememberReasoningTaskBinding: (binding: AgiReasoningTaskBinding) => void;
   newSession: (title?: string, contextId?: string) => string;
   setActive: (id: string) => void;
   addMessage: (
@@ -40,7 +50,10 @@ interface AgiChatStore {
   totals: (sessionId: string) => { tokens: number; messages: number };
 }
 
-type PersistedAgiChatState = Pick<AgiChatStore, "sessions" | "activeId">;
+type PersistedAgiChatState = Pick<
+  AgiChatStore,
+  "sessions" | "activeId" | "reasoningTaskBindings"
+>;
 
 export const estimateTokens = (text: string) => {
   const rough = Math.ceil(text.trim().length / 4);
@@ -232,6 +245,7 @@ function buildPersistedChatState(
       sessions.map((session) => [session.id, session]),
     ),
     activeId: state.activeId,
+    reasoningTaskBindings: state.reasoningTaskBindings ?? {},
   };
 }
 
@@ -242,12 +256,17 @@ function clampPersistedChatEnvelope(
   const record =
     envelope && typeof envelope === "object"
       ? (envelope as {
-          state?: { sessions?: Record<string, ChatSession>; activeId?: string };
+          state?: {
+            sessions?: Record<string, ChatSession>;
+            activeId?: string;
+            reasoningTaskBindings?: Record<string, AgiReasoningTaskBinding>;
+          };
         })
       : null;
   const sourceState = {
     sessions: record?.state?.sessions ?? {},
     activeId: record?.state?.activeId,
+    reasoningTaskBindings: record?.state?.reasoningTaskBindings ?? {},
   };
   let messageLimit = Math.min(AGI_CHAT_MAX_PERSISTED_MESSAGES_PER_SESSION, 40);
   let contentLimit = Math.min(AGI_CHAT_MAX_PERSISTED_CONTENT_CHARS, 6_000);
@@ -282,6 +301,7 @@ function clampPersistedChatEnvelope(
           sessions.map((session) => [session.id, session]),
         ),
         activeId: sourceState.activeId,
+        reasoningTaskBindings: sourceState.reasoningTaskBindings,
       },
     };
     if (JSON.stringify(next).length <= targetChars) break;
@@ -363,8 +383,15 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
     (set, get) => ({
       sessions: {},
       activeId: undefined,
+      reasoningTaskBindings: {},
       hydrated: false,
       setHydrated: (hydrated) => set({ hydrated }),
+      rememberReasoningTaskBinding: (binding) => set((state) => ({
+        reasoningTaskBindings: {
+          ...state.reasoningTaskBindings,
+          [binding.helix_conversation_id]: binding,
+        },
+      })),
       newSession: (title?: string, contextId?: string) => {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();

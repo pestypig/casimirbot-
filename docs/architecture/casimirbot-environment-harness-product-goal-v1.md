@@ -83,6 +83,7 @@ The labels below are deliberately strict:
 | Environment adapters | Versioned adapter registry, exact producer admission, normalized nonterminal observations and mechanics collections | Minecraft read-only profile enabled; synthetic adapter is fixture-only |
 | Minecraft read plane | Authenticated Paper/Fabric source ingress, bounded observations, mechanics retrieval and exact room/world/source provenance | Implemented; release claims require fresh keyed room evidence |
 | Minecraft action planes | Separately governed World Authority and Player Embodiment, finite reactive guardian/sequence programs, manual override and Emergency Stop | Implementation and deterministic evidence exist; the complete fluid, unexpected-event and durable-goal acceptance remains open |
+| Provider-neutral environment time | Three-clock temporal plans, receding-horizon execution, progressive affordance frontiers and ordered interruption/replanning semantics | Specified in `helix-environment-time-action-planning-v1.md`; Minecraft capacity and second-adapter conformance remain ordered evidence, so no general live-control claim is made |
 | Helix Ask and voice | Codex-oriented handoff, evidence/route/terminal authority contracts and text/voice certainty discipline | Implemented in parts; each provider, browser and live-room path requires its own current acceptance artifact |
 | Robinhood environment | Developer-only reads, deterministic paper execution, expiring order review, explicit approval, at-most-once tiny-live executor, reconciliation and kill switches | Implemented behind deployment flags; real-account acceptance is incomplete and unattended trading remains disabled |
 
@@ -473,6 +474,7 @@ The honest current-stage claim is:
 
 - `docs/helix-environment-harness-work-program-v1.md`
 - `docs/architecture/helix-environment-agent-reasoning-v1.md`
+- `docs/architecture/helix-environment-time-action-planning-v1.md`
 - `docs/helix-ask-codex-loop-discipline.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/architecture/helix-agent-api-v1.md`

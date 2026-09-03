@@ -255,6 +255,22 @@ import { buildHelixAskMoodAvatarState } from "@/components/helix/ask-console/Hel
 import { buildHelixAskComposerActionToolbarState } from "@/components/helix/ask-console/HelixAskComposerActionToolbarState";
 import { buildHelixAskComposerTextareaState } from "@/components/helix/ask-console/HelixAskComposerTextareaState";
 import {
+  buildHelixAskComposerDestinationModel,
+  saveHelixOperatorNote,
+  type HelixAskComposerDestinationKind,
+} from "@/components/helix/ask-console/HelixAskComposerDestination";
+import { HelixAskComposerDestinationStrip } from "@/components/helix/ask-console/HelixAskComposerDestinationStrip";
+import {
+  publishMinecraftPlaySteeringResult,
+  subscribeBoundAgentSteeringRequests,
+} from "@/components/helix/ask-console/HelixBoundAgentSteeringBridge";
+import {
+  dispatchCurrentReasoningSteering,
+  inspectLatestReasoningBinding,
+  inspectReasoningSteering,
+  resolveReasoningSteeringConversationId,
+} from "@/lib/agent-access/reasoningTaskBinding";
+import {
   createHelixAskComposerTextareaSizingController,
   type HelixAskComposerTextareaSizingController,
 } from "@/components/helix/ask-console/HelixAskComposerTextareaSizing";
@@ -852,6 +868,11 @@ import {
   type VoiceSteeringClientClassification,
   type VoiceSteeringClientRequest,
 } from "@/lib/helix/ask-voice-steering-client";
+import {
+  HELIX_VOICE_STEERING_FINALIZED_EVENT,
+  offerFinalizedVoiceSteering,
+  type HelixVoiceSteeringFinalizedDetail,
+} from "@/lib/helix/voice-steering-finalized";
 export {
   buildVoiceSteeringClientRequest,
   classifyVoiceSteeringClientTranscript,
@@ -1144,6 +1165,9 @@ import {
   type ContextLifecycleEvent,
   type MissionContextControls,
 } from "@/lib/mission-overwatch";
+import {
+  usePublishMissionGuideBinding,
+} from "@/components/workstation/guide/CasimirGuideMissionProjection";
 import {
   getDefaultReasoningTheaterConfig,
   type ReasoningTheaterConfigResponse,
@@ -6407,7 +6431,12 @@ export function HelixAskPill({
     if (!raw || /^auto$/i.test(raw)) return undefined;
     return raw;
   }, [userSettings.preferredResponseLanguage]);
-  const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
+  const {
+    activeId: activeChatSessionId,
+    ensureContextSession,
+    addMessage,
+    setActive,
+  } = useAgiChatStore();
   const helixChatSessions = useAgiChatStore((state) => state.sessions);
   const helixChatStoreHydrated = useAgiChatStore((state) => state.hydrated);
   const workflowDemoDebugState = useHelixAskWorkflowDemoDebugState();
@@ -6442,6 +6471,13 @@ export function HelixAskPill({
   const activeAskStartedAtMsRef = useRef<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
+  const [composerDestination, setComposerDestination] =
+    useState<HelixAskComposerDestinationKind>("helix_ask");
+  const [boundAgentState, setBoundAgentState] =
+    useState<"active" | "awaiting_agent_pickup" | "unavailable">("unavailable");
+  const bindingPickupPollRef = useRef<AbortController | null>(null);
+  const [operatorNoteState, setOperatorNoteState] =
+    useState<"idle" | "saving" | "saved" | "unavailable">("idle");
   const [askAttachments, setAskAttachments] = useState<HelixAskAttachment[]>([]);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const askRepliesRef = useRef<HelixAskReply[]>([]);
@@ -7165,6 +7201,13 @@ export function HelixAskPill({
   const [contextSessionState, setContextSessionState] = useState<
     "idle" | "requesting" | "active" | "stopping" | "error"
   >("idle");
+  usePublishMissionGuideBinding({
+    missionId: contextId,
+    tier: missionContextControls.tier,
+    sessionState: contextSessionState,
+    voiceMode: missionContextControls.voiceMode,
+    muteWhileTyping: missionContextControls.muteWhileTyping,
+  });
   const [readAloudByReply, setReadAloudByReply] = useState<Record<string, ReadAloudPlaybackState>>({});
   const [readAloudProjectionByReply, setReadAloudProjectionByReply] =
     useState<HelixAskReadAloudPlaybackProjectionByReply>({});
@@ -7469,6 +7512,116 @@ export function HelixAskPill({
     helixAskSessionContextRef.current = normalizedContextId || null;
     return helixAskSessionRef.current;
   }, [contextId, ensureContextSession]);
+
+  const dispatchBoundAgentSteering = useCallback(async (
+    text: string,
+    origin: "typed" | "gpt_live_finalized",
+    clientEventRef: string,
+  ): Promise<boolean> => {
+    try {
+      const selectedSessionId = resolveReasoningSteeringConversationId(
+        activeChatSessionId,
+        getHelixAskSessionId(),
+      );
+      const dispatched = await dispatchCurrentReasoningSteering({
+        ...(selectedSessionId
+          ? { helixConversationId: selectedSessionId }
+          : {}),
+        clientEventRef,
+        origin,
+        instructionText: text,
+      });
+      const sessionId = dispatched.binding.helix_conversation_id;
+      setBoundAgentState("awaiting_agent_pickup");
+      setAskError(null);
+      setAskStatus("Steering queued for exact agent pickup. Provider delivery is not claimed until acknowledgement.");
+      if (helixChatSessions[sessionId]) {
+        setActive(sessionId);
+        addMessage(sessionId, { role: "user", content: text, traceId: clientEventRef });
+      }
+      const eventRef = dispatched.event.steering_event_ref;
+      if (eventRef) {
+        bindingPickupPollRef.current?.abort();
+        const controller = new AbortController();
+        bindingPickupPollRef.current = controller;
+        void (async () => {
+          for (let attempt = 0; attempt < 30 && !controller.signal.aborted; attempt += 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+            if (controller.signal.aborted) return;
+            try {
+              const current = await inspectReasoningSteering({
+                bindingId: dispatched.binding.reasoning_binding_id,
+                bindingEpoch: dispatched.binding.binding_epoch,
+                eventRef,
+              });
+              if (current.delivery_state === "acknowledged") {
+                setBoundAgentState("active");
+                setAskStatus("The bound agent acknowledged exact pickup. This confirms transport pickup, not task completion.");
+                publishMinecraftPlaySteeringResult(clientEventRef, "acknowledged");
+                return;
+              }
+              if (current.delivery_state !== "pending") {
+                setBoundAgentState("unavailable");
+                setAskStatus(`Exact pickup ended with ${current.delivery_state}; no provider answer is claimed.`);
+                publishMinecraftPlaySteeringResult(
+                  clientEventRef,
+                  current.delivery_state,
+                );
+                return;
+              }
+            } catch {
+              setBoundAgentState("unavailable");
+              setAskStatus("Exact pickup status became unavailable; no provider delivery is claimed.");
+              publishMinecraftPlaySteeringResult(clientEventRef, "unavailable");
+              return;
+            }
+          }
+          if (!controller.signal.aborted) {
+            setBoundAgentState("active");
+            setAskStatus("Steering remains queued without an acknowledgement. The exact binding is still active.");
+            publishMinecraftPlaySteeringResult(clientEventRef, "unavailable");
+          }
+        })();
+      }
+      return true;
+    } catch {
+      setBoundAgentState("unavailable");
+      setAskStatus("The bound agent steering request was rejected or became stale.");
+      return false;
+    }
+  }, [activeChatSessionId, addMessage, getHelixAskSessionId, helixChatSessions, setActive]);
+
+  useEffect(() => {
+    return subscribeBoundAgentSteeringRequests(dispatchBoundAgentSteering);
+  }, [dispatchBoundAgentSteering]);
+
+  useEffect(() => () => bindingPickupPollRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (composerDestination !== "bound_agent") return;
+    let cancelled = false;
+    void inspectLatestReasoningBinding().then((binding) => {
+      if (!cancelled) setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
+    }).catch(() => {
+      if (!cancelled) setBoundAgentState("unavailable");
+    });
+    const onFinalizedVoice = (event: Event) => {
+      const voiceEvent = event as CustomEvent<HelixVoiceSteeringFinalizedDetail>;
+      const transcript = voiceEvent.detail?.transcript?.trim();
+      if (!transcript) return;
+      event.preventDefault();
+      void dispatchBoundAgentSteering(
+        transcript,
+        "gpt_live_finalized",
+        voiceEvent.detail.clientEventRef,
+      );
+    };
+    window.addEventListener(HELIX_VOICE_STEERING_FINALIZED_EVENT, onFinalizedVoice);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(HELIX_VOICE_STEERING_FINALIZED_EVENT, onFinalizedVoice);
+    };
+  }, [composerDestination, dispatchBoundAgentSteering]);
 
   const appendRuntimeGoalWakeReply = useCallback((replyRecord: Record<string, unknown>) => {
     const reply = replyRecord as HelixAskReply;
@@ -17460,6 +17613,27 @@ export function HelixAskPill({
       translationUncertain: pending.translationUncertain,
       steeringReservation: pending.steeringReservation ?? null,
     };
+    if (offerFinalizedVoiceSteering({
+      clientEventRef: `gpt-live:${pending.traceId}`,
+      transcript: pending.transcript,
+    })) {
+      patchVoiceSegmentAttempt(pending.segmentId, {
+        status: "stt_ok",
+        dispatch: "queued",
+        transcriptPreview: clipText(pending.transcript, 180),
+        translated: pending.translated,
+        engine: pending.sttEngine,
+        error: null,
+      });
+      markVoiceCheckpoint(
+        "stt_response_error",
+        "idle",
+        "Finalized transcript queued for exact bound-agent pickup.",
+      );
+      setVoiceInputError(null);
+      setVoiceInputState("idle");
+      return;
+    }
     voiceConfirmedTurnQueueRef.current = [
       confirmedTurn,
       ...voiceConfirmedTurnQueueRef.current.filter((entry) => entry.traceId !== pending.traceId),
@@ -22441,6 +22615,43 @@ export function HelixAskPill({
       askComposerInputFrameRef.current?.flush();
       void primeVoiceAudioPlayback();
       const rawInput = askInputRef.current?.value ?? "";
+      const selectedDestination = (
+        event.currentTarget.elements.namedItem("helix-composer-destination") as HTMLSelectElement | null
+      )?.value as HelixAskComposerDestinationKind | undefined;
+      if ((selectedDestination ?? composerDestination) === "bound_agent") {
+        const text = rawInput.trim();
+        if (!text) return;
+        const accepted = await dispatchBoundAgentSteering(
+          text,
+          "typed",
+          `typed:${crypto.randomUUID()}`,
+        );
+        if (accepted && askInputRef.current) {
+          askInputRef.current.value = "";
+          resizeTextarea();
+          askDraftRef.current = "";
+        }
+        return;
+      }
+      if (composerDestination === "operator_note") {
+        if (!rawInput.trim()) return;
+        setOperatorNoteState("saving");
+        try {
+          saveHelixOperatorNote(rawInput);
+          if (askInputRef.current) {
+            askInputRef.current.value = "";
+            resizeTextarea();
+          }
+          askDraftRef.current = "";
+          setOperatorNoteState("saved");
+          setAskError(null);
+          setAskStatus("Operator note saved locally. No provider delivery was claimed.");
+        } catch {
+          setOperatorNoteState("unavailable");
+          setAskStatus("Operator note could not be saved on this device.");
+        }
+        return;
+      }
       const entries = parseQueuedQuestions(rawInput);
       if (entries.length === 0) return;
       const inlineCapsuleIds = extractContextCapsuleIdsFromText(rawInput);
@@ -22759,6 +22970,8 @@ export function HelixAskPill({
       askBusy,
       askReplies,
       contextCompactionPausePending,
+      composerDestination,
+      dispatchBoundAgentSteering,
       latestAskReply,
       visualSituationEvidenceForTurn,
     ],
@@ -22777,6 +22990,22 @@ export function HelixAskPill({
     [agentRuntimePickerModel.selectedLabel, askBusy, placeholder],
   );
   const inputPlaceholder = composerViewModel.inputPlaceholder;
+  const composerDestinationModel = useMemo(
+    () => buildHelixAskComposerDestinationModel({
+      kind: composerDestination,
+      runtimeLabel: agentRuntimePickerModel.selectedLabel,
+      busy: askBusy,
+      noteState: operatorNoteState,
+      boundAgentState,
+    }),
+    [
+      askBusy,
+      composerDestination,
+      agentRuntimePickerModel.selectedLabel,
+      operatorNoteState,
+      boundAgentState,
+    ],
+  );
   const replyListClassNameResolved =
     replyListClassName ??
     (layoutVariant === "dock"
@@ -23095,6 +23324,15 @@ export function HelixAskPill({
     clipText,
   });
   const composerState = buildHelixAskLegacyComposerState({
+    destination: (
+      <HelixAskComposerDestinationStrip
+        model={composerDestinationModel}
+        onDestinationChange={(kind) => {
+          setComposerDestination(kind);
+          setOperatorNoteState("idle");
+        }}
+      />
+    ),
     voiceLevelMonitor: voiceLevelMonitorState,
     moodAvatar: moodAvatarState,
     actionToolbar: actionToolbarState,

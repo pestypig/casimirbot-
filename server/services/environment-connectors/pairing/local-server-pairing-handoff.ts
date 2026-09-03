@@ -74,6 +74,7 @@ export const stageLocalMinecraftServerPairing = async (input: {
   workspaceRoot?: string | null;
   serverRunDirectory?: string | null;
   ownerProfileId?: string | null;
+  appDataPath?: string | null;
 }): Promise<{ status: "server_pairing_inbox_staged" }> => {
   const command = input.command.trim();
   if (
@@ -127,6 +128,7 @@ export const stageLocalMinecraftServerPairing = async (input: {
     ? await resolveProfileOwnedMinecraftRunDirectory({
         ownerProfileId: input.ownerProfileId,
         storePath: process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE,
+        appDataPath: input.appDataPath?.trim() || process.env.APPDATA,
       })
     : null;
   const configuredServerRoot =

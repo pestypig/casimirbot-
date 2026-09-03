@@ -6,6 +6,12 @@ import type {
 import { assertHelixExternalExecutionActive } from "../helix-ask/runtime/external-capability-policy";
 import { executeGovernedHelixAskExternalTurn } from "./governed-external-turn-executor";
 import { containsHelixAgentSensitiveText } from "./sensitive-text";
+import {
+  HELIX_CAPABILITY_LIFECYCLE_LEDGER_SCHEMA,
+  type HelixCapabilityLifecycleLedger,
+} from "@shared/helix-capability-lifecycle-ledger";
+import { appendCapabilityLifecycleToOperatorActivity } from
+  "../helix-ask/operator-activity-ingestion";
 
 type RecordLike = Record<string, unknown>;
 
@@ -24,6 +30,7 @@ export type HelixAgentConversationContextReader = (
 export type FullHelixAskTurnExecutorDependencies = {
   readConversationContext?: HelixAgentConversationContextReader;
   executeExternalTurn?: typeof executeGovernedHelixAskExternalTurn;
+  appendCapabilityLifecycle?: typeof appendCapabilityLifecycleToOperatorActivity;
 };
 
 const buildQuestion = (
@@ -140,12 +147,15 @@ const protectedContentFailure = (): HelixAgentRunTurnExecutorResult => ({
 export class FullHelixAskTurnExecutor implements HelixAgentRunTurnExecutor {
   private readonly readConversationContext: HelixAgentConversationContextReader;
   private readonly executeExternalTurn: typeof executeGovernedHelixAskExternalTurn;
+  private readonly appendCapabilityLifecycle: typeof appendCapabilityLifecycleToOperatorActivity;
 
   constructor(dependencies: FullHelixAskTurnExecutorDependencies = {}) {
     this.readConversationContext =
       dependencies.readConversationContext ?? (async () => "");
     this.executeExternalTurn =
       dependencies.executeExternalTurn ?? executeGovernedHelixAskExternalTurn;
+    this.appendCapabilityLifecycle =
+      dependencies.appendCapabilityLifecycle ?? appendCapabilityLifecycleToOperatorActivity;
   }
 
   async executeTurn(
@@ -189,6 +199,28 @@ export class FullHelixAskTurnExecutor implements HelixAgentRunTurnExecutor {
     });
     const payload = result.payload;
     const projection = result.projection;
+    const capabilityLifecycle = readRecord(payload.capability_lifecycle_ledger);
+    if (
+      capabilityLifecycle?.schema === HELIX_CAPABILITY_LIFECYCLE_LEDGER_SCHEMA &&
+      capabilityLifecycle.assistant_answer === false &&
+      capabilityLifecycle.raw_content_included === false
+    ) {
+      const observedAt = new Date().toISOString();
+      await this.appendCapabilityLifecycle({
+        owner: {
+          tenantId: input.principal.tenantId,
+          issuer: input.principal.issuer,
+          subjectId: input.principal.subjectId,
+          accountProfileId: input.principal.accountProfileId,
+        },
+        ledger: capabilityLifecycle as HelixCapabilityLifecycleLedger,
+        runId: input.runId,
+        oauthClientRef: input.principal.oauthClientRef ?? null,
+        clientSessionRef: null,
+        occurredAt: observedAt,
+        observedAt,
+      });
+    }
     let protectedContentDetected = false;
     try {
       protectedContentDetected = containsHelixAgentSensitiveText(

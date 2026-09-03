@@ -10,6 +10,12 @@ The active development gate, dependency order, capability-specific maturity
 and required evidence are maintained only in
 `docs/helix-environment-harness-work-program-v1.md`.
 
+Provider-neutral clock identity, rolling temporal plans, affordance frontiers,
+watermarks and interruption semantics are specified in
+`docs/architecture/helix-environment-time-action-planning-v1.md`. That contract
+operationalizes the reaction-time hierarchy here without creating a second
+planner.
+
 ## Outcome
 
 Helix gives interchangeable reasoning runtimes governed access to connected

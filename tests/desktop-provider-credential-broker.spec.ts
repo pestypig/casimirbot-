@@ -108,4 +108,102 @@ describe("desktop provider credential broker", () => {
       "provider\nconnection:test\nprofile:owner",
     )).rejects.toThrow("provider_credential_broker_unavailable");
   });
+
+  it("mints only an ephemeral GPT Live secret while the long-lived key stays native", async () => {
+    const openAiApiKey = "openai-long-lived-key-must-not-cross";
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      id: "sess_native_broker",
+      value: "ephemeral-client-secret",
+      expires_at: 1_788_360_000,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const broker = await startDesktopProviderCredentialBroker({
+      keyring: { activeKey: key(), retiredKeys: [] },
+      openAiApiKey,
+      fetchImpl,
+    });
+    brokers.push(broker);
+
+    const response = await fetch(
+      `${broker.origin}/v1/openai/realtime/client-secret`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${broker.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: "gpt-realtime-2.1", voice: "marin" }),
+      },
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      schema: "casimir_desktop_provider_credential_broker/1",
+      ok: true,
+      providerSessionRef: "sess_native_broker",
+      ephemeralClientSecret: "ephemeral-client-secret",
+      ephemeralClientSecretExpiresAtMs: 1_788_360_000_000,
+    });
+    expect(JSON.stringify(payload)).not.toContain(openAiApiKey);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/realtime/client_secrets",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${openAiApiKey}`,
+        }),
+      }),
+    );
+  });
+
+  it("exchanges GPT Live SDP inside the native boundary", async () => {
+    const openAiApiKey = "openai-long-lived-key-must-not-cross";
+    const fetchImpl = vi.fn(async () => new Response("v=0\r\nanswer", {
+      status: 200,
+      headers: { location: "/v1/realtime/calls/rtc_native_broker_123" },
+    }));
+    const broker = await startDesktopProviderCredentialBroker({
+      keyring: { activeKey: key(), retiredKeys: [] },
+      openAiApiKey,
+      fetchImpl,
+    });
+    brokers.push(broker);
+
+    const response = await fetch(`${broker.origin}/v1/openai/realtime/sdp`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${broker.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        offerSdp: "v=0\r\noffer",
+        model: "gpt-realtime-2.1",
+        voice: "marin",
+        safetyIdentifier: "requester:realtime:native",
+      }),
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      schema: "casimir_desktop_provider_credential_broker/1",
+      ok: true,
+      answerSdp: "v=0\r\nanswer",
+      providerCallId: "rtc_native_broker_123",
+    });
+    const providerRequest = fetchImpl.mock.calls[0][1];
+    expect(providerRequest?.headers).toMatchObject({
+      Authorization: `Bearer ${openAiApiKey}`,
+    });
+    expect(providerRequest?.body).toBeInstanceOf(FormData);
+    const session = JSON.parse(String(providerRequest?.body?.get("session")));
+    expect(session).toMatchObject({
+      model: "gpt-realtime-2.1",
+      tools: [],
+      tool_choice: "none",
+    });
+    expect(JSON.stringify(payload)).not.toContain(openAiApiKey);
+  });
 });

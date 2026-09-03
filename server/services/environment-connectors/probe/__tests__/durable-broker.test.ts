@@ -487,6 +487,63 @@ describe("durable environment probe broker", () => {
     expect(new Set(packages.rows.map((row) => row.content_hash)).size).toBe(2);
   });
 
+  it("preserves device and environment identities across source credential rotation", async () => {
+    const original = await seed();
+    const rotatedCredentialId =
+      "room_source_credential:durable-environment-probe:rotated";
+
+    const rotated = await materializeLegacyRoomSourceConnector({
+      ownerProfileId: PROFILE_ID,
+      roomSourceBindingId: BINDING_ID,
+      credentialId: rotatedCredentialId,
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      worldId: WORLD_ID,
+      producerEpochRef: `${producerEpochRef}:rotated`,
+      adapterAdmission: admission,
+      capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
+        adapterProfileId: admission.adapter_profile_id,
+      }),
+    });
+
+    expect(rotated.deviceId).toBe(original.deviceId);
+    expect(rotated.environmentBindingId).toBe(original.environmentBindingId);
+
+    const devices = await getPool().query<{
+      device_id: string;
+      credential_ref: string | null;
+    }>(
+      `SELECT device_id, credential_ref
+       FROM helix_environment_connector_devices
+       WHERE installation_id = $1;`,
+      [rotated.installationId],
+    );
+    expect(devices.rows).toEqual([
+      {
+        device_id: original.deviceId,
+        credential_ref: rotatedCredentialId,
+      },
+    ]);
+
+    const bindings = await getPool().query<{
+      environment_binding_id: string;
+      device_id: string;
+      status: string;
+    }>(
+      `SELECT environment_binding_id, device_id, status
+       FROM helix_environment_connector_bindings
+       WHERE installation_id = $1 AND room_source_binding_id = $2;`,
+      [rotated.installationId, BINDING_ID],
+    );
+    expect(bindings.rows).toEqual([
+      {
+        environment_binding_id: original.environmentBindingId,
+        device_id: original.deviceId,
+        status: "active",
+      },
+    ]);
+  });
+
   it("binds an explicitly attested same-host connector to the active installed desktop node", async () => {
     const original = await seed();
     const installedDeviceId = "desktop_device:durable-environment-probe";

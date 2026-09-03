@@ -1,0 +1,410 @@
+{
+  "schema": "casimirbot.environment_harness_acceptance_evidence.v1",
+  "capability": "PNA3.4 exact reasoning-task binding and voice pickup",
+  "recorded_at": "2026-09-01",
+  "maturity": "deterministically verified",
+  "classification": [
+    "source admission",
+    "evidence normalization",
+    "evidence re-entry",
+    "presentation",
+    "Codex-owned runtime behavior only at a thin continuation-adapter edge"
+  ],
+  "verified_contracts": [
+    "negotiated continuation readiness",
+    "local Helix conversation without provider-task creation claim",
+    "show-once exact authenticated task claim",
+    "binding epoch and stale-epoch rejection",
+    "shared typed and finalized GPT Live steering dispatch",
+    "exact MCP pickup and acknowledgement",
+    "reasoning-tool OAuth catalog metadata on full and coordination-only MCP surfaces",
+    "redacted browser acknowledgement inspection",
+    "no answer, execution, evidence, or terminal authority from steering receipts"
+  ],
+  "verification": [
+    {
+      "command": "focused PNA3.4 binding, route, MCP, profile, setup, and composer Vitest battery",
+      "result": "pass",
+      "test_files": 7,
+      "tests_passed": 46
+    },
+    {
+      "command": "route and binding-store acknowledgement inspection Vitest battery",
+      "result": "pass",
+      "test_files": 2,
+      "tests_passed": 12
+    },
+    {
+      "command": "npm run build:client",
+      "result": "pass",
+      "notes": "Production client build passed with existing dependency/chunk warnings."
+    },
+    {
+      "command": "npm run build:server",
+      "result": "pass",
+      "notes": "Production server build passed with four pre-existing duplicate-key/case warnings outside PNA3.4."
+    },
+    {
+      "command": "npm run helix:ask:discipline:full",
+      "result": "pass",
+      "notes": "Prompt-solving, four adversarial shards, API parity and four scenario shards, live-source continuation routing, live-source identity audit, and server build passed."
+    },
+    {
+      "command": "npm run helix:environment-harness:docs-audit",
+      "result": "pass"
+    },
+    {
+      "command": "npx vitest run server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts --pool=forks",
+      "result": "pass",
+      "test_files": 1,
+      "tests_passed": 18,
+      "notes": "Both MCP surfaces advertise the exact claim/read/acknowledge tools with their required OAuth read or write scopes."
+    },
+    {
+      "command": "npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks",
+      "result": "pass",
+      "test_files": 1,
+      "tests_passed": 36
+    },
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass"
+    },
+    {
+      "command": "npm run build:server (post catalog repair)",
+      "result": "pass",
+      "notes": "Production server build passed with the same four pre-existing duplicate-key/case warnings outside PNA3.4."
+    }
+  ],
+  "non_passing_diagnostics": [
+    {
+      "command": "npx tsc --noEmit --pretty false",
+      "classification": "harness_resource_failure",
+      "result": "Node exhausted its 4 GB heap after approximately 230 seconds without emitting a TypeScript diagnostic."
+    },
+    {
+      "command": "single legacy helix-ask-pill-ui test selection",
+      "classification": "harness_timeout",
+      "result": "The file collected but its global hook exceeded 10 seconds before the selected test ran; 202 tests were skipped."
+    }
+  ],
+  "browser_checkpoint": {
+    "result": "rebuilt_destination_ui_loaded_on_current_source_server",
+    "observed_destination": "Bound external AI task",
+    "live_server_status": "current_source_running",
+    "observed_process_id": 900,
+    "observed_process_started_at": "2026-09-01T22:53:57-04:00",
+    "current_session_probe_status": 200,
+    "reasoning_binding_route_probe_status": 401,
+    "reasoning_binding_route_probe_error": "session_required",
+    "signed_in_browser_session_recovered": true,
+    "full_mcp_authorization_ready": true,
+    "coordination_plugin_session": "terminated_after_service_restart",
+    "reasoning_tools_present_in_current_task_catalog": false,
+    "live_acceptance_claimed": false,
+    "reason": "The current-source server and browser are ready, but the same Codex task must reconnect to re-enumerate the new reasoning claim, read, and acknowledge tools before exact live pickup can be tested."
+  },
+  "post_repair_checkpoint": {
+    "catalog_gap_repaired": true,
+    "account_session_probe_status": 200,
+    "helix_pipeline_probe_status": 200,
+    "agent_providers_probe_status": 200,
+    "provisional_codex_exec_live_catalog_authenticated": false,
+    "provisional_codex_exec_failure": "native_desktop_delegation_required",
+    "classification": "successful negative governance result; not live pickup evidence",
+    "external_keyed_launcher_required": true,
+    "external_keyed_launcher_status": "agent_hidden_process_was_terminated_by_codex_restart",
+    "account_session_probe_after_handoff": 200,
+    "helix_pipeline_probe_after_handoff": 200,
+    "agent_providers_probe_after_handoff": 200,
+    "device_check_connector_retry": "Session terminated",
+    "device_check_v2_connector_retry": "Session terminated",
+    "tunnel_client_app_server_bridge": "ready",
+    "managed_runtime_alias_count": 0,
+    "admin_key_present": false,
+    "unsupported_tunnel_created": false,
+    "native_desktop_reconnect_required": true,
+    "auth0_google_sign_in_completed": true,
+    "codex_reported_reconnected": true,
+    "post_reconnect_existing_task_session": "Session terminated",
+    "codex_restart_observed": true,
+    "agent_hidden_launcher_survived_codex_restart": false,
+    "post_restart_account_probe": "connection_failed",
+    "post_restart_reasoning_tool_count": 0,
+    "agent_access_retry_result": "remained_at_check_connection",
+    "device_check_counts_as_connection_proof": false,
+    "verified_reconnect_surface": "Codex Plugins > Installed > CasimirBot connection > Connect or Finish setup or Authenticate",
+    "verified_coordination_endpoint": "https://casimirbot.com/mcp/local-supervisor-coordination",
+    "new_chat_required_for_catalog_adoption": true,
+    "i_added_it_selected": false,
+    "reconnect_while_keyed_host_live_completed": true,
+    "existing_task_original_device_check_after_reconnect": "Session terminated",
+    "existing_task_device_check_v2_after_reconnect": "Session terminated",
+    "existing_task_reasoning_tool_count_after_reconnect": 0,
+    "in_place_existing_task_catalog_adoption": false
+  },
+  "native_harness_transition_checkpoint": {
+    "observed_at": "2026-09-02T15:13:59.889Z",
+    "installed_native_harness_started": true,
+    "native_host_process_id": 17984,
+    "native_service_process_id": 7972,
+    "native_tunnel_process_id": 12740,
+    "native_tunnel_health": "live",
+    "native_tunnel_readiness": "ready",
+    "read_only_device_check_connector_recovered": true,
+    "presence_schema_skew_observed": "installed connector rejected the newer optional thread_observability_bridge field",
+    "presence_schema_skew_fallback": "the same exact presence succeeded after omitting only the unsupported optional field",
+    "service_instance_ref": "service_instance:203791dedfab8b1f54b6b87d4aa30358",
+    "client_session_ref": "supervisor_client:9e7b6e1fc6caddc39c980fc6defb293e",
+    "conversation_thread_ref": "codex-thread:01a060f9-ebfd-7251-9fd3-479a01dd3c40:pna3.4",
+    "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+    "authenticated_mcp_client_ref": "mcp_client:native_desktop:ca070d77067993caefd14281d1e40fbad2437505cd284bd7812a3512649c74fb",
+    "exact_presence_active": true,
+    "first_transition_request_attempt": "HTTP 504 transport timeout with no returned request or receipt",
+    "bounded_retry_policy": "one retry only; an already-created request would fail closed as transition_request_already_open",
+    "transition_request_ref": "desktop_tunnel_request:25b29a65-b9c2-4dc2-be87-30285f2ef7a1",
+    "transition_receipt_ref": "desktop_tunnel_receipt:64695150-c60f-4a0d-a480-a940677f098c",
+    "transition_request_status": "pending_user_delegation",
+    "requested_scope": "full_helix_agent",
+    "requested_lease_seconds": 300,
+    "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+    "independent_external_oauth_client_bound": false,
+    "reconnect_required": true,
+    "catalog_refresh_required": true,
+    "authority_limited_to_tunnel_transport": true,
+    "environment_authority_granted": false,
+    "trading_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "live_acceptance_claimed": false,
+    "next_required_observation": "separate first-party native user delegation for this exact request"
+  },
+  "full_session_start_permission_repair": {
+    "recorded_at": "2026-09-02",
+    "classification": [
+      "tool admission",
+      "presentation"
+    ],
+    "defect": "configured desktop installs automatically ran read-only transport while the Device Check UI hid the full-session start action whenever that process was active",
+    "implemented": true,
+    "start_action": "Enable full harness for this session",
+    "permission_basis": "explicit native action by the current signed-in developer",
+    "scope": "full_helix_agent transport only",
+    "active_read_only_scope_replaced_without_separate_agent_prompt": true,
+    "developer_account_revalidated": true,
+    "same_scope_start_is_idempotent": true,
+    "degraded_or_failed_full_start_restores_read_only": true,
+    "automatic_recovery_restores_full_scope": false,
+    "environment_authority_granted": false,
+    "trading_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "deterministic_verification": {
+      "command": "npx vitest run tests/desktop-mcp-tunnel-transition-executor.spec.ts client/src/components/__tests__/DeviceCheckPanel.spec.tsx tests/desktop-mcp-tunnel.spec.ts --pool=forks",
+      "result": "pass",
+      "test_files": 3,
+      "tests_passed": 22
+    },
+    "desktop_typescript": "pass",
+    "production_client_build": "pass with existing dependency and chunk-size warnings",
+    "desktop_host_build": "pass with four pre-existing bundled-service warnings outside this repair",
+    "helix_ask_discipline_quick": "pass with dirty-worktree classification warning",
+    "environment_harness_docs_audit": "pass: 37 capability rows and 14 acceptance claims",
+    "installed_live_acceptance": false,
+    "reason": "The source repair requires a rebuilt installed desktop; it does not retroactively change the running packaged harness or prove catalog adoption."
+  },
+  "hidden_native_window_reactivation_repair": {
+    "recorded_at": "2026-09-02",
+    "observed_installed_state": "native service and tunnel alive, but Windows computer control reported no targetable CasimirBot window",
+    "bounded_activation_attempts": 2,
+    "installed_window_revealed": false,
+    "unsupported_win32_visibility_bypass_used": false,
+    "installed_harness_restarted": false,
+    "source_defect": "the Electron second-instance handler restored minimized windows but did not show an existing hidden window",
+    "source_repair": "second-instance activation now calls show before restore and focus",
+    "focused_security_tests": "pass: 2 tests, 7 unrelated tests skipped",
+    "desktop_typescript": "pass",
+    "broader_security_file_diagnostic": "one unrelated dirty-checkout assertion still expects two listeners while the existing packaged smoke script requires three or four",
+    "installed_live_acceptance": false
+  },
+  "installed_full_session_permission_checkpoint": {
+    "observed_at": "2026-09-02T15:48:37.042Z",
+    "installer_path": "apps/desktop/release/CasimirBot-0.1.0-alpha.11-x64-setup.exe",
+    "installer_sha256": "B2CAD8C30EFDBF9B9C8B33F90EB585D046682384D492EF2B55B694ED067616A7",
+    "development_installer_authenticode_status": "NotSigned",
+    "production_authenticode_receipt_present": false,
+    "installed_artifacts_match_built_win_unpacked": true,
+    "installed_window_revealed": true,
+    "explicit_start_action": "Enable full harness for this session",
+    "visible_tunnel_status": "Ready - Full developer MCP",
+    "codex_restarted": false,
+    "keyed_server_restarted_or_replaced": false,
+    "keyed_server_port": 1522,
+    "keyed_server_pid": 12592,
+    "keyed_server_health_status": 200,
+    "keyed_server_health_ready": true,
+    "conversation_thread_ref": "codex-thread:01a060f9-ebfd-7251-9fd3-479a01dd3c40:pna3.4",
+    "service_instance_ref": "service_instance:eda6a91e2c004c8bac4867e71195430b",
+    "client_session_ref": "supervisor_client:3cffafb8ebd3072ea309046af7c9542c",
+    "presence_active": true,
+    "presence_ttl_seconds": 180,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "required_custom_reasoning_tools_present": {
+      "helix_reasoning_task_binding_claim": false,
+      "helix_reasoning_steering_read": false,
+      "helix_reasoning_steering_acknowledge": false
+    },
+    "device_check_authorization_probe": "unauthorized: bearer token has no verified expiry",
+    "custom_server_catalog_adopted": false,
+    "live_acceptance_claimed": false,
+    "next_required_observation": "supported host-owned adoption of the healthy keyed custom-server catalog without another blind restart loop"
+  },
+  "post_restart_catalog_adoption_checkpoint": {
+    "observed_at": "2026-09-02T16:01:46.685Z",
+    "operator_restart_count": 1,
+    "restarted_server": "casimirbot_g2_a1_local",
+    "aligned_preconditions": {
+      "installed_full_developer_mcp_ready": true,
+      "keyed_server_port": 1522,
+      "keyed_server_pid": 12592,
+      "keyed_server_health_status": 200,
+      "keyed_server_ready": true,
+      "exact_continuation_presence_active": true
+    },
+    "codex_network_service_established_connections_to_1522": 3,
+    "custom_server_tools_in_task_catalog": 0,
+    "required_custom_reasoning_tools_present": {
+      "helix_reasoning_task_binding_claim": false,
+      "helix_reasoning_steering_read": false,
+      "helix_reasoning_steering_acknowledge": false
+    },
+    "service_instance_ref": "service_instance:eda6a91e2c004c8bac4867e71195430b",
+    "client_session_ref": "supervisor_client:3cffafb8ebd3072ea309046af7c9542c",
+    "conversation_thread_ref": "codex-thread:01a060f9-ebfd-7251-9fd3-479a01dd3c40:pna3.4",
+    "second_restart_requested": false,
+    "catalog_adoption_proven": false,
+    "binding_or_execution_attempted": false,
+    "reason": "The Codex host connected to the healthy keyed listener but published no callable tools from the configured custom server into this task."
+  },
+  "oauth_catalog_and_profile_binding_checkpoint": {
+    "observed_at": "2026-09-02T16:14:13.260Z",
+    "pre_login_custom_server_auth_status": "Not logged in",
+    "device_check_plugin_connection_is_custom_server_login": false,
+    "supported_oauth_login_completed": true,
+    "oauth_flow": "Authorization Code with PKCE",
+    "post_login_custom_server_auth_status": "OAuth",
+    "second_mcp_restart_required": false,
+    "required_custom_reasoning_tools_present": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true
+    },
+    "exact_custom_presence": {
+      "service_instance_ref": "service_instance:3289754974ed200d398c7b956bc2ee51",
+      "client_session_ref": "supervisor_client:039262677df33ba5f8341197c372edee",
+      "conversation_thread_ref": "codex-thread:01a060f9-ebfd-7251-9fd3-479a01dd3c40:pna3.4",
+      "authenticated_profile_ref": "profile:g2-a1-codex",
+      "authenticated_mcp_client_ref": "oauth_client:1c7c2cf7c0796d467616e5bd4c7b24715c83f7d27b3f9fa4c0611dc16b59775a",
+      "negotiated_observability_level": "continuation_ready",
+      "active": true
+    },
+    "installed_browser_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+    "profiles_match": false,
+    "first_pre_presence_claim_call": "timed out after 360 seconds; browser remained pending_claim",
+    "fresh_post_presence_claim_consumed": false,
+    "browser_destination_state": "No active exact-task binding - Delivery unavailable",
+    "cross_profile_binding_bypass_used": false,
+    "steering_pickup_claimed": false,
+    "minecraft_execution_claimed": false,
+    "next_required_observation": "explicit owner-approved convergence of the browser account and custom MCP principal before issuing another show-once claim"
+  },
+  "current_service_play_onboarding_checkpoint": {
+    "observed_at": "2026-09-03T02:28:30Z",
+    "keyed_server_restarted_with_approved_launcher": true,
+    "keyed_server_port": 1522,
+    "service_instance_ref": "service_instance:2f25c607e9b59b52f22220e0bd65034f",
+    "health_probes": {
+      "account_session": 200,
+      "helix_pipeline": 200,
+      "agent_providers": 200
+    },
+    "required_custom_reasoning_tools_present": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true
+    },
+    "continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+    "reasoning_binding_id": "reasoning_binding:2c909c4073d245aa406d2cadedb706e6",
+    "binding_epoch": 1,
+    "helix_conversation_id": "19713475-9932-400d-a53b-4b0ac2915375",
+    "composer_destination": "Bound external AI task",
+    "full_shell_play_dispatch_defect": "The full HelixAskPill shell did not subscribe to the Play-card browser steering event even though the minimal shell did.",
+    "full_shell_play_dispatch_repair": "Both shells now use one fail-closed HelixBoundAgentSteeringBridge subscriber.",
+    "play_request_ref": "minecraft-play:223f076f-cb2d-4e03-83d9-3dd15096c72c",
+    "steering_event_ref": "reasoning_steering:b98b80a156d5cc46424ed05eae4a89b1",
+    "steering_origin": "typed",
+    "steering_acknowledged_at": "2026-09-03T02:16:40.559Z",
+    "steering_advisory_only": true,
+    "steering_execution_requested": false,
+    "steering_answer_authority": false,
+    "steering_terminal_eligible": false,
+    "post_restart_sensor_negative": {
+      "outcome": "permission_revoked",
+      "reason": "room_read_grant_identity_mismatch",
+      "provenance_valid": false,
+      "used_as_reentry_evidence": false
+    },
+    "player_authority_id": "environment_action_authority:f47dbc59-ca24-449c-a4e2-2eebda81aae1",
+    "player_authority_policy_version": 5,
+    "allowed_capabilities": [
+      "com.casimirbot.minecraft.player.look"
+    ],
+    "player_manifest_admitted": true,
+    "player_declared_capability_count": 21,
+    "player_heartbeat_fresh": true,
+    "node_server_pairing_directory_divergence": "The node-hosted service lacked the desktop profile-store environment and staged the opaque action inbox under the default .minecraft directory instead of the running isolated .minecraft-helix-c0 directory.",
+    "pairing_directory_live_recovery": "The still-opaque inbox file was moved without reading its contents to the verified isolated client config directory; the first aged attempt failed closed as player_pairing_inbox_stale and a fresh retry redeemed successfully.",
+    "minecraft_action": {
+      "capability_id": "com.casimirbot.minecraft.player.look",
+      "outcome": "succeeded",
+      "requested_yaw_delta_degrees": 10,
+      "applied_yaw_delta_degrees": 10,
+      "duration_ticks": 5,
+      "yaw_error_degrees": 0,
+      "pitch_error_degrees": 0,
+      "controls_released": true,
+      "inventory_mutation_performed": false,
+      "world_mutation_performed": false,
+      "evidence_ref": "environment_action_evidence:2f33e163526f8c39fbca9a36beb1fb84312865b2a",
+      "mcp_observation_ref": "mcp_evidence_observation:helix.minecraft.player_action.observe_result:ae30df14-f191-4692-934e-352657b964a3",
+      "provenance_valid": true
+    },
+    "run_id": "run_941db6dc-c839-401d-afd2-6fe31d451ff0",
+    "evidence_reentry_version": 2,
+    "reentered_observation_count": 1,
+    "binding_revoked": true,
+    "stale_pickup_result": "reasoning_binding_revoked",
+    "stale_pickup_retryable": false,
+    "durable_goal_selector_repair": "The durable-goal resolver now accepts the sanitized environment_subject public reference through the backward-compatible subject selector field and resolves the native identity only inside the server transaction.",
+    "durable_goal_selector_tests": "pass: 11/11",
+    "remaining_onboarding_work": [
+      "load the durable-goal selector repair and create the exact scoped goal and monitor without exposing native identity",
+      "make isolated player-directory discovery durable for node-hosted development or require the profile-store input explicitly",
+      "rebuild and smoke-test the packaged desktop after the final onboarding repairs"
+    ]
+  },
+  "remaining_live_evidence": [
+    "durable goal and semantic monitor creation through the public subject selector",
+    "packaged desktop onboarding smoke after the remaining profile-directory repair"
+  ],
+  "authority_claims": {
+    "provider_task_created": false,
+    "provider_delivery_proven": true,
+    "minecraft_execution_proven": true,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  }
+}

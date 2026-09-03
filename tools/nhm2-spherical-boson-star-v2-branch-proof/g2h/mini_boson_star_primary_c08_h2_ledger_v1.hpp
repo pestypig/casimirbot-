@@ -2,6 +2,7 @@
 
 #include "mini_boson_star_primary_c08_convolution_selector_v1.hpp"
 #include "mini_boson_star_primary_c08_finite_history_v1.hpp"
+#include "mini_boson_star_primary_c08_h2_p8p_observer_progress_v1.hpp"
 
 #include <arb.h>
 
@@ -16,6 +17,8 @@ namespace nhm2::g2h_e_s5::primary_c08_h2_ledger_v1 {
 namespace finite = primary_c08_finite_history_v1;
 namespace selector = primary_c08_convolution_selector_v1;
 namespace ledger = primary_c08_convolution_ledger_v1;
+namespace p8p = primary_c08_h2_p8p_observer_progress_v1;
+namespace p8n = primary_c08_h2_p8n_selector_term_radius_binding_v1;
 
 inline constexpr slong kPrecisionBits = 512;
 inline constexpr std::size_t kJetCount = 13U;
@@ -118,6 +121,11 @@ class Context {
         std::size_t, selector::Output *, selector::Result *,
         selector::CoefficientDecompositionObservation *,
         selector::CandidateProgressObserver, void *);
+    friend bool diagnose_next_selector_candidate_term_radius_observed(
+        const Input &, const Context *, std::size_t, std::size_t, unsigned,
+        std::size_t, selector::Output *, selector::Result *,
+        selector::CoefficientDecompositionObservation *, p8n::Observation *,
+        p8p::ProgressCallback, void *, p8p::TimingObservation *);
     friend ledger::LedgerView published(const Context &);
 };
 
@@ -161,6 +169,17 @@ bool diagnose_next_selector_candidate_observable(
     selector::Output *output, selector::Result *result,
     selector::CoefficientDecompositionObservation *observation,
     selector::CandidateProgressObserver progress, void *progress_context);
+
+// P8P receipt-only binding. It constructs the same authenticated read-only
+// next-ordinal selector input and delegates all arithmetic to the versioned
+// P8P wrapper around immutable P8N.
+bool diagnose_next_selector_candidate_term_radius_observed(
+    const Input &input, const Context *context, std::size_t panel_count,
+    std::size_t thread_count, unsigned target_degree, std::size_t target_jet,
+    selector::Output *output, selector::Result *result,
+    selector::CoefficientDecompositionObservation *predecessor_observation,
+    p8n::Observation *observation, p8p::ProgressCallback progress,
+    void *progress_context, p8p::TimingObservation *timing);
 
 // Deterministic bounded JSON representation for future executor persistence.
 // This function performs no file I/O and rejects incomplete or over-cap data.

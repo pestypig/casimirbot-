@@ -20,10 +20,14 @@ import { sharedLiveRoomAgentApiService } from "../services/shared-live-room-cont
 import type { HelixAgentApiPrincipal } from "../services/helix-agent-api/types";
 import type { HelixLocalSupervisorCoordinationStore } from
   "../services/local-supervisor/local-supervisor-coordination";
+import type { HelixReasoningTaskBindingStore } from
+  "../services/local-supervisor/reasoning-task-binding-store";
 import type { DesktopMcpTunnelTransitionStore } from
   "../services/local-supervisor/desktop-mcp-tunnel-transition-store";
 import type { DesktopMcpTunnelTransitionExecutor } from
   "../mcp/helix-mcp-server";
+import { appendMcpToolInvocationToOperatorActivity } from
+  "../services/helix-ask/operator-activity-ingestion";
 import { DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER } from
   "@shared/desktop-mcp-tunnel";
 import { CASIMIR_DESKTOP_SESSION_HEADER } from
@@ -46,8 +50,12 @@ export type HelixMcpServerFactory = (input: {
   principal: HelixAgentApiPrincipal;
   service: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
+  mcpToolLifecycleObserver?: Parameters<
+    typeof createHelixMcpServer
+  >[0]["mcpToolLifecycleObserver"];
 }) => McpServer;
 
 type McpRouterDependencies = {
@@ -63,6 +71,7 @@ type McpRouterDependencies = {
   enforceTransportSecurity?: boolean;
   resourceMetadataPath?: string;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
+  reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
   desktopDelegationScopes?: readonly string[];
@@ -93,7 +102,7 @@ const record = (value: unknown): JsonRecord | null =>
 
 const agentChatClaimPattern = /^agent_chat_claim_[A-Za-z0-9:._~-]+$/u;
 
-const protectedMcpEnvelopeValue = (value: unknown): unknown => {
+export const protectedMcpEnvelopeValue = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map(protectedMcpEnvelopeValue);
   }
@@ -120,6 +129,24 @@ const protectedMcpEnvelopeValue = (value: unknown): unknown => {
             ...request,
             claim_handle: "opaque_browser_chat_claim",
           },
+        },
+      };
+    }
+  } else if (
+    envelope.method === "tools/call" &&
+    params?.name === "helix_reasoning_task_binding_claim"
+  ) {
+    const args = record(params.arguments);
+    const claimHandle = args?.claim_handle;
+    if (
+      typeof claimHandle === "string" &&
+      agentChatClaimPattern.test(claimHandle)
+    ) {
+      output.params = {
+        ...params,
+        arguments: {
+          ...args,
+          claim_handle: "opaque_reasoning_task_claim",
         },
       };
     }
@@ -310,10 +337,39 @@ export const createHelixMcpRouter = (
           service,
           localSupervisorCoordinationStore:
             dependencies.localSupervisorCoordinationStore,
+          reasoningTaskBindingStore:
+            dependencies.reasoningTaskBindingStore,
           desktopMcpTunnelTransitionStore:
             dependencies.desktopMcpTunnelTransitionStore,
           desktopMcpTunnelTransitionExecutor:
             dependencies.desktopMcpTunnelTransitionExecutor,
+          mcpToolLifecycleObserver: async (observation) => {
+            const requestId = (res.locals as McpLocals).helixAgentRequestId;
+            if (!requestId) return;
+            await appendMcpToolInvocationToOperatorActivity({
+              owner: {
+                tenantId: principal.tenantId,
+                issuer: principal.issuer,
+                subjectId: principal.subjectId,
+                accountProfileId: principal.accountProfileId,
+              },
+              requestId,
+              toolName: observation.toolName,
+              outcome: observation.outcome,
+              occurredAt: observation.occurredAt,
+              observedAt: observation.observedAt,
+              nodeRef:
+                dependencies.localSupervisorCoordinationStore
+                  ?.serviceInstanceRef,
+              oauthClientRef:
+                principal.oauthClientRef ?? principal.mcpClientRef ?? null,
+              clientSessionRef: `mcp_client_session:${crypto
+                .createHash("sha256")
+                .update(principal.accountContext.session_id, "utf8")
+                .digest("hex")
+                .slice(0, 48)}`,
+            });
+          },
         });
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,

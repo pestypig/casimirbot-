@@ -1,6 +1,12 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Users } from "lucide-react";
 import { SharedLiveRoomDialog } from "./SharedLiveRoomDialog";
+import {
+  HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT,
+  buildSharedLiveRoomGuideProjection,
+  recordSharedLiveRoomGuideProjection,
+  resetSharedLiveRoomGuideProjection,
+} from "./SharedLiveRoomGuideProjection";
 import { useHelixSharedLiveRoom } from "./useHelixSharedLiveRoom";
 
 export type HelixAskSharedLiveRoomControlsProps = {
@@ -37,6 +43,12 @@ export function HelixAskSharedLiveRoomControls({
   const hostInvalidationHandledRef = useRef(false);
   const hostTransportSeenRef = useRef(false);
   const room = controller.room;
+  const guideProjection = useMemo(() => buildSharedLiveRoomGuideProjection({
+    room,
+    mediaBridge: controller.mediaBridge,
+    loading: controller.busyAction === "loading",
+    failed: Boolean(controller.error),
+  }), [controller.busyAction, controller.error, controller.mediaBridge, room]);
   const roomButtonLabel = room
     ? `Room ${room.participants.filter((participant) => participant.presence !== "left").length}/2`
     : "Room";
@@ -49,6 +61,18 @@ export function HelixAskSharedLiveRoomControls({
     room.runtime.realtime_session_ref_hash,
   );
   const sharedTransportBound = hostTransportReferencePresent && room?.runtime.state !== "closed";
+
+  useEffect(() => {
+    recordSharedLiveRoomGuideProjection(guideProjection);
+  }, [guideProjection]);
+
+  useEffect(() => () => resetSharedLiveRoomGuideProjection(), []);
+
+  useEffect(() => {
+    const openDialog = (): void => setDialogOpen(true);
+    window.addEventListener(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT, openDialog);
+    return () => window.removeEventListener(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT, openDialog);
+  }, []);
 
   useEffect(() => {
     onActiveRoomChange?.(room?.status === "closed" ? null : room?.room_id ?? null);

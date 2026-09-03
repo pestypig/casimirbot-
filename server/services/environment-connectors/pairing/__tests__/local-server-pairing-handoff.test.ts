@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -159,6 +159,50 @@ describe("local Fabric server pairing handoff", () => {
         "utf8",
       ),
     ).resolves.toBe("/helix pair Z4ZD-X2JJ");
+  });
+
+  it("discovers the desktop-owned server profile from APPDATA", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-server-pairing-"));
+    roots.push(root);
+    const serverRunDirectory = path.join(root, "combat-c0-server");
+    const playerGameDirectory = path.join(root, ".minecraft-helix-c0");
+    await mkdir(path.join(serverRunDirectory, "config"), { recursive: true });
+    await writeFile(
+      path.join(serverRunDirectory, "server.properties"),
+      "server-port=25566\n",
+    );
+    await mkdir(path.join(playerGameDirectory, "config"), { recursive: true });
+    await mkdir(path.join(playerGameDirectory, "mods"), { recursive: true });
+    const storePath = path.join(
+      root,
+      "@casimirbot",
+      "desktop",
+      "state",
+      "local-minecraft-run-profiles.json",
+    );
+    await mkdir(path.dirname(storePath), { recursive: true });
+    await writeFile(storePath, JSON.stringify({
+      schema: "casimirbot.local_minecraft_run_profiles/2",
+      profiles: [{
+        owner_profile_id: "profile:owner",
+        run_directory: serverRunDirectory,
+        player_game_directory: playerGameDirectory,
+        label: "C0 arena",
+      }],
+    }));
+
+    await expect(stageLocalMinecraftServerPairing({
+      workspaceRoot: root,
+      appDataPath: root,
+      ownerProfileId: "profile:owner",
+      command: "/helix pair Z4ZD-X2JJ",
+    })).resolves.toEqual({ status: "server_pairing_inbox_staged" });
+
+    await expect(readFile(path.join(
+      serverRunDirectory,
+      "config",
+      "helix-fabric-sensor.pairing-inbox",
+    ), "utf8")).resolves.toBe("/helix pair Z4ZD-X2JJ");
   });
 
   it("rejects a selected server profile outside the fixed Fabric run root", async () => {

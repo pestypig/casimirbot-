@@ -5,6 +5,7 @@ import {
   HELIX_AGENT_RUN_SCHEMA,
   helixAgentCancelRequestSchema,
   helixAgentContinueRequestSchema,
+  helixAgentEvidenceReentryRequestSchema,
   helixAgentRunSchema,
   helixAgentStartRequestSchema,
 } from "../helix-agent-api.v1";
@@ -81,6 +82,34 @@ describe("Helix agent API v1 contracts", () => {
         reason: "stop",
       }).success,
     ).toBe(true);
+  });
+
+  it("accepts only exact observation references for external evidence re-entry", () => {
+    expect(
+      helixAgentEvidenceReentryRequestSchema.safeParse({
+        expected_version: 1,
+        observation_refs: ["mcp_observation:one"],
+      }).success,
+    ).toBe(true);
+    expect(
+      helixAgentEvidenceReentryRequestSchema.safeParse({
+        expected_version: 1,
+        observation_refs: ["mcp_observation:one", "mcp_observation:one"],
+      }).success,
+    ).toBe(false);
+    expect(
+      helixAgentEvidenceReentryRequestSchema.safeParse({
+        expected_version: 1,
+        observation_refs: ["mcp_observation:one"],
+        receipt_text: "Minecraft moved successfully",
+      }).success,
+    ).toBe(false);
+    expect(
+      helixAgentEvidenceReentryRequestSchema.safeParse({
+        expected_version: 1,
+        observation_refs: [],
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps every public run and evidence projection non-authoritative", () => {

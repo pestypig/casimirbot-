@@ -9,7 +9,8 @@
       "com.casimirbot.helixcompanion.spike.gametest.CompanionFeasibilityGameTests",
       "com.casimirbot.helixcompanion.spike.gametest.CompanionPresenceGameTests",
       "com.casimirbot.helixcompanion.spike.gametest.CompanionFollowGameTests",
-      "com.casimirbot.helixcompanion.spike.gametest.CompanionInventoryCustodyGameTests"
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionInventoryCustodyGameTests",
+      "com.casimirbot.helixcompanion.spike.gametest.CompanionSurvivalMiningGameTests"
     ],
     "fabric-client-gametest": [
       "com.casimirbot.helixcompanion.spike.gametest.RealClientMiningOracleGameTest"

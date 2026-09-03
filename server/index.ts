@@ -83,6 +83,9 @@ import { agentRunObserverRouter } from "./routes/agent-run-observer";
 import { createHelixAgentAccountBindingsRouter } from
   "./routes/helix-agent-account-bindings";
 import { createAgentConnectionsRouter } from "./routes/agent-connections";
+import { createOperatorActivityRouter } from "./routes/operator-activity";
+import { operatorActivityStore } from
+  "./services/helix-ask/operator-activity-ingestion";
 import { createDesktopAuth0AccountLinkRouter } from
   "./routes/desktop-auth0-account-link";
 import {
@@ -100,6 +103,8 @@ import { createLocalSupervisorCoordinationRouter } from
   "./routes/local-supervisor-coordination";
 import { HelixLocalSupervisorCoordinationStore } from
   "./services/local-supervisor/local-supervisor-coordination";
+import { HelixReasoningTaskBindingStore } from
+  "./services/local-supervisor/reasoning-task-binding-store";
 import { DesktopMcpTunnelTransitionStore } from
   "./services/local-supervisor/desktop-mcp-tunnel-transition-store";
 import { createDesktopMcpTunnelTransitionExecutorFromEnvironment } from
@@ -168,6 +173,9 @@ const localSupervisorCoordinationStore =
   new HelixLocalSupervisorCoordinationStore(
     localSupervisorIdentity.serviceInstanceRef,
   );
+const reasoningTaskBindingStore = new HelixReasoningTaskBindingStore(
+  localSupervisorCoordinationStore,
+);
 const desktopMcpTunnelTransitionStore =
   new DesktopMcpTunnelTransitionStore(
     localSupervisorIdentity.serviceInstanceRef,
@@ -639,17 +647,25 @@ app.use(
 app.use(
   HELIX_LOCAL_SUPERVISOR_COORDINATION_MCP_PATH,
   createHelixMcpRouter({
-    createServer: ({ principal, localSupervisorCoordinationStore: store }) =>
+    createServer: ({
+      principal,
+      localSupervisorCoordinationStore: store,
+      reasoningTaskBindingStore,
+      mcpToolLifecycleObserver,
+    }) =>
       createHelixMcpServer({
         principal,
         surface: "local_supervisor_coordination",
         localSupervisorCoordinationStore: store,
+        reasoningTaskBindingStore,
         desktopMcpTunnelTransitionStore,
         desktopMcpTunnelTransitionExecutor,
+        mcpToolLifecycleObserver,
       }),
     resourceMetadataPath:
       HELIX_LOCAL_SUPERVISOR_COORDINATION_RESOURCE_METADATA_PATH,
     localSupervisorCoordinationStore,
+    reasoningTaskBindingStore,
     desktopMcpTunnelTransitionStore,
     desktopMcpTunnelTransitionExecutor,
     // Secure MCP Tunnel does not relay ChatGPT's bearer token to the local
@@ -665,6 +681,7 @@ app.use(
 );
 app.use("/mcp", createHelixMcpRouter({
   localSupervisorCoordinationStore,
+  reasoningTaskBindingStore,
   // Keep the governed transport controls present after the native tunnel
   // reaches the full surface. Without these shared dependencies the client
   // can pre-advertise the transition tools on the restricted endpoint, then
@@ -739,7 +756,9 @@ app.use(
 // ENABLE_AUTH does not silently replace their documented cookie boundary.
 app.use("/api/account", createAgentConnectionsRouter({
   coordinationStore: localSupervisorCoordinationStore,
+  reasoningBindingStore: reasoningTaskBindingStore,
 }));
+app.use("/api/account", createOperatorActivityRouter({ activityStore: operatorActivityStore }));
 app.use("/api/account", createHelixAgentAccountBindingsRouter());
 // Native Auth0 PKCE linking is a separate app-only admission lane. It never
 // accepts a client secret or a public callback and is guarded by the exact
@@ -753,6 +772,16 @@ app.use(
   "/api/billing/stripe/webhook",
   express.raw({ type: "application/json", limit: "256kb" }),
   createStripeSandboxWebhookRouter(),
+);
+// Profile backups may legitimately approach the account's 5 MiB storage
+// quota. Give only this exact endpoint enough parser headroom for the payload
+// envelope; the storage service still enforces the account quota and per-entry
+// limits. Keeping this before the general parser prevents a smaller
+// deployment-wide JSON limit from turning an eligible backup into a retry
+// storm without broadening unrelated request surfaces.
+app.use(
+  "/api/account/profile-storage/snapshot",
+  express.json({ limit: "6mb" }),
 );
 app.use(express.json({
   limit: jsonBodyLimit,
@@ -1439,7 +1468,20 @@ app.use((req, res, next) => {
       // Log the error but do not crash the server; this keeps dev server alive
       // and avoids connection refusals after a first route error.
       try {
-        console.error("[express] error handler:", status, message);
+        const requestLabel = `${_req?.method ?? "UNKNOWN"} ${_req?.path ?? "unknown"}`;
+        const parserLimit = Number.isFinite(Number(err?.limit))
+          ? ` limit=${Number(err.limit)}`
+          : "";
+        const parserLength = Number.isFinite(Number(err?.length))
+          ? ` length=${Number(err.length)}`
+          : "";
+        const parserReceived = Number.isFinite(Number(err?.received))
+          ? ` received=${Number(err.received)}`
+          : "";
+        console.error(
+          `[express] error handler: ${status} ${requestLabel}${parserLimit}${parserLength}${parserReceived}`,
+          message,
+        );
         if (process.env.NODE_ENV !== "production") {
           console.error(err?.stack || err);
         }

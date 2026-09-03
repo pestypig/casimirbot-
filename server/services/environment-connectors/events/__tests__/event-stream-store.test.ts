@@ -247,6 +247,7 @@ describe("environment event stream and digest reducer", () => {
       `);
 
       const claim: EnvironmentActionConnectorClaim = {
+        ownerProfileId: "profile-owner",
         authorityId: "environment_action_authority:event-test",
         credentialId: "environment_action_credential:event-test",
         connectorInstallationId:

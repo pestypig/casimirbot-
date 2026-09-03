@@ -1,0 +1,133 @@
+{
+  "schema": "helix.eh_g8_pna3.current_source_acceptance_checkpoint.v1",
+  "recorded_at": "2026-09-02T01:23:00.000Z",
+  "baseline_commit": "5e883f7552946a19dff15420b68100e421260805",
+  "working_tree_policy": "dirty_tree_preserved",
+  "installed_artifact": {
+    "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+    "sha256": "DCC711BD5146D3269BA81CC844EA476660FE2D43E709077BCAA4B7A083424F76",
+    "app_asar_sha256": "FD9965DBBE02E36651189352F1AA6C17ADB1A4483D71A2D7F590606C0B7B3471",
+    "runtime_manifest_sha256": "2F8B4B4C2EE07E80069E628A080327BD021B49DC8F73DEA3D7B7BF59A2769133",
+    "client_tree_sha256": "3bc088577e0b9c3bf0f040d2eb6fbe3a4d8d6f35b755ac96004cffa7494b9803",
+    "server_sha256": "bbeb05eaa7d95624a784ffbbb28eab77b4034da8181c6b493e850bdc8d317058",
+    "tested_service_instance_refs": [
+      "service_instance:4e971d3446cbe66b0afe0b1ae33f30af",
+      "service_instance:24ab12c83e8ca3377731aca85dc36cce"
+    ],
+    "current_source_repairs_packaged": true,
+    "dependency_closure": "staged_verified",
+    "bundled_agent_runtime": false
+  },
+  "nodes": {
+    "installed_mcp_node": "unpacked desktop private service",
+    "keyed_ui_node": "http://127.0.0.1:1522",
+    "coherent_single_node_acceptance_complete": false,
+    "reason": "The base MCP, activity, chat, observer-failure, pagination, and recovery paths ran on current source, but the exact final artifact did not complete a successful provider-finalized observer turn with nonzero bounded context."
+  },
+  "repairs": [
+    {
+      "boundary": "MCP execution -> lifecycle normalization/ingestion",
+      "result": "repaired",
+      "summary": "Ordinary MCP tool completion now emits a sanitized eight-stage operator-activity lifecycle without arguments, result payloads, prompts, credentials, or reasoning."
+    },
+    {
+      "boundary": "chat-store/UI wiring",
+      "result": "repaired",
+      "summary": "The workstation chat switcher now exposes inline keyboard rename and confirmed clear controls while preserving delete and predictable selection behavior."
+    },
+    {
+      "boundary": "provider event normalization -> presentation",
+      "result": "repaired",
+      "summary": "Provider-native delta frames are filtered from numbered transcript rows; completed native events, governed milestones, terminal selection, and final answers remain visible."
+    },
+    {
+      "boundary": "expired observer binding -> local disconnect recovery",
+      "result": "repaired",
+      "summary": "Observer disconnect treats server 404/410 as already detached and clears stale browser binding state while preserving other errors."
+    },
+    {
+      "boundary": "Device Check refresh -> tunnel delegation request discovery",
+      "result": "repaired",
+      "summary": "The main Refresh control now refreshes pending tunnel delegations as well as connector health, and the consent copy reflects request-specific short leases."
+    }
+  ],
+  "acceptance_cases": {
+    "A0": { "status": "pass", "evidence": ["focused baseline battery 92/92", "API parity matrix 31/31 at baseline", "discipline quick, documentation audit, and production build passed"] },
+    "A1": { "status": "pass", "evidence": ["installed native tunnel authenticated presence and reconnect continuity", "native transport reported Ready - Full developer MCP after explicit user delegation"] },
+    "A2": { "status": "pass", "evidence": ["ordinary narrow presence capability callable before transition", "pre-advertised full chat-claim capability correctly unavailable before governed native transition", "explicit short-lived user delegation admitted the full catalog", "Codex plugin disable/enable refreshed the catalog after the authority transition"] },
+    "A3": { "status": "pass", "evidence": ["installed store contains privacy-safe mcp_capability_lifecycle activity", "plaintext MCP tool name absent", "claim handle and known prompt text absent"] },
+    "A4": { "status": "pass_current_source", "evidence": ["two named chats created, switched, renamed inline, and restored after reload", "local note showed Local operator note, Save operator note, and saved delivery", "Ask changed to Queue while live Ask was busy", "mobile/chat lifecycle regression 4/4"] },
+    "A5": {
+      "status": "partial_typed_provider_finalization_failure",
+      "evidence": [
+        "same installed node started run run_7b453105-94f8-4895-9ccd-c54cd2a22a8a and consumed a one-time chat claim handle",
+        "binding agent_chat_binding:b66ecd0a-208d-4cee-a721-79047998e006 became active with bounded context disabled",
+        "observer showed Agent working and Run started without projecting a receipt as chat",
+        "continuation produced explicit external_turn_finalization_failed and blocked terminal authority",
+        "event sequence 1-4 was run_started, continuation_received, terminal_authority_evaluated, run_blocked",
+        "disconnect restored Authorize selected chat and removed the observer",
+        "expired binding 404/410 disconnect regression passed 15/15",
+        "cross-node claim was not admitted"
+      ],
+      "open": "Demonstrate one successful provider-finalized terminal projection and repeat the claim with nonzero bounded chat context on the exact final artifact."
+    },
+    "A6": { "status": "pass_current_source", "evidence": ["live keyed docs.search turn showed request, observation, model re-entry, terminal selection, and final answer", "typed failure examples remained explicit", "provider-native token delta presentation repaired with 42/42 transcript tests"] },
+    "A7": {
+      "status": "pass",
+      "evidence": {
+        "installed_event_total": 256,
+        "unique_event_ids": 256,
+        "unique_projection_sequences": 256,
+        "min_projection_sequence": 0,
+        "max_projection_sequence": 255,
+        "sequence_gap_count": 0,
+        "duplicate_source_ref_count": 0,
+        "first_page_size": 50,
+        "load_more_result": "256 of 256",
+        "known_prompt_leak_rows": 0,
+        "secret_shaped_payload_rows": 0,
+        "operator_activity_store_tests": "6/6"
+      }
+    },
+    "A8": { "status": "pass_deterministic_and_boundary_live", "evidence": ["observer, activity, and store identity/adversarial tests passed", "cross-node claim did not cross the service boundary", "256 installed events contained no known prompt or secret-shaped payload", "restart selected a new service epoch rather than inheriting prior current authority"] },
+    "A9": {
+      "status": "partial",
+      "evidence": ["MCP disconnect/reconnect and stale-presence expiry were observed", "short lease expiry returned transport to Ready - Read-only coordination", "stale full-catalog calls did not retain authority", "desktop and keyed service restarts changed service epoch", "expired observer state self-healed to Authorize selected chat", "catalog refresh after delegation worked through Codex plugin disable/enable", "Device Check refresh discovery defect was repaired with regression coverage"],
+      "open": "Repeat revoked-binding recovery through fresh native PKCE consent and explicit store reactivation; then repeat the observer journey on the exact final package."
+    },
+    "A10": {
+      "status": "pass_current_source_deterministic",
+      "evidence": ["semantic controls for chat, destination, observer, activity tabs, composer, and delegation refresh", "inline rename supports Enter and Escape", "mobile workstation/chat regression passed", "Device Check consent refresh regression passed 5/5"],
+      "open": "Repeat the essential observer journey at compact desktop width after successful terminal projection becomes available."
+    }
+  },
+  "verification": {
+    "focused_pna3_contract_tests": "63/63 passed",
+    "observer_binding_tests": "15/15 passed",
+    "device_check_tests": "5/5 passed",
+    "transcript_projection_tests": "42/42 passed",
+    "mobile_chat_tests": "4/4 passed",
+    "client_production_build": "passed",
+    "desktop_pack_dir": "passed",
+    "packaged_launch_smoke": "PASS; 4 processes; 3 loopback listeners; readiness, service listener, provider credential vault, and protocol registration PASS",
+    "discipline_quick": "passed; classification_not_declared warning recorded",
+    "change_classification": ["source admission", "evidence normalization", "follow-up reasoning", "terminal authority", "presentation", "Codex-owned runtime behavior"],
+    "environment_harness_docs_audit": "passed after final packet update",
+    "api_parity_matrix": "31/31 baseline pass; final rerun hung during test load in the resource-heavy live environment and was terminated without a verdict",
+    "live_api_parity": {
+      "artifact": "artifacts/helix-ask-api-parity/api-parity-1788307455972/summary.json",
+      "completed_scenarios": 16,
+      "failure_count": 2,
+      "failures": ["live_source_identity_missing_environment_source", "live_source_identity_no_situation_run"],
+      "diagnosis": "Both visual live-source identity cases reported fresh_observation_not_in_situation_run instead of field_evaluations_missing; they are outside the base PNA3 chat/activity/observer path and remain separately visible."
+    },
+    "existing_build_warnings": "unchanged",
+    "casimir_verification": "not_applicable_non_physics_change"
+  },
+  "decision": {
+    "stage_4_ready": false,
+    "base_codex_harness_path": "accepted_for_governed_tool_use_and_truthful_public_activity",
+    "reason": "The hardest transport, catalog, ordinary activity, chat lifecycle, pagination, isolation, and restart boundaries work. Packet completion still lacks a successful provider-finalized observer answer, nonzero bounded-context projection, exact-final-artifact observer repeat, and the fresh-PKCE revocation recovery exercise.",
+    "next_action": "Close the four remaining PNA3 acceptance gaps before starting a provider-session Stage 4 connector. Keep the two visual live-source parity failures in their separate repair lane."
+  }
+}

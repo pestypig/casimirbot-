@@ -30,7 +30,8 @@ export type HelixRealtimeSessionFeatureGate = {
 
 export const realtimeSessionOpenAiKeyConfigured = (
   env: NodeJS.ProcessEnv = process.env,
-): boolean => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY"]);
+): boolean => hasAnyConfiguredEnvVar(env, ["OPENAI_API_KEY"]) ||
+  readBooleanEnv(env.HELIX_NATIVE_OPENAI_REALTIME_BROKER_ENABLED, false);
 
 export const readRealtimeSessionFeatureGate = (
   env: NodeJS.ProcessEnv = process.env,

@@ -39,6 +39,7 @@ export type DesktopClickBehavior = "ToggleMinimize" | "FocusOnly";
 type DesktopState = {
   windows: Record<string, WindowState>;
   pinned: Record<string, boolean>;
+  recentPanelIds: string[];
   clickBehavior: DesktopClickBehavior;
   zCounter: number;
   topZCounter: number;
@@ -126,6 +127,10 @@ const migrateDesktopStore = (state: unknown, version: number) => {
 
 const DEFAULT_Z_BASE = 10;
 const TOP_Z_BASE = 100000;
+const MAX_RECENT_PANEL_IDS = 24;
+
+const updateRecentPanelIds = (current: string[] | null | undefined, panelId: string): string[] =>
+  [panelId, ...(current ?? []).filter((entry) => entry !== panelId)].slice(0, MAX_RECENT_PANEL_IDS);
 
 const ensureZCounter = (value?: number) =>
   typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_Z_BASE;
@@ -152,6 +157,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
     (set, get) => ({
       windows: {},
       pinned: {},
+      recentPanelIds: [],
       clickBehavior: "ToggleMinimize",
       zCounter: 10,
       topZCounter: TOP_Z_BASE,
@@ -216,6 +222,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           return {
             zCounter,
             topZCounter,
+            recentPanelIds: updateRecentPanelIds(state.recentPanelIds, id),
             windows: {
               ...state.windows,
               [id]: {
@@ -270,6 +277,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           return {
             zCounter,
             topZCounter,
+            recentPanelIds: updateRecentPanelIds(state.recentPanelIds, id),
             windows: {
               ...state.windows,
               [id]: {
@@ -292,6 +300,7 @@ export const useDesktopStore = createWithEqualityFn<DesktopState>()(
           return {
             zCounter,
             topZCounter,
+            recentPanelIds: updateRecentPanelIds(state.recentPanelIds, id),
             windows: {
               ...state.windows,
               [id]: { ...current, z }

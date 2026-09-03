@@ -4,6 +4,12 @@ import path from "node:path";
 const STORE_SCHEMA_V1 = "casimirbot.local_minecraft_run_profiles/1" as const;
 const STORE_SCHEMA = "casimirbot.local_minecraft_run_profiles/2" as const;
 const MAX_STORE_BYTES = 64 * 1024;
+const DESKTOP_PROFILE_STORE_RELATIVE_PATH = path.join(
+  "@casimirbot",
+  "desktop",
+  "state",
+  "local-minecraft-run-profiles.json",
+) as string;
 
 type StoreEntry = Readonly<{
   owner_profile_id: string;
@@ -23,12 +29,27 @@ const exactLocalWindowsDirectory = (value: unknown): string | null => {
   return resolved;
 };
 
+const resolveStorePath = (input: {
+  storePath?: string | null;
+  appDataPath?: string | null;
+}): string | null => {
+  const explicit = input.storePath?.trim();
+  if (explicit) return explicit;
+  const appDataPath = input.appDataPath?.trim();
+  if (!appDataPath || !path.isAbsolute(appDataPath)) return null;
+  return path.join(
+    path.resolve(appDataPath),
+    DESKTOP_PROFILE_STORE_RELATIVE_PATH,
+  );
+};
+
 export const resolveProfileOwnedMinecraftRunDirectory = async (input: {
   ownerProfileId: string;
   storePath?: string | null;
+  appDataPath?: string | null;
 }): Promise<string | null> => {
   const ownerProfileId = input.ownerProfileId.trim();
-  const storePath = input.storePath?.trim();
+  const storePath = resolveStorePath(input);
   if (!ownerProfileId || !storePath) return null;
   const storeStat = await stat(storePath).catch(() => null);
   if (!storeStat?.isFile() || storeStat.size <= 0 || storeStat.size > MAX_STORE_BYTES) {
@@ -73,9 +94,10 @@ export const resolveProfileOwnedMinecraftRunDirectory = async (input: {
 export const resolveProfileOwnedMinecraftPlayerGameDirectory = async (input: {
   ownerProfileId: string;
   storePath?: string | null;
+  appDataPath?: string | null;
 }): Promise<string | null> => {
   const ownerProfileId = input.ownerProfileId.trim();
-  const storePath = input.storePath?.trim();
+  const storePath = resolveStorePath(input);
   if (!ownerProfileId || !storePath) return null;
   const storeStat = await stat(storePath).catch(() => null);
   if (!storeStat?.isFile() || storeStat.size <= 0 || storeStat.size > MAX_STORE_BYTES) {

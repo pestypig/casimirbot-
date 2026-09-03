@@ -7,7 +7,7 @@ import React, {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CircleDot, Eraser, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
 import { WorkstationResizeRail } from "@/components/workstation/WorkstationResizeRail";
@@ -28,6 +28,9 @@ import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
+import { getPanelDef } from "@/lib/desktop/panelRegistry";
+import { useDesktopStore } from "@/store/useDesktopStore";
+import { CasimirGuideOverlay, type CasimirGuideContext } from "@/components/workstation/guide/CasimirGuideOverlay";
 import type { WorkstationEntrySurface } from "@shared/workstation-link-meta";
 
 const HELIX_CONVERSATION_TRACE_PANEL_ID = "workstation-workflow-timeline";
@@ -78,6 +81,8 @@ export function HelixWorkstationShell({
   initialMobileSurface?: WorkstationEntrySurface;
 }) {
   const chatDock = useWorkstationLayoutStore((state) => state.chatDock);
+  const workstationGroups = useWorkstationLayoutStore((state) => state.groups);
+  const activeGroupId = useWorkstationLayoutStore((state) => state.activeGroupId);
   const setChatDockWidth = useWorkstationLayoutStore((state) => state.setChatDockWidth);
   const captureLayoutSnapshot = useWorkstationLayoutStore((state) => state.captureLayoutSnapshot);
   const applyLayoutSnapshot = useWorkstationLayoutStore((state) => state.applyLayoutSnapshot);
@@ -89,9 +94,15 @@ export function HelixWorkstationShell({
   const chatStoreHydrated = useAgiChatStore((state) => state.hydrated);
   const newSession = useAgiChatStore((state) => state.newSession);
   const setActiveChat = useAgiChatStore((state) => state.setActive);
+  const clearSession = useAgiChatStore((state) => state.clearSession);
   const deleteLocalSession = useAgiChatStore((state) => state.deleteSession);
+  const renameSession = useAgiChatStore((state) => state.renameSession);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
+  const pinnedPanels = useDesktopStore((state) => state.pinned);
   const [sessionListOpen, setSessionListOpen] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [guideOpen, setGuideOpen] = useState(false);
   const [mobileSurface, setMobileSurface] =
     useState<WorkstationEntrySurface>(initialMobileSurface);
   const [resizePreviewWidth, setResizePreviewWidth] = useState<number | null>(null);
@@ -101,6 +112,35 @@ export function HelixWorkstationShell({
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
   const { t } = useInterfaceText(interfaceLanguage.code);
   const newChatLabel = t("workstation.shell.newChat");
+
+  useEffect(() => {
+    if (layoutVariant !== "desktop") return;
+    const handleGuideShortcut = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        setGuideOpen((current) => !current);
+      }
+    };
+    window.addEventListener("keydown", handleGuideShortcut);
+    return () => window.removeEventListener("keydown", handleGuideShortcut);
+  }, [layoutVariant]);
+
+  const guideContext = useMemo<CasimirGuideContext>(() => {
+    const activeGroup = workstationGroups[activeGroupId];
+    const activePanelId = activeGroup?.activePanelId && getPanelDef(activeGroup.activePanelId)
+      ? activeGroup.activePanelId
+      : null;
+    const recentPanelIds = (activeGroup?.panelIds ?? [])
+      .filter((panelId) => panelId !== activePanelId && Boolean(getPanelDef(panelId)))
+      .slice(-5)
+      .reverse();
+    const favoritePanelIds = Object.entries(pinnedPanels)
+      .filter(([, isPinned]) => isPinned)
+      .map(([panelId]) => panelId)
+      .filter((panelId) => Boolean(getPanelDef(panelId)))
+      .slice(0, 5);
+    return { activePanelId, recentPanelIds, favoritePanelIds };
+  }, [activeGroupId, pinnedPanels, workstationGroups]);
 
   const handleOpenConversation = useCallback(
     (_sessionId: string) => {
@@ -264,6 +304,40 @@ export function HelixWorkstationShell({
     ],
   );
 
+  const handleBeginRenameSession = useCallback(
+    (sessionId: string) => {
+      const target = sessions[sessionId];
+      if (!target) return;
+      setRenamingSessionId(sessionId);
+      setRenameDraft(titleFromSession(target, newChatLabel));
+    },
+    [newChatLabel, sessions],
+  );
+
+  const handleCommitRenameSession = useCallback(
+    (sessionId: string) => {
+      const nextTitle = renameDraft.trim();
+      if (nextTitle) renameSession(sessionId, nextTitle.slice(0, 120));
+      setRenamingSessionId(null);
+      setRenameDraft("");
+    },
+    [renameDraft, renameSession],
+  );
+
+  const handleClearSession = useCallback(
+    (sessionId: string) => {
+      const target = sessions[sessionId];
+      if (!target || target.messages.length === 0) return;
+      const title = titleFromSession(target, newChatLabel);
+      const confirmed =
+        typeof window === "undefined" ||
+        window.confirm(t("workstation.shell.clearChatConfirm", { title }));
+      if (!confirmed) return;
+      clearSession(sessionId);
+    },
+    [clearSession, newChatLabel, sessions, t],
+  );
+
   const sessionHeaderContent = (
     <>
       <div className="flex shrink-0 items-center">
@@ -283,6 +357,20 @@ export function HelixWorkstationShell({
           {t("workstation.shell.sessionEyebrow")}
         </p>
       </div>
+      {layoutVariant === "desktop" ? (
+        <button
+          type="button"
+          onClick={() => setGuideOpen((current) => !current)}
+          aria-label={guideOpen ? "Close Casimir Guide" : "Open Casimir Guide"}
+          aria-expanded={guideOpen}
+          aria-controls="casimir-guide-dialog"
+          title="Casimir Guide (Ctrl+Shift+G)"
+          className="ml-auto inline-flex h-9 items-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 text-xs font-semibold uppercase tracking-wide text-cyan-100 hover:bg-cyan-500/20"
+        >
+          <CircleDot className="h-4 w-4" aria-hidden />
+          Guide
+        </button>
+      ) : null}
     </>
   );
 
@@ -318,21 +406,41 @@ export function HelixWorkstationShell({
                       : "border-white/10 bg-black/25"
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleSelectSession(session.id)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="truncate text-sm font-medium text-slate-100">{title}</p>
-                    <p className="mt-1 truncate text-[11px] text-slate-500">
-                      {t(
-                        messageCount === 1
-                          ? "workstation.shell.messageCountSingular"
-                          : "workstation.shell.messageCountPlural",
-                        { count: messageCount },
-                      )} - {formatSessionDate(session.updatedAt)}
-                    </p>
-                  </button>
+                  {renamingSessionId === session.id ? (
+                    <input
+                      autoFocus
+                      value={renameDraft}
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleCommitRenameSession(session.id);
+                        } else if (event.key === "Escape") {
+                          setRenamingSessionId(null);
+                          setRenameDraft("");
+                        }
+                      }}
+                      aria-label={t("workstation.shell.renameChatInput", { title })}
+                      className="min-w-0 flex-1 rounded border border-cyan-300/40 bg-black/35 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-200"
+                      maxLength={120}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSession(session.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate text-sm font-medium text-slate-100">{title}</p>
+                      <p className="mt-1 truncate text-[11px] text-slate-500">
+                        {t(
+                          messageCount === 1
+                            ? "workstation.shell.messageCountSingular"
+                            : "workstation.shell.messageCountPlural",
+                          { count: messageCount },
+                        )} - {formatSessionDate(session.updatedAt)}
+                      </p>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleSelectSession(session.id)}
@@ -340,6 +448,55 @@ export function HelixWorkstationShell({
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
                   >
                     <ChevronRight className="h-4 w-4" />
+                  </button>
+                  {renamingSessionId === session.id ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleCommitRenameSession(session.id)}
+                        aria-label={t("workstation.shell.renameChatSave", { title })}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenamingSessionId(null);
+                          setRenameDraft("");
+                        }}
+                        aria-label={t("workstation.shell.renameChatCancel", { title })}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleBeginRenameSession(session.id);
+                      }}
+                      aria-label={t("workstation.shell.renameChat", { title })}
+                      title={t("workstation.shell.renameChatTitle")}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleClearSession(session.id);
+                    }}
+                    aria-label={t("workstation.shell.clearChat", { title })}
+                    title={t("workstation.shell.clearChatTitle")}
+                    disabled={messageCount === 0}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-300/20 bg-amber-500/10 text-amber-100 hover:border-amber-200/50 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <Eraser className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"
@@ -482,6 +639,7 @@ export function HelixWorkstationShell({
   }
 
   return (
+    <>
     <div
       className="fixed inset-0 z-10 grid min-h-0 w-full"
       style={{
@@ -531,5 +689,12 @@ export function HelixWorkstationShell({
         />
       </div>
     </div>
+    <CasimirGuideOverlay
+      open={guideOpen}
+      onClose={() => setGuideOpen(false)}
+      onOpenPanel={onOpenPanel}
+      context={guideContext}
+    />
+    </>
   );
 }

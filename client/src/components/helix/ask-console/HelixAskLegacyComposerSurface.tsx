@@ -19,6 +19,7 @@ import {
 } from "./HelixAskVoiceLevelMonitorSurface";
 
 export type HelixAskLegacyComposerSurfaceProps = {
+  destination?: ReactNode;
   voiceLevelMonitor: HelixAskVoiceLevelMonitorSurfaceProps;
   moodAvatar: HelixAskMoodAvatarSurfaceProps;
   actionToolbar: HelixAskComposerActionToolbarSurfaceProps;
@@ -28,6 +29,7 @@ export type HelixAskLegacyComposerSurfaceProps = {
 };
 
 export function HelixAskLegacyComposerSurface({
+  destination,
   voiceLevelMonitor,
   moodAvatar,
   actionToolbar,
@@ -37,6 +39,7 @@ export function HelixAskLegacyComposerSurface({
 }: HelixAskLegacyComposerSurfaceProps) {
   return (
     <HelixAskSurfaceComposerPanel
+      destination={destination}
       voiceLevelMonitor={<HelixAskVoiceLevelMonitorSurface {...voiceLevelMonitor} />}
       moodAvatar={<HelixAskMoodAvatarSurface {...moodAvatar} />}
       actionToolbar={<HelixAskComposerActionToolbarSurface {...actionToolbar} />}

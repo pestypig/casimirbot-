@@ -402,11 +402,23 @@ The core durable-run tools are:
 | MCP tool                   | Scope | Input                                           |
 | -------------------------- | ----- | ----------------------------------------------- |
 | `helix_run_start`          | write | `idempotency_key`, start `request`              |
+| `helix_run_evidence_reenter` | write | `run_id`, `idempotency_key`, expected version and stored observation refs |
 | `helix_run_continue`       | write | `run_id`, `idempotency_key`, continue `request` |
 | `helix_run_cancel`         | write | `run_id`, `idempotency_key`, cancel `request`   |
 | `helix_run_inspect`        | read  | `run_id`                                        |
 | `helix_run_fetch_evidence` | read  | `run_id`                                        |
 | `helix_run_list_events`    | read  | `run_id`, `after_seq`, `limit`                  |
+
+`helix_run_evidence_reenter` is the explicit external-agent bridge between a
+governed MCP capability result and the next bounded Ask continuation. It accepts
+only references that resolve through the authenticated owner's durable MCP
+observation store with valid integrity, retention, freshness, and the fixed
+evidence-only authority flags. It never accepts raw receipt text, invokes a
+model, executes a capability, creates or selects a provider task, or grants
+answer or terminal authority. The calling runtime remains responsible for the
+sequence: start or select the run, call the admitted capability, re-enter its
+stored observation reference, then call `helix_run_continue` with the new run
+version.
 
 The Shared Live Room extension tools are:
 
@@ -543,6 +555,7 @@ const response = await openai.responses.create({
       authorization: casimirAccessToken,
       allowed_tools: [
         "helix_run_start",
+        "helix_run_evidence_reenter",
         "helix_run_continue",
         "helix_run_inspect",
         "helix_run_fetch_evidence",
@@ -578,6 +591,7 @@ scopes = [
 ]
 enabled_tools = [
   "helix_run_start",
+  "helix_run_evidence_reenter",
   "helix_run_continue",
   "helix_run_inspect",
   "helix_run_fetch_evidence",
@@ -628,6 +642,7 @@ const interaction = await gemini.interactions.create({
       },
       allowed_tools: [
         "helix_run_start",
+        "helix_run_evidence_reenter",
         "helix_run_continue",
         "helix_run_inspect",
         "helix_run_fetch_evidence",

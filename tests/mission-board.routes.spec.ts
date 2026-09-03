@@ -189,6 +189,10 @@ describe("mission board routes", () => {
       traceId: "trace-123",
       evidenceRefs: ["ctx:screen"],
       ts: "2026-02-24T06:01:00.000Z",
+      certaintyClass: "confirmed",
+      failReason: "context_source_verified",
+      suppressionReason: "critical_only_policy",
+      lastVerifiedAt: "2026-02-24T06:00:59.000Z",
     });
 
     expect(res.status).toBe(200);
@@ -197,11 +201,47 @@ describe("mission board routes", () => {
 
     const events = await request(app).get(`/api/mission-board/${missionId}/events`).query({ limit: 10 });
     expect(events.status).toBe(200);
-    const contextEvent = (events.body.events as Array<{ text: string; traceId?: string; contextTier?: string; sessionState?: string }>).find((event) => event.text.includes("context:tier1/active"));
+    const contextEvent = (events.body.events as Array<{
+      text: string;
+      traceId?: string;
+      contextTier?: string;
+      sessionState?: string;
+      certaintyClass?: string;
+      failReason?: string;
+      suppressionReason?: string;
+      lastVerifiedAt?: string;
+    }>).find((event) => event.text.includes("context:tier1/active"));
     expect(contextEvent).toBeTruthy();
     expect(contextEvent?.traceId).toBe("trace-123");
     expect(contextEvent?.contextTier).toBe("tier1");
     expect(contextEvent?.sessionState).toBe("active");
+    expect(contextEvent?.certaintyClass).toBe("confirmed");
+    expect(contextEvent?.failReason).toBe("context_source_verified");
+    expect(contextEvent?.suppressionReason).toBe("critical_only_policy");
+    expect(contextEvent?.lastVerifiedAt).toBe("2026-02-24T06:00:59.000Z");
+  });
+
+  it("returns the latest bounded event page when tail projection is requested", async () => {
+    const app = buildApp();
+    const missionId = uniqueMissionId();
+    for (let index = 1; index <= 3; index += 1) {
+      await request(app).post(`/api/mission-board/${missionId}/actions`).send({
+        actionId: `tail-event-${index}`,
+        type: "verify",
+        requestedAt: `2026-02-24T06:00:0${index}.000Z`,
+      });
+    }
+
+    const events = await request(app)
+      .get(`/api/mission-board/${missionId}/events`)
+      .query({ limit: 2, tail: 1 });
+    expect(events.status).toBe(200);
+    expect(events.body.events.map((event: { eventId: string }) => event.eventId)).toEqual([
+      "tail-event-2",
+      "tail-event-3",
+    ]);
+    expect(events.body.cursor).toBe(1);
+    expect(events.body.nextCursor).toBeNull();
   });
 
   it("projects objective/gap fields from context-events into snapshot", async () => {
@@ -342,7 +382,7 @@ describe("mission board routes", () => {
       ts: "2026-02-24T06:00:10.000Z",
       timer: {
         timerId: "timer-1",
-        timerKind: "countdown",
+        timerKind: "stale_window",
         status: "running",
         dueTs: "2026-02-24T06:00:00.000Z",
         derivedFromEventId: "event-root",
@@ -351,6 +391,7 @@ describe("mission board routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.event.timerId).toBe("timer-1");
+    expect(res.body.event.timerKind).toBe("stale_window");
     expect(res.body.event.derivedFromEventId).toBe("event-root");
   });
 

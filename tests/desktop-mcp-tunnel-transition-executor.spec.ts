@@ -4,6 +4,7 @@ import {
   DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS,
   executeDesktopMcpTunnelTransitionNow,
   restoreDesktopMcpTunnelReadOnly,
+  startDesktopMcpTunnelForUserSession,
   type DesktopMcpTunnelTransitionControllerPort,
 } from "../apps/desktop/src/mcp-tunnel-transition-executor";
 import type {
@@ -15,7 +16,7 @@ const state = (
   scope: DesktopMcpTunnelScope,
   ready: boolean,
 ): DesktopMcpTunnelState => ({
-  schemaVersion: "casimir_desktop_mcp_tunnel/3",
+  schemaVersion: "casimir_desktop_mcp_tunnel/4",
   transport: "openai_secure_mcp_tunnel",
   access: "developer_private",
   scope,
@@ -28,6 +29,15 @@ const state = (
   ready,
   adminUiAvailable: ready,
   failureCode: null,
+  recovery: {
+    phase: "idle",
+    attemptCount: 0,
+    maxAttempts: 3,
+    nextAttemptAt: null,
+    lastReason: null,
+    automaticScope: "local_supervisor_coordination_and_device_check",
+    manualInterventionRequired: false,
+  },
 });
 
 const controller = (input?: {
@@ -76,6 +86,69 @@ describe("native desktop MCP tunnel transition executor", () => {
     expect(port.start).toHaveBeenCalledWith(
       "account_session:fixture-owner",
       "full_helix_agent",
+    );
+  });
+
+  it("treats native full-session start as permission to replace active read-only transport", async () => {
+    const port = controller();
+    const result = await startDesktopMcpTunnelForUserSession({
+      controller: port,
+      accountSessionId: "account_session:fixture-owner",
+      accountType: "developer",
+      requestedScope: "full_helix_agent",
+    });
+    expect(result).toMatchObject({
+      scope: "full_helix_agent",
+      processRunning: true,
+      ready: true,
+    });
+    expect(port.stop).toHaveBeenCalledOnce();
+    expect(port.start).toHaveBeenCalledWith(
+      "account_session:fixture-owner",
+      "full_helix_agent",
+    );
+  });
+
+  it("rejects full-session start for a user account without stopping read-only transport", async () => {
+    const port = controller();
+    await expect(startDesktopMcpTunnelForUserSession({
+      controller: port,
+      accountSessionId: "account_session:fixture-user",
+      accountType: "user",
+      requestedScope: "full_helix_agent",
+    })).rejects.toThrow("mcp_tunnel_full_developer_account_required");
+    expect(port.stop).not.toHaveBeenCalled();
+    expect(port.start).not.toHaveBeenCalled();
+  });
+
+  it("restores read-only transport when explicit full-session start throws", async () => {
+    const port = controller();
+    port.start.mockRejectedValueOnce(new Error("full start failed"));
+    await expect(startDesktopMcpTunnelForUserSession({
+      controller: port,
+      accountSessionId: "account_session:fixture-owner",
+      accountType: "developer",
+      requestedScope: "full_helix_agent",
+    })).rejects.toThrow("full start failed");
+    expect(port.stop).toHaveBeenCalledTimes(2);
+    expect(port.start).toHaveBeenLastCalledWith(
+      "account_session:fixture-owner",
+      "local_supervisor_coordination_and_device_check",
+    );
+  });
+
+  it("restores read-only transport when explicit full-session start is degraded", async () => {
+    const port = controller({ failFull: true });
+    await expect(startDesktopMcpTunnelForUserSession({
+      controller: port,
+      accountSessionId: "account_session:fixture-owner",
+      accountType: "developer",
+      requestedScope: "full_helix_agent",
+    })).rejects.toThrow("mcp_tunnel_requested_scope_not_ready");
+    expect(port.stop).toHaveBeenCalledTimes(2);
+    expect(port.start).toHaveBeenLastCalledWith(
+      "account_session:fixture-owner",
+      "local_supervisor_coordination_and_device_check",
     );
   });
 

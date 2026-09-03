@@ -8,6 +8,7 @@ import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { HELIX_PANELS, type HelixPanelRef } from "@/pages/helix-core.panels";
+import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -35,8 +36,7 @@ export function DesktopTaskbar({
   showStart = true,
   showWindowTabs = true
 }: DesktopTaskbarProps) {
-  const { open } = useDesktopStore();
-  const { focus } = useDesktopStore();
+  const { open, focus, windows, pinned, recentPanelIds } = useDesktopStore();
   const [guideOpen, setGuideOpen] = React.useState(false);
   const handleOpenTaskbarPanel = React.useCallback(() => open("taskbar"), [open]);
   const handleOpenPanel = React.useCallback((panelId: string) => {
@@ -51,12 +51,44 @@ export function DesktopTaskbar({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "g") {
         event.preventDefault();
-        setGuideOpen((current) => !current);
+        setGuideOpen((current: boolean) => !current);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  const guideContext = React.useMemo(() => {
+    const registeredRecent = recentPanelIds.filter((panelId: string) => {
+      const panel = getPanelDef(panelId);
+      return Boolean(panel && !panel.skipTaskbar && !panel.startHidden);
+    });
+    const activePanelId = registeredRecent.find((panelId: string) => {
+      const windowState = windows[panelId];
+      return Boolean(windowState?.isOpen && !windowState.isMinimized);
+    }) ?? Object.values(windows)
+      .filter((windowState) => windowState.isOpen && !windowState.isMinimized)
+      .sort((left, right) => right.z - left.z)
+      .map((windowState) => windowState.id)
+      .find((panelId) => {
+        const panel = getPanelDef(panelId);
+        return Boolean(panel && !panel.skipTaskbar && !panel.startHidden);
+      }) ?? null;
+    return {
+      activePanelId,
+      recentPanelIds: registeredRecent
+        .filter((panelId: string) => panelId !== activePanelId)
+        .slice(0, 5),
+      favoritePanelIds: Object.entries(pinned)
+        .filter(([, isPinned]) => isPinned)
+        .map(([panelId]) => panelId)
+        .filter((panelId: string) => {
+          const panel = getPanelDef(panelId);
+          return Boolean(panel && !panel.skipTaskbar && !panel.startHidden);
+        })
+        .slice(0, 5),
+    };
+  }, [pinned, recentPanelIds, windows]);
 
   return (
     <>
@@ -76,9 +108,11 @@ export function DesktopTaskbar({
         />
         <div className="relative flex w-full items-center gap-3">
           {showStart ? <HelixStartLauncher onOpenPanel={onOpenPanel} /> : null}
-          <Button size="sm" variant="outline" onClick={() => setGuideOpen(true)}
+          <Button size="sm" variant="outline" onClick={() => setGuideOpen((current: boolean) => !current)}
             className="relative flex items-center gap-2 rounded-full border-cyan-400/45 bg-card/70 px-3 text-[12px] font-semibold uppercase tracking-wide text-cyan-200"
-            aria-label="Open Casimir Guide">
+            aria-label={guideOpen ? "Close Casimir Guide" : "Open Casimir Guide"}
+            aria-expanded={guideOpen}
+            aria-controls="casimir-guide-dialog">
             <CircleDot className="h-4 w-4" /> Guide
           </Button>
           <div className="flex-1 overflow-hidden">
@@ -91,7 +125,12 @@ export function DesktopTaskbar({
         </div>
       </div>
     </div>
-    <CasimirGuideOverlay open={guideOpen} onClose={() => setGuideOpen(false)} onOpenPanel={handleOpenPanel} />
+    <CasimirGuideOverlay
+      open={guideOpen}
+      onClose={() => setGuideOpen(false)}
+      onOpenPanel={handleOpenPanel}
+      context={guideContext}
+    />
     </>
   );
 }

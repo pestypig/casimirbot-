@@ -4,6 +4,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildHelixAgentClientReadiness } from "@shared/helix-agent-client-readiness";
+import { DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION } from "@shared/desktop-mcp-tunnel";
 import {
   AGENT_CONNECTION_READINESS_ENDPOINT,
   AgentConnectionSetup,
@@ -24,7 +25,7 @@ const connectionStatus = (connected: boolean) => {
     client_presence: connected ? "online" : "offline",
     catalog_sync: connected ? "current" : "stale",
     thread_attachment: connected ? "attached" : "not_attached",
-    continuation_readiness: "polling",
+    continuation_readiness: "unavailable",
     environment_readiness: "not_selected",
   });
   return {
@@ -71,6 +72,31 @@ const connectionStatus = (connected: boolean) => {
   };
 };
 
+const fullTunnelState = {
+  schemaVersion: DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
+  transport: "openai_secure_mcp_tunnel" as const,
+  access: "developer_private" as const,
+  scope: "full_helix_agent" as const,
+  status: "ready" as const,
+  configured: true,
+  vaultAvailable: true,
+  binaryVersion: "0.0.13",
+  processRunning: true,
+  healthy: true,
+  ready: true,
+  adminUiAvailable: true,
+  failureCode: null,
+  recovery: {
+    phase: "idle" as const,
+    attemptCount: 0,
+    maxAttempts: 3,
+    nextAttemptAt: null,
+    lastReason: null,
+    automaticScope: "local_supervisor_coordination_and_device_check" as const,
+    manualInterventionRequired: false,
+  },
+};
+
 beforeEach(() => {
   window.localStorage.clear();
   delete window.casimirDesktop;
@@ -83,6 +109,103 @@ afterEach(() => {
 });
 
 describe("AgentConnectionSetup", () => {
+  it("starts the native full harness once and then diagnoses the exact Codex connection", async () => {
+    const startMcpTunnel = vi.fn(async () => fullTunnelState);
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      startMcpTunnel,
+      getMcpTunnelState: vi.fn(async () => fullTunnelState),
+    });
+    const fetchMock = vi.fn().mockResolvedValue(response(connectionStatus(true)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AgentConnectionSetup />);
+    expect(document.body.textContent).toMatch(/never approves OAuth/i);
+    fireEvent.click(screen.getByRole("button", { name: "Start Harness" }));
+
+    await waitFor(() => expect(startMcpTunnel).toHaveBeenCalledTimes(1));
+    expect(startMcpTunnel).toHaveBeenCalledWith({ scope: "full_helix_agent" });
+    expect(await screen.findByText("AI app connected")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${AGENT_CONNECTION_READINESS_ENDPOINT}?client_profile=codex_app`,
+      expect.objectContaining({ credentials: "same-origin", cache: "no-store" }),
+    );
+  });
+
+  it("uses the same Start Harness entry point for browser diagnosis without native mutation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response(connectionStatus(false)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AgentConnectionSetup />);
+    fireEvent.click(screen.getByRole("button", { name: "Start Harness" }));
+
+    expect(await screen.findByText("Add CasimirBot to Codex App")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Start Harness available after persisted setup and performs one fresh diagnosis", async () => {
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app",
+      viewed_step: "check",
+    }));
+    const startMcpTunnel = vi.fn(async () => fullTunnelState);
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      startMcpTunnel,
+      getMcpTunnelState: vi.fn(async () => fullTunnelState),
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(connectionStatus(false)))
+      .mockResolvedValueOnce(response(connectionStatus(true)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AgentConnectionSetup />);
+    const startButton = await screen.findByRole("button", { name: "Start Harness" });
+    fireEvent.click(startButton);
+
+    await waitFor(() => expect(startMcpTunnel).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("AI app connected")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("copies only sanitized finite onboarding diagnostics", async () => {
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app",
+      viewed_step: "ready",
+    }));
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      getMcpTunnelState: vi.fn(async () => fullTunnelState),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(connectionStatus(true))));
+
+    render(<AgentConnectionSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Copy diagnostics" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    const exported = writeText.mock.calls[0]?.[0] ?? "";
+    expect(JSON.parse(exported)).toMatchObject({
+      schema: "helix.agent_harness_onboarding_diagnostic.v1",
+      native_desktop_available: true,
+      provider_task_created: false,
+      codex_ui_automation_used: false,
+      credential_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(exported).not.toContain("profile-ref");
+    expect(exported).not.toContain("mcp-client-ref");
+    expect(exported).not.toContain("thread-ref");
+    expect(await screen.findByText("Sanitized onboarding diagnostics copied.")).toBeInTheDocument();
+  });
+
   it("guides Codex setup without treating the optional plugin as connection proof", async () => {
     const openCodexPlugin = vi.fn(async () => undefined);
     window.casimirDesktop = Object.freeze({
@@ -121,14 +244,16 @@ describe("AgentConnectionSetup", () => {
     fireEvent.click(screen.getByRole("button", { name: "I added it" }));
     expect(screen.getByText("Check the connection")).toBeInTheDocument();
     expect(screen.getByText(/stop repeating the loop/i)).toBeInTheDocument();
+    expect(screen.getByText(/separate Device Check plugin/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("AI app connected")).toBeInTheDocument();
     expect(screen.getByText(/does not expose private reasoning/i)).toBeInTheDocument();
     expect(screen.getByText(/Thread visibility: tool activity only/i)).toBeInTheDocument();
+    expect(screen.getByText(/sees harness tool activity only and cannot send messages/i)).toBeInTheDocument();
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("binding-ref");
   });
 
-  it("requires one explicit reconnect when authorization is newer than the catalog probe", async () => {
+  it("requires one explicit same-task reload when authorization is newer than the catalog probe", async () => {
     window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
       schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
       selected_profile: "codex_app",
@@ -151,8 +276,10 @@ describe("AgentConnectionSetup", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(candidate)));
 
     render(<AgentConnectionSetup />);
-    expect(await screen.findByText("Refresh the AI app connection")).toBeInTheDocument();
-    expect(screen.getByText(/authorization changed after this app last loaded/i)).toBeInTheDocument();
+    expect(await screen.findByText("Refresh this AI task's connection")).toBeInTheDocument();
+    expect(screen.getByText(/authorization changed after this task last loaded/i)).toBeInTheDocument();
+    expect(screen.getByText(/in-place MCP reload for this same task/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/start a fresh (chat|task)|begin a new chat/i);
     expect(screen.queryByText("AI app connected")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
@@ -199,6 +326,48 @@ describe("AgentConnectionSetup", () => {
       "/api/account/session/agent-bindings/binding-ref",
       expect.objectContaining({ method: "DELETE", credentials: "same-origin" }),
     ));
+  });
+
+  it("rehydrates the current exact reasoning binding after readiness reload", async () => {
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app",
+      viewed_step: "ready",
+    }));
+    const candidate = connectionStatus(true);
+    candidate.readiness = buildHelixAgentClientReadiness({
+      agentSelected: true,
+      provider_application: "available",
+      client_authorization: "active",
+      client_presence: "online",
+      catalog_sync: "current",
+      thread_attachment: "attached",
+      continuation_readiness: "polling",
+      environment_readiness: "not_selected",
+    });
+    candidate.thread_observability_bridge.negotiated_level = "continuation_ready";
+    const binding = {
+      reasoning_binding_id: "reasoning_binding:reload-test",
+      helix_conversation_id: "helix-chat-test",
+      status: "active",
+      continuation_transport: "polling",
+      binding_epoch: 2,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(candidate))
+      .mockResolvedValueOnce(response({ binding }))
+      .mockResolvedValueOnce(response({ binding: { ...binding, status: "revoked" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AgentConnectionSetup />);
+
+    expect(await screen.findByText(/Binding state:/i)).toHaveTextContent("active");
+    fireEvent.click(screen.getByRole("button", { name: "Revoke binding" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/account/session/agent-connections/reasoning-bindings/reasoning_binding%3Areload-test/revoke",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    ));
+    expect(await screen.findByText(/Binding state:/i)).toHaveTextContent("revoked");
   });
 
   it("allows the optional Device Check to be skipped with keyboard-native controls", async () => {

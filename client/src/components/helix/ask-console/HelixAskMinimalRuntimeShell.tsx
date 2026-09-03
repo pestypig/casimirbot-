@@ -87,6 +87,34 @@ import {
 import { HelixAskWorkflowSuggestionRuntime } from "./HelixAskWorkflowSuggestionRuntime";
 import { useHelixAskWorkflowQteBridge } from "./HelixAskWorkflowQteBridge";
 import { buildHelixAskMinimalRuntimeWorkspaceContext } from "./HelixAskMinimalRuntimeWorkspaceContext";
+import {
+  buildHelixAskComposerDestinationModel,
+  saveHelixOperatorNote,
+  type HelixAskComposerDestinationKind,
+} from "./HelixAskComposerDestination";
+import { HelixAskComposerDestinationStrip } from "./HelixAskComposerDestinationStrip";
+import {
+  dispatchReasoningSteering,
+  dispatchCurrentReasoningSteering,
+  HELIX_REASONING_BINDING_STORAGE_KEY,
+  HELIX_REASONING_BINDING_UPDATED_EVENT,
+  inspectReasoningBinding,
+  inspectCurrentReasoningBinding,
+  inspectLatestReasoningBinding,
+  inspectReasoningSteering,
+  readLatestReasoningBinding,
+  readReasoningBinding,
+  type BrowserReasoningBinding,
+  useBrowserReasoningBindingStore,
+} from "@/lib/agent-access/reasoningTaskBinding";
+import {
+  publishMinecraftPlaySteeringResult,
+  subscribeBoundAgentSteeringRequests,
+} from "./HelixBoundAgentSteeringBridge";
+import {
+  HELIX_VOICE_STEERING_FINALIZED_EVENT,
+  type HelixVoiceSteeringFinalizedDetail,
+} from "@/lib/helix/voice-steering-finalized";
 
 export type HelixAskMinimalRuntimeVisibleSurfaceSlots = {
   voiceLevelMonitor?: ReactNode;
@@ -130,6 +158,16 @@ export function HelixAskMinimalRuntimeShell({
 }: HelixAskMinimalRuntimeShellProps) {
   const shellProps = buildHelixAskConsoleRuntimeBridgeProps(props);
   const [draft, setDraft] = useState("");
+  const [composerDestination, setComposerDestination] =
+    useState<HelixAskComposerDestinationKind>("helix_ask");
+  const composerDestinationRef = useRef<HelixAskComposerDestinationKind>("helix_ask");
+  const [operatorNoteState, setOperatorNoteState] =
+    useState<"idle" | "saving" | "saved" | "unavailable">("idle");
+  const [boundAgentState, setBoundAgentState] =
+    useState<"active" | "awaiting_agent_pickup" | "unavailable">("unavailable");
+  const [currentReasoningBinding, setCurrentReasoningBinding] =
+    useState<BrowserReasoningBinding | null>(null);
+  const sharedReasoningBinding = useBrowserReasoningBindingStore((state) => state.current);
   const [selectedRuntime, setSelectedRuntime] = useState<HelixAgentRuntimeId>("codex");
   const [runtimeProviders, setRuntimeProviders] = useState(DEFAULT_HELIX_AGENT_RUNTIME_PROVIDERS);
   const [selectedLanguageModelProfile, setSelectedLanguageModelProfile] = useState<HelixLanguageModelProfileId>(() =>
@@ -148,12 +186,25 @@ export function HelixAskMinimalRuntimeShell({
   const runtimeGoalWakeLastSubmittedKeyRef = useRef<string | null>(null);
   const hydratedChatSessionRef = useRef<string | null>(null);
   const pendingExternalPromptRef = useRef<PendingHelixAskPrompt | null>(null);
+  const bindingPickupPollRef = useRef<AbortController | null>(null);
+  const bindingInspectionSequenceRef = useRef(0);
   const workflowQteBridge = useHelixAskWorkflowQteBridge();
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const addChatMessage = useAgiChatStore((state) => state.addMessage);
   const setActiveChatSession = useAgiChatStore((state) => state.setActive);
+  const activeChatSessionId = useAgiChatStore((state) => state.activeId ?? null);
+  const persistedReasoningBindings = useAgiChatStore(
+    (state) => state.reasoningTaskBindings,
+  );
+  const existingContextSessionId = useAgiChatStore((state) => {
+    const activeSession = state.activeId ? state.sessions[state.activeId] : undefined;
+    if (activeSession?.contextId === props.contextId) return activeSession.id;
+    return Object.values(state.sessions).find(
+      (session) => session.contextId === props.contextId,
+    )?.id;
+  });
   const chatSession = useAgiChatStore((state) => (chatSessionId ? state.sessions[chatSessionId] : undefined));
   const turnRunner = runTurn ?? runHelixAskMinimalRuntimeBackendTurn;
   const selectedLanguageModelSelection = useMemo<HelixLanguageModelSelectionRequest>(
@@ -213,7 +264,7 @@ export function HelixAskMinimalRuntimeShell({
   }, [runtimeState.replies]);
 
   const getMinimalRuntimeSessionId = useCallback(() => {
-    const sessionId = chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
+    const sessionId = activeChatSessionId ?? chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
     if (sessionId && sessionId !== chatSessionId) {
       setChatSessionId(sessionId);
       setActiveChatSession(sessionId);
@@ -311,20 +362,20 @@ export function HelixAskMinimalRuntimeShell({
     }
     workflowQteBridge.clearPending();
     const desktopUrl = typeof window === "undefined" ? "" : window.location.href;
+    const sessionId = chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
     const submitPlan = buildHelixAskMinimalRuntimeSubmitPlan({
       draft: draftText,
       selectedRuntime,
       selectedLanguageModelProfile,
       selectedLanguageModelSelection,
       desktopUrl,
-      workspaceContextSnapshot: buildMinimalWorkspaceContextSnapshot(chatSessionId),
+      workspaceContextSnapshot: buildMinimalWorkspaceContextSnapshot(sessionId || null),
       pendingPrompt,
       durableReplies: chatSession ? buildHelixAskMinimalRuntimeRepliesFromChatSession(chatSession) : [],
       visibleReplies: runtimeState.replies,
     });
     if (submitPlan.envelope) {
       const turnId = `ask:${crypto.randomUUID()}`;
-      const sessionId = chatSessionId ?? ensureContextSession(props.contextId, "Helix Ask");
       onSubmitPlan?.(submitPlan);
       if (sessionId) {
         setChatSessionId(sessionId);
@@ -508,16 +559,464 @@ export function HelixAskMinimalRuntimeShell({
       }),
     [runtimePickerModel.selectedLabel, runtimeState.askBusy, shellProps.placeholder],
   );
-  const submitCurrentDraft = useCallback(() => {
-    submitMinimalRuntimeQuestion(draft);
-  }, [draft, submitMinimalRuntimeQuestion]);
+  const selectedHelixConversationId = activeChatSessionId ?? chatSessionId;
+  const latestIssuedReasoningBinding = typeof window === "undefined"
+    ? null
+    : readLatestReasoningBinding();
+  const exactBindingIsActive = [
+    sharedReasoningBinding,
+    currentReasoningBinding,
+    latestIssuedReasoningBinding,
+    selectedHelixConversationId
+      ? persistedReasoningBindings[selectedHelixConversationId] ?? null
+      : null,
+    readReasoningBinding(selectedHelixConversationId),
+  ].some((binding) => binding?.status === "active" && (
+    binding.helix_conversation_id === selectedHelixConversationId ||
+    binding === sharedReasoningBinding ||
+    binding === currentReasoningBinding
+  ));
+  const effectiveBoundAgentState = exactBindingIsActive && boundAgentState !== "awaiting_agent_pickup"
+    ? "active"
+    : boundAgentState;
+  const composerDestinationModel = useMemo(
+    () => buildHelixAskComposerDestinationModel({
+      kind: composerDestination,
+      runtimeLabel: runtimePickerModel.selectedLabel,
+      busy: runtimeState.askBusy,
+      noteState: operatorNoteState,
+      boundAgentState: effectiveBoundAgentState,
+    }),
+    [
+      composerDestination,
+      effectiveBoundAgentState,
+      operatorNoteState,
+      runtimePickerModel.selectedLabel,
+      runtimeState.askBusy,
+    ],
+  );
+  const dispatchToBoundAgent = useCallback(async (
+    text: string,
+    origin: "typed" | "gpt_live_finalized",
+    clientEventRef: string,
+  ): Promise<boolean> => {
+    const candidateSessionId = activeChatSessionId ?? chatSessionId;
+    const verifiedPanelCandidate = [
+      readLatestReasoningBinding(),
+      sharedReasoningBinding,
+      currentReasoningBinding,
+    ]
+      .find((candidate) => candidate?.status === "active") ?? null;
+    const bindingCandidates = [
+      sharedReasoningBinding,
+      currentReasoningBinding,
+      readReasoningBinding(candidateSessionId),
+      candidateSessionId ? persistedReasoningBindings[candidateSessionId] ?? null : null,
+    ].filter((candidate) =>
+      candidate != null && candidate.helix_conversation_id === candidateSessionId,
+    );
+    // Resolve the selected chat through the authenticated server before using
+    // any browser projection. Stored `active` is only a historical status and
+    // can outlive the short lease; it must never mask a newer exact binding.
+    let binding: BrowserReasoningBinding | null = null;
+    let currentDispatch: Record<string, unknown> | null = null;
+    try {
+      const dispatched = await dispatchCurrentReasoningSteering({
+        ...(candidateSessionId
+          ? { helixConversationId: candidateSessionId }
+          : {}),
+        clientEventRef,
+        origin,
+        instructionText: text,
+      });
+      binding = dispatched.binding;
+      currentDispatch = dispatched as unknown as Record<string, unknown>;
+      setCurrentReasoningBinding(dispatched.binding);
+      setBoundAgentState("active");
+    } catch {
+      // Fall through to exact browser projections for compatibility with an
+      // older server that does not yet expose the current-binding dispatch.
+    }
+    try {
+      const authoritative = binding ?? await inspectLatestReasoningBinding();
+      if (authoritative.status === "active") {
+        binding = authoritative;
+        setCurrentReasoningBinding(authoritative);
+        setBoundAgentState("active");
+      }
+    } catch {
+      // Browser projections and the selected-chat lookup remain fail-closed fallbacks.
+    }
+    if (!binding && verifiedPanelCandidate) {
+      try {
+        const authoritative = await inspectReasoningBinding(
+          verifiedPanelCandidate.reasoning_binding_id,
+        );
+        if (authoritative.status === "active") {
+          binding = authoritative;
+          setCurrentReasoningBinding(authoritative);
+          setBoundAgentState("active");
+        }
+      } catch {
+        // The authenticated selected-chat lookup below is the only fallback.
+      }
+    }
+    if (!binding && candidateSessionId) {
+      try {
+        const authoritative = await inspectCurrentReasoningBinding(candidateSessionId);
+        if (authoritative.status === "active") {
+          binding = authoritative;
+          setCurrentReasoningBinding(authoritative);
+          setBoundAgentState("active");
+        }
+      } catch {
+        // Exact remembered candidates are verified below; no other chat may
+        // substitute for the selected destination.
+      }
+    }
+    if (!binding) {
+      for (const candidate of bindingCandidates) {
+        try {
+          const authoritative = await inspectReasoningBinding(candidate.reasoning_binding_id);
+          if (
+            authoritative.status === "active" &&
+            authoritative.helix_conversation_id === candidateSessionId
+          ) {
+            binding = authoritative;
+            setCurrentReasoningBinding(authoritative);
+            setBoundAgentState("active");
+            break;
+          }
+        } catch {
+          // Continue only across projections for this exact selected chat.
+        }
+      }
+    }
+    const sessionId = binding?.helix_conversation_id ?? candidateSessionId ??
+      ensureContextSession(props.contextId, "Helix Ask");
+    if (!sessionId || !binding || binding.status !== "active") {
+      console.warn("[helix-bound-agent] exact binding unavailable", {
+        candidateSessionId,
+        candidates: bindingCandidates.map((candidate) => candidate
+          ? {
+              bindingId: candidate.reasoning_binding_id,
+              conversationId: candidate.helix_conversation_id,
+              status: candidate.status,
+            }
+          : null),
+      });
+      setBoundAgentState("unavailable");
+      setRuntimeState((state) => ({
+        ...state,
+        askStatus: "No active exact-task binding. Save a local note or bind this Helix chat in Agent Connections.",
+      }));
+      return false;
+    }
+    setBoundAgentState("awaiting_agent_pickup");
+    try {
+      const dispatch = currentDispatch ?? await dispatchReasoningSteering({
+          bindingId: binding.reasoning_binding_id,
+          bindingEpoch: binding.binding_epoch,
+          clientEventRef,
+          origin,
+          instructionText: text,
+        });
+      setChatSessionId(sessionId);
+      setActiveChatSession(sessionId);
+      addChatMessage(sessionId, {
+        role: "user",
+        content: text,
+        traceId: clientEventRef,
+      });
+      setRuntimeState((state) => ({
+        ...state,
+        askStatus: "Steering queued for exact agent pickup. Provider delivery is not claimed until acknowledgement.",
+      }));
+      const event = dispatch.event as { steering_event_ref?: string } | undefined;
+      if (event?.steering_event_ref) {
+        bindingPickupPollRef.current?.abort();
+        const controller = new AbortController();
+        bindingPickupPollRef.current = controller;
+        void (async () => {
+          for (let attempt = 0; attempt < 30 && !controller.signal.aborted; attempt += 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+            if (controller.signal.aborted) return;
+            try {
+              const current = await inspectReasoningSteering({
+                bindingId: binding.reasoning_binding_id,
+                bindingEpoch: binding.binding_epoch,
+                eventRef: event.steering_event_ref!,
+              });
+              if (current.delivery_state === "acknowledged") {
+                setBoundAgentState("active");
+                setRuntimeState((state) => ({
+                  ...state,
+                  askStatus: "The bound agent acknowledged exact pickup. This confirms transport pickup, not task completion.",
+                }));
+                publishMinecraftPlaySteeringResult(clientEventRef, "acknowledged");
+                return;
+              }
+              if (current.delivery_state !== "pending") {
+                setBoundAgentState("unavailable");
+                setRuntimeState((state) => ({
+                  ...state,
+                  askStatus: `Exact pickup ended with ${current.delivery_state}; no provider answer is claimed.`,
+                }));
+                publishMinecraftPlaySteeringResult(
+                  clientEventRef,
+                  current.delivery_state,
+                );
+                return;
+              }
+            } catch {
+              setBoundAgentState("unavailable");
+              setRuntimeState((state) => ({
+                ...state,
+                askStatus: "Exact pickup status became unavailable; no provider delivery is claimed.",
+              }));
+              publishMinecraftPlaySteeringResult(clientEventRef, "unavailable");
+              return;
+            }
+          }
+          if (!controller.signal.aborted) {
+            setBoundAgentState("active");
+            setRuntimeState((state) => ({
+              ...state,
+              askStatus: "Steering remains queued without an acknowledgement. The exact binding is still active.",
+            }));
+            publishMinecraftPlaySteeringResult(clientEventRef, "unavailable");
+          }
+        })();
+      }
+      return true;
+    } catch {
+      setBoundAgentState("unavailable");
+      setRuntimeState((state) => ({
+        ...state,
+        askStatus: "The bound agent steering request was rejected or became stale.",
+      }));
+      return false;
+    }
+  }, [activeChatSessionId, addChatMessage, chatSessionId, currentReasoningBinding, ensureContextSession, persistedReasoningBindings, props.contextId, setActiveChatSession, sharedReasoningBinding]);
 
   useEffect(() => {
-    const sessionId = ensureContextSession(props.contextId, "Helix Ask");
-    if (!sessionId) return;
-    setChatSessionId(sessionId);
-    setActiveChatSession(sessionId);
-  }, [ensureContextSession, props.contextId, setActiveChatSession]);
+    return subscribeBoundAgentSteeringRequests(dispatchToBoundAgent);
+  }, [dispatchToBoundAgent]);
+
+  useEffect(() => () => bindingPickupPollRef.current?.abort(), []);
+
+  const submitCurrentDraft = useCallback((destinationOverride?: HelixAskComposerDestinationKind) => {
+    const destination = destinationOverride ?? composerDestinationRef.current;
+    if (destination === "operator_note") {
+      if (!draft.trim()) return;
+      setOperatorNoteState("saving");
+      try {
+        saveHelixOperatorNote(draft);
+        setDraft("");
+        setOperatorNoteState("saved");
+        setRuntimeState((state) => ({
+          ...state,
+          askStatus: "Operator note saved locally. No provider delivery was claimed.",
+        }));
+      } catch {
+        setOperatorNoteState("unavailable");
+        setRuntimeState((state) => ({
+          ...state,
+          askStatus: "Operator note could not be saved on this device.",
+        }));
+      }
+      return;
+    }
+    if (destination === "bound_agent") {
+      const text = draft.trim();
+      if (!text) return;
+      const eventRef = `typed:${crypto.randomUUID()}`;
+      void dispatchToBoundAgent(text, "typed", eventRef).then((accepted) => {
+        if (accepted) setDraft("");
+      });
+      return;
+    }
+    submitMinimalRuntimeQuestion(draft);
+  }, [dispatchToBoundAgent, draft, submitMinimalRuntimeQuestion]);
+
+  useEffect(() => {
+    const inspectionSequence = ++bindingInspectionSequenceRef.current;
+    const preferredBinding = readReasoningBinding(activeChatSessionId ?? chatSessionId);
+    const latestBinding = readLatestReasoningBinding();
+    const binding = [preferredBinding, latestBinding].find(
+      (candidate) => candidate?.status === "active",
+    ) ?? [preferredBinding, latestBinding].filter(
+      (candidate): candidate is BrowserReasoningBinding => candidate != null,
+    ).sort((left, right) => right.binding_epoch - left.binding_epoch)[0] ?? null;
+    if (!binding) {
+      setCurrentReasoningBinding(null);
+      setBoundAgentState("unavailable");
+      return;
+    }
+    setCurrentReasoningBinding(binding);
+    setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
+    void inspectReasoningBinding(binding.reasoning_binding_id).then((current) => {
+      if (bindingInspectionSequenceRef.current !== inspectionSequence) return;
+      setCurrentReasoningBinding(current);
+      setBoundAgentState(current.status === "active" ? "active" : "unavailable");
+    }).catch(() => {
+      if (bindingInspectionSequenceRef.current === inspectionSequence) {
+        setBoundAgentState("unavailable");
+      }
+    });
+  }, [activeChatSessionId, chatSessionId]);
+
+  useEffect(() => {
+    const helixConversationId = activeChatSessionId ?? chatSessionId;
+    if (!helixConversationId) return;
+    let cancelled = false;
+    const synchronizeServerBinding = async () => {
+      try {
+        const binding = composerDestination === "bound_agent"
+          ? await inspectLatestReasoningBinding()
+          : await inspectCurrentReasoningBinding(helixConversationId);
+        if (cancelled) return;
+        bindingInspectionSequenceRef.current += 1;
+        setCurrentReasoningBinding((current) => {
+          if (
+            binding.status !== "active" &&
+            current?.status === "active" &&
+            current.reasoning_binding_id !== binding.reasoning_binding_id
+          ) {
+            return current;
+          }
+          setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
+          return binding;
+        });
+        if (
+          composerDestination === "bound_agent" &&
+          binding.status === "active" &&
+          useAgiChatStore.getState().sessions[binding.helix_conversation_id]
+        ) {
+          setChatSessionId(binding.helix_conversation_id);
+          setActiveChatSession(binding.helix_conversation_id);
+        }
+      } catch {
+        // A missing binding is an expected unavailable state. Existing local
+        // projection remains visible until an authoritative status replaces it.
+      }
+    };
+    void synchronizeServerBinding();
+    if (composerDestination !== "bound_agent") {
+      return () => { cancelled = true; };
+    }
+    const interval = window.setInterval(() => void synchronizeServerBinding(), 1_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeChatSessionId, chatSessionId, composerDestination, setActiveChatSession]);
+
+  useEffect(() => {
+    if (composerDestination !== "bound_agent") return;
+    let cancelled = false;
+    void inspectLatestReasoningBinding().then((binding) => {
+      if (cancelled) return;
+      setCurrentReasoningBinding(binding);
+      setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
+    }).catch(() => {
+      if (!cancelled) setBoundAgentState("unavailable");
+    });
+    return () => { cancelled = true; };
+  }, [composerDestination]);
+
+  useEffect(() => {
+    const synchronizeRememberedBinding = () => {
+      // Once the operator selects the exact-task destination, browser storage
+      // is only historical projection. Binding epochs are service-local, so an
+      // older service can otherwise overwrite the authenticated current epoch.
+      if (composerDestination === "bound_agent") return;
+      const binding = readLatestReasoningBinding();
+      if (!binding) return;
+      setCurrentReasoningBinding((current) => {
+        if (
+          current?.reasoning_binding_id === binding.reasoning_binding_id &&
+          current.status === binding.status
+        ) return current;
+        setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
+        return binding;
+      });
+    };
+    synchronizeRememberedBinding();
+    const interval = window.setInterval(synchronizeRememberedBinding, 1_000);
+    return () => window.clearInterval(interval);
+  }, [composerDestination]);
+
+  useEffect(() => {
+    if (!sharedReasoningBinding) return;
+    bindingInspectionSequenceRef.current += 1;
+    setCurrentReasoningBinding(sharedReasoningBinding);
+    setBoundAgentState(sharedReasoningBinding.status === "active" ? "active" : "unavailable");
+    if (
+      sharedReasoningBinding.status === "active" &&
+      useAgiChatStore.getState().sessions[sharedReasoningBinding.helix_conversation_id]
+    ) {
+      setChatSessionId(sharedReasoningBinding.helix_conversation_id);
+      setActiveChatSession(sharedReasoningBinding.helix_conversation_id);
+    }
+  }, [setActiveChatSession, sharedReasoningBinding]);
+
+  useEffect(() => {
+    const applyBinding = (binding: BrowserReasoningBinding | null) => {
+      if (!binding) return;
+      bindingInspectionSequenceRef.current += 1;
+      setCurrentReasoningBinding(binding);
+      setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
+      if (
+        binding.status === "active" &&
+        useAgiChatStore.getState().sessions[binding.helix_conversation_id]
+      ) {
+        setChatSessionId(binding.helix_conversation_id);
+        setActiveChatSession(binding.helix_conversation_id);
+      }
+    };
+    const onBindingUpdated = (event: Event) => {
+      applyBinding((event as CustomEvent<BrowserReasoningBinding>).detail ?? null);
+    };
+    const onBindingStorageUpdated = (event: StorageEvent) => {
+      if (event.key !== HELIX_REASONING_BINDING_STORAGE_KEY) return;
+      applyBinding(readLatestReasoningBinding());
+    };
+    window.addEventListener(HELIX_REASONING_BINDING_UPDATED_EVENT, onBindingUpdated);
+    window.addEventListener("storage", onBindingStorageUpdated);
+    return () => {
+      window.removeEventListener(HELIX_REASONING_BINDING_UPDATED_EVENT, onBindingUpdated);
+      window.removeEventListener("storage", onBindingStorageUpdated);
+    };
+  }, [activeChatSessionId, chatSessionId, setActiveChatSession]);
+
+  useEffect(() => {
+    const onFinalizedVoice = (event: Event) => {
+      if (composerDestinationRef.current !== "bound_agent") return;
+      const voiceEvent = event as CustomEvent<HelixVoiceSteeringFinalizedDetail>;
+      const transcript = voiceEvent.detail?.transcript?.trim();
+      if (!transcript) return;
+      event.preventDefault();
+      void dispatchToBoundAgent(
+        transcript,
+        "gpt_live_finalized",
+        voiceEvent.detail.clientEventRef,
+      );
+    };
+    window.addEventListener(HELIX_VOICE_STEERING_FINALIZED_EVENT, onFinalizedVoice);
+    return () => window.removeEventListener(HELIX_VOICE_STEERING_FINALIZED_EVENT, onFinalizedVoice);
+  }, [composerDestination, dispatchToBoundAgent, effectiveBoundAgentState]);
+
+  useEffect(() => {
+    const preferredSessionId = activeChatSessionId ?? existingContextSessionId;
+    if (!preferredSessionId || preferredSessionId === chatSessionId) return;
+    // The operator-selected chat is global workstation state. A shell mounted
+    // for another panel context may hydrate its local transcript from that
+    // selection, but must never replace the global selection with an older
+    // context-matching session.
+    setChatSessionId(preferredSessionId);
+    if (!activeChatSessionId) setActiveChatSession(preferredSessionId);
+  }, [activeChatSessionId, chatSessionId, existingContextSessionId, setActiveChatSession]);
 
   useEffect(() => {
     if (!chatSession || hydratedChatSessionRef.current === chatSession.id) return;
@@ -554,7 +1053,10 @@ export function HelixAskMinimalRuntimeShell({
             onPrimeInteraction={() => undefined}
             onSubmit={(event) => {
               event.preventDefault();
-              submitCurrentDraft();
+              const selectedDestination = (
+                event.currentTarget.elements.namedItem("helix-composer-destination") as HTMLSelectElement | null
+              )?.value as HelixAskComposerDestinationKind | undefined;
+              submitCurrentDraft(selectedDestination);
             }}
           >
             <div className="relative z-[90] flex justify-end px-4 pt-3">
@@ -581,6 +1083,16 @@ export function HelixAskMinimalRuntimeShell({
             </div>
             {visibleSurface?.voiceLevelMonitor}
             <HelixAskLegacyComposerSurface
+              destination={
+                <HelixAskComposerDestinationStrip
+                  model={composerDestinationModel}
+                  onDestinationChange={(kind) => {
+                    composerDestinationRef.current = kind;
+                    setComposerDestination(kind);
+                    setOperatorNoteState("idle");
+                  }}
+                />
+              }
               voiceLevelMonitor={{
                 visible: false,
                 maxHeightPx: 0,

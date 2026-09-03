@@ -91,6 +91,7 @@ const adapterAdmission: HelixEnvironmentAdapterAdmissionProjection = {
 };
 
 const actionClaim: EnvironmentActionConnectorClaim = {
+  ownerProfileId: "profile-owner",
   authorityId: "environment_action_authority:g4-test",
   credentialId: "environment_action_credential:g4-test",
   connectorInstallationId: "environment_connector_installation:g4-test",

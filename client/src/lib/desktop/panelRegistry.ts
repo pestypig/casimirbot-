@@ -26,6 +26,7 @@ export type PanelId =
   | "live-answer-environment"
   | "image-lens"
   | "document-image-lens"
+  | "motorcycle-hud-lab"
   | "narrator"
   | "postulate-board"
   | HelixPanelRef["id"];
@@ -408,6 +409,15 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 980, h: 720 },
     defaultPosition: { x: 320, y: 180 },
     keywords: ["workflow", "demo", "quick time event", "qte", "research", "proposal", "developer"],
+  },
+  {
+    id: "motorcycle-hud-lab",
+    title: "Motorcycle HUD Lab",
+    loader: load(() => import("@/components/workstation/MotorcycleHudLabPanel")),
+    defaultSize: { w: 1240, h: 820 },
+    defaultPosition: { x: 260, y: 130 },
+    keywords: ["motorcycle", "helmet", "hud", "radar", "sensor", "replay", "safety", "developer"],
+    heavy: false,
   },
   {
     id: "workstation-process-graph",

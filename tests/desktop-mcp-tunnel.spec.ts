@@ -194,6 +194,14 @@ describe("desktop Secure MCP Tunnel boundary", () => {
     });
     const state = controller.configure(validCredentials);
     expect(parseDesktopMcpTunnelState(state)).toEqual(state);
+    expect(parseDesktopMcpTunnelState({
+      ...state,
+      recovery: { ...state.recovery, attemptCount: 4, maxAttempts: 3 },
+    })).toBeNull();
+    expect(parseDesktopMcpTunnelState({
+      ...state,
+      schemaVersion: "casimir_desktop_mcp_tunnel/3",
+    })).toBeNull();
     expect(state).toMatchObject({ status: "stopped", configured: true });
     expect(state.scope).toBe(
       "local_supervisor_coordination_and_device_check",

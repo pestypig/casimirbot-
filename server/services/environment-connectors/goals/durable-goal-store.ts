@@ -212,6 +212,13 @@ const readGoalEvents = async (
 
 export const resolveCurrentEnvironmentDurableGoalIdentity:
   EnvironmentDurableGoalIdentityResolver = async (db, request) => {
+    const subjectSelector = request.subjectNativeId.trim();
+    const subjectIdentityColumn = (
+      subjectSelector.startsWith("environment_subject_binding:") ||
+      subjectSelector.startsWith("environment_subject:")
+    )
+      ? "s.subject_ref"
+      : "s.subject_native_id";
     const result = await db.query<{
       owner_profile_id: string;
       installation_id: string;
@@ -245,7 +252,7 @@ export const resolveCurrentEnvironmentDurableGoalIdentity:
            ON m.action_authority_id = a.action_authority_id
         WHERE e.environment_binding_id = $1 AND e.room_id = $2
           AND e.owner_profile_id = $3 AND e.status = 'active'
-          AND s.participant_id = $4 AND s.subject_native_id = $5
+          AND s.participant_id = $4 AND ${subjectIdentityColumn} = $5
           AND s.status = 'active'
           AND a.action_authority_id = $6 AND a.status = 'active'
           AND a.expires_at > now() AND m.status = 'active'
@@ -256,7 +263,7 @@ export const resolveCurrentEnvironmentDurableGoalIdentity:
         request.roomId,
         request.ownerProfileId,
         request.authorityParticipantId ?? request.participantId,
-        request.subjectNativeId,
+        subjectSelector,
         request.actionAuthorityId,
       ],
     );
@@ -290,12 +297,12 @@ export const resolveCurrentEnvironmentDurableGoalIdentity:
         `SELECT subject_binding_id, status
            FROM helix_room_environment_subject_bindings
           WHERE environment_binding_id = $1 AND participant_id = $2
-            AND subject_native_id = $3
+            AND ${subjectIdentityColumn.replace("s.", "")} = $3
           ORDER BY updated_at DESC LIMIT 1;`,
         [
           request.environmentBindingId,
           request.authorityParticipantId ?? request.participantId,
-          request.subjectNativeId,
+          subjectSelector,
         ],
       );
       if (!subject.rows[0] || subject.rows[0].status !== "active") {

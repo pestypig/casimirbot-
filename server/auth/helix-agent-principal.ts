@@ -3,7 +3,6 @@ import type { Request } from "express";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import {
   buildHelixAccountCapabilityPolicy,
-  buildHelixSharedRealtimeRoomsExperimentPolicy,
 } from "@shared/helix-account-session";
 import type { HelixAccountType } from "@shared/helix-account-session";
 import { HELIX_AGENT_RUN_DEVELOPER_SCOPE } from "@shared/contracts/helix-agent-api.v1";
@@ -17,7 +16,10 @@ import {
   isDesktopSessionAuthorized,
   resolveDesktopSessionConfig,
 } from "../security/desktop-session";
-import { getAccountSessionById } from
+import {
+  buildSharedRealtimeRoomsSessionPolicy,
+  getAccountSessionById,
+} from
   "../services/helix-account/account-session-store";
 import { HelixAgentApiServiceError } from "../services/helix-agent-api/errors";
 import type { HelixAgentApiPrincipal } from "../services/helix-agent-api/types";
@@ -450,7 +452,7 @@ export const resolveHelixAgentApiPrincipal = async (
   // other developer feature.
   const accountPolicy = token.scopes.has(HELIX_SHARED_LIVE_ROOM_READ_SCOPE) ||
       token.scopes.has(HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE)
-    ? buildHelixSharedRealtimeRoomsExperimentPolicy(accountType)
+    ? buildSharedRealtimeRoomsSessionPolicy(accountType)
     : buildHelixAccountCapabilityPolicy(accountType);
   const now = new Date().toISOString();
   const sessionId = sessionRef(token.issuer, token.subject, account.profile_id);

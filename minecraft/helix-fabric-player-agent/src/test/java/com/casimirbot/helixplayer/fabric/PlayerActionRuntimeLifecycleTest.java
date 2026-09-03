@@ -85,6 +85,18 @@ final class PlayerActionRuntimeLifecycleTest {
             "error",
             PlayerActionRuntime.connectorHeartbeatStatus(false, false, conflict)
         );
+        assertTrue(PlayerActionRuntime.eventStreamResyncRequiresWorkflowStop(
+            true,
+            "workflow:active"
+        ));
+        assertFalse(PlayerActionRuntime.eventStreamResyncRequiresWorkflowStop(
+            true,
+            null
+        ));
+        assertFalse(PlayerActionRuntime.eventStreamResyncRequiresWorkflowStop(
+            false,
+            "workflow:active"
+        ));
     }
 
     @Test
@@ -119,5 +131,32 @@ final class PlayerActionRuntimeLifecycleTest {
             )
         ));
         assertTrue(PlayerActionRuntime.effectExecutionPerformed(true, true, Map.of()));
+    }
+
+    @Test
+    void laterSafetyRefusalPreservesMeasuredPartialMotion() {
+        assertTrue(PlayerActionRuntime.effectExecutionPerformed(
+            true,
+            true,
+            Map.of(
+                "effect_prevented", true,
+                "player_motion_performed", true,
+                "distance_blocks", 3.0,
+                "reason_code", "locomotion_predicted_drop_exceeded"
+            )
+        ));
+    }
+
+    @Test
+    void plannerRefusalWithExplicitZeroMotionDoesNotClaimAnEffect() {
+        assertFalse(PlayerActionRuntime.effectExecutionPerformed(
+            true,
+            true,
+            Map.of(
+                "player_motion_performed", false,
+                "workflow_displacement_blocks", 0.0,
+                "reason_code", "native_plan_unavailable"
+            )
+        ));
     }
 }

@@ -92,6 +92,8 @@ import {
 import { DesktopUpdateController } from "./updater";
 import { installDesktopSessionSecurity } from "./security";
 import { DesktopMcpTunnelController } from "./mcp-tunnel";
+import { DesktopMcpTunnelRecoverySupervisor } from
+  "./mcp-tunnel-recovery-supervisor";
 import {
   extractDesktopAuth0Callback,
   isAllowedDesktopAuth0AuthorizationUrl,
@@ -126,6 +128,7 @@ import {
   DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS,
   executeDesktopMcpTunnelTransitionNow,
   restoreDesktopMcpTunnelReadOnly,
+  startDesktopMcpTunnelForUserSession,
 } from "./mcp-tunnel-transition-executor";
 import {
   parseActiveDesktopAccount,
@@ -173,6 +176,7 @@ type StartupJournal = {
 
 let desktopRuntime: DesktopRuntime | null = null;
 let mcpTunnelController: DesktopMcpTunnelController | null = null;
+let mcpTunnelRecoverySupervisor: DesktopMcpTunnelRecoverySupervisor | null = null;
 let mainWindow: BrowserWindow | null = null;
 let texturePackOverlayController: RealtimeTexturePackOverlayController | null = null;
 let mcpFullLeaseTimer: NodeJS.Timeout | null = null;
@@ -412,6 +416,7 @@ const restoreReadOnlyMcpTunnel = async (
   controller: DesktopMcpTunnelController,
   accountSessionId: string,
 ): Promise<void> => {
+  mcpTunnelRecoverySupervisor?.cancel("scope_transition");
   if (mcpFullLeaseTimer) clearTimeout(mcpFullLeaseTimer);
   mcpFullLeaseTimer = null;
   await restoreDesktopMcpTunnelReadOnly({ controller, accountSessionId });
@@ -425,6 +430,7 @@ const scheduleNativeMcpTunnelTransition = (input: {
   const timer = setTimeout(() => {
     void (async () => {
       if (generation !== mcpTransitionGeneration) return;
+      mcpTunnelRecoverySupervisor?.cancel("scope_transition");
       const execution = await executeDesktopMcpTunnelTransitionNow({
         controller: input.controller,
         accountSessionId: input.request.accountSessionId,
@@ -471,6 +477,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   const providerCredentialBroker =
     await startDesktopProviderCredentialBroker({
       keyring: providerCredentialKeyring,
+      openAiApiKey: process.env.OPENAI_API_KEY,
     });
   const coordinationOrigin =
     process.env.HELIX_FRIENDS_PARTIES_COORDINATION_ORIGIN?.trim() ?? "";
@@ -1137,6 +1144,7 @@ const registerDesktopIpc = (
   });
   ipcMain.handle(DESKTOP_MCP_TUNNEL_CONFIGURE_CHANNEL, (event, input: unknown) => {
     assertTrustedRenderer(event.senderFrame?.url ?? "");
+    mcpTunnelRecoverySupervisor?.cancel("credentials_reconfigured");
     return tunnelController.configure(input);
   });
   ipcMain.handle(DESKTOP_MCP_TUNNEL_START_CHANNEL, async (event, input: unknown) => {
@@ -1144,20 +1152,22 @@ const registerDesktopIpc = (
     const request = parseDesktopMcpTunnelStartRequest(input);
     if (!request) throw new Error("mcp_tunnel_start_request_invalid");
     const account = await resolveActiveDesktopAccount(runtime, event.sender.session);
-    if (
-      request.scope === "full_helix_agent" &&
-      account.accountType !== "developer"
-    ) {
-      throw new Error("mcp_tunnel_full_developer_account_required");
-    }
-    return tunnelController.start(account.sessionId, request.scope);
+    mcpTunnelRecoverySupervisor?.cancel("scope_transition");
+    return startDesktopMcpTunnelForUserSession({
+      controller: tunnelController,
+      accountSessionId: account.sessionId,
+      accountType: account.accountType,
+      requestedScope: request.scope,
+    });
   });
   ipcMain.handle(DESKTOP_MCP_TUNNEL_STOP_CHANNEL, async (event) => {
     assertTrustedRenderer(event.senderFrame?.url ?? "");
+    mcpTunnelRecoverySupervisor?.cancel("operator_stop");
     return tunnelController.stop();
   });
   ipcMain.handle(DESKTOP_MCP_TUNNEL_CLEAR_CHANNEL, async (event) => {
     assertTrustedRenderer(event.senderFrame?.url ?? "");
+    mcpTunnelRecoverySupervisor?.cancel("credentials_cleared");
     return tunnelController.clear();
   });
   ipcMain.handle(DESKTOP_MCP_TUNNEL_OPEN_ADMIN_CHANNEL, async (event) => {
@@ -1292,12 +1302,14 @@ if (!singleInstance) {
       }
     }
     if (!mainWindow) return;
+    if (!mainWindow.isVisible()) mainWindow.show();
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   });
 
   app.on("before-quit", () => {
     quitting = true;
+    mcpTunnelRecoverySupervisor?.cancel("operator_stop");
     void mcpTunnelController?.stop();
     texturePackOverlayController?.stop("desktop_quit");
     stopDesktopService();
@@ -1321,6 +1333,7 @@ if (!singleInstance) {
       desktopRuntime = await startDesktopService();
       installSessionHeaderInjection(desktopRuntime);
       const tunnelArtifact = readTunnelArtifact(runtimeRoot);
+      let recoverySupervisor: DesktopMcpTunnelRecoverySupervisor | null = null;
       mcpTunnelController = new DesktopMcpTunnelController({
         binaryPath: tunnelArtifact.binaryPath,
         expectedBinarySha256: tunnelArtifact.executableSha256,
@@ -1329,6 +1342,12 @@ if (!singleInstance) {
         runtimeOrigin: desktopRuntime.origin,
         desktopSessionSecret: desktopRuntime.secret,
         storage: safeStorage,
+        onUnexpectedExit: (event) => {
+          recoverySupervisor?.trigger({
+            accountSessionId: event.accountSessionId,
+            reason: event.reason,
+          });
+        },
         publishState: (state) => {
           for (const window of BrowserWindow.getAllWindows()) {
             if (isTrustedRendererUrl(window.webContents.getURL(), desktopRuntime?.origin ?? "")) {
@@ -1337,6 +1356,21 @@ if (!singleInstance) {
           }
         },
       });
+      recoverySupervisor = new DesktopMcpTunnelRecoverySupervisor({
+        controller: mcpTunnelController,
+        resolveAccount: async () => {
+          const window = mainWindow;
+          const runtime = desktopRuntime;
+          if (!runtime || !window || window.isDestroyed()) {
+            throw new Error("mcp_tunnel_native_window_unavailable");
+          }
+          return resolveActiveDesktopAccount(
+            runtime,
+            window.webContents.session,
+          );
+        },
+      });
+      mcpTunnelRecoverySupervisor = recoverySupervisor;
       registerDesktopIpc(desktopRuntime, codexIntegration, mcpTunnelController);
       await createMainWindow(desktopRuntime);
       if (pendingAuth0Callback) {

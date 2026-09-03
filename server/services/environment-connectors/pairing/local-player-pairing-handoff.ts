@@ -51,6 +51,7 @@ export const stageLocalMinecraftPlayerPairing = async (input: {
     ? await resolveProfileOwnedMinecraftPlayerGameDirectory({
         ownerProfileId: input.ownerProfileId,
         storePath: process.env.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE,
+        appDataPath,
       })
     : null;
   const configuredGameDirectory =

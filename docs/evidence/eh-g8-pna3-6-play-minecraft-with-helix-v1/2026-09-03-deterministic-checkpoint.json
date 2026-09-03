@@ -1,0 +1,166 @@
+{
+  "schema": "helix.environment_harness.acceptance_evidence.v1",
+  "packet": "eh-g8-pna3-6-play-minecraft-with-helix-v1",
+  "captured_at": "2026-09-03T01:54:00.000Z",
+  "maturity": "deterministically_verified",
+  "live_acceptance_complete": false,
+  "classification": [
+    "source_admission",
+    "tool_admission",
+    "evidence_normalization",
+    "evidence_re_entry",
+    "follow_up_reasoning",
+    "terminal_authority",
+    "presentation"
+  ],
+  "verified_contracts": {
+    "existing_exact_reasoning_task_required": true,
+    "replacement_provider_task_created": false,
+    "codex_ui_puppeteering_used": false,
+    "startup_grants_environment_authority": false,
+    "explicit_play_activation_required": true,
+    "steering_pickup_is_readiness": false,
+    "durable_goal_and_monitor_independently_verified": true,
+    "pairing_key_bounded_and_idempotent": true,
+    "receipts_have_answer_authority": false,
+    "receipts_are_terminal_eligible": false
+  },
+  "checks": [
+    {
+      "command": "npx vitest run client/src/components/__tests__/helix-ask-minimal-runtime-shell.spec.tsx client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPlayerEmbodimentPanel.spec.tsx client/src/components/helix/ask-console/shared-live-room/__tests__/minecraftPlayJourney.spec.ts server/routes/__tests__/agent-connections.test.ts --pool=forks",
+      "result": "pass",
+      "files": 4,
+      "tests": 28
+    },
+    {
+      "command": "npx vitest run server/services/environment-connectors/monitoring/__tests__/environment-monitor-store.test.ts client/src/components/helix/ask-console/shared-live-room/__tests__/minecraftPlayJourney.spec.ts client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPlayerEmbodimentPanel.spec.tsx server/routes/__tests__/agent-connections.test.ts --pool=forks",
+      "result": "pass",
+      "files": 4,
+      "tests": 24
+    },
+    {
+      "command": "npm run build:server",
+      "result": "pass",
+      "notes": "Four pre-existing duplicate-key/case warnings outside this packet."
+    },
+    {
+      "command": "npm run build:client:min",
+      "result": "pass",
+      "notes": "Existing bundle-size and browser-externalization warnings only."
+    },
+    {
+      "command": "npm --prefix apps/desktop run pack:dir",
+      "result": "pass",
+      "notes": "Allowlisted runtime dependency closure staged_verified; unpacked Windows application produced."
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:packaged-launch",
+      "result": "pass",
+      "notes": "Guarded disposable-profile smoke: full readiness, service listener, credential vault, and protocol preservation all PASS; this is packaged host readiness, not the live Minecraft journey."
+    },
+    {
+      "command": "npm run helix:ask:discipline:quick",
+      "result": "pass_with_classification_warning",
+      "notes": "Static checks passed; the dirty checkout contains many unrelated sensitive files and the inferred categories are recorded in this evidence."
+    },
+    {
+      "command": "npm run typecheck:environment-actions",
+      "result": "baseline_fail",
+      "notes": "The scoped repository configuration reports numerous pre-existing unrelated TypeScript errors; no changed PNA3.6 file appeared in the reported failures."
+    },
+    {
+      "command": "npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks",
+      "result": "bounded_timeout",
+      "notes": "Stopped after more than two minutes without test output to avoid an unbounded loop; focused exact-binding route tests pass."
+    },
+    {
+      "command": "npx vitest run server/services/environment-connectors/installations/__tests__/minecraft-fabric-loopback-lifecycle.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+      "result": "pass",
+      "files": 1,
+      "tests": 4
+    },
+    {
+      "command": "npx vitest run server/routes/__tests__/minecraft-local-lifecycle-route.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+      "result": "pass",
+      "files": 1,
+      "tests": 3
+    },
+    {
+      "command": "npx vitest run client/src/lib/agent-access/__tests__/reasoningTaskBinding.spec.ts client/src/components/helix/ask-console/__tests__/HelixAskBoundAgentDestination.spec.tsx server/services/environment-connectors/installations/__tests__/minecraft-fabric-loopback-lifecycle.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+      "result": "pass",
+      "files": 3,
+      "tests": 10,
+      "notes": "Covers canonical selected-chat precedence over the shell context fallback."
+    },
+    {
+      "command": "npx vitest run server/services/environment-connectors/installations/__tests__/minecraft-fabric-loopback-lifecycle.test.ts server/routes/__tests__/minecraft-local-lifecycle-route.test.ts client/src/lib/agent-access/__tests__/reasoningTaskBinding.spec.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+      "result": "pass",
+      "files": 3,
+      "tests": 9,
+      "notes": "Covers direct parsing of the observed lifecycle stdout, route projection, and canonical selected-chat precedence."
+    },
+    {
+      "command": "npm --prefix apps/desktop run pack:dir",
+      "result": "pass",
+      "notes": "Rebuilt the unpacked Windows application with the lifecycle receipt and selected-chat repairs."
+    },
+    {
+      "command": "npm --prefix apps/desktop run smoke:packaged-launch",
+      "result": "resource_precondition_blocked",
+      "notes": "The guarded smoke refused to start because the retained live Fabric server and client left less than 4 GiB physical headroom; no product assertion was made from this refusal."
+    }
+  ],
+  "open_live_requirements": [
+    "packaged_exe_play_activation",
+    "natural_helix_chat_request",
+    "natural_in_game_helix_ask_request",
+    "admitted_minecraft_action",
+    "fresh_observation_reentry",
+    "authoritative_text_and_same_result_voice",
+    "revocation_and_stale_pickup_rejection"
+  ],
+  "live_preflight": {
+    "room_id": "shared_realtime_room:450c2fd7-5bea-4487-9a2d-4b510fd4e1ca",
+    "room_status": "waiting_for_participant",
+    "minecraft_actor_status": "source_recovered_player_online_and_reverified",
+    "fabric_server_listener": "127.0.0.1:25565",
+    "fabric_server_ready_signal": "Done",
+    "player_display_name": "DatDamPig",
+    "source_capabilities_admitted": 12,
+    "player_capabilities_declared": 21,
+    "refreshed_mcp_catalog": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true
+    },
+    "keyed_health": {
+      "account_session_http_status": 200,
+      "helix_pipeline_http_status": 200,
+      "agent_providers_http_status": 200
+    },
+    "continuation_presence_refresh": {
+      "active": true,
+      "client_continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+      "server_supported_observability_levels": [
+        "tool_activity_only"
+      ],
+      "disposition": "running_server_is_healthy_but_still_serves_the_pre_repair_bundle"
+    },
+    "exact_reasoning_binding": {
+      "reasoning_binding_id": "reasoning_binding:cc7e1dcd56369f88a419b065db056f18",
+      "binding_epoch": 4,
+      "continuation_transport": "polling",
+      "negotiated_observability_level": "continuation_ready"
+    },
+    "first_divergence": "The launcher produced a connected receipt with isolated_game_directory=true, but the strict shared receipt schema omitted that current field and converted success to minecraft_lifecycle_receipt_missing.",
+    "repair": "The shared receipt schema now admits isolated_game_directory as a required boolean, and the full Helix composer now prefers the canonical operator-selected chat over its context-session fallback.",
+    "running_server_reload_required": true,
+    "keyed_server_restarted": false,
+    "oauth_or_catalog_repair_required": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

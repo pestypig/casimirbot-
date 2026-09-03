@@ -305,8 +305,17 @@ export type HelixAgentRunUpdate = {
   completedAt?: string | null;
 };
 
+export type HelixAgentCommittedEventSink = (input: {
+  owner: HelixAgentRunOwner;
+  run: HelixAgentRunRecord;
+  events: HelixAgentRunEvent[];
+}) => Promise<void>;
+
 export class HelixAgentRunStore {
-  constructor(private readonly injectedPool?: Pool) {}
+  constructor(
+    private readonly injectedPool?: Pool,
+    private readonly committedEventSink?: HelixAgentCommittedEventSink,
+  ) {}
 
   private async pool(): Promise<Pool> {
     if (this.injectedPool) return this.injectedPool;
@@ -314,9 +323,16 @@ export class HelixAgentRunStore {
     return getPool();
   }
 
-  private async afterCommit(): Promise<void> {
+  private async afterCommit(activity?: {
+    owner: HelixAgentRunOwner;
+    run: HelixAgentRunRecord;
+    events: HelixAgentRunEvent[];
+  }): Promise<void> {
     if (!this.injectedPool) {
       await persistLocalDatabaseSnapshotIfEnabled();
+    }
+    if (activity && activity.events.length > 0 && this.committedEventSink) {
+      await this.committedEventSink(activity);
     }
   }
 
@@ -661,8 +677,18 @@ export class HelixAgentRunStore {
         createdAt: input.now,
       });
       await client.query("COMMIT");
-      await this.afterCommit();
-      return { run: runFromRow(rows[0]), event };
+      const committedRun = runFromRow(rows[0]);
+      await this.afterCommit({
+        owner: {
+          tenantId: committedRun.tenantId,
+          issuer: committedRun.issuer,
+          subjectId: committedRun.subjectId,
+          accountProfileId: committedRun.accountProfileId,
+        },
+        run: committedRun,
+        events: [event],
+      });
+      return { run: committedRun, event };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -686,6 +712,78 @@ export class HelixAgentRunStore {
       [runId, ...ownerParams(owner)],
     );
     return rows[0] ? runFromRow(rows[0]) : null;
+  }
+
+  async appendExternalEvidence(input: {
+    owner: HelixAgentRunOwner;
+    runId: string;
+    expectedVersion: number;
+    evidenceBundle: HelixAgentEvidenceBundle;
+    observationRefs: string[];
+    eventId: string;
+    now: string;
+  }): Promise<HelixAgentRunRecord | null> {
+    const pool = await this.pool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query<RunRow>(
+        `
+          UPDATE helix_agent_runs
+          SET evidence_bundle = $7::jsonb,
+              latest_summary = $8,
+              version = version + 1,
+              updated_at = $9
+          WHERE run_id = $1 AND tenant_id = $2 AND issuer = $3
+            AND subject_id = $4 AND account_profile_id = $5
+            AND version = $6
+            AND lifecycle_status IN ('queued', 'waiting')
+            AND completion_status NOT IN (
+              'completed', 'failed', 'budget_exhausted', 'cancelled'
+            )
+            AND active_operation_id IS NULL
+            AND expires_at > $9
+          RETURNING *;
+        `,
+        [
+          input.runId,
+          ...ownerParams(input.owner),
+          input.expectedVersion,
+          JSON.stringify(input.evidenceBundle),
+          "Owner-scoped external observations were admitted for the next bounded Helix Ask continuation.",
+          input.now,
+        ],
+      );
+      if (!rows[0]) {
+        await client.query("COMMIT");
+        return null;
+      }
+      const run = runFromRow(rows[0]);
+      const event = await appendEvent(client, {
+        eventId: input.eventId,
+        runId: input.runId,
+        eventType: "evidence_reentered",
+        payload: {
+          version: run.version,
+          observation_refs: input.observationRefs,
+          evidence_refs: input.observationRefs,
+          receipt_refs: [],
+          evidence_is_terminal_answer: false,
+          reentry_source: "authenticated_mcp_observation_store",
+          model_continuation_executed: false,
+          environment_action_executed: false,
+        },
+        createdAt: input.now,
+      });
+      await client.query("COMMIT");
+      await this.afterCommit({ owner: input.owner, run, events: [event] });
+      return run;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async listEvents(input: {
@@ -772,7 +870,7 @@ export class HelixAgentRunStore {
           createdAt: input.now,
         });
         await client.query("COMMIT");
-        await this.afterCommit();
+        await this.afterCommit({ owner: input.owner, run, events: [event] });
         return { kind: "claimed", run, event };
       }
 
@@ -874,15 +972,20 @@ export class HelixAgentRunStore {
         return null;
       }
       const run = runFromRow(rows[0]);
+      const committedEvents: HelixAgentRunEvent[] = [];
       for (const event of input.events) {
-        await appendEvent(client, {
+        committedEvents.push(await appendEvent(client, {
           ...event,
           runId: input.runId,
           createdAt: input.now,
-        });
+        }));
       }
       await client.query("COMMIT");
-      await this.afterCommit();
+      await this.afterCommit({
+        owner: input.owner,
+        run,
+        events: committedEvents,
+      });
       return run;
     } catch (error) {
       await client.query("ROLLBACK");
@@ -932,7 +1035,7 @@ export class HelixAgentRunStore {
         return null;
       }
       const run = runFromRow(rows[0]);
-      await appendEvent(client, {
+      const event = await appendEvent(client, {
         eventId: input.eventId,
         runId: input.runId,
         eventType: "budget_exhausted",
@@ -944,7 +1047,7 @@ export class HelixAgentRunStore {
         createdAt: input.now,
       });
       await client.query("COMMIT");
-      await this.afterCommit();
+      await this.afterCommit({ owner: input.owner, run, events: [event] });
       return run;
     } catch (error) {
       await client.query("ROLLBACK");
@@ -996,7 +1099,7 @@ export class HelixAgentRunStore {
         return null;
       }
       const run = runFromRow(rows[0]);
-      await appendEvent(client, {
+      const event = await appendEvent(client, {
         eventId: input.eventId,
         runId: input.runId,
         eventType: "run_failed",
@@ -1008,7 +1111,7 @@ export class HelixAgentRunStore {
         createdAt: input.now,
       });
       await client.query("COMMIT");
-      await this.afterCommit();
+      await this.afterCommit({ owner: input.owner, run, events: [event] });
       return run;
     } catch (error) {
       await client.query("ROLLBACK");
@@ -1063,7 +1166,7 @@ export class HelixAgentRunStore {
       );
       if (rows[0]) {
         const run = runFromRow(rows[0]);
-        await appendEvent(client, {
+        const event = await appendEvent(client, {
           eventId: input.eventId,
           runId: input.runId,
           eventType: "run_cancelled",
@@ -1074,7 +1177,7 @@ export class HelixAgentRunStore {
           createdAt: input.now,
         });
         await client.query("COMMIT");
-        await this.afterCommit();
+        await this.afterCommit({ owner: input.owner, run, events: [event] });
         return { kind: "cancelled", run };
       }
       const existingResult = await client.query<RunRow>(

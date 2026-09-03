@@ -236,6 +236,14 @@ export default function DeviceCheckPanel() {
     }
   }, []);
 
+  const refreshAll = useCallback(async () => {
+    const operations: Promise<unknown>[] = [refresh()];
+    if (runtime.surface === "desktop_native" && tunnel?.configured) {
+      operations.push(refreshTransitionRequests());
+    }
+    await Promise.all(operations);
+  }, [refresh, refreshTransitionRequests, runtime.surface, tunnel?.configured]);
+
   useEffect(() => {
     if (runtime.surface !== "desktop_native" || !tunnel?.configured) return;
     const controller = new AbortController();
@@ -350,6 +358,15 @@ export default function DeviceCheckPanel() {
   const tunnelFailureMessage = tunnel?.failureCode
     ? tunnel.failureCode.split("_").map(label).join(" ")
     : null;
+  const tunnelRecoveryMessage = tunnel?.recovery.phase === "scheduled"
+    ? `Self-repair scheduled (${tunnel.recovery.attemptCount}/${tunnel.recovery.maxAttempts} attempts used)`
+    : tunnel?.recovery.phase === "revalidating"
+      ? "Self-repair is revalidating the exact developer session"
+      : tunnel?.recovery.phase === "restarting"
+        ? `Self-repair is restoring read-only coordination (attempt ${tunnel.recovery.attemptCount}/${tunnel.recovery.maxAttempts})`
+        : tunnel?.recovery.phase === "exhausted"
+          ? `Self-repair stopped after ${tunnel.recovery.attemptCount}/${tunnel.recovery.maxAttempts} attempts${tunnel.recovery.lastReason ? ` · ${label(tunnel.recovery.lastReason)}` : ""}`
+          : null;
 
   const openCodexPlugin = useCallback(async () => {
     const openPlugin = window.casimirDesktop?.openCodexPlugin;
@@ -388,7 +405,7 @@ export default function DeviceCheckPanel() {
         </div>
         <button
           type="button"
-          onClick={() => void refresh()}
+          onClick={() => void refreshAll()}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 hover:border-cyan-400/50 hover:text-white disabled:cursor-wait disabled:opacity-60"
         >
@@ -430,7 +447,7 @@ export default function DeviceCheckPanel() {
                   Local Desktop MCP tunnel
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">
-              Outbound-only developer connection to OpenAI Secure MCP Tunnel. Read-only Device Check and local-supervisor coordination remain the default. A signed-in developer may explicitly start the full Helix MCP surface; OAuth scopes, room grants, and environment authority are still enforced separately. The desktop session secret and runtime key stay outside the web service and Codex.
+              Outbound-only developer connection to OpenAI Secure MCP Tunnel. Read-only Device Check and local-supervisor coordination remain the automatic default. Choosing Start full developer MCP or Enable full harness for this session is the permission grant for the current signed-in developer session, so individual agent requests do not need a second harness prompt while that full tunnel remains active. OAuth scopes, room grants, capability admission, and environment authority are still enforced separately. The grant ends when the tunnel stops, the account session is invalidated, credentials change, or the app exits; automatic recovery restores read-only only. The desktop session secret and runtime key stay outside the web service and Codex.
                 </p>
                 <p className="mt-2 text-xs text-slate-300" data-testid="device-check-tunnel-status">
                   Status: <span className="font-medium text-emerald-200">{tunnel ? label(tunnel.status) : "Inspecting"}</span>
@@ -438,6 +455,16 @@ export default function DeviceCheckPanel() {
                    {tunnel ? ` · ${tunnel.scope === "full_helix_agent" ? "Full developer MCP" : "Read-only coordination"}` : ""}
                   {tunnelFailureMessage ? ` · ${tunnelFailureMessage}` : ""}
                 </p>
+                {tunnelRecoveryMessage ? (
+                  <p
+                    className={tunnel?.recovery.manualInterventionRequired
+                      ? "mt-1 text-xs text-amber-200"
+                      : "mt-1 text-xs text-cyan-200"}
+                    data-testid="device-check-tunnel-recovery"
+                  >
+                    {tunnelRecoveryMessage}. Automatic recovery never restores full MCP authority.
+                  </p>
+                ) : null}
               </div>
               {tunnel?.ready ? (
                 <button
@@ -517,18 +544,34 @@ export default function DeviceCheckPanel() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={tunnelBusy}
-                    onClick={() => {
-                      const stop = window.casimirDesktop?.stopMcpTunnel;
-                      if (stop) void runTunnelOperation(stop);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-100 disabled:opacity-50"
-                  >
-                    <Square className="h-3.5 w-3.5" aria-hidden="true" />
-                    Stop tunnel
-                  </button>
+                  <>
+                    {tunnel.scope === "local_supervisor_coordination_and_device_check" ? (
+                      <button
+                        type="button"
+                        disabled={tunnelBusy}
+                        onClick={() => {
+                          const start = window.casimirDesktop?.startMcpTunnel;
+                          if (start) void runTunnelOperation(() => start({ scope: "full_helix_agent" }));
+                        }}
+                        className="inline-flex items-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 disabled:opacity-50"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                        Enable full harness for this session
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={tunnelBusy}
+                      onClick={() => {
+                        const stop = window.casimirDesktop?.stopMcpTunnel;
+                        if (stop) void runTunnelOperation(stop);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-100 disabled:opacity-50"
+                    >
+                      <Square className="h-3.5 w-3.5" aria-hidden="true" />
+                      Stop tunnel
+                    </button>
+                  </>
                 )}
                 <button
                   type="button"
@@ -553,7 +596,7 @@ export default function DeviceCheckPanel() {
                   Agent-requested tunnel delegations
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">
-                  A grant lasts 120 seconds and permits only the native tunnel transport to switch modes. It does not grant room, environment, brokerage, trading, or answer authority. Current private-pilot identity binds the native tunnel client plus a server-derived conversation continuation; independent external-client cryptographic binding remains a release gate.
+                  Each grant lasts for the short lease requested below and permits only the native tunnel transport to switch modes. It does not grant room, environment, brokerage, trading, or answer authority. Current private-pilot identity binds the native tunnel client plus a server-derived conversation continuation; independent external-client cryptographic binding remains a release gate.
                 </p>
                 {transitionRequests.length === 0 ? (
                   <p className="mt-2 text-xs text-slate-500">

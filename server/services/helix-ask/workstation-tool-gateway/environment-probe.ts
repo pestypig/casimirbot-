@@ -119,7 +119,11 @@ const dependencies = (
   readMembership: overrides.readMembership ?? readSharedRealtimeRoomMembership,
   readRoom: overrides.readRoom ?? readSharedRealtimeRoom,
   listSourceCandidates:
-    overrides.listSourceCandidates ?? listLatestBoundRoomSourceCandidates,
+    overrides.listSourceCandidates ??
+      ((roomId) =>
+        listLatestBoundRoomSourceCandidates(roomId, {
+          allowHeartbeat: true,
+        })),
   materializeConnector:
     overrides.materializeConnector ?? materializeLegacyRoomSourceConnector,
   listActiveConnectors:

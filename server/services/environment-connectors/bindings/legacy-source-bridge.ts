@@ -76,7 +76,6 @@ export const materializeLegacyRoomSourceConnector = async (input: {
     `connector_device:legacy:${shortHash([
       installationId,
       input.roomSourceBindingId,
-      input.credentialId,
     ])}`;
   let environmentBindingId =
     `environment_binding:legacy:${shortHash([
@@ -129,15 +128,22 @@ export const materializeLegacyRoomSourceConnector = async (input: {
     );
     const existingBinding = await db.query<{ environment_binding_id: string }>(
       `
-        SELECT environment_binding_id
-        FROM helix_environment_connector_bindings
-        WHERE installation_id = $1
-          AND device_id = $2
-          AND room_source_binding_id = $3
-        ORDER BY updated_at DESC, created_at DESC
+        SELECT b.environment_binding_id
+        FROM helix_environment_connector_bindings b
+        LEFT JOIN helix_environment_action_authorities a
+          ON a.environment_binding_id = b.environment_binding_id
+         AND a.status = 'active'
+         AND (a.expires_at IS NULL OR a.expires_at > now())
+        WHERE b.installation_id = $1
+          AND b.room_source_binding_id = $2
+        ORDER BY
+          CASE WHEN a.action_authority_id IS NOT NULL THEN 0 ELSE 1 END,
+          CASE WHEN b.status = 'active' THEN 0 ELSE 1 END,
+          b.updated_at DESC,
+          b.created_at DESC
         LIMIT 1;
       `,
-      [installationId, deviceId, input.roomSourceBindingId],
+      [installationId, input.roomSourceBindingId],
     );
     environmentBindingId =
       existingBinding.rows[0]?.environment_binding_id ?? environmentBindingId;
@@ -207,17 +213,22 @@ export const materializeLegacyRoomSourceConnector = async (input: {
           last_contact_at
         ) VALUES ($1, $2, $3, $4, $5, 'online', now())
         ON CONFLICT (device_id) DO UPDATE
-        SET producer_epoch_ref = EXCLUDED.producer_epoch_ref,
+        SET device_public_key_hash = EXCLUDED.device_public_key_hash,
+            credential_ref = EXCLUDED.credential_ref,
+            producer_epoch_ref = EXCLUDED.producer_epoch_ref,
+            status = 'active',
             health_status = 'online',
             last_contact_at = now(),
+            revoked_at = NULL,
             updated_at = now();
       `,
       [
         deviceId,
         installationId,
         environmentConnectorSha256({
-          compatibility_identity: "legacy_room_source_credential",
-          credential_id: input.credentialId,
+          compatibility_identity: "legacy_room_source_device",
+          installation_id: installationId,
+          room_source_binding_id: input.roomSourceBindingId,
         }),
         input.credentialId,
         input.producerEpochRef,
@@ -238,7 +249,8 @@ export const materializeLegacyRoomSourceConnector = async (input: {
           consent_capability_ids
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
         ON CONFLICT (environment_binding_id) DO UPDATE
-        SET adapter_admission_id = EXCLUDED.adapter_admission_id,
+        SET device_id = EXCLUDED.device_id,
+            adapter_admission_id = EXCLUDED.adapter_admission_id,
             owner_profile_id = EXCLUDED.owner_profile_id,
             room_id = EXCLUDED.room_id,
             source_id = EXCLUDED.source_id,

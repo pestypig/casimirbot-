@@ -22,7 +22,10 @@ import {
   createHelixAgentProtectedResourceMetadataRouter,
   HELIX_AGENT_OAUTH_OFFLINE_ACCESS_SCOPE,
 } from "../helix-agent-api";
-import { createHelixMcpRouter } from "../helix-mcp";
+import {
+  createHelixMcpRouter,
+  protectedMcpEnvelopeValue,
+} from "../helix-mcp";
 import { createHelixRunMcpServer } from "../../mcp/helix-run-mcp-server";
 import {
   HELIX_DEVICE_CHECK_RESOURCE_METADATA_PATH,
@@ -664,6 +667,7 @@ describe("Helix MCP server", () => {
       expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
         "helix_run_cancel",
         "helix_run_continue",
+        "helix_run_evidence_reenter",
         "helix_run_fetch_evidence",
         "helix_run_inspect",
         "helix_run_list_events",
@@ -698,6 +702,7 @@ describe("Helix MCP server", () => {
       expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
         "helix_run_cancel",
         "helix_run_continue",
+        "helix_run_evidence_reenter",
         "helix_run_fetch_evidence",
         "helix_run_inspect",
         "helix_run_list_events",
@@ -927,6 +932,40 @@ describe("Helix MCP HTTP transport", () => {
       id: null,
     });
     expect(JSON.stringify(rejected.body)).not.toContain(rpcIdSecret);
+  });
+
+  it("admits only the exact reasoning-task claim field through credential scanning", () => {
+    const claimHandle = "agent_chat_claim_reasoning_transport_123456789";
+    const sanitized = protectedMcpEnvelopeValue({
+      jsonrpc: "2.0",
+      id: 92,
+      method: "tools/call",
+      params: {
+        name: "helix_reasoning_task_binding_claim",
+        arguments: {
+          client_continuation_ref: "codex-continuation:transport-test",
+          claim_handle: claimHandle,
+        },
+      },
+    });
+    expect(sanitized).toMatchObject({
+      params: {
+        name: "helix_reasoning_task_binding_claim",
+        arguments: {
+          claim_handle: "opaque_reasoning_task_claim",
+        },
+      },
+    });
+    expect(JSON.stringify(sanitized)).not.toContain(claimHandle);
+
+    const wrongTool = protectedMcpEnvelopeValue({
+      method: "tools/call",
+      params: {
+        name: "helix_reasoning_steering_read",
+        arguments: { claim_handle: claimHandle },
+      },
+    });
+    expect(JSON.stringify(wrongTool)).toContain(claimHandle);
   });
 
   it("dispatches stateless tools/call to the injected durable service", async () => {

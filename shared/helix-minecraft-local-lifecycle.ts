@@ -44,6 +44,7 @@ export const helixMinecraftLocalLifecycleReceiptSchema = z
     status: z.literal("connected"),
     profile_id: z.string().trim().min(1).max(200),
     profile_version: z.string().trim().min(1).max(200),
+    isolated_game_directory: z.boolean(),
     client_process_id: z.number().int().positive(),
     server_address: helixMinecraftLoopbackAddressSchema,
     launcher_action: z.enum(["launched_client", "reused_client"]),

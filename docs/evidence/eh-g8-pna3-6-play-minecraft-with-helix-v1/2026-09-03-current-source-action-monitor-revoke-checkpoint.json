@@ -1,0 +1,204 @@
+{
+  "schema": "casimirbot.eh_g8_pna3_6_current_source_action_monitor_revoke_checkpoint.v1",
+  "recorded_at": "2026-09-03T03:16:00Z",
+  "program_gate": "G8",
+  "capability_or_component": "PNA3.6 finite one-start Play Minecraft with Helix journey",
+  "lifecycle_stage": "tool admission, execution, evidence re-entry, monitor acknowledgement, Emergency Stop, and revocation",
+  "current_maturity": "deterministically verified",
+  "target_maturity": "live accepted",
+  "acceptance_status": "checkpoint_only_not_live_accepted",
+  "acceptance_limitations": [
+    "Development repairs occurred during this run, so it is not the required repair-free installed-node acceptance.",
+    "The exact reasoning-task binding had already been revoked before this action/monitor segment.",
+    "The rebuilt packaged EXE passed its isolated Start Harness smoke, but the complete repair-free installed-node Minecraft journey has not yet been repeated.",
+    "GPT Live authoritative presentation was proven by PNA3.4 but was not repeated in this segment."
+  ],
+  "identity": {
+    "client_continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+    "room_id": "shared_realtime_room:450c2fd7-5bea-4487-9a2d-4b510fd4e1ca",
+    "participant_id": "shared_realtime_participant:f59388d6-287c-40fe-a6de-f900714ed0e6",
+    "environment_binding_id": "environment_binding:legacy:9910caee8091d404f4b5c55697c0e2bb14e4a7f5",
+    "source_id": "source:room-ingress:8419dfae-fbec-42d2-b23c-ec877fc6dba3",
+    "world_id": "minecraft:connector:3981f6df-f1b",
+    "subject_binding_id": "environment_subject_binding:16addbe6-4002-4d32-a41d-e0ba3c8ca276",
+    "action_authority_id": "environment_action_authority:1ee63648-173d-4867-a9df-dfa9aecf3927",
+    "action_policy_revision": 6,
+    "run_id": "run_ecefad19-1e2f-4e77-a794-f4a27ddd0897",
+    "goal_id": "environment_durable_goal:6add6205-7823-4785-954f-c68f634f41ae",
+    "monitor_id": "environment_monitor:49c06787-ea2f-4a9d-883c-ed9147f00079"
+  },
+  "positive_evidence": {
+    "refreshed_mcp_catalog": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true
+    },
+    "local_supervisor_presence": {
+      "service_instance_ref": "service_instance:030e2f1fdc06b50c0f9bcf95230cd802",
+      "client_continuation_ref": "codex-continuation:pna3-6-play-minecraft-20260903-main",
+      "lifecycle_state": "waiting",
+      "room_identity_basis": "server_verified",
+      "provider_task_created": false,
+      "hidden_reasoning_included": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "keyed_server": {
+      "origin": "http://127.0.0.1:1522",
+      "health": "app_ready",
+      "server_replacement_or_unkeyed_fallback_used": false
+    },
+    "connector_readiness_before_action": {
+      "state": "ready",
+      "ready_for_actions": true,
+      "manifest_admitted": true,
+      "heartbeat_fresh": true,
+      "available_control_engines": ["baritone", "native_fabric"],
+      "emergency_stop_latched": false
+    },
+    "admitted_action": {
+      "capability_id": "com.casimirbot.minecraft.player.look",
+      "action_kind": "look_at",
+      "requested_yaw_delta_degrees": 5,
+      "applied_yaw_delta_degrees": 5,
+      "yaw_error_degrees": 0,
+      "duration_ticks": 1,
+      "control_engine": "native_fabric",
+      "outcome": "succeeded",
+      "controls_released": true,
+      "model_invoked_by_executor": false,
+      "environment_action_evidence_ref": "environment_action_evidence:720ac84843266cda42c23a77858f9f2b3bcc816d7",
+      "mcp_observation_ref": "mcp_evidence_observation:helix.minecraft.player_action.observe_result:f3fe3094-a95e-463f-92d3-fc1f3a64962e",
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "semantic_monitor": {
+      "initial_bounded_wait_disposition": "timeout",
+      "initial_timeout_invented_event": false,
+      "post_action_disposition": "delivered",
+      "cursor_before": 0,
+      "cursor_after": 1,
+      "delivered_item_count": 3,
+      "delivered_evidence_refs": [
+        "environment_situation_digest:c2519e81245af0de8e7ca649433a82500c0cf286faebf699",
+        "environment_situation_digest:6a2beafdd1df2026fed1f903b7374c8526cf7e025a85baa3",
+        "environment_situation_digest:ca19810d377d3b23b43ee9d296e3dfc6796805f645ccf493"
+      ],
+      "all_provenance_valid": true,
+      "acknowledged_cursor": 1,
+      "acknowledgement_answer_authority": false,
+      "acknowledgement_terminal_eligible": false
+    },
+    "evidence_reentry": {
+      "operation": "reenter_evidence",
+      "expected_version": 1,
+      "result_version": 2,
+      "admitted_observation_refs": [
+        "mcp_evidence_observation:helix.minecraft.player_action.observe_result:f3fe3094-a95e-463f-92d3-fc1f3a64962e"
+      ],
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "monitor_revocation": {
+      "status": "revoked",
+      "revoked_at": "2026-09-03T02:51:51.818Z",
+      "post_revoke_read_disposition": "lease_inactive",
+      "post_revoke_item_count": 0
+    },
+    "player_emergency_stop": {
+      "ui_confirmation_required": true,
+      "authority_status_after_confirmation": "suspended",
+      "ordinary_actions_suspended_immediately": true
+    },
+    "post_stop_action_rejection": {
+      "requested_capability_id": "com.casimirbot.minecraft.player.look",
+      "status": "blocked",
+      "request_created": false,
+      "action_execution_ref": null,
+      "mcp_evidence": null,
+      "eligible_for_current_turn_reentry": false,
+      "summary": "Player-action authority was not found."
+    }
+  },
+  "negative_authority_evidence": {
+    "durable_run_nonterminal_checkpoint": {
+      "completion_status": "blocked",
+      "terminal_authority_status": "blocked",
+      "failure_code": "terminal_boundary_ineligible",
+      "summary": "GENERIC_COLLAPSE",
+      "receipt_promoted_to_answer": false
+    },
+    "monitor_timeout_promoted_to_evidence": false,
+    "monitor_acknowledgement_granted_execution_authority": false,
+    "action_observation_promoted_to_answer": false,
+    "post_revoke_failure_admitted_for_reentry": false,
+    "provider_task_created_or_switched": false
+  },
+  "product_repairs": [
+    {
+      "area": "account JSON parser isolation",
+      "result": "Profile backup ingress no longer inherits the 16 KiB agent-connections parser."
+    },
+    {
+      "area": "desktop Minecraft profile discovery",
+      "result": "Local private player/server pairing discovers the exact authenticated profile from the desktop-owned APPDATA registry when the desktop-only pointer is absent.",
+      "fallback_to_unowned_or_only_profile": false,
+      "credential_content_read_or_logged": false,
+      "resolved_player_game_directory": "C:\\Users\\dan\\AppData\\Roaming\\.minecraft-helix-c0",
+      "resolved_server_profile_label": "combat-c0-server"
+    },
+    {
+      "area": "finite full-gameplay access preset",
+      "result": "One explicit preset selects every registered typed Minecraft player capability for a two-hour approved-capabilities lease with manual input set to cancel.",
+      "requires_one_displayed_control_and_world_mutation_acknowledgement": true,
+      "implicit_startup_authority": false,
+      "host_shell_files_rcon_processes_or_credentials_granted": false,
+      "emergency_stop_preserved": true
+    }
+  ],
+  "verification": {
+    "focused_pairing_tests": { "result": "pass", "test_files": 3, "tests": 18 },
+    "focused_onboarding_action_and_ingame_tests": { "result": "pass", "test_files": 6, "tests": 32 },
+    "agent_connections_parser_tests": { "result": "pass", "tests": 10 },
+    "server_build": { "result": "pass", "pre_existing_warnings": 4 },
+    "helix_ask_discipline_quick": "pass_with_classification_declaration_warning",
+    "environment_harness_docs_audit": "pass",
+    "environment_actions_typecheck": {
+      "result": "failed_existing_dirty_tree_baseline",
+      "new_pairing_repair_errors_observed": false
+    },
+    "desktop_pack_dir": {
+      "result": "pass",
+      "artifact": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+      "artifact_bytes": 225533440,
+      "built_at_local": "2026-09-02T23:14:30.4691557-04:00"
+    },
+    "release_verify_artifacts": {
+      "result": "not_applicable_to_pack_dir",
+      "reason": "pack:dir does not create release/authenticode-receipt.json"
+    },
+    "packaged_launch_smoke": {
+      "result": "pass",
+      "free_physical_memory_before_gib": 5.21,
+      "native_bridge": "pass",
+      "start_harness_settled": "pass",
+      "diagnostic_sanitization": "pass",
+      "provider_task_created": false,
+      "codex_ui_automation_used": false,
+      "tunnel_status": "unconfigured",
+      "tunnel_scope": "local_supervisor_coordination_and_device_check",
+      "elapsed_ms": 9572
+    }
+  },
+  "remaining_required_acceptance": [
+    "One repair-free packaged-EXE journey from Start Harness through the existing exact Codex binding and Play Minecraft readiness.",
+    "One natural Helix chat request and one natural /helix ask request in the same exact room/player/world/task authority lifecycle.",
+    "Final authoritative text and GPT Live presentation after fresh action observation re-entry.",
+    "Cancellation, Emergency Stop, reasoning-binding and monitor/action-lease revocation, and stale pickup/action rejection in the clean final run."
+  ],
+  "credential_included": false,
+  "provider_thread_content_included": false,
+  "hidden_reasoning_included": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

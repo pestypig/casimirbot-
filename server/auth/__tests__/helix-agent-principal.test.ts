@@ -1,7 +1,10 @@
 import type { Request } from "express";
 import { SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildHelixAccountCapabilityPolicy } from
+import {
+  buildHelixAccountCapabilityPolicy,
+  buildHelixSharedRealtimeRoomsExperimentPolicy,
+} from
   "@shared/helix-account-session";
 import {
   HELIX_AGENT_RUN_DEVELOPER_SCOPE,
@@ -10,6 +13,8 @@ import {
 } from "@shared/contracts/helix-agent-api.v1";
 import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from
   "@shared/contracts/helix-shared-live-room-agent.v1";
+import { HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY } from
+  "@shared/helix-environment-connector";
 
 const databaseMocks = vi.hoisted(() => ({
   ensureDatabase: vi.fn(),
@@ -27,6 +32,23 @@ vi.mock("../../db/client", () => ({
   }),
 }));
 vi.mock("../../services/helix-account/account-session-store", () => ({
+  buildSharedRealtimeRoomsSessionPolicy: (accountType: "developer" | "user") => {
+    const policy = buildHelixSharedRealtimeRoomsExperimentPolicy(accountType);
+    const publicIngressEnabled =
+      process.env.HELIX_PUBLIC_ROOMS_EXPERIMENT === "1" &&
+      (process.env.NODE_ENV !== "production" ||
+        process.env.HELIX_PUBLIC_ROOM_SOURCE_INGRESS === "1");
+    if (accountType !== "developer" && publicIngressEnabled) {
+      policy.feature_flags.push("room_source_ingress");
+      policy.locked_features = policy.locked_features.filter(
+        (feature) => feature !== "room_source_ingress",
+      );
+      policy.allowed_workstation_capabilities.push(
+        HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
+      );
+    }
+    return policy;
+  },
   getAccountSessionById: (...args: unknown[]) =>
     accountSessionMocks.getAccountSessionById(...args),
 }));
@@ -52,6 +74,8 @@ const relevantEnvironmentKeys = [
   "HELIX_AGENT_ALLOW_LOCAL_HS256",
   "HELIX_AGENT_LOCAL_JWT_SECRET",
   "HELIX_DEVELOPER_PROFILE_IDS",
+  "HELIX_PUBLIC_ROOMS_EXPERIMENT",
+  "HELIX_PUBLIC_ROOM_SOURCE_INGRESS",
   "CASIMIR_DESKTOP_HOST",
   "CASIMIR_DESKTOP_SESSION_SECRET",
   "HELIX_DESKTOP_DEVICE_ID",
@@ -640,6 +664,35 @@ describe("resolveHelixAgentApiPrincipal", () => {
     expect(principal.accountContext.account_policy?.locked_features).toContain(
       "developer_workstation_panels",
     );
+  });
+
+  it("applies the governed public room-source policy to an exact room OAuth principal", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.HELIX_PUBLIC_ROOMS_EXPERIMENT = "1";
+    process.env.HELIX_PUBLIC_ROOM_SOURCE_INGRESS = "1";
+    databaseMocks.query.mockResolvedValue({
+      rows: [linkedAccount({ account_type: "user" })],
+    });
+
+    const principal = await resolveHelixAgentApiPrincipal(
+      requestWithHeaders({ authorization: "Bearer access-token" }),
+      verifierDouble(
+        verifiedToken({
+          scopes: new Set([HELIX_SHARED_LIVE_ROOM_READ_SCOPE]),
+        }),
+      ),
+    );
+
+    expect(principal.accountType).toBe("user");
+    expect(principal.accountContext.account_policy?.feature_flags).toEqual(
+      expect.arrayContaining(["shared_realtime_rooms", "room_source_ingress"]),
+    );
+    expect(principal.accountContext.account_policy?.locked_features).not.toContain(
+      "room_source_ingress",
+    );
+    expect(
+      principal.accountContext.account_policy?.allowed_workstation_capabilities,
+    ).toContain(HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY);
   });
 });
 

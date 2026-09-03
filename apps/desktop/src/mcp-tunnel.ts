@@ -14,6 +14,7 @@ import {
   DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER,
   DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION,
   type DesktopMcpTunnelFailureCode,
+  type DesktopMcpTunnelRecoveryState,
   type DesktopMcpTunnelScope,
   type DesktopMcpTunnelState,
   type DesktopMcpTunnelStatus,
@@ -92,7 +93,22 @@ type ControllerOptions = Readonly<{
   desktopSessionSecret: string;
   storage: SecureStoragePort;
   publishState?: (state: DesktopMcpTunnelState) => void;
+  onUnexpectedExit?: (event: Readonly<{
+    accountSessionId: string;
+    previousScope: DesktopMcpTunnelScope;
+    reason: "process_exit" | "health_failed";
+  }>) => void;
 }>;
+
+const INITIAL_RECOVERY_STATE: DesktopMcpTunnelRecoveryState = Object.freeze({
+  phase: "idle",
+  attemptCount: 0,
+  maxAttempts: 3,
+  nextAttemptAt: null,
+  lastReason: null,
+  automaticScope: READ_ONLY_TUNNEL_SCOPE,
+  manualInterventionRequired: false,
+});
 
 const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -233,6 +249,9 @@ export class DesktopMcpTunnelController {
   private healthTimer: NodeJS.Timeout | null = null;
   private stopping = false;
   private activeScope: DesktopMcpTunnelScope = READ_ONLY_TUNNEL_SCOPE;
+  private activeAccountSessionId: string | null = null;
+  private unexpectedExitReason: "process_exit" | "health_failed" = "process_exit";
+  private consecutiveHealthFailures = 0;
   private state: DesktopMcpTunnelState;
   private readonly vaultPath: string;
   private readonly runRoot: string;
@@ -308,6 +327,7 @@ export class DesktopMcpTunnelController {
       ready: input.ready ?? false,
       adminUiAvailable: input.adminUiAvailable ?? false,
       failureCode: input.failureCode,
+      recovery: INITIAL_RECOVERY_STATE,
     });
   }
 
@@ -319,6 +339,10 @@ export class DesktopMcpTunnelController {
 
   getState(): DesktopMcpTunnelState {
     return this.state;
+  }
+
+  setRecoveryState(recovery: DesktopMcpTunnelRecoveryState): DesktopMcpTunnelState {
+    return this.setState({ recovery: Object.freeze({ ...recovery }) });
   }
 
   private readCredentials(): McpTunnelCredentials {
@@ -391,6 +415,9 @@ export class DesktopMcpTunnelController {
       void Promise.all([this.probe("/healthz"), this.probe("/readyz")]).then(
         ([healthy, ready]) => {
           if (!this.child || this.stopping) return;
+          this.consecutiveHealthFailures = healthy
+            ? 0
+            : this.consecutiveHealthFailures + 1;
           this.setState({
             status: ready ? "ready" : "degraded",
             processRunning: true,
@@ -399,6 +426,12 @@ export class DesktopMcpTunnelController {
             adminUiAvailable: healthy,
             failureCode: healthy ? null : "health_failed",
           });
+          if (this.consecutiveHealthFailures >= 3 && this.child) {
+            this.unexpectedExitReason = "health_failed";
+            if (this.healthTimer) clearInterval(this.healthTimer);
+            this.healthTimer = null;
+            this.child.kill();
+          }
         },
       );
     }, HEALTH_MONITOR_MS);
@@ -436,6 +469,9 @@ export class DesktopMcpTunnelController {
       scope: this.activeScope,
     });
     this.stopping = false;
+    this.activeAccountSessionId = accountSessionId;
+    this.unexpectedExitReason = "process_exit";
+    this.consecutiveHealthFailures = 0;
     this.healthBase = null;
     this.setState({
       status: "starting",
@@ -458,7 +494,13 @@ export class DesktopMcpTunnelController {
     });
     child.once("error", () => {
       if (this.child !== child) return;
+      const accountSessionId = this.activeAccountSessionId;
+      const previousScope = this.activeScope;
       this.child = null;
+      this.activeAccountSessionId = null;
+      this.healthBase = null;
+      if (this.healthTimer) clearInterval(this.healthTimer);
+      this.healthTimer = null;
       this.activeScope = READ_ONLY_TUNNEL_SCOPE;
       this.setState({
         status: "degraded",
@@ -469,10 +511,21 @@ export class DesktopMcpTunnelController {
         adminUiAvailable: false,
         failureCode: "process_exit",
       });
+      if (accountSessionId) {
+        this.options.onUnexpectedExit?.({
+          accountSessionId,
+          previousScope,
+          reason: "process_exit",
+        });
+      }
     });
     child.once("exit", () => {
       if (this.child !== child) return;
+      const accountSessionId = this.activeAccountSessionId;
+      const previousScope = this.activeScope;
+      const reason = this.unexpectedExitReason;
       this.child = null;
+      this.activeAccountSessionId = null;
       this.healthBase = null;
       if (this.healthTimer) clearInterval(this.healthTimer);
       this.healthTimer = null;
@@ -485,8 +538,15 @@ export class DesktopMcpTunnelController {
           healthy: false,
           ready: false,
           adminUiAvailable: false,
-          failureCode: "process_exit",
+          failureCode: reason,
         });
+        if (accountSessionId) {
+          this.options.onUnexpectedExit?.({
+            accountSessionId,
+            previousScope,
+            reason,
+          });
+        }
       }
     });
 
@@ -554,6 +614,7 @@ export class DesktopMcpTunnelController {
     await Promise.race([exited, delay(5_000)]);
     if (this.child === child && child.exitCode === null) child.kill("SIGKILL");
     this.child = null;
+    this.activeAccountSessionId = null;
     this.healthBase = null;
     this.stopping = false;
     this.activeScope = READ_ONLY_TUNNEL_SCOPE;

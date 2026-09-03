@@ -3,6 +3,7 @@ import type { HelixAskLegacyComposerSurfaceProps } from "./HelixAskLegacyCompose
 export type HelixAskLegacyComposerStateOptions = HelixAskLegacyComposerSurfaceProps;
 
 export function buildHelixAskLegacyComposerState({
+  destination,
   voiceLevelMonitor,
   moodAvatar,
   actionToolbar,
@@ -11,6 +12,7 @@ export function buildHelixAskLegacyComposerState({
   slashCommandMenu,
 }: HelixAskLegacyComposerStateOptions): HelixAskLegacyComposerSurfaceProps {
   return {
+    destination,
     voiceLevelMonitor,
     moodAvatar,
     actionToolbar,

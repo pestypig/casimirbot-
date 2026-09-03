@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, KeyRound, Power, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { Copy, Gamepad2, KeyRound, Loader2, Power, RefreshCw, ShieldCheck, X } from "lucide-react";
 import type {
   HelixConnectorPairing,
   HelixConnectorPairingReceipt,
@@ -37,13 +37,32 @@ import {
   HELIX_MINECRAFT_PLAYER_WALK_CAPABILITY,
 } from "@shared/helix-minecraft-player-capabilities";
 import type { HelixRoomSourceBinding } from "@shared/helix-room-source-ingress";
-import { MinecraftLocalLifecycleCard } from "./MinecraftLocalLifecycleCard";
+import {
+  inspectCurrentReasoningBinding,
+  type BrowserReasoningBinding,
+} from "@/lib/agent-access/reasoningTaskBinding";
+import { useAgiChatStore } from "@/store/useAgiChatStore";
+import {
+  HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
+  requestBoundAgentSteering,
+  type HelixBoundAgentSteeringResult,
+} from "../HelixBoundAgentSteeringBridge";
+import { launchMinecraftLocalLifecycle } from "./MinecraftLocalLifecycleCard";
+import {
+  buildMinecraftPlayActivationInstruction,
+  diagnoseMinecraftPlayJourney,
+} from "./minecraftPlayJourney";
 
 const PLAYER_ACTION_ADAPTER = "minecraft.fabric_client.v1";
 const DEFAULT_LEASE_MS = 2 * 60 * 60_000;
 const SEVEN_DAY_LEASE_MS = 7 * 24 * 60 * 60_000;
 const THIRTY_DAY_LEASE_MS = 30 * 24 * 60 * 60_000;
 const PLAYER_AUTHORITY_REFRESH_INTERVAL_MS = 10_000;
+const DEFAULT_PLAY_OBJECTIVE =
+  "Assist me while I play Minecraft, follow my natural requests, and preserve my player's viability while using only the displayed admitted capabilities.";
+const FULL_GAMEPLAY_CAPABILITY_IDS = [
+  ...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS,
+] as const;
 
 const actionAuthoritiesPath = (
   roomId: string,
@@ -53,6 +72,12 @@ const actionAuthoritiesPath = (
 
 const connectorPairingsPath = (roomId: string): string =>
   `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/connector-pairings`;
+
+const playReadinessPath = (
+  roomId: string,
+  environmentBindingId: string,
+): string =>
+  `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(environmentBindingId)}/play-readiness`;
 
 type SafeActionAuthorityReceipt =
   Partial<HelixEnvironmentActionAuthorityReceipt> & {
@@ -68,6 +93,20 @@ type SafePairingReceipt = Partial<HelixConnectorPairingReceipt> & {
   error?: string | null;
   message?: string | null;
   pairing?: HelixConnectorPairing | null;
+};
+
+type MinecraftPlayReadinessReceipt = {
+  schema: "helix.minecraft.play_readiness.v1";
+  ok: boolean;
+  error?: string | null;
+  message?: string | null;
+  durable_goal_ready: boolean;
+  semantic_monitor_ready: boolean;
+  goal_id?: string | null;
+  monitor_id?: string | null;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
 };
 
 const CAPABILITY_OPTIONS: Array<{ id: string; label: string }> = [
@@ -174,17 +213,22 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   sourceBinding?: HelixRoomSourceBinding;
   isOwner: boolean;
 }) {
+  const activeChatId = useAgiChatStore((state) => state.activeId);
   const authorityPath = useMemo(
     () => actionAuthoritiesPath(roomId, environment.environment_binding_id),
     [environment.environment_binding_id, roomId],
   );
   const pairingPath = useMemo(() => connectorPairingsPath(roomId), [roomId]);
+  const readinessPath = useMemo(
+    () => playReadinessPath(roomId, environment.environment_binding_id),
+    [environment.environment_binding_id, roomId],
+  );
   const [authority, setAuthority] =
     useState<HelixEnvironmentActionAuthority | null>(null);
   const [readiness, setReadiness] =
     useState<HelixEnvironmentActionConnectorReadiness | null>(null);
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>(
-    [...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS],
+    [...FULL_GAMEPLAY_CAPABILITY_IDS],
   );
   const [autonomyMode, setAutonomyMode] =
     useState<HelixEnvironmentActionAutonomyMode>("approved_capabilities");
@@ -202,6 +246,16 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     "idle",
   );
   const [stopArmed, setStopArmed] = useState(false);
+  const [playObjective, setPlayObjective] = useState(DEFAULT_PLAY_OBJECTIVE);
+  const playRequestIdRef = useRef<string | null>(null);
+  const [playRequestId, setPlayRequestId] = useState<string | null>(null);
+  const [playLaunchConnected, setPlayLaunchConnected] = useState(false);
+  const [playSteeringAcknowledged, setPlaySteeringAcknowledged] = useState(false);
+  const [playDurableGoalReady, setPlayDurableGoalReady] = useState(false);
+  const [playSemanticMonitorReady, setPlaySemanticMonitorReady] = useState(false);
+  const [playReasoningBinding, setPlayReasoningBinding] =
+    useState<BrowserReasoningBinding | null>(null);
+  const [playStatus, setPlayStatus] = useState<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
@@ -260,6 +314,85 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     };
   }, [load]);
 
+  useEffect(() => {
+    const onSteeringResult = (event: Event): void => {
+      const detail = (event as CustomEvent<HelixBoundAgentSteeringResult>).detail;
+      if (!detail || detail.requestId !== playRequestIdRef.current) return;
+      if (detail.deliveryState === "queued") {
+        setPlayStatus(
+          "The play request is queued for the exact Codex task. Waiting for pickup acknowledgement; this is not task completion.",
+        );
+        return;
+      }
+      if (detail.deliveryState === "acknowledged") {
+        setPlaySteeringAcknowledged(true);
+        setPlayStatus(
+          "The exact Codex task acknowledged pickup and is checking the governed Minecraft goal and monitor. Continue in Helix chat or use /helix ask after it reports readiness.",
+        );
+        return;
+      }
+      setPlaySteeringAcknowledged(false);
+      setPlayStatus(
+        `The exact-task pickup ended with ${detail.deliveryState}; no readiness, execution, or answer is claimed.`,
+      );
+    };
+    window.addEventListener(
+      HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
+      onSteeringResult,
+    );
+    return () => window.removeEventListener(
+      HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
+      onSteeringResult,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!playSteeringAcknowledged) {
+      setPlayDurableGoalReady(false);
+      setPlaySemanticMonitorReady(false);
+      return;
+    }
+    const controller = new AbortController();
+    let timer: number | null = null;
+    const inspect = async (): Promise<void> => {
+      try {
+        const response = await fetch(readinessPath, {
+          method: "POST",
+          credentials: "include",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ objective_text: playObjective.trim() }),
+        });
+        const receipt = (await response.json().catch(() => null)) as
+          | MinecraftPlayReadinessReceipt
+          | null;
+        if (!response.ok || !receipt?.ok) {
+          throw new Error(receipt?.message || "Minecraft play readiness is unavailable.");
+        }
+        setPlayDurableGoalReady(receipt.durable_goal_ready);
+        setPlaySemanticMonitorReady(receipt.semantic_monitor_ready);
+        setPlayStatus(receipt.message ?? "Minecraft play readiness checked.");
+        if (!receipt.durable_goal_ready || !receipt.semantic_monitor_ready) {
+          timer = window.setTimeout(() => void inspect(), 1_500);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setPlayDurableGoalReady(false);
+        setPlaySemanticMonitorReady(false);
+        setPlayStatus(
+          error instanceof Error
+            ? error.message
+            : "Minecraft play readiness is unavailable.",
+        );
+      }
+    };
+    void inspect();
+    return () => {
+      controller.abort();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [playObjective, playSteeringAcknowledged, readinessPath]);
+
   const mutationSelected = selectedCapabilities.some(
     (id) =>
       id === HELIX_MINECRAFT_PLAYER_MINE_CAPABILITY ||
@@ -267,6 +400,47 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
       id === HELIX_MINECRAFT_PLAYER_EXECUTE_SEQUENCE_CAPABILITY,
   );
   const warningRequired = mutationSelected || autonomyMode === "autonomous";
+  const fullGameplayAccessSelected =
+    autonomyMode === "approved_capabilities" &&
+    selectedCapabilities.length === FULL_GAMEPLAY_CAPABILITY_IDS.length &&
+    FULL_GAMEPLAY_CAPABILITY_IDS.every((capabilityId) =>
+      selectedCapabilities.includes(capabilityId));
+
+  const selectFullGameplayAccess = (): void => {
+    authorityDraftDirtyRef.current = true;
+    setSelectedCapabilities([...FULL_GAMEPLAY_CAPABILITY_IDS]);
+    setAutonomyMode("approved_capabilities");
+    setManualOverridePolicy("cancel");
+    setLeaseMs(DEFAULT_LEASE_MS);
+    setAcknowledged(false);
+    setMessage(
+      "Full gameplay access selected for a two-hour player-only lease. Acknowledge the displayed boundary once, then start Play Minecraft with Helix.",
+    );
+  };
+
+  const configureCurrentAuthority = async (): Promise<HelixEnvironmentActionAuthority> => {
+    const receipt = await readActionReceipt(
+      await fetch(authorityPath, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participant_id: selfParticipantId,
+          domain_adapter: PLAYER_ACTION_ADAPTER,
+          allowed_capability_ids: selectedCapabilities,
+          autonomy_mode: autonomyMode,
+          manual_override_policy: manualOverridePolicy,
+          expires_at: new Date(Date.now() + leaseMs).toISOString(),
+        }),
+      }),
+    );
+    if (!receipt.authority) {
+      throw new Error("Player-action authority was not returned.");
+    }
+    setAuthority(receipt.authority);
+    authorityDraftDirtyRef.current = false;
+    return receipt.authority;
+  };
 
   const saveAuthority = async (): Promise<void> => {
     if (selectedCapabilities.length === 0) {
@@ -282,26 +456,10 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     setBusy("save");
     setMessage(null);
     try {
-      const receipt = await readActionReceipt(
-        await fetch(authorityPath, {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            participant_id: selfParticipantId,
-            domain_adapter: PLAYER_ACTION_ADAPTER,
-            allowed_capability_ids: selectedCapabilities,
-            autonomy_mode: autonomyMode,
-            manual_override_policy: manualOverridePolicy,
-            expires_at: new Date(Date.now() + leaseMs).toISOString(),
-          }),
-        }),
-      );
-      setAuthority(receipt.authority ?? null);
-      authorityDraftDirtyRef.current = false;
+      await configureCurrentAuthority();
       setAcknowledged(false);
       await load();
-      setMessage(receipt.message ?? "Player Embodiment authority configured.");
+      setMessage("Player Embodiment authority configured.");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -356,6 +514,32 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     }
   };
 
+  const stageLocalPlayerPairing = async (
+    currentAuthority: HelixEnvironmentActionAuthority,
+    idempotencyKey: string,
+  ): Promise<SafePairingReceipt> => {
+    if (!sourceBinding) throw new Error("A current Minecraft source binding is required.");
+    return readPairingReceipt(
+      await fetch(`${pairingPath}/local-player-handoff`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          purpose: "rotate",
+          binding_id: sourceBinding.binding_id,
+          domain_adapter: sourceBinding.domain_adapter,
+          source_label: sourceBinding.source_label,
+          action_credential_requested: true,
+          action_authority_id: currentAuthority.action_authority_id,
+          credential_ttl_ms: leaseMs,
+        }),
+      }),
+    );
+  };
+
   const pairLocalPlayer = async (): Promise<void> => {
     if (!authority || !sourceBinding) return;
     setBusy("pair-local");
@@ -365,24 +549,9 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     setPairingExpiresAt(null);
     setCopyState("idle");
     try {
-      const receipt = await readPairingReceipt(
-        await fetch(`${pairingPath}/local-player-handoff`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": `browser-local-player-action-pairing:${crypto.randomUUID()}`,
-          },
-          body: JSON.stringify({
-            purpose: "rotate",
-            binding_id: sourceBinding.binding_id,
-            domain_adapter: sourceBinding.domain_adapter,
-            source_label: sourceBinding.source_label,
-            action_credential_requested: true,
-            action_authority_id: authority.action_authority_id,
-            credential_ttl_ms: leaseMs,
-          }),
-        }),
+      const receipt = await stageLocalPlayerPairing(
+        authority,
+        `browser-local-player-action-pairing:${crypto.randomUUID()}`,
       );
       setMessage(
         receipt.message ??
@@ -399,6 +568,148 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
       setBusy(null);
     }
   };
+
+  const startPlayJourney = async (): Promise<void> => {
+    if (busy !== null) return;
+    setBusy("play");
+    setMessage(null);
+    setPlayStatus("Checking the exact Codex task and Minecraft identities…");
+    setPlaySteeringAcknowledged(false);
+    setPlayDurableGoalReady(false);
+    setPlaySemanticMonitorReady(false);
+    setPlayRequestId(null);
+    playRequestIdRef.current = null;
+    try {
+      if (!activeChatId) {
+        throw new Error(
+          "Open a Helix chat, then bind that exact chat to the existing Codex task in Agent Connections.",
+        );
+      }
+      const reasoningBinding = await inspectCurrentReasoningBinding(activeChatId);
+      setPlayReasoningBinding(reasoningBinding);
+      if (
+        reasoningBinding.status !== "active" ||
+        reasoningBinding.continuation_transport !== "polling"
+      ) {
+        throw new Error(
+          "The selected Helix chat does not have an active exact Codex pickup binding.",
+        );
+      }
+      if (!isOwner) {
+        throw new Error("Only the room owner can activate this local play session.");
+      }
+      if (
+        environment.connection_status !== "active" ||
+        !sourceBinding ||
+        sourceBinding.status !== "active"
+      ) {
+        throw new Error(
+          "The exact Minecraft source and world binding must be active before launch.",
+        );
+      }
+      if (environment.self_subject_binding?.status !== "active") {
+        throw new Error(
+          "Select and verify the current Minecraft player before launch.",
+        );
+      }
+      if (!playObjective.trim()) {
+        throw new Error("Enter the Minecraft play objective before activation.");
+      }
+      const requiresAuthorityWrite =
+        !authority ||
+        authority.status !== "active" ||
+        authorityDraftDirtyRef.current;
+      if (requiresAuthorityWrite && warningRequired && !acknowledged) {
+        throw new Error(
+          "Review the displayed capabilities and acknowledge the finite player-control lease before activation.",
+        );
+      }
+
+      setPlayStatus("Confirming the finite player authority…");
+      const currentAuthority = requiresAuthorityWrite
+        ? await configureCurrentAuthority()
+        : authority;
+      if (!currentAuthority) {
+        throw new Error("A current player-action authority is required.");
+      }
+
+      setPlayStatus("Launching or reusing the prepared Fabric client and joining localhost…");
+      await launchMinecraftLocalLifecycle();
+      setPlayLaunchConnected(true);
+
+      if (!readiness?.ready_for_actions ||
+          readiness.action_authority_id !== currentAuthority.action_authority_id) {
+        setPlayStatus("Privately staging the exact player companion pairing…");
+        const idempotencyDigest = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(
+            `${currentAuthority.action_authority_id}\n${sourceBinding.binding_id}`,
+          ),
+        );
+        const idempotencySuffix = Array.from(new Uint8Array(idempotencyDigest))
+          .map((value) => value.toString(16).padStart(2, "0"))
+          .join("");
+        await stageLocalPlayerPairing(
+          currentAuthority,
+          `minecraft-play:${idempotencySuffix}`,
+        );
+      }
+
+      const requestId = `minecraft-play:${crypto.randomUUID()}`;
+      playRequestIdRef.current = requestId;
+      setPlayRequestId(requestId);
+      setPlayStatus(
+        "Sending the visible objective to the exact bound Codex task for current-state inspection, goal/monitor setup, and acknowledgement…",
+      );
+      requestBoundAgentSteering({
+        requestId,
+        origin: "typed",
+        source: "minecraft_play_activation",
+        instructionText: buildMinecraftPlayActivationInstruction({
+          objective: playObjective,
+          roomId,
+          environmentBindingId: environment.environment_binding_id,
+          roomSourceBindingId: environment.room_source_binding_id,
+          sourceId: environment.source_id,
+          worldId: environment.world_id,
+          participantId: selfParticipantId,
+          subjectBindingId: environment.self_subject_binding.subject_binding_id,
+          actionAuthorityId: currentAuthority.action_authority_id,
+          allowedCapabilityIds: currentAuthority.allowed_capability_ids,
+          authorityExpiresAt: currentAuthority.expires_at,
+        }),
+      });
+      await load();
+    } catch (error) {
+      setPlayLaunchConnected(false);
+      setPlaySteeringAcknowledged(false);
+      setPlayStatus(
+        error instanceof Error
+          ? error.message
+          : "The Minecraft play journey could not continue.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const playProjection = diagnoseMinecraftPlayJourney({
+    reasoningBinding: playReasoningBinding,
+    roomPresent: Boolean(roomId),
+    isOwner,
+    environmentStatus: environment.connection_status,
+    sourceBindingStatus: sourceBinding?.status ?? null,
+    playerBindingStatus: environment.self_subject_binding?.status ?? null,
+    authorityConfirmationRequired:
+      warningRequired &&
+      (!authority || authority.status !== "active" || authorityDraftDirtyRef.current),
+    authorityConfirmed: acknowledged,
+    launchConnected: playLaunchConnected,
+    playerClientReady: Boolean(readiness?.ready_for_actions),
+    steeringAcknowledged: playSteeringAcknowledged,
+    durableGoalReady: playDurableGoalReady,
+    semanticMonitorReady: playSemanticMonitorReady,
+  });
 
   const emergencyStop = async (): Promise<void> => {
     if (!authority) return;
@@ -498,7 +809,116 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
 
       {isOwner ? (
         <div className="mt-2 space-y-2">
-          <MinecraftLocalLifecycleCard />
+          <div className="rounded border border-cyan-300/25 bg-cyan-400/10 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="flex items-center gap-1 text-[11px] font-semibold text-cyan-50">
+                  <Gamepad2 className="h-3.5 w-3.5" />
+                  Play Minecraft with Helix
+                </p>
+                <p className="mt-1 max-w-2xl text-[9px] leading-4 text-cyan-50/70">
+                  One explicit activation verifies the existing exact Codex task,
+                  launches or reuses the prepared Fabric client, privately pairs
+                  this player when needed, and sends the visible objective to that
+                  task for governed goal and monitor setup. It never creates a
+                  provider task or treats pickup and lifecycle receipts as answers.
+                </p>
+              </div>
+              <span className={`rounded px-2 py-1 text-[9px] ${
+                playProjection.ready
+                  ? "bg-emerald-400/15 text-emerald-100"
+                  : "bg-slate-950/50 text-cyan-100"
+              }`}>
+                {playProjection.stage.replaceAll("_", " ")}
+              </span>
+            </div>
+            <div className="mt-2 rounded border border-emerald-300/25 bg-emerald-400/10 p-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  data-helix-interaction-kind="configure"
+                  data-helix-authority-state="blocked_pending_contract"
+                  data-helix-control-id="helix.ask.shared_live_room.player-embodiment.full-gameplay-access"
+                  type="button"
+                  aria-pressed={fullGameplayAccessSelected}
+                  disabled={busy !== null}
+                  className="inline-flex items-center gap-1 rounded border border-emerald-200/40 bg-emerald-300/15 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-50 disabled:opacity-40"
+                  onClick={selectFullGameplayAccess}
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  Full gameplay access
+                </button>
+                <span className="text-[9px] text-emerald-100/75">
+                  {fullGameplayAccessSelected
+                    ? "Selected: all registered player capabilities, two hours, manual input cancels AI control."
+                    : "Custom capability scope selected."}
+                </span>
+              </div>
+              <p className="mt-1 text-[9px] leading-4 text-emerald-100/60">
+                This covers normal AI play without guessing future actions. It is
+                still limited to the selected Minecraft player and never grants
+                commands, host shell, files, RCON, credentials, or answer authority.
+                You confirm it once before Play; Emergency Stop revokes it immediately.
+              </p>
+            </div>
+            <label className="mt-2 block text-[9px] text-cyan-100/75">
+              Play objective
+              <textarea
+                aria-label="Minecraft play objective"
+                value={playObjective}
+                disabled={busy !== null}
+                rows={3}
+                maxLength={1_000}
+                className="mt-1 w-full resize-y rounded border border-cyan-200/20 bg-slate-950/70 px-2 py-1.5 text-[10px] leading-4 text-cyan-50 disabled:opacity-50"
+                onChange={(event) => setPlayObjective(event.target.value)}
+              />
+            </label>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                data-helix-interaction-kind="act"
+                data-helix-authority-state="blocked_pending_contract"
+                data-helix-control-id="helix.ask.shared_live_room.player-embodiment.play-minecraft-with-helix"
+                type="button"
+                disabled={
+                  busy !== null ||
+                  !activeChatId ||
+                  !sourceBinding ||
+                  environment.connection_status !== "active" ||
+                  environment.self_subject_binding?.status !== "active" ||
+                  !playObjective.trim() ||
+                  (warningRequired &&
+                    (!authority || authority.status !== "active" || authorityDraftDirtyRef.current) &&
+                    !acknowledged)
+                }
+                className="inline-flex items-center gap-1.5 rounded border border-cyan-200/40 bg-cyan-300/15 px-3 py-2 text-[10px] font-semibold text-cyan-50 disabled:opacity-40"
+                onClick={() => void startPlayJourney()}
+              >
+                {busy === "play" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Gamepad2 className="h-3 w-3" />
+                )}
+                {busy === "play" ? "Preparing play session…" : "Play Minecraft with Helix"}
+              </button>
+              <span className="text-[9px] text-cyan-100/60">
+                {playProjection.nextAction}
+              </span>
+            </div>
+            {!activeChatId ? (
+              <p className="mt-2 text-[9px] text-amber-100">
+                Open a Helix chat and bind it to the existing Codex task first.
+              </p>
+            ) : null}
+            {playStatus ? (
+              <p className="mt-2 text-[9px] leading-4 text-cyan-50" role="status" aria-live="polite">
+                {playStatus}
+              </p>
+            ) : null}
+            {playRequestId ? (
+              <p className="mt-1 text-[8px] text-cyan-100/45">
+                Exact request {playRequestId}; queued pickup is not task completion.
+              </p>
+            ) : null}
+          </div>
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-[9px] text-emerald-100/70">
               Approval mode

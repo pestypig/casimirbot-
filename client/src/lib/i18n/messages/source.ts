@@ -414,6 +414,69 @@ export const interfaceSourceMessages = {
     placeholders: { title: "string" },
     screenshotSurface: "workstation",
   },
+  "workstation.shell.renameChat": {
+    id: "workstation.shell.renameChat",
+    defaultMessage: "Rename {title}",
+    description: "Accessible label for renaming a saved Helix Ask chat.",
+    context: "Workstation shell chat session list.",
+    placeholders: { title: "string" },
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.renameChatTitle": {
+    id: "workstation.shell.renameChatTitle",
+    defaultMessage: "Rename chat",
+    description: "Tooltip for the saved-chat rename button.",
+    context: "Workstation shell chat session list.",
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.renameChatInput": {
+    id: "workstation.shell.renameChatInput",
+    defaultMessage: "New name for {title}",
+    description: "Accessible label for the inline saved-chat rename field.",
+    context: "Workstation shell chat session list.",
+    placeholders: { title: "string" },
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.renameChatSave": {
+    id: "workstation.shell.renameChatSave",
+    defaultMessage: "Save new name for {title}",
+    description: "Accessible label for saving an inline chat rename.",
+    context: "Workstation shell chat session list.",
+    placeholders: { title: "string" },
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.renameChatCancel": {
+    id: "workstation.shell.renameChatCancel",
+    defaultMessage: "Cancel renaming {title}",
+    description: "Accessible label for cancelling an inline chat rename.",
+    context: "Workstation shell chat session list.",
+    placeholders: { title: "string" },
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.clearChat": {
+    id: "workstation.shell.clearChat",
+    defaultMessage: "Clear {title}",
+    description: "Accessible label for clearing the messages from a saved Helix Ask chat.",
+    context: "Workstation shell chat session list.",
+    placeholders: { title: "string" },
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.clearChatTitle": {
+    id: "workstation.shell.clearChatTitle",
+    defaultMessage: "Clear chat messages",
+    description: "Tooltip for the saved-chat clear button.",
+    context: "Workstation shell chat session list.",
+    screenshotSurface: "workstation",
+  },
+  "workstation.shell.clearChatConfirm": {
+    id: "workstation.shell.clearChatConfirm",
+    defaultMessage: "Clear all messages from \"{title}\"? The saved chat itself will remain.",
+    description: "Browser confirmation prompt shown before clearing a saved Helix Ask chat.",
+    context: "Workstation shell chat session list.",
+    placeholders: { title: "string" },
+    glossaryTerms: ["Helix Ask"],
+    screenshotSurface: "workstation",
+  },
   "workstation.shell.deleteChatTitle": {
     id: "workstation.shell.deleteChatTitle",
     defaultMessage: "Delete chat",
@@ -39944,6 +40007,572 @@ export const interfaceSourceMessages = {
     description: "Theory Badge Graph shared data text from theory.preset.curvature_collapse description.",
     context: "Theory Badge Graph shared badge, atlas, preset, lens, and hover-card data rendered in the workstation UI.",
     screenshotSurface: "workstation",
+  },
+  "casimirGuide.title": {
+    id: "casimirGuide.title", defaultMessage: "Casimir Guide",
+    description: "Title of the Casimir Guide overlay.", context: "Casimir Guide header.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.description": {
+    id: "casimirGuide.description", defaultMessage: "Quick status and navigation",
+    description: "Description of the Casimir Guide overlay.", context: "Casimir Guide header.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.close": {
+    id: "casimirGuide.close", defaultMessage: "Close Casimir Guide",
+    description: "Accessible label for closing the Guide.", context: "Casimir Guide header.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.bladesLabel": {
+    id: "casimirGuide.bladesLabel", defaultMessage: "Guide blades",
+    description: "Accessible label for Guide blade navigation.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.blade.workspace": {
+    id: "casimirGuide.blade.workspace", defaultMessage: "Workspace",
+    description: "Workspace Guide blade label.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.blade.mission": {
+    id: "casimirGuide.blade.mission", defaultMessage: "Mission",
+    description: "Mission Guide blade label.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.blade.guide": {
+    id: "casimirGuide.blade.guide", defaultMessage: "Casimir Guide",
+    description: "Default Guide blade label.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.blade.liveRoom": {
+    id: "casimirGuide.blade.liveRoom", defaultMessage: "Live Room",
+    description: "Live Room Guide blade label.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.blade.environment": {
+    id: "casimirGuide.blade.environment", defaultMessage: "Environment",
+    description: "Environment Guide blade label.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.blade.system": {
+    id: "casimirGuide.blade.system", defaultMessage: "System",
+    description: "System Guide blade label.", context: "Casimir Guide tabs.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.bladeSelected": {
+    id: "casimirGuide.bladeSelected", defaultMessage: "{blade} blade selected",
+    description: "Screen reader announcement after a Guide blade changes.", context: "Casimir Guide live region.",
+    placeholders: { blade: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.openMainMenu": {
+    id: "casimirGuide.row.openMainMenu", defaultMessage: "Open Main Menu",
+    description: "Guide row that opens the complete launcher.", context: "Casimir Guide rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.returnToWorkstation": {
+    id: "casimirGuide.row.returnToWorkstation", defaultMessage: "Return to Workstation",
+    description: "Guide row that closes the overlay.", context: "Casimir Guide rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.resume": {
+    id: "casimirGuide.row.resume", defaultMessage: "Resume {title}",
+    description: "Guide row that returns to the active panel.", context: "Casimir Guide contextual rows.",
+    placeholders: { title: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.noActivePanel": {
+    id: "casimirGuide.row.noActivePanel", defaultMessage: "No active panel",
+    description: "Guide row shown when no panel is active.", context: "Casimir Guide contextual rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.recentPanels": {
+    id: "casimirGuide.row.recentPanels", defaultMessage: "Recent panels",
+    description: "Guide row that opens recent panels.", context: "Casimir Guide Workspace blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.favorites": {
+    id: "casimirGuide.row.favorites", defaultMessage: "Favorites",
+    description: "Guide row that opens pinned panels.", context: "Casimir Guide Workspace blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.searchPanels": {
+    id: "casimirGuide.row.searchPanels", defaultMessage: "Search panels",
+    description: "Guide row that opens policy-aware panel search.", context: "Casimir Guide Workspace blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.back": {
+    id: "casimirGuide.row.back", defaultMessage: "Back",
+    description: "Guide row that returns from a nested list.", context: "Casimir Guide nested views.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.noRecentPanels": {
+    id: "casimirGuide.row.noRecentPanels", defaultMessage: "No recent panels",
+    description: "Guide empty state for recent panels.", context: "Casimir Guide Workspace blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.noFavorites": {
+    id: "casimirGuide.row.noFavorites", defaultMessage: "No favorite panels",
+    description: "Guide empty state for favorites.", context: "Casimir Guide Workspace blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.noSearchResults": {
+    id: "casimirGuide.row.noSearchResults", defaultMessage: "No matching panels",
+    description: "Guide empty state for panel search.", context: "Casimir Guide Workspace search.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.search.placeholder": {
+    id: "casimirGuide.search.placeholder", defaultMessage: "Search panels...",
+    description: "Placeholder for Guide panel search.", context: "Casimir Guide Workspace search.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.search.label": {
+    id: "casimirGuide.search.label", defaultMessage: "Search panels",
+    description: "Accessible label for Guide panel search.", context: "Casimir Guide Workspace search.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.friendsOnline": {
+    id: "casimirGuide.row.friendsOnline", defaultMessage: "Friends online",
+    description: "Guide Live Room friend-presence row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.voiceParty": {
+    id: "casimirGuide.row.voiceParty", defaultMessage: "Voice party",
+    description: "Guide voice-party row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.microphone": {
+    id: "casimirGuide.row.microphone", defaultMessage: "Microphone",
+    description: "Guide microphone row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.gptLive": {
+    id: "casimirGuide.row.gptLive", defaultMessage: "GPT Live",
+    description: "Guide GPT Live attachment row.", context: "Casimir Guide Live Room blade.", glossaryTerms: ["GPT Live"], screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.invitations": {
+    id: "casimirGuide.row.invitations", defaultMessage: "Invitations",
+    description: "Guide invitations row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.friendsPartyControls": {
+    id: "casimirGuide.row.friendsPartyControls", defaultMessage: "Friends & party controls",
+    description: "Guide row that opens full social controls.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.sharedRoom": {
+    id: "casimirGuide.row.sharedRoom", defaultMessage: "Shared room",
+    description: "Guide selected Shared Live Room row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.roomParticipants": {
+    id: "casimirGuide.row.roomParticipants", defaultMessage: "Room participants",
+    description: "Guide room participant summary row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.speakingFloor": {
+    id: "casimirGuide.row.speakingFloor", defaultMessage: "Speaking floor",
+    description: "Guide room floor-holder summary row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.roomMicrophone": {
+    id: "casimirGuide.row.roomMicrophone", defaultMessage: "Room microphone",
+    description: "Guide Shared Live Room microphone summary row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.roomGptAttachment": {
+    id: "casimirGuide.row.roomGptAttachment", defaultMessage: "Room GPT attachment",
+    description: "Guide room GPT Live attachment summary row.", context: "Casimir Guide Live Room blade.", glossaryTerms: ["GPT Live"], screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.sharedSources": {
+    id: "casimirGuide.row.sharedSources", defaultMessage: "Shared sources",
+    description: "Guide safe shared-source metadata row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.publicResults": {
+    id: "casimirGuide.row.publicResults", defaultMessage: "Public results",
+    description: "Guide public terminal-result metadata row.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.openFullLiveRoom": {
+    id: "casimirGuide.row.openFullLiveRoom", defaultMessage: "Open full Live Room",
+    description: "Guide navigation row for the existing Shared Live Room dialog.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.missionIdentity": {
+    id: "casimirGuide.row.missionIdentity", defaultMessage: "Mission identity",
+    description: "Guide authoritative mission binding row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.currentObjective": {
+    id: "casimirGuide.row.currentObjective", defaultMessage: "Current objective",
+    description: "Guide current mission objective row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.missionPhaseStatus": {
+    id: "casimirGuide.row.missionPhaseStatus", defaultMessage: "Phase, status, and freshness",
+    description: "Guide mission phase and status row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.missionAttention": {
+    id: "casimirGuide.row.missionAttention", defaultMessage: "Attention",
+    description: "Guide latest unresolved mission attention row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.missionEvidenceReplay": {
+    id: "casimirGuide.row.missionEvidenceReplay", defaultMessage: "Evidence and replay",
+    description: "Guide bounded mission evidence and replay-availability row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.latestMissionResult": {
+    id: "casimirGuide.row.latestMissionResult", defaultMessage: "Latest result",
+    description: "Guide terminal-result eligibility row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.missionVoiceState": {
+    id: "casimirGuide.row.missionVoiceState", defaultMessage: "Mission voice state",
+    description: "Guide read-only mission voice and context state row.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.openMissionBoard": {
+    id: "casimirGuide.row.openMissionBoard", defaultMessage: "Open Mission Go Board",
+    description: "Guide navigation placeholder for a governed Mission Go Board surface.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.environmentSelection": {
+    id: "casimirGuide.row.environmentSelection", defaultMessage: "Environment",
+    description: "Guide selected environment or monitoring projection row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.environmentConnector": {
+    id: "casimirGuide.row.environmentConnector", defaultMessage: "Connector and world",
+    description: "Guide connector health and world-binding projection row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.embodiments": {
+    id: "casimirGuide.row.embodiments", defaultMessage: "Embodiments",
+    description: "Guide player-proxy and companion embodiment projection row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.companion": {
+    id: "casimirGuide.row.companion", defaultMessage: "Companion",
+    description: "Guide companion actor and incarnation projection row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.residentMode": {
+    id: "casimirGuide.row.residentMode", defaultMessage: "Resident mode",
+    description: "Guide resident-controller profile and maturity row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.authoritySafety": {
+    id: "casimirGuide.row.authoritySafety", defaultMessage: "Authority and safety",
+    description: "Guide actor/effect lease and safety-boundary row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.environmentEvidence": {
+    id: "casimirGuide.row.environmentEvidence", defaultMessage: "Evidence and activity",
+    description: "Guide bounded environment evidence and blocker-count row.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.row.environmentControls": {
+    id: "casimirGuide.row.environmentControls", defaultMessage: "Environment controls",
+    description: "Guide navigation row for the full governed environment monitor.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.policy.locked": {
+    id: "casimirGuide.policy.locked", defaultMessage: "This destination is locked by the active account policy.",
+    description: "Guide explanation for a policy-locked panel.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.route.unavailable": {
+    id: "casimirGuide.route.unavailable", defaultMessage: "The workstation panel route is not registered.",
+    description: "Guide explanation for an absent panel route.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.social.failed": {
+    id: "casimirGuide.social.failed", defaultMessage: "Social status could not be refreshed. Open the full panel for details.",
+    description: "Guide social status failure explanation.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.social.locked": {
+    id: "casimirGuide.social.locked", defaultMessage: "Social status requires an authenticated account session.",
+    description: "Guide explanation for social status rejected by session authorization.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.loading": {
+    id: "casimirGuide.value.loading", defaultMessage: "Loading",
+    description: "Guide pending-state value.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noMissionBound": {
+    id: "casimirGuide.value.noMissionBound", defaultMessage: "No mission bound",
+    description: "Guide value when no mission controller has published an identity.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.missionObjective": {
+    id: "casimirGuide.value.missionObjective", defaultMessage: "{title} · {status}",
+    description: "Guide mission objective and state.", context: "Casimir Guide Mission blade.",
+    placeholders: { title: "string", status: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noMissionObjective": {
+    id: "casimirGuide.value.noMissionObjective", defaultMessage: "No unresolved objective projected",
+    description: "Guide value when no unresolved mission objective exists.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.missionPhaseStatus": {
+    id: "casimirGuide.value.missionPhaseStatus", defaultMessage: "{phase} · {status} · {freshness}",
+    description: "Guide mission phase, state, and explicit freshness.", context: "Casimir Guide Mission blade.",
+    placeholders: { phase: "string", status: "string", freshness: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noMissionAttention": {
+    id: "casimirGuide.value.noMissionAttention", defaultMessage: "No unresolved critical or action event",
+    description: "Guide value when no unresolved attention event exists.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.none": {
+    id: "casimirGuide.value.none", defaultMessage: "none",
+    description: "Guide value for an absent optional mission reason.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.missionEvidenceReplay": {
+    id: "casimirGuide.value.missionEvidenceReplay", defaultMessage: "{count} evidence refs · replay {replay}",
+    description: "Guide evidence count and trace replay availability.", context: "Casimir Guide Mission blade.",
+    placeholders: { count: "number", replay: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noTerminalResult": {
+    id: "casimirGuide.value.noTerminalResult", defaultMessage: "No terminal-authority result projected",
+    description: "Guide value when no governed terminal result is available.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.missionVoiceState": {
+    id: "casimirGuide.value.missionVoiceState", defaultMessage: "{tier} · {session} · {mode}",
+    description: "Guide mission context tier, session, and voice mode.", context: "Casimir Guide Mission blade.",
+    placeholders: { tier: "string", session: "string", mode: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.failed": {
+    id: "casimirGuide.mission.failed", defaultMessage: "Mission state could not be refreshed. Open a governed mission surface for details.",
+    description: "Guide mission refresh failure explanation.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.stale": {
+    id: "casimirGuide.mission.stale", defaultMessage: "The retained mission projection is stale and is not current authority.",
+    description: "Guide retained mission snapshot warning.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.lastVerified": {
+    id: "casimirGuide.mission.lastVerified", defaultMessage: "Last verified {timestamp}",
+    description: "Guide last verified mission timestamp.", context: "Casimir Guide Mission blade.",
+    placeholders: { timestamp: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.freshnessBoundary": {
+    id: "casimirGuide.mission.freshnessBoundary", defaultMessage: "Freshness remains unknown without an explicit stale-window event.",
+    description: "Guide fail-closed mission freshness explanation.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.attentionMeta": {
+    id: "casimirGuide.mission.attentionMeta", defaultMessage: "Certainty {certainty} · fail {failReason} · voice suppression {suppressionReason}",
+    description: "Guide certainty and deterministic reason metadata.", context: "Casimir Guide Mission blade.",
+    placeholders: { certainty: "string", failReason: "string", suppressionReason: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.evidenceBoundary": {
+    id: "casimirGuide.mission.evidenceBoundary", defaultMessage: "Counts only; evidence identity and replay execution remain in governed mission surfaces.",
+    description: "Guide evidence and replay authority boundary.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.terminalBoundary": {
+    id: "casimirGuide.mission.terminalBoundary", defaultMessage: "The Guide cannot materialize, upgrade, or become authority for a mission result.",
+    description: "Guide terminal authority boundary.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.voiceBoundary": {
+    id: "casimirGuide.mission.voiceBoundary", defaultMessage: "Read-only policy state; the Guide cannot speak, change consent, or acknowledge callouts.",
+    description: "Guide mission voice authority boundary.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.boardUnavailable": {
+    id: "casimirGuide.mission.boardUnavailable", defaultMessage: "A full governed Mission Go Board panel is not registered yet.",
+    description: "Guide absent Mission Go Board route explanation.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.historyNavigation": {
+    id: "casimirGuide.mission.historyNavigation", defaultMessage: "Open the governed task-history surface; replay does not execute inside the Guide.",
+    description: "Guide mission history navigation explanation.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.mission.graphNavigation": {
+    id: "casimirGuide.mission.graphNavigation", defaultMessage: "Open the governed process graph without granting Guide-side execution authority.",
+    description: "Guide mission process graph navigation explanation.", context: "Casimir Guide Mission blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.notActive": {
+    id: "casimirGuide.value.notActive", defaultMessage: "Not active",
+    description: "Guide inactive-party value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.notConnected": {
+    id: "casimirGuide.value.notConnected", defaultMessage: "Not connected",
+    description: "Guide disconnected-media value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.online": {
+    id: "casimirGuide.value.online", defaultMessage: "{count} online",
+    description: "Guide online friend count.", context: "Casimir Guide social summary.",
+    placeholders: { count: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.onlineParty": {
+    id: "casimirGuide.value.onlineParty", defaultMessage: "{online} online · {members} in party",
+    description: "Guide combined online and party count.", context: "Casimir Guide social summary.",
+    placeholders: { online: "number", members: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.partyMembers": {
+    id: "casimirGuide.value.partyMembers", defaultMessage: "{count} members · {state}",
+    description: "Guide voice-party member count and raw state.", context: "Casimir Guide Live Room blade.",
+    placeholders: { count: "number", state: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.muted": {
+    id: "casimirGuide.value.muted", defaultMessage: "{state} · muted",
+    description: "Guide media state with muted qualifier.", context: "Casimir Guide Live Room blade.",
+    placeholders: { state: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noSharedRoom": {
+    id: "casimirGuide.value.noSharedRoom", defaultMessage: "No room selected",
+    description: "Guide value when the room controller has no selected room.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomParticipants": {
+    id: "casimirGuide.value.roomParticipants", defaultMessage: "{present} present · {count}/{required} members",
+    description: "Guide present and total room member counts.", context: "Casimir Guide Live Room blade.",
+    placeholders: { present: "number", count: "number", required: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.floorHeld": {
+    id: "casimirGuide.value.floorHeld", defaultMessage: "Held",
+    description: "Guide value when a floor holder exists but has no projected label.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.floorOpen": {
+    id: "casimirGuide.value.floorOpen", defaultMessage: "Open",
+    description: "Guide value when no room participant holds the speaking floor.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomMicrophone.unavailable": {
+    id: "casimirGuide.value.roomMicrophone.unavailable", defaultMessage: "Unavailable",
+    description: "Guide unavailable room microphone value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomMicrophone.consent_required": {
+    id: "casimirGuide.value.roomMicrophone.consent_required", defaultMessage: "Consent required",
+    description: "Guide room microphone consent-required value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomMicrophone.ready": {
+    id: "casimirGuide.value.roomMicrophone.ready", defaultMessage: "Ready",
+    description: "Guide ready room microphone value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomMicrophone.active": {
+    id: "casimirGuide.value.roomMicrophone.active", defaultMessage: "Active",
+    description: "Guide active room microphone value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomMicrophone.degraded": {
+    id: "casimirGuide.value.roomMicrophone.degraded", defaultMessage: "Degraded",
+    description: "Guide degraded room microphone value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.roomMicrophone.failed": {
+    id: "casimirGuide.value.roomMicrophone.failed", defaultMessage: "Failed",
+    description: "Guide failed room microphone value.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.gptAttached": {
+    id: "casimirGuide.value.gptAttached", defaultMessage: "Attached · {state}",
+    description: "Guide attached GPT Live runtime value.", context: "Casimir Guide Live Room blade.",
+    placeholders: { state: "string" }, glossaryTerms: ["GPT Live"], screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.gptDetached": {
+    id: "casimirGuide.value.gptDetached", defaultMessage: "Detached · {state}",
+    description: "Guide detached GPT Live runtime value.", context: "Casimir Guide Live Room blade.",
+    placeholders: { state: "string" }, glossaryTerms: ["GPT Live"], screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.sources": {
+    id: "casimirGuide.value.sources", defaultMessage: "{fresh} fresh · {count} total",
+    description: "Guide fresh and total safe shared-source counts.", context: "Casimir Guide Live Room blade.",
+    placeholders: { fresh: "number", count: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.publicResults": {
+    id: "casimirGuide.value.publicResults", defaultMessage: "{count} published",
+    description: "Guide published public-result count.", context: "Casimir Guide Live Room blade.",
+    placeholders: { count: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.environmentMonitor": {
+    id: "casimirGuide.value.environmentMonitor", defaultMessage: "{preset} · {status} · {sources} sources",
+    description: "Guide environment monitor preset, state, and safe source count.", context: "Casimir Guide Environment blade.",
+    placeholders: { preset: "string", status: "string", sources: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.boundWorld": {
+    id: "casimirGuide.value.boundWorld", defaultMessage: "World {world}",
+    description: "Guide world binding when no live monitor is selected.", context: "Casimir Guide Environment blade.",
+    placeholders: { world: "string" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noEnvironmentProjection": {
+    id: "casimirGuide.value.noEnvironmentProjection", defaultMessage: "No environment projected",
+    description: "Guide empty environment projection value.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.environmentConnector": {
+    id: "casimirGuide.value.environmentConnector", defaultMessage: "{health} · {freshness} · {capabilities} capabilities",
+    description: "Guide connector health, freshness, and capability count.", context: "Casimir Guide Environment blade.",
+    placeholders: { health: "string", freshness: "string", capabilities: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noConnectorProjection": {
+    id: "casimirGuide.value.noConnectorProjection", defaultMessage: "No connector projected",
+    description: "Guide empty connector projection value.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noActorProjection": {
+    id: "casimirGuide.value.noActorProjection", defaultMessage: "No player or companion actor projected",
+    description: "Guide empty embodiment projection value.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noCompanionIncarnation": {
+    id: "casimirGuide.value.noCompanionIncarnation", defaultMessage: "No current actor/incarnation projected",
+    description: "Guide empty companion incarnation projection value.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.followProfileAccepted": {
+    id: "casimirGuide.value.followProfileAccepted", defaultMessage: "Follow-only C1 · live accepted",
+    description: "Canonical maturity label for the narrow companion-follow profile.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.noLeaseProjection": {
+    id: "casimirGuide.value.noLeaseProjection", defaultMessage: "No active lease projected",
+    description: "Guide value when no actor/effect lease is projected.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.value.environmentEvidence": {
+    id: "casimirGuide.value.environmentEvidence", defaultMessage: "{deltas} deltas · {blockers} blockers",
+    description: "Guide safe environment delta and blocker counts.", context: "Casimir Guide Environment blade.",
+    placeholders: { deltas: "number", blockers: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.liveRoom.failed": {
+    id: "casimirGuide.liveRoom.failed", defaultMessage: "Room state could not be refreshed. The last projection is not treated as authority.",
+    description: "Guide room refresh-failure explanation.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.liveRoom.microphoneConsent": {
+    id: "casimirGuide.liveRoom.microphoneConsent", defaultMessage: "Microphone consent can only be changed in the full room controls.",
+    description: "Guide explanation of the room microphone consent boundary.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.liveRoom.sourcesReadOnly": {
+    id: "casimirGuide.liveRoom.sourcesReadOnly", defaultMessage: "Metadata only; source access remains governed by the full room.",
+    description: "Guide explanation of its read-only source projection.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.liveRoom.resultsReadOnly": {
+    id: "casimirGuide.liveRoom.resultsReadOnly", defaultMessage: "Counts only; the originating Ask turn remains the terminal writer.",
+    description: "Guide explanation of its non-authoritative result projection.", context: "Casimir Guide Live Room blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.failed": {
+    id: "casimirGuide.environment.failed", defaultMessage: "Environment state could not be refreshed. Retained observations are stale, not authority.",
+    description: "Guide environment refresh-failure explanation.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.connectorBlocked": {
+    id: "casimirGuide.environment.connectorBlocked", defaultMessage: "Probe is not ready · {count} blockers. Open Device Check for details.",
+    description: "Guide connector readiness blocker summary.", context: "Casimir Guide Environment blade.",
+    placeholders: { count: "number" }, screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.actorBoundary": {
+    id: "casimirGuide.environment.actorBoundary", defaultMessage: "Player proxy and companion identities remain separate and require an authoritative runtime projection.",
+    description: "Guide embodiment identity-boundary explanation.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.companionBoundary": {
+    id: "casimirGuide.environment.companionBoundary", defaultMessage: "Presence, incarnation, revision, and cleanup are never inferred from connector health.",
+    description: "Guide companion projection boundary explanation.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.followBoundary": {
+    id: "casimirGuide.environment.followBoundary", defaultMessage: "Capability maturity only; no Guide-side follow, hold, mining, inventory, or world action is exposed.",
+    description: "Guide narrow follow-profile authority explanation.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.authorityBoundary": {
+    id: "casimirGuide.environment.authorityBoundary", defaultMessage: "Actor/effect leases, override, release, and Emergency Stop remain on the governing control surface.",
+    description: "Guide lease and safety-control boundary explanation.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.environment.evidenceBoundary": {
+    id: "casimirGuide.environment.evidenceBoundary", defaultMessage: "Observation metadata only; it is not an answer, execution receipt, or terminal authority.",
+    description: "Guide environment evidence-authority explanation.", context: "Casimir Guide Environment blade.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.available": {
+    id: "casimirGuide.state.available", defaultMessage: "Available",
+    description: "Guide available state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.locked": {
+    id: "casimirGuide.state.locked", defaultMessage: "Locked",
+    description: "Guide locked state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.unavailable": {
+    id: "casimirGuide.state.unavailable", defaultMessage: "Unavailable",
+    description: "Guide unavailable state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.degraded": {
+    id: "casimirGuide.state.degraded", defaultMessage: "Degraded",
+    description: "Guide degraded state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.stale": {
+    id: "casimirGuide.state.stale", defaultMessage: "Stale",
+    description: "Guide stale state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.pending": {
+    id: "casimirGuide.state.pending", defaultMessage: "Pending",
+    description: "Guide pending state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.failed": {
+    id: "casimirGuide.state.failed", defaultMessage: "Failed",
+    description: "Guide failed state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.planned": {
+    id: "casimirGuide.state.planned", defaultMessage: "Planned",
+    description: "Guide planned state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.state.readOnly": {
+    id: "casimirGuide.state.readOnly", defaultMessage: "Read only",
+    description: "Guide read-only state label.", context: "Casimir Guide typed rows.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.label": {
+    id: "casimirGuide.legend.label", defaultMessage: "Guide action legend",
+    description: "Accessible label for the Guide action legend.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.select": {
+    id: "casimirGuide.legend.select", defaultMessage: "Select",
+    description: "Guide select action label.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.close": {
+    id: "casimirGuide.legend.close", defaultMessage: "Close",
+    description: "Guide close action label.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.back": {
+    id: "casimirGuide.legend.back", defaultMessage: "Back",
+    description: "Guide back action label.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.changeBlade": {
+    id: "casimirGuide.legend.changeBlade", defaultMessage: "Change blade",
+    description: "Guide blade-change action label.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.mainMenu": {
+    id: "casimirGuide.legend.mainMenu", defaultMessage: "Main Menu",
+    description: "Guide Main Menu action label.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
+  },
+  "casimirGuide.legend.search": {
+    id: "casimirGuide.legend.search", defaultMessage: "Search",
+    description: "Guide search action label.", context: "Casimir Guide footer.", screenshotSurface: "workstation",
   },
 } as const satisfies Record<string, InterfaceMessageMeta>;
 

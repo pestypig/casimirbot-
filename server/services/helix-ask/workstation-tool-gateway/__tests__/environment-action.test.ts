@@ -148,7 +148,7 @@ describe("Minecraft player-action workstation gateway", () => {
   });
 
   it("publishes the baseline and reusable bounded, nonterminal, host-free player tools", () => {
-    expect(environmentActionMinecraftManifests).toHaveLength(19);
+    expect(environmentActionMinecraftManifests).toHaveLength(21);
     expect(environmentActionMinecraftManifests).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ capability_id: CAPABILITY_ID }),
@@ -1211,6 +1211,50 @@ describe("Minecraft player-action workstation gateway", () => {
         ),
         workflow_ref: expect.stringContaining("environment_action_workflow:"),
       },
+    });
+  });
+
+  it("queues exact workflow cancellation when the action deadline elapses", async () => {
+    const requestControl = vi.fn(async () => ({}) as never);
+    const awaitObservation = vi.fn(async () => {
+      throw new EnvironmentActionBrokerError(
+        "action_request_expired",
+        504,
+        "The player workflow did not return before its deadline.",
+      );
+    });
+
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:deadline",
+      toolCallId: "tool_call:player-action-deadline",
+      providerExecutionId: "provider_execution:player-action-deadline",
+      arguments: {
+        destination: { x: 2, y: 64, z: 0 },
+        arrival_radius: 0.5,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        awaitObservation: awaitObservation as never,
+        requestControl,
+      }),
+    });
+
+    expect(requestControl).toHaveBeenCalledWith(expect.objectContaining({
+      controlKind: "cancel",
+      workflowId: expect.stringContaining("environment_action_workflow:"),
+      roomId: ROOM_ID,
+      environmentBindingId: ENVIRONMENT_ID,
+    }));
+    expect(result).toMatchObject({
+      ok: false,
+      status: "failed",
+      error: "action_outcome_unknown",
     });
   });
 

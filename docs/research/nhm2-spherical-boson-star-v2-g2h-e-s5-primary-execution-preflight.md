@@ -27,11 +27,21 @@ The subordinate staged checklist for choosing and closing the remaining work is
 [`nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md`](./nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md).
 It does not replace this packet or the canonical work program, and its
 post-S5 stages remain downstream/ineligible.
-The current A4 handoff is the
-[`candidate-neutral H2 performance-successor packet`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-performance-successor-handoff.md).
-It records the preserved serial runs, timing evidence, optimization hypotheses,
-equivalence gates and resume point. It is a nested implementation correction,
-not a new program gate or scientific authorization.
+The current A4 decision surface is the inert
+[`P8P observer progress and turnaround calibration`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-observer-progress-turnaround-calibration.md),
+selected by the completed
+[`P8O representative term/radius decision`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8o-representative-term-radius-decision-packet.md),
+following the completed
+[`candidate-neutral P8N selector-path term/radius binding`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8n-selector-term-radius-binding.md),
+the
+[`candidate-neutral P8M term/radius attribution fixture`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8m-term-radius-attribution-fixture.md),
+following the preserved
+[`P8K/P8L result adjudication`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8k-p8l-result-adjudication.md).
+P8O records that the diagnostic is evidence-distinguishable but the current
+serial observer is not turnaround-calibrated or progress-observable enough to
+freeze the full run. P8P is a calibration-first lead and grants no execution.
+It is a nested implementation correction, not candidate evaluation or
+scientific authorization.
 The active S5-A definition issue is recorded in
 [`nhm2-spherical-boson-star-v2-g2h-e-s5-a-formal-germ-subtraction-definition-review.md`](./nhm2-spherical-boson-star-v2-g2h-e-s5-a-formal-germ-subtraction-definition-review.md);
 it is an unsealed review, not a new mathematical selector.
@@ -366,15 +376,116 @@ is `DONE` with HTTP 503 and `ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS`; the
 exact VM is absent. Result `2cf0ef29...27f7b68` passes independent audit 28/28
 at `0ac59b69...ed50775`. R6 is exhausted with zero VM, disk, build, numerical
 process or candidate activity.
-The R2/R3 current-head checkpoint is math 323/323, root-to-leaf PASS, WARP
-18/18 files and 179/179 tests, and Casimir adapter run 2599 `PASS/GREEN`, trace
-`adapter:282c7fcd-777d-4cce-bee8-4c4389cafb23`, with certificate
+P8J-R7 now freezes the regional single-VM allocation successor at
+`1a2ac30f...f7469e`. It uses one `us-east1` regional bulk request with one
+predefined name, `count=1`, `min-count=1` and `ANY_SINGLE_ZONE`, allowing the
+provider to choose among `us-east1-b/c/d` by capacity while proving that no
+second VM can be created. The exact C2D machine, archives, build, fixture,
+binary, scientific process, ceilings and authority locks remain unchanged.
+Independent static audit passes 42/42 at `00ffdfd4...158794b`. The sole
+authorized regional request selected `us-east1-c` and then stopped before
+resource creation with `VM_MIN_COUNT_NOT_REACHED` and
+`ZONE_RESOURCE_POOL_EXHAUSTED`: the exact 30 GB `pd-balanced` disk was
+unavailable. The R7 result is `948b2655...2556b5` and its independent audit
+passes 34/34 at `4804f4c7...65ca2ad`. The exact VM and disk remain absent; no
+build, fixture or numerical process ran. R7 is exhausted and any
+storage-capacity successor requires separate research and freezing.
+The terminal R7 current-head checkpoint is math 323/323, root-to-leaf PASS,
+WARP 18/18 files and 179/179 tests, and Casimir adapter `PASS/GREEN`, trace
+`adapter:8317712f-4090-4e1d-8a00-0abd8c16fec2`, with certificate
 `6e84f965...e12a4e45` and integrity true.
+P8J-R8 now freezes the storage-capacity successor at
+`fd73febf...81b83`. It preserves R7's exact regional C2D allocation,
+archives, offline build, fixture, executable, representative scientific
+process, ceilings, evidence requirements and authority locks, changing only
+the 30 GB boot disk from `pd-balanced` to C2D-supported `pd-standard`. This
+tests the exact R7 `persistent_disk_availability` blocker without altering the
+calculation. Independent static audit passes 50/50 at
+`7ce6b0ff...d8ae4`. No R8 cloud resource or process exists and its sole request
+requires separate exact operator authorization.
+The frozen R8 current-head checkpoint is math 323/323, root-to-leaf PASS,
+required WARP tests 8/8 files and 36/36 tests, and Casimir adapter run 5
+`PASS/GREEN`, trace `adapter:7a2cc478-df71-4d86-ad50-edba6c4b4f1e`, with
+certificate `6e84f965...e12a4e45` and integrity true.
+The sole authorized R8 attempt stopped before preexecution admission when the
+browser terminal retained an unsent partial prefix and concatenated it to the
+complete read-only guard. Bash rejected the compound line with
+`syntax error in conditional expression` and `syntax error near ';'`; no guard
+or `gcloud` query executed and no regional request was submitted. Immutable
+result `28f66693...9abc43` passes independent audit 23/23 at
+`c99563ed...4af5d3`. R8 is exhausted with zero resource, build, fixture,
+numerical process or candidate activity. Its storage-capacity hypothesis is
+unobserved and a successor must separately freeze atomic command transport.
+P8J-R9 now freezes that atomic transport successor at
+`f652f5af...1509a`. Its 7,132-byte orchestrator `7007992e...8e379` preserves
+the unchanged one-request R8 allocation and scientific path. A 33-command
+ledger `4c94a957...a8d54` reconstructs it through 30 short cumulative chunks,
+with byte-for-byte textbox-DOM admission before every Enter and exact base64
+plus decoded hashes before one invocation. Definition audit passes 27/27 and
+independent proposal audit passes 29/29 at `f9844e2f...3c01ad`. The authorized
+protocol reconstructed and invoked the exact orchestrator once. It passed
+preexecution, allocated the exact C2D VM in `us-east1-c`, transferred both
+archives and installed Docker. The one-shot service became inactive before the
+five-second guard; outer exit `3` triggered fail-stop and the VM is
+`TERMINATED`. The locally preserved 9,037-byte Cloud Shell archive hashes to
+`ffe56577...f665`. R9 is exhausted and no long numerical result is inferred.
+P8J-R10 freezes read-only stopped-disk recovery at proposal
+`45e8cc5c...2e36`. Its 2,674-byte rescue procedure hashes to
+`387637b2...5cf`, requires a snapshot-derived read-only clone and stopped
+`e2-small` helper, and passes independent audit 14/14. No recovery resource,
+numerical process or candidate action occurred during preparation.
+R10 subsequently recovered the immutable R9 controller archive
+`c6a193fb...5dbf`; independent audit passes 16/16 and identifies the exact
+failure as an offline Docker base-image binding that attempted a registry pull.
+R11's separately versioned controller `867f4b20...7a01` changes only that
+binding and passes definition audit 21/21 at `91cd993b...d463`. R11 proved the
+repair by reaching the fixture build with both authenticated local base-image
+IDs, then its outer five-second guard incorrectly terminated the healthy
+long-running `Type=oneshot` service. R12 recovered archive
+`0a350e53...6f88`; independent audit passes 16/16 at `334a4c7b...2306` and
+classifies only the controller handoff as defective. R13 changes only that
+handoff guard and passes definition audit 15/15 at `ff748905...5355`. Its sole
+bounded process subsequently completed all 65,536 candidate-neutral panels
+without timeout and automatically stopped. R14 recovered the terminal package
+through a snapshot-derived read-only clone. Independent recovery audit passes
+37/37 at `a0ee190e...dc96864`: fixture, executable and reconstruction identities
+pass, while final radius/threshold is strictly `1.025898515806916...` and the
+direct integrated slot-3 radius is strictly `1.020137126125156...` of
+threshold. The exact boundary component is zero and the `gprime` hull strictly
+exceeds the `f` hull, selecting
+`P8J_DIRECT_INTEGRATION_GPRIME_HULL_ASYMMETRY_LEAD`. The preserved frozen
+auditor failure is a representational mismatch between its manufactured
+1,086-term assumption and the structurally derived 16,638-term representative
+panels, plus an invalid strict-positive requirement for the exact-zero boundary
+enclosure. The unchanged failure remains evidence. P8K corrected replay passes
+11/11 at `a14cbb66...af4fc1`, P8L evidence-only localization passes 16/16 at
+`631cead0...5e98a`, and independent deterministic adjudication passes 29/29 at
+`1b83c284...c8ad7`. The combined source-hull scale and the integrated/direct
+translation gap are each strictly too small to explain the direct excess
+alone. P8M now implements that candidate-neutral direct-term attribution
+surface by global degree and radius origin. Its deterministic fixture passes
+12/12 twice, observes 1,086 direct terms across 63 degrees, preserves exact
+ordinary/observed output and retains zero candidate activity. The corrected
+independent audit passes 42/42 at `b1a18eb7...525d09`; unchanged P8H and P8I
+regressions pass 11/11 and 14/14. P8N then binds the P8M observer exclusively
+to selector slot 3 after the unchanged P8I producer succeeds. Its fixed
+514-bucket fixture passes 15/15 twice, exactly matches P8I's counts and six
+aggregates, observes 2,172 terms across 63 degrees and replays identically at
+one and two threads. The corrected independent audit passes 45/45 at
+`6a132349...3f5074a`; the earlier line-sensitive 44/45 predicate failure is
+preserved. P8O then authenticates the 6,044-second P8J baseline, the serial
+1,090,387,968-term P8N replay surface and missing observer progress boundary.
+Its corrected independent decision audit passes 40/40 at
+`15b7db5b...a214928`. The next bounded lead is inert P8P progress binding and
+one separately proposed P=1024 turnaround calibration. No calibration or full
+representative numerical rerun is eligible under the packet itself. All
+authority locks remain false.
 The separately frozen result-only P8F auditor passes 4/4 synthetic fixtures and
 precommits a strict outer-accumulation, boundary, unique-slot or distributed
 classification without reading the active evidence root. It selects nothing
 on timeout, execution failure or audit failure. Its separate static definition
 audit passes 31/31 at receipt `6ad6d18d...bbbca`.
-The C2-R1 verification checkpoint is math 323/323, WARP 18/18 files and
-179/179 tests, and Casimir run 2591 PASS/GREEN with certificate
+The P8O closure checkpoint is math 323/323, WARP 18/18 files and 179/179
+tests, and Casimir run 2613 PASS/GREEN, trace
+`adapter:3c937e86-a7dc-4855-a886-a523f395b206`, with certificate
 `6e84f965...e12a4e45` and integrity true.

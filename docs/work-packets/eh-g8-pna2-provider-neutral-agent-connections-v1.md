@@ -408,3 +408,39 @@ Casimir adapter verification: PASS; certificate hash 6e84f965957f63aad452981d2ed
 
 The sanitized immutable checkpoint is
 `docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-desktop-cloud-signing-infrastructure-acceptance.json`.
+
+## Deferred signed-install acceptance and continuation
+
+The owner elected on 2026-09-01 to defer the signed-current-installer
+acceptance rather than alter a pending Microsoft account security-information
+replacement solely for release signing. The Azure subscription was created in
+the new `pestypiggmail.onmicrosoft.com` Default Directory, but access to that
+directory's security-code-protected administration is unavailable until the
+account security-information hold ends on 2026-10-01. No security request was
+cancelled, no Artifact Signing SKU was activated, and no release tag was
+created.
+
+Deferred acceptance checklist:
+
+- regain normal administrative access to the Default Directory after the
+  Microsoft account hold ends, or supply a separately trusted exportable
+  Windows code-signing `.pfx` through the existing Advanced backend;
+- activate Azure Artifact Signing **Basic** only with owner approval, complete
+  Public Trust identity validation, and create the exact signing account and
+  certificate profile;
+- create the GitHub environment-bound Entra federated identity, assign only the
+  certificate-profile signer role, and configure the documented
+  `desktop-production` variables and Casimir release secrets without a client
+  secret or private key in the repository;
+- create a reviewer-approved desktop release tag, verify Authenticode publisher
+  identity plus Casimir receipts, and install that immutable current artifact;
+  and
+- repeat the connection, restart, disconnect, and reactivation journey on the
+  signed install before promoting PNA2 to `integrated accepted`.
+
+This deferral does not invalidate the deterministic Stage 2 implementation or
+its 133-test release battery. Stage 3 deterministic development may proceed
+because canonical MCP/Agent lifecycle normalization, ordered activity
+projection, redaction, pagination, and presentation do not depend on a
+particular code-signing provider. Stage 3 installed acceptance, Stage 5, and G8
+release closure may not inherit or bypass the deferred signed-install evidence.
