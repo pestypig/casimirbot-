@@ -365,6 +365,7 @@ import {
   "../services/environment-connectors/pairing/local-server-pairing-handoff";
 import {
   configureEnvironmentActionAuthority,
+  emergencyStopEnvironmentActionAuthority,
   extendEnvironmentActionAuthorityLease,
   isEnvironmentActionAuthorityError,
   readEnvironmentActionAuthorities,
@@ -759,6 +760,13 @@ type HelixEnvironmentActionAuthorityConfigureToolArguments = {
   settings: z.infer<typeof helixEnvironmentActionAuthoritySettingsSchema>;
 };
 
+type HelixEnvironmentActionAuthorityRevokeToolArguments = {
+  room_id: string;
+  environment_binding_id: string;
+  action_authority_id: string;
+  reason: string;
+};
+
 type HelixEnvironmentCommandAuthorityConfigureToolArguments = {
   room_id: string;
   environment_binding_id: string;
@@ -909,6 +917,8 @@ export type HelixEnvironmentActionAuthorityLeaseExtender =
   typeof extendEnvironmentActionAuthorityLease;
 export type HelixEnvironmentActionAuthorityConfigurator =
   typeof configureEnvironmentActionAuthority;
+export type HelixEnvironmentActionAuthorityRevoker =
+  typeof emergencyStopEnvironmentActionAuthority;
 export type HelixEnvironmentCommandAuthorityConfigurator =
   typeof configureEnvironmentCommandAuthority;
 export type HelixEnvironmentActionAuthorityInspector = (input: {
@@ -1676,6 +1686,22 @@ const environmentActionAuthorityConfigureOutputSchema = z
     authority: helixEnvironmentActionAuthoritySchema,
     content_role: z.literal(
       "environment_action_authority_receipt_not_assistant_answer",
+    ),
+    reentry_required: z.literal(true),
+    answer_authority: z.literal(false),
+    assistant_answer: z.literal(false),
+    terminal_eligible: z.literal(false),
+  })
+  .strict();
+
+const environmentActionAuthorityRevokeOutputSchema = z
+  .object({
+    operation: z.literal("environment.action_authority.revoke"),
+    room_id: helixSharedLiveRoomIdSchema,
+    authority: helixEnvironmentActionAuthoritySchema,
+    emergency_control_request: jsonObjectSchema,
+    content_role: z.literal(
+      "environment_action_authority_revocation_receipt_not_assistant_answer",
     ),
     reentry_required: z.literal(true),
     answer_authority: z.literal(false),
@@ -2750,6 +2776,7 @@ const ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES = new Map<
   ["helix_environment_subject_select", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
   ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+  ["helix_environment_action_authority_revoke", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_environment_command_authority_configure", HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES],
   ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_environment_source_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
@@ -2989,6 +3016,20 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
   }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
+  server.registerTool("helix_environment_action_authority_revoke", {
+    title: "Emergency-stop an exact player-action authority",
+    description:
+      "Revokes one exact Player Embodiment lease and queues control release for its active workflows. This authority-reducing operation cannot widen permissions, launch Minecraft, or become an assistant answer.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      environment_binding_id: z.string().trim().min(1).max(320),
+      action_authority_id: z.string().trim().min(1).max(320),
+      reason: z.string().trim().min(1).max(1_000),
+    }).strict(),
+    outputSchema: environmentActionAuthorityRevokeOutputSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+  }, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
   server.registerTool("helix_environment_command_authority_configure", {
     title: "Configure current world command authority",
     description:
@@ -3194,6 +3235,7 @@ export const createHelixMcpServer = (input: {
   environmentMonitorSemanticSource?: HelixEnvironmentMonitorSemanticSourcePort;
   environmentActionAuthorityInspector?: HelixEnvironmentActionAuthorityInspector;
   environmentActionAuthorityConfigurator?: HelixEnvironmentActionAuthorityConfigurator;
+  environmentActionAuthorityRevoker?: HelixEnvironmentActionAuthorityRevoker;
   environmentCommandAuthorityConfigurator?: HelixEnvironmentCommandAuthorityConfigurator;
   environmentActionAuthorityLeaseExtender?: HelixEnvironmentActionAuthorityLeaseExtender;
   environmentPlayerPairLocalHandoff?: HelixEnvironmentPlayerPairLocalHandoff;
@@ -3286,6 +3328,9 @@ export const createHelixMcpServer = (input: {
   const actionAuthorityConfigurator =
     input.environmentActionAuthorityConfigurator ??
       configureEnvironmentActionAuthority;
+  const actionAuthorityRevoker =
+    input.environmentActionAuthorityRevoker ??
+      emergencyStopEnvironmentActionAuthority;
   const commandAuthorityConfigurator =
     input.environmentCommandAuthorityConfigurator ??
       configureEnvironmentCommandAuthority;
@@ -5990,6 +6035,56 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_environment_action_authority_revoke",
+    {
+      title: "Emergency-stop an exact player-action authority",
+      description:
+        "Revokes one exact Player Embodiment lease and queues control release for its active workflows. This authority-reducing operation cannot widen permissions, launch Minecraft, or become an assistant answer.",
+      inputSchema: z.object({
+        room_id: helixSharedLiveRoomIdSchema,
+        environment_binding_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320),
+        reason: z.string().trim().min(1).max(1_000),
+      }).strict(),
+      outputSchema: environmentActionAuthorityRevokeOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+    },
+    async (argumentsValue: HelixEnvironmentActionAuthorityRevokeToolArguments) =>
+      callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const stopped = await actionAuthorityRevoker({
+          roomId: argumentsValue.room_id,
+          profileId: input.principal.accountProfileId,
+          environmentBindingId: argumentsValue.environment_binding_id,
+          actionAuthorityId: argumentsValue.action_authority_id,
+          reason: argumentsValue.reason,
+        });
+        return {
+          ok: true,
+          value: {
+            operation: "environment.action_authority.revoke",
+            room_id: argumentsValue.room_id,
+            authority: stopped.authority,
+            emergency_control_request: stopped.controlRequest,
+            content_role:
+              "environment_action_authority_revocation_receipt_not_assistant_answer",
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        };
+      }),
+  );
+
+  server.registerTool(
     "helix_environment_command_authority_configure",
     {
       title: "Configure current world command authority",
@@ -8116,6 +8211,7 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
       ["helix_environment_action_authority_configure", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_action_authority_revoke", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_command_authority_configure", HELIX_MINECRAFT_COMMAND_AUTHORITY_MCP_SCOPES],
       ["helix_environment_player_pair_local", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_source_pair_local", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
