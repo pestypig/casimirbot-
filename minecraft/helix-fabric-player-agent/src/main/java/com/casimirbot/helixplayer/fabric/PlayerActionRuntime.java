@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 
 final class PlayerActionRuntime implements AutoCloseable {
     private static final String PROTOCOL_VERSION = "helix.environment_action.v1";
-    static final String ADAPTER_VERSION = "0.4.1";
+    static final String ADAPTER_VERSION = "0.4.9";
     private static final int POLL_INTERVAL_TICKS = 20;
     private static final int HEARTBEAT_INTERVAL_TICKS = 100;
     private static final int LOCAL_STATUS_INTERVAL_TICKS = 5;
@@ -37,7 +37,8 @@ final class PlayerActionRuntime implements AutoCloseable {
         String startedAt,
         Map<String, Object> startedClock,
         String controlEngine,
-        List<String> progressEventRefs
+        List<String> progressEventRefs,
+        EnvironmentCapacityTelemetry capacityTelemetry
     ) {}
 
     private record LocalDiagnosticEnvelope(
@@ -58,6 +59,8 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final NativeFabricControlBridge bridge;
     private final PlayerActionController controller;
     private final ExecutorService network;
+    private final ExecutorService criticalDeliveryNetwork;
+    private final ExecutorService projectionDeliveryNetwork;
     private final PlayerActionHttpClient http;
     private final Consumer<String> localDiagnosticMessage;
     private final PlayerActionLocalStatusWriter localStatusWriter;
@@ -66,7 +69,9 @@ final class PlayerActionRuntime implements AutoCloseable {
     private final String executionClockId = id("minecraft_client_tick_clock");
     private final AtomicBoolean cyclePending = new AtomicBoolean(false);
     private final AtomicBoolean manifestPending = new AtomicBoolean(false);
-    private final AtomicBoolean deliveryFlushPending = new AtomicBoolean(false);
+    private final AtomicBoolean heartbeatPublishPending = new AtomicBoolean(false);
+    private final AtomicBoolean criticalDeliveryFlushPending = new AtomicBoolean(false);
+    private final AtomicBoolean projectionDeliveryFlushPending = new AtomicBoolean(false);
     private volatile boolean manifestReady;
     private volatile boolean heartbeatReady;
     private volatile Instant lastHeartbeatAcceptedAt;
@@ -74,12 +79,15 @@ final class PlayerActionRuntime implements AutoCloseable {
     private volatile boolean eventStreamResyncRequired;
     private volatile boolean manualInputDetected;
     private volatile long latestEventSequence = -1;
+    private volatile long latestAcknowledgedEventSequence = -1;
     private volatile String lastTransportError = "";
     private volatile ActiveEnvelope activeEnvelope;
     private volatile LocalDiagnosticEnvelope localDiagnosticEnvelope;
     private final PlayerActionDeliveryOutbox deliveryOutbox =
         new PlayerActionDeliveryOutbox(MAX_PENDING_DELIVERIES);
     private volatile Map<String, Object> latestClockSnapshot = Map.of();
+    private final List<WorkflowEvent> deferredWorkflowEvents = new ArrayList<>();
+    private boolean residentCallbackInProgress;
     private volatile MinecraftViabilityGuardian.Decision latestViabilityDecision;
     private volatile String lastViabilityNotice = "";
     private volatile String lastViabilityEventReason = "";
@@ -105,6 +113,16 @@ final class PlayerActionRuntime implements AutoCloseable {
         this.controller = new PlayerActionController(bridge, this::onWorkflowEvent);
         this.network = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "helix-player-action-network");
+            thread.setDaemon(true);
+            return thread;
+        });
+        this.criticalDeliveryNetwork = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "helix-player-action-critical-delivery");
+            thread.setDaemon(true);
+            return thread;
+        });
+        this.projectionDeliveryNetwork = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "helix-player-action-projection-delivery");
             thread.setDaemon(true);
             return thread;
         });
@@ -141,7 +159,27 @@ final class PlayerActionRuntime implements AutoCloseable {
             );
             bridge.releaseAll();
         } else if (!residentOwnsTick) {
-            controller.tick();
+            ActiveEnvelope tickEnvelope = activeEnvelope;
+            if (tickEnvelope == null || controller.activeWorkflowId() == null) {
+                controller.tick();
+            } else {
+                boolean activeControl = controller.state() == State.RUNNING;
+                long tickStartedNanos = System.nanoTime();
+                tickEnvelope.capacityTelemetry().recordSchedulerTick(
+                    activeControl,
+                    tickStartedNanos
+                );
+                residentCallbackInProgress = true;
+                try {
+                    controller.tick();
+                } finally {
+                    tickEnvelope.capacityTelemetry().recordResidentComputation(
+                        Math.max(0L, System.nanoTime() - tickStartedNanos)
+                    );
+                    residentCallbackInProgress = false;
+                    flushDeferredWorkflowEvents();
+                }
+            }
         }
         ticks++;
         latestClockSnapshot = captureClockSnapshot(ticks);
@@ -164,7 +202,7 @@ final class PlayerActionRuntime implements AutoCloseable {
             });
         }
         if (ticks % HEARTBEAT_INTERVAL_TICKS == 0) {
-            if (manifestReady) network.execute(this::publishHeartbeat);
+            if (manifestReady) scheduleHeartbeatPublish();
         }
         if (eventStreamResyncRequired) return;
         if (
@@ -183,7 +221,20 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     void renderFrame(long frameNanos) {
-        controller.renderFrame(frameNanos);
+        ActiveEnvelope frameEnvelope = activeEnvelope;
+        long startedNanos = System.nanoTime();
+        residentCallbackInProgress = frameEnvelope != null;
+        try {
+            controller.renderFrame(frameNanos);
+        } finally {
+            if (frameEnvelope != null) {
+                frameEnvelope.capacityTelemetry().recordResidentComputation(
+                    Math.max(0L, System.nanoTime() - startedNanos)
+                );
+                residentCallbackInProgress = false;
+                flushDeferredWorkflowEvents();
+            }
+        }
     }
 
     boolean ready() {
@@ -481,7 +532,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         bridge.disarmViabilityGuardian();
         controller.emergencyStop(reason);
         bridge.releaseAll();
-        if (http != null) network.execute(this::publishHeartbeat);
+        if (http != null) scheduleHeartbeatPublish();
     }
 
     PlayerActionController controllerForIntegration() {
@@ -506,7 +557,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 // Establish a fresh active heartbeat before the first work poll.
                 // Otherwise the broker correctly rejects the poll as stale and
                 // the transient bootstrap error can become self-sustaining.
-                publishHeartbeat();
+                scheduleHeartbeatPublish();
             }
         } catch (Exception error) {
             manifestReady = false;
@@ -545,6 +596,22 @@ final class PlayerActionRuntime implements AutoCloseable {
         }
     }
 
+    private void scheduleHeartbeatPublish() {
+        if (!heartbeatPublishPending.compareAndSet(false, true)) return;
+        // Heartbeats and environment projection share one executor so the
+        // advertised cursor cannot race the interval after the server commits
+        // a batch but before this client processes that batch's acknowledgement.
+        // Critical workflow events and action results retain their independent
+        // deadline-sensitive lane.
+        projectionDeliveryNetwork.execute(() -> {
+            try {
+                publishHeartbeat();
+            } finally {
+                heartbeatPublishPending.set(false);
+            }
+        });
+    }
+
     private void publishLocalStatus() {
         String workflow = controller.activeWorkflowId();
         State state = controller.state();
@@ -572,6 +639,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         producerEpochRef = id("environment_action_epoch");
         manifestId = id("environment_action_manifest");
         latestEventSequence = -1;
+        latestAcknowledgedEventSequence = -1;
         manifestReady = false;
         heartbeatReady = false;
         eventStreamResyncRequired = false;
@@ -597,7 +665,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                     return;
                 }
             }
-            flushDeliveryOutbox();
+            scheduleDeliveryFlush();
             if (
                 emergencyStopLatched ||
                 activeEnvelope != null ||
@@ -612,12 +680,31 @@ final class PlayerActionRuntime implements AutoCloseable {
             List<Object> requests = HelixJson.asList(actions.body().get("action_requests"));
             if (!requests.isEmpty()) {
                 Map<String, Object> request = HelixJson.asObject(requests.get(0));
+                Map<String, Object> queueObservation = object(
+                    actions.body().get("queue_observation")
+                );
+                long queueDepthAtLease = nonnegativeLong(
+                    queueObservation,
+                    "queue_depth_at_lease",
+                    requests.size()
+                );
+                long oldestPendingAgeMs = nonnegativeLong(
+                    queueObservation,
+                    "oldest_pending_age_ms",
+                    0L
+                );
+                long dispatchReceivedNanos = System.nanoTime();
                 // A successful leased-work poll is the control-plane contact
                 // that authorizes this exact local action to begin. Do not let
                 // an older, already-recovered transport error cancel it.
                 clearTransportError();
                 runOnClient(() -> {
-                    accept(request);
+                    accept(
+                        request,
+                        dispatchReceivedNanos,
+                        queueDepthAtLease,
+                        oldestPendingAgeMs
+                    );
                     return Boolean.TRUE;
                 });
             }
@@ -628,7 +715,12 @@ final class PlayerActionRuntime implements AutoCloseable {
         }
     }
 
-    private void accept(Map<String, Object> wire) {
+    private void accept(
+        Map<String, Object> wire,
+        long dispatchReceivedNanos,
+        long queueDepthAtLease,
+        long oldestPendingAgeMs
+    ) {
         String requestedEngine = text(wire, "requested_control_engine");
         String resolvedEngine = "baritone".equals(requestedEngine)
             ? "baritone"
@@ -662,7 +754,14 @@ final class PlayerActionRuntime implements AutoCloseable {
                 Instant.now().toString(),
                 clockSnapshot(),
                 resolvedEngine,
-                new ArrayList<>()
+                new ArrayList<>(),
+                new EnvironmentCapacityTelemetry(
+                    dispatchReceivedNanos,
+                    System.nanoTime(),
+                    queueDepthAtLease,
+                    oldestPendingAgeMs,
+                    request.maxDurationTicks()
+                )
             );
             activeEnvelope = envelope;
             if (!controller.start(request)) {
@@ -715,6 +814,15 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     private void onWorkflowEvent(WorkflowEvent event) {
+        ActiveEnvelope currentEnvelope = activeEnvelope;
+        if (
+            residentCallbackInProgress &&
+            currentEnvelope != null &&
+            event.workflowId().equals(text(currentEnvelope.wire(), "workflow_id"))
+        ) {
+            deferredWorkflowEvents.add(event);
+            return;
+        }
         LocalDiagnosticEnvelope diagnostic = localDiagnosticEnvelope;
         if (
             diagnostic != null &&
@@ -729,6 +837,14 @@ final class PlayerActionRuntime implements AutoCloseable {
         long environmentEventSequence = ++latestEventSequence;
         manualInputDetected = manualInputDetected || event.manualOverrideDetected();
         envelope.progressEventRefs().add(eventId);
+        if (event.manualOverrideDetected() && event.controlsReleased()) {
+            Long releaseLatencyNanos = bridge.consumeManualReleaseLatencyNanos();
+            if (releaseLatencyNanos != null) {
+                envelope.capacityTelemetry().recordManualOrSafetyToRelease(
+                    releaseLatencyNanos
+                );
+            }
+        }
         Map<String, Object> payload = baseNonAnswer();
         payload.put("schema", "helix.environment_action.workflow_event.v1");
         payload.put("event_id", eventId);
@@ -740,7 +856,11 @@ final class PlayerActionRuntime implements AutoCloseable {
         payload.put("progress_fraction", event.progressFraction());
         payload.put("summary", event.summary());
         payload.put("control_engine", envelope.controlEngine());
-        payload.put("measurements", event.measurements());
+        Map<String, Object> capacityMeasurements = new LinkedHashMap<>(
+            event.measurements()
+        );
+        capacityMeasurements.putAll(envelope.capacityTelemetry().snapshot());
+        payload.put("measurements", capacityMeasurements);
         payload.put("clock", clockSnapshot());
         payload.put("evidence_refs", List.of());
         payload.put("manual_override_detected", event.manualOverrideDetected());
@@ -766,7 +886,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 envelope.progressEventRefs(),
                 event.state() == State.SUCCEEDED,
                 event.manualOverrideDetected(),
-                event.measurements()
+                capacityMeasurements
             )
             : null;
         if (terminal) activeEnvelope = null;
@@ -800,6 +920,13 @@ final class PlayerActionRuntime implements AutoCloseable {
             deliveryOutbox.size()
         );
         scheduleDeliveryFlush();
+    }
+
+    private void flushDeferredWorkflowEvents() {
+        if (deferredWorkflowEvents.isEmpty()) return;
+        List<WorkflowEvent> pending = List.copyOf(deferredWorkflowEvents);
+        deferredWorkflowEvents.clear();
+        for (WorkflowEvent event : pending) onWorkflowEvent(event);
     }
 
     private void onLocalDiagnosticEvent(
@@ -852,19 +979,56 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     private void scheduleDeliveryFlush() {
-        if (!deliveryFlushPending.compareAndSet(false, true)) return;
-        network.execute(() -> {
+        scheduleCriticalDeliveryFlush();
+        scheduleProjectionDeliveryFlush();
+    }
+
+    private void scheduleCriticalDeliveryFlush() {
+        if (deliveryOutbox.isCriticalEmpty() ||
+            !criticalDeliveryFlushPending.compareAndSet(false, true)) return;
+        criticalDeliveryNetwork.execute(() -> {
+            boolean drained = false;
             try {
-                flushDeliveryOutbox();
+                drained = flushCriticalDeliveryOutbox();
             } finally {
-                deliveryFlushPending.set(false);
+                criticalDeliveryFlushPending.set(false);
+                if (drained && !deliveryOutbox.isCriticalEmpty()) {
+                    scheduleCriticalDeliveryFlush();
+                }
             }
         });
     }
 
-    private boolean flushDeliveryOutbox() {
-        while (!deliveryOutbox.isEmpty()) {
-            PlayerActionDeliveryOutbox.Delivery delivery = deliveryOutbox.peek();
+    private void scheduleProjectionDeliveryFlush() {
+        if (deliveryOutbox.isProjectionEmpty() ||
+            !projectionDeliveryFlushPending.compareAndSet(false, true)) return;
+        projectionDeliveryNetwork.execute(() -> {
+            boolean drained = false;
+            try {
+                drained = flushProjectionDeliveryOutbox();
+            } finally {
+                projectionDeliveryFlushPending.set(false);
+                if (drained && !deliveryOutbox.isProjectionEmpty()) {
+                    scheduleProjectionDeliveryFlush();
+                }
+            }
+        });
+    }
+
+    private boolean flushCriticalDeliveryOutbox() {
+        return flushDeliveryLane(false);
+    }
+
+    private boolean flushProjectionDeliveryOutbox() {
+        return flushDeliveryLane(true);
+    }
+
+    private boolean flushDeliveryLane(boolean projectionLane) {
+        while (true) {
+            PlayerActionDeliveryOutbox.Delivery delivery = projectionLane
+                ? deliveryOutbox.peekProjection()
+                : deliveryOutbox.peekCritical();
+            if (delivery == null) break;
             try {
                 PlayerActionHttpClient.Response receipt = http.post(
                     delivery.stage().endpointSuffix(),
@@ -883,11 +1047,20 @@ final class PlayerActionRuntime implements AutoCloseable {
                         logger.error(
                             "Helix player-action evidence stream requires a fresh pairing; controls were released and no further actions will be polled."
                         );
-                        network.execute(this::publishHeartbeat);
+                        scheduleHeartbeatPublish();
                     }
                     return false;
                 }
-                deliveryOutbox.acknowledge(delivery);
+                boolean acknowledged = deliveryOutbox.acknowledge(delivery);
+                if (
+                    acknowledged &&
+                    delivery.stage() == PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH
+                ) {
+                    latestAcknowledgedEventSequence = acknowledgedEventSequence(
+                        latestAcknowledgedEventSequence,
+                        delivery.payload()
+                    );
+                }
                 logger.debug(
                     "Helix player-action delivery acknowledged: stage={} pending={}",
                     delivery.stage().diagnosticName(),
@@ -901,7 +1074,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 return false;
             }
         }
-        clearTransportError();
+        clearTransportErrorIfDeliveryComplete();
         return true;
     }
 
@@ -939,7 +1112,11 @@ final class PlayerActionRuntime implements AutoCloseable {
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("actor", actor);
         attributes.put("active_workflow", activeWorkflow);
-        attributes.put("workflow_measurements", workflowEvent.measurements());
+        Map<String, Object> workflowMeasurements = new LinkedHashMap<>(
+            workflowEvent.measurements()
+        );
+        workflowMeasurements.putAll(envelope.capacityTelemetry().snapshot());
+        attributes.put("workflow_measurements", workflowMeasurements);
         attributes.put("clock", clockSnapshot());
         attributes.put("action_event_ref", actionEventId);
 
@@ -1398,13 +1575,25 @@ final class PlayerActionRuntime implements AutoCloseable {
             engineStates.add(baritoneEngine);
         }
         heartbeat.put("control_engines", engineStates);
-        heartbeat.put("latest_event_sequence", latestEventSequence < 0 ? null : latestEventSequence);
+        heartbeat.put(
+            "latest_event_sequence",
+            latestAcknowledgedEventSequence < 0 ? null : latestAcknowledgedEventSequence
+        );
         heartbeat.put("clock", clockSnapshot());
         heartbeat.put("evidence_refs", List.of());
         heartbeat.put("created_at", Instant.now().toString());
         heartbeat.put("credential_included", false);
         heartbeat.put("content_role", "environment_action_connector_heartbeat_not_assistant_answer");
         return heartbeat;
+    }
+
+    static long acknowledgedEventSequence(
+        long currentSequence,
+        Map<String, Object> batch
+    ) {
+        Object candidate = batch.get("last_sequence");
+        if (!(candidate instanceof Number number)) return currentSequence;
+        return Math.max(currentSequence, number.longValue());
     }
 
     private List<Map<String, Object>> instanceCapabilities() {
@@ -1710,6 +1899,16 @@ final class PlayerActionRuntime implements AutoCloseable {
         return number(map, key).longValue();
     }
 
+    private static long nonnegativeLong(
+        Map<String, Object> map,
+        String key,
+        long fallback
+    ) {
+        Object value = map.get(key);
+        if (!(value instanceof Number number)) return fallback;
+        return Math.max(0L, number.longValue());
+    }
+
     private static boolean positiveMeasurement(Map<String, Object> map, String key) {
         Object value = map.get(key);
         return value instanceof Number number && number.doubleValue() > 0;
@@ -1722,6 +1921,8 @@ final class PlayerActionRuntime implements AutoCloseable {
         bridge.releaseAll();
         publishLocalStatus();
         network.shutdownNow();
+        criticalDeliveryNetwork.shutdownNow();
+        projectionDeliveryNetwork.shutdownNow();
         if (http != null) http.close();
     }
 }

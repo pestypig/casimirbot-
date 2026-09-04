@@ -11,29 +11,62 @@ import org.junit.jupiter.api.Test;
 
 final class PlayerActionDeliveryOutboxTest {
     @Test
-    void preservesStrictDeliveryOrderUntilEachEntryIsAcknowledged() {
-        PlayerActionDeliveryOutbox outbox = new PlayerActionDeliveryOutbox(6);
-        PlayerActionDeliveryOutbox.Delivery event = delivery(
+    void settlesTheActionLaneBeforeSlowEnvironmentProjection() {
+        PlayerActionDeliveryOutbox outbox = new PlayerActionDeliveryOutbox(9);
+        PlayerActionDeliveryOutbox.Delivery started = delivery(
             PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
-            "event"
+            "started"
         );
-        PlayerActionDeliveryOutbox.Delivery batch = delivery(
+        PlayerActionDeliveryOutbox.Delivery startedBatch = delivery(
             PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH,
-            "batch"
+            "started-batch"
+        );
+        PlayerActionDeliveryOutbox.Delivery progress = delivery(
+            PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
+            "progress"
+        );
+        PlayerActionDeliveryOutbox.Delivery progressBatch = delivery(
+            PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH,
+            "progress-batch"
+        );
+        PlayerActionDeliveryOutbox.Delivery terminal = delivery(
+            PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
+            "terminal"
         );
         PlayerActionDeliveryOutbox.Delivery result = delivery(
             PlayerActionDeliveryOutbox.Stage.ACTION_RESULT,
             "result"
         );
+        PlayerActionDeliveryOutbox.Delivery terminalBatch = delivery(
+            PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH,
+            "terminal-batch"
+        );
 
-        assertTrue(outbox.enqueueSequence(List.of(event, batch, result), 0));
-        assertSame(event, outbox.peek());
-        assertTrue(outbox.acknowledge(event));
-        assertSame(batch, outbox.peek());
-        assertFalse(outbox.acknowledge(result));
-        assertSame(batch, outbox.peek());
-        assertTrue(outbox.acknowledge(batch));
+        assertTrue(outbox.enqueueSequence(List.of(started, startedBatch), 3));
+        assertSame(started, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(started));
+        assertSame(startedBatch, outbox.peekProjection());
+        assertTrue(outbox.enqueueSequence(
+            List.of(progress, progressBatch, terminal, terminalBatch, result),
+            0
+        ));
+
+        // A selected slow projection remains pinned to its own lane while the
+        // ordered workflow events and terminal result settle independently.
+        assertSame(progress, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(progress));
+        assertSame(terminal, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(terminal));
+        assertSame(result, outbox.peekCritical());
         assertTrue(outbox.acknowledge(result));
+        assertTrue(outbox.isCriticalEmpty());
+        assertSame(startedBatch, outbox.peekProjection());
+        assertTrue(outbox.acknowledge(startedBatch));
+        assertSame(progressBatch, outbox.peekProjection());
+        assertFalse(outbox.acknowledge(terminalBatch));
+        assertTrue(outbox.acknowledge(progressBatch));
+        assertSame(terminalBatch, outbox.peekProjection());
+        assertTrue(outbox.acknowledge(terminalBatch));
         assertTrue(outbox.isEmpty());
     }
 

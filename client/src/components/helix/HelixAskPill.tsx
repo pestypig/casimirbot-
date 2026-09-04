@@ -257,6 +257,7 @@ import { buildHelixAskComposerTextareaState } from "@/components/helix/ask-conso
 import {
   buildHelixAskComposerDestinationModel,
   saveHelixOperatorNote,
+  shouldAutomaticallySelectBoundAgent,
   type HelixAskComposerDestinationKind,
 } from "@/components/helix/ask-console/HelixAskComposerDestination";
 import { HelixAskComposerDestinationStrip } from "@/components/helix/ask-console/HelixAskComposerDestinationStrip";
@@ -6473,6 +6474,7 @@ export function HelixAskPill({
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [composerDestination, setComposerDestination] =
     useState<HelixAskComposerDestinationKind>("helix_ask");
+  const composerDestinationChosenByOperatorRef = useRef(false);
   const [boundAgentState, setBoundAgentState] =
     useState<"active" | "awaiting_agent_pickup" | "unavailable">("unavailable");
   const bindingPickupPollRef = useRef<AbortController | null>(null);
@@ -7596,6 +7598,42 @@ export function HelixAskPill({
   }, [dispatchBoundAgentSteering]);
 
   useEffect(() => () => bindingPickupPollRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (
+      composerDestination === "bound_agent" ||
+      composerDestinationChosenByOperatorRef.current
+    ) return;
+    let cancelled = false;
+    const synchronizeExternalBinding = async () => {
+      try {
+        const binding = await inspectLatestReasoningBinding();
+        if (cancelled) return;
+        setBoundAgentState(
+          binding.status === "active" ? "active" : "unavailable",
+        );
+        if (shouldAutomaticallySelectBoundAgent({
+          bindingStatus: binding.status,
+          operatorSelectedDestination:
+            composerDestinationChosenByOperatorRef.current,
+        })) {
+          setComposerDestination("bound_agent");
+        }
+      } catch {
+        // An external MCP claim can complete after this legacy shell mounts.
+        // Keep the normal Ask destination while no active binding exists.
+      }
+    };
+    void synchronizeExternalBinding();
+    const interval = window.setInterval(
+      () => void synchronizeExternalBinding(),
+      1_000,
+    );
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [composerDestination]);
 
   useEffect(() => {
     if (composerDestination !== "bound_agent") return;
@@ -23328,6 +23366,7 @@ export function HelixAskPill({
       <HelixAskComposerDestinationStrip
         model={composerDestinationModel}
         onDestinationChange={(kind) => {
+          composerDestinationChosenByOperatorRef.current = true;
           setComposerDestination(kind);
           setOperatorNoteState("idle");
         }}

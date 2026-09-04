@@ -8,6 +8,10 @@ import { getAccountSessionById } from
   "../services/helix-account/account-session-store";
 import { readHelixSessionCookie } from
   "../services/helix-account/session-cookie";
+import type {
+  InstalledDeviceFullHarnessTrust,
+  InstalledSecurityStore,
+} from "../services/helix-account/installed-security-store";
 
 const flags = {
   credential_included: false as const,
@@ -94,17 +98,175 @@ const decisionSchema = z.object({
   lease_seconds: z.number().int().min(30).max(300).optional(),
 }).strict();
 
+const trustDecisionSchema = z.object({ trusted: z.boolean() }).strict();
+const trustedRenewalSchema = z.object({
+  previous_transition_request_ref: z.string().trim().min(1).max(180),
+}).strict();
+
+const publicTrust = (trust: InstalledDeviceFullHarnessTrust) => ({
+  schema: trust.schema,
+  trusted: trust.trusted,
+  device_ref: trust.device_ref,
+  policy_revision: trust.policy_revision,
+  trusted_at: trust.trusted_at,
+  revoked_at: trust.revoked_at,
+  authority_limited_to_tunnel_transport:
+    trust.authority_limited_to_tunnel_transport,
+  environment_authority_granted: trust.environment_authority_granted,
+  trading_authority_granted: trust.trading_authority_granted,
+  answer_authority: trust.answer_authority,
+  terminal_eligible: trust.terminal_eligible,
+});
+
 export const createDesktopMcpTunnelTransitionRouter = (input: {
   store: DesktopMcpTunnelTransitionStore;
+  installedSecurityStore?: Pick<
+    InstalledSecurityStore,
+    "inspectFullHarnessTrust" | "setFullHarnessTrust"
+  >;
+  desktopDeviceId?: string | null;
+  desktopHostEnabled?: boolean;
   onRevoked?: (input: {
     transitionRequestRef: string;
     delegationRef: string;
     delegationExpiresAt: string;
     accountSessionId: string;
   }) => Promise<void>;
+  onTrustedRenewal?: (input: {
+    transitionRequestRef: string;
+    delegationRef: string;
+    delegationExpiresAt: string;
+    accountSessionId: string;
+  }) => Promise<{ accepted: boolean; nativeReceiptRef: string }>;
 }): Router => {
   const router = Router();
   router.use(express.json({ limit: "16kb" }));
+
+  const requireNativeTrustStore = () => {
+    const deviceId = input.desktopDeviceId?.trim() ?? "";
+    if (!input.desktopHostEnabled || !deviceId || !input.installedSecurityStore) {
+      throw new DesktopMcpTunnelTransitionError(
+        "transition_native_trust_unavailable",
+        404,
+      );
+    }
+    return { deviceId, security: input.installedSecurityStore };
+  };
+
+  router.get("/full-harness-trust", route(async (req, res) => {
+    const session = await account(req);
+    const { deviceId, security } = requireNativeTrustStore();
+    const trust = await security.inspectFullHarnessTrust({
+      profileId: session.profile.profile_id,
+      deviceId,
+    });
+    res.json({ ok: true, trust: publicTrust(trust), ...flags });
+  }));
+
+  router.put("/full-harness-trust", route(async (req, res) => {
+    requireSameOrigin(req);
+    const session = await account(req);
+    const body = trustDecisionSchema.parse(req.body);
+    const { deviceId, security } = requireNativeTrustStore();
+    const trust = await security.setFullHarnessTrust({
+      session: {
+        sessionId: session.session_id,
+        profileId: session.profile.profile_id,
+      },
+      deviceId,
+      trusted: body.trusted,
+    });
+    const delegatedRequestRefs: string[] = [];
+    if (trust.trusted && trust.delegated_account_session_id) {
+      for (const request of input.store.listForAccount({
+        authenticatedProfileRef: session.profile.profile_id,
+        accountSessionId: session.session_id,
+      })) {
+        if (request.status !== "pending_user_delegation") continue;
+        const granted = input.store.grant({
+          requestRef: request.transition_request_ref,
+          authenticatedProfileRef: session.profile.profile_id,
+          accountSessionId: session.session_id,
+          accountType: session.account_policy.account_type,
+          leaseSeconds: request.requested_lease_seconds,
+        });
+        delegatedRequestRefs.push(granted.request.transition_request_ref);
+      }
+    }
+    res.json({
+      ok: true,
+      trust: publicTrust(trust),
+      delegated_request_refs: delegatedRequestRefs,
+      ...flags,
+    });
+  }));
+
+  router.post("/full-harness-trust/renew", route(async (req, res) => {
+    requireSameOrigin(req);
+    const session = await account(req);
+    const body = trustedRenewalSchema.parse(req.body);
+    const { deviceId, security } = requireNativeTrustStore();
+    if (!input.onTrustedRenewal) {
+      throw new DesktopMcpTunnelTransitionError(
+        "transition_native_broker_unavailable",
+        503,
+      );
+    }
+    const trust = await security.inspectFullHarnessTrust({
+      profileId: session.profile.profile_id,
+      deviceId,
+    });
+    if (
+      !trust.trusted ||
+      trust.delegated_account_session_id !== session.session_id
+    ) {
+      throw new DesktopMcpTunnelTransitionError(
+        "transition_trusted_renewal_forbidden",
+        403,
+      );
+    }
+    const renewed = input.store.renewTrustedDeviceLease({
+      previousRequestRef: body.previous_transition_request_ref,
+      authenticatedProfileRef: session.profile.profile_id,
+      accountSessionId: session.session_id,
+      accountType: session.account_policy.account_type,
+    });
+    const delegationRef = renewed.request.delegation_ref;
+    const delegationExpiresAt = renewed.request.delegation_expires_at;
+    if (!delegationRef || !delegationExpiresAt) {
+      throw new DesktopMcpTunnelTransitionError(
+        "transition_delegation_not_active",
+        409,
+      );
+    }
+    try {
+      const native = await input.onTrustedRenewal({
+        transitionRequestRef: renewed.request.transition_request_ref,
+        delegationRef,
+        delegationExpiresAt,
+        accountSessionId: session.session_id,
+      });
+      if (!native.accepted) {
+        throw new Error("transition_native_broker_rejected");
+      }
+      res.json({
+        ok: true,
+        renewed: true,
+        request: renewed.request,
+        receipt: renewed.authorization.receipt,
+        native_receipt_ref: native.nativeReceiptRef,
+        trust: publicTrust(trust),
+        ...flags,
+      });
+    } catch (error) {
+      input.store.settle({
+        requestRef: renewed.request.transition_request_ref,
+        eventType: "failed",
+        reasonCode: "trusted_renewal_native_transition_rejected",
+      });
+      throw error;
+    }
+  }));
 
   router.get("/requests", route(async (req, res) => {
     const session = await account(req);

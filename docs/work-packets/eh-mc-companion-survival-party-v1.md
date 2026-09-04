@@ -371,6 +371,10 @@ between admission and settlement.
 Search only declared loaded coverage, mine an exact set, collect resulting
 items and craft one tool through normal recipes/inventory. Interrupt on an
 admitted hazard or health threshold and resume only from a fresh revision.
+Goal-directed travel for this course depends on live-accepted NAV8 from
+`docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`. C4 may use that
+movement profile but cannot inherit its own search target, mining, pickup,
+inventory or crafting authority from navigation.
 
 ### C5 — cooperative party
 
@@ -431,7 +435,7 @@ holds/suspends lower-priority companions with
 | S3 | `resident.minecraft.companion-follow.v1` | C1 A0/A1/B and EH-RCC3 evidence |
 | S4 | Transactional inventory/equipment custody | C2 A0/A1/B and no-duplication |
 | S5 | Exact Survival mining using accepted backend | C3 A0/A1/B plus real-client differential |
-| S6 | Gather/craft, Noble Team assignments/dependencies and cooperative party budgets | C4/C5 evidence, serialized conflicts and distinct actor/effect leases |
+| S6 | Gather/craft, Noble Team assignments/dependencies and cooperative party budgets | live-accepted ENV-NAV1/NAV8 movement plus C4/C5 evidence, serialized conflicts and distinct actor/effect leases |
 | S7 | Bounded legitimate Nether contribution | C6 evidence; no World Authority in measured lane |
 
 Each slice has a separate GO/NO-GO. S0 does not authorize S5; S3 follow does

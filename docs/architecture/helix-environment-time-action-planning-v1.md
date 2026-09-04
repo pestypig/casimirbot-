@@ -1,6 +1,8 @@
 # Helix Environment Time and Action Planning v1
 
-Status: architecture contract; specified, not yet a shared implementation.
+Status: architecture contract; ET0–ET5 shared contract, deterministic ledger,
+Minecraft compatibility compiler, affordance delta and feedback/interruption
+surfaces are deterministically verified. ET6–ET8 remain ordered acceptance work.
 
 Current status and dependency order remain governed only by
 `docs/helix-environment-harness-work-program-v1.md`. Runtime ownership remains
@@ -242,4 +244,3 @@ remain provenance.
 - no receipt/frontier/scheduler terminal authority;
 - no Minecraft acceptance promoted to another environment; and
 - no capacity claim before measured percentile evidence.
-

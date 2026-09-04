@@ -29,8 +29,28 @@ final class DesktopServiceEndpointResolverTest {
             "http://127.0.0.1:57577/api/room-ingress/v1/bindings/binding:test",
             DesktopServiceEndpointResolver.resolve(
                 "http://127.0.0.1:1522/api/room-ingress/v1/bindings/binding:test",
-                receipt
+                receipt,
+                ignored -> false
             )
+        );
+    }
+
+    @Test
+    void preservesAReachablePairedEndpointInsteadOfSplittingServiceEpochs() throws Exception {
+        Path receipt = temporaryDirectory.resolve("desktop-service-ready.json");
+        Files.writeString(
+            receipt,
+            """
+            {"schema":"casimir_desktop_service_ready_receipt/1","ready":true,
+             "origin":"http://127.0.0.1:57577","serviceProcessId":%d}
+            """.formatted(ProcessHandle.current().pid())
+        );
+        String configured =
+            "http://127.0.0.1:1522/api/room-ingress/v1/bindings/binding:test";
+
+        assertEquals(
+            configured,
+            DesktopServiceEndpointResolver.resolve(configured, receipt, ignored -> true)
         );
     }
 

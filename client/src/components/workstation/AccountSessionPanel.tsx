@@ -789,7 +789,10 @@ export default function AccountSessionPanel() {
                 </button>
               </div>
             ) : (
-              <div className="mt-3 space-y-3">
+              <div
+                className="mt-3 space-y-3"
+                data-helix-guidance-target="account-session-sign-in"
+              >
                 <div className="rounded border border-cyan-400/20 bg-cyan-500/10 p-3">
                   <div className="mb-2 flex items-center gap-2 text-xs font-medium text-cyan-100">
                     <LogIn className="h-3.5 w-3.5" />

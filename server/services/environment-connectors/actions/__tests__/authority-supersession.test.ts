@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertEnvironmentActionLifecycle,
   canCancelEnvironmentActionWorkflowStatus,
   isEnvironmentActionAuthorityLeaseExtension,
   planEnvironmentActionAuthoritySupersession,
 } from "../authority-store";
 
 describe("environment action authority supersession", () => {
+  it("keeps authority reduction available after every environment liveness gate expires", () => {
+    const inactive = {
+      environment_status: "revoked",
+      source_status: "expired",
+      room_status: "closed",
+      adapter_admission_status: "expired",
+    };
+
+    expect(() => assertEnvironmentActionLifecycle(
+      inactive,
+      "authority_reduction",
+    )).not.toThrow();
+    expect(() => assertEnvironmentActionLifecycle(inactive, "active"))
+      .toThrowError(expect.objectContaining({
+        code: "action_environment_binding_inactive",
+      }));
+  });
+
   it("permits release-only cancellation after the broker observation deadline", () => {
     expect(canCancelEnvironmentActionWorkflowStatus("timed_out")).toBe(true);
     expect(canCancelEnvironmentActionWorkflowStatus("succeeded")).toBe(false);

@@ -30,6 +30,7 @@ export class MinecraftLocalLifecycleError extends Error {
 
 export type MinecraftLocalLifecycleRunner = (input: {
   address: string;
+  restartClient: boolean;
   signal?: AbortSignal;
 }) => Promise<HelixMinecraftLocalLifecycleReceipt>;
 
@@ -120,19 +121,21 @@ const defaultRunner: MinecraftLocalLifecycleRunner = async (input) => {
     );
   }
   try {
+    const scriptArguments = [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      scriptPath,
+      "-Address",
+      input.address,
+    ];
+    if (input.restartClient) scriptArguments.push("-RestartClient");
     const result = await execFileAsync(
       powershellPath(),
-      [
-        "-NoLogo",
-        "-NoProfile",
-        "-NonInteractive",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        scriptPath,
-        "-Address",
-        input.address,
-      ],
+      scriptArguments,
       {
         cwd: process.cwd(),
         windowsHide: true,
@@ -172,6 +175,7 @@ export const executeMinecraftFabricLoopbackLifecycle = async (input: {
   }
   const execution = (input.runner ?? defaultRunner)({
     address: parsed.data.address,
+    restartClient: parsed.data.restart_client,
     signal: input.signal,
   });
   activeExecution = execution;

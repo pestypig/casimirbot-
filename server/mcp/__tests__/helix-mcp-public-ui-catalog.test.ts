@@ -122,7 +122,10 @@ describe("Helix MCP public UI catalog", () => {
   });
 
   it("publishes the public-only catalog as a read-only authenticated tool", async () => {
-    const connection = await connect([HELIX_AGENT_RUN_READ_SCOPE]);
+    const connection = await connect([
+      HELIX_AGENT_RUN_READ_SCOPE,
+      HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    ]);
     try {
       const listed = await connection.client.listTools();
       const tool = listed.tools.find((candidate) => candidate.name === "helix_public_ui_catalog") as
@@ -160,12 +163,12 @@ describe("Helix MCP public UI catalog", () => {
         totals: {
           public_surface_count: 20,
           public_control_count: 398,
-          public_capability_count: 42,
-          public_mcp_binding_count: 9,
+          public_capability_count: 43,
+          public_mcp_binding_count: 10,
           matched_surface_count: 20,
           matched_control_count: 398,
-          matched_capability_count: 42,
-          matched_mcp_binding_count: 9,
+          matched_capability_count: 43,
+          matched_mcp_binding_count: 10,
         },
       });
       expect(JSON.stringify(catalog)).not.toMatch(
@@ -182,8 +185,8 @@ describe("Helix MCP public UI catalog", () => {
         payload: {
           totals: {
             public_control_count: 398,
-            public_capability_count: 42,
-            public_mcp_binding_count: 9,
+            public_capability_count: 43,
+            public_mcp_binding_count: 10,
           },
         },
         retention: {
@@ -280,7 +283,7 @@ describe("Helix MCP public UI catalog", () => {
         controls: Array<Record<string, unknown>>;
         mcp_bindings: unknown[];
       };
-      expect(roomCatalog.controls).toHaveLength(101);
+      expect(roomCatalog.controls).toHaveLength(100);
       expect(roomCatalog.controls.every((control) =>
         control.authority_state === "blocked_pending_contract",
       )).toBe(true);
@@ -299,6 +302,11 @@ describe("Helix MCP public UI catalog", () => {
         };
       expect(routeOwnedCatalog.controls).toEqual([
         expect.objectContaining({
+          control_id: "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop",
+          route_contract_id: "environment.action_authority.revoke",
+          authority_state: "route_owned",
+        }),
+        expect.objectContaining({
           control_id: "helix.ask.shared_live_room.shared-live-room-runtime-panel.take-speaking-floor",
           route_contract_id: "room.floor.acquire",
           authority_state: "route_owned",
@@ -309,7 +317,7 @@ describe("Helix MCP public UI catalog", () => {
           authority_state: "route_owned",
         }),
       ]);
-      expect(routeOwnedCatalog.mcp_bindings).toHaveLength(9);
+      expect(routeOwnedCatalog.mcp_bindings).toHaveLength(10);
       expect(routeOwnedCatalog.mcp_bindings).toEqual(expect.arrayContaining([
         expect.objectContaining({
           tool_name: "helix_room_create",
@@ -325,6 +333,18 @@ describe("Helix MCP public UI catalog", () => {
         expect.objectContaining({
           tool_name: "helix_room_consent_grant",
           requires_signed_delegation: true,
+        }),
+        expect.objectContaining({
+          tool_name: "helix_environment_action_authority_revoke",
+          capability_id: "environment.action_authority.revoke",
+          control_ids: [
+            "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop",
+          ],
+          required_scopes: ["helix.rooms.read", "helix.environment.action.write"],
+          mutating: true,
+          requires_signed_delegation: false,
+          assistant_answer: false,
+          terminal_eligible: false,
         }),
       ]));
     } finally {

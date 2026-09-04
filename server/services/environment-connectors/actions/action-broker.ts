@@ -3410,7 +3410,11 @@ export const enqueueEnvironmentAction = async (input: {
 export const leasePendingEnvironmentActions = async (input: {
   claim: EnvironmentActionConnectorClaim;
   limit?: number;
-}): Promise<HelixEnvironmentActionRequest[]> => {
+}): Promise<{
+  requests: HelixEnvironmentActionRequest[];
+  queueDepthAtLease: number;
+  oldestPendingAgeMs: number;
+}> => {
   const readDb = await readSharedRealtimeRoomDatabase();
   await assertFreshConnector(readDb, input.claim);
   const work = await readDb.query<{ present: number }>(
@@ -3424,7 +3428,9 @@ export const leasePendingEnvironmentActions = async (input: {
      LIMIT 1;`,
     [input.claim.authorityId],
   );
-  if (!work.rows[0]) return [];
+  if (!work.rows[0]) {
+    return { requests: [], queueDepthAtLease: 0, oldestPendingAgeMs: 0 };
+  }
 
   return withSharedRealtimeRoomTransaction(async (db) => {
     await assertFreshConnector(db, input.claim);
@@ -3446,6 +3452,7 @@ export const leasePendingEnvironmentActions = async (input: {
          AND deadline_at <= now();`,
       [input.claim.authorityId],
     );
+    const currentManifest = (await latestManifest(db, input.claim.authorityId))!;
     const candidates = await db.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
        WHERE action_authority_id = $1 AND connector_manifest_id = $2
@@ -3453,10 +3460,25 @@ export const leasePendingEnvironmentActions = async (input: {
        ORDER BY created_at LIMIT $3 FOR UPDATE;`,
       [
         input.claim.authorityId,
-        (await latestManifest(db, input.claim.authorityId))!.manifest_id,
+        currentManifest.manifest_id,
         limit,
       ],
     );
+    const queueDepth = await db.query<{
+      queue_depth: number | string;
+      oldest_created_at: Date | string | null;
+    }>(
+      `SELECT count(*)::int AS queue_depth, min(created_at) AS oldest_created_at
+       FROM helix_environment_action_requests
+       WHERE action_authority_id = $1 AND connector_manifest_id = $2
+         AND status = 'admitted' AND deadline_at > now();`,
+      [input.claim.authorityId, currentManifest.manifest_id],
+    );
+    const queueDepthAtLease = Number(queueDepth.rows[0]?.queue_depth ?? 0);
+    const oldestCreatedAt = queueDepth.rows[0]?.oldest_created_at;
+    const oldestPendingAgeMs = oldestCreatedAt
+      ? Math.max(0, now.getTime() - Date.parse(iso(oldestCreatedAt)))
+      : 0;
     const leased: HelixEnvironmentActionRequest[] = [];
     for (const candidate of candidates.rows) {
       const leaseExpiresAt = new Date(
@@ -3475,7 +3497,11 @@ export const leasePendingEnvironmentActions = async (input: {
       );
       if (updated.rows[0]) leased.push(requestProjection(updated.rows[0]));
     }
-    return leased;
+    return {
+      requests: leased,
+      queueDepthAtLease,
+      oldestPendingAgeMs,
+    };
   });
 };
 

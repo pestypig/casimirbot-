@@ -1,0 +1,131 @@
+{
+  "schema": "casimirbot.environment_spatial_navigation_acceptance.v1",
+  "recorded_at": "2026-09-03T22:46:00.000Z",
+  "program_gate": "G8",
+  "workstream": "provider-neutral environment spatial navigation",
+  "stage": "NAV0",
+  "maturity": "deterministically verified",
+  "scope": {
+    "included": [
+      "provider-neutral spatial snapshot schema",
+      "provider-neutral topology graph schema",
+      "movement-only navigation request schema",
+      "route-corridor and receding-trajectory plan schema",
+      "semantic navigation feedback schema",
+      "clean-room black-box benchmark protocol",
+      "cross-contract identity, hash, route, cost, effect, risk, deadline and destination validation",
+      "non-voxel navmesh-shaped conformance fixture"
+    ],
+    "excluded": [
+      "Minecraft sensor-to-topology compiler",
+      "route-search algorithm",
+      "trajectory execution",
+      "Minecraft or FiveM live acceptance",
+      "Baritone execution or redistribution",
+      "mining, building, combat, inventory mutation or World Authority"
+    ]
+  },
+  "authority": {
+    "codex_or_operator_selects_goal_and_policy": true,
+    "helix_owns_identity_admission_effects_and_provenance": true,
+    "planner_strategy_authority": false,
+    "adapter_strategy_authority": false,
+    "automatic_replay": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "movement_effect_kinds": ["locomotion", "orientation"]
+  },
+  "contracts": [
+    "environment.spatial_snapshot.v1",
+    "environment.topology_graph.v1",
+    "environment.navigation_request.v1",
+    "environment.navigation_plan.v1",
+    "environment.navigation_feedback.v1",
+    "environment.navigation_benchmark_protocol.v1"
+  ],
+  "adversarial_coverage": [
+    "semantic hash tampering",
+    "false complete coverage",
+    "coordinate dimension drift",
+    "duplicate identifiers",
+    "dangling and stale topology edges",
+    "hidden non-navigation effects",
+    "future observation floors",
+    "malformed route corridors",
+    "unbound checkpoints",
+    "stale producer epoch",
+    "substituted cost policy",
+    "forbidden traversal and excessive risk",
+    "expired deadlines",
+    "unadmitted partial-frontier progress",
+    "invalid manual or authority continuation",
+    "training and held-out course overlap",
+    "missing benchmark metrics",
+    "reference source consultation and shipping contamination"
+  ],
+  "verification": {
+    "focused_navigation_contract_tests": {
+      "command": "npx vitest run shared/__tests__/helix-environment-navigation.spec.ts --pool=forks",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0
+    },
+    "navigation_and_environment_time_tests": {
+      "command": "npx vitest run shared/__tests__/helix-environment-navigation.spec.ts shared/__tests__/helix-environment-time.spec.ts --pool=forks",
+      "status": "passed",
+      "passed": 38,
+      "failed": 0
+    },
+    "full_repository_typecheck": {
+      "command": "npm run typecheck",
+      "status": "inconclusive_host_limit",
+      "reason": "Node reached its approximately 4 GB heap limit after about 270 seconds before emitting a TypeScript diagnostic. The same unchanged heavy command was not repeated."
+    },
+    "targeted_typecheck": {
+      "command": "npx tsc --noEmit --skipLibCheck --moduleResolution bundler --module ESNext --target ES2022 --types node shared/helix-environment-navigation.ts",
+      "status": "blocked_by_existing_dependency_diagnostics",
+      "reason": "The compiler reported only current diagnostics in imported shared/helix-environment-time.ts around temporal projection state inference; it emitted no diagnostic in the NAV0 module."
+    },
+    "diff_check": {
+      "command": "git diff --check -- <NAV0 files and canonical backlinks>",
+      "status": "passed"
+    },
+    "environment_harness_documentation_audit": {
+      "command": "npm run helix:environment-harness:docs-audit",
+      "status": "passed",
+      "failures": []
+    },
+    "format_check": {
+      "command": "npx prettier --check <NAV0 contract, fixtures, packet and evidence>",
+      "status": "passed"
+    }
+  },
+  "artifacts": [
+    {
+      "path": "shared/helix-environment-navigation.ts",
+      "sha256": "35478CEA9C93E32B3ADBF05C8A5BA8122C7A994C61F108D8880030CA9AC1003B"
+    },
+    {
+      "path": "shared/__tests__/helix-environment-navigation.spec.ts",
+      "sha256": "D32370098E0CA39CADB4AC37CF2884DFC99BD10DFC00C57AB625B48D8A44531A"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+      "sha256": "816AADB9B5F5153ABE6F01B70605E1F3AFFEF716DA29853E95C5BD614FE0BB0F"
+    }
+  ],
+  "clean_room_boundary": {
+    "reference_role": "isolated non-shipping black-box benchmark only",
+    "reference_code_used": false,
+    "reference_api_or_structure_copied": false,
+    "shipping_dependency_allowed": false,
+    "held_out_tuning_allowed": false,
+    "general_superiority_claim_authorized": false
+  },
+  "next_stage": {
+    "stage": "NAV1",
+    "status": "specified",
+    "prerequisite": "ET6 Minecraft capacity qualification must pass before NAV1 implementation begins"
+  }
+}

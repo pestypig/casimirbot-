@@ -489,7 +489,7 @@ describe("Helix MCP Minecraft action boundary", () => {
       });
       expect(executeProbe).toHaveBeenCalledWith(expect.objectContaining({
         capabilityId: HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
-        arguments: {},
+        arguments: { freshness_requirement_ms: 30_000 },
         accountContext: expect.objectContaining({
           profile_id: "profile-mcp-minecraft-action",
         }),
@@ -503,6 +503,7 @@ describe("Helix MCP Minecraft action boundary", () => {
         arguments: {
           horizontal_radius: 7,
           vertical_radius: 8,
+          freshness_requirement_ms: 30_000,
         },
         accountContext: expect.objectContaining({
           profile_id: "profile-mcp-minecraft-action",
@@ -760,7 +761,7 @@ describe("Helix MCP Minecraft action boundary", () => {
       expect(firstGuardedExecution?.providerExecutionId).toBe(
         secondGuardedExecution?.providerExecutionId,
       );
-      expect(firstGuardedExecution?.toolCallId).toBe(
+      expect(firstGuardedExecution?.toolCallId).not.toBe(
         secondGuardedExecution?.toolCallId,
       );
 

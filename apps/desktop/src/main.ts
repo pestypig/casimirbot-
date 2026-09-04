@@ -69,6 +69,8 @@ import {
   DESKTOP_MCP_TUNNEL_START_CHANNEL,
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
+  DESKTOP_WORKSTATION_GUIDANCE_CHANNEL,
+  DESKTOP_WORKSTATION_GUIDANCE_PENDING_CHANNEL,
   DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL,
   DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL,
   DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL,
@@ -91,7 +93,12 @@ import {
 } from "./codex-plugin";
 import { DesktopUpdateController } from "./updater";
 import { installDesktopSessionSecurity } from "./security";
+import { clearDesktopEphemeralWebCaches } from "./web-cache-lifecycle";
 import { DesktopMcpTunnelController } from "./mcp-tunnel";
+import {
+  startDesktopMcpTunnelScopeRouter,
+  type DesktopMcpTunnelScopeRouter,
+} from "./mcp-tunnel-scope-router";
 import { DesktopMcpTunnelRecoverySupervisor } from
   "./mcp-tunnel-recovery-supervisor";
 import {
@@ -122,6 +129,7 @@ import {
   startDesktopMcpTunnelTransitionBroker,
   type DesktopMcpTunnelTransitionBroker,
   type DesktopMcpTunnelTransitionBrokerRequest,
+  type DesktopWorkstationPresentRequest,
 } from "./mcp-tunnel-transition-broker";
 import {
   autoStartConfiguredDesktopMcpTunnelReadOnly,
@@ -131,6 +139,7 @@ import {
   startDesktopMcpTunnelForUserSession,
 } from "./mcp-tunnel-transition-executor";
 import {
+  ensureDelegatedActiveDesktopAccount,
   parseActiveDesktopAccount,
   type ActiveDesktopAccount,
 } from "./active-account-session";
@@ -176,6 +185,7 @@ type StartupJournal = {
 
 let desktopRuntime: DesktopRuntime | null = null;
 let mcpTunnelController: DesktopMcpTunnelController | null = null;
+let mcpTunnelScopeRouter: DesktopMcpTunnelScopeRouter | null = null;
 let mcpTunnelRecoverySupervisor: DesktopMcpTunnelRecoverySupervisor | null = null;
 let mainWindow: BrowserWindow | null = null;
 let texturePackOverlayController: RealtimeTexturePackOverlayController | null = null;
@@ -183,6 +193,9 @@ let mcpFullLeaseTimer: NodeJS.Timeout | null = null;
 let mcpTransitionGeneration = 0;
 let quitting = false;
 let pendingAuth0Callback: string | null = null;
+let pendingWorkstationGuidance:
+  | Readonly<{ payload: Readonly<Record<string, unknown>>; expiresAt: number }>
+  | null = null;
 
 const registerDesktopProtocol = (): void => {
   if (
@@ -412,6 +425,35 @@ const resolveActiveDesktopAccount = async (
   return account;
 };
 
+const renewTrustedFullHarnessLease = async (input: {
+  runtime: DesktopRuntime;
+  rendererSession: Session;
+  previousTransitionRequestRef: string;
+}): Promise<boolean> => {
+  const response = await input.rendererSession.fetch(
+    `${input.runtime.origin}/api/desktop/mcp-tunnel-transition/full-harness-trust/renew`,
+    {
+      method: "POST",
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Origin: input.runtime.origin,
+        "Sec-Fetch-Site": "same-origin",
+      },
+      body: JSON.stringify({
+        previous_transition_request_ref:
+          input.previousTransitionRequestRef,
+      }),
+    },
+  );
+  const body = await response.json().catch(() => null) as
+    | Record<string, unknown>
+    | null;
+  return response.ok && body?.ok === true && body.renewed === true;
+};
+
 const restoreReadOnlyMcpTunnel = async (
   controller: DesktopMcpTunnelController,
   accountSessionId: string,
@@ -427,6 +469,12 @@ const scheduleNativeMcpTunnelTransition = (input: {
   request: DesktopMcpTunnelTransitionBrokerRequest;
 }): void => {
   const generation = ++mcpTransitionGeneration;
+  // A stable scope router changes only the loopback upstream. No remote MCP
+  // socket is replaced, so the accepted response can continue draining on its
+  // already-selected upstream while the next request sees the new scope.
+  const transitionDelayMs = input.controller.supportsStableScopeRouting()
+    ? 0
+    : DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS;
   const timer = setTimeout(() => {
     void (async () => {
       if (generation !== mcpTransitionGeneration) return;
@@ -445,15 +493,31 @@ const scheduleNativeMcpTunnelTransition = (input: {
             Date.parse(input.request.delegationExpiresAt) - Date.now(),
           );
           mcpFullLeaseTimer = setTimeout(() => {
-            void restoreReadOnlyMcpTunnel(
-              input.controller,
-              input.request.accountSessionId,
-            );
+            void (async () => {
+              const runtime = desktopRuntime;
+              const window = mainWindow;
+              const renewed = runtime && window && !window.isDestroyed()
+                ? await renewTrustedFullHarnessLease({
+                    runtime,
+                    rendererSession: window.webContents.session,
+                    previousTransitionRequestRef:
+                      input.request.transitionRequestRef,
+                  }).catch(() => false)
+                : false;
+              // The renewal route receipt-chains a new request, delegation and
+              // native acceptance. Its broker callback increments this
+              // generation and schedules the next finite lease boundary.
+              if (renewed || generation !== mcpTransitionGeneration) return;
+              await restoreReadOnlyMcpTunnel(
+                input.controller,
+                input.request.accountSessionId,
+              );
+            })();
           }, remaining);
           mcpFullLeaseTimer.unref();
       }
     })();
-  }, DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS);
+  }, transitionDelayMs);
   timer.unref();
 };
 
@@ -496,6 +560,97 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   const origin = `http://127.0.0.1:${port}`;
   const secret = randomBytes(32).toString("base64url");
   const mcpTransitionBroker = await startDesktopMcpTunnelTransitionBroker({
+      onPresent: async (request: DesktopWorkstationPresentRequest) => {
+        const runtime = desktopRuntime;
+        const window = mainWindow;
+        if (!runtime || !window || window.isDestroyed()) {
+          throw new Error("native_present_runtime_unavailable");
+        }
+        const account = await ensureDelegatedActiveDesktopAccount({
+          origin: runtime.origin,
+          delegatedAccountSessionId: request.accountSessionId,
+          readActiveAccount: () => resolveActiveDesktopAccount(
+            runtime,
+            window.webContents.session,
+          ),
+          setCookie: (cookie) => window.webContents.session.cookies.set(cookie),
+        });
+        if (
+          account.sessionId !== request.accountSessionId ||
+          (request.targetId === "full-harness-trust" &&
+            account.accountType !== "developer")
+        ) throw new Error("native_present_developer_revalidation_failed");
+        if (!window.isVisible()) window.show();
+        if (window.isMinimized()) window.restore();
+        window.focus();
+        const guidance = Object.freeze({
+          kind: "user_attention",
+          panelId: request.panelId,
+          ...(request.targetId ? { targetId: request.targetId } : {}),
+          ...(request.controlId ? { controlId: request.controlId } : {}),
+          label: request.controlId
+            ? "Review the highlighted human-only control. CasimirBot will not activate it for you."
+            : request.targetId === "account-session-sign-in"
+              ? "Sign in to the local CasimirBot profile before linking agent access."
+            : request.targetId === "auth0-account-link"
+              ? "Link the verified OAuth account required before exact AI-task binding."
+              : "Review and choose whether to trust this installed device for short Full Harness tunnel leases.",
+          durationMs: 8000,
+        });
+        pendingWorkstationGuidance = Object.freeze({
+          payload: guidance,
+          expiresAt: Date.now() + 30_000,
+        });
+        const currentUrl = new URL(
+          window.webContents.getURL() || `${runtime.origin}/desktop`,
+        );
+        appendStartupJournal(
+          startupJournal,
+          "host",
+          `workstation guidance requested panel=${request.panelId} current_path=${currentUrl.pathname}`,
+          secret,
+        );
+        if (currentUrl.pathname !== "/desktop") {
+          const targetUrl = new URL(`${runtime.origin}/desktop`);
+          targetUrl.searchParams.set("panels", request.panelId);
+          targetUrl.searchParams.set("focus", request.panelId);
+          targetUrl.searchParams.set(
+            "native_presentation",
+            "reasoning-binding",
+          );
+          await window.loadURL(targetUrl.toString());
+          appendStartupJournal(
+            startupJournal,
+            "host",
+            `workstation guidance loaded SPA panel=${request.panelId}`,
+            secret,
+          );
+        }
+        window.webContents.send(DESKTOP_WORKSTATION_GUIDANCE_CHANNEL, guidance);
+        if (process.env.HELIX_NATIVE_PRESENTATION_DIAGNOSTICS === "1") {
+          void (async () => {
+            await delay(10_000);
+            if (window.isDestroyed()) return;
+            const image = await window.webContents.capturePage();
+            const capturePath = path.join(
+              userDataPath,
+              "logs",
+              "native-presentation.png",
+            );
+            writeFileSync(capturePath, image.toPNG(), { mode: 0o600 });
+            appendStartupJournal(
+              startupJournal,
+              "host",
+              "workstation native presentation diagnostic captured",
+              secret,
+            );
+          })().catch(() => undefined);
+        }
+        return {
+          presentReceiptRef:
+            `native_present_receipt:${randomBytes(18).toString("base64url")}`,
+        };
+      },
       onTransition: async (request) => {
         const runtime = desktopRuntime;
         const window = mainWindow;
@@ -507,19 +662,28 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
           throw new Error("native_transition_tunnel_unconfigured");
         }
         if (request.targetScope === "full_helix_agent") {
-          const account = await resolveActiveDesktopAccount(
-            runtime,
-            window.webContents.session,
-          );
+          const account = await ensureDelegatedActiveDesktopAccount({
+            origin: runtime.origin,
+            delegatedAccountSessionId: request.accountSessionId,
+            readActiveAccount: () => resolveActiveDesktopAccount(
+              runtime,
+              window.webContents.session,
+            ),
+            setCookie: (cookie) => window.webContents.session.cookies.set(cookie),
+          });
           if (
             account.sessionId !== request.accountSessionId ||
             account.accountType !== "developer"
           ) throw new Error("native_transition_developer_revalidation_failed");
         }
         scheduleNativeMcpTunnelTransition({ controller, request });
+        const stableScopeRouting = controller.supportsStableScopeRouting();
         return {
           nativeReceiptRef:
             `native_transition_receipt:${randomBytes(18).toString("base64url")}`,
+          reconnectRequired: !stableScopeRouting,
+          catalogRefreshRequired: !stableScopeRouting,
+          stableScopeRouting,
         };
       },
     }).catch(async (error) => {
@@ -990,6 +1154,27 @@ const registerDesktopIpc = (
       capabilities: runtimeCapabilities,
     });
   });
+  ipcMain.handle(DESKTOP_WORKSTATION_GUIDANCE_PENDING_CHANNEL, (event) => {
+    assertTrustedRenderer(event.senderFrame?.url ?? "");
+    const pending = pendingWorkstationGuidance;
+    pendingWorkstationGuidance = null;
+    if (!pending || pending.expiresAt < Date.now()) {
+      appendStartupJournal(
+        startupJournal,
+        "host",
+        "workstation pending guidance unavailable",
+        secret,
+      );
+      return null;
+    }
+    appendStartupJournal(
+      startupJournal,
+      "host",
+      "workstation pending guidance consumed by target renderer",
+      secret,
+    );
+    return pending.payload;
+  });
   ipcMain.handle(DESKTOP_UPDATE_STATE_CHANNEL, (event) => {
     assertTrustedRenderer(event.senderFrame?.url ?? "");
     return updater.getState();
@@ -1279,6 +1464,9 @@ const stopDesktopService = (): void => {
   mcpTransitionGeneration += 1;
   if (mcpFullLeaseTimer) clearTimeout(mcpFullLeaseTimer);
   mcpFullLeaseTimer = null;
+  const scopeRouter = mcpTunnelScopeRouter;
+  mcpTunnelScopeRouter = null;
+  void scopeRouter?.close();
   const runtime = desktopRuntime;
   desktopRuntime = null;
   if (!runtime) return;
@@ -1319,6 +1507,7 @@ if (!singleInstance) {
 
   void app.whenReady().then(async () => {
     try {
+      await clearDesktopEphemeralWebCaches(session.defaultSession);
       installDesktopSessionSecurity(session.defaultSession, {
         getTrustedRendererOrigin: () => desktopRuntime?.origin ?? null,
       });
@@ -1332,6 +1521,9 @@ if (!singleInstance) {
       });
       desktopRuntime = await startDesktopService();
       installSessionHeaderInjection(desktopRuntime);
+      mcpTunnelScopeRouter = await startDesktopMcpTunnelScopeRouter({
+        runtimeOrigin: desktopRuntime.origin,
+      });
       const tunnelArtifact = readTunnelArtifact(runtimeRoot);
       let recoverySupervisor: DesktopMcpTunnelRecoverySupervisor | null = null;
       mcpTunnelController = new DesktopMcpTunnelController({
@@ -1339,9 +1531,11 @@ if (!singleInstance) {
         expectedBinarySha256: tunnelArtifact.executableSha256,
         binaryVersion: tunnelArtifact.version,
         userDataPath: app.getPath("userData"),
-        runtimeOrigin: desktopRuntime.origin,
+        runtimeOrigin: mcpTunnelScopeRouter.origin,
         desktopSessionSecret: desktopRuntime.secret,
         storage: safeStorage,
+        stableMcpRoute: true,
+        routeScope: (scope) => mcpTunnelScopeRouter?.setScope(scope),
         onUnexpectedExit: (event) => {
           recoverySupervisor?.trigger({
             accountSessionId: event.accountSessionId,

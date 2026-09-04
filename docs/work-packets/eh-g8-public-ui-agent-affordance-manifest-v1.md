@@ -77,7 +77,7 @@ confirmation requirements all admit it.
 | UI-1 surface manifest | complete | All 16 public panels plus Ask, feature-gated room, shell, and mobile families have stable surface IDs and source ownership. |
 | UI-2 control inventory | complete | The deterministic TSX inventory currently finds 398 controls across public roots and their static or statically analyzable dynamic delegated component imports. |
 | UI-3 classification | complete | All 398 controls have unique canonical IDs plus explicit interaction and authority metadata. The distribution is 186 `act`, 150 `configure`, 43 `navigate`, 18 `observe`, and one disabled status indicator `human_only`. |
-| UI-4 parity audits | partial | All 41 public policy capabilities classify as 36 shared-gateway plus 5 route-owned capabilities with zero policy orphans. `helix_public_ui_catalog` projects all 398 controls without source/handler leakage through the full MCP server, standalone Device Check server, and installed local-supervisor coordination surface. The narrow installed surfaces reuse their existing Shared Live Room read scope and resource-metadata challenge. In-memory MCP tests cover listing, user-principal access, filters, scope denial, nonterminal flags, 102 room controls that remain blocked pending contract, and the first explicitly bound room control: exact-epoch speaking-floor release. Further direct control bindings and handler/receipt parity remain separately gated promotions. |
+| UI-4 parity audits | partial | All 43 public policy capabilities classify as 36 shared-gateway plus 7 route-owned capabilities with zero policy orphans. `helix_public_ui_catalog` projects all 398 controls without source/handler leakage through the full MCP server, standalone Device Check server, and installed local-supervisor coordination surface. The narrow installed surfaces reuse their existing Shared Live Room read scope and resource-metadata challenge. In-memory MCP tests cover listing, user-principal access, filters, scope denial, nonterminal flags, 100 room controls that remain blocked pending contract, and three explicitly bound room controls: speaking-floor acquire/release and owner-exact Player Embodiment revoke. Further direct control bindings and handler/receipt parity remain separately gated promotions. |
 | UI-5 deterministic closure | complete | Generated-catalog drift checks, public UI audits, 14 focused MCP contracts, Ask discipline quick, environment docs audit, and the production server build pass. The build reports four pre-existing duplicate-key/case warnings outside this packet. No keyed Ask or refreshed-package catalog call has run. |
 | UI-6 live convergence | blocked by installed-package refresh | The running CasimirBot EXE reports its private tunnel Ready on tunnel-client 0.0.13, but that installed package predates narrow-surface catalog publication. A rebuilt/upgraded EXE and MCP reconnect are required before an authenticated installed-tunnel catalog trace can prove exact catalog, admission, and presentation convergence. No localhost port is required. |
 
@@ -132,7 +132,7 @@ handlers, and lexical action cues never grant execution.
 
 The capability audit independently joins the public account policy to the
 registered workstation gateway and the typed route-owned exception list. Its
-current 40 rows project agent commands from `helix.ask` onto public panel or
+current 43 rows project agent commands from `helix.ask` onto public panel or
 feature-gated room surfaces while preserving nonterminal observation and
 model-reentry requirements.
 
@@ -147,12 +147,22 @@ the ordinary agent-run read scope. The standalone Device Check and installed
 local-supervisor coordination servers expose the same tool under their existing
 Shared Live Room read scope and private resource-metadata paths. Agents may
 filter by public surface, interaction kind, and authority state. The room filter
-therefore reports 102 room controls as `blocked_pending_contract` and one
-feature-gated `route_owned` controls for `room.floor.acquire` and
-`room.floor.release`, while Ask and
+therefore reports 100 room controls as `blocked_pending_contract` and three
+feature-gated `route_owned` controls for `room.floor.acquire`,
+`room.floor.release`, and `environment.action_authority.revoke`, while Ask and
 panel-local controls remain `client_local` unless an explicit binding passes
 the control-to-policy audit. The tool cannot click, configure, or execute a UI
 handler merely because it can describe that handler's public control identity.
+
+The Player Embodiment emergency-stop promotion is intentionally narrow. The
+browser retains its two-step confirmation, while MCP calls must already have
+the Full Harness transition, `helix.rooms.read` and
+`helix.environment.action.write`, and must match the exact owning profile,
+room, environment binding, and action-authority lease. Its receipt remains an
+observation requiring model re-entry and has neither assistant-answer nor
+terminal authority. Deterministic catalog and panel tests pass; installed-host
+catalog adoption and the ET6 live revoke/stale-retry trace remain separate
+acceptance evidence.
 
 The durable implementation contract is
 `docs/architecture/helix-public-ui-agent-affordance-contract-v1.md`.

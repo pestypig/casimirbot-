@@ -8,5 +8,6 @@ describe("client startup reload policy", () => {
     const buildSync = source.slice(source.indexOf("const syncBuildStamp"), source.indexOf("const shouldAutoReload"));
     expect(buildSync).not.toContain("scheduleReloadOnce()");
     expect(source).not.toContain('serviceWorker.addEventListener("controllerchange"');
+    expect(source).toContain("isProd && isSecure && !isNativeDesktop");
   });
 });

@@ -1,0 +1,348 @@
+{
+  "schema": "helix.environment_time.et6_packaged_trust_cache_repair.v1",
+  "recorded_at": "2026-09-04T01:22:00.000Z",
+  "program_gate": "EH-G8",
+  "workstream": "ET6 live Minecraft capacity qualification",
+  "capability_or_component": "packaged desktop Full Harness trust onramp and ephemeral web-cache lifecycle",
+  "lifecycle_stage": "pre-admission transport readiness",
+  "reaction_timescale": "operator interaction and desktop startup",
+  "authority_owner": "signed-in developer profile on the installed device",
+  "current_maturity": "deterministic repair with packaged startup evidence",
+  "target_maturity": "ET6 live capacity evidence",
+  "required_evidence": "fresh packaged trust grant, exact continuation, three measured cycles, steering, interruption, reconnect, revoke and stale rejection",
+  "explicit_non_goals": [
+    "grant environment authority",
+    "grant answer or terminal authority",
+    "promote ET7 or ET8",
+    "treat a UI receipt as a model answer"
+  ],
+  "downstream_gate_unlocked": "none; ET6 remains open",
+  "classification": [
+    "presentation",
+    "local transport-state persistence"
+  ],
+  "user_observation": {
+    "summary": "The Full Harness trust control appeared selected, clicking it appeared to deselect it, and the action-required guidance did not clear.",
+    "native_ui_directly_reproduced_by_agent": false,
+    "reason": "Windows Computer Use failed before native-window attachment with a local kernel-assets error; no Codex or authentication UI was puppeteered."
+  },
+  "first_divergence": {
+    "stage": "packaged local state persistence",
+    "evidence": "The packaged desktop startup journal repeatedly reported ENOSPC while writing its local pg-mem snapshot.",
+    "volume_free_gib_before_repair": 1.46,
+    "packaged_desktop_total_storage_gib": 2.611,
+    "service_worker_storage_gib": 2.35,
+    "cause": "The production client registered the mobile service worker inside the packaged desktop. Each launch used a newly reserved loopback port, so origin-scoped CacheStorage from old launches accumulated and could not be cleared by later renderer origins.",
+    "causal_strength": "code path plus on-disk footprint and ENOSPC log; the exact checkbox click was not directly captured"
+  },
+  "repair": {
+    "desktop_startup_cleanup": "Clear only serviceworkers and cachestorage through the Electron session before window creation.",
+    "desktop_registration_guard": "Do not register the mobile service worker when the native desktop bridge is present.",
+    "trust_control": "Render explicit grant and explicit remove-trust actions instead of an ambiguous controlled checkbox.",
+    "pending_start_recovery": "After a successful trust grant, retry exactly one previously failed Start Harness attempt; do not start merely because trust was toggled in isolation.",
+    "preserved_state": [
+      "cookies",
+      "local storage",
+      "IndexedDB",
+      "installed security store",
+      "connector credentials",
+      "environment authority",
+      "Minecraft and Fabric processes",
+      "keyed server"
+    ]
+  },
+  "packaged_verification": {
+    "exe_sha256": "1fcd9b64bc80b5efca5d42b77b2c843b9566640c25266d25086d6aea7308378e",
+    "service_origin": "http://127.0.0.1:56100",
+    "service_ready": true,
+    "restored_database_rows": 10742,
+    "cache_storage_bytes_after_start": 0,
+    "volume_free_gib_after_start": 3.828,
+    "enospc_recurred_after_start": false,
+    "fabric_listener_preserved": "127.0.0.1:25566",
+    "keyed_listener_preserved": "127.0.0.1:1522",
+    "installed_device_trust_after_user_action": {
+      "trusted": true,
+      "policy_revision": 11,
+      "delegated_session_present": true,
+      "record_observed_at": "2026-09-04T01:31:45.012Z"
+    },
+    "packaged_tunnel_probe_after_user_action": {
+      "process_running": true,
+      "healthz_status": 200,
+      "readyz_status": 200
+    }
+  },
+  "verification": {
+    "focused_vitest": {
+      "status": "pass",
+      "files": 4,
+      "tests": 25
+    },
+    "desktop_transition_vitest": {
+      "status": "pass",
+      "files": 5,
+      "tests": 45,
+      "coverage": "MCP request/inspect/execute catalog, native broker, transition executor, stable-scope tunnel controller and server routes"
+    },
+    "desktop_host_build": "pass",
+    "client_production_build": "pass",
+    "packaged_directory_build": "pass",
+    "diff_check": "pass",
+    "desktop_strict_typescript_check": "pass: npx tsc -p apps/desktop/tsconfig.json",
+    "full_typescript_check": "fail outside this repair: with an 8 GiB heap the repository-wide compiler completed and reported a large pre-existing dirty-checkout backlog across unrelated CLI, document, test and warp surfaces; no changed desktop-host error was reported"
+  },
+  "authority_boundaries": {
+    "device_trust_self_granted": false,
+    "device_trust_user_granted": true,
+    "environment_authority_granted": false,
+    "answer_authority_granted": false,
+    "terminal_authority_granted": false,
+    "credentials_exposed": false,
+    "hidden_reasoning_captured": false
+  },
+  "catalog_adoption_observation": {
+    "current_task_service_instance_ref": "service_instance:7c33a4927f9dfcc66a7cd4280c17ca36",
+    "current_task_mcp_origin": "http://127.0.0.1:1522/mcp",
+    "packaged_service_origin": "http://127.0.0.1:56100",
+    "current_task_exposes_desktop_transition_tools": false,
+    "rebuilt_source_and_package_define_desktop_transition_tools": true,
+    "required_tool_names": [
+      "helix_desktop_tunnel_transition_request",
+      "helix_desktop_tunnel_transition_inspect",
+      "helix_desktop_tunnel_transition_execute"
+    ],
+    "live_method_types": {
+      "helix_desktop_tunnel_transition_request": "undefined",
+      "helix_desktop_tunnel_transition_inspect": "undefined",
+      "helix_desktop_tunnel_transition_execute": "undefined"
+    },
+    "keyed_server_started_at": "2026-09-03T22:18:28.5071169Z",
+    "mcp_source_last_write_at": "2026-09-04T00:54:33.6547132Z",
+    "source_changed_after_keyed_server_start": true,
+    "interpretation": "The remaining boundary is adoption of the rebuilt packaged MCP route by this exact task, not another device-trust decision. The two service identities must not be conflated."
+  },
+  "authorized_keyed_restart": {
+    "authorized_by_user": true,
+    "old_service_instance_ref": "service_instance:7c33a4927f9dfcc66a7cd4280c17ca36",
+    "new_service_instance_ref": "service_instance:8df0d367ff6366d6d2874c803b0f87c1",
+    "new_process_id": 1844,
+    "listener": "127.0.0.1:1522",
+    "health_status": 200,
+    "app_ready": true,
+    "persisted_rows_restored": 26986,
+    "discarded_compacted_or_invalid_rows": 46,
+    "exact_environment_binding_retained": "environment_binding:legacy:9910caee8091d404f4b5c55697c0e2bb14e4a7f5",
+    "fabric_listener_preserved": "127.0.0.1:25566",
+    "packaged_listener_preserved": "127.0.0.1:56100",
+    "wrong_port_candidate": "A first inherited launch defaulted to port 5050; it was stopped normally before readiness and no acceptance calls were sent to it.",
+    "catalog_refresh_still_required": true
+  },
+  "post_refresh_catalog_divergence": {
+    "operator_refreshed_named_connection": true,
+    "connection_name": "casimirbot_g2_a1_local",
+    "transition_tools_visible_after_refresh": false,
+    "first_divergence": "full MCP OAuth catalog metadata augmentation",
+    "cause": "The full /mcp surface registered the request, inspect and execute handlers but omitted their securitySchemes from its OAuth catalog augmentation map. The restricted local-supervisor surface already declared the same exact scopes.",
+    "repair": "Declare the request scope on request and inspect and the execute scope on execute in the full-surface augmentation map. Handler-side scope checks, active-presence binding, first-party native delegation and broker revalidation remain unchanged.",
+    "classification": "tool admission",
+    "focused_regression": {
+      "command": "npx vitest run server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts --pool=forks",
+      "status": "pass",
+      "tests": 19,
+      "assertion": "The full MCP catalog carries exact OAuth securitySchemes for all three transition tools."
+    },
+    "discipline_quick": "pass",
+    "repaired_keyed_service": {
+      "origin": "http://127.0.0.1:1522",
+      "health_status": 200,
+      "ready": true,
+      "process_id": 12292,
+      "persisted_rows_restored": 26986
+    },
+    "rebuilt_packaged_exe": {
+      "sha256": "045ac0c8aee431e903163733e6997f805ec4522b954dc47501ee246054b03d8b",
+      "service_origin": "http://127.0.0.1:59683",
+      "health_status": 200,
+      "ready": true
+    },
+    "answer_authority_changed": false,
+    "execution_authority_changed": false,
+    "environment_authority_granted": false
+  },
+  "live_native_transition_admission": {
+    "observed_at": "2026-09-04T01:51:33.660Z",
+    "client_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "service_instance_ref": "service_instance:2804a6393a196bccdd8d151b439c8ab7",
+    "client_session_ref": "supervisor_client:c731b23904567bd34462ff54c69328fd",
+    "transition_request_ref": "desktop_tunnel_request:56636f70-796c-49ae-97b4-cd40ca0ab566",
+    "native_receipt_ref": "native_transition_receipt:b7kNnSlRgKnH4ohNsixaxt6U",
+    "request_status": "transition_accepted",
+    "trusted_device_delegation_applied": true,
+    "native_attention_requested": true,
+    "native_attention_presentation_only": true,
+    "tool_list_changed_requested": true,
+    "stable_scope_routing": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false,
+    "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+    "independent_external_oauth_client_bound": false,
+    "environment_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false,
+    "device_check_after_transition": {
+      "environment_binding_id": "environment_binding:legacy:a3cb9ebe48ac74aa03bfcae837021a270284062a",
+      "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+      "health": "offline",
+      "freshness": "stale",
+      "probe_ready": false,
+      "blocking_reasons": [
+        "credential_expired",
+        "contact_stale"
+      ]
+    }
+  },
+  "post_transition_host_catalog_observation": {
+    "cache_observed_at": "2026-09-04T01:50:11.5866969Z",
+    "cache_sha256": "0be6e5c694baaf87c1356bea1444c3dc91f40b9141757703d1fd10bb503b58bc",
+    "visible_full_harness_tools": 74,
+    "required_tools_present": {
+      "helix_reasoning_task_binding_claim": false,
+      "helix_reasoning_steering_read": false,
+      "helix_reasoning_steering_acknowledge": false,
+      "helix_minecraft_local_lifecycle_launch": false
+    },
+    "authorization_profiles": {
+      "g2_action_ready": true,
+      "g8_monitor_ready": true,
+      "missing_scopes": []
+    },
+    "classification": "host-published developer-app metadata snapshot",
+    "interpretation": "The native stable-scope transition and OAuth authorization both succeeded. The host cache was freshly written but still describes the older published app tool snapshot, so another local server restart cannot add these four declarations. A developer-app metadata Refresh is required once; reconnect or new-task churn is not evidence and is not requested until that refresh completes.",
+    "minecraft_runtime_observation": {
+      "fabric_listener_25566": false,
+      "connector_contact": "stale",
+      "connector_credential": "expired",
+      "action_attempted": false
+    }
+  },
+  "developer_app_metadata_refresh_and_self_healing_reentry": {
+    "observed_at": "2026-09-04T02:08:15.236Z",
+    "developer_app_id": "asdk_app_6a91d26fb68481918606bfc290b2ab0d",
+    "refresh_surface": "ChatGPT developer-mode plugin settings",
+    "refresh_control": "Refresh",
+    "refresh_result": "success",
+    "refreshed_declarations_observed": {
+      "helix_reasoning_task_binding_claim": true,
+      "helix_reasoning_steering_read": true,
+      "helix_reasoning_steering_acknowledge": true,
+      "helix_minecraft_local_lifecycle_launch": true,
+      "transition_oauth_security_schemes_present": true
+    },
+    "durable_repair": "When an already-accepted or active transition request is recovered, request a standards-based MCP tool-list change again without resubmitting the native transition.",
+    "focused_regression": {
+      "command": "npx vitest run server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts --pool=forks",
+      "status": "pass",
+      "tests": 19,
+      "duplicate_native_transition_count": 0
+    },
+    "rebuilt_packaged_exe": {
+      "sha256": "6afcfffd032d183d9376d0d94be94afa5061e43ce2c162b094f7a943aa2132b4",
+      "service_origin": "http://127.0.0.1:59485",
+      "ready_status": 200,
+      "service_instance_ref": "service_instance:cea035500ec72a681f06e646934159c5"
+    },
+    "exact_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "native_transition": {
+      "transition_request_ref": "desktop_tunnel_request:12cd7987-9624-4c57-9059-30c611a0819d",
+      "trusted_device_delegation_applied": true,
+      "transition_accepted": true,
+      "stable_scope_routing": true,
+      "reconnect_required": false,
+      "catalog_refresh_required": false,
+      "tool_list_changed_requested": true,
+      "environment_authority_granted": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "current_turn_catalog_mutable": false,
+    "post_notification_host_cache": {
+      "observed_at": "2026-09-04T02:10:00.000Z",
+      "last_write_at": "2026-09-04T01:59:07.2901357Z",
+      "sha256": "0be6e5c694baaf87c1356bea1444c3dc91f40b9141757703d1fd10bb503b58bc",
+      "required_tools_present": false,
+      "changed_after_tool_list_notification": false
+    },
+    "post_explicit_host_reload": {
+      "observed_at": "2026-09-04T02:11:39.116Z",
+      "cache_last_write_at": "2026-09-04T02:11:02.7327209Z",
+      "cache_sha256": "fc9e39f30013627ad3edf0bc5bd7796e6a6c16b0ac0c8cf667aaea4ffc08c26c",
+      "required_tools_present": {
+        "helix_reasoning_task_binding_claim": true,
+        "helix_reasoning_steering_read": true,
+        "helix_reasoning_steering_acknowledge": true,
+        "helix_minecraft_local_lifecycle_launch": true
+      },
+      "packaged_service_instance_ref": "service_instance:cea035500ec72a681f06e646934159c5",
+      "g2_action_authorization_ready": true,
+      "g8_monitor_authorization_ready": true,
+      "missing_scopes": [],
+      "minecraft_connector_state": "offline_stale_credential_expired",
+      "minecraft_action_attempted": false
+    },
+    "interpretation": "The remote developer-app metadata and packaged transport are now correct, and the harness successfully emitted a standards-based tool-list change without duplicating the native transition. The current Codex host did not re-enumerate its installed developer-app cache from that notification; one explicit host-side MCP connection restart is still required. No server restart, EXE rebuild, reauthentication, new task, or repeated refresh is required."
+  },
+  "native_guidance_prerequisite_repair": {
+    "observed_at": "2026-09-04T02:35:16.553Z",
+    "operator_screenshot_observation": "Agent Connections displayed Step 1 of 6 while an undismissable action-required overlay instructed the operator to enable Full Harness trust over a card that already stated the device was trusted and offered only Remove Full Harness device trust.",
+    "first_divergence": "presentation prerequisite resolution",
+    "defects": [
+      "a satisfied trust target remained eligible when its next target was not mounted",
+      "the guidance overlay exposed no operator dismiss action",
+      "an already-active native Full Harness did not advance the onboarding wizard without a redundant Start Harness click"
+    ],
+    "repair": {
+      "mounted_prerequisite_chain": "Resolve trusted-device guidance to the first mounted unmet target: exact reasoning binding when ready, otherwise Fast start with Codex.",
+      "dismissal": "Expose a pointer-enabled Dismiss action that clears timers and listeners without clicking or granting the highlighted control.",
+      "native_state_adoption": "On validated Agent Access guidance, inspect the native tunnel; if Full Harness is already ready, adopt that state and run the existing Codex readiness check without restarting the tunnel or granting task binding."
+    },
+    "focused_regression": {
+      "command": "npx vitest run client/src/components/workstation/__tests__/WorkstationGuidanceOverlay.spec.tsx client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx --pool=forks",
+      "status": "pass",
+      "tests": 18
+    },
+    "packaged_verification": {
+      "app_asar_sha256": "f0d28b460ba18ea1e4e5e2dadffb59a169f8e6267dce5465f582e0eaae5951f6",
+      "client_tree_sha256": "455eb59656de632c16681f21633e77c3f756396ad56b552bc48d8cd89cc4fc86",
+      "client_bundle_contains_dismiss_guidance": true,
+      "client_bundle_contains_prerequisite_targets": true,
+      "service_origin": "http://127.0.0.1:62945",
+      "service_instance_ref": "service_instance:d6a09fe3234db3e7af1f19877703a345",
+      "ready": true,
+      "native_window_responding": true,
+      "transition_request_ref": "desktop_tunnel_request:66693657-e73b-426f-bd08-62aa4e3302a1",
+      "transition_accepted": true,
+      "stable_scope_routing": true,
+      "duplicate_effect_count": 0
+    },
+    "packaging_first_divergence": {
+      "observation": "Electron pack:dir rebuilds the host and stages dist/public but does not itself rebuild the production client.",
+      "repair_execution": "Run npm run build:client before npm run pack:dir.",
+      "verification": "The staged runtime manifest carries the new client tree hash and the packaged asset tree contains Dismiss guidance plus both prerequisite target identifiers."
+    },
+    "policy_checks": {
+      "helix_ask_discipline_quick": "pass",
+      "environment_harness_docs_audit": "pass"
+    },
+    "authority_boundaries": {
+      "device_trust_changed": false,
+      "reasoning_task_binding_granted": false,
+      "environment_authority_granted": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "live_ui_result_observed_after_rebuild": false,
+    "interpretation": "The contradictory state is reproduced by the operator screenshot and covered by deterministic component tests. The rebuilt packaged path and native transition are live, but the post-rebuild rendered target still requires operator observation before it is live acceptance evidence."
+  },
+  "next_required_live_evidence": "Consume only the operator-issued exact reasoning-binding handle for this continuation, then re-pair/revalidate the packaged Minecraft connector and proceed to the three-cycle ET6 capacity run."
+}

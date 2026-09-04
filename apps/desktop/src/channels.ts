@@ -22,6 +22,10 @@ export const DESKTOP_MCP_TUNNEL_CLEAR_CHANNEL =
   "casimir-desktop:mcp-tunnel-clear";
 export const DESKTOP_MCP_TUNNEL_OPEN_ADMIN_CHANNEL =
   "casimir-desktop:mcp-tunnel-open-admin";
+export const DESKTOP_WORKSTATION_GUIDANCE_CHANNEL =
+  "casimir-desktop:workstation-guidance";
+export const DESKTOP_WORKSTATION_GUIDANCE_PENDING_CHANNEL =
+  "casimir-desktop:workstation-guidance-pending";
 export const DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL =
   "casimir-desktop:minecraft-run-profile-state";
 export const DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL =

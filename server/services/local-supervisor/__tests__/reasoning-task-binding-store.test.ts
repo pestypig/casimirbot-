@@ -104,6 +104,9 @@ describe("HelixReasoningTaskBindingStore", () => {
       hidden_reasoning_included: false,
     });
     expect(JSON.stringify(issued.binding)).not.toContain("provider-thread-private");
+    expect(issued.claim_handle).toMatch(
+      /^reasoning_claim:[a-f0-9]{16}:[A-Za-z0-9_-]{32}$/u,
+    );
     expect(() => store.claim({
       profileRef: "profile-current",
       authenticatedMcpClientRef: "mcp-client-wrong",
@@ -122,6 +125,30 @@ describe("HelixReasoningTaskBindingStore", () => {
       clientSessionRef: "client-session-current",
       claimHandle: issued.claim_handle,
     })).toThrowError(expect.objectContaining({ code: "reasoning_binding_claim_invalid" }));
+  });
+
+  it("distinguishes a prior service-epoch claim without retaining its handle", () => {
+    const first = setup();
+    const issued = first.store.issueClaim({
+      profileRef: "profile-current",
+      clientSessionRef: "client-session-current",
+      helixConversationId: "helix-conversation-current",
+    });
+    const nextPresence = presence({ service_instance_ref: "service-next" });
+    const replacement = new HelixReasoningTaskBindingStore({
+      serviceInstanceRef: "service-next",
+      listPresence: () => [nextPresence],
+    });
+
+    expect(() => replacement.claim({
+      profileRef: "profile-current",
+      authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current",
+      claimHandle: issued.claim_handle,
+    })).toThrowError(expect.objectContaining({
+      code: "reasoning_binding_claim_service_epoch_mismatch",
+      status: 409,
+    }));
   });
 
   it("deduplicates dispatch and exposes text only to the exact bound task", () => {

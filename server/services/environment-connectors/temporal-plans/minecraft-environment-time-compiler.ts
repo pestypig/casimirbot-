@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import {
+  helixEnvironmentTimeSha256,
   helixEnvironmentTemporalPlanSchema,
   type HelixEnvironmentPlanCondition,
   type HelixEnvironmentTemporalPlan,
@@ -50,6 +51,42 @@ export class MinecraftEnvironmentTimeCompileError extends Error {
     this.name = "MinecraftEnvironmentTimeCompileError";
   }
 }
+
+export type MinecraftEnvironmentTimeCompilation<T> = {
+  schema: "environment.minecraft_temporal_plan_compilation.v1";
+  source_plan_id: string;
+  source_plan_hash: string;
+  source_goal_id: string;
+  source_goal_revision: number;
+  target_schema: string;
+  arguments: T;
+  compilation_hash: string;
+  execution_authority: false;
+  answer_authority: false;
+  assistant_answer: false;
+  terminal_eligible: false;
+};
+
+const wrapCompilation = <T extends object>(
+  plan: HelixEnvironmentTemporalPlan,
+  targetSchema: string,
+  argumentsValue: T,
+): MinecraftEnvironmentTimeCompilation<T> => {
+  const base = {
+    schema: "environment.minecraft_temporal_plan_compilation.v1" as const,
+    source_plan_id: plan.plan_id,
+    source_plan_hash: plan.plan_hash,
+    source_goal_id: plan.identity.goal_id,
+    source_goal_revision: plan.identity.goal_revision,
+    target_schema: targetSchema,
+    arguments: argumentsValue,
+    execution_authority: false as const,
+    answer_authority: false as const,
+    assistant_answer: false as const,
+    terminal_eligible: false as const,
+  };
+  return { ...base, compilation_hash: helixEnvironmentTimeSha256(base) };
+};
 
 const condition = (
   source: HelixEnvironmentPlanCondition,
@@ -452,4 +489,26 @@ export const compileEnvironmentTimePlanToMinecraftReactiveProgram = (input: {
     );
   }
   return parsed.data;
+};
+
+export const compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact = (
+  input: Parameters<typeof compileEnvironmentTimePlanToMinecraftFluidSequence>[0],
+) => {
+  const plan = helixEnvironmentTemporalPlanSchema.parse(input.plan);
+  return wrapCompilation(
+    plan,
+    HELIX_MINECRAFT_PLAYER_SEQUENCE_SCHEMA,
+    compileEnvironmentTimePlanToMinecraftFluidSequence(input),
+  );
+};
+
+export const compileEnvironmentTimePlanToMinecraftReactiveProgramArtifact = (
+  input: Parameters<typeof compileEnvironmentTimePlanToMinecraftReactiveProgram>[0],
+) => {
+  const plan = helixEnvironmentTemporalPlanSchema.parse(input.plan);
+  return wrapCompilation(
+    plan,
+    HELIX_MINECRAFT_REACTIVE_PROGRAM_SCHEMA,
+    compileEnvironmentTimePlanToMinecraftReactiveProgram(input),
+  );
 };

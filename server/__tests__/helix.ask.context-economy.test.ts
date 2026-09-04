@@ -176,6 +176,95 @@ describe("Helix Ask context economy", () => {
     ]));
   });
 
+  it("re-enters inner-practice procedural findings ahead of shared-authority composition", () => {
+    const packet = compactMoralGraphReflectionArtifactForModel({
+      turnId: "turn-spite-redirection",
+      userRequested: "Reflect on spite, anger, chosen purpose, and repair without calling the person evil.",
+      artifact: {
+        artifact_id: "artifact:spite-redirection",
+        kind: "helix_moral_graph_reflection_tool_result",
+        payload: {
+          proceduralClassification: {
+            artifactId: "procedural_moral_classification",
+            sourceReflectionId: "reflection:spite-redirection",
+            classifications: [
+              {
+                observedPattern: "retaliatory_affect_loop",
+                moralRootId: "feedback-loop-hygiene",
+                moralRootLabel: "Feedback Loop Hygiene",
+                proceduralMove: "separate_signal_from_retaliation",
+                explanation: "Separate anger's information from retaliatory conduct and preserve repair.",
+                missingEvidence: ["affected_parties_and_harm", "repair_obligation_if_harm_occurred"],
+                warnings: ["anger_is_not_a_character_verdict", "purpose_does_not_erase_repair"],
+              },
+              {
+                observedPattern: "identity_view",
+                moralRootId: "identity-view-and-non-attachment",
+                moralRootLabel: "Identity View and Non-Attachment",
+                proceduralMove: "reframe_without_finality",
+                explanation: "Describe the harmful pattern without making it the person's permanent identity.",
+                missingEvidence: ["observable_behavior_now"],
+                warnings: ["avoid_evil_as_fixed_identity"],
+              },
+            ],
+            recommendedNextMoves: [{
+              label: "Separate the signal from retaliation.",
+              description: "Choose a non-retaliatory practice and preserve repair obligations.",
+            }],
+          },
+          moralReflectionMediation: {
+            artifactId: "moral_reflection_mediation_packet",
+            reflectionId: "reflection:spite-redirection",
+            reflectionFamily: "inner_practice",
+            objectiveSourceOptions: ["person_declared", "unknown"],
+            evidenceOrderBoundary: {
+              kind: "moral_scenario_ready",
+              reason: "The scenario is ready for bounded reflection.",
+              requiredBeforeStrongClaim: ["scenario_observation_boundaries"],
+              advisory_only: true,
+            },
+            steps: [{
+              id: "developmental_freedom",
+              priority: "primary",
+              question: "Can the person revise without permanent condemnation?",
+              missingEvidence: ["revision_evidence"],
+            }],
+            synthesisProtocol: ["Do not issue a character verdict."],
+          },
+          sharedAuthoritySocialRenewal: {
+            reflectionId: "reflection:spite-redirection",
+            domains: [{
+              id: "leadership_lifecycle_and_succession",
+              question: "Can leadership survive succession?",
+            }],
+            prioritizedBadgeIds: ["leadership-as-capacity-transfer"],
+          },
+        },
+      },
+    });
+    const found = packet?.found.join(" ") ?? "";
+
+    expect(found).toContain("Reflection family [inner_practice]");
+    expect(found).toContain("retaliatory_affect_loop");
+    expect(found).toContain("separate_signal_from_retaliation");
+    expect(found).toContain("Identity View and Non-Attachment");
+    expect(found).toContain("Separate the signal from retaliation");
+    expect(found).not.toContain("leadership survive succession");
+    expect(packet?.proves).toEqual(expect.arrayContaining([
+      "Procedural warning: anger_is_not_a_character_verdict.",
+      "Procedural warning: purpose_does_not_erase_repair.",
+    ]));
+    expect(packet?.missing_or_uncertain).toEqual(expect.arrayContaining([
+      "repair_obligation_if_harm_occurred",
+      "observable_behavior_now",
+    ]));
+    expect(packet?.support_refs).toEqual(expect.arrayContaining([
+      "moral-badge:feedback-loop-hygiene",
+      "moral-badge:identity-view-and-non-attachment",
+    ]));
+    expect(packet?.support_refs).not.toContain("moral-badge:leadership-as-capacity-transfer");
+  });
+
   it("builds composer context from compact observations and excludes raw debug", () => {
     const context = buildHelixModelPromptContext({
       turnId: "turn-composer",

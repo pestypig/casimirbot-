@@ -14,6 +14,8 @@ import type { HelixLocalSupervisorPresence } from
 const digest = (value: string): string =>
   crypto.createHash("sha256").update(value, "utf8").digest("hex");
 const clone = <T>(value: T): T => structuredClone(value);
+const CLAIM_HANDLE_PATTERN =
+  /^reasoning_claim:([a-f0-9]{16}):[A-Za-z0-9_-]{32}$/u;
 
 type PresencePort = Readonly<{
   serviceInstanceRef: string;
@@ -45,6 +47,13 @@ export class HelixReasoningTaskBindingStore {
     private readonly presence: PresencePort,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  private serviceEpochTag(): string {
+    // The service reference is already a non-secret projection. Its short
+    // digest lets a replacement service distinguish a stale show-once value
+    // without retaining or disclosing the private handle.
+    return digest(this.presence.serviceInstanceRef).slice(0, 16);
+  }
 
   private currentBinding(bindingId: string): PrivateBinding {
     const binding = this.bindings.get(bindingId);
@@ -108,7 +117,9 @@ export class HelixReasoningTaskBindingStore {
       });
     }
     const createdAt = this.now();
-    const claimHandle = `reasoning_claim:${crypto.randomBytes(24).toString("base64url")}`;
+    const claimHandle =
+      `reasoning_claim:${this.serviceEpochTag()}:` +
+      crypto.randomBytes(24).toString("base64url");
     const bindingEpoch = ++this.bindingEpoch;
     const bindingId = `reasoning_binding:${digest([
       this.presence.serviceInstanceRef,
@@ -162,6 +173,13 @@ export class HelixReasoningTaskBindingStore {
     clientSessionRef: string;
     claimHandle: string;
   }): HelixReasoningTaskBindingProjection {
+    const encodedEpoch = CLAIM_HANDLE_PATTERN.exec(input.claimHandle)?.[1];
+    if (encodedEpoch && encodedEpoch !== this.serviceEpochTag()) {
+      throw new HelixReasoningTaskBindingError(
+        "reasoning_binding_claim_service_epoch_mismatch",
+        409,
+      );
+    }
     const handleHash = digest(input.claimHandle);
     const bindingId = this.claimHandles.get(handleHash);
     if (!bindingId) throw new HelixReasoningTaskBindingError("reasoning_binding_claim_invalid", 404);

@@ -59,6 +59,20 @@ function makeCapabilities(
 }
 
 export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelCapabilities> = {
+  "surface-workspace": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Surface Workspace",
+        description: "Open the developer Surface Workspace for profile-bound HUD and program surface management.",
+        risk: "low",
+        aliases: ["open surface workspace", "show surface manager", "open hud surface manager"],
+      },
+    ],
+  }),
   "docs-viewer": makeCapabilities({
     can_read_state: true,
     can_run_action: true,

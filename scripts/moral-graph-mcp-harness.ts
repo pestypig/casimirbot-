@@ -35,6 +35,7 @@ try {
   if (result.isError) throw new Error("Moral Graph MCP harness returned an error result");
   const structuredContent = result.structuredContent as Record<string, unknown> | undefined;
   process.stdout.write(`${JSON.stringify({
+    proceduralClassification: structuredContent?.proceduralClassification,
     sharedAuthoritySocialRenewal: structuredContent?.sharedAuthoritySocialRenewal,
     moralReflectionMediation: structuredContent?.moralReflectionMediation,
   }, null, 2)}\n`);

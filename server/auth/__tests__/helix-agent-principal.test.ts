@@ -631,6 +631,31 @@ describe("resolveHelixAgentApiPrincipal", () => {
     expect(withDeveloperScope.trustedDeveloperProfile).toBe(true);
   });
 
+  it("retains a stored developer profile on the local development runtime without production elevation scope", async () => {
+    process.env.NODE_ENV = "development";
+    databaseMocks.query.mockResolvedValue({
+      rows: [
+        linkedAccount({
+          profile_id: "profile-developer",
+          account_type: "developer",
+        }),
+      ],
+    });
+
+    const principal = await resolveHelixAgentApiPrincipal(
+      requestWithHeaders({ authorization: "Bearer access-token" }),
+      verifierDouble(
+        verifiedToken({
+          subject: "subject-developer",
+          scopes: new Set([HELIX_AGENT_RUN_READ_SCOPE]),
+        }),
+      ),
+    );
+
+    expect(principal.accountType).toBe("developer");
+    expect(principal.trustedDeveloperProfile).toBe(true);
+  });
+
   it("unlocks only the room experiment for an exact room OAuth scope", async () => {
     process.env.NODE_ENV = "production";
     process.env.HELIX_DEVELOPER_PROFILE_IDS = "subject-developer";

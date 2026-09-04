@@ -65,7 +65,7 @@ const controller = (input?: {
 
 describe("native desktop MCP tunnel transition executor", () => {
   it("freezes the MCP response-drain window before native process replacement", () => {
-    expect(DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS).toBe(750);
+    expect(DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS).toBe(15_000);
   });
 
   it("stops read-only and starts the exact requested full scope", async () => {
@@ -87,6 +87,47 @@ describe("native desktop MCP tunnel transition executor", () => {
       "account_session:fixture-owner",
       "full_helix_agent",
     );
+  });
+
+  it("switches a stable routed tunnel without replacing its process", async () => {
+    let current = state("local_supervisor_coordination_and_device_check", true);
+    const stop = vi.fn(async () => current);
+    const start = vi.fn(async () => current);
+    const switchScope = vi.fn(async (
+      _accountSessionId: string,
+      scope: DesktopMcpTunnelScope,
+    ) => {
+      current = state(scope, true);
+      return current;
+    });
+    const port: DesktopMcpTunnelTransitionControllerPort = {
+      getState: () => current,
+      stop,
+      start,
+      switchScope,
+    };
+    const result = await executeDesktopMcpTunnelTransitionNow({
+      controller: port,
+      accountSessionId: "account_session:fixture-owner",
+      targetScope: "full_helix_agent",
+    });
+    expect(result.requestedScopeReady).toBe(true);
+    expect(switchScope).toHaveBeenCalledWith(
+      "account_session:fixture-owner",
+      "full_helix_agent",
+    );
+    expect(stop).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+
+    expect(await restoreDesktopMcpTunnelReadOnly({
+      controller: port,
+      accountSessionId: "account_session:fixture-owner",
+    })).toBe(true);
+    expect(switchScope).toHaveBeenLastCalledWith(
+      "account_session:fixture-owner",
+      "local_supervisor_coordination_and_device_check",
+    );
+    expect(stop).not.toHaveBeenCalled();
   });
 
   it("treats native full-session start as permission to replace active read-only transport", async () => {

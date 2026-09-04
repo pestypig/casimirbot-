@@ -114,6 +114,35 @@ public final class HelixHttpClient implements Closeable {
     private int queuedRequestCount;
     private volatile long backoffUntilMs = 0L;
 
+    enum RequestLane {
+        PRIORITY,
+        CONTROL_PLANE,
+        ORDINARY,
+        NONE
+    }
+
+    static RequestLane nextRequestLane(
+        boolean priorityWaiting,
+        boolean controlPlaneWaiting,
+        boolean ordinaryWaiting
+    ) {
+        if (priorityWaiting) return RequestLane.PRIORITY;
+        if (controlPlaneWaiting) return RequestLane.CONTROL_PLANE;
+        if (ordinaryWaiting) return RequestLane.ORDINARY;
+        return RequestLane.NONE;
+    }
+
+    static boolean retryMayContinue(
+        boolean priority,
+        boolean controlPlane,
+        boolean priorityWaiting
+    ) {
+        // Probe polling/results are demand-driven and retain their bounded
+        // same-identity retry. Periodic manifests and heartbeats yield their
+        // retry slot as soon as an on-demand probe is queued.
+        return (priority && !controlPlane) || !priorityWaiting;
+    }
+
     public HelixHttpClient(
         HelixSensorConfig config,
         Logger logger,
@@ -351,9 +380,16 @@ public final class HelixHttpClient implements Closeable {
 
     private void pumpLocked() {
         if (requestInFlight) return;
-        PendingRequest pending = controlPlaneRequests.pollFirst();
-        if (pending == null) pending = priorityRequests.pollFirst();
-        if (pending == null) pending = ordinaryRequests.pollFirst();
+        PendingRequest pending = switch (nextRequestLane(
+            !priorityRequests.isEmpty(),
+            !controlPlaneRequests.isEmpty(),
+            !ordinaryRequests.isEmpty()
+        )) {
+            case PRIORITY -> priorityRequests.pollFirst();
+            case CONTROL_PLANE -> controlPlaneRequests.pollFirst();
+            case ORDINARY -> ordinaryRequests.pollFirst();
+            case NONE -> null;
+        };
         if (pending == null) return;
 
         requestInFlight = true;
@@ -472,7 +508,11 @@ public final class HelixHttpClient implements Closeable {
                 if (
                     attempt < MAX_SAME_IDENTITY_ATTEMPTS &&
                     retrySameIdentity(response) &&
-                    (envelope.priority() || !priorityRequestWaiting())
+                    retryMayContinue(
+                        envelope.priority(),
+                        envelope.controlPlane(),
+                        priorityRequestWaiting()
+                    )
                 ) {
                     long delayMs = Math.min(2_000L, 250L << (attempt - 1));
                     return CompletableFuture

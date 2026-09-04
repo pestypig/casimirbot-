@@ -203,9 +203,15 @@ export const buildDesktopServiceEnvironment = (input: {
     DESKTOP_LOCAL_DATABASE_RELATIVE_PATH,
   );
   environment.HELIX_LOCAL_PG_MEM_PERSIST = "1";
-  // Immediate writes use the database's streaming atomic snapshot writer and
-  // avoid losing a deferred update when Windows terminates the child process.
-  environment.HELIX_LOCAL_PG_MEM_WRITE_MODE = "immediate";
+  // Environment telemetry can mutate the local store several times per
+  // second. Awaiting a complete atomic pg-mem snapshot on every request makes
+  // connector responses proportional to the entire durable profile and can
+  // starve on-demand probes. Use the existing bounded deferred writer for the
+  // packaged service; it coalesces mutations, flushes at graceful shutdown,
+  // and still caps the unflushed window independently of idle traffic.
+  environment.HELIX_LOCAL_PG_MEM_WRITE_MODE = "deferred";
+  environment.HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS = "2500";
+  environment.HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS = "15000";
   environment.HELIX_PROVIDER_CREDENTIAL_BROKER_ORIGIN =
     providerCredentialBrokerOrigin.origin;
   environment.HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN =

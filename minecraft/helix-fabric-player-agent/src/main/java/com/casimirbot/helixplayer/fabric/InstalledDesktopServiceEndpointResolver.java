@@ -2,12 +2,15 @@ package com.casimirbot.helixplayer.fabric;
 
 import com.casimirbot.helixsensor.HelixJson;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.function.IntPredicate;
 
 /**
  * Follows the installed desktop service's per-launch loopback origin without
@@ -29,8 +32,27 @@ final class InstalledDesktopServiceEndpointResolver {
     }
 
     static String resolve(String configuredEndpoint, Path receiptPath) {
+        return resolve(
+            configuredEndpoint,
+            receiptPath,
+            InstalledDesktopServiceEndpointResolver::acceptsLoopbackConnection
+        );
+    }
+
+    static String resolve(
+        String configuredEndpoint,
+        Path receiptPath,
+        IntPredicate configuredPortReachable
+    ) {
         URI configured = exactLoopbackEndpoint(configuredEndpoint);
         if (configured == null || receiptPath == null || !Files.isRegularFile(receiptPath)) {
+            return configuredEndpoint;
+        }
+        // Pairing establishes one exact service/database epoch. Keep that
+        // configured endpoint authoritative while it remains reachable; a
+        // simultaneously running packaged desktop receipt is only a fallback
+        // after the paired endpoint disappears.
+        if (configuredPortReachable.test(configured.getPort())) {
             return configuredEndpoint;
         }
         try {
@@ -65,6 +87,15 @@ final class InstalledDesktopServiceEndpointResolver {
             ).toString();
         } catch (IOException | RuntimeException | URISyntaxException ignored) {
             return configuredEndpoint;
+        }
+    }
+
+    private static boolean acceptsLoopbackConnection(int port) {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress("127.0.0.1", port), 150);
+            return true;
+        } catch (IOException ignored) {
+            return false;
         }
     }
 

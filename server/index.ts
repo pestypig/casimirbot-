@@ -82,6 +82,10 @@ import { HELIX_BROKERAGE_MARKET_OBSERVER_PROCESS_SCOPE } from
 import { agentRunObserverRouter } from "./routes/agent-run-observer";
 import { createHelixAgentAccountBindingsRouter } from
   "./routes/helix-agent-account-bindings";
+import { helixAgentAccountLinkStore } from
+  "./services/helix-account/agent-account-link-store";
+import { getAccountSessionById } from
+  "./services/helix-account/account-session-store";
 import { createAgentConnectionsRouter } from "./routes/agent-connections";
 import { createOperatorActivityRouter } from "./routes/operator-activity";
 import { operatorActivityStore } from
@@ -107,12 +111,17 @@ import { HelixReasoningTaskBindingStore } from
   "./services/local-supervisor/reasoning-task-binding-store";
 import { DesktopMcpTunnelTransitionStore } from
   "./services/local-supervisor/desktop-mcp-tunnel-transition-store";
-import { createDesktopMcpTunnelTransitionExecutorFromEnvironment } from
+import {
+  createDesktopMcpTunnelTransitionExecutorFromEnvironment,
+  createDesktopWorkstationPresenterFromEnvironment,
+} from
   "./services/local-supervisor/desktop-mcp-tunnel-transition-broker-client";
 import { installDesktopMcpTunnelSafetyHandler } from
   "./services/local-supervisor/desktop-mcp-tunnel-safety";
 import { createDesktopMcpTunnelTransitionRouter } from
   "./routes/desktop-mcp-tunnel-transition";
+import { installedSecurityStore } from
+  "./services/helix-account/installed-security-store";
 import {
   HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
   HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
@@ -182,6 +191,8 @@ const desktopMcpTunnelTransitionStore =
   );
 const desktopMcpTunnelTransitionExecutor =
   createDesktopMcpTunnelTransitionExecutorFromEnvironment(process.env);
+const desktopWorkstationPresenter =
+  createDesktopWorkstationPresenterFromEnvironment(process.env);
 installDesktopMcpTunnelSafetyHandler(
   desktopMcpTunnelTransitionExecutor
     ? async (reason) => {
@@ -199,6 +210,47 @@ installDesktopMcpTunnelSafetyHandler(
     : null,
 );
 const desktopSessionConfig = resolveDesktopSessionConfig(process.env);
+const desktopDeviceId = process.env.HELIX_DESKTOP_DEVICE_ID?.trim() || null;
+const desktopFullHarnessTrustReader = desktopDeviceId
+  ? async (input: { authenticatedProfileRef: string }) => {
+      const trust = await installedSecurityStore.inspectFullHarnessTrust({
+        profileId: input.authenticatedProfileRef,
+        deviceId: desktopDeviceId,
+      });
+      let accountSessionReady = false;
+      let agentAccountBindingReady = false;
+      if (trust.trusted && trust.delegated_account_session_id) {
+        try {
+          const accountSession = await getAccountSessionById(
+            trust.delegated_account_session_id,
+          );
+          accountSessionReady =
+            accountSession?.profile.profile_id ===
+            input.authenticatedProfileRef;
+          if (!accountSessionReady) {
+            throw new Error("delegated_account_session_inactive");
+          }
+          const bindings = await helixAgentAccountLinkStore.listBindings({
+            session: {
+              sessionId: trust.delegated_account_session_id,
+              profileId: input.authenticatedProfileRef,
+            },
+          });
+          agentAccountBindingReady = bindings.oauth_ready;
+        } catch {
+          // Presentation must fail closed to the first human authentication
+          // prerequisite when the binding state cannot be authenticated.
+          agentAccountBindingReady = false;
+        }
+      }
+      return {
+        trusted: trust.trusted,
+        delegatedAccountSessionId: trust.delegated_account_session_id,
+        accountSessionReady,
+        agentAccountBindingReady,
+      };
+    }
+  : undefined;
 app.use(createDesktopSessionGuard(desktopSessionConfig));
 
 const __filename = fileURLToPath(import.meta.url);
@@ -660,6 +712,8 @@ app.use(
         reasoningTaskBindingStore,
         desktopMcpTunnelTransitionStore,
         desktopMcpTunnelTransitionExecutor,
+        desktopWorkstationPresenter,
+        desktopFullHarnessTrustReader,
         mcpToolLifecycleObserver,
       }),
     resourceMetadataPath:
@@ -668,6 +722,8 @@ app.use(
     reasoningTaskBindingStore,
     desktopMcpTunnelTransitionStore,
     desktopMcpTunnelTransitionExecutor,
+    desktopWorkstationPresenter,
+    desktopFullHarnessTrustReader,
     // Secure MCP Tunnel does not relay ChatGPT's bearer token to the local
     // target. Bind only the bounded advisory coordination scopes to the exact
     // active desktop account session carried by the supervised child.
@@ -692,6 +748,8 @@ app.use("/mcp", createHelixMcpRouter({
   // separate native developer delegation before any scope increase.
   desktopMcpTunnelTransitionStore,
   desktopMcpTunnelTransitionExecutor,
+  desktopWorkstationPresenter,
+  desktopFullHarnessTrustReader,
   // A current tunnel-client may forward the external bearer as well as the
   // two protected native headers. The MCP router gives the exact native
   // desktop delegation precedence when those headers are present. Bind the
@@ -738,6 +796,9 @@ app.use(
   "/api/desktop/mcp-tunnel-transition",
   createDesktopMcpTunnelTransitionRouter({
     store: desktopMcpTunnelTransitionStore,
+    installedSecurityStore,
+    desktopDeviceId,
+    desktopHostEnabled: desktopSessionConfig.enabled,
     onRevoked: desktopMcpTunnelTransitionExecutor
       ? async (request) => {
           await desktopMcpTunnelTransitionExecutor({
@@ -748,6 +809,15 @@ app.use(
             delegationExpiresAt: request.delegationExpiresAt,
           });
         }
+      : undefined,
+    onTrustedRenewal: desktopMcpTunnelTransitionExecutor
+      ? async (request) => desktopMcpTunnelTransitionExecutor({
+          transitionRequestRef: request.transitionRequestRef,
+          delegationRef: request.delegationRef,
+          accountSessionId: request.accountSessionId,
+          targetScope: "full_helix_agent",
+          delegationExpiresAt: request.delegationExpiresAt,
+        })
       : undefined,
   }),
 );

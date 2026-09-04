@@ -329,6 +329,7 @@ const dependencies = (
   materializeConnector: async () => ({
     packageVersionId: "connector_package_version:environment-probe",
     installationId: "connector_installation:environment-probe",
+    installedNodeRef: "device:sha256:environment-probe",
     deviceId: "connector_device:environment-probe",
     environmentBindingId: "environment_binding:environment-probe",
     catalogSnapshot: helixEnvironmentCatalogSnapshotSchema.parse({
@@ -1043,6 +1044,34 @@ describe("environment probe workstation gateway", () => {
     );
     expect(JSON.stringify(result)).not.toContain(CREDENTIAL_ID);
     expect(JSON.stringify(result)).not.toContain("lease_token");
+  });
+
+  it("preserves the installed desktop node while rematerializing a live source", async () => {
+    const previousDeviceId = process.env.HELIX_DESKTOP_DEVICE_ID;
+    process.env.HELIX_DESKTOP_DEVICE_ID = "desktop-device:environment-probe";
+    const materializeConnector = vi.fn(dependencies().materializeConnector!);
+    try {
+      const result = await executeEnvironmentProbeGatewayCapability({
+        turnId: `${TURN_ID}:installed-node`,
+        toolCallId: `${TOOL_CALL_ID}:installed-node`,
+        providerExecutionId: "codex_native_execution:environment-probe-node",
+        arguments: { target: "current_actor" },
+        policy: policy(),
+        dependencies: dependencies({ materializeConnector }),
+      });
+      expect(result.ok).toBe(true);
+      expect(materializeConnector).toHaveBeenCalledWith(
+        expect.objectContaining({
+          installedDeviceId: "desktop-device:environment-probe",
+        }),
+      );
+    } finally {
+      if (previousDeviceId === undefined) {
+        delete process.env.HELIX_DESKTOP_DEVICE_ID;
+      } else {
+        process.env.HELIX_DESKTOP_DEVICE_ID = previousDeviceId;
+      }
+    }
   });
 
   it("freezes a verified participant subject while keeping its native id out of model-visible evidence", async () => {

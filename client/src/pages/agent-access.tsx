@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowLeft, MonitorCog } from "lucide-react";
 import { Link } from "wouter";
 import AgentAccessGuide from "@/components/agent-access/AgentAccessGuide";
+import AgentConnectionSetup from "@/components/agent-access/AgentConnectionSetup";
 import { AGENT_ACCESS_CONTENT } from "@/lib/agent-access/agentAccessContent";
 import { buildWorkstationEntryUrl } from "@shared/workstation-link-meta";
 
@@ -35,6 +36,9 @@ export default function AgentAccessPage() {
           Open workstation configuration
         </a>
       </nav>
+      <div className="mx-auto w-full max-w-6xl px-4 pt-8 sm:px-6 lg:px-8">
+        <AgentConnectionSetup />
+      </div>
       <AgentAccessGuide />
     </main>
   );

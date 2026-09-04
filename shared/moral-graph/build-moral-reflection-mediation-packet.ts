@@ -76,6 +76,18 @@ export function buildMoralReflectionMediationPacketV1(
   const scenarioText = options.text?.trim() ?? "";
   const theoryBridgeCue = /\b(?:coherence lifetime|boundary-sensitive|natural selection|heritable|molecular structure|dielectric environment|collective mode|physical process|physical mechanism|biological process|moral proof|analogy)\b/i.test(scenarioText);
   const externalVerificationCue = /\b(?:recently|latest|episode\s+\d+|tweet|twitter|public post|acquisition|security concern|according to|reported that|what happened)\b/i.test(scenarioText);
+  const publicJudgmentCue = /\b(?:AI|artificial intelligence|LLM|Grok|chatbot|roast|ridicule|public shame|pile-on|borrowed authority)\b/i.test(scenarioText);
+  const innerPracticeCue = /\b(?:spite|spiteful|resentment|revenge|vengeance|anger|angry|irritation|ill will|self[-\s]?perpetuat|rumination|take\w*\s+(?:the\s+)?(?:anger|frustration|pain)\s+out\s+on|path ahead|chosen purpose)\b/i.test(scenarioText);
+  const socialAuthorityCue = /\b(?:leader|leadership|commander|kingdom|princess|institution|hierarchy|mandate|governance|succession|dynastic|political authority)\b/i.test(scenarioText);
+  const reflectionFamily: MoralReflectionMediationPacketV1["reflectionFamily"] = theoryBridgeCue
+    ? "cross_domain"
+    : publicJudgmentCue
+      ? "public_judgment"
+      : innerPracticeCue && !socialAuthorityCue
+        ? "inner_practice"
+        : socialAuthorityCue
+          ? "social_authority"
+          : "general";
   const evidenceOrderBoundary: MoralReflectionMediationPacketV1["evidenceOrderBoundary"] = theoryBridgeCue
     ? {
         kind: "theory_ideology_bridge_first",
@@ -102,15 +114,21 @@ export function buildMoralReflectionMediationPacketV1(
         };
   const priorityRank = { primary: 0, supporting: 1, available: 2 } as const;
   const steps = STEP_DEFINITIONS.map((definition, definitionIndex): MoralReflectionMediationStepV1 & { definitionIndex: number } => {
+    const familyPrimary = reflectionFamily === "inner_practice" &&
+      (definition.id === "observation_claim_boundary" || definition.id === "developmental_freedom");
     const cueMatched = scenarioText.length > 0 && (
       definition.scenarioCues.test(scenarioText) ||
-      (theoryBridgeCue && definition.id === "observation_claim_boundary")
+      (theoryBridgeCue && definition.id === "observation_claim_boundary") ||
+      familyPrimary
     );
     const inScopeDomains = definition.supportingDomainIds.filter((id) => domainById.get(id)?.status === "in_scope");
     const inScopeTensions = definition.supportingTensionIds.filter((id) => tensionById.get(id)?.status === "in_scope");
     const priority: MoralReflectionMediationStepV1["priority"] = cueMatched
       ? "primary"
-      : !theoryBridgeCue && !definition.requiresScenarioCue && (inScopeDomains.length || inScopeTensions.length)
+      : reflectionFamily !== "cross_domain" &&
+          reflectionFamily !== "inner_practice" &&
+          !definition.requiresScenarioCue &&
+          (inScopeDomains.length || inScopeTensions.length)
         ? "supporting"
         : "available";
     return {
@@ -143,6 +161,7 @@ export function buildMoralReflectionMediationPacketV1(
       "Carry the Moral Graph's evidence boundaries and mediation questions into post-observation reasoning without supplying a verdict or inferring intent.",
     objectiveSourceOptions: [...MORAL_REFLECTION_OBJECTIVE_SOURCE_OPTIONS],
     objectiveSourceStatus: "unresolved",
+    reflectionFamily,
     evidenceOrderBoundary,
     steps,
     synthesisProtocol: [

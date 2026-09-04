@@ -1,0 +1,115 @@
+{
+  "schema": "helix.environment_harness_acceptance_evidence.v1",
+  "recorded_at": "2026-09-03",
+  "program_gate": "G8",
+  "workstream": "ET6 Minecraft capacity qualification onboarding",
+  "classification": "presentation",
+  "claim": "The packaged-desktop UI can guide a user to a pending Full Harness consent or authentication surface and can visualize workstation MCP engagement without executing the highlighted control or gaining authority.",
+  "implementation": {
+    "event": "helix-workstation-guidance",
+    "native_broker_route": "/v1/present",
+    "mcp_entrypoint": "helix_desktop_tunnel_transition_request",
+    "kinds": [
+      "user_attention",
+      "tool_activity"
+    ],
+    "full_harness_target": "full-harness-trust",
+    "authentication_target": "auth0-account-link",
+    "panel": "agent-access",
+    "authentication_transport": "existing_native_public_client_pkce_window"
+  },
+  "positive_evidence": [
+    "Start Harness requests an Agent Access panel open and a bounded spotlight on the exact Full Harness trust control when device trust is absent.",
+    "An inactive client authorization routes attention to the account-link surface and its user-triggered native Auth0 window.",
+    "A workstation panel action emits a short-lived view-only engagement highlight before normal ledgered execution.",
+    "The overlay scrolls the registered target into the viewport and exposes an aria-live status label.",
+    "The existing transition-request MCP operation can ask the protected native broker to show, restore, focus, and highlight the exact Agent Access trust target without requiring a new catalog tool.",
+    "A live packaged request desktop_tunnel_request:a9592741-3a4f-4906-81ba-ef64c43b2691 presented the correct control; the operator visibly confirmed the foreground/highlight behavior and then independently enabled trust.",
+    "The exact transition receipt chain advanced requested -> delegated -> transition_accepted -> expired. The accepted native transport cut lost its HTTP response, but no duplicate execute was issued; after lease rollback the same request remained inspectable with its hash chain intact."
+  ],
+  "negative_evidence": [
+    "The guidance overlay has pointer-events disabled and never invokes click on the highlighted element.",
+    "Malformed guidance kinds are rejected and target identifiers are reduced to bounded selector-independent tokens.",
+    "Guidance does not approve OAuth, update trusted-device policy, delegate a tunnel lease, execute an environment action, or gain answer or terminal authority.",
+    "Tool-activity text explicitly states that the highlight is view-only and implies no authority."
+  ],
+  "verification": {
+    "focused_ui_tests": {
+      "command": "npx vitest run client/src/components/workstation/__tests__/WorkstationGuidanceOverlay.spec.tsx client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx --pool=forks",
+      "result": "PASS",
+      "files": 3,
+      "tests": 21
+    },
+    "client_build": {
+      "command": "npm run build:client",
+      "result": "PASS"
+    },
+    "packaged_directory_build": {
+      "command": "npm --prefix apps/desktop run pack:dir",
+      "result": "PASS",
+      "artifact": "apps/desktop/release/win-unpacked/CasimirBot.exe"
+    },
+    "packaged_runtime_health": {
+      "result": "PASS",
+      "basis": "Fresh packaged process reached express app ready; protected account session, Helix pipeline, and agent-provider routes each responded HTTP 401 to an unauthenticated loopback probe, while the authenticated renderer recorded HTTP 200 for those routes."
+    },
+    "packaged_onboarding_smoke": {
+      "command": "npm --prefix apps/desktop run smoke:agent-onboarding",
+      "result": "NOT_RUN_RESOURCE_GUARD",
+      "reason": "Repository guard requires at least 4 GiB free physical memory; measured free physical memory was 2.97 GiB. The guard was preserved."
+    },
+    "native_presentation_boundary_tests": {
+      "command": "npx vitest run server/__tests__/desktop-mcp-tunnel-transition-broker.test.ts server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts client/src/components/workstation/__tests__/WorkstationGuidanceOverlay.spec.tsx --pool=forks",
+      "result": "PASS",
+      "files": 3,
+      "tests": 23,
+      "assertions": [
+        "bearer-protected exact native presentation accepted",
+        "unauthorized request rejected",
+        "widened panel target rejected",
+        "MCP presenter invoked without changing transition receipt authority",
+        "renderer overlay never clicks the target"
+      ]
+    }
+  },
+  "live_native_presentation": {
+    "service_instance_ref": "service_instance:c5548214827b218dd6a0b3b825ec9694",
+    "client_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "transition_request_ref": "desktop_tunnel_request:a9592741-3a4f-4906-81ba-ef64c43b2691",
+    "requested_receipt_ref": "desktop_tunnel_receipt:f1ebde8b-73fd-4d38-a097-87ec64bddbab",
+    "delegation_ref": "desktop_tunnel_delegation:2e63e43b-9280-49dd-82ac-4db0b5d06cb2",
+    "delegated_receipt_ref": "desktop_tunnel_receipt:3126c34a-810c-4f0b-87d5-5bdce77d357c",
+    "accepted_receipt_ref": "desktop_tunnel_receipt:b9a1bca4-e202-4ff8-bba0-4505449d2525",
+    "expired_receipt_ref": "desktop_tunnel_receipt:aa7adedc-7215-4ecc-8343-c019622bbe7e",
+    "native_attention_requested": true,
+    "operator_confirmed_visible_target": true,
+    "execute_response": "HTTP_504_AFTER_ACCEPTED_TRANSPORT_CUT",
+    "duplicate_execute_attempted": false,
+    "post_rollback_inspection": "PASS",
+    "receipt_hash_chain_intact": true
+  },
+  "authority": {
+    "user_consent_required": true,
+    "synthetic_click_performed": false,
+    "oauth_approved": false,
+    "tunnel_authority_granted": false,
+    "environment_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "remaining_blocker": {
+    "observed_at": "2026-09-03T13:36:07.603Z",
+    "minecraft_device_health": "offline",
+    "minecraft_device_freshness": "stale",
+    "blocking_reasons": [
+      "credential_expired",
+      "contact_stale"
+    ],
+    "codex_allowlist_repaired": [
+      "helix_minecraft_local_lifecycle_launch",
+      "helix_environment_action_authority_revoke"
+    ],
+    "loaded_task_catalog_refresh_required_once": true
+  },
+  "et6_live_exit_satisfied": false
+}

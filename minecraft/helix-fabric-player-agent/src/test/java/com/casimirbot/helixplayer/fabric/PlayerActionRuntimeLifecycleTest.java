@@ -121,6 +121,35 @@ final class PlayerActionRuntimeLifecycleTest {
     }
 
     @Test
+    void heartbeatCursorAdvancesOnlyFromAcknowledgedEnvironmentBatches() {
+        long acknowledged = -1;
+
+        // Producing workflow events does not change the server-visible cursor.
+        assertEquals(-1, acknowledged);
+        acknowledged = PlayerActionRuntime.acknowledgedEventSequence(
+            acknowledged,
+            Map.of("last_sequence", 2)
+        );
+        assertEquals(2, acknowledged);
+
+        // A delayed replay cannot move the acknowledged cursor backwards.
+        assertEquals(
+            2,
+            PlayerActionRuntime.acknowledgedEventSequence(
+                acknowledged,
+                Map.of("last_sequence", 1)
+            )
+        );
+        assertEquals(
+            2,
+            PlayerActionRuntime.acknowledgedEventSequence(
+                acknowledged,
+                Map.of("schema", "helix.environment_action.workflow_event.v1")
+            )
+        );
+    }
+
+    @Test
     void preControlSafetyRefusalDoesNotClaimAnEnvironmentEffect() {
         assertFalse(PlayerActionRuntime.effectExecutionPerformed(
             true,

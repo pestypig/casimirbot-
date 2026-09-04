@@ -21,7 +21,7 @@
   "implementation": {
     "shared_contract": {
       "path": "shared/helix-environment-time.ts",
-      "sha256": "90fb7315a37cd3872ffec0d3d973108612402f7cf015b8ced4e9a6db4ae24702"
+      "sha256": "7bcd00a85cd9439096f5cf105cbb1e092e122e2a50be35f9964e599f66324368"
     },
     "append_only_ledger": {
       "path": "server/services/environment-connectors/temporal-plans/environment-time-ledger.ts",
@@ -29,7 +29,7 @@
     },
     "minecraft_compatibility_compiler": {
       "path": "server/services/environment-connectors/temporal-plans/minecraft-environment-time-compiler.ts",
-      "sha256": "af8aeb5269183e8b260df8a8a23214404bc48b3cb76961ef3f4eaef27381f757"
+      "sha256": "297f6386ae11133e6bd2e91de00e003539196629c9159ddcfe41a0dcd7525879"
     }
   },
   "positive_evidence": [
@@ -51,7 +51,7 @@
     {
       "command": "npx vitest run shared/__tests__/helix-environment-time.spec.ts server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks",
       "result": "pass",
-      "tests": 35
+      "tests": 36
     },
     {
       "command": "npx vitest run server/__tests__/minecraft-fluid-sequence-contract.test.ts server/__tests__/minecraft-fluid-micro-course-fixture.test.ts server/__tests__/minecraft-reactive-program-contract.test.ts server/__tests__/minecraft-reactive-program-evidence.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks",

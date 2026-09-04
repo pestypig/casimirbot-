@@ -200,9 +200,104 @@ payloads, private prompts and hidden reasoning.
    watchdog intervention, one Codex strategy revision and clean control
    release.
 
-R0 through R2 are deterministically verified. R3 is the next eligible
-implementation assignment; later stages require the named prior-stage evidence
-and must not be bundled into one unreviewed increment.
+R0 through R2 are deterministically verified and the finite R3 polling and
+qualification machinery is implemented. R3-A is the next eligible live-
+acceptance assignment; later stages require the named prior-stage evidence and
+must not be bundled into one unreviewed increment.
+
+## Frozen G8 continuation ladder — 2026-09-03
+
+This ladder decomposes the remaining R3–R5 work without creating another
+program gate or a competing roadmap. Each stage is a bounded work assignment.
+Its evidence must be reviewed before the next stage begins. Full Harness
+connection, read-source availability, or simulated profitability cannot
+self-promote maturity or grant provider mutation authority.
+
+### R3-A — Installed read-source preflight
+
+Start one finite profile-owned Full Harness lease and verify the current
+Robinhood OAuth connection, exact owner-private room binding, producer epoch,
+environment binding and read-only provider catalog during regular market
+hours. Admit one normalized quote containing the required bid, ask, last,
+prior-close and market-session fields, with truthful provider-event or
+arrival-proxy timing. The terminal preflight must prove current identity,
+source freshness, secret exclusion, `provider_mutation_calls=0`, no simulated
+effect and clean lease release.
+
+Exit evidence: one sanitized installed-source receipt and one terminal
+preflight report whose hashes bind the same connection, room, profile,
+producer epoch, environment binding and quote revision. Typed provider
+unavailability remains an honest retryable stop and does not advance R3-A.
+
+### R3-B — First regular-hours live shadow
+
+Run one finite simulation-only shadow session from the installed read source.
+Record arrival cadence, observation-to-decision latency, degraded timing,
+source gaps, watchdog state, simulated proposals/effects and postconditions.
+The session must terminate and archive restart-safe evidence with zero provider
+mutation, zero duplicate effects and no unresolved simulated reservation.
+
+Exit evidence: one complete identity-matched regular-hours session archive.
+This is measured live-input evidence, but one market date cannot qualify R3.
+
+### R3-C — Second-date qualification
+
+On a distinct regular-market date, run another finite identity-matched shadow
+session. Across the qualifying sessions, demonstrate one bounded restart or
+reconnect recovery and one safe freshness, gap or watchdog intervention. Seal
+the canonical multi-session qualification archive with measured timing,
+explicit gaps, terminal state and `provider_mutation_calls=0`.
+
+Exit evidence: the existing qualification surface returns
+`ready_for_maturity_review=true` for at least two complete sessions containing
+processed regular-hours observations on at least two distinct market dates.
+Because the archive has `maturity_authority=false`, a human-reviewed update to
+this work program is still required before R3 may be called `live accepted`.
+
+### R4 — Codex semantic re-entry acceptance
+
+Project only material controller decisions and state changes through the exact
+profile-scoped monitor continuation. Prove delivery and acknowledgement,
+restart/reconnect continuity, stale-epoch rejection, one Runtime Codex
+strategy revision and no duplicate simulated effect. Every observation and
+receipt retains `answer_authority=false`; Runtime Codex remains the only
+semantic replanning and terminal-answer authority.
+
+Exit evidence: a sanitized exact-task trace connecting a material observation,
+monitor cursor, acknowledgement, Codex revision, newly hashed finite manifest
+or explicit abstention, and subsequent controller observation.
+
+### R5 — Cross-surface integrated acceptance
+
+Correlate the installed EXE, authenticated MCP surface and operator-visible
+trace for at least three consecutive
+observe → decide → simulate → observe cycles. Include one watchdog
+intervention, one Codex strategy revision, restart-safe evidence, no duplicate
+effects and clean release of monitor, controller, source and simulated-ledger
+authority.
+
+Exit evidence: one hash-bound installed-node acceptance artifact showing the
+same identities, revisions, effects and terminal state across all three
+surfaces. Only this stage may advance the packet to `integrated accepted`.
+
+### Ordered handoff to attended tiny-live qualification
+
+R5 does not arm or approve live trading. After R5 acceptance, the separate
+`eh-g8-robinhood-attended-tiny-live-qualification-v1.md` packet governs any
+real-money canary: refreshed real-account and provider-contract checks,
+zero-exposure and minimum-notional verification, attended supervisor/dead-man
+rehearsal, one exact user-approved entry no greater than $25, a separately
+approved protective exit, reconciliation, zero-exposure closeout and archival.
+The approximately $200 allocation remains an account ceiling rather than
+standing order authority.
+
+### Release-hardening follow-on
+
+Tiny-live acceptance is not G8 release closure. A reviewer-approved signed
+installer must subsequently repeat current-source start, restart, reconnect,
+revocation, rollback and fail-closed recovery with credential separation and
+consistent cross-surface status. This follow-on cannot weaken G1–G7 or infer
+autonomous live-entry authority from a successful canary.
 
 ## R0 deterministic checkpoint — 2026-08-27
 

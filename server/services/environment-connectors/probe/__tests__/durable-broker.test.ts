@@ -587,6 +587,24 @@ describe("durable environment probe broker", () => {
       [rebound.installationId],
     );
     expect(installation.rows).toEqual([{ installed_device_id: installedDeviceId }]);
+
+    const rematerialized = await materializeLegacyRoomSourceConnector({
+      ownerProfileId: PROFILE_ID,
+      roomSourceBindingId: BINDING_ID,
+      credentialId: CREDENTIAL_ID,
+      roomId: ROOM_ID,
+      sourceId: SOURCE_ID,
+      worldId: WORLD_ID,
+      producerEpochRef,
+      adapterAdmission: admission,
+      capabilityDescriptors: listEnvironmentConnectorCapabilityDescriptors({
+        adapterProfileId: admission.adapter_profile_id,
+      }),
+    });
+
+    expect(rematerialized.installedNodeRef).toBe(
+      installedDeviceRef(installedDeviceId),
+    );
   });
 
   it("persists exact correlation, leases once, hashes the lease token, and normalizes an idempotent result", async () => {

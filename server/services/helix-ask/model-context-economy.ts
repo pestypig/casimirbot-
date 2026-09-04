@@ -235,7 +235,8 @@ export const compactMoralGraphReflectionArtifactForModel = (input: {
   if (!payload) return null;
   const mediation = readRecord(payload.moralReflectionMediation);
   const sharedAuthority = readRecord(payload.sharedAuthoritySocialRenewal);
-  if (!mediation && !sharedAuthority) return null;
+  const procedural = readRecord(payload.proceduralClassification);
+  if (!mediation && !sharedAuthority && !procedural) return null;
   const cfg = config();
   const steps = readArray(mediation?.steps).map((entry) => readRecord(entry)).filter(Boolean);
   const relevantSteps = steps.filter((step) => {
@@ -244,15 +245,38 @@ export const compactMoralGraphReflectionArtifactForModel = (input: {
   });
   const selectedSteps = relevantSteps.length ? relevantSteps : steps;
   const domains = readArray(sharedAuthority?.domains).map((entry) => readRecord(entry)).filter(Boolean);
+  const classifications = readArray(procedural?.classifications).map((entry) => readRecord(entry)).filter(Boolean);
+  const recommendedMoves = readArray(procedural?.recommendedNextMoves).map((entry) => readRecord(entry)).filter(Boolean);
+  const proceduralFindings = classifications.slice(0, 4).map((classification) => {
+    const pattern = readString(classification?.observedPattern) ?? "unclear_evidence";
+    const root = readString(classification?.moralRootLabel) ?? readString(classification?.moralRootId) ?? "Moral Graph lens";
+    const move = readString(classification?.proceduralMove) ?? "preserve_uncertainty";
+    const explanation = readString(classification?.explanation) ?? "Treat this as a procedural question, not a character verdict.";
+    return compactText(`Procedural classification [${pattern}] -> ${root} -> ${move}: ${explanation}`, 420);
+  });
+  const recommendedMoveFindings = recommendedMoves.slice(0, 1).map((move) => compactText(
+    `Recommended bounded move: ${readString(move?.label) ?? "Choose a reviewable next practice."} ${readString(move?.description) ?? ""}`,
+    420,
+  ));
+  const proceduralWarnings = unique(
+    classifications.flatMap((classification) => readStringArray(classification?.warnings)),
+    cfg.observationMaxProves,
+  );
+  const proceduralMissing = unique(
+    classifications.map((classification) => readStringArray(classification?.missingEvidence).at(-1)),
+    cfg.observationMaxFindings,
+  );
   const reflection = readRecord(payload.reflection);
   const reflectionId =
     readString(mediation?.reflectionId) ??
     readString(sharedAuthority?.reflectionId) ??
+    readString(procedural?.sourceReflectionId) ??
     readString(reflection?.reflectionId);
   const observationRef =
     readString(artifact?.artifact_id) ??
     readString(mediation?.artifactId) ??
     readString(sharedAuthority?.artifactId) ??
+    readString(procedural?.artifactId) ??
     `moral-reflection:${input.turnId}`;
   const questions = selectedSteps.length
     ? selectedSteps.map((step) => {
@@ -274,13 +298,20 @@ export const compactMoralGraphReflectionArtifactForModel = (input: {
     cfg.observationMaxFindings,
   );
   const protocol = readStringArray(mediation?.synthesisProtocol);
+  const reflectionFamily = readString(mediation?.reflectionFamily);
   const evidenceOrderBoundary = readRecord(mediation?.evidenceOrderBoundary);
   const boundaryKind = readString(evidenceOrderBoundary?.kind);
   const boundaryReason = readString(evidenceOrderBoundary?.reason);
   const supportRefs = unique([
     observationRef,
     ...(reflectionId ? [`moral-reflection:${reflectionId}`] : []),
-    ...readStringArray(sharedAuthority?.prioritizedBadgeIds).map((id) => `moral-badge:${id}`),
+    ...classifications
+      .map((classification) => readString(classification?.moralRootId))
+      .filter((id): id is string => Boolean(id))
+      .map((id) => `moral-badge:${id}`),
+    ...(reflectionFamily === "inner_practice"
+      ? []
+      : readStringArray(sharedAuthority?.prioritizedBadgeIds).map((id) => `moral-badge:${id}`)),
   ], 64);
   return {
     schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
@@ -295,20 +326,24 @@ export const compactMoralGraphReflectionArtifactForModel = (input: {
     user_requested: compactText(input.userRequested ?? "", 320),
     found: unique([
       ...(boundaryKind
-        ? [compactText(`Evidence order boundary [${boundaryKind}]: ${boundaryReason ?? "Preserve the declared evidence order before strengthening the moral claim."}`, 420)]
+        ? [compactText(`${reflectionFamily ? `Reflection family [${reflectionFamily}]; ` : ""}evidence order boundary [${boundaryKind}]: ${boundaryReason ?? "Preserve the declared evidence order before strengthening the moral claim."}`, 420)]
         : []),
+      ...proceduralFindings,
+      ...recommendedMoveFindings,
       ...questions,
       ...(objectiveOptions.length && objectiveAttributionSelected
         ? [`Objective source remains unresolved; test: ${objectiveOptions.join(", ")}.`]
         : []),
     ], cfg.observationMaxFindings),
     proves: unique([
+      ...proceduralWarnings.map((warning) => `Procedural warning: ${warning}.`),
       ...protocol.map((rule) => compactText(`Synthesis discipline: ${rule}`, 420)),
       "This Moral Graph artifact is evidence-only and supplies reflection questions, not a verdict or intent attribution.",
     ], cfg.observationMaxProves),
     support_refs: supportRefs,
     missing_or_uncertain: unique([
       ...readStringArray(evidenceOrderBoundary?.requiredBeforeStrongClaim),
+      ...proceduralMissing,
       ...missing,
     ], cfg.observationMaxFindings),
     suggested_next_steps: ["answer"],

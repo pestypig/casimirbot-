@@ -68,6 +68,52 @@ type EnvironmentRow = {
   adapter_admission_status: string;
 };
 
+type EnvironmentActionLifecycleRequirement = "active" | "authority_reduction";
+
+export const assertEnvironmentActionLifecycle = (
+  row: Pick<
+    EnvironmentRow,
+    | "environment_status"
+    | "source_status"
+    | "room_status"
+    | "adapter_admission_status"
+  >,
+  requirement: EnvironmentActionLifecycleRequirement,
+): void => {
+  // An exact owner must be able to remove authority even after the producer
+  // goes stale. Connector liveness is an admission requirement, not a veto on
+  // emergency stop/revocation.
+  if (requirement === "authority_reduction") return;
+  if (row.environment_status !== "active") {
+    throw new EnvironmentActionAuthorityError(
+      "action_environment_binding_inactive",
+      409,
+      "The exact environment binding is not active enough to pair player embodiment.",
+    );
+  }
+  if (row.source_status !== "active") {
+    throw new EnvironmentActionAuthorityError(
+      "action_source_binding_inactive",
+      409,
+      "The exact room source binding is not active enough to pair player embodiment.",
+    );
+  }
+  if (row.room_status === "closed") {
+    throw new EnvironmentActionAuthorityError(
+      "action_room_closed",
+      409,
+      "The shared room is closed, so player embodiment cannot be paired.",
+    );
+  }
+  if (row.adapter_admission_status !== "active") {
+    throw new EnvironmentActionAuthorityError(
+      "action_adapter_admission_inactive",
+      409,
+      "The exact environment adapter admission is not active enough to pair player embodiment.",
+    );
+  }
+};
+
 type AuthorityRow = {
   action_authority_id: string;
   environment_binding_id: string;
@@ -333,6 +379,7 @@ const readEnvironment = async (
   roomId: string,
   environmentBindingId: string,
   lock = false,
+  lifecycleRequirement: EnvironmentActionLifecycleRequirement = "active",
 ): Promise<EnvironmentRow> => {
   const result = await db.query<EnvironmentRow>(
     `
@@ -362,34 +409,7 @@ const readEnvironment = async (
       "The room environment was not found.",
     );
   }
-  if (row.environment_status !== "active") {
-    throw new EnvironmentActionAuthorityError(
-      "action_environment_binding_inactive",
-      409,
-      "The exact environment binding is not active enough to pair player embodiment.",
-    );
-  }
-  if (row.source_status !== "active") {
-    throw new EnvironmentActionAuthorityError(
-      "action_source_binding_inactive",
-      409,
-      "The exact room source binding is not active enough to pair player embodiment.",
-    );
-  }
-  if (row.room_status === "closed") {
-    throw new EnvironmentActionAuthorityError(
-      "action_room_closed",
-      409,
-      "The shared room is closed, so player embodiment cannot be paired.",
-    );
-  }
-  if (row.adapter_admission_status !== "active") {
-    throw new EnvironmentActionAuthorityError(
-      "action_adapter_admission_inactive",
-      409,
-      "The exact environment adapter admission is not active enough to pair player embodiment.",
-    );
-  }
+  assertEnvironmentActionLifecycle(row, lifecycleRequirement);
   return row;
 };
 
@@ -1043,7 +1063,13 @@ export const emergencyStopEnvironmentActionAuthority = async (input: {
     profileId: input.profileId,
   });
   const stopped = await withSharedRealtimeRoomTransaction(async (db) => {
-    await readEnvironment(db, input.roomId, input.environmentBindingId, true);
+    await readEnvironment(
+      db,
+      input.roomId,
+      input.environmentBindingId,
+      true,
+      "authority_reduction",
+    );
     const selected = await db.query<AuthorityRow>(
       `SELECT * FROM helix_environment_action_authorities
        WHERE action_authority_id = $1 AND environment_binding_id = $2

@@ -2,11 +2,14 @@ package com.casimirbot.helixsensor.fabric;
 
 import com.casimirbot.helixsensor.HelixJson;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.function.IntPredicate;
 
 /**
  * Resolves the installed desktop service's current per-launch loopback origin
@@ -28,8 +31,28 @@ final class DesktopServiceEndpointResolver {
     }
 
     static String resolve(String configuredEndpoint, Path receiptPath) {
+        return resolve(
+            configuredEndpoint,
+            receiptPath,
+            DesktopServiceEndpointResolver::acceptsLoopbackConnection
+        );
+    }
+
+    static String resolve(
+        String configuredEndpoint,
+        Path receiptPath,
+        IntPredicate configuredPortReachable
+    ) {
         URI configured = exactLoopbackBindingEndpoint(configuredEndpoint);
         if (configured == null || receiptPath == null || !Files.isRegularFile(receiptPath)) {
+            return configuredEndpoint;
+        }
+        // A freshly paired endpoint is authoritative while it remains reachable.
+        // Redirecting it merely because a packaged desktop process is also alive
+        // splits pairing and ingress across two independent service/database
+        // epochs. The ready receipt is only a relaunch fallback after the paired
+        // endpoint has gone away.
+        if (configuredPortReachable.test(configured.getPort())) {
             return configuredEndpoint;
         }
         try {
@@ -61,6 +84,15 @@ final class DesktopServiceEndpointResolver {
             ).toString();
         } catch (IOException | RuntimeException | java.net.URISyntaxException ignored) {
             return configuredEndpoint;
+        }
+    }
+
+    private static boolean acceptsLoopbackConnection(int port) {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress("127.0.0.1", port), 150);
+            return true;
+        } catch (IOException ignored) {
+            return false;
         }
     }
 

@@ -1,0 +1,46 @@
+{
+  "schema": "helix.environment_time.et6_guidance_satisfied_repair.v1",
+  "recorded_at": "2026-09-04T00:16:00-04:00",
+  "program_gate": "G8",
+  "stage": "ET6",
+  "status": "deterministically_verified_live_visual_acceptance_pending",
+  "classification": "presentation",
+  "first_divergence": {
+    "surface": "packaged_exe_agent_connections_guidance",
+    "observed_state": "full_harness_device_trust_already_enabled",
+    "visible_rejection": "reasoning_binding_claim_invalid",
+    "cause": "the guidance overlay retained the previously selected trust target while the next prerequisite control was not mounted",
+    "risk": "the user could click the already-enabled trust control and unintentionally remove trust while attempting to satisfy an obsolete instruction",
+    "authority_reclassification": false
+  },
+  "repair": {
+    "recursive_prerequisite_resolution": true,
+    "stale_spotlight_removed_while_next_target_mounts": true,
+    "always_visible_close_control": true,
+    "escape_dismissal": true,
+    "underlying_consent_auto_applied": false,
+    "environment_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "verification": {
+    "focused_component_files": 2,
+    "focused_tests_passed": 20,
+    "production_client_build": "pass_with_pre_existing_dependency_and_chunk_warnings",
+    "packaged_directory_build": "pass_with_four_pre_existing_unrelated_server_warnings",
+    "packaged_exe_sha256": "530b67d285643d7f1be5e7efe288cc90ab8e07372408af0dcd351427f0febc33",
+    "packaged_exe_relaunched": true,
+    "current_service_instance_ref": "service_instance:0cd5b19844d8b7782276b2d14496052b",
+    "mcp_stable_scope_transition_accepted": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false,
+    "credentials_included": false,
+    "hidden_reasoning_included": false
+  },
+  "live_status": {
+    "operator_render_observation_after_rebuild": false,
+    "fresh_reasoning_binding_claim_required": true,
+    "minecraft_capacity_run_replayed_after_repair": false,
+    "et6_exit_satisfied": false
+  }
+}

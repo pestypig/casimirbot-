@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { migration026 } from "../../../db/migrations/026_helix_accounts";
 import { migration070 } from "../../../db/migrations/070_installed_security_devices";
+import { migration081 } from "../../../db/migrations/081_installed_device_full_harness_trust";
 import {
   InstalledSecurityStore,
   installedDeviceRef,
@@ -27,6 +28,7 @@ describe("InstalledSecurityStore", () => {
       const context = { enablePgvector: false };
       await migration026.run(client, context);
       await migration070.run(client, context);
+      await migration081.run(client, context);
     } finally {
       client.release();
     }
@@ -161,5 +163,59 @@ describe("InstalledSecurityStore", () => {
       maximumAgeSeconds: 300,
     });
     expect(JSON.stringify(status.recent_events)).not.toContain("receipt");
+  });
+
+  it("persists finite-tunnel trust only for an active developer device session", async () => {
+    await store.registerDevice({ session: OWNER, deviceId: DEVICE_ID });
+    const granted = await store.setFullHarnessTrust({
+      session: OWNER,
+      deviceId: DEVICE_ID,
+      trusted: true,
+    });
+    expect(granted).toMatchObject({
+      trusted: true,
+      policy_revision: 1,
+      delegated_account_session_id: OWNER.sessionId,
+      authority_limited_to_tunnel_transport: true,
+      environment_authority_granted: false,
+      trading_authority_granted: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(JSON.stringify(granted)).not.toContain(DEVICE_ID);
+
+    await pool.query(
+      `UPDATE helix_account_sessions SET status = 'signed_out'
+       WHERE session_id = $1;`,
+      [OWNER.sessionId],
+    );
+    const expired = await store.inspectFullHarnessTrust({
+      profileId: OWNER.profileId,
+      deviceId: DEVICE_ID,
+    });
+    expect(expired).toMatchObject({
+      trusted: false,
+      delegated_account_session_id: null,
+    });
+  });
+
+  it("clears remembered full-harness trust on device revoke and recovery", async () => {
+    await store.registerDevice({ session: OWNER, deviceId: DEVICE_ID });
+    await store.setFullHarnessTrust({
+      session: OWNER,
+      deviceId: DEVICE_ID,
+      trusted: true,
+    });
+    await store.revokeDevice({ session: OWNER, deviceId: DEVICE_ID });
+    await store.recoverDevice({ session: OWNER, deviceId: DEVICE_ID });
+    const trust = await store.inspectFullHarnessTrust({
+      profileId: OWNER.profileId,
+      deviceId: DEVICE_ID,
+    });
+    expect(trust).toMatchObject({
+      trusted: false,
+      policy_revision: 3,
+      delegated_account_session_id: null,
+    });
   });
 });

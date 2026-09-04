@@ -32,6 +32,25 @@ describe("local player pairing handoff", () => {
     ), "utf8")).resolves.toBe("/helix-player pair Z4ZD-X2JJ");
   });
 
+  it("preserves the exact loopback pairing issuer in the bounded command", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
+    roots.push(root);
+    const command =
+      "/helix-player pair Z4ZD-X2JJ http://127.0.0.1:1522/api/environment-connectors/v1/pairing/redeem";
+
+    await expect(stageLocalMinecraftPlayerPairing({
+      appDataPath: root,
+      command,
+    })).resolves.toEqual({ status: "player_pairing_inbox_staged" });
+
+    await expect(readFile(path.join(
+      root,
+      ".minecraft",
+      "config",
+      "helix-fabric-player-agent.pairing-inbox",
+    ), "utf8")).resolves.toBe(command);
+  });
+
   it("targets an explicitly configured isolated client game directory", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "helix-player-pairing-"));
     roots.push(root);

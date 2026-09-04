@@ -92,8 +92,15 @@ provider-neutral capability
 `environment.minecraft.fabric_loopback.launch_and_join`. The localhost browser
 and packaged EXE render the same lifecycle card and call the same same-origin
 operator endpoint. Codex reaches that executor through the workstation tool
-gateway after a trusted runtime confirmation receipt. These are different
-admission paths into one executor, not separate browser and desktop launchers.
+gateway after a trusted runtime confirmation receipt, or through the installed
+MCP lifecycle tool after the exact developer profile and durable Full Harness
+device trust are verified. That trust control explicitly discloses installed
+local environment application start/stop authority while withholding all
+in-environment action authority. The latter may bootstrap the client before a player
+subject exists, but returns `action_authority_id: null`, grants no Minecraft
+action, and cannot replace a running client without an exact active Player
+Embodiment lease. These are different admission paths into one executor, not
+separate browser and desktop launchers.
 Neither UI shell receives an executable path, arbitrary arguments, a host shell,
 or Minecraft credentials. The packaged runtime stages the fixed script under
 its allowlisted runtime root so installed and repository surfaces retain the
@@ -266,7 +273,7 @@ control or generated host code.
 | Player Embodiment | navigate, look, walk, jump, interact, hotbar and equip     | separately paired Fabric client, finite owner-configured UI/API authority, durable action broker and measured postconditions                                                                                                                                                                                                                                                                                                                                                                                   | implemented baseline; keyed live regression still required                                             |
 | Player Embodiment | workflow status, resume, cancel and emergency stop         | typed control queue/result lane with control release requirements                                                                                                                                                                                                                                                                                                                                                                                                                                              | implemented baseline; manual-interruption live journey still required                                  |
 | Shared evidence   | raw event ledger and situation digest                      | both protected world events and client workflow events enter plane-labeled, content-hashed batches; `com.casimirbot.minecraft.situation_digest.read` re-enters a selected plane                                                                                                                                                                                                                                                                                                                                | implemented deterministic slice; freshness and cross-plane live evidence still required                |
-| Player Embodiment | optional Baritone navigation                               | `BaritoneFacade` discovers the public API at runtime; the live manifest advertises the engine only when discovery succeeds                                                                                                                                                                                                                                                                                                                                                                                     | implemented conditional adapter; installed-Baritone keyed live regression still required               |
+| Player Embodiment | evaluation-only Baritone comparison                        | `BaritoneFacade` discovers the public API only in the isolated non-shipping evaluation profile; product and shipping manifests must omit the engine. The owned successor is specified in `docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`.                                                                                                                                                                                                                                                         | comparison deterministically verified; owned planner remains specified after ET6                         |
 | Player Embodiment | follow, collect, mine, place, craft and inventory transfer | Fabric player-agent `0.3.0`, trusted 13-action catalog/profile parity, bounded native workflow engine, action-specific terminal measurements and broker-side scope validation                                                                                                                                                                                                                                                                                                                                  | implemented deterministic baseline; workflow-by-workflow keyed live regression still required          |
 | Player Embodiment | fluid survival TAS sequence                                | one provider-neutral sequence capability embeds the existing actions plus tick-addressed input, finite branches and checkpoints; the 20 Hz Fabric interpreter reports world ticks and wall time independently and releases controls on every terminal path                                                                                                                                                                                                                                                     | implemented and unit-tested; direct-Codex and keyed-Helix micro-course evidence still required         |
 | Player Embodiment | concurrent reactive guardian                               | Codex authors a finite `helix.minecraft.reactive_program.v1`; Fabric executes same-tick nonconflicting lanes, explicit resource locks, bounded repeat/maintain/event nodes, races and one-shot interrupts. A place action may use exact cells or one bounded `predicted_collision_cell` binding (1-20 ticks, at most six actor-relative blocks); Fabric resolves geometry while Codex still owns locomotion, timing and strategy. Helix validates the resolved cell, settled lane evidence and effect ceilings | direct and keyed water-bucket rescue benchmark live accepted; cross-gap viability, broader unexpected-event and workflow acceptance remain open |
@@ -333,7 +340,10 @@ The provider-neutral parent for clocks, rolling plan watermarks, progressive
 affordance frontiers and interruption timing is
 `docs/architecture/helix-environment-time-action-planning-v1.md`. Minecraft's
 sequence and concurrent guardian are the capacity reference and compilation
-target; their tick vocabulary must not leak into the shared contract.
+target; their tick vocabulary must not leak into the shared contract. The ET2
+compatibility compiler is deterministically verified against both existing
+schemas and native engine tests. That evidence does not establish ET6 live
+capacity, select a planning horizon or admit unsupported interrupt semantics.
 
 Branch, event, interrupt and checkpoint conditions may read only a bounded vocabulary: tick,
 grounded pose, position, health, food, inventory/resource counts, equipped

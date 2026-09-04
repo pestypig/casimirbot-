@@ -17,7 +17,49 @@ const EXACT_NODE_ID_SCORE = 1;
 const EXACT_LABEL_OR_ALIAS_SCORE = 0.9;
 const TAG_ACTION_REFERENCE_SCORE = 0.75;
 const LIKELY_KEYWORD_OVERLAP_SCORE = 0.5;
-const LOW_INFORMATION_KEYWORD_TOKENS = new Set(["present", "position"]);
+const LOW_INFORMATION_KEYWORD_TOKENS = new Set([
+  "about",
+  "after",
+  "again",
+  "also",
+  "because",
+  "becomes",
+  "before",
+  "being",
+  "between",
+  "could",
+  "from",
+  "have",
+  "into",
+  "itself",
+  "more",
+  "most",
+  "other",
+  "position",
+  "present",
+  "rather",
+  "should",
+  "than",
+  "that",
+  "their",
+  "them",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "those",
+  "through",
+  "want",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "will",
+  "with",
+  "would",
+]);
 const LOW_INFORMATION_STANDALONE_TAGS = new Set(["response"]);
 
 function normalize(value: string): string {

@@ -147,6 +147,20 @@ describe("desktop Secure MCP Tunnel boundary", () => {
     expect(environment.MCP_EXTRA_HEADERS).toBe(
       "X-Casimir-Desktop-Session: env:CASIMIR_TUNNEL_DESKTOP_SESSION_SECRET, x-casimir-desktop-account-session: env:CASIMIR_TUNNEL_ACCOUNT_SESSION_ID",
     );
+
+    const stableEnvironment = buildMcpTunnelEnvironment({
+      processEnv: {},
+      credentials: validCredentials,
+      runtimeOrigin: "http://127.0.0.1:43124",
+      desktopSessionSecret: "desktop-session-secret",
+      accountSessionId: "account_session:fixture-owner",
+      healthUrlFile: "C:\\state\\stable-health.url",
+      scope: "local_supervisor_coordination_and_device_check",
+      stableMcpRoute: true,
+    });
+    expect(stableEnvironment.MCP_SERVER_URL).toBe(
+      "http://127.0.0.1:43124/mcp",
+    );
   });
 
   it("admits only exact HTTPS OAuth metadata and registration targets", () => {

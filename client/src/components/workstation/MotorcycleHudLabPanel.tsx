@@ -11,9 +11,11 @@ import {
   DEFAULT_MOTORCYCLE_REPLAY_FIXTURE,
   MOTORCYCLE_REPLAY_FIXTURES,
 } from "@shared/helix-motorcycle-awareness-fixtures";
-import MotorcycleHudRenderer, {
-  type MotorcycleHudDisplayMode,
-} from "./motorcycle-awareness/MotorcycleHudRenderer";
+import { HUD_SURFACE_SCHEMA, type HudScene, type HudSurfaceRenderReceipt, type SurfaceFrame, type SurfaceSourceBinding } from "@shared/helix-hud-surface";
+import HudSurfaceHost from "./hud-surface/HudSurfaceHost";
+import MotorcycleHudRenderer from "./motorcycle-awareness/MotorcycleHudRenderer";
+import VisualSequenceInspector from "./visual-sequence/VisualSequenceInspector";
+import SurfaceRegistryStatus from "./hud-surface/SurfaceRegistryStatus";
 
 type ReplaySession = {
   frameIndex: number;
@@ -83,13 +85,64 @@ export default function MotorcycleHudLabPanel() {
   const [fixtureId, setFixtureId] = useState(DEFAULT_MOTORCYCLE_REPLAY_FIXTURE.id);
   const [session, setSession] = useState<ReplaySession>(resetSession);
   const [playing, setPlaying] = useState(false);
-  const [displayMode, setDisplayMode] = useState<MotorcycleHudDisplayMode>("transparent");
+  const [hudElement, setHudElement] = useState<HTMLDivElement | null>(null);
+  const [hudSurfaceReceipt, setHudSurfaceReceipt] = useState<HudSurfaceRenderReceipt | null>(null);
+  const [registryBlankRequest, setRegistryBlankRequest] = useState(0);
 
   const fixture = useMemo(
     () => MOTORCYCLE_REPLAY_FIXTURES.find((candidate) => candidate.id === fixtureId) ?? DEFAULT_MOTORCYCLE_REPLAY_FIXTURE,
     [fixtureId],
   );
   const currentFrame = session.frameIndex >= 0 ? fixture.frames[session.frameIndex] : null;
+  const surfaceAtMs = currentFrame?.atMs ?? 0;
+  const surfaceBinding = useMemo<SurfaceSourceBinding>(() => ({
+    schema: HUD_SURFACE_SCHEMA,
+    profileId: "motorcycle-awareness",
+    runId: `fixture:${fixture.id}`,
+    sourceId: "synthetic-road-underlay",
+    producerEpoch: `fixture:${fixture.id}:epoch-1`,
+    sourceKind: "simulator",
+    locatorRef: "fixture:hudh-0a-synthetic-road-v1",
+    permission: "not_required",
+    retention: "none",
+  }), [fixture.id]);
+  const surfaceFrame = useMemo<SurfaceFrame>(() => ({
+    schema: HUD_SURFACE_SCHEMA,
+    frameId: `synthetic-road:${fixture.id}:${Math.max(0, session.frameIndex)}`,
+    sourceId: surfaceBinding.sourceId,
+    producerEpoch: surfaceBinding.producerEpoch,
+    sequence: Math.max(0, session.frameIndex),
+    capturedAtMs: surfaceAtMs,
+    freshnessDeadlineMs: surfaceAtMs + 1_000,
+    width: 1280,
+    height: 720,
+    colorSpace: "srgb",
+    alphaMode: "opaque",
+    provenanceRef: "fixture:hudh-0a-synthetic-road-v1",
+    contentClass: "synthetic_fixture",
+  }), [fixture.id, session.frameIndex, surfaceAtMs, surfaceBinding.producerEpoch, surfaceBinding.sourceId]);
+  const hudScene = useMemo<HudScene>(() => ({
+    schema: HUD_SURFACE_SCHEMA,
+    sceneId: `motorcycle-scene:${fixture.id}:${Math.max(0, session.frameIndex)}`,
+    profileId: surfaceBinding.profileId,
+    producerEpoch: surfaceBinding.producerEpoch,
+    revision: Math.max(0, session.frameIndex),
+    authoredAtMs: surfaceAtMs,
+    freshnessDeadlineMs: surfaceAtMs + 1_000,
+    normalizedViewport: "unit_rect_top_left_v1",
+    primitives: [{
+      primitiveId: "motorcycle-eight-sector-layer",
+      kind: "profile_surface",
+      xNorm: 0,
+      yNorm: 0,
+      widthNorm: 1,
+      heightNorm: 1,
+      rotationDeg: 0,
+      opacity: 1,
+      styleToken: "motorcycle-eight-sector-v1",
+      semanticRef: fixtureIdentityHash(session.state.activeCues),
+    }],
+  }), [fixture.id, session.frameIndex, session.state.activeCues, surfaceAtMs, surfaceBinding.producerEpoch, surfaceBinding.profileId]);
   const latestReceipt = session.state.receipts.at(-1);
   const complete = session.frameIndex >= fixture.frames.length - 1;
   const oraclePassed = complete
@@ -182,18 +235,21 @@ export default function MotorcycleHudLabPanel() {
         </div>
 
         <div className="space-y-3">
-          <article className="rounded-lg border border-cyan-300/15 bg-slate-950/70 p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div><h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Shared eight-sector HUD renderer</h2><p className="mt-0.5 text-[10px] text-slate-500">Central road region intentionally graphics-free</p></div>
-              <div className="flex rounded border border-white/10 p-0.5 text-[10px]">
-                {(["transparent", "projector_black"] as const).map((mode) => <button type="button" key={mode} onClick={() => setDisplayMode(mode)} className={`rounded px-2 py-1 ${displayMode === mode ? "bg-cyan-300/15 text-cyan-100" : "text-slate-500"}`}>{mode === "transparent" ? "Combiner" : "Projector black"}</button>)}
-              </div>
-            </div>
-            <div className="mb-2 rounded border border-violet-300/20 bg-violet-400/[0.06] px-3 py-2" data-testid="normalized-hud-plane-notice">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200">Normalized HUD coordinate plane</div>
-              <p className="mt-1 text-[10px] leading-relaxed text-slate-400">No visor curvature, optical skew, eye-box correction, combiner calibration, or CAD-derived projection is applied. Those remain a later transform over this unchanged cue plane.</p>
-            </div>
-            <MotorcycleHudRenderer cues={session.state.activeCues} blankReason={session.state.blankReason} mode={displayMode} />
+          <div>
+            <HudSurfaceHost
+              profileLabel="Motorcycle eight-sector HUD"
+              atMs={surfaceAtMs}
+              binding={surfaceBinding}
+              frame={surfaceFrame}
+              scene={hudScene}
+              manualBlank={session.state.blankReason === "manual_blank"}
+              emergencyStop={session.state.blankReason === "emergency_stop"}
+              initialMode="hud_over_source"
+              feedRef={setHudElement}
+              onReceiptChange={setHudSurfaceReceipt}
+            >
+              <MotorcycleHudRenderer cues={session.state.activeCues} blankReason={session.state.blankReason} mode="transparent" className="h-full min-h-0 w-full rounded-none border-0" />
+            </HudSurfaceHost>
             <div className="mt-2 grid grid-cols-5 gap-1 text-center text-[9px] uppercase tracking-wide text-slate-500" aria-label="HUD reaction state legend">
               <div className="rounded border border-white/5 px-1 py-1.5"><span className="mx-auto mb-1 block h-1.5 w-6 rounded bg-slate-700" />off</div>
               <div className="rounded border border-cyan-300/10 px-1 py-1.5"><span className="mx-auto mb-1 block h-1.5 w-6 rounded bg-cyan-300/40" />dim/info</div>
@@ -201,7 +257,7 @@ export default function MotorcycleHudLabPanel() {
               <div className="rounded border border-orange-300/10 px-1 py-1.5"><span className="mx-auto mb-1 block h-1.5 w-8 rounded bg-orange-400/80" />urgent</div>
               <div className="rounded border border-red-300/10 px-1 py-1.5"><span className="mx-auto mb-1 block h-1.5 w-9 rounded bg-red-400" />pulse</div>
             </div>
-          </article>
+          </div>
 
           <article className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
             <div className="mb-2 flex items-center justify-between"><h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Track → threat → cue</h2><span className="text-[10px] text-slate-500">safety priority before navigation</span></div>
@@ -252,9 +308,23 @@ export default function MotorcycleHudLabPanel() {
             <div className="flex gap-2"><AlertTriangle className="mt-0.5 shrink-0 text-amber-300" size={15} /><p>This panel is an engineering replay surface, not a certified warning device. FiveM, Minecraft, hardware IO, projector output, and network reasoning remain intentionally disconnected.</p></div>
           </article>
 
-          <button type="button" onClick={() => { setSession((current) => ({ ...current, state: { ...current.state, activeCues: [], blankReason: "emergency_stop" } })); setPlaying(false); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-red-200 hover:bg-red-500/20" aria-label="Emergency blank HUD"><CircleStop size={16} />Emergency blank</button>
+          <button type="button" onClick={() => { setSession((current) => ({ ...current, state: { ...current.state, activeCues: [], blankReason: "emergency_stop" } })); setRegistryBlankRequest((value) => value + 1); setPlaying(false); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-red-200 hover:bg-red-500/20" aria-label="Emergency blank HUD"><CircleStop size={16} />Emergency blank</button>
         </div>
       </main>
+      <div className="border-t border-white/10 p-3">
+        <div className="mb-3"><SurfaceRegistryStatus binding={surfaceBinding} emergencyBlankRequest={registryBlankRequest} /></div>
+        <VisualSequenceInspector
+          hudElement={hudElement}
+          hudReceipt={hudSurfaceReceipt}
+          hudIdentity={{
+            sourceId: surfaceBinding.sourceId,
+            producerEpoch: surfaceBinding.producerEpoch,
+            profileId: "pending-authenticated-profile",
+            runId: surfaceBinding.runId,
+            threadId: "motorcycle-hud-lab",
+          }}
+        />
+      </div>
     </section>
   );
 }

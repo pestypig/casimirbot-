@@ -3,6 +3,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
+  HELIX_SURFACE_PANEL_ROUTE_SCHEMA,
+  SurfaceDesiredStateSchema,
+  SurfacePanelRouteTargetSchema,
+} from "@shared/helix-surface-registry";
+import { SurfaceRegistryService, surfaceRegistryService } from "../services/hud-surface/surface-registry-service";
+import {
   HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
   HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
   desktopMcpTransitionExecuteInputSchema,
@@ -21,6 +27,8 @@ import {
   type HelixPublicUiAuthorityState,
   type HelixPublicUiInteractionKind,
 } from "@shared/helix-public-ui-affordance";
+import { HELIX_PUBLIC_UI_CONTROL_CATALOG } from
+  "@shared/helix-public-ui-control-catalog.generated";
 import { helixMcpEvidenceObservationSchema } from
   "@shared/contracts/helix-mcp-evidence-capability.v1";
 import {
@@ -134,6 +142,7 @@ import {
   HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
   helixMinecraftLocalLifecycleRequestSchema,
   helixMinecraftLocalLifecycleReceiptSchema,
+  type HelixMinecraftLocalLifecycleRequest,
   type HelixMinecraftLocalLifecycleReceipt,
 } from "@shared/helix-minecraft-local-lifecycle";
 import {
@@ -966,7 +975,7 @@ export type HelixEnvironmentActionAuthorityInspector = (input: {
   connectorReadiness: HelixEnvironmentActionConnectorReadiness[];
 }>;
 export type HelixMinecraftLocalLifecycleRunner = (input: {
-  request: { address: string };
+  request: HelixMinecraftLocalLifecycleRequest;
 }) => Promise<HelixMinecraftLocalLifecycleReceipt>;
 export type HelixEnvironmentPlayerPairLocalHandoff = (input: {
   roomId: string;
@@ -1759,7 +1768,11 @@ const minecraftLocalLifecycleLaunchOutputSchema = z
     ),
     room_id: helixSharedLiveRoomIdSchema,
     environment_binding_id: z.string().trim().min(1).max(320),
-    action_authority_id: z.string().trim().min(1).max(320),
+    action_authority_id: z.string().trim().min(1).max(320).nullable(),
+    launch_authority_basis: z.enum([
+      "active_player_embodiment",
+      "trusted_device_workstation_lifecycle",
+    ]),
     status: z.literal("connected"),
     receipt: helixMinecraftLocalLifecycleReceiptSchema,
     authority_widened: z.literal(false),
@@ -2408,6 +2421,14 @@ const requireSharedLiveRoomFeature = (
 
 const publicUiSurfaceIds = new Set(
   HELIX_PUBLIC_UI_SURFACE_CATALOG.map((surface) => surface.surface_id),
+);
+const publicUiHumanControlById = new Map(
+  HELIX_PUBLIC_UI_CONTROL_CATALOG
+    .filter((control) =>
+      control.interaction_kind === "human_only" &&
+      control.surface_id.startsWith("workstation.panel."),
+    )
+    .map((control) => [control.control_id, control] as const),
 );
 
 const publicUiCatalogQuerySchema = z.object({
@@ -3091,7 +3112,7 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
   server.registerTool("helix_environment_action_authority_revoke", {
     title: "Emergency-stop an exact player-action authority",
     description:
-      "Revokes one exact Player Embodiment lease and queues control release for its active workflows. It cannot widen authority or become an assistant answer.",
+      "Revokes one exact Player Embodiment lease and queues control release for its active workflows. This authority-reducing operation cannot widen permissions, launch Minecraft, or become an assistant answer.",
     inputSchema: z.object({
       room_id: helixSharedLiveRoomIdSchema,
       environment_binding_id: z.string().trim().min(1).max(320),
@@ -3174,11 +3195,11 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
   server.registerTool("helix_minecraft_local_lifecycle_launch", {
     title: "Launch and join the local Fabric play session",
     description:
-      "Launches or reuses the prepared same-host Fabric client and joins the loopback server only under an exact current Player Embodiment lease. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence.",
+      "Launches or reuses the prepared same-host Fabric client and joins the loopback server under either an exact current Player Embodiment lease or the separately trusted developer-device Workstation Lifecycle bootstrap. Bootstrap grants no Minecraft action authority. An explicit restart_client request still requires an active Player Embodiment lease. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence for Codex re-entry.",
     inputSchema: z.object({
       room_id: helixSharedLiveRoomIdSchema,
       environment_binding_id: z.string().trim().min(1).max(320),
-      action_authority_id: z.string().trim().min(1).max(320),
+      action_authority_id: z.string().trim().min(1).max(320).nullable().optional(),
       operator_confirmation: z.literal(true),
       request: helixMinecraftLocalLifecycleRequestSchema,
     }).strict(),
@@ -3266,7 +3287,27 @@ export type DesktopMcpTunnelTransitionExecutor = (input: {
 }) => Promise<{
   accepted: true;
   nativeReceiptRef: string;
+  reconnectRequired: boolean;
+  catalogRefreshRequired: boolean;
+  stableScopeRouting: boolean;
 }>;
+
+export type DesktopFullHarnessTrustReader = (input: {
+  authenticatedProfileRef: string;
+}) => Promise<{
+  trusted: boolean;
+  delegatedAccountSessionId: string | null;
+  accountSessionReady?: boolean;
+  agentAccountBindingReady?: boolean;
+}>;
+
+export type DesktopWorkstationPresenter = (input: {
+  presentationRequestRef: string;
+  accountSessionId: string;
+  panelId: string;
+  targetId?: string;
+  controlId?: string;
+}) => Promise<{ accepted: boolean }>;
 
 export type HelixMcpToolLifecycleObservation = Readonly<{
   toolName: string;
@@ -3283,6 +3324,8 @@ export const createHelixMcpServer = (input: {
   reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
+  desktopFullHarnessTrustReader?: DesktopFullHarnessTrustReader;
+  desktopWorkstationPresenter?: DesktopWorkstationPresenter;
   mcpToolLifecycleObserver?: (
     observation: HelixMcpToolLifecycleObservation,
   ) => Promise<void> | void;
@@ -3344,8 +3387,10 @@ export const createHelixMcpServer = (input: {
   environmentSourcePairLocalHandoff?: HelixEnvironmentSourcePairLocalHandoff;
   environmentServerPairLocalHandoff?: HelixEnvironmentServerPairLocalHandoff;
   mcpEvidenceObservationStore?: HelixMcpEvidenceObservationStorePort;
+  surfaceRegistryService?: SurfaceRegistryService;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
+  const hudSurfaceRegistry = input.surfaceRegistryService ?? surfaceRegistryService;
   const roomControlService =
     input.roomControlService ?? getSharedLiveRoomControlService();
   const roomBindingStore =
@@ -3465,7 +3510,18 @@ export const createHelixMcpServer = (input: {
         idempotencyKey: request.idempotencyKey,
       });
       const staged = await stageLocalMinecraftPlayerPairing({
-        command: `/helix-player pair ${created.pairingCode}`,
+        // Bind the one-shot handoff to the exact service epoch that issued it.
+        // A previously saved player endpoint may still be reachable (for
+        // example a packaged EXE beside the keyed development server), so
+        // relying on client-side discovery here can redeem against the wrong
+        // pairing store and produce a false connector_pairing_not_found.
+        command: `/helix-player pair ${created.pairingCode} ${
+          resolveLocalMinecraftPairingEndpoint({
+            serviceBaseUrl: process.env.CASIMIR_PUBLIC_BASE_URL,
+            requestBaseUrl:
+              `http://127.0.0.1:${process.env.PORT?.trim() || "1522"}`,
+          })
+        }`,
         ownerProfileId: request.ownerProfileId,
       });
       return {
@@ -3907,6 +3963,125 @@ export const createHelixMcpServer = (input: {
     requiredScope: HELIX_AGENT_RUN_READ_SCOPE,
     evidenceStore,
   });
+
+  const requireSurfaceDeveloper = (scope: typeof HELIX_AGENT_RUN_READ_SCOPE | typeof HELIX_AGENT_RUN_WRITE_SCOPE = HELIX_AGENT_RUN_READ_SCOPE) => {
+    requireHelixAgentApiScope(input.principal, scope);
+    if (input.principal.accountType !== "developer") {
+      throw new HelixAgentApiServiceError(403, "developer_account_required", "Shared Surface Registry tools are restricted to developer accounts.", false);
+    }
+  };
+  const surfaceMcpPrincipal = (threadId: string, controlLeaseId: string) => ({
+    kind: "mcp_codex" as const,
+    principal_id: input.principal.mcpClientRef ?? input.principal.subjectId,
+    owner_profile_id: input.principal.accountProfileId,
+    thread_id: threadId,
+    control_lease_id: controlLeaseId,
+  });
+
+  server.registerTool(
+    "helix_surface_list",
+    {
+      title: "List shared HUD surfaces",
+      description: "Lists sanitized, profile-owned Surface Registry state. This is observation only and carries no program-input, reflex, or answer authority.",
+      inputSchema: z.object({}).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async () => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
+      requireSurfaceDeveloper();
+      return { schema: "helix.surface_registry.v1", surfaces: hudSurfaceRegistry.list(input.principal.accountProfileId), assistant_answer: false, terminal_eligible: false };
+    }),
+  );
+
+  server.registerTool(
+    "helix_surface_inspect",
+    {
+      title: "Inspect one shared HUD surface",
+      description: "Reads one canonical Surface Registry instance and its non-terminal control receipts.",
+      inputSchema: z.object({ surface_instance_id: z.string().trim().min(1).max(200) }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async ({ surface_instance_id }) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
+      requireSurfaceDeveloper();
+      return { schema: "helix.surface_registry.v1", ...hudSurfaceRegistry.inspect(input.principal.accountProfileId, surface_instance_id), assistant_answer: false, terminal_eligible: false };
+    }),
+  );
+
+  server.registerTool(
+    "helix_surface_prepare_panel_route",
+    {
+      title: "Prepare a leased Surface Workspace panel route",
+      description: "Validates one typed cross-panel handoff against the canonical surface revision and a user-issued route lease. It returns a non-terminal route receipt; it does not click, open, or control the workstation UI.",
+      inputSchema: z.object({
+        surface_instance_id: z.string().trim().min(1).max(200),
+        expected_revision: z.number().int().positive(),
+        thread_id: z.string().trim().min(1).max(200),
+        control_lease_id: z.string().trim().min(1).max(200),
+        target: SurfacePanelRouteTargetSchema,
+        sequence_id: z.string().trim().min(1).max(200).nullable().optional(),
+        requested_view: z.string().trim().min(1).max(200).nullable().optional(),
+        focus_target: z.string().trim().min(1).max(200).nullable().optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+    },
+    async ({ surface_instance_id, expected_revision, thread_id, control_lease_id, target, sequence_id, requested_view, focus_target }) => callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+      requireSurfaceDeveloper(HELIX_AGENT_RUN_WRITE_SCOPE);
+      return {
+        ...hudSurfaceRegistry.preparePanelRoute(
+          input.principal.accountProfileId,
+          surface_instance_id,
+          {
+            schema: HELIX_SURFACE_PANEL_ROUTE_SCHEMA,
+            expected_revision,
+            target,
+            sequence_id: sequence_id ?? null,
+            requested_view: requested_view ?? null,
+            focus_target: focus_target ?? null,
+          },
+          surfaceMcpPrincipal(thread_id, control_lease_id),
+        ),
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    }),
+  );
+
+  server.registerTool(
+    "helix_surface_configure",
+    {
+      title: "Configure a leased shared HUD surface",
+      description: "Applies a revision-checked presentation configuration through a user-issued, thread-bound lease. It cannot change the leased profile/source/producer identity or gain program-input, reflex, or answer authority.",
+      inputSchema: z.object({ surface_instance_id: z.string().trim().min(1).max(200), expected_revision: z.number().int().positive(), thread_id: z.string().trim().min(1).max(200), control_lease_id: z.string().trim().min(1).max(200), desired_state: SurfaceDesiredStateSchema }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+    },
+    async ({ surface_instance_id, expected_revision, thread_id, control_lease_id, desired_state }) => callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+      requireSurfaceDeveloper(HELIX_AGENT_RUN_WRITE_SCOPE);
+      return { ...hudSurfaceRegistry.execute(input.principal.accountProfileId, surface_instance_id, { operation: "configure", expected_revision, desired_state }, surfaceMcpPrincipal(thread_id, control_lease_id)), assistant_answer: false, terminal_eligible: false };
+    }),
+  );
+
+  for (const operation of ["blank", "release"] as const) {
+    server.registerTool(
+      `helix_surface_${operation}`,
+      {
+        title: `${operation === "blank" ? "Emergency blank" : "Release"} a leased shared HUD surface`,
+        description: `${operation === "blank" ? "Blanks" : "Releases"} one exact revision through a user-issued, thread-bound control lease. The receipt is observation, not an assistant answer.`,
+        inputSchema: z.object({ surface_instance_id: z.string().trim().min(1).max(200), expected_revision: z.number().int().positive(), thread_id: z.string().trim().min(1).max(200), control_lease_id: z.string().trim().min(1).max(200) }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: operation === "release", idempotentHint: false, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_AGENT_RUN_WRITE_SCOPE),
+      },
+      async ({ surface_instance_id, expected_revision, thread_id, control_lease_id }) => callTool(HELIX_AGENT_RUN_WRITE_SCOPE, async () => {
+        requireSurfaceDeveloper(HELIX_AGENT_RUN_WRITE_SCOPE);
+        const command = operation === "blank"
+          ? { operation, expected_revision, reason: "emergency_blank" as const }
+          : { operation, expected_revision, reason: "manual_release" as const };
+        return { ...hudSurfaceRegistry.execute(input.principal.accountProfileId, surface_instance_id, command, surfaceMcpPrincipal(thread_id, control_lease_id)), assistant_answer: false, terminal_eligible: false };
+      }),
+    );
+  }
 
   server.registerTool(
     "helix_realtime_texture_pack_inspect",
@@ -4445,6 +4620,99 @@ export const createHelixMcpServer = (input: {
       }),
     );
 
+    server.registerTool(
+      "helix_workstation_human_control_present",
+      {
+        title: "Present a human-only CasimirBot control",
+        description: "Brings the native CasimirBot window forward, opens the owning panel, scrolls to one catalogued human-only control, and highlights it for the user. It cannot click the control, invoke its handler, grant consent or authority, expose UI state, or become an assistant answer.",
+        inputSchema: z.object({
+          client_continuation_ref: localSupervisorContinuationSchema,
+          control_id: z.string().trim().min(8).max(220)
+            .refine(
+              (value) => publicUiHumanControlById.has(value),
+              "Unknown or non-human-only public UI control.",
+            ),
+        }).strict(),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      },
+      async (args) => callLocalSupervisorTool(
+        HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+        async () => {
+          requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+          if (!input.desktopWorkstationPresenter) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "native_presenter_unavailable",
+              "The installed CasimirBot presentation broker is unavailable.",
+              true,
+            );
+          }
+          const identity = localSupervisorIdentity(
+            args.client_continuation_ref,
+          );
+          const presence = coordinationStore.listPresence().find((entry) =>
+            entry.client_session_ref === identity.clientSessionRef,
+          );
+          if (
+            !presence?.active ||
+            presence.conversation_thread_ref !==
+              args.client_continuation_ref ||
+            presence.authenticated_mcp_client_ref !==
+              identity.authenticatedClientRef
+          ) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "active_client_presence_required",
+              "Register this exact continuation with the local supervisor before presenting a human-only control.",
+              true,
+            );
+          }
+          coordinationStore.authenticateClient({
+            profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId,
+            clientSessionRef: identity.clientSessionRef,
+          });
+          const control = publicUiHumanControlById.get(args.control_id)!;
+          const panelId = control.surface_id.slice(
+            "workstation.panel.".length,
+          );
+          const presentationRequestRef =
+            `workstation_present_request:${crypto.randomUUID()}`;
+          const presented = await input.desktopWorkstationPresenter({
+            presentationRequestRef,
+            accountSessionId: input.principal.accountContext.session_id,
+            panelId,
+            controlId: control.control_id,
+          });
+          return {
+            schema: "helix.workstation_human_control_presentation.v1",
+            accepted: presented.accepted,
+            presentation_request_ref: presentationRequestRef,
+            control_id: control.control_id,
+            panel_id: panelId,
+            interaction_kind: "human_only" as const,
+            presentation_only: true,
+            control_invoked: false,
+            consent_granted: false,
+            authority_granted: false,
+            credential_included: false,
+            private_ui_state_included: false,
+            reentry_required: true,
+            answer_authority: false,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          };
+        },
+      ),
+    );
+
     if (input.desktopMcpTunnelTransitionStore) {
       const transitionStore = input.desktopMcpTunnelTransitionStore;
       if (transitionStore.serviceInstanceRef !== coordinationStore.serviceInstanceRef) {
@@ -4503,8 +4771,14 @@ export const createHelixMcpServer = (input: {
         };
       };
       const transitionOutputFlags = {
-        reconnect_required: true as const,
-        catalog_refresh_required: true as const,
+        // The installed desktop now keeps one public MCP route and switches
+        // only its loopback target. Request/inspect/replay receipts must not
+        // resurrect the legacy manual-reconnect contract after that stable
+        // router has been packaged. A native executor may still override these
+        // fields below if it truthfully reports a non-stable transition.
+        reconnect_required: false as const,
+        catalog_refresh_required: false as const,
+        stable_scope_routing: true as const,
         shared_live_room_catalog_pre_advertised: true as const,
         tool_list_changed_supported: true as const,
         authority_limited_to_tunnel_transport: true as const,
@@ -4516,6 +4790,23 @@ export const createHelixMcpServer = (input: {
         answer_authority: false as const,
         assistant_answer: false as const,
         terminal_eligible: false as const,
+      };
+      const transitionFlagsFor = (
+        requestRef: string,
+        identity: DesktopMcpTransitionIdentity,
+      ) => {
+        const outcome = transitionStore.readNativeRoutingOutcome({
+          identity,
+          requestRef,
+        });
+        return {
+          ...transitionOutputFlags,
+          ...(outcome ? {
+            reconnect_required: outcome.reconnectRequired,
+            catalog_refresh_required: outcome.catalogRefreshRequired,
+            stable_scope_routing: outcome.stableScopeRouting,
+          } : {}),
+        };
       };
       const requestToolCatalogRefresh = async (): Promise<boolean> => {
         try {
@@ -4533,21 +4824,116 @@ export const createHelixMcpServer = (input: {
         "helix_desktop_tunnel_transition_request",
         {
           title: "Request a governed full MCP tunnel delegation",
-          description: "Creates a pending, developer-only, short-lived tunnel transport request bound to this exact active MCP presence. A separate first-party native desktop session must approve it before execution. It cannot grant itself, start the tunnel, grant an environment capability, or become an assistant answer.",
+          description: "Creates or recovers the open developer-only, short-lived tunnel transport request bound to this exact active MCP presence. A separate first-party native desktop session must approve it before execution. It cannot grant itself, start the tunnel, grant an environment capability, or become an assistant answer.",
           inputSchema: desktopMcpTransitionRequestInputSchema,
           annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
           _meta: oauthToolMeta(HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE),
         },
         async (args) => callLocalSupervisorTool(
           HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
-          () => {
+          async () => {
             requireAllAgentScopes([HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]);
-            const created = transitionStore.request({
-              identity: transitionIdentity(args.client_continuation_ref),
+            const identity = transitionIdentity(args.client_continuation_ref);
+            const openRequest = transitionStore.findOpenForIdentity(identity);
+            const created = openRequest ? null : transitionStore.request({
+              identity,
               declaredTaskSummary: args.declared_task_summary,
               requestedLeaseSeconds: args.requested_lease_seconds,
             });
-            return { ok: true, ...created, ...transitionOutputFlags };
+            let request = openRequest ?? created!.request;
+            let receipt = openRequest
+              ? transitionStore.listReceipts(openRequest.transition_request_ref).at(-1)!
+              : created!.receipt;
+            let trustedDeviceDelegationApplied = false;
+            let trustedDevicePolicyActive = false;
+            let accountSessionReady = false;
+            let agentAccountBindingReady = false;
+            if (
+              input.principal.accountType === "developer" &&
+              input.desktopFullHarnessTrustReader
+            ) {
+              const trust = await input.desktopFullHarnessTrustReader({
+                authenticatedProfileRef: input.principal.accountProfileId,
+              });
+              trustedDevicePolicyActive = trust.trusted;
+              accountSessionReady = trust.accountSessionReady === true;
+              agentAccountBindingReady =
+                trust.agentAccountBindingReady === true;
+              if (
+                request.status === "pending_user_delegation" &&
+                trust.trusted &&
+                trust.delegatedAccountSessionId
+              ) {
+                const granted = transitionStore.grant({
+                  requestRef: request.transition_request_ref,
+                  authenticatedProfileRef: input.principal.accountProfileId,
+                  accountSessionId: trust.delegatedAccountSessionId,
+                  accountType: "developer",
+                  leaseSeconds: request.requested_lease_seconds,
+                });
+                request = granted.request;
+                receipt = granted.receipt;
+                trustedDeviceDelegationApplied = true;
+              }
+            }
+            // Clients that have not adopted the dedicated human-control
+            // presentation tool can still complete onboarding through this
+            // stable tunnel tool. A pending untrusted request presents only
+            // device trust. Once trust is active, present the next human-only
+            // OAuth account binding when it is absent or revoked, then the
+            // exact-task binding control. Neither branch invokes the control.
+            const nativePresentation = !input.desktopWorkstationPresenter
+              ? null
+              : request.status === "pending_user_delegation" &&
+                  !trustedDevicePolicyActive
+                ? {
+                    panelId: "agent-access",
+                    targetId: "full-harness-trust",
+                  }
+                : trustedDevicePolicyActive &&
+                    ["delegated", "transition_accepted", "active"].includes(
+                      request.status,
+                    )
+                  ? !accountSessionReady
+                    ? {
+                        panelId: "account-session",
+                        targetId: "account-session-sign-in",
+                      }
+                    : agentAccountBindingReady
+                      ? {
+                          panelId: "agent-access",
+                          controlId:
+                            "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+                        }
+                      : {
+                          panelId: "agent-access",
+                          targetId: "auth0-account-link",
+                        }
+                  : null;
+            const nativeAttentionRequested = nativePresentation
+              ? await input.desktopWorkstationPresenter({
+                  presentationRequestRef: request.transition_request_ref,
+                  accountSessionId: input.principal.accountContext.session_id,
+                  ...nativePresentation,
+                }).then((result) => result.accepted).catch(() => false)
+              : false;
+            const toolListChangedRequested =
+              Boolean(openRequest) &&
+              (request.status === "transition_accepted" ||
+                request.status === "active")
+                ? await requestToolCatalogRefresh()
+                : false;
+            return {
+              ok: true,
+              request,
+              receipt,
+              existing_request_reused: Boolean(openRequest),
+              trusted_device_delegation_applied: trustedDeviceDelegationApplied,
+              tool_list_changed_requested: toolListChangedRequested,
+              native_attention_requested: nativeAttentionRequested,
+              native_attention_presentation_only: true,
+              ...transitionFlagsFor(request.transition_request_ref, identity),
+            };
           },
         ),
       );
@@ -4568,8 +4954,9 @@ export const createHelixMcpServer = (input: {
           HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
           () => {
             requireAllAgentScopes([HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]);
+            const identity = transitionIdentity(args.client_continuation_ref);
             const request = transitionStore.inspect({
-              identity: transitionIdentity(args.client_continuation_ref),
+              identity,
               requestRef: args.transition_request_ref,
             });
             const receipts = transitionStore.listReceipts(
@@ -4580,7 +4967,7 @@ export const createHelixMcpServer = (input: {
               request,
               receipts,
               receipt_chain_scope: "service_instance" as const,
-              ...transitionOutputFlags,
+              ...transitionFlagsFor(request.transition_request_ref, identity),
             };
           },
         ),
@@ -4633,7 +5020,7 @@ export const createHelixMcpServer = (input: {
                 idempotency_replayed: true,
                 native_transition_resubmitted: false,
                 tool_list_changed_requested: toolListChangedRequested,
-                ...transitionOutputFlags,
+                ...transitionFlagsFor(delegated.transition_request_ref, identity),
               };
             }
             try {
@@ -4644,6 +5031,14 @@ export const createHelixMcpServer = (input: {
                   authorization.delegatedAccountSessionId,
                 targetScope: args.target_scope,
                 delegationExpiresAt: delegated.delegation_expires_at,
+              });
+              transitionStore.recordNativeRoutingOutcome({
+                requestRef: delegated.transition_request_ref,
+                outcome: {
+                  reconnectRequired: native.reconnectRequired,
+                  catalogRefreshRequired: native.catalogRefreshRequired,
+                  stableScopeRouting: native.stableScopeRouting,
+                },
               });
               const toolListChangedRequested = native.accepted
                 ? await requestToolCatalogRefresh()
@@ -4656,7 +5051,7 @@ export const createHelixMcpServer = (input: {
                 idempotency_replayed: false,
                 native_transition_resubmitted: true,
                 tool_list_changed_requested: toolListChangedRequested,
-                ...transitionOutputFlags,
+                ...transitionFlagsFor(delegated.transition_request_ref, identity),
               };
             } catch (error) {
               transitionStore.settle({
@@ -4684,6 +5079,7 @@ export const createHelixMcpServer = (input: {
         ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_workstation_human_control_present", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ...(input.reasoningTaskBindingStore ? [
           ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
           ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
@@ -6962,11 +7358,11 @@ export const createHelixMcpServer = (input: {
     {
       title: "Launch and join the local Fabric play session",
       description:
-        "Launches or reuses the prepared same-host Fabric client and joins the loopback server only under an exact current Player Embodiment lease and explicit operator confirmation. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence for Codex re-entry.",
+        "Launches or reuses the prepared same-host Fabric client and joins the loopback server under either an exact current Player Embodiment lease or the separately trusted developer-device Workstation Lifecycle bootstrap. Bootstrap grants no Minecraft action authority. An explicit restart_client request still requires an active Player Embodiment lease. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence for Codex re-entry.",
       inputSchema: z.object({
         room_id: helixSharedLiveRoomIdSchema,
         environment_binding_id: z.string().trim().min(1).max(320),
-        action_authority_id: z.string().trim().min(1).max(320),
+        action_authority_id: z.string().trim().min(1).max(320).nullable().optional(),
         operator_confirmation: z.literal(true),
         request: helixMinecraftLocalLifecycleRequestSchema,
       }).strict(),
@@ -6999,12 +7395,14 @@ export const createHelixMcpServer = (input: {
           profileId: input.principal.accountProfileId,
           environmentBindingId: argumentsValue.environment_binding_id,
         });
-        const authority = inspected.authorities.find((entry) =>
-          entry.action_authority_id === argumentsValue.action_authority_id &&
+        const actionAuthorityId = argumentsValue.action_authority_id ?? null;
+        const authority = actionAuthorityId === null ? null :
+          inspected.authorities.find((entry) =>
+          entry.action_authority_id === actionAuthorityId &&
           entry.room_id === argumentsValue.room_id &&
           entry.environment_binding_id === argumentsValue.environment_binding_id
-        );
-        if (!authority) {
+        ) ?? null;
+        if (actionAuthorityId !== null && !authority) {
           throw new HelixAgentApiServiceError(
             404,
             "minecraft_local_lifecycle_authority_not_found",
@@ -7012,11 +7410,11 @@ export const createHelixMcpServer = (input: {
             false,
           );
         }
-        if (
+        if (authority && (
           authority.status !== "active" ||
           (authority.expires_at !== null &&
             Date.parse(authority.expires_at) <= Date.now())
-        ) {
+        )) {
           throw new HelixAgentApiServiceError(
             409,
             "minecraft_local_lifecycle_authority_inactive",
@@ -7024,13 +7422,38 @@ export const createHelixMcpServer = (input: {
             false,
           );
         }
-        if (authority.domain_adapter !== "minecraft.fabric_client.v1") {
+        if (authority &&
+          authority.domain_adapter !== "minecraft.fabric_client.v1") {
           throw new HelixAgentApiServiceError(
             409,
             "minecraft_local_lifecycle_authority_incompatible",
             "The exact active authority is not a Fabric player-client lease.",
             false,
           );
+        }
+        if (!authority) {
+          if (argumentsValue.request.restart_client) {
+            throw new HelixAgentApiServiceError(
+              409,
+              "minecraft_local_lifecycle_restart_authority_required",
+              "Replacing a running Minecraft client requires an exact active Player Embodiment authority.",
+              false,
+            );
+          }
+          const trust = await input.desktopFullHarnessTrustReader?.({
+            authenticatedProfileRef: input.principal.accountProfileId,
+          });
+          if (!trust?.trusted) {
+            throw new HelixAgentApiServiceError(
+              403,
+              "account_policy_blocked",
+              "Trust this installed developer device for Full Harness before launching the Minecraft workstation lifecycle without Player Embodiment authority.",
+              false,
+              {
+                reason: "minecraft_local_lifecycle_device_trust_required",
+              },
+            );
+          }
         }
         const receipt = helixMinecraftLocalLifecycleReceiptSchema.parse(
           await minecraftLocalLifecycleRunner({
@@ -7044,7 +7467,10 @@ export const createHelixMcpServer = (input: {
               HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
             room_id: argumentsValue.room_id,
             environment_binding_id: argumentsValue.environment_binding_id,
-            action_authority_id: argumentsValue.action_authority_id,
+            action_authority_id: actionAuthorityId,
+            launch_authority_basis: authority
+              ? "active_player_embodiment" as const
+              : "trusted_device_workstation_lifecycle" as const,
             status: "connected",
             receipt,
             authority_widened: false,
@@ -7091,7 +7517,12 @@ export const createHelixMcpServer = (input: {
             turnId: `mcp_environment_probe_turn:${digest}`,
             toolCallId: `mcp_environment_probe_tool_call:${digest}`,
             providerExecutionId: `mcp_environment_probe_execution:${digest}`,
-            arguments: {},
+            // The installed Fabric connector captures fresh state immediately,
+            // but its bounded polling + durable re-entry path can legitimately
+            // exceed the gateway's generic 5 s default. Keep stale results
+            // fail-closed while giving this user-facing convenience read the
+            // same explicit budget exposed by helix_minecraft_situation_probe.
+            arguments: { freshness_requirement_ms: 30_000 },
             accountContext: input.principal.accountContext,
             conversationThreadId: `helix-ask:room:${room_id}`,
           });
@@ -7107,6 +7538,7 @@ export const createHelixMcpServer = (input: {
             arguments: {
               horizontal_radius: 7,
               vertical_radius: 8,
+              freshness_requirement_ms: 30_000,
             },
             accountContext: input.principal.accountContext,
             conversationThreadId: `helix-ask:room:${room_id}`,
@@ -8137,11 +8569,17 @@ export const createHelixMcpServer = (input: {
           idempotencyKey: effectiveIdempotencyKey,
         });
         const actionArguments = normalizeMinecraftMcpActionArguments(action);
+        // The idempotency digest identifies the physical intent, but each MCP
+        // invocation still needs its own delivery identity. The action gateway
+        // compares the queued tool-call id with this invocation id to report a
+        // duplicate as an idempotent replay. Reusing the digest here preserved
+        // exactly-once execution but incorrectly labeled the replay as fresh.
+        const invocationId = crypto.randomUUID();
         const execution: EnvironmentActionGatewayExecution =
           await environmentActionExecutor({
             capabilityId,
             turnId: principal_turn_id ?? `mcp_environment_turn:${digest}`,
-            toolCallId: `mcp_environment_tool_call:${digest}`,
+            toolCallId: `mcp_environment_tool_call:${invocationId}`,
             providerExecutionId: `mcp_environment_execution:${digest}`,
             arguments: {
               ...actionArguments,
@@ -8927,6 +9365,12 @@ export const createHelixMcpServer = (input: {
       ["helix_run_evidence_reenter", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_public_ui_catalog", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_surface_list", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_surface_inspect", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_surface_prepare_panel_route", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_surface_configure", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_surface_blank", HELIX_AGENT_RUN_WRITE_SCOPE],
+      ["helix_surface_release", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_realtime_texture_pack_inspect", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_realtime_texture_pack_control", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_realtime_texture_pack_visual_direction_control", HELIX_AGENT_RUN_WRITE_SCOPE],
@@ -9003,10 +9447,16 @@ export const createHelixMcpServer = (input: {
       ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ["helix_workstation_human_control_present", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ...(input.reasoningTaskBindingStore ? [
         ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ] as Array<[string, RequiredOAuthScopes]> : []),
+      ...(input.desktopMcpTunnelTransitionStore ? [
+        ["helix_desktop_tunnel_transition_request", [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]],
+        ["helix_desktop_tunnel_transition_inspect", [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]],
+        ["helix_desktop_tunnel_transition_execute", [HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE]],
       ] as Array<[string, RequiredOAuthScopes]> : []),
     ]),
   );

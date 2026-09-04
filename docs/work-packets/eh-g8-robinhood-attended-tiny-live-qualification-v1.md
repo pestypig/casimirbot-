@@ -264,20 +264,28 @@ enabled and no provider order call was made.
 
 ## Remaining live-acceptance sequence
 
-1. **Passed 2026-08-27:** installed profile-owned OAuth and read-only acceptance
-   has fresh sanitized portfolio, position, quote, order-history and P&L
-   receipts.
-2. **Passed 2026-08-27:** while both live flags remained off, the seven-contract
-   provider preflight recorded PASS with `provider_order_tool_calls_made=0`.
-3. Confirm the selected Agentic account has no position and no open order and
+The reactive simulation packet's R3–R5 evidence is an ordered harness-quality
+prerequisite for beginning a new attended canary assignment. It does not
+authorize an order. Once that prerequisite is accepted, the remaining
+real-money sequence uses these stage labels:
+
+1. **T0 — Current account and contract refresh.** The 2026-08-27 installed
+   profile-owned OAuth/read-only acceptance produced fresh sanitized portfolio,
+   position, quote, order-history and P&L receipts. With both live flags off,
+   the seven-contract provider preflight also recorded PASS with
+   `provider_order_tool_calls_made=0`. These receipts must be refreshed if
+   provider state, connection identity, catalog hash or policy revision changes
+   before the canary.
+2. **T1 — Zero-exposure and notional qualification.** Confirm the selected Agentic account has no position and no open order and
    determine the smallest provider-supported notional no greater than $25.
-4. **Passed 2026-08-27:** the paired gates booted only with the stable key; the
-   installed supervisor and protective-exit plane were fresh, attended
-   presence reached `READY TO ARM`, and heartbeat expiry produced the persisted
-   zero-call dead-man relock.
-5. Stop before placement and present the exact entry review, notional, limit,
+3. **T2 — Attended safety rehearsal.** On 2026-08-27, the paired gates booted
+   only with the stable key; the installed supervisor and protective-exit plane
+   were fresh, attended presence reached `READY TO ARM`, and heartbeat expiry
+   produced the persisted zero-call dead-man relock. This rehearsal must be
+   current for the exact canary session.
+4. **T3 — Exact entry review and approval boundary.** Stop before placement and present the exact entry review, notional, limit,
    estimated risk and approval phrases to the user.
-6. Only after the user's exact per-order approval, place once, reconcile, add
+5. **T4 — One entry, protective exit and closeout.** Only after the user's exact per-order approval, place once, reconcile, add
    and reconcile the separately approved protective exit, remove all exposure,
    disable both live flags and archive the sanitized acceptance report with the
    exact connection- and room-bound confirmation phrase.

@@ -14,6 +14,7 @@ import {
   setSharedRealtimeRoomsExperiment,
   verifyPasswordAccountEmail,
 } from "../services/helix-account/account-session-store";
+import { surfaceRegistryService } from "../services/hud-surface/surface-registry-service";
 import {
   clearHelixSessionCookie,
   readHelixSessionCookie,
@@ -153,12 +154,17 @@ accountSessionRouter.post("/session/password-reset/confirm", async (req: Request
 
 accountSessionRouter.post("/session/sign-out", async (req: Request, res: Response) => {
   clearHelixSessionCookie(res);
-  res.json(await signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
+  const receipt = await signOutAccountSession(readHelixSessionCookie(req.headers.cookie));
+  if (receipt.session?.profile.profile_id) surfaceRegistryService.signOut(receipt.session.profile.profile_id);
+  res.json(receipt);
 });
 
 accountSessionRouter.delete("/profile", async (req: Request, res: Response) => {
   const receipt = await deleteAccountProfile(readHelixSessionCookie(req.headers.cookie));
-  if (receipt.ok) clearHelixSessionCookie(res);
+  if (receipt.ok) {
+    clearHelixSessionCookie(res);
+    if (receipt.session?.profile.profile_id) surfaceRegistryService.signOut(receipt.session.profile.profile_id);
+  }
   res.status(receipt.ok ? 200 : 401).json(receipt);
 });
 

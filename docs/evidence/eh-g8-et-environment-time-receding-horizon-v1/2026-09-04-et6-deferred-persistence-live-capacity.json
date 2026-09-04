@@ -1,0 +1,627 @@
+{
+  "schema": "helix.environment_time.et6_live_checkpoint.v1",
+  "recorded_at": "2026-09-04T00:45:00-04:00",
+  "program_gate": "G8",
+  "stage": "ET6",
+  "status": "partial_live_acceptance_reasoning_binding_and_interruption_pending",
+  "classification": [
+    "evidence_normalization",
+    "evidence_re_entry",
+    "tool_admission",
+    "presentation"
+  ],
+  "packaged_runtime": {
+    "surface": "canonical_packaged_exe",
+    "exe_sha256": "4f434941aeba5ba05d89d6b92cdbacff908726c68678b7b0e6d7080bd8bac611",
+    "service_instance_ref": "service_instance:0881e7327728b8eb0fe9a3b7f7e6654c",
+    "stable_scope_routing": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false
+  },
+  "first_divergence": {
+    "historical_symptom": "The fresh Fabric source was probe-ready, but perception_snapshot timed out while repeated world-event batch submissions hit transport deadlines.",
+    "cause": "The installed desktop forced immediate local pg-mem snapshots, so each mutation synchronously rewrote an approximately 41 MB durable profile before returning HTTP responses.",
+    "repair": {
+      "write_mode": "deferred",
+      "idle_flush_ms": 2500,
+      "max_flush_ms": 15000,
+      "graceful_shutdown_flush_preserved": true,
+      "bounded_smoke_polling_added": true
+    },
+    "live_result": "After the packaged service restart the manifest was admitted, recurring world-event transport timeouts stopped, and one bounded perception probe completed successfully in 3453 ms."
+  },
+  "identity": {
+    "client_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "room_ref": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "participant_ref": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+    "environment_binding_ref": "environment_binding:legacy:be9436afe188d057c5d54fa72da2953d93b31bd7",
+    "room_source_binding_ref": "room_source_binding:07ae48b8-8481-4c34-80a2-faf1491fa139",
+    "source_ref": "source:room-ingress:c524e05a-247b-48b7-b011-8e89cb9b6796",
+    "world_ref": "minecraft:minehut:479f4368-ada",
+    "subject_binding_ref": "environment_subject_binding:73487de1-dd67-454d-bc8d-d9c4f05ff044",
+    "subject_label": "DatDamPig",
+    "exact_reasoning_binding_status": "fresh_operator_claim_required",
+    "supplied_claim_result": "reasoning_binding_claim_invalid_nonretryable",
+    "claim_handle_retained": false,
+    "claim_replayed": false
+  },
+  "connector": {
+    "health": "online",
+    "freshness": "fresh",
+    "probe_ready": true,
+    "blocking_reasons": [],
+    "capability_count": 12,
+    "manifest_readmitted_after_restart": true,
+    "recurring_world_event_timeouts_after_readmission": false
+  },
+  "initial_perception": {
+    "probe_request_ref": "environment_probe_request:764b8e40-22ee-4188-b446-dcc6d9922d56",
+    "evidence_ref": "environment_probe_evidence:9383482309ba0f19bfa309568249eb4ca9d677c3",
+    "outcome": "succeeded",
+    "wall_clock_ms": 3453,
+    "freshness_age_ms": 69,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "semantic_fingerprint": "sha256:e6d5d1c77ceff5722d8fce5394a3733c2c582fb09276b55a196dd36ada389960",
+    "position": { "x": -3.13, "y": 65, "z": 5.03 },
+    "hazard_count": 0,
+    "navigation_planner": "casimirbot_native_bounded_dijkstra",
+    "reachable_foothold_count": 95,
+    "coverage_complete": true
+  },
+  "player_embodiment": {
+    "action_authority_ref": "environment_action_authority:5b10b82b-93d8-4b2f-8f19-949e13cdc209",
+    "domain_adapter": "minecraft.fabric_client.v1",
+    "allowed_capability_ids": [
+      "com.casimirbot.minecraft.player.sequence.execute"
+    ],
+    "autonomy_mode": "autonomous",
+    "manual_override_policy": "cancel",
+    "credential_included": false,
+    "pairing_code_included": false,
+    "client_process_id": 25768,
+    "launcher_action": "launched_client",
+    "connection_action": "autojoin_staged",
+    "isolated_game_directory": true,
+    "authority_widened": false
+  },
+  "rolling_cycles": [
+    {
+      "cycle": 1,
+      "sequence_id": "sequence:et6_deferred_persistence_cycle_1",
+      "perception_fingerprint": "sha256:e6d5d1c77ceff5722d8fce5394a3733c2c582fb09276b55a196dd36ada389960",
+      "action_request_ref": "environment_action_request:bc1e6a9a-8916-47b1-a060-b10641684bdb",
+      "action_execution_ref": "environment_action_execution:e94bcfba-38cd-4c35-b0ce-916cc55dc356",
+      "workflow_ref": "environment_action_workflow:603a1c2f-6e00-4ec3-8ae5-31eff4f45b12",
+      "evidence_ref": "environment_action_evidence:46e7a5ac1f66e20c941176e8285aaa13b93c82deb",
+      "dispatch_to_first_tick_ms": 60,
+      "resident_computation_ms": 9,
+      "wall_clock_elapsed_ms": 263,
+      "scheduler_ticks": 6,
+      "missed_ticks": 0,
+      "stalled_ticks": 0,
+      "controls_released": true,
+      "player_motion_performed": true
+    },
+    {
+      "cycle": 2,
+      "sequence_id": "sequence:et6_deferred_persistence_cycle_2",
+      "perception_evidence_ref": "environment_probe_evidence:489c37fea28d60d07d7f01fa7f407b7dd13410f8",
+      "perception_fingerprint": "sha256:f63cfbe611abd18f89dc871cc73ad982d2c0bd5dafca803b5a73dab5e760b258",
+      "action_request_ref": "environment_action_request:c4c6e883-dade-4fdf-9be1-9da0e346add1",
+      "action_execution_ref": "environment_action_execution:59b1f8c3-d5ac-472b-a61f-1d70a27f8076",
+      "workflow_ref": "environment_action_workflow:3c61a490-e29c-4b1f-884e-823c0f9b841d",
+      "evidence_ref": "environment_action_evidence:c235a29676c8e863ee2670a1de0e31dec7b3ed5fa",
+      "dispatch_to_first_tick_ms": 25,
+      "resident_computation_ms": 4,
+      "wall_clock_elapsed_ms": 238,
+      "scheduler_ticks": 6,
+      "missed_ticks": 0,
+      "stalled_ticks": 0,
+      "controls_released": true,
+      "player_motion_performed": true
+    },
+    {
+      "cycle": 3,
+      "sequence_id": "sequence:et6_changed_affordance_cycle_3",
+      "perception_evidence_ref": "environment_probe_evidence:089ec4a74da9e8958497be0de5bfb08b1466993b",
+      "perception_fingerprint": "sha256:951e43524f90d282407dac3c4eb74f7d4f617301470d57de142bd6ba94d65b6e",
+      "changed_affordance": {
+        "reachable_foothold_count_before": 95,
+        "reachable_foothold_count_after_cycle_2": 91,
+        "selected_new_safe_direction": "left_north"
+      },
+      "action_request_ref": "environment_action_request:55ab67e0-e0a5-41cd-903f-3d7e65b187b3",
+      "action_execution_ref": "environment_action_execution:08bf9e8d-2fdc-49db-aba5-52664299bef2",
+      "workflow_ref": "environment_action_workflow:97c977fc-4a54-4580-b657-e6b659fe901a",
+      "evidence_ref": "environment_action_evidence:90c5bec98e25306855df164bf37d6898bb88a6560",
+      "dispatch_to_first_tick_ms": 30,
+      "resident_computation_ms": 4,
+      "wall_clock_elapsed_ms": 237,
+      "scheduler_ticks": 6,
+      "missed_ticks": 0,
+      "stalled_ticks": 0,
+      "controls_released": true,
+      "player_motion_performed": true
+    }
+  ],
+  "sustained_runway": {
+    "sequence_id": "sequence:et6_local_interrupt_stationary_20260904",
+    "action_request_ref": "environment_action_request:2cc861b8-5dbf-4138-b5f4-db2dcb78bd17",
+    "action_execution_ref": "environment_action_execution:c7fff81c-6c2d-4b8d-a122-98a1c3798a42",
+    "workflow_ref": "environment_action_workflow:e89f3842-5d7c-450e-b873-6b27f902091b",
+    "evidence_ref": "environment_action_evidence:0bd9abcef2100c604731567bc5a04ef71a2667f53",
+    "scheduler_ticks": 202,
+    "wall_clock_elapsed_ms": 10037,
+    "dispatch_to_first_tick_ms": 10,
+    "resident_computation_ms": 64,
+    "missed_ticks": 0,
+    "stalled_ticks": 0,
+    "controls_released": true,
+    "player_motion_performed": false,
+    "manual_override_detected": false,
+    "classification": "positive_sustained_runway_not_interruption_proof"
+  },
+  "durable_capacity_measurement_extraction": {
+    "source": "packaged_exe_local_pg_mem_action_request_result_and_workflow_event_rows",
+    "source_saved_at": "2026-09-04T01:23:29.9216717-04:00",
+    "workflow_count": 3,
+    "per_cycle": [
+      {
+        "rolling_cycle_index": 1,
+        "workflow_ref": "environment_action_workflow:603a1c2f-6e00-4ec3-8ae5-31eff4f45b12",
+        "admitted_queue_depth_at_creation": 1,
+        "admission_to_lease_ms": 815,
+        "result_ingestion_ms": 90,
+        "dispatch_to_client_accept_ms": 29
+      },
+      {
+        "rolling_cycle_index": 2,
+        "workflow_ref": "environment_action_workflow:3c61a490-e29c-4b1f-884e-823c0f9b841d",
+        "admitted_queue_depth_at_creation": 1,
+        "admission_to_lease_ms": 448,
+        "result_ingestion_ms": 324,
+        "dispatch_to_client_accept_ms": 23
+      },
+      {
+        "rolling_cycle_index": 3,
+        "workflow_ref": "environment_action_workflow:97c977fc-4a54-4580-b657-e6b659fe901a",
+        "admitted_queue_depth_at_creation": 1,
+        "admission_to_lease_ms": 648,
+        "result_ingestion_ms": 163,
+        "dispatch_to_client_accept_ms": 27
+      }
+    ],
+    "percentiles_ms": {
+      "admission_to_lease": { "sample_count": 3, "p50": 648, "p95": 798.3, "p99": 811.66 },
+      "dispatch_to_client_accept": { "sample_count": 3, "p50": 27, "p95": 28.8, "p99": 28.96 },
+      "dispatch_to_first_tick": { "sample_count": 3, "p50": 30, "p95": 57, "p99": 59.4 },
+      "resident_computation": { "sample_count": 3, "p50": 4, "p95": 8.5, "p99": 8.9 },
+      "result_ingestion": { "sample_count": 3, "p50": 163, "p95": 307.9, "p99": 320.78 }
+    },
+    "continuous_control_ratio": 1,
+    "stalled_tick_count": 0,
+    "missed_tick_count": 0,
+    "controls_released_count": 3,
+    "canonical_capacity_report_emitted": false,
+    "canonical_report_blockers": [
+      "exact_reasoning_binding_ref_missing_for_these_cycles",
+      "controlled_and_unknown_world_course_split_missing",
+      "resident_extension_queue_depth_peak_missing",
+      "extension_lead_time_ticks_missing",
+      "evidence_to_pickup_latency_missing",
+      "stop_to_replan_latency_missing",
+      "finalized_steering_to_stop_latency_missing",
+      "manual_or_safety_to_release_latency_missing",
+      "observation_bytes_tokens_and_coalescing_missing",
+      "verified_progress_per_model_tool_round_trip_missing"
+    ],
+    "interpretation": "The persisted timestamps support these action-plane percentiles only. Admitted queue depth at request creation is not substituted for resident extension queue depth, and result ingestion is not substituted for evidence pickup.",
+    "credential_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "post_action_observation": {
+    "evidence_ref": "environment_probe_evidence:d72c27cf0346842e12861980298f17ec853c3aca",
+    "semantic_fingerprint": "sha256:070c61b356b547085a5cf1acb21ac5b9dcab4caed8c85579362b35f3c9719611",
+    "position": { "x": -2.38, "y": 65, "z": 5.45 },
+    "reachable_foothold_count": 103,
+    "hazard_count": 0,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true
+  },
+  "reconnect_recovery": {
+    "credential_rotation": "opaque_room_source_pairing",
+    "prior_epoch_rejection": {
+      "outcome": "producer_epoch_mismatch",
+      "evidence_ref": "environment_probe_failure:d05d5f90ae11e6e8921575213fb1c2cd67b9ba41"
+    },
+    "recovered_subject_binding_ref": "environment_subject_binding:1d3f597a-86f8-410c-9ca4-d34b5c46539c",
+    "recovered_producer_epoch_ref": "adapter_epoch:df7a6d7d2cb5f93d6289edd02fcefee2e1c66b2f",
+    "same_subject_reverified": true,
+    "duplicate_effects": 0,
+    "credential_included": false
+  },
+  "manual_interruption_probe": {
+    "status": "negative_live_evidence_first_divergence_repaired_deterministically",
+    "first_divergence": "Windows message injection could move the Minecraft player while the prior GLFW sampled-state detector still reported manual_override_detected=false.",
+    "synthetic_keyboard_attempt": {
+      "action_evidence_ref": "environment_action_evidence:3904c7852c632173a25d3bda9f333b58a9b5f0005",
+      "motion_observed": true,
+      "manual_override_detected": false,
+      "post_observation_ref": "environment_probe_evidence:10fc530847d8d611e321954972c702fcf5dcc679",
+      "classification": "negative_synthetic_input_evidence_not_manual_interruption_acceptance"
+    },
+    "synthetic_mouse_attempt": {
+      "workflow_ref": "environment_action_workflow:a25b3bf0-c862-41cf-a152-9570f125abe6",
+      "action_evidence_ref": "environment_action_evidence:7866ef67f0065e40e246ec96f74ed0115b157960b",
+      "scheduler_ticks": 601,
+      "wall_clock_elapsed_ms": 30049,
+      "missed_ticks": 0,
+      "stalled_ticks": 0,
+      "controls_released": true,
+      "manual_override_detected": false,
+      "classification": "negative_synthetic_input_evidence_not_manual_interruption_acceptance"
+    },
+    "repair": {
+      "mechanism": "workflow_scoped_raw_keyboard_and_mouse_press_latch",
+      "armed_only_during_active_workflow": true,
+      "first_reason_consumed_once": true,
+      "cleared_on_control_release": true,
+      "installed_mod_sha256": "759d726fc98a17aeffbb4431caaf6622474df154cc8a887a9c7df77b1ad62580",
+      "rollback_mod_sha256": "e73eeb067185a4d01b99b1427af765744224a4834b0e68982dc6cab205628ad2"
+    },
+    "genuine_user_input_live_acceptance": false
+  },
+  "revocation": {
+    "operation": "environment.action_authority.revoke",
+    "control_request_ref": "environment_action_control:d71ae054-510a-4e76-a1c0-369f9a9afe1e",
+    "release_all_controls": true,
+    "authority_status_in_immediate_receipt": "suspended",
+    "stale_repeat": {
+      "outcome": "authority_stale",
+      "action_request_ref": "environment_action_request_uncreated:8fb1b766d7a8a562d47781b0536687d4eeb2c6c4",
+      "workflow_ref": "environment_action_workflow_uncreated:8fb1b766d7a8a562d47781b0536687d4eeb2c6c4",
+      "action_execution_ref": null,
+      "progress_observation_count": 0,
+      "postcondition_evidence_count": 0,
+      "additional_admitted_effects": 0
+    },
+    "post_revoke_observation_ref": "environment_probe_evidence:55d36d41be6e498ef59172cd9fd9ccfea4ace810",
+    "post_revoke_position": { "x": -2.38, "y": 65, "z": 5.45 },
+    "post_revoke_fingerprint_unchanged": true,
+    "zero_further_motion": true
+  },
+  "post_repair_authority_reduction": {
+    "inspection_outcome": "action_adapter_admission_inactive",
+    "retryable": false,
+    "connector_log_observation": "room_source_credential_expired_and_sensor_transport_terminally_paused",
+    "blind_duplicate_revoke_attempted": false,
+    "new_action_admitted": false
+  },
+  "normal_shutdown": {
+    "minecraft_client_process_id": 27056,
+    "minecraft_close_main_window_accepted": true,
+    "minecraft_exit": "normal",
+    "fabric_stop_command_accepted": true,
+    "players_saved": true,
+    "worlds_saved": true,
+    "all_dimensions_saved": true,
+    "fabric_exit": "normal"
+  },
+  "queue_telemetry_repair_for_next_live_capture": {
+    "classification": [
+      "evidence_normalization",
+      "tool_admission"
+    ],
+    "first_divergence": "The broker leased a bounded action list but discarded the admitted queue depth and pending age, so the Fabric terminal envelope could not preserve queue pressure for ET6.",
+    "server_measurements_added": [
+      "queue_depth_at_lease",
+      "oldest_pending_age_ms"
+    ],
+    "fabric_adapter_version": "0.4.6",
+    "measurement_only": true,
+    "lease_order_changed": false,
+    "scheduling_changed": false,
+    "action_admission_changed": false,
+    "fabric_measurements_added": [
+      "queue_depth_at_lease",
+      "oldest_pending_age_ms",
+      "planned_runway_ticks_at_accept",
+      "runway_ticks_remaining"
+    ],
+    "installed_mod_sha256": "8b47d69557b42d8d0c2da294f1f42b0048625a4fc47669a92ab86dbbd7c491db",
+    "immediate_rollback_mod_sha256": "5b15163f8265da9aecb6bc6dbe87735bfc9be4b4be143f4e65120be147ff53bb",
+    "manual_input_repair_rollback_mod_sha256": "759d726fc98a17aeffbb4431caaf6622474df154cc8a887a9c7df77b1ad62580",
+    "packaged_exe_sha256": "d74c48e6add8dd3a052e8aa242f4d991450b417254f22538de3a0754d15553f6",
+    "packaged_server_sha256": "17a6e3ed7d71e3b4df2a13d5dac8d8c734545d4eb6817098bc5e767f8eb12f13",
+    "packaged_client_tree_sha256": "120a3ce825597845731725eba85e31ec207496454a36e858ae6b3541c5ec35fb",
+    "packaged_service_instance_ref": "service_instance:b9477f82b4119ff66c8c290af1f79239",
+    "packaged_health": "ready_http_200",
+    "transport_recovery": {
+      "transition_request_ref": "desktop_tunnel_request:a90d2591-5dbf-471e-b5ca-7036367d5072",
+      "transition_receipt_ref": "desktop_tunnel_receipt:d8f60462-7924-4e11-8179-80f8757b874b",
+      "trusted_device_delegation_reused": true,
+      "stable_scope_routing": true,
+      "reconnect_required_after_execution": false,
+      "catalog_refresh_required_after_execution": false,
+      "environment_authority_granted": false
+    },
+    "semantic_limit": "oldest_pending_age_ms measures queue wait and the runway fields measure the current finite horizon; neither is substituted for resident extension lead time",
+    "live_queue_measurement_captured": false,
+    "credential_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "reasoning_binding_consent_discoverability_repair": {
+    "classification": "presentation",
+    "first_divergence": "Agent Access rendered exact reasoning claim and lifecycle controls, but the public UI catalog exposed only the surrounding panel and two account-binding controls.",
+    "stable_control_ids_added": [
+      "workstation.panel.agent-access.agent-connection-setup.reasoning-claim-handle",
+      "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+      "workstation.panel.agent-access.agent-connection-setup.check-reasoning-binding",
+      "workstation.panel.agent-access.agent-connection-setup.revoke-reasoning-binding"
+    ],
+    "observation_controls": [
+      "reasoning-claim-handle",
+      "check-reasoning-binding"
+    ],
+    "human_only_controls": [
+      "bind-current-helix-chat",
+      "revoke-reasoning-binding"
+    ],
+    "capability_binding_added": false,
+    "route_contract_added": false,
+    "agent_click_authority_added": false,
+    "fresh_claim_still_required": true,
+    "source_client_build": "pass",
+    "focused_tests": "pass_14_of_14",
+    "packaged_exe_updated": true,
+    "packaged_exe_sha256": "e1c2d464cbfd0953dc2f583b0ce0104b24501e44232f380e90ff0da3bdce0119",
+    "packaged_service_sha256": "abea4d8b4af2c622b4b1ce3eefdb68c2d87fa45d4a2786f43bffc341de69874e",
+    "packaged_client_tree_sha256": "058d0d00edea6af4a8851c7b667a4442aa43e718083237966d9d259a3a1b6462",
+    "packaged_service_instance_ref": "service_instance:ef741012b3ec6253778d96f40dd984ac",
+    "normal_prior_exe_close": true,
+    "rebuilt_exe_visible_window_relaunched": true,
+    "full_harness_transition": {
+      "transition_request_ref": "desktop_tunnel_request:fff0cf03-7017-476f-9666-dceee296a0fe",
+      "transition_receipt_ref": "desktop_tunnel_receipt:990cffe0-8209-46cc-b7ea-bc091e98f876",
+      "trusted_device_delegation_reused": true,
+      "stable_scope_routing": true,
+      "reconnect_required_after_execution": false,
+      "catalog_refresh_required_after_execution": false,
+      "environment_authority_granted": false
+    },
+    "live_catalog_confirmation": {
+      "observation_ref": "mcp_evidence_observation:helix.public_ui.catalog.inspect:153fc6de-5a73-4010-b107-405c3c093e33",
+      "agent_access_control_count": 6,
+      "new_control_count": 4,
+      "human_only_count": 2,
+      "mcp_binding_count": 0,
+      "provenance_valid": true
+    },
+    "global_public_ui_audit": {
+      "status": "pre_existing_dirty_worktree_drift_remains",
+      "unregistered_control_count": 34,
+      "existing_id_collision": "workstation.panel.image-lens.realtime-texture-pack-controls.input",
+      "unrelated_controls_absorbed_into_this_repair": false
+    },
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "human_only_control_presentation_repair": {
+    "classification": "presentation",
+    "first_divergence": "The packaged workstation could catalog the exact human-only reasoning-binding control, but an already-loaded Codex task could not ask the native EXE to foreground, open, scroll to and spotlight that control without either UI puppeteering or another manual search.",
+    "tool_name": "helix_workstation_human_control_present",
+    "accepted_target_class": "catalogued_human_only_workstation_control",
+    "native_actions": [
+      "restore_and_foreground_packaged_window",
+      "open_owning_workstation_panel",
+      "scroll_to_exact_control",
+      "temporarily_highlight_exact_control"
+    ],
+    "explicitly_excluded_actions": [
+      "click_control",
+      "invoke_handler",
+      "grant_consent",
+      "grant_environment_authority",
+      "grant_answer_authority",
+      "grant_terminal_authority",
+      "expose_private_ui_state"
+    ],
+    "protocol_schema": "casimir_desktop_workstation_present_request/2",
+    "packaged_exe_sha256": "fb5669ea54e99f797b1c31311b1e3042e5b1d0e30daa6b64ce52f2b1c67a9bb9",
+    "packaged_service_sha256": "1479cfe42660941d886a7315eaa29c92f81a6087aaaabb3c2823f8ce6d7c2007",
+    "packaged_client_tree_sha256": "058d0d00edea6af4a8851c7b667a4442aa43e718083237966d9d259a3a1b6462",
+    "packaged_service_instance_ref": "service_instance:40c82f9ed8610defde0eb9557df2e91f",
+    "packaged_exe_process_id": 25852,
+    "protected_loopback_boundary": "three_broker_ports_returned_http_401_without_native_secret",
+    "full_harness_transition": {
+      "transition_request_ref": "desktop_tunnel_request:fe6d77f4-ed0f-4c0a-9172-02026b420b44",
+      "delegation_ref": "desktop_tunnel_delegation:186e6623-7933-450a-b400-de6070ae7477",
+      "accepted_receipt_ref": "desktop_tunnel_receipt:10c5530a-a9bc-45fe-94be-e40599455446",
+      "status": "transition_accepted",
+      "reconnect_required": true,
+      "catalog_refresh_required": true,
+      "environment_authority_granted": false
+    },
+    "loaded_task_catalog_state": "new_presentation_tool_not_adopted",
+    "live_presentation_receipt_captured": false,
+    "claim_attempt_after_rebuild": {
+      "outcome": "reasoning_binding_claim_invalid",
+      "retryable": false,
+      "handle_retained_in_evidence": false,
+      "binding_created": false,
+      "interpretation": "negative stale-epoch claim evidence; not exact-binding acceptance",
+      "further_retry_after_this_rejection": false
+    },
+    "fresh_operator_issued_claim_still_required": true,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "stale_reasoning_claim_surface_repair": {
+    "classification": "presentation",
+    "first_divergence": "A show-once claim remained visible in renderer state after its issuing packaged-service epoch was replaced, even though the new server correctly discarded the private one-shot lookup map and rejected the value.",
+    "repairs": [
+      "preserve service_instance_ref and expires_at in the browser binding projection",
+      "clear the claim and binding on current-service epoch mismatch",
+      "clear the claim on authoritative binding not-found, expired or superseded responses",
+      "clear the claim locally at its finite expiry",
+      "show the expiry time and explicit no-retry-after-restart guidance"
+    ],
+    "claim_persisted_across_service_restart": false,
+    "claim_value_retained_in_evidence": false,
+    "binding_authority_changed": false,
+    "reasoning_role_changed": false,
+    "focused_ui_and_catalog_tests": "pass_22_of_22",
+    "production_client_build": "pass",
+    "helix_ask_discipline_quick": "pass_with_expected_dirty_worktree_classifications",
+    "packaged_exe_sha256": "fb5669ea54e99f797b1c31311b1e3042e5b1d0e30daa6b64ce52f2b1c67a9bb9",
+    "packaged_app_asar_sha256": "db9854ee597ece2b4d2177bc8726e4584e5d0fecdbf811b6a46e34f2a8b17329",
+    "packaged_service_sha256": "1479cfe42660941d886a7315eaa29c92f81a6087aaaabb3c2823f8ce6d7c2007",
+    "packaged_main_process_id": 21116,
+    "protected_native_listener_count": 3,
+    "protected_native_listener_unauthenticated_status": 401,
+    "current_service_instance_ref": "service_instance:f828e88ee54ab2541af9fceb0303eec6",
+    "current_client_session_ref": "supervisor_client:7a58974644ca6d99723d165069bc71a7",
+    "exact_continuation_registered": true,
+    "room_identity_reverified": true,
+    "connector_source_epoch_reverified": true,
+    "full_harness_transition": {
+      "transition_request_ref": "desktop_tunnel_request:6a92534f-40b9-464f-9811-50a971c8d122",
+      "delegation_ref": "desktop_tunnel_delegation:c8d098d0-0f3e-4481-a64a-44a82a799ee9",
+      "accepted_receipt_ref": "desktop_tunnel_receipt:75f3394b-dfa2-4739-bfd2-22a053048ed4",
+      "trusted_device_delegation_reused": true,
+      "stable_scope_routing": true,
+      "reconnect_required_after_execution": false,
+      "catalog_refresh_required_after_execution": false,
+      "tool_list_changed_requested": true,
+      "environment_authority_granted": false
+    },
+    "current_task_callable_reasoning_tools": [
+      "helix_reasoning_task_binding_claim",
+      "helix_reasoning_steering_read",
+      "helix_reasoning_steering_acknowledge"
+    ],
+    "current_task_callable_human_control_present_tool": false,
+    "fresh_operator_issued_claim_still_required": true,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "service_epoch_tagged_reasoning_claim_repair": {
+    "classification": "source_admission",
+    "first_divergence": "After a packaged-service replacement, the new process could reject an old show-once claim only as a generic unknown handle because the private lookup map is intentionally process-local.",
+    "claim_format": "reasoning_claim:<non_secret_service_epoch_digest>:<32_character_random_secret>",
+    "service_epoch_digest_length": 16,
+    "service_epoch_source_is_already_public_projection": true,
+    "secret_random_length": 32,
+    "prior_epoch_outcome": "reasoning_binding_claim_service_epoch_mismatch",
+    "prior_epoch_status": 409,
+    "prior_epoch_claim_map_retained": false,
+    "arbitrary_unknown_current_epoch_outcome": "reasoning_binding_claim_invalid",
+    "exact_profile_client_and_session_checks_preserved": true,
+    "show_once_consumption_preserved": true,
+    "binding_execution_authority": false,
+    "binding_evidence_authority": false,
+    "binding_answer_authority": false,
+    "guidance_satisfied_when_binding_active": true,
+    "focused_store_ui_and_guidance_tests": "pass_25_of_25",
+    "browser_reasoning_binding_api_tests": "pass_10_of_10",
+    "exact_mcp_claim_read_ack_test": "pass_1_with_19_skipped",
+    "full_mcp_local_supervisor_suite": "29_of_30_pass_one_pre_existing_public_catalog_count_drift",
+    "production_client_build": "pass",
+    "helix_ask_discipline_quick": "pass_with_expected_dirty_worktree_classifications",
+    "packaged_exe_sha256": "d8a5b069fd65054a1fe489b75deb5f75c2b494882b8766b8192fd2fa4550cac5",
+    "packaged_app_asar_sha256": "2dd0351b1a32079d21db211854ba81eed4caa91cb01e50aeec387abd5e325139",
+    "packaged_service_sha256": "bd67bdce3f9124ce35409961d5a348950977ff516d2bad54d718f4c29d289a2c",
+    "packaged_main_process_id": 21012,
+    "protected_native_listener_count": 3,
+    "current_service_instance_ref": "service_instance:1fb496ff7aa26b32786b4a9d1e79f144",
+    "current_client_session_ref": "supervisor_client:83cdba1a2ab727ddd959e7ae8071b7d0",
+    "exact_continuation_registered": true,
+    "room_identity_reverified": true,
+    "connector_source_epoch_reverified": true,
+    "full_harness_transition": {
+      "transition_request_ref": "desktop_tunnel_request:f2928fd3-5444-4147-99aa-9485cf546837",
+      "delegation_ref": "desktop_tunnel_delegation:2097773e-a6a0-4292-bac4-d54e95c30162",
+      "accepted_receipt_ref": "desktop_tunnel_receipt:cbaa8e0e-29d3-49dd-9f93-4c59dad9eec7",
+      "trusted_device_delegation_reused": true,
+      "stable_scope_routing": true,
+      "reconnect_required_after_execution": false,
+      "catalog_refresh_required_after_execution": false,
+      "tool_list_changed_requested": true,
+      "environment_authority_granted": false
+    },
+    "native_onramp_attention": {
+      "existing_transition_reused": true,
+      "native_attention_requested": true,
+      "presentation_only": true,
+      "starting_target": "full-harness-trust",
+      "satisfied_prerequisite_skipping": "client_guidance_contract",
+      "expected_next_unmet_target": "reasoning-task-binding",
+      "control_invoked": false,
+      "consent_granted": false
+    },
+    "current_human_only_catalog_observation": {
+      "observation_ref": "mcp_evidence_observation:helix.public_ui.catalog.inspect:fd897f47-4532-4738-a8c4-7854941791b9",
+      "matched_surface_count": 1,
+      "matched_control_count": 2,
+      "bind_control_present": true,
+      "revoke_control_present": true,
+      "mcp_binding_count": 0,
+      "provenance_valid": true
+    },
+    "fresh_current_epoch_claim_live_capture": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "focused_verification": {
+    "desktop_service_boundary_smoke": "pass",
+    "local_pg_mem_persistence_tests": "9_of_9_pass",
+    "guidance_component_tests": "20_of_20_pass",
+    "environment_harness_docs_audit_after_this_record": "pass_39_status_rows_14_claims",
+    "helix_ask_discipline_quick_before_this_record": "pass_with_expected_dirty_worktree_classifications",
+    "manual_input_latch_tests": "3_of_3_pass",
+    "player_action_controller_tests": "40_of_40_pass",
+    "fabric_game_tests": "5_of_5_pass",
+    "fabric_full_build": "pass",
+    "queue_telemetry_server_and_mcp_tests": "38_of_38_pass",
+    "queue_telemetry_fabric_unit_and_lifecycle_tests": "pass",
+    "queue_telemetry_full_fabric_build_and_game_tests": "pass_5_of_5_game_tests",
+    "packaged_client_build": "pass",
+    "reasoning_binding_consent_control_tests": "pass_14_of_14",
+    "reasoning_binding_source_client_build": "pass",
+    "stale_claim_surface_ui_and_catalog_tests": "pass_22_of_22",
+    "stale_claim_surface_production_client_build": "pass",
+    "service_epoch_claim_store_ui_guidance_tests": "pass_25_of_25",
+    "service_epoch_claim_browser_api_tests": "pass_10_of_10",
+    "service_epoch_claim_exact_mcp_path_test": "pass_1_with_19_skipped",
+    "service_epoch_claim_full_mcp_suite": "29_of_30_pass_one_pre_existing_public_catalog_count_drift",
+    "native_presentation_broker_tests": "pass_3_of_3",
+    "native_presentation_device_check_tests": "pass_4_of_4",
+    "human_only_presentation_mcp_test": "pass_1_with_19_skipped",
+    "desktop_typescript_check": "pass",
+    "server_build": "pass_with_4_known_unrelated_duplicate_key_and_case_warnings",
+    "public_ui_global_audit": "not_a_gate_for_this_slice_pre_existing_34_unregistered_controls_and_one_existing_id_collision",
+    "packaged_directory_build": "pass",
+    "repository_wide_typescript_check": "not_a_gate_failed_on_extensive_pre_existing_unrelated_errors",
+    "git_diff_check": "pass_with_line_ending_warnings_only"
+  },
+  "remaining_exit_requirements": [
+    "fresh exact reasoning-task claim and finalized provider-neutral steering pickup/acknowledgement",
+    "steering-driven interruption or replanning under a newly admitted finite Player Embodiment lease",
+    "independent local/manual interruption proof",
+    "queue-depth and planning-lead-time percentile artifact",
+    "repeat normal Minecraft client and Fabric server shutdown after the remaining genuine-user live segment"
+  ],
+  "truth_constraints": {
+    "credential_included": false,
+    "hidden_reasoning_included": false,
+    "unsupported_provider_task_created": false,
+    "receipt_used_as_answer_authority": false,
+    "steering_used_as_execution_authority": false,
+    "terminal_authority_claimed": false,
+    "et6_promoted": false
+  }
+}

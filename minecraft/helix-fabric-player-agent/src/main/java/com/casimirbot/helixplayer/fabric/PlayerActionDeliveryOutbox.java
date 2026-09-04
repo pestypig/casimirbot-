@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +47,8 @@ final class PlayerActionDeliveryOutbox {
 
     private final int capacity;
     private final Deque<Delivery> pending = new ArrayDeque<>();
+    private Delivery criticalInFlight;
+    private Delivery projectionInFlight;
 
     PlayerActionDeliveryOutbox(int capacity) {
         if (capacity < 3) throw new IllegalArgumentException("Delivery outbox capacity is too small.");
@@ -60,18 +63,60 @@ final class PlayerActionDeliveryOutbox {
         return true;
     }
 
-    synchronized Delivery peek() {
-        return pending.peekFirst();
+    synchronized Delivery peekCritical() {
+        if (criticalInFlight != null) return criticalInFlight;
+        for (Delivery delivery : pending) {
+            if (delivery.stage() == Stage.ENVIRONMENT_EVENT_BATCH) continue;
+            criticalInFlight = delivery;
+            return criticalInFlight;
+        }
+        return null;
+    }
+
+    synchronized Delivery peekProjection() {
+        if (projectionInFlight != null) return projectionInFlight;
+        for (Delivery delivery : pending) {
+            if (delivery.stage() != Stage.ENVIRONMENT_EVENT_BATCH) continue;
+            projectionInFlight = delivery;
+            return projectionInFlight;
+        }
+        return null;
     }
 
     synchronized boolean acknowledge(Delivery expected) {
-        if (pending.peekFirst() != expected) return false;
-        pending.removeFirst();
-        return true;
+        if (expected == null) return false;
+        Delivery selected = expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH
+            ? projectionInFlight
+            : criticalInFlight;
+        if (selected != expected) return false;
+        Iterator<Delivery> iterator = pending.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next() != expected) continue;
+            iterator.remove();
+            if (expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH) {
+                projectionInFlight = null;
+            } else {
+                criticalInFlight = null;
+            }
+            return true;
+        }
+        return false;
     }
 
     synchronized boolean isEmpty() {
         return pending.isEmpty();
+    }
+
+    synchronized boolean isCriticalEmpty() {
+        return pending.stream().noneMatch(
+            delivery -> delivery.stage() != Stage.ENVIRONMENT_EVENT_BATCH
+        );
+    }
+
+    synchronized boolean isProjectionEmpty() {
+        return pending.stream().noneMatch(
+            delivery -> delivery.stage() == Stage.ENVIRONMENT_EVENT_BATCH
+        );
     }
 
     synchronized int size() {

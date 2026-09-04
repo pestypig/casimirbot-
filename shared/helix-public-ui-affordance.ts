@@ -137,6 +137,7 @@ export const HELIX_PUBLIC_UI_ROUTE_OWNED_CAPABILITIES = [
   "postulate.submit_proposal",
   "room.floor.release",
   "room.floor.acquire",
+  "environment.action_authority.revoke",
 ] as const;
 
 export const HELIX_PUBLIC_UI_AUTHORITY_BINDINGS = [
@@ -193,6 +194,15 @@ export const HELIX_PUBLIC_UI_AUTHORITY_BINDINGS = [
     permission_profile_required: "act",
     requires_confirmation: false,
     notes: "Authority-reducing exact-epoch speaking-floor release through the shared room control service.",
+  },
+  {
+    surface_id: "helix.ask.shared_live_room",
+    capability_id: "environment.action_authority.revoke",
+    authority_state: "route_owned",
+    interaction_kind: "act",
+    permission_profile_required: "act",
+    requires_confirmation: true,
+    notes: "Owner-exact Player Embodiment emergency stop revokes the bounded action lease and releases controls.",
   },
 ] as const satisfies readonly HelixPublicUiAuthorityBinding[];
 
@@ -372,6 +382,26 @@ export const HELIX_PUBLIC_UI_MCP_BINDINGS = [
     mutating: true,
     requires_idempotency_key: true,
     requires_signed_delegation: true,
+    pre_transition_behavior: "deny_full_mcp_transition_required",
+    post_transition_behavior: "execute_governed_handler",
+    assistant_answer: false,
+    terminal_eligible: false,
+  },
+  {
+    tool_name: "helix_environment_action_authority_revoke",
+    capability_id: "environment.action_authority.revoke",
+    command_surface_id: "mcp",
+    projection_surface_id: "helix.ask.shared_live_room",
+    account_scope: "user_feature_gated",
+    interaction_kind: "act",
+    authority_state: "route_owned",
+    control_ids: [
+      "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop",
+    ],
+    required_scopes: ["helix.rooms.read", "helix.environment.action.write"],
+    mutating: true,
+    requires_idempotency_key: false,
+    requires_signed_delegation: false,
     pre_transition_behavior: "deny_full_mcp_transition_required",
     post_transition_behavior: "execute_governed_handler",
     assistant_answer: false,

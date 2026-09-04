@@ -1,0 +1,76 @@
+{
+  "schema": "helix.environment_time.et6_capacity_reporter_checkpoint.v1",
+  "recorded_at": "2026-09-03T21:09:00-04:00",
+  "program_gate": "EH-G8",
+  "workstream": "provider-neutral environment time and receding-horizon action planning",
+  "capability_or_component": "ET6 measured capacity report generation",
+  "lifecycle_stage": "deterministic measurement plumbing",
+  "reaction_timescale": "post-run evidence normalization",
+  "authority_owner": "measured adapter and harness evidence; Codex remains the terminal writer",
+  "current_maturity": "deterministically verified",
+  "target_maturity": "live accepted",
+  "required_evidence": [
+    "one exact reasoning binding across all capacity samples",
+    "at least three measured rolling cycles",
+    "complete latency, queue, runway, observation and progress measurements",
+    "controlled and unknown-world courses",
+    "interruption, steering, reconnect, revoke and stale-rejection observations"
+  ],
+  "explicit_non_goals": [
+    "inventing missing live measurements",
+    "aggregating different reasoning bindings",
+    "granting answer or terminal authority to a report",
+    "promoting ET7 or ET8"
+  ],
+  "downstream_gate_unlocked": null,
+  "classification": [
+    "evidence normalization",
+    "evidence re-entry"
+  ],
+  "implementation": {
+    "script": "scripts/helix-environment-capacity-report.ts",
+    "command": "npm run helix:environment-time:capacity-report -- --input <capture.json> --out <report.json>",
+    "input_schema": "environment.capacity_capture.v1",
+    "sample_schema": "environment.capacity_sample.v1",
+    "report_schema": "environment.capacity_report.v1",
+    "incomplete_report_exit_code": 2,
+    "credential_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "live_coordination": {
+    "client_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "service_instance_ref": "service_instance:7c33a4927f9dfcc66a7cd4280c17ca36",
+    "client_session_ref": "supervisor_client:f4cf1fc61341531a9598d8bfd597aa35",
+    "room_ref": "shared_realtime_room:450c2fd7-5bea-4487-9a2d-4b510fd4e1ca",
+    "environment_ref": "environment_binding:legacy:9910caee8091d404f4b5c55697c0e2bb14e4a7f5",
+    "lifecycle_state": "waiting",
+    "blocker": "explicit installed-device Full Harness trust and a fresh browser-issued exact reasoning-binding claim",
+    "execution_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "positive_evidence": [
+    "The utility parses every sample through the canonical strict schema and builds the canonical capacity report.",
+    "A complete three-cycle fixture spanning controlled and unknown-world courses satisfies the exit predicate.",
+    "A mixed exact-reasoning-binding capture is rejected before report generation.",
+    "A missing observation-token measurement remains explicit and keeps the report exit false."
+  ],
+  "retained_negative_evidence": [
+    "No new live capacity sample was captured in this checkpoint.",
+    "The current keyed browser session stopped at the explicit installed-device Full Harness trust boundary.",
+    "The assistant did not self-grant device trust or issue a provider task.",
+    "ET6 remains open until the live measured capture passes the canonical report predicate."
+  ],
+  "verification": {
+    "focused_command": "npx vitest run server/__tests__/helix.environment-capacity-report.test.ts shared/__tests__/helix-environment-time.spec.ts --pool=forks",
+    "focused_test_files": 2,
+    "focused_tests_passed": 26,
+    "focused_tests_failed": 0,
+    "helix_ask_discipline_quick": "pass with inferred classification warning",
+    "environment_harness_docs_audit": "pass",
+    "git_diff_check": "pass with line-ending warning only"
+  },
+  "live_exit_satisfied": false
+}

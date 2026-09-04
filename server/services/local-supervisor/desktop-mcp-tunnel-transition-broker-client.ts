@@ -60,11 +60,56 @@ export const createDesktopMcpTunnelTransitionExecutorFromEnvironment = (
       body?.ok !== true ||
       body.accepted !== true ||
       typeof body.nativeReceiptRef !== "string" ||
-      !RECEIPT_PATTERN.test(body.nativeReceiptRef)
+      !RECEIPT_PATTERN.test(body.nativeReceiptRef) ||
+      typeof body.reconnect_required !== "boolean" ||
+      typeof body.catalog_refresh_required !== "boolean" ||
+      typeof body.stable_scope_routing !== "boolean"
     ) throw new Error("transition_native_broker_rejected");
     return {
       accepted: true,
       nativeReceiptRef: body.nativeReceiptRef,
+      reconnectRequired: body.reconnect_required,
+      catalogRefreshRequired: body.catalog_refresh_required,
+      stableScopeRouting: body.stable_scope_routing,
     };
+  };
+};
+
+export const createDesktopWorkstationPresenterFromEnvironment = (
+  env: NodeJS.ProcessEnv = process.env,
+) => {
+  const origin = exactLoopbackOrigin(
+    env.HELIX_DESKTOP_MCP_TRANSITION_BROKER_ORIGIN,
+  );
+  const token = env.HELIX_DESKTOP_MCP_TRANSITION_BROKER_TOKEN?.trim() ?? "";
+  if (!origin || !TOKEN_PATTERN.test(token) || Buffer.from(token, "base64url").length !== 32) {
+    return undefined;
+  }
+  return async (input: {
+    presentationRequestRef: string;
+    accountSessionId: string;
+    panelId: string;
+    targetId?: string;
+    controlId?: string;
+  }): Promise<{ accepted: boolean }> => {
+    const response = await fetch(new URL("/v1/present", origin), {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        schema: "casimir_desktop_workstation_present_request/2",
+        presentationRequestRef: input.presentationRequestRef,
+        accountSessionId: input.accountSessionId,
+        panelId: input.panelId,
+        ...(input.targetId ? { targetId: input.targetId } : {}),
+        ...(input.controlId ? { controlId: input.controlId } : {}),
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+    return { accepted: response.status === 202 && body?.accepted === true };
   };
 };

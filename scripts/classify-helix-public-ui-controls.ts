@@ -19,6 +19,17 @@ const NAVIGATE_PATTERN = /(?:^|[.-])(?:advanced-fallback|back|close|collapse|dir
 export const classifyHelixPublicUiControl = (
   entry: PublicUiControlInventoryEntry,
 ): HelixPublicUiInteractionKind => {
+  // Explicit human-consent boundaries are semantic policy, not mechanical
+  // defaults. A verb such as "bind" or "revoke" must not silently turn a
+  // user-only decision into an agent-classified action during catalog audits.
+  if (
+    entry.interaction_classification_source === "explicit" &&
+    entry.interaction_kind === "human_only"
+  ) return "human_only";
+  if (
+    entry.locator ===
+    "workstation.panel.agent-access.agent-connection-setup.reasoning-claim-handle"
+  ) return "observe";
   if (["input", "select", "textarea", "Input", "Textarea", "Checkbox", "Switch", "Slider", "SelectTrigger"].includes(entry.element)) return "configure";
   if (["TabsTrigger", "DropdownMenuItem", "CommandItem"].includes(entry.element)) return "navigate";
   if (entry.element === "form") return "act";

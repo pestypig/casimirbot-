@@ -79,6 +79,7 @@ import { migration077 } from "./migrations/077_friends_voice_parties";
 import { migration078 } from "./migrations/078_environment_action_result_control_release_check";
 import { migration079 } from "./migrations/079_linked_provider_exact_unique_constraint";
 import { migration080 } from "./migrations/080_operator_activity_ledger";
+import { migration081 } from "./migrations/081_installed_device_full_harness_trust";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -162,6 +163,7 @@ const MIGRATIONS = [
   migration078,
   migration079,
   migration080,
+  migration081,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

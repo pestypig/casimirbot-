@@ -29,14 +29,39 @@ final class InstalledDesktopServiceEndpointResolverTest {
             "http://127.0.0.1:57577/api/environment-connectors/v1/pairing/redeem",
             InstalledDesktopServiceEndpointResolver.resolve(
                 "http://localhost:1522/api/environment-connectors/v1/pairing/redeem",
-                receipt
+                receipt,
+                ignored -> false
             )
         );
         assertEquals(
             "http://127.0.0.1:57577/api/environment-actions/v1/authorities/authority:test",
             InstalledDesktopServiceEndpointResolver.resolve(
                 "http://127.0.0.1:1522/api/environment-actions/v1/authorities/authority:test",
-                receipt
+                receipt,
+                ignored -> false
+            )
+        );
+    }
+
+    @Test
+    void preservesAReachablePairedEndpointInsteadOfSplittingServiceEpochs() throws Exception {
+        Path receipt = temporaryDirectory.resolve("desktop-service-ready.json");
+        Files.writeString(
+            receipt,
+            """
+            {"schema":"casimir_desktop_service_ready_receipt/1","ready":true,
+             "origin":"http://127.0.0.1:57577","serviceProcessId":%d}
+            """.formatted(ProcessHandle.current().pid())
+        );
+        String configured =
+            "http://127.0.0.1:1522/api/environment-connectors/v1/pairing/redeem";
+
+        assertEquals(
+            configured,
+            InstalledDesktopServiceEndpointResolver.resolve(
+                configured,
+                receipt,
+                ignored -> true
             )
         );
     }

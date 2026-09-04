@@ -101,6 +101,66 @@ afterEach(async () => {
 });
 
 describe("Helix MCP local-supervisor coordination", () => {
+  it("presents only a catalogued human-only control without invoking it", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:34343434343434343434343434343434",
+    );
+    const identity: HelixAgentApiPrincipal = {
+      ...principal("profile:human-control", "oauth_client:human-control"),
+      scopes: new Set([
+        ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+        ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+      ]),
+    };
+    const presenter = vi.fn(async () => ({ accepted: true }));
+    const client = await connect(store, identity, {
+      surface: "local_supervisor_coordination",
+      desktopWorkstationPresenter: presenter,
+    });
+    const continuation = "codex_thread:human-control";
+    await heartbeat(client, continuation, "Present exact binding consent.");
+
+    const result = await client.callTool({
+      name: "helix_workstation_human_control_present",
+      arguments: {
+        client_continuation_ref: continuation,
+        control_id:
+          "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+      },
+    });
+
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      schema: "helix.workstation_human_control_presentation.v1",
+      accepted: true,
+      panel_id: "agent-access",
+      interaction_kind: "human_only",
+      presentation_only: true,
+      control_invoked: false,
+      consent_granted: false,
+      authority_granted: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(presenter).toHaveBeenCalledWith(expect.objectContaining({
+      accountSessionId: identity.accountContext.session_id,
+      panelId: "agent-access",
+      controlId:
+        "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+    }));
+
+    const rejected = await client.callTool({
+      name: "helix_workstation_human_control_present",
+      arguments: {
+        client_continuation_ref: continuation,
+        control_id:
+          "workstation.panel.agent-access.agent-connection-setup.check-reasoning-binding",
+      },
+    });
+    expect(rejected.isError).toBe(true);
+    expect(presenter).toHaveBeenCalledTimes(1);
+  });
+
   it("claims, reads, and acknowledges steering only through the exact authenticated continuation", async () => {
     const store = new HelixLocalSupervisorCoordinationStore(
       "service_instance:90909090909090909090909090909090",
@@ -307,11 +367,13 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_environment_subject_select",
       "helix_environment_action_authority_inspect",
       "helix_environment_action_authority_configure",
+      "helix_environment_action_authority_revoke",
       "helix_environment_command_authority_configure",
       "helix_environment_player_pair_local",
       "helix_environment_source_pair_local",
       "helix_environment_server_pair_local",
       "helix_environment_action_authority_extend",
+      "helix_minecraft_local_lifecycle_launch",
       "helix_minecraft_actor_status",
       "helix_minecraft_player_action",
       "helix_minecraft_workflow_status",
@@ -388,6 +450,11 @@ describe("Helix MCP local-supervisor coordination", () => {
     };
     const executed: Array<Record<string, unknown>> = [];
     let rejectNativeTransition = false;
+    let nextNativeRouting = {
+      reconnectRequired: false,
+      catalogRefreshRequired: false,
+      stableScopeRouting: true,
+    };
     const client = await connect(store, desktopPrincipal, {
       surface: "local_supervisor_coordination",
       desktopMcpTunnelTransitionStore: transitions,
@@ -396,7 +463,11 @@ describe("Helix MCP local-supervisor coordination", () => {
         if (rejectNativeTransition) {
           throw new Error("fixture_native_transition_rejected");
         }
-        return { accepted: true, nativeReceiptRef: "native_transition_receipt:fixture" };
+        return {
+          accepted: true,
+          nativeReceiptRef: "native_transition_receipt:fixture",
+          ...nextNativeRouting,
+        };
       },
     });
     let toolListChangedNotifications = 0;
@@ -437,11 +508,35 @@ describe("Helix MCP local-supervisor coordination", () => {
       },
     });
     expect(requested.isError).not.toBe(true);
+    expect(requested.structuredContent).toMatchObject({
+      reconnect_required: false,
+      catalog_refresh_required: false,
+      stable_scope_routing: true,
+    });
     const request = (requested.structuredContent as any).request;
     expect(request).toMatchObject({
       status: "pending_user_delegation",
       independent_external_oauth_client_bound: false,
       terminal_eligible: false,
+    });
+    const recovered = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:bootstrap",
+        declared_task_summary: "Recover the existing MCP transition.",
+        requested_lease_seconds: 60,
+      },
+    });
+    expect(recovered.isError, JSON.stringify(recovered)).not.toBe(true);
+    expect(recovered.structuredContent).toMatchObject({
+      existing_request_reused: true,
+      reconnect_required: false,
+      catalog_refresh_required: false,
+      stable_scope_routing: true,
+      request: {
+        transition_request_ref: request.transition_request_ref,
+        status: "pending_user_delegation",
+      },
     });
     const inspected = await client.callTool({
       name: "helix_desktop_tunnel_transition_inspect",
@@ -452,6 +547,9 @@ describe("Helix MCP local-supervisor coordination", () => {
     });
     expect(inspected.structuredContent).toMatchObject({
       receipt_chain_scope: "service_instance",
+      reconnect_required: false,
+      catalog_refresh_required: false,
+      stable_scope_routing: true,
       receipts: [{
         event_type: "requested",
         previous_receipt_hash: null,
@@ -481,8 +579,9 @@ describe("Helix MCP local-supervisor coordination", () => {
       accepted: true,
       idempotency_replayed: false,
       native_transition_resubmitted: true,
-      reconnect_required: true,
-      catalog_refresh_required: true,
+      reconnect_required: false,
+      catalog_refresh_required: false,
+      stable_scope_routing: true,
       shared_live_room_catalog_pre_advertised: true,
       tool_list_changed_supported: true,
       tool_list_changed_requested: true,
@@ -509,9 +608,105 @@ describe("Helix MCP local-supervisor coordination", () => {
       idempotency_replayed: true,
       native_transition_resubmitted: false,
       tool_list_changed_requested: true,
+      reconnect_required: false,
+      catalog_refresh_required: false,
+      stable_scope_routing: true,
     });
     expect(executed).toHaveLength(1);
     expect(toolListChangedNotifications).toBe(2);
+
+    const refreshed = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:bootstrap",
+        declared_task_summary: "Refresh metadata after native acceptance.",
+        requested_lease_seconds: 60,
+      },
+    });
+    expect(refreshed.isError, JSON.stringify(refreshed)).not.toBe(true);
+    expect(refreshed.structuredContent).toMatchObject({
+      existing_request_reused: true,
+      tool_list_changed_requested: true,
+      reconnect_required: false,
+      catalog_refresh_required: false,
+      stable_scope_routing: true,
+      request: {
+        transition_request_ref: request.transition_request_ref,
+        status: "transition_accepted",
+      },
+    });
+    expect(executed).toHaveLength(1);
+    expect(toolListChangedNotifications).toBe(3);
+
+    await heartbeat(
+      client,
+      "codex_thread:non-stable-native",
+      "Preserve a native reconnect requirement across replay and inspection.",
+    );
+    const nonStableRequestResult = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:non-stable-native",
+        declared_task_summary:
+          "Preserve a native reconnect requirement across replay and inspection.",
+        requested_lease_seconds: 60,
+      },
+    });
+    const nonStableRequest = (nonStableRequestResult.structuredContent as any)
+      .request;
+    transitions.grant({
+      requestRef: nonStableRequest.transition_request_ref,
+      authenticatedProfileRef: "profile:desktop",
+      accountSessionId: "account_session:desktop-owner",
+      accountType: "developer",
+      leaseSeconds: 60,
+    });
+    nextNativeRouting = {
+      reconnectRequired: true,
+      catalogRefreshRequired: true,
+      stableScopeRouting: false,
+    };
+    const nonStableAccepted = await client.callTool({
+      name: "helix_desktop_tunnel_transition_execute",
+      arguments: {
+        client_continuation_ref: "codex_thread:non-stable-native",
+        transition_request_ref: nonStableRequest.transition_request_ref,
+        target_scope: "full_helix_agent",
+        idempotency_key: "idempotency-non-stable-native",
+      },
+    });
+    expect(nonStableAccepted.structuredContent).toMatchObject({
+      reconnect_required: true,
+      catalog_refresh_required: true,
+      stable_scope_routing: false,
+    });
+    const nonStableReplay = await client.callTool({
+      name: "helix_desktop_tunnel_transition_execute",
+      arguments: {
+        client_continuation_ref: "codex_thread:non-stable-native",
+        transition_request_ref: nonStableRequest.transition_request_ref,
+        target_scope: "full_helix_agent",
+        idempotency_key: "idempotency-non-stable-native",
+      },
+    });
+    expect(nonStableReplay.structuredContent).toMatchObject({
+      idempotency_replayed: true,
+      reconnect_required: true,
+      catalog_refresh_required: true,
+      stable_scope_routing: false,
+    });
+    const nonStableInspected = await client.callTool({
+      name: "helix_desktop_tunnel_transition_inspect",
+      arguments: {
+        client_continuation_ref: "codex_thread:non-stable-native",
+        transition_request_ref: nonStableRequest.transition_request_ref,
+      },
+    });
+    expect(nonStableInspected.structuredContent).toMatchObject({
+      reconnect_required: true,
+      catalog_refresh_required: true,
+      stable_scope_routing: false,
+    });
 
     rejectNativeTransition = true;
     await heartbeat(
@@ -546,7 +741,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       },
     });
     expect(rejected.isError).toBe(true);
-    expect(toolListChangedNotifications).toBe(2);
+    expect(toolListChangedNotifications).toBe(5);
   });
 
   it("keeps governed transition controls registered on the full MCP surface", async () => {
@@ -582,6 +777,9 @@ describe("Helix MCP local-supervisor coordination", () => {
       desktopMcpTunnelTransitionExecutor: async () => ({
         accepted: true,
         nativeReceiptRef: "native_transition_receipt:full-surface",
+        reconnectRequired: false,
+        catalogRefreshRequired: false,
+        stableScopeRouting: true,
       }),
     });
 
@@ -596,6 +794,24 @@ describe("Helix MCP local-supervisor coordination", () => {
         "helix_minecraft_player_action",
       ]),
     );
+    const expectedTransitionSecuritySchemes = new Map<string, unknown>([
+      ["helix_desktop_tunnel_transition_request", [{
+        type: "oauth2",
+        scopes: [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE],
+      }]],
+      ["helix_desktop_tunnel_transition_inspect", [{
+        type: "oauth2",
+        scopes: [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE],
+      }]],
+      ["helix_desktop_tunnel_transition_execute", [{
+        type: "oauth2",
+        scopes: [HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE],
+      }]],
+    ]);
+    for (const [toolName, securitySchemes] of expectedTransitionSecuritySchemes) {
+      const tool = listed.tools.find((candidate) => candidate.name === toolName);
+      expect(tool?._meta?.securitySchemes, toolName).toEqual(securitySchemes);
+    }
 
     await heartbeat(
       client,
@@ -619,6 +835,195 @@ describe("Helix MCP local-supervisor coordination", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
+  });
+
+  it("applies an active native trusted-device policy to a finite transition request", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:78787878787878787878787878787878",
+    );
+    const transitions = new DesktopMcpTunnelTransitionStore(
+      store.serviceInstanceRef,
+    );
+    const identity: HelixAgentApiPrincipal = {
+      ...principal("profile:trusted-device", "oauth_client:trusted-device"),
+      scopes: new Set([
+        ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+        ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+      ]),
+    };
+    const trustReader = vi.fn(async () => ({
+      trusted: true,
+      delegatedAccountSessionId: "account_session:native-trusted-device",
+      accountSessionReady: true,
+      agentAccountBindingReady: true,
+    }));
+    const presenter = vi.fn(async () => ({ accepted: true }));
+    const client = await connect(store, identity, {
+      surface: "local_supervisor_coordination",
+      desktopMcpTunnelTransitionStore: transitions,
+      desktopFullHarnessTrustReader: trustReader,
+      desktopWorkstationPresenter: presenter,
+    });
+    await heartbeat(
+      client,
+      "codex_thread:trusted-device",
+      "Request a finite full-harness tunnel lease.",
+    );
+    const result = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:trusted-device",
+        declared_task_summary: "Request a finite full-harness tunnel lease.",
+        requested_lease_seconds: 90,
+      },
+    });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      trusted_device_delegation_applied: true,
+      native_attention_requested: true,
+      native_attention_presentation_only: true,
+      request: {
+        status: "delegated",
+        requested_lease_seconds: 90,
+        environment_authority_granted: false,
+        trading_authority_granted: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+      receipt: { event_type: "delegated" },
+    });
+    expect(trustReader).toHaveBeenCalledWith({
+      authenticatedProfileRef: "profile:trusted-device",
+    });
+    expect(presenter).toHaveBeenCalledWith(expect.objectContaining({
+      accountSessionId: identity.accountContext.session_id,
+      controlId:
+        "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+    }));
+    const request = (result.structuredContent as any).request;
+    expect(transitions.listReceipts(request.transition_request_ref).map(
+      (receipt) => receipt.event_type,
+    )).toEqual(["requested", "delegated"]);
+  });
+
+  it("presents OAuth linking before exact task binding when the agent account binding is not active", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:79797979797979797979797979797979",
+    );
+    const transitions = new DesktopMcpTunnelTransitionStore(
+      store.serviceInstanceRef,
+    );
+    const identity: HelixAgentApiPrincipal = {
+      ...principal("profile:binding-prerequisite", "oauth_client:binding-prerequisite"),
+      scopes: new Set([
+        ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+        ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+      ]),
+    };
+    const presenter = vi.fn(async () => ({ accepted: true }));
+    const client = await connect(store, identity, {
+      surface: "local_supervisor_coordination",
+      desktopMcpTunnelTransitionStore: transitions,
+      desktopFullHarnessTrustReader: vi.fn(async () => ({
+        trusted: true,
+        delegatedAccountSessionId: "account_session:native-binding-prerequisite",
+        accountSessionReady: true,
+        agentAccountBindingReady: false,
+      })),
+      desktopWorkstationPresenter: presenter,
+    });
+    await heartbeat(
+      client,
+      "codex_thread:binding-prerequisite",
+      "Present the first unmet exact-binding prerequisite.",
+    );
+
+    const result = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:binding-prerequisite",
+        declared_task_summary:
+          "Present the first unmet exact-binding prerequisite.",
+        requested_lease_seconds: 90,
+      },
+    });
+
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      trusted_device_delegation_applied: true,
+      native_attention_requested: true,
+      native_attention_presentation_only: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(presenter).toHaveBeenCalledWith(expect.objectContaining({
+      accountSessionId: identity.accountContext.session_id,
+      panelId: "agent-access",
+      targetId: "auth0-account-link",
+    }));
+    expect(presenter).not.toHaveBeenCalledWith(expect.objectContaining({
+      controlId:
+        "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+    }));
+  });
+
+  it("presents local sign-in before OAuth linking when the delegated desktop session is inactive", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:80808080808080808080808080808080",
+    );
+    const transitions = new DesktopMcpTunnelTransitionStore(
+      store.serviceInstanceRef,
+    );
+    const identity: HelixAgentApiPrincipal = {
+      ...principal("profile:session-prerequisite", "oauth_client:session-prerequisite"),
+      scopes: new Set([
+        ...HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+        ...HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+      ]),
+    };
+    const presenter = vi.fn(async () => ({ accepted: true }));
+    const client = await connect(store, identity, {
+      surface: "local_supervisor_coordination",
+      desktopMcpTunnelTransitionStore: transitions,
+      desktopFullHarnessTrustReader: vi.fn(async () => ({
+        trusted: true,
+        delegatedAccountSessionId: "account_session:expired",
+        accountSessionReady: false,
+        agentAccountBindingReady: false,
+      })),
+      desktopWorkstationPresenter: presenter,
+    });
+    await heartbeat(
+      client,
+      "codex_thread:session-prerequisite",
+      "Present the first unmet exact-binding prerequisite.",
+    );
+
+    const result = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:session-prerequisite",
+        declared_task_summary:
+          "Present the first unmet exact-binding prerequisite.",
+        requested_lease_seconds: 90,
+      },
+    });
+
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(presenter).toHaveBeenCalledWith(expect.objectContaining({
+      accountSessionId: identity.accountContext.session_id,
+      panelId: "account-session",
+      targetId: "account-session-sign-in",
+    }));
+    expect(presenter).not.toHaveBeenCalledWith(expect.objectContaining({
+      targetId: "auth0-account-link",
+    }));
   });
 
   it("keeps an OAuth requester bound while executing only with a separately delegated native session", async () => {
@@ -653,6 +1058,9 @@ describe("Helix MCP local-supervisor coordination", () => {
         return {
           accepted: true,
           nativeReceiptRef: "native_transition_receipt:oauth-fixture",
+          reconnectRequired: false,
+          catalogRefreshRequired: false,
+          stableScopeRouting: true,
         };
       },
     });
@@ -786,6 +1194,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_room_presence_set",
       "helix_room_source_create",
       "helix_room_source_list",
+      "helix_workstation_human_control_present",
     ]);
     expect(listed.tools.map((tool) => tool.name)).toContain(
       "helix_minecraft_player_action",

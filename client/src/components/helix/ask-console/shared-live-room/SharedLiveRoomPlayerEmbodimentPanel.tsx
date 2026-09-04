@@ -1069,7 +1069,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
               </button>
             ) : null}
             {authority?.status === "active" ? (
-              <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop"
+              <button data-helix-interaction-kind="act" data-helix-authority-state="route_owned" data-helix-route-contract-id="environment.action_authority.revoke" data-helix-control-id="helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop"
                 type="button"
                 disabled={busy !== null}
                 className="inline-flex items-center gap-1 rounded border border-red-300/30 px-2 py-1 text-[9px] font-semibold text-red-200 disabled:opacity-50"

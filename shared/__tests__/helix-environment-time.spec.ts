@@ -3,11 +3,13 @@ import {
   buildHelixEnvironmentTemporalPlan,
   buildHelixEnvironmentTemporalPlanEvent,
   buildHelixEnvironmentAffordanceFrontier,
+  buildHelixEnvironmentCapacityReport,
   buildHelixEnvironmentFeedbackLatency,
   buildHelixEnvironmentInterruptReceipt,
   canonicalEnvironmentTimeValue,
   evaluateHelixEnvironmentPlanCurrentness,
   helixEnvironmentAffordanceFrontierSchema,
+  helixEnvironmentCapacitySampleSchema,
   helixEnvironmentFeedbackLatencySchema,
   helixEnvironmentInterruptReceiptSchema,
   helixEnvironmentTemporalPlanSchema,
@@ -31,6 +33,56 @@ const identity = (): HelixEnvironmentTimeIdentity => ({
   observation_revision: 12,
   affordance_revision: 9,
 });
+
+const capacitySample = (cycle: number, patch: Record<string, unknown> = {}) =>
+  helixEnvironmentCapacitySampleSchema.parse({
+    schema: "environment.capacity_sample.v1",
+    sample_id: `capacity_sample:test:${cycle}`,
+    course: cycle === 1 ? "controlled_n0" : "unknown_world",
+    rolling_cycle_index: cycle,
+    identity: identity(),
+    exact_reasoning_binding_ref: "reasoning_binding:et6:test",
+    resident_computation_ms: cycle * 10,
+    dispatch_to_first_tick_ms: cycle * 5,
+    scheduler_ticks: 20,
+    active_control_ticks: 15,
+    stalled_ticks: 1,
+    missed_ticks: 0,
+    queue_depth_peak: cycle,
+    lead_time_ticks: cycle * 5,
+    latencies_ms: {
+      event_to_evidence: cycle * 4,
+      evidence_to_pickup: cycle * 6,
+      stop_to_replan: cycle * 8,
+      finalized_steering_to_stop: cycle * 3,
+      manual_or_safety_to_release: cycle * 2,
+    },
+    elapsed_ms: 10_000,
+    replans: 1,
+    unnecessary_replans: 0,
+    observation_input_bytes: 1_000,
+    observation_output_bytes: 200,
+    observation_tokens: 50,
+    raw_event_count: 10,
+    emitted_observation_count: 2,
+    performed_effect_refs: [`effect:test:${cycle}`],
+    verified_progress_units: 4,
+    model_tool_round_trips: 1,
+    changed_affordance_replan_observed: cycle === 2,
+    local_intervention_observed: cycle === 2,
+    user_steering_observed: cycle === 2,
+    reconnect_recovery_observed: cycle === 3,
+    revocation_observed: cycle === 3,
+    stale_after_revoke_rejected: cycle === 3,
+    evidence_reentered: true,
+    controls_released: true,
+    credential_included: false,
+    hidden_reasoning_included: false,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    ...patch,
+  });
 
 const clocks = (sequence = 100, elapsed = 1_000) => ({
   environment: {
@@ -89,7 +141,11 @@ const buildPlan = (patch: Record<string, unknown> = {}) =>
           maximum_duration_units: 20,
         },
         preconditions: [
-          { kind: "boolean_equals", fact_key: "player.grounded", expected: true },
+          {
+            kind: "boolean_equals",
+            fact_key: "player.grounded",
+            expected: true,
+          },
         ],
         completion_conditions: [
           {
@@ -100,7 +156,11 @@ const buildPlan = (patch: Record<string, unknown> = {}) =>
           },
         ],
         abort_guards: [
-          { kind: "boolean_equals", fact_key: "hazard.critical", expected: true },
+          {
+            kind: "boolean_equals",
+            fact_key: "hazard.critical",
+            expected: true,
+          },
         ],
         effect_budget: { "effect:player_motion": 1 },
         on_success_node_id: "node:checkpoint",
@@ -154,12 +214,14 @@ describe("provider-neutral environment time contract", () => {
     expect(helixEnvironmentTimeSha256({ b: 2, a: 1 })).toBe(
       helixEnvironmentTimeSha256({ a: 1, b: 2 }),
     );
-    expect(helixEnvironmentTemporalPlanSchema.parse(buildPlan())).toMatchObject({
-      automatic_replay: false,
-      adapter_strategy_authority: false,
-      answer_authority: false,
-      terminal_eligible: false,
-    });
+    expect(helixEnvironmentTemporalPlanSchema.parse(buildPlan())).toMatchObject(
+      {
+        automatic_replay: false,
+        adapter_strategy_authority: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+    );
   });
 
   it("rejects cycles, unreachable nodes and missing targets", () => {
@@ -179,12 +241,46 @@ describe("provider-neutral environment time contract", () => {
       on_satisfied_node_id: "node:walk",
       on_timeout_node_id: "node:failed",
     };
-    expect(helixEnvironmentTemporalPlanSchema.safeParse(rehash(cyclic)).success).toBe(false);
+    expect(
+      helixEnvironmentTemporalPlanSchema.safeParse(rehash(cyclic)).success,
+    ).toBe(false);
 
     const missing = structuredClone(plan);
     if (missing.nodes[0].kind !== "action") throw new Error("fixture drift");
     missing.nodes[0].on_success_node_id = "node:absent";
-    expect(helixEnvironmentTemporalPlanSchema.safeParse(rehash(missing)).success).toBe(false);
+    expect(
+      helixEnvironmentTemporalPlanSchema.safeParse(rehash(missing)).success,
+    ).toBe(false);
+  });
+
+  it("rejects condition references to missing nodes and checkpoints", () => {
+    const base = buildPlan();
+    const missingNode = structuredClone(base);
+    if (missingNode.nodes[0].kind !== "action") throw new Error("fixture");
+    missingNode.nodes[0].preconditions = [
+      {
+        kind: "prior_node_outcome",
+        node_id: "node:missing",
+        outcome: "succeeded",
+      },
+    ];
+    expect(
+      helixEnvironmentTemporalPlanSchema.safeParse(rehash(missingNode)).success,
+    ).toBe(false);
+
+    const missingCheckpoint = structuredClone(base);
+    if (missingCheckpoint.nodes[0].kind !== "action")
+      throw new Error("fixture");
+    missingCheckpoint.nodes[0].preconditions = [
+      {
+        kind: "checkpoint_satisfied",
+        checkpoint_id: "checkpoint:missing",
+      },
+    ];
+    expect(
+      helixEnvironmentTemporalPlanSchema.safeParse(rehash(missingCheckpoint))
+        .success,
+    ).toBe(false);
   });
 
   it("rejects undeclared resources, effect overflow and invalid watermarks", () => {
@@ -192,21 +288,27 @@ describe("provider-neutral environment time contract", () => {
     const resource = structuredClone(plan);
     if (resource.nodes[0].kind !== "action") throw new Error("fixture drift");
     resource.nodes[0].required_resources = ["resource:main_hand"];
-    expect(helixEnvironmentTemporalPlanSchema.safeParse(rehash(resource)).success).toBe(false);
+    expect(
+      helixEnvironmentTemporalPlanSchema.safeParse(rehash(resource)).success,
+    ).toBe(false);
 
     const effects = structuredClone(plan);
     if (effects.nodes[0].kind !== "action") throw new Error("fixture drift");
     effects.nodes[0].effect_budget = { "effect:player_motion": 2 };
-    expect(helixEnvironmentTemporalPlanSchema.safeParse(rehash(effects)).success).toBe(false);
+    expect(
+      helixEnvironmentTemporalPlanSchema.safeParse(rehash(effects)).success,
+    ).toBe(false);
 
-    expect(() => buildPlan({
-      watermarks: {
-        decision_unit: 50,
-        stop_unit: 40,
-        committed_through_unit: 60,
-        stabilization_node_id: "node:checkpoint",
-      },
-    })).toThrow(/Watermarks/);
+    expect(() =>
+      buildPlan({
+        watermarks: {
+          decision_unit: 50,
+          stop_unit: 40,
+          committed_through_unit: 60,
+          stabilization_node_id: "node:checkpoint",
+        },
+      }),
+    ).toThrow(/Watermarks/);
   });
 
   it.each([
@@ -270,7 +372,9 @@ describe("provider-neutral environment time contract", () => {
       assistant_answer: false,
       terminal_eligible: false,
     };
-    expect(helixEnvironmentAffordanceFrontierSchema.parse(frontier)).toEqual(frontier);
+    expect(helixEnvironmentAffordanceFrontierSchema.parse(frontier)).toEqual(
+      frontier,
+    );
     expect(
       helixEnvironmentAffordanceFrontierSchema.safeParse({
         ...frontier,
@@ -301,12 +405,14 @@ describe("provider-neutral environment time contract", () => {
       assistant_answer: false,
       terminal_eligible: false,
     };
-    expect(helixEnvironmentInterruptReceiptSchema.parse(receipt)).toMatchObject({
-      next_decision: "replan",
-      execution_authority: false,
-      answer_authority: false,
-      terminal_eligible: false,
-    });
+    expect(helixEnvironmentInterruptReceiptSchema.parse(receipt)).toMatchObject(
+      {
+        next_decision: "replan",
+        execution_authority: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+    );
     expect(
       helixEnvironmentInterruptReceiptSchema.safeParse({
         ...receipt,
@@ -365,36 +471,46 @@ describe("provider-neutral environment time contract", () => {
       expires_at_environment_sequence: 110,
       entries: [entry],
     });
-    const nextIdentity = { ...identity(), observation_revision: 13, affordance_revision: 10 };
+    const nextIdentity = {
+      ...identity(),
+      observation_revision: 13,
+      affordance_revision: 10,
+    };
     const second = buildHelixEnvironmentAffordanceFrontier({
       frontier_id: "frontier:2",
       identity: nextIdentity,
       clocks: clocks(101, 1_050),
       expires_at_environment_sequence: 111,
       previous_frontier: first,
-      entries: [{
-        ...entry,
-        state: "available_now",
-        reason_codes: ["grounded"],
-        missing_observation_kinds: [],
-      }],
+      entries: [
+        {
+          ...entry,
+          state: "available_now",
+          reason_codes: ["grounded"],
+          missing_observation_kinds: [],
+        },
+      ],
     });
     expect(first.newly_blocked_capability_ids).toEqual(["capability:move"]);
     expect(second.newly_available_capability_ids).toEqual(["capability:move"]);
-    expect(second.materially_changed_capability_ids).toEqual(["capability:move"]);
+    expect(second.materially_changed_capability_ids).toEqual([
+      "capability:move",
+    ]);
     expect(second).toMatchObject({
       strategy_recommendation_included: false,
       execution_authority: false,
       answer_authority: false,
     });
-    expect(() => buildHelixEnvironmentAffordanceFrontier({
-      frontier_id: "frontier:bad",
-      identity: { ...nextIdentity, affordance_revision: 12 },
-      clocks: clocks(102, 1_100),
-      expires_at_environment_sequence: 112,
-      previous_frontier: second,
-      entries: [],
-    })).toThrow("exactly one");
+    expect(() =>
+      buildHelixEnvironmentAffordanceFrontier({
+        frontier_id: "frontier:bad",
+        identity: { ...nextIdentity, affordance_revision: 12 },
+        clocks: clocks(102, 1_100),
+        expires_at_environment_sequence: 112,
+        previous_frontier: second,
+        entries: [],
+      }),
+    ).toThrow("exactly one");
   });
 
   it("builds authority-reducing interrupt receipts from fixed priority policy", () => {
@@ -443,19 +559,23 @@ describe("provider-neutral environment time contract", () => {
       proposal_to_admission: 25,
       admission_to_first_execution_unit: 45,
     });
-    expect(() => buildHelixEnvironmentFeedbackLatency({
-      trace_id: "latency:bad",
-      identity: identity(),
-      provider_id: null,
-      marks_ms: { input_finalized: 10, task_available: 9 },
-    })).toThrow("cannot regress");
+    expect(() =>
+      buildHelixEnvironmentFeedbackLatency({
+        trace_id: "latency:bad",
+        identity: identity(),
+        provider_id: null,
+        marks_ms: { input_finalized: 10, task_available: 9 },
+      }),
+    ).toThrow("cannot regress");
   });
 
   it("reduces an append-only plan lifecycle without granting terminal authority", () => {
     const plan = buildPlan();
     const events: HelixEnvironmentTemporalPlanEvent[] = [];
     const append = (
-      payload: Parameters<typeof buildHelixEnvironmentTemporalPlanEvent>[0]["payload"],
+      payload: Parameters<
+        typeof buildHelixEnvironmentTemporalPlanEvent
+      >[0]["payload"],
       sequence: number,
     ) => {
       events.push(
@@ -559,5 +679,140 @@ describe("provider-neutral environment time contract", () => {
       expect(error).toBeInstanceOf(HelixEnvironmentPlanReductionError);
       expect((error as HelixEnvironmentPlanReductionError).code).toBe(code);
     }
+  });
+
+  it("builds a truthful ET6 capacity report from three measured rolling cycles", () => {
+    const report = buildHelixEnvironmentCapacityReport({
+      report_id: "capacity_report:et6:test",
+      samples: [capacitySample(1), capacitySample(2), capacitySample(3)],
+      evidence_refs: ["evidence:et6:test"],
+    });
+
+    expect(report).toMatchObject({
+      sample_count: 3,
+      rolling_cycle_count: 3,
+      courses_observed: ["controlled_n0", "unknown_world"],
+      continuous_control_ratio: 0.75,
+      stalled_tick_count: 3,
+      missed_tick_count: 0,
+      queue_depth_peak: 3,
+      lead_time_ticks_p50: 10,
+      observation_coalescing_ratio: 0.8,
+      performed_effect_count: 3,
+      duplicate_effect_count: 0,
+      verified_progress_per_model_tool_round_trip: 4,
+      missing_measurements: [],
+      exit_satisfied: true,
+      credential_included: false,
+      hidden_reasoning_included: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
+    expect(report.latency_percentiles_ms.resident_computation).toEqual({
+      sample_count: 3,
+      p50: 20,
+      p95: 29,
+      p99: 29.8,
+    });
+    expect(Object.values(report.exit_criteria).every(Boolean)).toBe(true);
+  });
+
+  it("fails capacity exit truthfully for duplicate effects and missing measurements", () => {
+    const report = buildHelixEnvironmentCapacityReport({
+      report_id: "capacity_report:et6:negative",
+      samples: [
+        capacitySample(1),
+        capacitySample(2, {
+          performed_effect_refs: ["effect:test:1"],
+          observation_tokens: null,
+        }),
+      ],
+      evidence_refs: ["evidence:et6:negative"],
+    });
+
+    expect(report.duplicate_effect_count).toBe(1);
+    expect(report.missing_measurements).toContain("observation:tokens");
+    expect(report.exit_criteria.zero_duplicate_effects).toBe(false);
+    expect(report.exit_criteria.required_measurements_complete).toBe(false);
+    expect(report.exit_satisfied).toBe(false);
+  });
+
+  it("accepts event-specific latency coverage across different rolling cycles", () => {
+    const report = buildHelixEnvironmentCapacityReport({
+      report_id: "capacity_report:et6:event-specific-latencies",
+      samples: [
+        capacitySample(1, {
+          latencies_ms: {
+            event_to_evidence: 4,
+            evidence_to_pickup: 6,
+            stop_to_replan: null,
+            finalized_steering_to_stop: null,
+            manual_or_safety_to_release: null,
+          },
+        }),
+        capacitySample(2, {
+          latencies_ms: {
+            event_to_evidence: 5,
+            evidence_to_pickup: 7,
+            stop_to_replan: 8,
+            finalized_steering_to_stop: 3,
+            manual_or_safety_to_release: null,
+          },
+        }),
+        capacitySample(3, {
+          latencies_ms: {
+            event_to_evidence: 6,
+            evidence_to_pickup: 8,
+            stop_to_replan: 9,
+            finalized_steering_to_stop: null,
+            manual_or_safety_to_release: 2,
+          },
+        }),
+      ],
+      evidence_refs: ["evidence:et6:event-specific-latencies"],
+    });
+
+    expect(report.missing_measurements).toEqual([]);
+    expect(report.latency_percentiles_ms.finalized_steering_to_stop.sample_count)
+      .toBe(1);
+    expect(report.latency_percentiles_ms.manual_or_safety_to_release.sample_count)
+      .toBe(1);
+    expect(report.exit_satisfied).toBe(true);
+  });
+
+  it("fails capacity exit when coalescing or progress efficiency was not measured", () => {
+    const report = buildHelixEnvironmentCapacityReport({
+      report_id: "capacity_report:et6:missing-throughput",
+      samples: [
+        capacitySample(1, {
+          raw_event_count: 0,
+          emitted_observation_count: 0,
+          model_tool_round_trips: 0,
+        }),
+      ],
+      evidence_refs: ["evidence:et6:missing-throughput"],
+    });
+
+    expect(report.missing_measurements).toEqual(expect.arrayContaining([
+      "observation:coalescing",
+      "progress:model_tool_round_trip",
+    ]));
+    expect(report.exit_criteria.required_measurements_complete).toBe(false);
+    expect(report.exit_satisfied).toBe(false);
+  });
+
+  it("rejects mixed exact reasoning bindings in one capacity report", () => {
+    expect(() =>
+      buildHelixEnvironmentCapacityReport({
+        report_id: "capacity_report:et6:mixed_binding",
+        samples: [
+          capacitySample(1),
+          capacitySample(2, {
+            exact_reasoning_binding_ref: "reasoning_binding:other",
+          }),
+        ],
+        evidence_refs: ["evidence:et6:mixed_binding"],
+      }),
+    ).toThrow("one exact reasoning binding");
   });
 });

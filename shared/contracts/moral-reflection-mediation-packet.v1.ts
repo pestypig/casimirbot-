@@ -41,6 +41,7 @@ export type MoralReflectionMediationPacketV1 = {
   purpose: string;
   objectiveSourceOptions: MoralReflectionObjectiveSourceV1[];
   objectiveSourceStatus: "unresolved";
+  reflectionFamily: "general" | "inner_practice" | "social_authority" | "public_judgment" | "cross_domain";
   evidenceOrderBoundary: {
     kind: "moral_scenario_ready" | "external_verification_first" | "theory_ideology_bridge_first";
     reason: string;
@@ -91,6 +92,8 @@ export function validateMoralReflectionMediationPacketV1(value: unknown): string
     issues.push("objectiveSourceOptions must contain all supported attribution states");
   }
   if (value.objectiveSourceStatus !== "unresolved") issues.push("objectiveSourceStatus must remain unresolved");
+  if (!["general", "inner_practice", "social_authority", "public_judgment", "cross_domain"]
+    .includes(String(value.reflectionFamily))) issues.push("reflectionFamily is invalid");
   if (!isRecord(value.evidenceOrderBoundary)) {
     issues.push("evidenceOrderBoundary must be an object");
   } else {

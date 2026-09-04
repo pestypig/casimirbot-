@@ -132,9 +132,9 @@ describe("Helix public UI control inventory", () => {
       observe: 18,
     });
     expect(authorityCounts).toEqual({
-      blocked_pending_contract: 101,
+      blocked_pending_contract: 100,
       client_local: 295,
-      route_owned: 2,
+      route_owned: 3,
     });
     expect(
       inventory.filter((entry) => entry.interaction_kind === "human_only").map((entry) => entry.locator),
@@ -148,7 +148,7 @@ describe("Helix public UI control inventory", () => {
     );
 
     expect(inventory.every((entry) => entry.authority_state !== "unmapped")).toBe(true);
-    expect(explicitAgentAuthority).toHaveLength(2);
+    expect(explicitAgentAuthority).toHaveLength(3);
     expect(explicitAgentAuthority).toEqual(expect.arrayContaining([
       expect.objectContaining({
         locator: "helix.ask.shared_live_room.shared-live-room-runtime-panel.take-speaking-floor",
@@ -160,6 +160,12 @@ describe("Helix public UI control inventory", () => {
         locator: "helix.ask.shared_live_room.shared-live-room-runtime-panel.release-speaking-floor",
         authority_state: "route_owned",
         route_contract_id: "room.floor.release",
+        authority_classification_source: "route_binding",
+      }),
+      expect.objectContaining({
+        locator: "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-emergency-stop",
+        authority_state: "route_owned",
+        route_contract_id: "environment.action_authority.revoke",
         authority_classification_source: "route_binding",
       }),
     ]));

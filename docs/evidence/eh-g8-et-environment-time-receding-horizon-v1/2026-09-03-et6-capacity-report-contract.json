@@ -1,0 +1,84 @@
+{
+  "schema": "casimirbot.environment_time_capacity_contract_evidence.v1",
+  "recorded_at": "2026-09-03T12:56:00.000Z",
+  "program_gate": "G8",
+  "workstream": "ET6 Minecraft capacity qualification",
+  "capability": "provider-neutral environment capacity report",
+  "lifecycle_stage": "measurement and acceptance reporting",
+  "reaction_timescale": "mixed",
+  "authority_owner": "Helix policy and environment adapter evidence; Codex remains the terminal writer",
+  "current_maturity": "deterministically verified",
+  "target_maturity": "live accepted",
+  "implementation": {
+    "contract_file": "shared/helix-environment-time.ts",
+    "sample_schema": "environment.capacity_sample.v1",
+    "report_schema": "environment.capacity_report.v1",
+    "test_file": "shared/__tests__/helix-environment-time.spec.ts",
+    "minecraft_adapter_version": "0.4.3",
+    "minecraft_telemetry_file": "minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/EnvironmentCapacityTelemetry.java",
+    "minecraft_telemetry_test": "minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/EnvironmentCapacityTelemetryTest.java",
+    "deployed_mod_sha256": "CE933D5906D7BD89A7C1585F887C082BB93171D4A7151C59B7CB53FDEB61F260"
+  },
+  "positive_evidence": [
+    "Three measured rolling cycles can satisfy the report only when controlled and unknown-world courses are both represented.",
+    "The report computes resident and reaction-latency p50/p95/p99, continuous-control ratio, stalls, missed ticks, queue peak, lead time, replan rates, observation coalescing, effects, and verified progress per model/tool round trip.",
+    "Required interruption, reconnect, revocation, stale rejection, evidence re-entry, and control-release observations are explicit exit criteria.",
+    "All report projections fix credential, hidden-reasoning, answer, assistant-answer, and terminal authority to false.",
+    "The Fabric adapter emits dispatch-to-client-accept, dispatch-to-first-tick, resident computation, scheduler/active/stalled ticks, and missed-tick measurements without changing the scheduler or owning controls."
+  ],
+  "negative_evidence": [
+    "A repeated performed-effect reference increments duplicate_effect_count and fails ET6 exit.",
+    "A missing observation-token or latency measurement remains listed in missing_measurements and fails ET6 exit.",
+    "Samples carrying different exact reasoning-binding references are rejected rather than aggregated.",
+    "This deterministic artifact does not satisfy the separate packaged live Minecraft acceptance exit."
+  ],
+  "verification": [
+    {
+      "command": "npx vitest run shared/__tests__/helix-environment-time.spec.ts --pool=forks",
+      "result": "pass",
+      "test_files": 1,
+      "tests": 23
+    },
+    {
+      "command": "npm run helix:environment-harness:docs-audit",
+      "result": "pass",
+      "failures": []
+    },
+    {
+      "command": "npm run typecheck:environment-actions",
+      "result": "inconclusive_preexisting_checkout_errors",
+      "new_capacity_contract_errors_observed": false
+    },
+    {
+      "command": "minecraft/helix-paper-sensor/gradlew.bat -p minecraft/helix-fabric-player-agent -Dorg.gradle.java.home=<verified-jdk21> test --no-daemon",
+      "result": "pass",
+      "jvm_tests": 202,
+      "minecraft_game_tests": 5
+    },
+    {
+      "command": "minecraft/helix-paper-sensor/gradlew.bat -p minecraft/helix-fabric-player-agent -Dorg.gradle.java.home=<verified-jdk21> build --no-daemon",
+      "result": "pass",
+      "remapped_jar_built": true,
+      "configured_instance_deployment_hash_match": true
+    },
+    {
+      "command": "npx vitest run server/services/environment-connectors/actions/__tests__/action-result-canonicalization.test.ts --pool=forks",
+      "result": "pass",
+      "test_files": 1,
+      "tests": 29,
+      "verified_terminal_capacity_measurements_preserved": true
+    }
+  ],
+  "live_acceptance": {
+    "et6_exit_satisfied": false,
+    "reason": "The packaged EXE and Fabric adapter 0.4.3 completed three consecutive admitted resident sequences across the former second-cycle cursor failure boundary. Every cycle re-entered evidence, moved the player, reported zero missed/stalled ticks and released controls. Reconnect and finite-credential refusal/recovery were also observed. Local/manual intervention, finalized user steering interruption, explicit catalogued revoke, and the controlled unknown-world course remain open, so no complete ET6 capacity report is asserted.",
+    "latest_resident_action_evidence_ref": "environment_action_evidence:39fd257b43055f5f59e0e99235840d56dc1bdb214",
+    "latest_resident_post_action_observation_ref": "environment_probe_evidence:42bf8520a50158f12f72da2c6fcc52c67f6b1453",
+    "latest_stale_rejection_ref": "environment_action_failure:ed8488bc50ead553e8c1a8986e0ce3c186551eb6"
+  },
+  "explicit_non_goals": [
+    "No ET7 cross-environment maturity claim.",
+    "No ET8 integrated-acceptance or release-readiness claim.",
+    "No credential, hidden reasoning, environment authority, answer authority, or terminal authority is conveyed by this evidence record."
+  ]
+}

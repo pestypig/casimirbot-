@@ -26,6 +26,7 @@ export type PanelId =
   | "live-answer-environment"
   | "image-lens"
   | "document-image-lens"
+  | "surface-workspace"
   | "motorcycle-hud-lab"
   | "narrator"
   | "postulate-board"
@@ -409,6 +410,15 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 980, h: 720 },
     defaultPosition: { x: 320, y: 180 },
     keywords: ["workflow", "demo", "quick time event", "qte", "research", "proposal", "developer"],
+  },
+  {
+    id: "surface-workspace",
+    title: "Surface Workspace",
+    loader: load(() => import("@/components/workstation/SurfaceWorkspacePanel")),
+    defaultSize: { w: 1180, h: 780 },
+    defaultPosition: { x: 260, y: 140 },
+    keywords: ["surface", "hud", "routing", "registry", "output", "overlay", "developer"],
+    heavy: false,
   },
   {
     id: "motorcycle-hud-lab",

@@ -1,0 +1,56 @@
+{
+  "schema": "helix.environment_time.et6_trusted_device_onramp_repair.v1",
+  "recorded_at": "2026-09-03T08:25:00-04:00",
+  "program_gate": "G8",
+  "stage": "ET6",
+  "status": "deterministically_verified_live_acceptance_pending",
+  "classification": [
+    "presentation",
+    "tool_admission",
+    "authority_lifecycle"
+  ],
+  "repair": {
+    "control": "Trust this device for Full Harness",
+    "surface": "packaged_desktop_agent_connections_start_harness",
+    "default": "off",
+    "binding": [
+      "active_developer_profile",
+      "exact_installed_device",
+      "granting_native_account_session"
+    ],
+    "lease_seconds_min": 30,
+    "lease_seconds_max": 300,
+    "future_pending_requests_may_be_delegated": true,
+    "existing_pending_requests_delegated_when_enabled": true,
+    "device_revoke_clears_trust": true,
+    "device_recovery_clears_trust": true,
+    "expired_or_signed_out_granting_session_rejects_trust": true,
+    "agent_can_enable_trust": false,
+    "environment_authority_granted": false,
+    "minecraft_authority_granted": false,
+    "trading_authority_granted": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "verification": {
+    "focused_test_files": 5,
+    "focused_tests_passed": 42,
+    "server_build": "pass_with_four_pre_existing_unrelated_warnings",
+    "client_build": "pass_with_pre_existing_dependency_and_chunk_warnings",
+    "packaged_directory_build": "pass_with_four_pre_existing_unrelated_warnings",
+    "packaged_launch_smoke": "pass",
+    "packaged_onboarding_smoke": "pass_default_off_and_unauthenticated_opt_in_rejected",
+    "helix_ask_discipline_quick": "pass_no_sensitive_ask_files_detected",
+    "repository_typecheck": "inconclusive_node_heap_exhausted_near_4_gb_after_164_seconds",
+    "credentials_included": false,
+    "hidden_reasoning_included": false
+  },
+  "live_status": {
+    "rebuilt_real_profile_exe_started": true,
+    "native_trust_toggle_attended": false,
+    "governed_transition_executed": false,
+    "minecraft_capacity_run_started": false,
+    "et6_exit_satisfied": false
+  },
+  "next_required_observation": "An attended click in the rebuilt packaged desktop must enable the trust policy once; the exact continuation can then request and execute a finite full-harness tunnel transition before live Minecraft ET6 measurement begins."
+}

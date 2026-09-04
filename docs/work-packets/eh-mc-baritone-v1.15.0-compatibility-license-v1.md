@@ -1,14 +1,14 @@
 Program gate: G8 — installed profile connection broker and environment-harness convergence; this is a bounded N0 Player Embodiment support lane and does not advance the active broker gate
-Workstream: Minecraft Player Embodiment optional navigation engine compatibility
-Capability or component: Baritone v1.15.0 movement-only public-API adapter
+Workstream: Minecraft Player Embodiment non-shipping navigation comparison
+Capability or component: Baritone v1.15.0 evaluation-only compatibility oracle
 Lifecycle stage: execution, cancellation, observation, and capability-manifest projection
 Reaction timescale: tick-local path execution with short semantic replanning only after typed settlement or deviation
-Authority owner: Helix owns admission and effect ceilings; the Fabric companion owns the settings lease, public-API call, status observation, and control release; Baritone owns only the admitted path calculation/execution; Codex owns semantic strategy
+Authority owner: Helix owns admission and effect ceilings; the Fabric companion owns the evaluation lease, public-API call, status observation, and control release; Baritone owns only the locally evaluated path calculation/execution; Codex owns semantic strategy
 Current maturity: deterministically verified
-Target maturity: deterministically verified
+Target maturity: deterministically verified evaluation-only compatibility evidence
 Required evidence: official artifact/version/hash record; LGPL-3.0 notice; public-API compatibility probe; mutation-disabled navigation; pre-existing-task rejection; policy-drift cancellation; safe/unsafe cancellation restoration tests; and one controlled live no-mutation trace
-Explicit non-goals: no Baritone chat commands, mining process, builder process, inventory management, private/internal API, unrestricted navigation, silent takeover of a user path, portal planner, bundled redistribution, or requirement that the baseline native harness depend on Baritone
-Downstream gate unlocked: optional obstacle-aware locomotion for later N0 and unknown-world Nether travel after the native baseline is preserved
+Explicit non-goals: no Baritone chat commands, mining process, builder process, inventory management, private/internal API, unrestricted navigation, silent takeover of a user path, portal planner, bundled redistribution, shipping dependency, product runtime dependency, or copying of Baritone code, assets, APIs, or implementation structure into CasimirBot's owned planner
+Downstream gate unlocked: comparative evidence for an independently implemented, provider-neutral CasimirBot navigation planner; no Baritone product capability is unlocked
 
 # Baritone v1.15.0 compatibility and license packet
 
@@ -28,6 +28,23 @@ only into the local test profile. Any later redistribution requires a separate
 release/legal review that preserves the LGPL notice, license, source and
 modification obligations. CasimirBot's reflection-only adapter remains a
 separate work and uses only the published `baritone.api` surface.
+
+## Product disposition — 2026-09-03
+
+Baritone is an evaluation-only, non-shipping comparative oracle. CasimirBot does
+not plan to retain it as a product engine, release dependency, or durable
+environment-harness capability. Its local traces may identify capability-level
+requirements such as obstacle-aware routing, bounded replanning, interruption,
+and control release. They must not be used to copy Baritone code, assets, APIs,
+or implementation structure. The durable planner must be independently built
+from general published planning algorithms, CasimirBot's provider-neutral
+environment contracts, and CasimirBot-authored tests.
+
+This is a product-scope decision, not a claim that the upstream license forbids
+all use. The pinned license record remains here so the historical local
+evaluation is reproducible and truthfully attributed. Shipping profiles must
+omit the Baritone artifact and must not advertise `baritone` as a product
+engine.
 
 ## Required movement-only lease
 
@@ -81,8 +98,9 @@ Stop and omit Baritone from the capability manifest when:
 - cancellation leaves an unrestricted movement segment active; or
 - native Fabric behavior regresses merely because Baritone is present.
 
-Passing this packet permits a controlled optional-engine experiment. It does
-not accept Baritone, the Nether journey, or any mutating Baritone workflow.
+Passing this packet permits only a controlled local comparative experiment. It
+does not accept Baritone as a product engine, the Nether journey, or any
+mutating Baritone workflow.
 
 ## Deterministic verification record — 2026-08-24
 

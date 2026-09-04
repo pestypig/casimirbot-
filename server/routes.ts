@@ -56,6 +56,8 @@ import { requireJwtMiddleware } from "./auth/jwt";
 import { qiSnapHub } from "./qi/qi-snap-broadcaster";
 import { vectorizerRouter } from "./routes/vectorizer";
 import { removeBgEdgesRouter } from "./routes/remove-bg-edges";
+import { visualSequenceRouter } from "./routes/visual-sequences";
+import { hudSurfaceRouter } from "./routes/hud-surfaces";
 import { hullPreviewRouter } from "./routes/hull-preview";
 import { hullRenderRouter } from "./routes/hull-render";
 import { hullExportRouter } from "./routes/hull-export";
@@ -71,7 +73,10 @@ import { DEFAULT_QBV_SCHEDULE, DEMO_FLOWS, simulate as simulateTsn } from "../si
 import { getGitFirstAppearances } from "./lib/git-first-appearance";
 import { trainStatusRouter } from "./routes/train-status";
 import { clientErrorRouter } from "./routes/observability.client-error";
-import { createRateLimiter } from "./middleware/rate-limit";
+import {
+  createRateLimiter,
+  isDedicatedEnvironmentConnectorApiPath,
+} from "./middleware/rate-limit";
 import { createConcurrencyGuard } from "./middleware/concurrency-guard";
 import { startStagePlayLiveSourceMailWakeService } from "./services/stage-play/stage-play-live-source-mail-wake-service";
 import { startLiveTradingSupervisor } from
@@ -160,6 +165,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const path = req.path || "";
       if (path.includes("/stream")) return true;
       if (path.startsWith("/agi/ask/jobs")) return true;
+      if (isDedicatedEnvironmentConnectorApiPath(path)) return true;
       return false;
     };
     if (askJobsMax > 0) {
@@ -212,6 +218,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/luma", lumaRouter);
   registerLumaWhisperRoute(app);
   app.use("/api/tools/remove-bg-edges", removeBgEdgesRouter);
+  app.use("/api/visual-sequences", visualSequenceRouter);
+  app.use("/api/hud-surfaces", hudSurfaceRouter);
   app.use("/api/ethos", ethosRouter);
   app.use("/api/search", searchRouter);
   app.use("/api/dev-terminal", devTerminalRouter);

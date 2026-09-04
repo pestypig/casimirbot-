@@ -19,6 +19,31 @@ type DeviceRow = {
   revoked_at: Date | string | null;
 };
 
+type FullHarnessTrustRow = {
+  device_id: string;
+  full_harness_trusted: boolean;
+  full_harness_trust_revision: number;
+  full_harness_trusted_at: Date | string | null;
+  full_harness_trust_revoked_at: Date | string | null;
+  full_harness_trusted_by_session_id: string | null;
+  trusted_session_active?: boolean;
+};
+
+export type InstalledDeviceFullHarnessTrust = Readonly<{
+  schema: "helix.installed_device_full_harness_trust.v1";
+  trusted: boolean;
+  device_ref: string;
+  policy_revision: number;
+  trusted_at: string | null;
+  revoked_at: string | null;
+  delegated_account_session_id: string | null;
+  authority_limited_to_tunnel_transport: true;
+  environment_authority_granted: false;
+  trading_authority_granted: false;
+  answer_authority: false;
+  terminal_eligible: false;
+}>;
+
 type SessionRow = {
   session_id: string;
   status: string;
@@ -131,6 +156,26 @@ export class InstalledSecurityStore {
         VALUES ($1, $2, $3, 'windows', 'active', 0, $4, $4, NULL, $4, $4)
         ON CONFLICT (profile_id, device_id) DO UPDATE SET
           label = EXCLUDED.label,
+          full_harness_trusted = CASE
+            WHEN helix_installed_devices.status = 'active'
+              THEN helix_installed_devices.full_harness_trusted
+            ELSE false
+          END,
+          full_harness_trust_revision = CASE
+            WHEN helix_installed_devices.status = 'active'
+              THEN helix_installed_devices.full_harness_trust_revision
+            ELSE helix_installed_devices.full_harness_trust_revision + 1
+          END,
+          full_harness_trusted_by_session_id = CASE
+            WHEN helix_installed_devices.status = 'active'
+              THEN helix_installed_devices.full_harness_trusted_by_session_id
+            ELSE NULL
+          END,
+          full_harness_trust_revoked_at = CASE
+            WHEN helix_installed_devices.status = 'active'
+              THEN helix_installed_devices.full_harness_trust_revoked_at
+            ELSE EXCLUDED.updated_at
+          END,
           status = 'active',
           registered_at = COALESCE(helix_installed_devices.registered_at, EXCLUDED.registered_at),
           last_seen_at = EXCLUDED.last_seen_at,
@@ -154,6 +199,10 @@ export class InstalledSecurityStore {
         UPDATE helix_installed_devices
         SET status = 'active',
             recovery_generation = recovery_generation + 1,
+            full_harness_trusted = false,
+            full_harness_trust_revision = full_harness_trust_revision + 1,
+            full_harness_trusted_by_session_id = NULL,
+            full_harness_trust_revoked_at = $3,
             last_seen_at = $3,
             revoked_at = NULL,
             updated_at = $3
@@ -184,7 +233,13 @@ export class InstalledSecurityStore {
     const result = await (await this.pool()).query(
       `
         UPDATE helix_installed_devices
-        SET status = 'revoked', revoked_at = $3, updated_at = $3
+        SET status = 'revoked',
+            revoked_at = $3,
+            full_harness_trusted = false,
+            full_harness_trust_revision = full_harness_trust_revision + 1,
+            full_harness_trusted_by_session_id = NULL,
+            full_harness_trust_revoked_at = $3,
+            updated_at = $3
         WHERE profile_id = $1 AND device_id = $2 AND status = 'active';
       `,
       [input.session.profileId, input.deviceId, now],
@@ -237,6 +292,128 @@ export class InstalledSecurityStore {
     await this.recordEvent(input.session, "installed_session_revoked", {
       session_ref: input.targetSessionRef,
     });
+  }
+
+  async setFullHarnessTrust(input: {
+    session: InstalledSecuritySession;
+    deviceId: string;
+    trusted: boolean;
+  }): Promise<InstalledDeviceFullHarnessTrust> {
+    await this.requireSession(input.session);
+    const now = this.now().toISOString();
+    const result = await (await this.pool()).query<FullHarnessTrustRow>(
+      `
+        UPDATE helix_installed_devices
+        SET full_harness_trusted = $3,
+            full_harness_trust_revision = full_harness_trust_revision + 1,
+            full_harness_trusted_at = CASE WHEN $3 THEN $4 ELSE full_harness_trusted_at END,
+            full_harness_trust_revoked_at = CASE WHEN $3 THEN NULL ELSE $4 END,
+            full_harness_trusted_by_session_id = CASE WHEN $3 THEN $5 ELSE NULL END,
+            last_seen_at = $4,
+            updated_at = $4
+        WHERE profile_id = $1 AND device_id = $2 AND status = 'active'
+        RETURNING device_id, full_harness_trusted,
+          full_harness_trust_revision, full_harness_trusted_at,
+          full_harness_trust_revoked_at, full_harness_trusted_by_session_id;
+      `,
+      [
+        input.session.profileId,
+        input.deviceId,
+        input.trusted,
+        now,
+        input.session.sessionId,
+      ],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new InstalledSecurityStoreError(
+        404,
+        "device_not_registered",
+        "The installed device is not active.",
+      );
+    }
+    await this.recordEvent(
+      input.session,
+      input.trusted
+        ? "full_harness_device_trust_granted"
+        : "full_harness_device_trust_revoked",
+      {
+        device_ref: installedDeviceRef(input.deviceId),
+        policy_revision: Number(row.full_harness_trust_revision),
+      },
+    );
+    return this.projectFullHarnessTrust(row, true);
+  }
+
+  async inspectFullHarnessTrust(input: {
+    profileId: string;
+    deviceId: string;
+  }): Promise<InstalledDeviceFullHarnessTrust> {
+    const { rows } = await (await this.pool()).query<FullHarnessTrustRow>(
+      `
+        SELECT d.device_id, d.full_harness_trusted,
+          d.full_harness_trust_revision, d.full_harness_trusted_at,
+          d.full_harness_trust_revoked_at,
+          d.full_harness_trusted_by_session_id,
+          COALESCE(
+            s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > $3),
+            false
+          ) AS trusted_session_active
+        FROM helix_installed_devices d
+        JOIN helix_accounts a ON a.profile_id = d.profile_id
+        LEFT JOIN helix_account_sessions s
+          ON s.session_id = d.full_harness_trusted_by_session_id
+          AND s.profile_id = d.profile_id
+        WHERE d.profile_id = $1
+          AND d.device_id = $2
+          AND d.status = 'active'
+          AND a.account_type = 'developer'
+          AND a.deleted_at IS NULL
+        LIMIT 1;
+      `,
+      [input.profileId, input.deviceId, this.now().toISOString()],
+    );
+    const row = rows[0];
+    if (!row) {
+      return {
+        schema: "helix.installed_device_full_harness_trust.v1",
+        trusted: false,
+        device_ref: installedDeviceRef(input.deviceId),
+        policy_revision: 0,
+        trusted_at: null,
+        revoked_at: null,
+        delegated_account_session_id: null,
+        authority_limited_to_tunnel_transport: true,
+        environment_authority_granted: false,
+        trading_authority_granted: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      };
+    }
+    return this.projectFullHarnessTrust(row, row.trusted_session_active === true);
+  }
+
+  private projectFullHarnessTrust(
+    row: FullHarnessTrustRow,
+    trustedSessionActive: boolean,
+  ): InstalledDeviceFullHarnessTrust {
+    const trusted = row.full_harness_trusted === true && trustedSessionActive;
+    return {
+      schema: "helix.installed_device_full_harness_trust.v1",
+      trusted,
+      device_ref: installedDeviceRef(row.device_id),
+      policy_revision: Number(row.full_harness_trust_revision),
+      trusted_at: nullableIso(row.full_harness_trusted_at),
+      revoked_at: nullableIso(row.full_harness_trust_revoked_at),
+      delegated_account_session_id: trusted
+        ? row.full_harness_trusted_by_session_id
+        : null,
+      authority_limited_to_tunnel_transport: true,
+      environment_authority_granted: false,
+      trading_authority_granted: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    };
   }
 
   async status(input: {

@@ -158,6 +158,181 @@ The amended current-head checkpoint passes math 323/323, WARP 18/18 files and
 `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
 with integrity true and `firstFail=null`.
 
+R30 subsequently localized R29's terminal condition to the offline build. Both
+pinned images loaded, but the digest-qualified builder `FROM` attempted registry
+resolution and failed before compilation. No container or numerical process ran.
+The separately versioned
+[R31 local-image binding fixture](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r31-local-image-binding-fixture.md)
+now freezes the proven P5A-R2/P8J-R11 repair pattern for P8P. It keeps the
+immutable P8P Dockerfile and all scientific bytes unchanged, supplying only the
+two authenticated archive-restored local tags as build arguments under exact
+identity, empty-`RepoDigests`, no-pull, no-network and executable-hash guards.
+Definition and retained-VM proposal audits pass 22/22. No fixture, calibration
+or cloud action has run. Exactly one separately authorized build-only R31
+fixture is the next eligible action; P8Q remains stopped.
+
+R31 was then authorized and consumed exactly once. Its proposal, uploads,
+account, project, stopped VM and disk passed preexecution. The sole restart
+operation `operation-1788532682610-65aa937375801-97851995-dccc69f6`
+terminated with HTTP 503 `ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS` for
+`c2d-standard-32` in `us-east1-c`. The VM remains `TERMINATED`; no upload,
+Docker action, build, fixture or numerical process occurred. The immutable
+[R31 capacity result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r31-capacity-result.md)
+passes independent audit 17/17. R31 is exhausted. Only a separately frozen
+capacity-aware build-only successor is eligible; P8Q remains stopped.
+
+That successor is frozen as the
+[R32 fresh small-VM binding fixture proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r32-fresh-vm-binding-fixture-proposal.md)
+at SHA-256 `40ec0f70...f6afaa`, with an independent 22/22 audit. Because
+the workload is build-and-hash only, R32 substitutes one fresh
+`e2-standard-4` in `us-east1-b` for the unavailable 32-vCPU retained VM while
+preserving the exact source, images, Dockerfile, offline build and executable
+identity. No R32 resource, upload, Docker action or fixture exists; separate
+billable authorization is required and P8Q remains stopped.
+
+R32 was then authorized and exhausted exactly once. It created and authenticated
+the exact `e2-standard-4` VM, but the sole three-file SCP failed because PuTTY
+misparsed the large archive's space-containing Windows path. The archive
+transferred zero bytes; the two small scripts transferred and are preserved.
+No guest command, Docker action, build, fixture or numerical process ran, and
+the VM is `TERMINATED`. The immutable
+[R32 upload result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r32-upload-result.md)
+passes independent audit 17/17. The separately frozen
+[R33 no-space transport proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r33-no-space-archive-transport-proposal.md)
+is `a3aa47b7...f24ee8` with audit 20/20. It reuses the stopped VM and partial
+scripts and changes only the local archive path representation. No R33 cloud
+action exists; P8Q remains stopped.
+
+R29 subsequently executed exactly once. Its immutable
+[terminal guest-depth-unknown result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r29-terminal-guest-depth-unknown-result.md)
+is SHA-256 `bf3c12a6719ba5dbf35a2ad8aff5b407c0dfb647cb4393644e6eb546cdbed3e7`
+and independently audits 16/16. The no-space receipt and evidence copy passed,
+as did a third distinct native SCP. The one SSH remote transaction returned
+exit 3 after its service-start sequence. The VM is `TERMINATED`, but serial
+output was unavailable, so guest execution depth is unknown rather than
+assumed absent. No complete evidence archive or P8Q audit exists. R29 is
+exhausted; the next eligible lead is stopped-disk read-only inspection without
+starting a service, Docker or numerical process.
+
+That lead is frozen as the
+[R30 stopped-disk inspection proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r30-stopped-disk-inspection-proposal.md),
+raw SHA-256 `3d9d79e8ad3b9513659859d6a093e76ef5e7397b47b380bd5344cc9f9e243f38`,
+with a 16/16 independent audit. It permits only a derivative snapshot,
+read-only clone and bounded stopped-disk inspection helper. The protected R29
+VM is not restarted; Docker, its service and numerical execution remain
+forbidden. No R30 cloud resource has been created.
+The R30 checkpoint passes math 323/323, all 18 required WARP files and 179/179
+tests (JSON SHA-256
+`d84af7b78c4dc3c506a66e2aa4ffec22a2559063dc42d788f3bcea4214e2c941`),
+and Casimir adapter run 2640 `PASS/GREEN`, trace
+`adapter:0cf07892-b0f7-4174-836a-146b4ebd7c65`, certificate
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`,
+integrity true, `firstFail=null`.
+
+R30 subsequently executed exactly once. Its immutable
+[stopped-disk inspection result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r30-stopped-disk-inspection-result.md)
+is SHA-256 `ba4dffb9135042a39816925dc3f2861de4e86d9101a7e0e90ed1a6627087bd0c`
+and independently audits 20/20. The 10,970-byte inspection archive proves the
+R29 service installed Docker, authenticated the inputs, loaded both images and
+entered the offline build. It then failed at Dockerfile step 3 with controller
+exit 98 because the digest-qualified builder `FROM` attempted registry
+resolution and received `pull access denied`. The evidence phase remained
+`preexecution`, no container metadata exists and no numerical execution
+occurred. The helper and original VM are both `TERMINATED`; the clone remains
+attached read-only. P8Q remains `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+Only a separately frozen candidate-neutral local-image digest-resolution
+fixture is now eligible.
+The R30 result checkpoint passes math 323/323, all 18 required WARP files and
+179/179 tests (JSON SHA-256
+`d7826181720c6a8c3672b186eb5242a3ff3b6de7960032e678ef7e94f1fd8220`),
+and Casimir adapter run 2641 `PASS/GREEN`, trace
+`adapter:e2d79d2f-7b80-44ec-ad75-54e20c8be219`, certificate
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`,
+integrity true, `firstFail=null`.
+
+R28 subsequently executed exactly once. Its immutable
+[terminal spaced-host-key result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r28-terminal-spaced-hostkey-result.md)
+is SHA-256 `0eecabbb9c2d763e0e9c082b23101d47fa1a87119791d053640d223029a41fb9`
+and independently audits 16/16. A second native SCP succeeded to the new R28
+remote filename, but the isolated receipt still did not materialize; the
+remaining differentiator is spaces in the option path. The guard stopped
+before SSH, the VM is `TERMINATED`, and no calculation ran. Only a separately
+frozen no-space receipt-path successor is eligible.
+
+R27 subsequently executed exactly once. Its immutable
+[terminal host-key receipt result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r27-terminal-hostkey-receipt-result.md)
+is SHA-256 `d919944dc84839649be0801400b1df9ab33230ef07de6cda1f41e06681b63e41`
+and independently audits 16/16. The one native SCP succeeded and transferred
+the archive to its new `/home/dan/` path, but Windows OpenSSH did not create
+the required isolated receipt at the backslash-form `UserKnownHostsFile` path.
+The guard stopped before SSH handoff; the exact VM is `TERMINATED`, and no
+Docker, build, calculation or P8Q audit ran. R27 is exhausted. A separately
+frozen forward-slash path-normalization successor is the only eligible next
+transport action.
+
+The no-space successor is frozen as
+[P8P-R29](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r29-no-space-hostkey-successor-proposal.md)
+at SHA-256 `b2690012739429b5e59c8a9d1f62fcf49c4d8c13ff9f0ad2bc488e6cab2fbf2b`
+with a 22/22 audit. Its 14,891-byte controller is SHA-256
+`e7163c720f6850fae9dd4a42499e0ee9f9d880823fd575d80384dec27de88e8e`,
+passes parsing, and OpenSSH's local configuration parser confirms the exact
+no-space receipt option. It preserves both retained partial archives and makes
+no scientific change. No R29 cloud action occurred.
+
+The R29 checkpoint passes math 323/323, WARP 18/18 requested files and 179/179
+tests with JSON SHA-256
+`52a31edbf10fba34b4bc84e4a7f50c0db88ee9e0087a79eae6ddacb5bd81ce82`,
+and Casimir adapter run 2639 `PASS/GREEN`, trace
+`adapter:41a06f95-3185-484d-af46-7280c1e07666`, certificate
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
+with integrity true and `firstFail=null`.
+
+That successor is frozen as
+[P8P-R28](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r28-forward-hostkey-path-successor-proposal.md)
+at SHA-256 `aa18c16745765915a512987098be85b4e53b17ef9c160e1ab7555983faf97f69`
+with a 21/21 exact-diff audit. Its 14,541-byte controller is SHA-256
+`479e59f066d6cba8367b4955a08c1c830e98c9eee68f1333c5e653cc7ccd6f50`,
+passes PowerShell parsing and proves the forward-slash path fixture locally.
+It preserves and does not use the retained R27 remote archive. No R28 cloud
+action occurred.
+
+The R28 current-head checkpoint passes math 323/323, required WARP regression
+18/18 requested files and 179/179 tests with JSON SHA-256
+`baff3a1115920b60848375ddfa0b1ed6c8677fa829670f463dd34b429c2e0019`,
+and Casimir adapter run 2638 `PASS/GREEN`, trace
+`adapter:f2a53f9c-490d-41fe-aee8-adacb1a84763`, certificate
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
+with integrity true and `firstFail=null`.
+
+R26 subsequently executed exactly once. Its immutable
+[terminal transport result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r26-terminal-transport-result.md)
+is SHA-256 `2342d09450b8bbb71b65de3a8d1af54d422b00a4789a58e3f6dee96a1b4e6dd7`
+and independently audits 17/17. The one regional request and exact VM/resource
+bindings passed, but the first SCP failed before ingress after first-use local
+gcloud selected PuTTY identity `dan` for the `/home/pestypig/` destination.
+The VM is confirmed `TERMINATED`; no archive transfer, Docker action, build,
+calibration or P8Q audit occurred. R26 is exhausted. The next eligible work is
+an identity- and host-key-bound transport successor with unchanged scientific
+inputs and calculation limits.
+
+That successor is now frozen as
+[P8P-R27](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r27-native-openssh-successor-proposal.md)
+at SHA-256 `ca51e39c517967490bcc66fb966da7a35979b4bd38b408cd02cd43a3c1f8d6d0`
+with a 26/26 independent audit. Its 14,360-byte controller is SHA-256
+`4fdb40027927f8d0006cfcb6e604fe7dad44b8ed481c484161b215434af14911`
+and passes PowerShell parsing. The unchanged local key now passes OpenSSH
+derivation after ACL hardening. R27 reuses only the stopped R26 VM, explicitly
+binds `dan`, isolates host-key acceptance, and requires preexisting
+`pestypig` before the unchanged ledger may run. No R27 cloud action occurred.
+
+The R27 current-head checkpoint passes math 323/323, required WARP regression
+18/18 requested files and 179/179 tests with JSON SHA-256
+`1c86b78ba68f492176e3383c65d3a50f7bf0c573ab6bf303430d35ae3d60bc4e`,
+and Casimir adapter run 2637 `PASS/GREEN`, trace
+`adapter:8bdd4002-e489-4b12-89d4-7b88ea367c60`, certificate
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
+with integrity true and `firstFail=null`.
+
 R9 then stopped before page creation because the Chrome browser-control
 provider returned `Browser is not available: chrome`; the read-only surface
 inventory exposed no Chrome application or tab. The immutable
@@ -474,6 +649,68 @@ and independently audits 13/13. R16 is exhausted without upload, cloud command,
 VM creation, build or calculation. P8Q remains
 `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
 
+R36 was then authorized and exhausted once. Preflight, one VM restart and the
+120-second wait passed. The one read-only SSH guard returned exit 127 because
+Windows gcloud/PuTTY transformed its multiline command into a remote attempt to
+run `C:WINDOWSsystem32cmd.exe`. No remote file test, SCP, upload, build, fixture
+or numerical process followed, and cleanup returned the VM to authenticated
+`TERMINATED`. The immutable
+[R36 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r36-remote-command-result.md)
+audits 14/14. The only eligible successor is the separately frozen
+[R37 newline-free controller proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r37-single-line-controller-proposal.md),
+which changes only the local representation of those two commands. P8Q remains
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
+R37 was then authorized and exhausted once. Preflight, its one restart and the
+120-second wait passed. Windows `cmd.exe` intercepted the pipe in the
+newline-free guard and attempted to execute `cut` locally, returning exit 255
+before remote file tests. No SCP, upload, build, fixture or numerical process
+occurred; cleanup returned the VM to authenticated `TERMINATED`. The immutable
+[R37 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r37-cmd-pipe-result.md)
+is independently audited. The only eligible successor is the separately frozen
+[R38 cmd-metacharacter-free controller proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r38-no-cmd-metachar-controller-proposal.md),
+which rejects pipes, ampersands, redirections and newlines before cloud action.
+P8Q remains `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
+R38 remains inert and was not executed. Evidence from R36 and R37 shows that
+incremental inline-command escaping is not the highest-leverage successor, so
+the separately versioned
+[R39 authenticated file-transport boundary](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r39-file-transport-boundary-proposal.md)
+supersedes it before execution. R39 moves all guest shell logic into two
+hash-bound Bash files and limits Windows/gcloud to file transfer plus three
+literal `test`/`bash <file>` invocations. The exact controller parses with zero
+errors; both Bash files pass `bash -n`; repository and short-path staging copies
+match; and the source-disjoint preexecution audit passes 36/36 at auditor
+SHA-256 `c6f7a2a8...0511f300`. The frozen proposal is SHA-256
+`7b20c090...58b59f0`. No R39 cloud or build action has occurred. Separate
+billable authorization is required; P8Q remains
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
+R39 was then authorized and consumed exactly once. Its file-based transport
+crossed the Windows/gcloud boundary: the guest guard printed
+`R39_REMOTE_GUARD_PASS`, both payload SCPs completed, and the launcher reached
+the unchanged R32 wrapper. The wrapper terminated `phase=fixture exit=101` and
+created a 5,155-byte guest evidence export SHA-256
+`de12d097...c55dcd`. The immutable
+[R39 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r39-build-fixture-result.md)
+also records that the initial exit-1 absence probe was an uncached-host-key
+prompt, not a valid remote absence observation; no non-clobbering authority is
+claimed from it. The controller's serial read returned Google `resource is not
+ready` after the VM had stopped, while the direct launcher receipt already
+proved the fixture classification. No numerical process ran and the source VM
+is authenticated `TERMINATED`.
+
+The evidence-selected successor is the separately frozen
+[R40 stopped-disk fixture-evidence recovery](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r40-stopped-disk-fixture-evidence-proposal.md),
+proposal SHA-256 `2116f1f4...c2cece6b`. It preserves the original VM/disk,
+uses one standard snapshot, one read-only `pd-standard` clone and one bounded
+`e2-small` helper, and requires the exact guest export identity before local
+recovery. Its source-disjoint audit passes 32/32 at auditor SHA-256
+`03d7b15b...97122ce`; both procedure parsers pass. No R40 cloud resource or
+action exists. Separate authorization is required, and neither a build
+correction nor P=1024 calibration is eligible before recovery classification.
+P8Q remains `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
 The frozen
 [R17 standalone Cloud Shell preflight](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r17-standalone-cloudshell-preflight.md)
 is SHA-256 `9d9f6f588cb4cfe89f2fd635eedbf1bfa0a78e64bbca4dc382d3549ab3c10c75`
@@ -500,3 +737,118 @@ is SHA-256 `d732adeb53c92d054ac5e36674743aa130d77e5269c1b883da3630ba5f77f6f0`
 and independently audits 10/10. R18 is exhausted before consent or any cloud
 action. The separately frozen R19 fresh-tab successor is now the only eligible
 transport-authentication action.
+
+R19 obtained the one authorized Cloud Shell consent but Google then held the
+terminal at `Connecting...` behind a temporary weekly usage limit. Its
+immutable
+[result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r19-cloudshell-quota-result.md)
+is SHA-256 `6fd354483e187956980a6e3893dd18f47b51923aab5bafd8a11671b16f4fbae8`
+and audits 13/13. R20 opened Google's read-only Usage Quota dialog, but its
+values and reset timestamp never rendered; the immutable
+[R20 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r20-quota-dialog-incomplete-result.md)
+is SHA-256 `46ce3c07e03e174b4c54c3b4c10a9a94545da2bf4d81715b55e13e2d696d756c`
+and audits 12/12.
+
+The local-CLI replacement then fail-closed twice before executable launch:
+R21 omitted exact local paths, and R22 accidentally bound Google's x86 checksum
+to the x64 package. The latter downloaded object was preserved and proved to
+match Google's current x64 row exactly. R23 authenticated and extracted that
+101,597,540-byte archive, then authenticated Google Cloud SDK 583.0.0. Its
+single OAuth tab disappeared during the mandatory action-time confirmation
+pause before `Allow`; the waiting login was terminated and no credential was
+stored. The immutable
+[R23 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r23-auth-tab-lost-result.md)
+is SHA-256 `842a8e4d6aad3e28bd618e829b969a0cd05d274ff22d85101cf9f848406c5a4a`
+and audits 13/13.
+
+The frozen
+[R24 auth-only successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r24-auth-only-handoff.md)
+is SHA-256 `f67d49ff44877b9e2b916eb39e9906b3c8ea877a53e206a965dba2c59f5fa79f`
+and audits 18/18. Its one authorized transaction reached the exact OAuth scope
+page and obtained the required `Allow` confirmation, but the handed-off tab
+disappeared before activation. The immutable
+[R24 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r24-confirmed-consent-tab-lost-result.md)
+is SHA-256 `2987c67419c717f027719ea0d49badf9f107f3cb3834ed82f098b7edd8327c6c`.
+Credential databases remain absent and R24 is exhausted.
+
+The separately versioned
+[R25 confirmation-stable authentication successor](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r25-confirmation-stable-authentication.md)
+is frozen at SHA-256
+`f0e11be050d6a210714dbe050752ed1039f3b85dd8ca3803cdc74fcf0d677709`
+and independently audits 22/22. It preserves one auth process and permits at
+most one conditional reattachment to the exact volatile final-consent URL
+after action-time confirmation. It permits no Compute Engine call and requires
+separate exact authorization. The P=1024 calibration remains unexecuted and
+P8Q remains `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
+R35 was then authorized and exhausted once. The temporary-drive repair worked:
+the authenticated R35 hard link is the same NTFS payload as the frozen source,
+and the temporary `R:` mapping was removed. The VM restarted once and completed
+the exact 120-second wait, but the locally constructed PowerShell guard failed
+to parse before any SSH process was issued. No upload, Docker, build, fixture or
+numerical process occurred, and cleanup returned the VM to authenticated
+`TERMINATED`. The immutable
+[R35 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r35-controller-parse-result.md)
+is independently audited. The only eligible successor is the separately frozen
+[R36 static-guard controller proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r36-static-guard-controller-proposal.md),
+which reuses the valid hard link and replaces only the local guard construction
+with a parse-tested literal controller. P8Q remains
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
+The R25 current-head checkpoint passes math 323/323, required WARP regression
+18/18 files and 179/179 tests with JSON report `4e2dbcdc...f9f1f3c`, and
+Casimir adapter run 2635 `PASS/GREEN`, trace
+`adapter:32c43c5f-bbdb-455a-afef-bc61e01773ae`, certificate
+`6e84f965...e12a4e45` with integrity true and `firstFail=null`.
+
+R25 subsequently completed exactly once. Its immutable
+[authentication result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r25-authentication-result.md)
+is SHA-256 `4458c10c8da75d8cf2adb32c8fe8f6727c67c7482f7b781d93138656cdc68cc6`
+and independently audits 14/14. The dedicated Google Cloud SDK account is
+`pestypig@gmail.com` and only its local configuration binds project
+`dark-stratum-455714-h4`. No Compute Engine query/action occurred. R25 is
+exhausted; only a separately frozen and authorized local-gcloud transport
+successor may attempt the unchanged candidate-neutral P=1024 calibration.
+
+That successor is now frozen as
+[P8P-R26](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r26-local-gcloud-successor-proposal.md)
+at SHA-256 `ec41efaf2de6c7384e71c3d13f3978f939409bd037288d168ea633a835c643e1`,
+with a 24/24 independent static audit. Its 13,377-byte local controller is
+SHA-256 `50c2743a6f2e61fc61a0e9df53b8806db8f1b41a26297cd647f1087517ae1a24`
+and passes PowerShell parsing. R26 preserves the R16 scientific payload and
+regional resource shape while replacing only transport and adding a bounded
+exact-name failure stop. No R26 Compute Engine call or resource action has
+occurred. P8Q remains stopped pending separate authorization and execution.
+
+The R26 current-head checkpoint passes math 323/323, the complete required
+WARP regression at 18/18 requested files and 179/179 tests with JSON SHA-256
+`78d3d18a89fc42052dcb213cd0bb7e4a72841170016d1ef42e0af278be1d1efe`,
+and Casimir adapter run 2636 `PASS/GREEN`, trace
+`adapter:6b621c9e-9c2c-422f-b129-765a3f30b377`, certificate
+`6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
+with integrity true and `firstFail=null`.
+
+R33 was authorized and exhausted once before cloud execution. The sole local
+hard-link operation encountered the source archive at Windows' exact
+260-character legacy path boundary and returned path-not-found. Read-only
+inspection preserved the authentic 236,640,768-byte source at SHA-256
+`3c697fa3...670b5`, while the R33 link remained absent. No VM restart, upload,
+build, fixture, numerical process or candidate action occurred. The immutable
+[R33 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r33-local-hardlink-result.md)
+is independently audited. The only eligible successor is the separately
+frozen
+[R34 extended-length hard-link proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r34-extended-path-hardlink-proposal.md),
+which changes only that local filesystem representation. P8Q remains
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
+R34 was then authorized and exhausted once before cloud execution. Its exact
+proposal, source, absent target and stopped VM passed authentication. The sole
+extended-length `fsutil` hard-link invocation returned Windows error 3 and exit
+1; the source remains authentic and the R34 link remains absent. No VM restart,
+upload, build, fixture, numerical process or candidate action occurred. The
+immutable
+[R34 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r34-extended-path-result.md)
+audits 12/12. The only eligible successor is the separately frozen
+[R35 temporary-drive hard-link proposal](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r35-subst-hardlink-proposal.md),
+which changes only the source's local drive-letter view and requires its cleanup.
+P8Q remains `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.

@@ -14,7 +14,14 @@ type PrivateRecord = {
   delegationAccountSessionHash: string | null;
   delegationAccountSessionId: string | null;
   idempotencyReceipts: Map<string, DesktopMcpTransitionReceipt>;
+  nativeRoutingOutcome: DesktopMcpNativeRoutingOutcome | null;
 };
+
+export type DesktopMcpNativeRoutingOutcome = Readonly<{
+  reconnectRequired: boolean;
+  catalogRefreshRequired: boolean;
+  stableScopeRouting: boolean;
+}>;
 
 const digest = (value: string): string =>
   crypto.createHash("sha256").update(value, "utf8").digest("hex");
@@ -247,9 +254,34 @@ export class DesktopMcpTunnelTransitionStore {
       delegationAccountSessionHash: null,
       delegationAccountSessionId: null,
       idempotencyReceipts: new Map(),
+      nativeRoutingOutcome: null,
     };
     this.records.set(request.transition_request_ref, record);
     return { request: clone(request), receipt: this.append(record, "requested", "full_helix_agent", "user_delegation_required") };
+  }
+
+  findOpenForIdentity(
+    identity: DesktopMcpTransitionIdentity,
+  ): DesktopMcpTransitionRequest | null {
+    if (identity.serviceInstanceRef !== this.serviceInstanceRef) {
+      throw new DesktopMcpTunnelTransitionError("transition_service_epoch_mismatch", 409);
+    }
+    for (const record of this.records.values()) this.expire(record);
+    const accountSessionHash = this.sessionHash(identity.accountSessionId);
+    const record = [...this.records.values()].find((candidate) =>
+      candidate.request.service_instance_ref === identity.serviceInstanceRef &&
+      candidate.request.client_session_ref === identity.clientSessionRef &&
+      candidate.request.conversation_thread_ref === identity.conversationThreadRef &&
+      candidate.request.authenticated_profile_ref === identity.authenticatedProfileRef &&
+      candidate.request.authenticated_mcp_client_ref === identity.authenticatedMcpClientRef &&
+      candidate.requesterAccountSessionHash === accountSessionHash &&
+      [
+        "pending_user_delegation",
+        "delegated",
+        "transition_accepted",
+        "active",
+      ].includes(candidate.request.status));
+    return record ? clone(record.request) : null;
   }
 
   inspect(input: {
@@ -257,6 +289,31 @@ export class DesktopMcpTunnelTransitionStore {
     requestRef: string;
   }): DesktopMcpTransitionRequest {
     return clone(this.requireOwned(input.requestRef, input.identity).request);
+  }
+
+  readNativeRoutingOutcome(input: {
+    identity: DesktopMcpTransitionIdentity;
+    requestRef: string;
+  }): DesktopMcpNativeRoutingOutcome | null {
+    const outcome = this.requireOwned(
+      input.requestRef,
+      input.identity,
+    ).nativeRoutingOutcome;
+    return outcome ? clone(outcome) : null;
+  }
+
+  recordNativeRoutingOutcome(input: {
+    requestRef: string;
+    outcome: DesktopMcpNativeRoutingOutcome;
+  }): void {
+    const record = this.records.get(input.requestRef);
+    if (!record) {
+      throw new DesktopMcpTunnelTransitionError(
+        "transition_request_not_found",
+        404,
+      );
+    }
+    record.nativeRoutingOutcome = Object.freeze({ ...input.outcome });
   }
 
   grant(input: {
@@ -287,6 +344,79 @@ export class DesktopMcpTunnelTransitionStore {
       delegation_expires_at: new Date(this.now().getTime() + leaseSeconds * 1000).toISOString(),
     });
     return { request, receipt: this.append(record, "delegated", "full_helix_agent", "developer_delegation_granted") };
+  }
+
+  renewTrustedDeviceLease(input: {
+    previousRequestRef: string;
+    authenticatedProfileRef: string;
+    accountSessionId: string;
+    accountType: "developer" | "user";
+  }): Readonly<{
+    request: DesktopMcpTransitionRequest;
+    requestedReceipt: DesktopMcpTransitionReceipt;
+    delegatedReceipt: DesktopMcpTransitionReceipt;
+    authorization: Readonly<{
+      receipt: DesktopMcpTransitionReceipt;
+      idempotencyReplayed: boolean;
+      delegatedAccountSessionId: string;
+    }>;
+  }> {
+    const previous = this.records.get(input.previousRequestRef);
+    if (!previous) {
+      throw new DesktopMcpTunnelTransitionError("transition_request_not_found", 404);
+    }
+    this.expire(previous);
+    if (
+      input.accountType !== "developer" ||
+      previous.request.authenticated_profile_ref !==
+        input.authenticatedProfileRef ||
+      this.sessionHash(input.accountSessionId) !==
+        previous.delegationAccountSessionHash ||
+      previous.request.status !== "expired"
+    ) {
+      throw new DesktopMcpTunnelTransitionError(
+        "transition_trusted_renewal_forbidden",
+        403,
+      );
+    }
+    const identity: DesktopMcpTransitionIdentity = {
+      serviceInstanceRef: previous.request.service_instance_ref,
+      clientSessionRef: previous.request.client_session_ref,
+      conversationThreadRef: previous.request.conversation_thread_ref,
+      authenticatedProfileRef: previous.request.authenticated_profile_ref,
+      authenticatedMcpClientRef:
+        previous.request.authenticated_mcp_client_ref,
+      accountSessionId: input.accountSessionId,
+      clientIdentityAssurance:
+        previous.request.client_identity_assurance,
+      independentExternalOAuthClientBound:
+        previous.request.independent_external_oauth_client_bound,
+    };
+    const created = this.request({
+      identity,
+      declaredTaskSummary: previous.request.declared_task_summary,
+      requestedLeaseSeconds: previous.request.requested_lease_seconds,
+    });
+    const delegated = this.grant({
+      requestRef: created.request.transition_request_ref,
+      authenticatedProfileRef: input.authenticatedProfileRef,
+      accountSessionId: input.accountSessionId,
+      accountType: input.accountType,
+      leaseSeconds: created.request.requested_lease_seconds,
+    });
+    const authorization = this.authorize({
+      identity,
+      requestRef: created.request.transition_request_ref,
+      targetScope: "full_helix_agent",
+      idempotencyKey:
+        `trusted-device-renewal:${created.request.transition_request_ref}`,
+    });
+    return Object.freeze({
+      request: delegated.request,
+      requestedReceipt: created.receipt,
+      delegatedReceipt: delegated.receipt,
+      authorization,
+    });
   }
 
   authorize(input: {

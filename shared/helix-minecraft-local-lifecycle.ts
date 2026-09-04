@@ -28,6 +28,7 @@ export const helixMinecraftLoopbackAddressSchema = z
 export const helixMinecraftLocalLifecycleRequestSchema = z
   .object({
     address: helixMinecraftLoopbackAddressSchema.default("localhost:25565"),
+    restart_client: z.boolean().default(false),
   })
   .strict();
 

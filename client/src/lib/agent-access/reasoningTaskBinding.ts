@@ -6,6 +6,10 @@ export type BrowserReasoningBinding = Readonly<{
   status: "pending_claim" | "active" | "revoked" | "expired" | "superseded";
   continuation_transport: "polling" | "monitor_only" | "unavailable";
   binding_epoch: number;
+  /** Present on current server projections; optional only for older local snapshots. */
+  service_instance_ref?: string;
+  /** Present on current server projections; optional only for older local snapshots. */
+  expires_at?: string;
 }>;
 
 type BrowserReasoningBindingStore = {
@@ -35,6 +39,10 @@ const isBrowserReasoningBinding = (value: unknown): value is BrowserReasoningBin
   return typeof candidate.reasoning_binding_id === "string" &&
     typeof candidate.helix_conversation_id === "string" &&
     Number.isInteger(candidate.binding_epoch) &&
+    (candidate.service_instance_ref === undefined ||
+      typeof candidate.service_instance_ref === "string") &&
+    (candidate.expires_at === undefined ||
+      typeof candidate.expires_at === "string") &&
     ["pending_claim", "active", "revoked", "expired", "superseded"].includes(candidate.status ?? "") &&
     ["polling", "monitor_only", "unavailable"].includes(candidate.continuation_transport ?? "");
 };

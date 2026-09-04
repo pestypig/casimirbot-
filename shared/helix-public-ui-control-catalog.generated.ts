@@ -1511,6 +1511,34 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "client_local"
   },
   {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.reasoning-claim-handle",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "observe",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.check-reasoning-binding",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "observe",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.revoke-reasoning-binding",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
     "control_id": "workstation.panel.agi-task-history.task-history-panel.set-active-session-id-window-dispatch-event-new-custom-event-open-helix",
     "surface_id": "workstation.panel.agi-task-history",
     "account_scope": "user",

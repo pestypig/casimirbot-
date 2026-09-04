@@ -15,6 +15,8 @@ const timestamp = z.string().datetime({ offset: true });
 
 export const helixEnvironmentDeviceCheckBlockingReasonSchema = z.enum([
   "installation_inactive",
+  "installed_node_unbound",
+  "installed_node_inactive",
   "device_inactive",
   "binding_missing",
   "binding_inactive",

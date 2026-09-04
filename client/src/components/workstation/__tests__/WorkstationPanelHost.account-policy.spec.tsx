@@ -75,6 +75,23 @@ describe("WorkstationPanelHost account policy", () => {
     expect(screen.queryByTestId("motorcycle-hud-lab")).toBeNull();
   });
 
+  it("keeps the general Surface Workspace developer-only", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ account_policy: HELIX_USER_ACCOUNT_POLICY }),
+      })),
+    );
+    await fetchAccountCapabilityPolicy();
+
+    render(<WorkstationPanelHost panelId="surface-workspace" />);
+
+    expect(screen.getByText("Surface Workspace is locked")).toBeTruthy();
+    expect(screen.getByText(/reserved for developer mode/i)).toBeTruthy();
+    expect(screen.queryByTestId("surface-workspace-panel")).toBeNull();
+  });
+
   it("renders the safe local harness status surface for public users", async () => {
     vi.stubGlobal("React", React);
     vi.stubGlobal(

@@ -44,12 +44,48 @@ const setup = () => {
     requestedLeaseSeconds: 120,
   });
   const onRevoked = vi.fn(async () => undefined);
+  const installedSecurityStore = {
+    inspectFullHarnessTrust: vi.fn(async () => ({
+      schema: "helix.installed_device_full_harness_trust.v1" as const,
+      trusted: false,
+      device_ref: "device:sha256:fixture",
+      policy_revision: 0,
+      trusted_at: null,
+      revoked_at: null,
+      delegated_account_session_id: null,
+      authority_limited_to_tunnel_transport: true as const,
+      environment_authority_granted: false as const,
+      trading_authority_granted: false as const,
+      answer_authority: false as const,
+      terminal_eligible: false as const,
+    })),
+    setFullHarnessTrust: vi.fn(async () => ({
+      schema: "helix.installed_device_full_harness_trust.v1" as const,
+      trusted: true,
+      device_ref: "device:sha256:fixture",
+      policy_revision: 1,
+      trusted_at: "2026-09-03T12:00:00.000Z",
+      revoked_at: null,
+      delegated_account_session_id: sessionId,
+      authority_limited_to_tunnel_transport: true as const,
+      environment_authority_granted: false as const,
+      trading_authority_granted: false as const,
+      answer_authority: false as const,
+      terminal_eligible: false as const,
+    })),
+  };
   const app = express();
   app.use(
     "/api/desktop/mcp-tunnel-transition",
-    createDesktopMcpTunnelTransitionRouter({ store, onRevoked }),
+    createDesktopMcpTunnelTransitionRouter({
+      store,
+      onRevoked,
+      installedSecurityStore,
+      desktopDeviceId: "desktop-device-fixture",
+      desktopHostEnabled: true,
+    }),
   );
-  return { app, store, created, onRevoked };
+  return { app, store, created, onRevoked, installedSecurityStore };
 };
 
 describe("desktop MCP tunnel transition consent route", () => {
@@ -201,5 +237,155 @@ describe("desktop MCP tunnel transition consent route", () => {
       idempotencyKey: "oauth-native-delegation-fixture",
     });
     expect(authorization.delegatedAccountSessionId).toBe(nativeSessionId);
+  });
+
+  it("stores native trusted-device opt-in and delegates existing pending leases without broad authority", async () => {
+    const { app, created, installedSecurityStore } = setup();
+    const headers = {
+      Cookie: `helix_session=${encodeURIComponent(sessionId)}`,
+      Origin: "http://127.0.0.1",
+      Host: "127.0.0.1",
+      "Sec-Fetch-Site": "same-origin",
+    };
+    const response = await request(app)
+      .put("/api/desktop/mcp-tunnel-transition/full-harness-trust")
+      .set(headers)
+      .send({ trusted: true });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ok: true,
+      trust: {
+        trusted: true,
+        environment_authority_granted: false,
+        trading_authority_granted: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
+      delegated_request_refs: [created.request.transition_request_ref],
+    });
+    expect(JSON.stringify(response.body)).not.toContain(sessionId);
+    expect(installedSecurityStore.setFullHarnessTrust).toHaveBeenCalledWith({
+      session: { sessionId, profileId },
+      deviceId: "desktop-device-fixture",
+      trusted: true,
+    });
+  });
+
+  it("receipt-chains a trusted rolling renewal for the exact expired continuation", async () => {
+    let nowMs = Date.parse("2026-09-03T12:00:00.000Z");
+    let ref = 0;
+    const store = new DesktopMcpTunnelTransitionStore(
+      serviceInstanceRef,
+      () => new Date(nowMs),
+      (kind) => `desktop_tunnel_${kind}:renew-${++ref}`,
+    );
+    const identity = {
+      serviceInstanceRef,
+      clientSessionRef: "supervisor_client:renew-fixture",
+      conversationThreadRef: "codex_thread:renew-fixture",
+      authenticatedProfileRef: profileId,
+      authenticatedMcpClientRef: "mcp_client:native_desktop:renew-fixture",
+      accountSessionId: sessionId,
+      clientIdentityAssurance:
+        "native_tunnel_client_plus_server_derived_continuation" as const,
+      independentExternalOAuthClientBound: false,
+    };
+    const first = store.request({
+      identity,
+      declaredTaskSummary: "Keep this exact trusted task connected.",
+      requestedLeaseSeconds: 30,
+    });
+    store.grant({
+      requestRef: first.request.transition_request_ref,
+      authenticatedProfileRef: profileId,
+      accountSessionId: sessionId,
+      accountType: "developer",
+    });
+    store.authorize({
+      identity,
+      requestRef: first.request.transition_request_ref,
+      targetScope: "full_helix_agent",
+      idempotencyKey: "first-transition",
+    });
+    nowMs += 30_001;
+    const installedSecurityStore = {
+      inspectFullHarnessTrust: vi.fn(async () => ({
+        schema: "helix.installed_device_full_harness_trust.v1" as const,
+        trusted: true,
+        device_ref: "device:sha256:fixture",
+        policy_revision: 4,
+        trusted_at: "2026-09-03T11:00:00.000Z",
+        revoked_at: null,
+        delegated_account_session_id: sessionId,
+        authority_limited_to_tunnel_transport: true as const,
+        environment_authority_granted: false as const,
+        trading_authority_granted: false as const,
+        answer_authority: false as const,
+        terminal_eligible: false as const,
+      })),
+      setFullHarnessTrust: vi.fn(),
+    };
+    const onTrustedRenewal = vi.fn(async () => ({
+      accepted: true,
+      nativeReceiptRef: "native_transition_receipt:renew-fixture",
+    }));
+    const app = express();
+    app.use(
+      "/api/desktop/mcp-tunnel-transition",
+      createDesktopMcpTunnelTransitionRouter({
+        store,
+        installedSecurityStore,
+        desktopDeviceId: "desktop-device-fixture",
+        desktopHostEnabled: true,
+        onTrustedRenewal,
+      }),
+    );
+    const response = await request(app)
+      .post("/api/desktop/mcp-tunnel-transition/full-harness-trust/renew")
+      .set({
+        Cookie: `helix_session=${encodeURIComponent(sessionId)}`,
+        Origin: "http://127.0.0.1",
+        Host: "127.0.0.1",
+        "Sec-Fetch-Site": "same-origin",
+      })
+      .send({
+        previous_transition_request_ref:
+          first.request.transition_request_ref,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ok: true,
+      renewed: true,
+      request: {
+        status: "delegated",
+        client_session_ref: identity.clientSessionRef,
+        conversation_thread_ref: identity.conversationThreadRef,
+      },
+      receipt: { event_type: "transition_accepted" },
+      native_receipt_ref: "native_transition_receipt:renew-fixture",
+      environment_authority_granted: false,
+      terminal_eligible: false,
+    });
+    expect(onTrustedRenewal).toHaveBeenCalledWith(expect.objectContaining({
+      accountSessionId: sessionId,
+      transitionRequestRef:
+        response.body.request.transition_request_ref,
+    }));
+    expect(JSON.stringify(response.body)).not.toContain(sessionId);
+  });
+
+  it("does not expose trusted-device policy outside the packaged desktop host", async () => {
+    const store = new DesktopMcpTunnelTransitionStore(serviceInstanceRef);
+    const app = express();
+    app.use(
+      "/api/desktop/mcp-tunnel-transition",
+      createDesktopMcpTunnelTransitionRouter({ store }),
+    );
+    const response = await request(app)
+      .get("/api/desktop/mcp-tunnel-transition/full-harness-trust")
+      .set("Cookie", `helix_session=${encodeURIComponent(sessionId)}`);
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe("transition_native_trust_unavailable");
   });
 });

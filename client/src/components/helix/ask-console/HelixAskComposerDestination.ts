@@ -19,6 +19,12 @@ export type HelixAskComposerDestinationModel = {
   providerDeliveryClaimed: boolean;
 };
 
+export const shouldAutomaticallySelectBoundAgent = (input: {
+  bindingStatus: "pending_claim" | "active" | "revoked" | "expired" | "superseded";
+  operatorSelectedDestination: boolean;
+}): boolean =>
+  input.bindingStatus === "active" && !input.operatorSelectedDestination;
+
 export const buildHelixAskComposerDestinationModel = (input: {
   kind: HelixAskComposerDestinationKind;
   runtimeLabel?: string | null;

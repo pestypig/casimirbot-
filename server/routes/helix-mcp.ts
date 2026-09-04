@@ -26,6 +26,10 @@ import type { DesktopMcpTunnelTransitionStore } from
   "../services/local-supervisor/desktop-mcp-tunnel-transition-store";
 import type { DesktopMcpTunnelTransitionExecutor } from
   "../mcp/helix-mcp-server";
+import type { DesktopFullHarnessTrustReader } from
+  "../mcp/helix-mcp-server";
+import type { DesktopWorkstationPresenter } from
+  "../mcp/helix-mcp-server";
 import { appendMcpToolInvocationToOperatorActivity } from
   "../services/helix-ask/operator-activity-ingestion";
 import { DESKTOP_MCP_TUNNEL_ACCOUNT_SESSION_HEADER } from
@@ -53,6 +57,8 @@ export type HelixMcpServerFactory = (input: {
   reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
+  desktopWorkstationPresenter?: DesktopWorkstationPresenter;
+  desktopFullHarnessTrustReader?: DesktopFullHarnessTrustReader;
   mcpToolLifecycleObserver?: Parameters<
     typeof createHelixMcpServer
   >[0]["mcpToolLifecycleObserver"];
@@ -74,6 +80,8 @@ type McpRouterDependencies = {
   reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
+  desktopWorkstationPresenter?: DesktopWorkstationPresenter;
+  desktopFullHarnessTrustReader?: DesktopFullHarnessTrustReader;
   desktopDelegationScopes?: readonly string[];
 };
 
@@ -343,6 +351,10 @@ export const createHelixMcpRouter = (
             dependencies.desktopMcpTunnelTransitionStore,
           desktopMcpTunnelTransitionExecutor:
             dependencies.desktopMcpTunnelTransitionExecutor,
+          desktopWorkstationPresenter:
+            dependencies.desktopWorkstationPresenter,
+          desktopFullHarnessTrustReader:
+            dependencies.desktopFullHarnessTrustReader,
           mcpToolLifecycleObserver: async (observation) => {
             const requestId = (res.locals as McpLocals).helixAgentRequestId;
             if (!requestId) return;

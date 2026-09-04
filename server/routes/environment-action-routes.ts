@@ -1,4 +1,5 @@
 import { Router, json, type Request, type Response } from "express";
+import { createRateLimiter } from "../middleware/rate-limit";
 import {
   authenticateEnvironmentActionConnector,
   EnvironmentActionBrokerError,
@@ -69,9 +70,22 @@ const noStore = (_req: Request, res: Response, next: () => void): void => {
 
 export const environmentActionRouter = Router();
 
+const actionConnectorRateLimitWindowMs = 60_000;
+const actionConnectorIpRateLimiter = createRateLimiter({
+  windowMs: actionConnectorRateLimitWindowMs,
+  max: Number(process.env.HELIX_ENVIRONMENT_ACTION_CONNECTOR_IP_RATE_LIMIT ?? "3600"),
+});
+const actionConnectorAuthorityRateLimiter = createRateLimiter({
+  windowMs: actionConnectorRateLimitWindowMs,
+  max: Number(process.env.HELIX_ENVIRONMENT_ACTION_CONNECTOR_AUTHORITY_RATE_LIMIT ?? "600"),
+  keyGenerator: (req) => `${req.ip ?? "unknown"}:${req.params.authorityId ?? "unknown"}`,
+});
+
 environmentActionRouter.use(
   "/v1/authorities/:authorityId",
   noStore,
+  actionConnectorIpRateLimiter,
+  actionConnectorAuthorityRateLimiter,
   json({ limit: "1mb" }),
 );
 
@@ -139,7 +153,7 @@ environmentActionRouter.get(
       authorization: req.headers.authorization,
       requiredScope: "action.poll",
     });
-    const requests = await leasePendingEnvironmentActions({
+    const leased = await leasePendingEnvironmentActions({
       claim,
       limit: Number(req.query.limit ?? 4),
     });
@@ -147,7 +161,14 @@ environmentActionRouter.get(
       schema: "helix.environment_action.pending_requests.v1",
       ok: true,
       error: null,
-      action_requests: requests,
+      action_requests: leased.requests,
+      queue_observation: {
+        queue_depth_at_lease: leased.queueDepthAtLease,
+        oldest_pending_age_ms: leased.oldestPendingAgeMs,
+        measurement_authority: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      },
       automatic_replay_allowed: false,
       host_access_allowed: false,
       answer_authority: false,

@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.player.LocalPlayer;
@@ -95,6 +96,8 @@ final class NativeFabricControlBridge implements ControlBridge {
     private PredictiveCameraTracker.State cameraTrackingState =
         PredictiveCameraTracker.State.initial();
     private long cameraTrackingLastFrameNanos;
+    private long manualInputDetectedNanos = -1L;
+    private Long pendingManualReleaseLatencyNanos;
 
     NativeFabricControlBridge(Minecraft minecraft) {
         this.minecraft = minecraft;
@@ -980,6 +983,9 @@ final class NativeFabricControlBridge implements ControlBridge {
         } else if (NativeFabricWorkflowEngine.usesReusableWorkflowEngine(actionKind)) {
             workflowEngine.begin(actionKind, arguments, controlEngine);
         }
+        manualInputDetectedNanos = -1L;
+        pendingManualReleaseLatencyNanos = null;
+        ManualInputLatch.arm();
     }
 
     @Override
@@ -1664,6 +1670,12 @@ final class NativeFabricControlBridge implements ControlBridge {
         return baritone.available();
     }
 
+    Long consumeManualReleaseLatencyNanos() {
+        Long measured = pendingManualReleaseLatencyNanos;
+        pendingManualReleaseLatencyNanos = null;
+        return measured;
+    }
+
     String baritoneVersion() {
         return baritone.version();
     }
@@ -1674,6 +1686,14 @@ final class NativeFabricControlBridge implements ControlBridge {
 
     @Override
     public void releaseAll() {
+        if (manualInputDetectedNanos >= 0L) {
+            pendingManualReleaseLatencyNanos = Math.max(
+                0L,
+                System.nanoTime() - manualInputDetectedNanos
+            );
+            manualInputDetectedNanos = -1L;
+        }
+        ManualInputLatch.disarm();
         reactiveScheduler.cancelAll("global_control_release");
         combatGuardian.cancel();
         releaseResources(Set.of(
@@ -2206,6 +2226,14 @@ final class NativeFabricControlBridge implements ControlBridge {
     }
 
     private String manualInputReason(LocalPlayer player) {
+        String rawInputReason = ManualInputLatch.consume();
+        if (rawInputReason != null) {
+            manualInputDetectedNanos = ManualInputLatch.detectedNanos();
+            if (manualInputDetectedNanos < 0L) {
+                manualInputDetectedNanos = System.nanoTime();
+            }
+            return rawInputReason;
+        }
         if (
             minecraft.screen != null &&
             expectedScreen == null &&
@@ -2221,33 +2249,41 @@ final class NativeFabricControlBridge implements ControlBridge {
         }
         if (
             minecraft.screen != null &&
+            !(minecraft.screen instanceof ChatScreen) &&
             minecraft.screen != expectedScreen &&
             !workflowEngine.screenAutomationAllowed()
         ) {
-            return "screen_open";
+            return detectedManualInput("screen_open");
         }
-        if (minecraft.mouseHandler.isLeftPressed()) return "left_mouse_pressed";
-        if (minecraft.mouseHandler.isMiddlePressed()) return "middle_mouse_pressed";
-        if (minecraft.mouseHandler.isRightPressed()) return "right_mouse_pressed";
+        if (minecraft.mouseHandler.isLeftPressed()) return detectedManualInput("left_mouse_pressed");
+        if (minecraft.mouseHandler.isMiddlePressed()) return detectedManualInput("middle_mouse_pressed");
+        if (minecraft.mouseHandler.isRightPressed()) return detectedManualInput("right_mouse_pressed");
         if (unexpectedDown(minecraft.options.keyUp, asserted.forward())) {
-            return "forward_key_pressed";
+            return detectedManualInput("forward_key_pressed");
         }
         if (unexpectedDown(minecraft.options.keyDown, asserted.back())) {
-            return "back_key_pressed";
+            return detectedManualInput("back_key_pressed");
         }
         if (unexpectedDown(minecraft.options.keyLeft, asserted.left())) {
-            return "left_key_pressed";
+            return detectedManualInput("left_key_pressed");
         }
         if (unexpectedDown(minecraft.options.keyRight, asserted.right())) {
-            return "right_key_pressed";
+            return detectedManualInput("right_key_pressed");
         }
         if (unexpectedDown(minecraft.options.keyJump, asserted.jump())) {
-            return "jump_key_pressed";
+            return detectedManualInput("jump_key_pressed");
         }
         if (unexpectedDown(minecraft.options.keySprint, asserted.sprint())) {
-            return "sprint_key_pressed";
+            return detectedManualInput("sprint_key_pressed");
         }
-        return viewWasManuallyChanged(player) ? "unexpected_view_change" : null;
+        return viewWasManuallyChanged(player)
+            ? detectedManualInput("unexpected_view_change")
+            : null;
+    }
+
+    private String detectedManualInput(String reason) {
+        manualInputDetectedNanos = System.nanoTime();
+        return reason;
     }
 
     private long currentGameTick() {

@@ -55,6 +55,22 @@ try {
     await agentAccess.waitFor({ state: "visible", timeout: 10_000 });
     await agentAccess.click();
   }
+  const trustControl = page.getByRole("checkbox", {
+    name: "Trust this device for Full Harness",
+    exact: false,
+  });
+  await trustControl.waitFor({ state: "visible", timeout: 30_000 });
+  if (await trustControl.isChecked()) {
+    throw new Error("Fresh packaged profile enabled trusted-device tunnel approval by default.");
+  }
+  await trustControl.click();
+  await page.getByText(
+    "CasimirBot could not change trusted-device approval. Sign in with a developer account and verify this installed device.",
+    { exact: true },
+  ).waitFor({ state: "visible", timeout: 10_000 });
+  if (await trustControl.isChecked()) {
+    throw new Error("Unauthenticated packaged profile retained trusted-device tunnel approval.");
+  }
   await button.waitFor({ state: "visible", timeout: 30_000 });
   await button.click();
   await page.waitForFunction(() => {
@@ -103,6 +119,8 @@ try {
   process.stdout.write(`${JSON.stringify({
     Verdict: "PASS",
     NativeBridge: "PASS",
+    TrustedDeviceDefaultOff: "PASS",
+    UnauthenticatedTrustRejected: "PASS",
     StartHarnessSettled: "PASS",
     DiagnosticSanitization: "PASS",
     TunnelStatus: tunnel.status ?? "unknown",

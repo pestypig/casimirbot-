@@ -43,6 +43,9 @@ describe("native desktop MCP transition broker parser", () => {
     const request = parseDesktopMcpTunnelTransitionBrokerRequest(valid, now)!;
     const execute = vi.fn(async () => ({
       nativeReceiptRef: "native_transition_receipt:fixture-1234",
+      reconnectRequired: false,
+      catalogRefreshRequired: false,
+      stableScopeRouting: true,
     }));
     const [first, replay] = await Promise.all([
       admission.admit({ request, execute }),
@@ -51,6 +54,9 @@ describe("native desktop MCP transition broker parser", () => {
     expect(first.idempotencyReplayed).toBe(false);
     expect(replay).toEqual({
       nativeReceiptRef: first.nativeReceiptRef,
+      reconnectRequired: false,
+      catalogRefreshRequired: false,
+      stableScopeRouting: true,
       idempotencyReplayed: true,
     });
     expect(execute).toHaveBeenCalledOnce();

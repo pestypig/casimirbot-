@@ -46,6 +46,23 @@ describe("governed desktop MCP tunnel transition store", () => {
       declaredTaskSummary: "Duplicate open request",
       requestedLeaseSeconds: 90,
     })).toThrow("transition_request_already_open");
+    expect(store.findOpenForIdentity(identity)).toMatchObject({
+      transition_request_ref: created.request.transition_request_ref,
+      status: "pending_user_delegation",
+    });
+    for (const changed of [
+      { clientSessionRef: "supervisor_client:not-the-owner" },
+      { conversationThreadRef: "codex_thread:not-the-owner" },
+      { authenticatedProfileRef: "profile:not-the-owner" },
+      { authenticatedMcpClientRef: "mcp_client:not-the-owner" },
+      { accountSessionId: "account_session:not-the-owner" },
+    ]) {
+      expect(store.findOpenForIdentity({ ...identity, ...changed })).toBeNull();
+    }
+    expect(() => store.findOpenForIdentity({
+      ...identity,
+      serviceInstanceRef: "service_instance:not-the-owner",
+    })).toThrow("transition_service_epoch_mismatch");
     expect(() => store.grant({
       requestRef: created.request.transition_request_ref,
       authenticatedProfileRef: "profile:owner",
@@ -138,6 +155,57 @@ describe("governed desktop MCP tunnel transition store", () => {
     expect(receipts[2].previous_receipt_hash).toBe(receipts[1].receipt_hash);
     expect(receipts.every((item) => /^[a-f0-9]{64}$/u.test(item.receipt_hash)))
       .toBe(true);
+  });
+
+  it("renews an expired trusted-device lease for the exact client and continuation", () => {
+    const { store, advance } = harness();
+    const first = store.request({
+      identity,
+      declaredTaskSummary: "Keep the exact trusted harness session active.",
+      requestedLeaseSeconds: 30,
+    });
+    store.grant({
+      requestRef: first.request.transition_request_ref,
+      authenticatedProfileRef: identity.authenticatedProfileRef,
+      accountSessionId: identity.accountSessionId,
+      accountType: "developer",
+    });
+    advance(30_001);
+
+    const renewed = store.renewTrustedDeviceLease({
+      previousRequestRef: first.request.transition_request_ref,
+      authenticatedProfileRef: identity.authenticatedProfileRef,
+      accountSessionId: identity.accountSessionId,
+      accountType: "developer",
+    });
+
+    expect(renewed.request).toMatchObject({
+      status: "delegated",
+      client_session_ref: identity.clientSessionRef,
+      conversation_thread_ref: identity.conversationThreadRef,
+      authenticated_mcp_client_ref: identity.authenticatedMcpClientRef,
+      requested_lease_seconds: 30,
+    });
+    expect(renewed.request.transition_request_ref).not.toBe(
+      first.request.transition_request_ref,
+    );
+    expect(renewed.authorization).toMatchObject({
+      idempotencyReplayed: false,
+      delegatedAccountSessionId: identity.accountSessionId,
+      receipt: { event_type: "transition_accepted" },
+    });
+    expect(store.listReceipts(first.request.transition_request_ref)
+      .map((item) => item.event_type)).toEqual([
+        "requested",
+        "delegated",
+        "expired",
+      ]);
+    expect(() => store.renewTrustedDeviceLease({
+      previousRequestRef: first.request.transition_request_ref,
+      authenticatedProfileRef: identity.authenticatedProfileRef,
+      accountSessionId: "account_session:other",
+      accountType: "developer",
+    })).toThrow("transition_trusted_renewal_forbidden");
   });
 
   it("makes accepted execution replay-safe and revocation return-to-read-only explicit", () => {

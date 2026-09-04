@@ -17,6 +17,12 @@ normalization, evidence re-entry, follow-up reasoning, terminal authority,
 presentation, and Codex-owned runtime behavior implemented only through a thin
 provider adapter
 
+Repository capability ownership, overlap resolution and reuse/extend/bridge
+decisions for this plan are maintained in
+`docs/work-packets/eh-hci-0a-repository-harness-capability-crosswalk-v1.md`.
+That crosswalk is a reconciliation aid, not a second maturity roadmap; the
+canonical environment-harness work program remains status authority.
+
 ## Decision
 
 Build a sparse motorcycle awareness HUD, not an augmented-reality windshield and
@@ -280,6 +286,839 @@ Battery and heavy compute should remain off the brow where practical. Early
 experiments may tether the headform. A worn system needs snag, connector-break,
 thermal, water-ingress, mass, center-of-mass, and emergency-removal analysis.
 
+## Reusable scientific hardware-definition and production-evidence lane
+
+Program gate: G8 — environment-harness release evaluation; parallel scientific-hardware planning lane that cannot substitute for G8 closure or any research program's active proof gate
+Workstream: theory-to-experiment-to-hardware digital thread
+Capability or component: reusable Hardware Definition Harness (`HDH-0`)
+Lifecycle stage: theory localization → predicted observable → device requirement → reference/component/CAD artifacts → independently admitted measurement → evidence re-entry
+Reaction timescale: asynchronous research and engineering workflow; never a reflex, device-protection, or live control loop
+Authority owner: the Theory Badge Graph owns typed theory location and claim boundaries; each research work program owns proof and maturity gates; the hardware project owns design revisions; instruments and admitted test adapters own measurements; Helix owns identity, provenance, leases, evidence admission, and terminal eligibility; Codex owns bounded reasoning and tool requests only
+Current maturity: specified
+Target maturity: deterministically verified
+Required evidence: versioned cross-domain contracts; exact theory badge, equation, scale, unit, requirement, component, CAD revision, simulator, instrument, and test-run bindings; reference classification; preregistered predictions and falsifiers; source/design/test separation; UI/MCP parity; fixed-view CAD comparison; DFM and compatibility checks; measurement uncertainty; negative and stale evidence; tool receipts; and proof that no design artifact, graph adjacency, simulation, or generated render is promoted into empirical or manufacturing authority
+Explicit non-goals: automatic proof promotion, graph proximity as truth, generated geometry as measurement, design-to-test circularity, post-result retuning, private model or tool loops, unattended fabrication or purchasing, arbitrary machine control, fabrication-readiness claims without review, physical viability inheritance, helmet certification, or road-use authority
+Downstream gate unlocked: HDH-0A may define the shared manifests and developer Hardware Workspace; motorcycle MHUD-2/MHUD-3 and separately governed research-device programs may consume those contracts without inheriting one another's maturity
+
+### Why this belongs above the motorcycle project
+
+The motorcycle HUD is one hardware environment, not the owner of hardware
+design. The repository already contains the more general pattern: theoretical
+and numerical work can identify an observable, an experimental device can be
+proposed to measure it, and a manufacturing/test packet can turn that proposal
+into falsifiable evidence. The Casimir-tile program is a useful precedent
+because it distinguishes a lab coupon that is a fabrication and measurement
+target from a system-mechanism tile that remains authoritative only for model
+and governance use. The two may be related without being treated as the same
+physical object or maturity claim.
+
+NHM2 full-solve artifacts and Theory Graph lamps are likewise inputs to this
+workflow only at their authenticated claim ceiling. A theory badge may locate
+equations, scale bands, runtime rows, missing bridges, candidate observables,
+and recommended next tools. It does not prove that an apparatus can be built,
+that a measurement occurred, or that measured evidence supports the theory.
+This lane must not modify an NHM2 candidate, active proof gate, frozen input,
+certificate, or Theory Graph lamp merely because a hardware design was created.
+
+```text
+Theory Badge Graph / governed research program
+        │ exact badge, equation, scale, units, claim ceiling
+        ▼
+predicted observable + uncertainty + falsifier
+        │ preregistered before apparatus results
+        ▼
+device requirement graph
+        │ sensitivity, range, timing, environment, geometry
+        ▼
+hardware environment profile + component graph
+        │ reference packet, CAD, electrical, firmware, fixtures
+        ▼
+simulation / tolerance / interference / DFM evidence
+        │ candidate design evidence; not empirical evidence
+        ▼
+human release to fabrication or bench integration
+        │ independently identified article, instrument and procedure
+        ▼
+measurement packet + uncertainty + negative results
+        │ evidence admission and post-tool Codex reasoning
+        ▼
+research work-program review / Theory Graph diagnostic update proposal
+```
+
+The return arrow is governed. Measurements may challenge, constrain, or support
+a bounded prediction, but only the owning research program can admit them into
+its proof or empirical status. A generated design cannot manufacture its own
+confirming evidence.
+
+### Two independent classification axes
+
+Every design feature, dimension, material, interface, and hidden region carries
+a reference classification:
+
+| Reference classification | Meaning |
+| --- | --- |
+| `observed` | directly visible in an immutable source image, scan, drawing, or existing article |
+| `measured` | supplied by calibrated metrology, an admitted instrument, or a traceable manufacturer datum |
+| `inferred` | estimated from incomplete evidence and explicitly uncertain |
+| `newly_designed` | intentionally introduced by the operator or Codex as a candidate design choice |
+
+A separate requirement-provenance field records whether a requirement is
+`theory_derived`, `simulation_derived`, `empirical`, `datasheet`,
+`engineering_assumption`, or `operator_constraint`. Neither axis is a maturity
+claim. For example, a reference-aligned CAD surface can remain `inferred`, and
+a precisely measured dimension can still belong to an article that failed its
+acceptance test.
+
+Artifact lifecycle is recorded independently:
+
+```text
+concept
+  → parametric_blockout
+  → reference_aligned
+  → interference_checked
+  → bench_candidate
+  → bench_verified
+  → manufacturing_reviewed
+  → fabrication_released
+```
+
+These are hardware-artifact states, not substitutes for the canonical
+environment-harness maturity vocabulary or the exploratory → reduced-order →
+diagnostic → certified math stages. `Fabrication_released` means a named human
+released an exact drawing/BOM revision to a named process; it does not mean the
+device works, validates a theory, satisfies product regulation, or is safe for
+wear.
+
+### Canonical hardware project contracts
+
+The first shared schemas should be domain-neutral:
+
+| Contract | Required identity and purpose |
+| --- | --- |
+| `TheoryDesignLink` | badge ids, equation/runtime rows, source artifacts, scale bands, unit signatures, claim ceiling, predicted observables, uncertainty, falsifiers, and owning work-program gate |
+| `HardwareEnvironmentProfile` | intended environment, component graph, frames/datums, sensor and display ports, compute/power/thermal/mass/bandwidth budgets, calibration, failure policies, and evidence refs |
+| `HardwareComponentSpec` | stable part/revision, role, supplier or custom status, physical envelope, interfaces, performance bands, environmental limits, substitutions, and provenance classes |
+| `ReferencePacketManifest` | immutable originals, scale anchors, orthographic guides, SVG contours, masks, classifications, uncertainty, approvals, and supersession history |
+| `DesignArtifactManifest` | CAD/EDA/firmware source revision, dependencies, coordinate system, generated exports, fixed cameras, hashes, classifications, unresolved regions, and tool receipts |
+| `ExperimentClosurePacket` | exact article/BOM/CAD/firmware, apparatus, calibration, preregistration, procedure, raw and derived evidence, uncertainty, falsifiers, deviations, and result claim ceiling |
+
+Software requirements and hardware capabilities meet through typed ports rather
+than prose alone. A sensor port declares observable type, units, frame,
+field-of-view, range, cadence, timing uncertainty, latency, protocol, calibration
+and stale/failure behavior. A display port declares pixel/optical geometry,
+refresh, latency, transform, luminance or electrical envelope, blanking and
+watchdog behavior. Compute, power, thermal and mechanical ports use the same
+revisioned compatibility pattern.
+
+This creates a bidirectional digital thread:
+
+- research and software tell the device what must be measured, rendered,
+  computed, synchronized, powered and physically accommodated;
+- selected or measured hardware tells software its actual calibration,
+  transforms, performance envelope, health, firmware and limitations; and
+- incompatibility remains visible as typed evidence rather than being repaired
+  by silently changing a theory prediction, sensor profile, CAD dimension or
+  acceptance threshold.
+
+### Reference compiler and CAD/EDA tool adapters
+
+The image-to-CAD workflow becomes a reusable, governed reference compiler:
+
+```text
+immutable originals
+  → feature and uncertainty inventory
+  → perspective correction / silhouettes / masks / SVG contours
+  → coordinated orthographic guides with common datums and scale
+  → operator approval of every inferred or newly designed region
+  → locked reference packet
+  → CAD blockout
+  → fixed-camera renders and transparent comparisons
+  → separately admitted print/manufacturing engineering
+```
+
+Original pixels and scans remain source evidence. Generated orthographic views,
+image-to-3D meshes, and completed hidden geometry are candidate artifacts.
+Blender Image Empties, fixed cameras, millimeter units, locked reference
+collections, checkpointed source scenes, and deterministic render paths are the
+preferred first CAD adapter conventions. A 2D adapter is useful for measurable
+tracing and annotation, not unrecorded beautification.
+
+Blender, a vector editor, EDA software, simulators, slicers, DFM checkers,
+instrument software and manufacturing-package exporters are harness tool
+adapters. They do not become state or reasoning authorities. Potentially
+destructive operations, arbitrary scripts, exports, machine motion, purchasing,
+fabrication submission and external messages require separately scoped tools,
+leases and receipts. Codex requests those tools through its native governed
+loop; Helix must not create a private sampler, retry loop or terminal answer
+from their receipts.
+
+### Hardware Workspace and shared UI/MCP behavior
+
+The developer Hardware Workspace should project the same canonical project
+state exposed through MCP:
+
+```text
+Hardware Workspace
+├─ Theory and observable links
+├─ Reference Packet
+├─ Requirements and scale/units
+├─ Component and interface graph
+├─ CAD / EDA / firmware sessions
+├─ Compatibility and tolerance findings
+├─ Calibration and test procedures
+├─ Fabrication-preparation package
+└─ Evidence, receipts and unresolved assumptions
+```
+
+The user can operate and monitor every admitted action. A bound Codex thread may
+also list, inspect, compare, configure and invoke supported adapters under exact
+profile/project/revision/tool leases. Both clients observe the same hashes,
+receipts, conflicts, unavailable tools and evidence; MCP does not click hidden
+panel controls. The Surface Registry may host CAD renders, live instrument
+views, plots and comparison overlays, while VSE may create bounded visual
+evidence packets. Neither pixels nor panel text supersede typed instrument or
+world-state evidence.
+
+### Proposed upper-tree file hierarchy
+
+```text
+shared/contracts/hardware-definition/                    # domain-neutral schemas
+shared/hardware-definition/                              # validation, hashing, compatibility
+server/services/hardware-definition/                     # project registry + evidence admission
+server/mcp/hardware-definition/                          # thin tools over the same service
+client/src/components/workstation/hardware-workspace/    # developer projection
+connectors/hardware-tools/
+├─ reference-2d/
+├─ blender/
+├─ eda/
+├─ simulation/
+├─ dfm-and-slicer/
+└─ instruments/
+hardware/projects/
+├─ motorcycle-hud/
+│  ├─ theory-design-links/
+│  ├─ references/
+│  ├─ requirements/
+│  ├─ components/
+│  ├─ cad/
+│  ├─ electrical/
+│  ├─ firmware/
+│  ├─ calibration/
+│  ├─ tests/
+│  ├─ renders/
+│  └─ exports/
+└─ casimir-tile/                                         # governed by its own specs/program
+   ├─ lab-coupon/
+   └─ system-mechanism/                                  # never merged with coupon authority
+artifacts/hardware-definition/                           # immutable run/receipt outputs
+```
+
+This hierarchy creates discoverable retrieval context for Codex without loading
+every theory, solver, CAD file, component catalog and measurement into every
+turn. Exact links allow the harness to retrieve only the relevant badges,
+equations, scale bands, device revision, adapter contracts, test evidence and
+claim boundaries.
+
+### Scientific independence and stop/fail rules
+
+Before a scored experiment, freeze the predicted observable, units, expected
+band or null behavior, uncertainty treatment, falsifiers, article revision,
+calibration procedure, excluded data, and analysis code hash. Design simulations
+may optimize apparatus sensitivity, but the measurement dataset cannot be used
+to retune the prediction, article or decision threshold and then be scored as
+independent evidence. Exploratory post-result changes create a new explicitly
+labelled run and cannot rewrite the previous receipt.
+
+Stop or fail the path when:
+
+- theory badge, owning gate, unit signature, scale band, or claim ceiling is
+  missing or mismatched;
+- a model abstraction is represented as the fabricated article;
+- an inferred/generated dimension is represented as observed or measured;
+- the CAD/BOM/firmware/calibration identities do not name the tested article;
+- simulated, rendered or expected output is substituted for instrument data;
+- uncertainty, calibration, negative results or protocol deviations are
+  missing;
+- design and evaluation share an undeclared tuned dataset or post-result
+  threshold;
+- a tool receipt is treated as proof that a render, export, fabrication,
+  machine action or measurement completed;
+- a device proposal attempts to raise the Theory Graph or research-program
+  claim ceiling automatically; or
+- a helmet design enters protective structure, wearable testing or road use
+  outside the separately reviewed MHUD gates.
+
+### HDH staged program
+
+| Phase | Build | Required evidence | Promotion boundary |
+| --- | --- | --- | --- |
+| HDH-0A | shared theory-design, hardware-profile, component, reference, artifact and experiment-closure contracts plus project registry | schema fixtures, canonical hashing, provenance/classification tests, unit/scale mismatch rejection, claim-ceiling and circular-evidence poison cases | design metadata only; no CAD tool, fabrication or empirical claim |
+| HDH-0B | developer Hardware Workspace and UI/MCP parity over the project registry | exact profile/project/revision binding, stale conflicts, lease/revoke/sign-out behavior, context poison tests and no panel-click automation | configuration and retrieval only |
+| HDH-0C | reference compiler plus governed 2D and Blender adapters | immutable-original preservation, classification coverage, fixed-camera reproducibility, checkpoint/recovery, script/export leases and visual comparison receipts | candidate geometry only; no fit, DFM or build claim |
+| HDH-0D | component, mechanical, electrical, firmware, tolerance and interface compatibility graph | unit-aware compatibility fixtures, conflict/failure propagation, substitutions, power/thermal/mass budgets and unresolved-assumption reporting | engineering analysis only; no procurement or manufacturing release |
+| HDH-0E | simulator, calibration and instrument evidence adapters | exact article/apparatus/firmware identity, timestamp/epoch binding, uncertainty, stale/revoke/negative-result cases and independent postcondition evidence | bench evidence only; no theory or product promotion |
+| HDH-0F | fabrication-preparation and external handoff package | exact released revision, drawings/BOM/process/test/acceptance package, DFM review, human release, vendor-message/procurement receipts and as-built return identity | handoff only; fabrication receipt is not performance evidence |
+
+The first implementation goal for this lane is HDH-0A. It can proceed as a
+separate planning/contract packet while HUDH-0C2 builds the reusable visual
+workspace, provided neither claims completion of the other's open dependency.
+
+## Bidirectional cross-environment object traversal
+
+Program gate: G8 — environment-harness release evaluation; parallel representation-transfer planning lane that cannot substitute for live adapter acceptance
+Workstream: portable object/scene evidence and target realization
+Capability or component: Environment Object Traversal (`EOT-0`)
+Lifecycle stage: source selection → multimodal observation → canonical portable object package → target adaptation → separately admitted realization → verification evidence
+Reaction timescale: asynchronous capture, reconstruction and build planning; never a reflex, safety-warning, or unbounded environment-action loop
+Authority owner: the source adapter owns typed source facts; sensing adapters own calibrated samples; the portable package owns provenance-preserving representation; the target adapter owns compatibility and loss reporting; Minecraft World Authority or Player Embodiment owns admitted game effects; the user owns capture consent, retention and release; Codex owns bounded reconstruction/build reasoning only
+Current maturity: specified
+Target maturity: deterministically verified
+Required evidence: exact source/target environment, object, profile, producer epoch, frame, scale, unit, capture, package, reconstruction, target-plan and realization-receipt identities; multimodal provenance; measured-versus-inferred geometry; privacy/retention controls; target loss reports; round-trip and cross-representation fixtures; stale/mismatch/poison cases; separate mutation admission; and postcondition comparison
+Explicit non-goals: literal identity claims across environments, screenshots as Minecraft World Authority, generated meshes as measured scans, silent scale/material/semantic invention, person or private-space capture without consent, continuous ambient recording, arbitrary external upload, automatic Minecraft mutation, generated build plans as completed structures, physical fabrication, or safety/proof authority
+Downstream gate unlocked: EOT-0A may define the portable package and adapter contracts; later Minecraft, Meshy-like reconstruction, LiDAR/depth, CAD and fabrication-target adapters remain separately permissioned and verified
+
+### Traversal is translation, not object teleportation
+
+An object does not retain perfect identity when it crosses between a voxel
+world, photographs, a point cloud, a triangle mesh, parametric CAD and a
+fabricated article. Each representation preserves different information. The
+harness therefore separates three authorities:
+
+1. **Source observation package:** what the selected environment or sensor
+   actually supplied, with exact identity, frame, scale, time and provenance.
+2. **Canonical portable object package:** a provider-neutral representation of
+   geometry, appearance, composition, semantics and uncertainty. It may contain
+   both measured samples and inferred candidate surfaces.
+3. **Target realization plan:** an environment-specific compilation with an
+   explicit approximation/loss report and separately admitted actions.
+
+```text
+Minecraft blocks / code / CAD / images / depth / LiDAR
+                         │
+                         ▼
+             SourceObservationBundle
+                         │
+               normalize frames/units
+                         ▼
+              PortableObjectPackage
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+   triangle mesh   Minecraft plan   CAD/fixture candidate
+    + textures     + block palette   + constraints/BOM
+          │              │              │
+          └────── target loss reports ──┘
+                         │
+                  separate execution
+                         │
+                 postcondition evidence
+```
+
+The portable package is not a universal perfect 3D format. It is an evidence
+container that can hold exact discrete structure, continuous geometry, images,
+point samples, materials, semantic parts and unresolved regions together
+without flattening their authority.
+
+### Canonical traversal contracts
+
+| Contract | Required content |
+| --- | --- |
+| `SourceObservationBundle` | owner/profile, source environment/object, producer epoch, timestamps, source coordinate frame, units, sensor/calibration identities, typed world facts, images/depth/point-cloud refs, consent, privacy class and hashes |
+| `PortableObjectPackage` | package/revision, local object frame, scale anchors, discrete structure, geometry layers, material/texture layers, semantic parts, topology, classifications, confidence/uncertainty, source links and unresolved regions |
+| `RepresentationLayer` | representation kind, fidelity, authority class, coordinate transform, bounds, resolution, provenance, generator and supersession history |
+| `TargetEnvironmentProfile` | target units/grid, coordinate frame, available primitives/materials, build permissions, size/resource limits, unsupported features and adapter version |
+| `TargetRealizationPlan` | package/target revisions, placement transform, selected representation, palette/component mapping, ordered candidate operations, resource estimate, approximation/loss report, preconditions and verification plan |
+| `RealizationReceipt` | exact admitted actions and actor authority, resulting target object/region, postcondition observations, deviations, residual/loss metrics and non-terminal evidence refs |
+
+Every representation layer retains the earlier HDH classifications. LiDAR or
+depth samples may be `measured`; the surface meshed between them is normally
+`inferred`; a repaired hole or stylized feature is `newly_designed`. A Minecraft
+block-state export may be exact for the selected admitted region while a render
+or screenshot of that region remains visual evidence only.
+
+### Coordinate, scale and semantic normalization
+
+Traversal requires an explicit transform chain rather than a guessed common
+origin:
+
+```text
+source environment frame
+  → selected object/region frame
+  → canonical object frame
+  → target placement frame
+  → target environment frame
+```
+
+Each transform records handedness, axis convention, units or voxel scale,
+origin/datum, rotation, scale, uncertainty and revision. A package with no
+credible scale anchor may be visually reconstructed but cannot claim real-world
+dimensions. Nonuniform scaling, coordinate clipping, voxel rounding and target
+placement changes appear in the loss report.
+
+Geometry alone is insufficient. The package may also record semantic parts,
+connectivity, openings, support relationships, intended function and source-
+specific behavior. These semantics are claims with provenance, not instructions.
+For example, recognizing a Minecraft block arrangement as a “door” does not
+authorize opening, replacing or rebuilding it.
+
+### Minecraft source and target paths
+
+For a Minecraft house used as a source, the preferred extraction path is typed
+World Authority data for an explicitly bounded, authorized region:
+
+- dimension/world, server and connector epoch;
+- integer bounds and anchor block;
+- block ids, properties, orientation and relevant structural relationships;
+- separately governed block-entity data;
+- palette and resource-pack identity where appearance matters; and
+- synchronized screenshots only as auxiliary appearance evidence.
+
+Signs, books, containers, player data, command blocks and other block-entity
+content require minimization/redaction policy because they may contain private
+text, inventory or executable behavior. Unsupported or withheld content remains
+typed as unavailable rather than being inferred from a screenshot.
+
+For Minecraft as a target, the adapter compiles a package into a candidate
+voxelization and block palette. It records scale choice, occupancy error,
+material substitutions, lost curvature/detail, unsupported behavior, required
+resources and ordered build operations. The plan does not mutate the world.
+Execution requires the normal selected player/world identity, World Authority
+or Player Embodiment admission, effect ceilings, manual override, checkpoints,
+postcondition sensing and terminal eligibility. A completed build receipt names
+what blocks actually changed; it does not claim equivalence to the source
+object beyond the measured target metrics.
+
+The first deterministic Minecraft fixtures should cover:
+
+1. exact bounded house export and import into an empty fixture world;
+2. rotation, translation and integer-scale transforms;
+3. round-trip block/state equality where the target palette is identical;
+4. curved CAD/mesh to voxel approximation with a declared error envelope;
+5. missing/modded blocks and palette substitution;
+6. hidden/private block-entity exclusion;
+7. interrupted build with checkpoint and rollback/recovery policy; and
+8. post-build comparison against the exact target plan.
+
+### Physical capture from a helmet or mobile sensor rig
+
+A later helmet, mask or handheld rig may contribute cameras, stereo/depth or
+LiDAR, but capture remains separate from motorcycle warning authority. The
+capture session binds sensor calibration, intrinsics/extrinsics, head/rig pose,
+timestamps, exposure/scan settings, coverage and subject/object selection.
+Point clouds and depth maps are stored as calibrated observations; registration,
+denoising, completion, semantic segmentation and mesh generation create derived
+layers with their own hashes and classifications.
+
+The operator must affirm that the object and space may be captured. People,
+faces, identifying text, screens, license plates, homes, precise location and
+private property invoke explicit minimization, redaction, retention and export
+rules. Profile storage needs visible quota, provenance, expiry/export/delete
+controls and revocation. No raw scan is automatically uploaded to an external
+provider, attached to an Ask turn, or retained merely because a derived asset
+was requested.
+
+### Shared multimodal sensing, recording and guidance sessions
+
+The platform capability is broader than a 3D scan. A real device or simulated
+environment may expose several receptive modalities at once, while HUD, audio
+or haptic outputs help the user conduct the capture. These streams need one
+governed session identity without pretending they have the same evidentiary
+meaning.
+
+```text
+physical or virtual hardware profile
+├─ receptive inputs
+│  ├─ RGB / infrared / event video
+│  ├─ still images
+│  ├─ microphone / spatial audio
+│  ├─ depth / LiDAR / point cloud
+│  ├─ IMU / pose / location
+│  └─ typed simulator or world-state observations
+├─ operator annotations
+│  ├─ voice memo
+│  ├─ text note
+│  └─ marked object, region or event
+└─ guidance outputs
+   ├─ HUD coverage / placement / focus / range cues
+   ├─ audio prompts or confirmation tones
+   └─ optional haptic status
+```
+
+The shared primitive is a `MultimodalCaptureSession`, not an ambient recorder.
+It binds the authenticated profile, hardware/environment profile, selected
+subject or region, purpose, admitted modalities, source and producer epochs,
+device/calibration identities, coordinate frames, time bases, consent,
+retention, output destinations and stop conditions. Each track has an
+independent permission, health, clock, encoding, classification and receipt.
+
+The canonical contracts should include:
+
+| Contract | Purpose |
+| --- | --- |
+| `MultimodalCaptureSession` | root identity, purpose, selected subject/region, profiles, clocks, consent, retention, admitted inputs/outputs and terminal state |
+| `ModalityTrackManifest` | audio, image, video, depth, LiDAR, pose, typed-world or annotation track identity, format, frame/units, calibration, time span, health and artifact refs |
+| `CrossModalAlignment` | source-clock to session-clock transforms, synchronization uncertainty, pose/frame bindings, gaps, drift and interpolation policy |
+| `GuidanceLayerManifest` | HUD/audio/haptic guidance revision, triggering observation refs, output surface/lease, visibility interval and explicit no-measurement authority |
+| `OperatorAnnotation` | voice/text/marker identity, author, capture time/range, related object/event refs, transcript derivation and command-ineligible default |
+| `CapabilityRecipe` | user-authored graph connecting admitted sources, processors, guidance and sinks with bounds, leases, costs and failure policy |
+
+Track evidence classes remain explicit:
+
+| Track class | Authority boundary |
+| --- | --- |
+| `physical_measurement` | calibrated device samples within their measured uncertainty; no automatic semantic conclusion |
+| `simulator_ground_truth` | exact only for the identified simulator/environment revision; no physical-sensor maturity |
+| `synthetic_sensor` | emulated sensor output for testing; not simulator truth unless separately bound |
+| `operator_annotation` | user-authored contextual evidence; a voice memo is not a measurement or command by default |
+| `derived_inference` | recognition, transcript, segmentation, registration or reconstruction candidate with model/version/input provenance |
+| `guidance_output` | HUD/audio/haptic assistance to the operator; never source or measurement authority |
+
+A virtual environment may provide direct block, entity, depth, segmentation or
+mesh facts that are unavailable to a physical camera. Those facts are valuable
+oracle evidence but must remain labelled `simulator_ground_truth`. A renderer
+that makes virtual video, noise, occlusion or LiDAR returns a separate
+`synthetic_sensor` track so sensor algorithms can be evaluated against the
+oracle without confusing the two.
+
+#### HUD-guided capture without feedback contamination
+
+An image-recognition or scan HUD may show coverage gaps, already-scanned areas,
+range, pose quality, focus, exposure, object bounds, occlusion, alignment
+targets, or where the user should stand next. It may also display a proposed
+placement when reconstructing an object in Minecraft or another environment.
+These are guidance layers rendered through the Surface Registry and bound to
+the same session timeline.
+
+The guidance layer must remain separate from the source track. Raw camera,
+depth and LiDAR evidence is captured before the HUD overlay. A composed
+operator-view recording is optional and explicitly labelled; it cannot replace
+the clean source. Every guidance revision records the observation refs that
+caused it, while the sensor sample records no dependency on the displayed
+pixels. This prevents the system from detecting its own overlay and treating
+that feedback as an object feature.
+
+Guidance may influence where the human points or moves the sensor. That is an
+attended capture action, not proof of coverage or accuracy. Coverage is measured
+from admitted pose/sensor evidence and reported with uncertainty. Guidance must
+clear on stale calibration, source loss, profile/epoch mismatch, manual blank,
+Emergency Stop or output-lease loss without stopping preservation of already
+admitted clean samples.
+
+#### Audio, pictures, clips and voice memos
+
+The user can compose bounded capture modes such as:
+
+- one still photograph with pose/calibration metadata;
+- a burst or bounded video segment;
+- a bounded depth/LiDAR sweep with synchronized pose and optional clean video;
+- a separately consented audio clip or spatial-audio track;
+- a push-to-record voice memo linked to an object, scan interval, frame or
+  target-placement proposal; or
+- a multimodal scan recipe combining selected tracks and HUD guidance.
+
+Microphone/system audio is not silently added to VSE-0B, whose current contract
+continues to exclude audio. A future audio-capable track uses a distinct
+permission and visible recording state. A transcript is `derived_inference`
+linked to immutable audio; it carries language/model/confidence and redaction
+metadata. Memo or transcript text re-enters Codex as an observation and is not
+executed as a command unless the user makes a separate affirmative request
+through the ordinary intent/tool-admission path.
+
+Bystander speech, faces, screens, private interiors, precise location and
+identifying marks require minimization and review. The session must support
+per-track pause, stop, revoke, redact, retain, export and delete rather than one
+all-or-nothing recording permission.
+
+#### Capability composition keeps creativity with the user
+
+Hardware profiles advertise capabilities rather than one fixed product
+workflow. A `CapabilityRecipe` lets the user connect compatible modules:
+
+```text
+selected camera + LiDAR + IMU
+        → synchronized scan processor
+        → coverage estimator
+        → HUD guidance surface
+        → portable object package
+        → profile storage
+        → optional Minecraft target compiler
+```
+
+Another recipe could omit LiDAR, use exact Minecraft region data, add a voice
+memo, render a placement preview, or produce only photographs. The harness
+validates interfaces, identities, permissions, budgets and evidence roles; it
+does not restrict creativity to a hard-coded helmet scenario.
+
+Recipes are declarative proposed graphs, not private agent programs. Each node
+names a catalogued capability, typed ports, bounds, resource/cost expectations,
+required consent, failure behavior and output classification. Codex may propose
+or configure a recipe under a user-issued project lease, but it cannot enable a
+microphone, camera, external upload, physical output or environment mutation
+outside the corresponding capability lease. The resident capture/watchdog
+controller continues independently if model reasoning is delayed or offline.
+
+#### Multimodal session UI/MCP projection
+
+The Hardware Workspace and Surface Workspace should share a **Capture Session
+Composer**:
+
+```text
+Session identity and purpose
+├─ connected real/simulated hardware profile
+├─ selected subject, object or region
+├─ input tracks and individual permissions
+├─ processors and derived tracks
+├─ HUD/audio/haptic guidance outputs
+├─ storage, retention, privacy and external-processing choices
+├─ synchronized timeline and health
+└─ stop, revoke, blank, export and delete controls
+```
+
+MCP exposes the same sanitized state and typed operations, not an alternative
+recorder. A bound Codex thread can inspect capabilities, propose a recipe,
+request an already-consented bounded capture, inspect manifests and compare
+evidence. User UI and MCP commands use the same revisions and receipts. The
+user may supervise every operation or issue a narrow time-, modality-, subject-
+and-destination-bounded lease; monitoring is optional, consent is not.
+
+### Connected reasoning and Shared Live Room sessions
+
+A device does not need to contain the principal reasoning runtime to
+participate. When it can authenticate to an authorized CasimirBot node or
+deployment over the network, it may contribute selected capabilities and
+receive supported products through a Shared Live Room. Managed Codex or GPT
+Realtime reasoning additionally requires a usable Internet/provider path;
+local capture, resident watchdogs and already-admitted reflex behavior must not
+depend on that path remaining available.
+
+```text
+phone / helmet / laptop / simulated client
+        │ authenticated room membership + revocable grants
+        ▼
+Shared Live Room
+├─ selected multimodal evidence tracks
+├─ participant speech, text and marked intent
+├─ room-visible HUD / screen / mission projections
+├─ one principal Runtime Codex lifecycle
+├─ optional GPT Realtime conversational presentation
+└─ one governed execution arbiter and terminal writer
+        │
+        ▼
+host-owned connectors, profile storage and environment capabilities
+```
+
+This enables an authorized participant to continue from another location, but
+"from anywhere" is a reachability goal rather than an ambient-access promise.
+It still requires a reachable healthy node or approved hosted deployment,
+authenticated account and room membership, current device trust, an explicit
+grant for every shared source or sink, and a supported network path. A room
+references owner-controlled connections; it does not acquire their credentials,
+private network, filesystem, microphone, camera, environment or mutation
+authority.
+
+The canonical root should be a `ConnectedReasoningSession` binding:
+
+- exact room, run, principal reasoning session and Ask-turn identities;
+- participant/account, installed-node, device, source, connector-epoch and
+  environment-subject identities;
+- each published `MultimodalCaptureSession`, track, HUD/surface and voice
+  projection by immutable reference rather than copied authority;
+- per-participant read, publish, annotate, speak, steer, capture and action
+  grants with expiry and revocation;
+- session clock alignment, cursors, gaps, reconnect epochs and bounded replay;
+- context-selection, compression and reasoning budgets;
+- one execution arbiter, cancellation state, supported terminal product and
+  presentation-certainty class; and
+- visible recording/sharing state plus leave, mute, stop-sharing, revoke and
+  Emergency Stop behavior.
+
+Room members share admitted information flow, not hidden model reasoning.
+Public observations, selected context, tool requests and results, evidence
+references, goal/checkpoint state and the supported terminal product may be
+projected to authorized participants. Private chain-of-thought, provider
+credentials, pairing material, raw secrets and another participant's
+ungranted tracks are never room content.
+
+#### Information intake is a governed rate, not one token counter
+
+It is useful to treat reasoning and perception as rate-limited flows, but the
+rates must stay dimensionally distinct:
+
+| Flow | Native rate | Governed quantity |
+| --- | --- | --- |
+| camera or shared screen | frames/s, pixels/s, bytes/s | selected frames, regions, deltas and visual evidence packets |
+| audio or voice | samples/s and bytes/s | consented speech segments, transcripts, speaker/timing metadata and acoustic events |
+| LiDAR/depth/pose | points/s or samples/s | bounded regions, keyframes, tracks, geometry deltas and uncertainty |
+| typed environment state | observations or events/s | deduplicated state changes, salience and freshness |
+| participant intent | utterances, turns or control events/min | ordered authorship, scope, priority, interruption and conflict state |
+| model context intake | input tokens/turn and tokens/time window | admitted evidence summaries plus exact retrievable refs |
+| model reasoning/output | latency and output tokens/s or turn | supported proposals, questions, explanations and terminal products |
+
+Raw video, audio or point clouds are therefore not naively converted into and
+charged as a continuous wall of language tokens. A deterministic intake plane
+first preserves the bounded raw evidence, then performs sampling, change
+detection, temporal segmentation, alignment, deduplication and compact typed
+normalization. Codex receives the smallest current evidence set that can answer
+the request, with exact references for governed follow-up inspection. Important
+events may wake reasoning; low-information repetition should not.
+
+An `InformationFlowBudget` should separately declare capture bandwidth,
+processing capacity, retained bytes, evidence-event cadence, maximum context
+tokens, reasoning turns, provider cost and end-to-end latency target. Pressure
+may reduce preview quality, frame sampling, derived-analysis frequency or
+noncritical callouts according to declared policy. It must not silently drop a
+critical event, invent a summary, weaken consent, extend a recording, or make
+voice certainty stronger than the supported text/evidence. Gaps and degraded
+quality remain explicit evidence.
+
+#### Intent, conversation and evidence remain different streams
+
+Realtime voice supplies a low-latency conversation surface; it is not the room
+execution authority. A finalized utterance is first bound to its speaker,
+room, time range and consent state, then classified through ordinary intent
+arbitration. Conversation-only speech may receive a conversational response.
+An affirmative request for reasoning or a capability may open or continue the
+principal Codex turn. A memo, quoted instruction, background speech, transcript
+fragment or another participant's screen-visible text does not execute a tool.
+
+Simultaneous participants require ordered, attributable intent rather than a
+single merged prompt. Conflicting steering requests produce a typed conflict,
+clarification or lease decision. Room ownership, moderator status or speaking
+volume does not automatically grant environment mutation. The same rule
+applies to screen sharing and video calls: shared pixels become consented live
+source observations with provenance and freshness, never direct answers or
+implicit control acts.
+
+GPT Realtime may maintain conversational responsiveness while a Codex worker
+performs grounded reasoning, but only the completed governed solver path may
+author the supported result. Realtime presentation must correlate the exact
+room, realtime interaction, Ask turn, selected terminal artifact and playback
+receipt. It gains no workstation tools or independent terminal authority, and
+it must remain able to render the same callout as text if voice is unavailable.
+
+#### Connected-room UI and MCP parity
+
+The Surface Workspace should expose a **Connected Session** panel with room and
+run identity, participants, contributed devices/capabilities, currently shared
+tracks, HUD/screen/video projections, voice state, intake/reasoning budgets,
+health/gaps, leases, event timeline and stop/revoke controls. Each participant
+must be able to see what that participant is publishing and who may receive it.
+
+MCP exposes the same sanitized room graph, cursors and bounded operations. A
+bound Codex task may inspect admitted room evidence, request a narrower sample,
+propose a capture or reasoning configuration, and return products to allowed
+surfaces. It cannot simulate panel clicks, join unseen sources, unmute devices,
+expand membership, grant itself action authority or turn a relay message into
+terminal evidence. The UI may be fully monitored by people, but routine
+operation need not require them to manually relay every observation.
+
+### Connected reasoning session staged program
+
+| Phase | Build | Required evidence | Promotion boundary |
+| --- | --- | --- | --- |
+| CRS-0A | connected-session, room-track, participant-intent, rate-budget and projection contracts | canonical/hash fixtures, exact identity graph, independent grants, dimensioned rates, cursor/gap/reconnect behavior and poison cases | contracts only; no remote media |
+| CRS-0B | one installed node with one remote authenticated observer/steerer | same run/evidence/terminal projection, revoke/leave/reconnect, device loss, network degradation and zero duplicate effects | exact tested single-node journey only |
+| CRS-0C | multi-participant voice/text and shared multimodal evidence | speaker/author attribution, consent, conflict arbitration, transcript/memo separation, context selection and certainty/playback parity | no implicit action or multi-host claim |
+| CRS-0D | bounded screen share/video-call and HUD surface projection | visible sharing state, clean-source/composed-view separation, source identity audit, adaptive rate behavior and stop/revoke guarantees | attended shared-source use only |
+| CRS-0E | multi-host contributed capabilities through one room | independent node/profile/device credentials and grants, partition/rejoin, serialized execution, principal reasoning and terminal continuity | requires the separate multi-host acceptance program; no ambient federation |
+
+### Multimodal sensing and guidance staged program
+
+| Phase | Build | Required evidence | Promotion boundary |
+| --- | --- | --- | --- |
+| MSH-0A | multimodal session, track, alignment, annotation, guidance and capability-recipe contracts | schema/hash fixtures, real/simulated classification, independent permissions, clock/frame uncertainty, source/guidance separation and poison cases | contracts only; no live capture |
+| MSH-0B | developer Capture Session Composer with hardware/environment capability discovery and UI/MCP parity | profile/source/epoch/revision identity, per-track consent, lease/revoke/sign-out, visible recording state, unavailable capabilities and no panel-click automation | configuration only |
+| MSH-0C | local still/video/audio/memo tracks with profile storage | bounded duration/bytes, device selection, per-track pause/stop/delete/export, privacy/redaction, transcript provenance and VSE audio non-regression | local captured evidence only |
+| MSH-0D | depth/LiDAR/pose synchronization and HUD-guided scan controller | calibration fixtures, cross-clock drift, coverage/residual metrics, clean-versus-composed separation, stale blanking and model-offline continuity | attended scan assistance only |
+| MSH-0E | simulated multimodal adapters and oracle/synthetic differential harness | exact simulator identity, oracle/sensor separation, deterministic noise/occlusion/replay and cross-source comparison | simulator evidence only; no physical maturity |
+| MSH-0F | portable-package and target-realization integration | exact session/package/target bindings, bounded Codex evidence re-entry, external-processing leases, postconditions and complete authority trace | exact tested journey only |
+
+### Image-to-3D and Meshy-like adapters
+
+A provider such as Meshy may be one target reconstruction adapter; its current
+official API/MCP surface includes image and multi-image to 3D generation. It is
+not a required dependency or a geometry authority. The harness supplies only a
+user-approved, minimized input bundle under an explicit external-processing and
+cost lease, then records provider/model version, request hash, output hashes,
+formats, task receipt and deletion/retention status.
+
+Provider output enters the package as `inferred` candidate mesh/texture data.
+It must be aligned and scaled from admitted anchors, compared with source views
+or point samples, checked for topology/holes/nonmanifold geometry, and kept
+separate from the immutable source evidence. Provider success proves only that
+an asset was returned. Blender or another CAD/mesh adapter may inspect, repair
+or retopologize it through a later revision, but cannot relabel it as measured.
+
+### Code- and CAD-defined objects moving into virtual environments
+
+The reverse path starts with an exact code, parametric CAD or component-graph
+revision. A target adapter reads its declared geometry and semantics, selects a
+supported representation, and emits an environment-specific realization plan.
+For Minecraft this may mean voxelization, block palette selection and build
+sequencing. For a game engine it may mean a mesh/material/collider package. For
+an optical simulator it may mean surfaces, indices and transforms. Each target
+is allowed to produce a resemblance appropriate to its capabilities; none may
+silently replace engineering dimensions or behavior with visual similarity.
+
+This dialogue is useful to research because a theory/device concept can be
+expressed at several scale bands: equations and predicted observables, code and
+simulation, geometric apparatus, virtual mock-up, bench article and instrument
+evidence. The Theory Badge Graph can locate and retrieve those related objects,
+but traversal edges carry representation and claim ceilings rather than proof.
+
+### Traversal UI/MCP and surface integration
+
+The Hardware Workspace should gain an **Object Traversal** view with:
+
+```text
+Source
+├─ environment/object/region identity
+├─ admitted sensors and coverage
+└─ privacy, retention and consent
+Portable package
+├─ representation layers
+├─ frames, scale and semantic parts
+├─ provenance/classification
+└─ uncertainty and unresolved regions
+Targets
+├─ mesh/CAD reconstruction
+├─ Minecraft realization
+├─ simulator/game representation
+└─ fabrication candidate
+Evidence
+├─ source/target comparisons
+├─ loss and residual reports
+└─ execution/postcondition receipts
+```
+
+The same project/package state is exposed through provider-neutral MCP tools.
+Codex may request bounded source inspection, package compilation, reconstruction,
+comparison or target-plan generation. External upload, costly generation and
+target mutation require distinct leases. Tool results re-enter Codex as
+observations; Helix owns evidence identity and terminal eligibility. The Surface
+Registry can host source images, point-cloud/mesh viewers, fixed-camera renders,
+voxel previews and source/target overlays. VSE can preserve bounded visual
+comparisons, but neither panel pixels nor generated captions become geometry or
+world-state authority.
+
+### EOT staged program and acceptance metrics
+
+| Phase | Build | Required evidence | Promotion boundary |
+| --- | --- | --- | --- |
+| EOT-0A | portable source/package/representation/target-plan/receipt schemas and canonical hashing | unit/frame/classification fixtures, profile/source/epoch isolation, immutable source layers, package supersession and poison cases | representation metadata only |
+| EOT-0B | exact Minecraft bounded-region exporter and non-mutating target compiler | vanilla/modded fixtures, block/state round trip, private block-entity policy, transforms, palette/loss reports and zero unauthorized mutation | Minecraft observation and plan only |
+| EOT-0C | local image/depth/point-cloud ingestion and reconstruction comparison | calibrated fixtures, coverage, registration residuals, scale-anchor failure, source/derived separation and bounded retention | local candidate reconstruction only |
+| EOT-0D | user-connected external image/multi-image-to-3D adapter | consent/cost/upload lease, provider/version/input/output receipts, deletion policy, failure/timeout handling and no credential exposure | inferred external asset only |
+| EOT-0E | code/CAD-to-target compilers plus Hardware Workspace UI/MCP parity | fixed revisions, target profiles, deterministic transforms, loss reports, stale conflicts, context poison and no panel-click automation | target plans only |
+| EOT-0F | separately admitted realization and round-trip verification | exact action authority, checkpoints, interruption, postconditions, residual metrics, negative evidence and model-unavailable continuity | exact tested environment/configuration only |
+
+Core metrics include source coverage, scale and transform uncertainty, point-to-
+surface residual, silhouette/feature error, occupancy intersection-over-union,
+topology defects, block/state equality, palette substitution count, semantic
+part retention, unsupported feature count, target resource/action estimate,
+realization deviation and postcondition completeness. A single similarity score
+must not hide which representation properties were lost.
+
 ## Helmet CAD and optical lane
 
 ### Preferred optical stack
@@ -374,12 +1213,13 @@ Stop the configuration if it:
 
 ### Separation of environments
 
-The software program contains four separate runtimes rather than one large app:
+The software program contains five separate runtimes rather than one large app:
 
 | Runtime | Purpose | Inputs | Outputs | Safety authority |
 | --- | --- | --- | --- | --- |
 | replay/simulator | generate and replay deterministic traffic and pose cases | fixture tracks, synthetic scenarios | expected threats and cues | none |
 | embedded reflex runtime | meet bounded timing and freshness policy | normalized tracks and pose | admitted `HudCue` plus receipt | display cues only |
+| governed HUD surface host | compose a versioned HUD scene with an optional admitted program, tab, camera, or simulator underlay | `HudScene`, source frames, viewport mode, transform reference | developer preview, clean projector feed, and render receipts | pixels only; no source-program input authority |
 | operator/calibration app | configure fixture, inspect timing, align optics, export evidence | run config and receipts | calibration and reports | no threat invention |
 | CasimirBot adapter | expose governed observations and digests to Runtime Codex | compact events and evidence refs | advisory interpretation and predeclared requests | no reflex or vehicle authority |
 
@@ -392,9 +1232,12 @@ does not copy Minecraft action vocabulary.
 
 ```text
 shared/helix-motorcycle-awareness.ts
+shared/helix-hud-surface.ts                              # reusable upper-tree contracts
 connectors/environment/examples/motorcycle-awareness/
 fixtures/environment-source/motorcycle-awareness/
 server/services/environment-connectors/conformance/__tests__/
+server/services/hud-surface-host/                        # source admission + composition receipts
+client/src/components/workstation/hud-surface/           # reusable developer-only host
 client/src/components/workstation/motorcycle-awareness/   # developer-only lab panel
 simulators/fivem/motorcycle-awareness/                    # resource + scenario fixtures
 hardware/motorcycle-hud/cad/                              # neutral CAD exports + source
@@ -406,6 +1249,564 @@ docs/runbooks/motorcycle-hud-optical-bench.md
 This is a reservation, not authorization to create every surface in one patch.
 Each implementation packet chooses one phase and verifies its first-divergence
 lifecycle stage.
+
+### Reusable upper-tree capability: governed HUD surface host
+
+Program gate: G8 — environment-harness release evaluation; parallel visual-surface design lane that cannot substitute for G8 closure
+Workstream: reusable environment display and projection surfaces
+Capability or component: developer-only governed HUD surface host (`HUDH-0`)
+Lifecycle stage: source admission → frame normalization → HUD-scene composition → output admission → render receipt
+Reaction timescale: display-rate composition; source-specific reflex and reasoning remain outside the host
+Authority owner: Helix owns source identity, admission, freshness, provenance, and output eligibility; the HUD profile owns bounded scene semantics; the host owns pixels only; the operator owns source selection and blanking
+Current maturity: specified
+Target maturity: deterministically verified
+Required evidence: contract tests, alpha-composition golden frames, source-switch and stale-frame tests, permission/identity tests, clean-feed isolation, and exact render receipts
+Explicit non-goals: universal arbitrary-program embedding, program input/control, camera truth claims, optical calibration, road use, hidden reasoning display, or safety certification
+Downstream gate unlocked: reusable live-source HUD profiles and a clean projector-output adapter; no environment or safety maturity is inherited
+
+The motorcycle HUD is the first reference profile, not the owner of this
+capability. The reusable host sits above individual environment adapters so the
+same bounded scene and composition lifecycle can support later navigation,
+maintenance, laboratory, accessibility, or mission HUDs without copying a new
+renderer and source-capture stack into every panel.
+
+```text
+program/tab adapter ─┐
+camera adapter ──────┼─> admitted SurfaceFrame ─┐
+simulator/replay ────┘                          │
+                                               ├─> HUD surface compositor
+profile controller ─────> admitted HudScene ───┘          │
+                                                          ├─> workstation preview
+                                                          ├─> clean projector feed
+                                                          └─> evidence/recording sink
+```
+
+The host supports four explicit composition modes:
+
+| Mode | Underlay | HUD scene | Intended first use |
+| --- | --- | --- | --- |
+| `hud_only_alpha` | transparent | visible | optical-see-through projector or alpha-capable downstream compositor |
+| `hud_on_black` | black calibration field | visible | projector-source inspection and optical bench |
+| `hud_over_source` | admitted tab/program/camera/simulator frame | visible | virtual testing, video-passthrough research, and operator preview |
+| `source_only` | admitted source frame | hidden | alignment, latency, crop, and source-diagnostic work only |
+
+“Empty space” is therefore not one ambiguous behavior. For an optical-see-through
+combiner it is alpha/transparent and the rider sees the world directly. For a
+video-passthrough experiment it is an admitted camera or program frame. For an
+optical bench it may be black. The selected mode, source binding, scene hash,
+viewport, and transform reference must appear in every render receipt.
+
+The normalized HUD plane remains independent of the final physical surface.
+Profiles author cue geometry in a stable normalized viewport. A later
+`ProjectionTransformRef` may describe visor curvature, lens distortion, crop,
+eye-box calibration, or projector orientation without changing threat logic or
+the canonical scene. An unconcluded CAD design therefore cannot leak provisional
+skew into the shared renderer.
+
+The initial contracts should distinguish at least:
+
+- `SurfaceSourceBinding`: exact profile, run, producer epoch, source kind
+  (`none`, `tab`, `program`, `camera`, `simulator`, or `replay`), opaque locator
+  reference, permission state, and retention policy;
+- `SurfaceFrame`: frame identity, monotonic media time, dimensions, color space,
+  alpha semantics, capture age, provenance reference, and content classification;
+- `HudScene`: versioned normalized primitives and cue-set hash produced by the
+  profile controller;
+- `ProjectionViewport`: composition mode, normalized crop, safe region,
+  transform reference, and output dimensions; and
+- `SurfaceRenderReceipt`: source-frame hash, HUD-scene hash, transform reference,
+  output target, admission result, blank/degraded reason, and render timing.
+
+The source path must be capability-aware rather than pretending every program
+can be placed in an iframe. The implementation order is:
+
+1. native scene providers that render directly from typed state;
+2. explicitly allowed same-origin or embeddable web content;
+3. permissioned pixel capture for an incompatible browser tab or external
+   program; and
+4. permissioned camera `MediaStream` input.
+
+Content-Security-Policy, frame-ancestor rules, authentication boundaries, DRM,
+protected surfaces, operating-system capture consent, and unavailable alpha may
+make a particular source non-hostable. That must return a typed unavailable or
+denied state, never a spoofed preview. Credentials, cookies, raw authorization
+headers, and sensitive-field contents do not enter HUD scene state or receipts.
+
+Observation and action authority stay separate. Seeing or hosting a program tab
+does not grant clicks, keystrokes, navigation, camera control, or environment
+mutation. Any such input requires the program's separate adapter contract,
+operator intent, admission policy, and finite action lease. Likewise, a rendered
+surface is a projection, not an observation receipt, model answer, or safety
+verdict.
+
+The first host remains developer-only. It provides a bounded source picker,
+composition-mode picker, normalized viewport, source-health strip, Emergency
+Blank, and a detachable clean-feed route with no workstation chrome. Public
+`user` exposure, unrestricted URL entry, arbitrary window capture, and physical
+projector output require later packets and explicit policy review.
+
+Fail-closed behavior is source-aware:
+
+- HUD cue TTL, watchdog, and manual blanking remain authoritative regardless of
+  the visual underlay;
+- a stale optional underlay is visibly marked or removed without extending any
+  HUD cue;
+- a source declared required for registration blanks the composed output when
+  stale or epoch-mismatched;
+- switching source or profile rotates the producer epoch and requires a fresh
+  snapshot; and
+- loss of the workstation preview cannot silently keep an unobserved clean-feed
+  lease alive.
+
+### Game HUDs, realtime textures, tab hosting, and fullscreen
+
+The governed HUD surface host is display-domain infrastructure, not a helmet
+simulator. An in-game HUD, a desktop application HUD, a camera-backed research
+display, and the motorcycle combiner preview all use the same stacking model.
+Their profile semantics, source permissions, output targets, transforms, and
+acceptance claims remain separate.
+
+The repository's existing Realtime Texture Pack is the first reusable dynamic
+texture producer for this host. Its canonical packet is
+`docs/work-packets/eh-g8-realtime-texture-pack-v1.md`. That lane already freezes
+selected-window consent, exact source/projection identity, latest-frame-only
+admission, stale fallback, immediate reveal/stop, and the rule that transformed
+pixels are `non_authoritative_projection`. The HUD host must consume those
+contracts through an adapter rather than creating another capture, provider,
+credential, or overlay lifecycle.
+
+The canonical layer order is:
+
+```text
+layer 0  untouched admitted source frame         optional underlay / truth copy
+layer 1  Realtime Texture Pack projection frame  optional non-authoritative texture
+layer 2  profile HudScene                         normalized semantic HUD graphics
+layer 3  diagnostics and workstation chrome      preview only; excluded from clean feed
+```
+
+Layer 1 never replaces layer 0 in evidence storage or sensor reasoning. A model-
+generated, transformed, interpolated, or stylized frame cannot become camera,
+game-truth, radar, lidar, OCR, or environment evidence. HUD decisions continue
+to consume their admitted observation contracts, not pixels recovered from the
+texture projection. `Reveal original` removes layer 1 without altering the HUD
+scene; `Emergency Blank` removes layer 2 and releases its output lease without
+rewriting either source identity.
+
+The panel host should expose three presentation targets backed by the same
+composition state:
+
+1. **Tabbed preview:** the normal developer workstation panel, including source,
+   layer, freshness, timing, and receipt controls around the viewport.
+2. **Panel fullscreen:** the selected workstation panel occupies the available
+   application viewport, with an always-recoverable exit path and Emergency
+   Blank. This is a presentation/layout state, not browser or game authority.
+3. **Clean feed:** a detachable or routable output containing only admitted
+   visual layers, with no tabs, controls, notifications, cursor, reasoning text,
+   or workstation chrome. A later projector, game overlay, recorder, or virtual
+   display adapter consumes this target.
+
+Panel fullscreen is distinct from exclusive-fullscreen capture. The current
+Realtime Texture Pack packet explicitly excludes exclusive-fullscreen support,
+game injection, and anti-cheat bypass. The first implementation therefore uses
+the workstation's existing fullscreen window state and only sources that the
+installed capture picker can identify and capture. An unavailable exclusive-
+fullscreen game returns a typed unsupported-source receipt; it does not broaden
+capture privileges or trigger a different capture method.
+
+The tab is a governed container, not merely a link to another page. It binds one
+HUD profile, one source session, one layer stack, one normalized viewport, and
+one output lease. Going fullscreen must retain those identities and must not
+restart capture, rotate scene semantics, or silently select a different source.
+Leaving fullscreen restores the same tab state. Closing the tab, changing the
+source, signing out, revoking capture, or using Emergency Blank releases the
+applicable clean-feed and capture leases according to policy.
+
+Realtime texture integration must measure and expose separate ages for source
+capture, texture projection, HUD scene, and final composition. A slow texture
+provider may degrade or reveal the original underlay while the deterministic HUD
+continues at its own admitted cadence. It cannot reduce the reflex controller to
+the texture frame rate or hold a cue past TTL. Tests must cover alpha blending,
+z-order, aspect-ratio contain/crop, resize, device-pixel ratio, source loss,
+projection staleness, HUD staleness, fullscreen enter/exit, clean-feed isolation,
+and independent stop/reveal/blank controls.
+
+### Shared UI and MCP surface orchestration
+
+Program gate: G8 — environment-harness release evaluation; parallel display-orchestration design lane that cannot substitute for G8 closure
+Workstream: shared surface registry, operator panels, MCP capability projection, and output routing
+Capability or component: Surface Orchestration MCP and developer Surface Workspace (`HUDH-0C`)
+Lifecycle stage: capability discovery → desired-state proposal → source/tool admission → surface mutation → observation receipt → UI/MCP projection → verification
+Reaction timescale: interactive configuration and asynchronous evidence handling; never the motorcycle reflex deadline or a replacement for a resident controller
+Authority owner: Helix owns identity, source/tool admission, leases, provenance, receipts, and terminal eligibility; Codex owns generic tool choice and result re-entry; the operator owns consent, revocation, manual override, Emergency Blank, and policy ceilings
+Current maturity: specified
+Target maturity: deterministically verified
+Required evidence: one canonical registry shared by UI and MCP, contract parity tests, exact source/profile/epoch/output binding, typed cross-panel handoff, scoped consent and lease tests, revocation and sign-out cleanup, stale-revision rejection, receipt re-entry, developer policy, and proof that UI projection is not action or answer authority
+Explicit non-goals: MCP-driven UI clicking, a second private agent loop, hidden capture, ambient desktop recording, silent permission expansion, arbitrary program input, unrestricted host access, model-written reflex cues, terminal answers authored by panels or receipts, physical projector acceptance, or safety certification
+Downstream gate unlocked: modular HUD profiles, selected-source composition, VSE inspection, Codex-assisted configuration, and clean-output adapters can share one governed surface lifecycle without duplicating capture or authority logic
+
+The canonical design rule is:
+
+> Workstation panels and MCP tools are equal clients of one versioned surface
+> harness. A panel must not privately own a capability, and MCP must not automate
+> panel clicks or maintain a second configuration state.
+
+```text
+                         Surface Harness
+              desired state + admission + receipts
+                                  │
+                 ┌────────────────┼────────────────┐
+                 │                │                │
+          Workstation UI     MCP capability    clean outputs
+          human client       Codex client      projector/game/
+                 │                │             recorder/display
+                 └────── same registry state ─────┘
+```
+
+The surface harness is the system of record. Panels render its state and submit
+typed commands. MCP exposes the same commands and observations to an exactly
+bound Codex thread. A change made through MCP appears immediately in the
+relevant panels; a user change appears in the next MCP read. Neither projection
+may overwrite a newer registry revision, conceal the acting principal, or
+manufacture a successful receipt.
+
+#### Canonical UI homes
+
+Capabilities may be launched or summarized from several panels, but each has
+one canonical human-facing home:
+
+| Capability | Canonical home | Responsibility |
+| --- | --- | --- |
+| source permission, binding, and health | existing **Situation Room Sources** | source discovery, consent state, source/producer epoch, freshness, retention, and revoke |
+| generic HUD composition and output routing | new developer **HUD Surface Studio** | profile/source selection, layer stack, composition mode, normalized viewport, transform reference, output leases, blanking, and receipt inspection |
+| bounded clips, captures, frames, and contact sheets | new developer **Visual Evidence** panel | VSE import/capture history, frame selection, alignment and provenance inspection, retention, deletion, and explicit promotion to a reasoning request |
+| environment-specific semantics and fixtures | profile labs such as **Motorcycle HUD Lab** | motorcycle controller fixtures, threat/cue behavior, domain diagnostics, and a projection of its bound shared HUD surface |
+| transformed visual producer | existing Realtime Texture Pack controls through an adapter | layer-1 producer state, reveal-original, projection freshness, and generated-pixel boundary |
+| model reasoning and explanation | Helix Ask / bound Codex thread | admitted tool use, evidence re-entry, follow-up reasoning, advisory output, and terminal synthesis |
+| projector, game overlay, recorder, or secondary display pixels | dedicated **Clean Feed** route/window, not a control panel | chrome-free output from one admitted surface/output lease with an always-available revoke/blank owner elsewhere |
+
+Motorcycle HUD Lab may continue to embed compact HUD and VSE controls for local
+development convenience. Those controls are projections of the shared surface
+and evidence services, not motorcycle-owned implementations. Other HUD profiles
+must reuse the same registry and canonical panels rather than copying the
+capture, composition, routing, or Codex integration stack.
+
+#### Typed cross-panel and output handoff
+
+Opening a panel by identifier is insufficient when a request refers to a
+particular surface or artifact. Add a versioned, non-secret `PanelLaunchContext`
+or equivalent handoff containing only admitted identifiers:
+
+```text
+panel_id
+surface_instance_id
+surface_revision
+profile_id
+run_id
+source_id
+producer_epoch
+sequence_id
+output_lease_id
+requested_view
+focus_target
+```
+
+The receiving panel resolves those identifiers from the registry under the
+current account policy. Handoff data contains no pixels, credentials, cookies,
+authorization headers, pairing material, private model reasoning, or authority.
+Missing, unauthorized, expired, stale, or epoch-mismatched targets fail closed.
+Workstation tab focus, URL/deep-link restoration, native guidance, and MCP-
+directed presentation should all use the same handoff schema.
+
+The Clean Feed is a routable output target rather than another copy of the
+control UI. It binds exactly one surface instance, registry revision, profile,
+source/producer epoch, transform, and finite output lease. Fullscreen,
+detachment, projector routing, game-overlay routing, and return to a tab
+preserve those identities. Closing the owner panel, signing out, revoking the
+source, Emergency Blank, or losing the output consumer releases or blanks the
+lease according to policy.
+
+#### Surface Orchestration MCP capability family
+
+The first provider-neutral MCP projection should expose bounded operations
+equivalent to the UI, with final names owned by the MCP capability catalog:
+
+```text
+surface.list
+surface.inspect
+surface.create
+surface.configure
+surface.bind_source
+surface.bind_profile
+surface.set_composition
+surface.route_output
+surface.blank
+surface.release
+surface.receipts
+visual_sequence.capture_start
+visual_sequence.capture_stop
+visual_sequence.capture_revoke
+visual_sequence.inspect
+visual_sequence.select_frames
+panel.open_with_context
+```
+
+Read tools return exact registry revision, source and producer epoch, freshness,
+permission, output health, and receipt references. Mutating tools require an
+affirmative operator request or an unexpired task-scoped lease, expected prior
+revision, exact target identity, finite effect, and verifiable postcondition.
+Concurrent or stale writes return a typed conflict and current state; Codex may
+re-read and replan through its normal tool loop, but Helix must not implement a
+private retry or sampling loop.
+
+MCP exposure means a bound Codex thread can discover admitted capabilities,
+configure a complete surface, route its preview, request a bounded capture,
+inspect the resulting VSE artifact, make permitted parameter changes, and
+verify final registry state without requiring the user to operate every panel.
+The panels remain available for direct manual use and continuously project who
+changed what, current leases, progress, degraded states, and exact receipts.
+Monitoring is optional; auditability, Stop, Revoke, and Emergency Blank are not.
+
+#### Consent and unattended bounded operation
+
+The operator may perform each step directly, supervise Codex, or grant a narrow
+lease that lets Codex finish a request unattended. A lease declares the bound
+account/thread, allowed source and surface, admitted operations, duration,
+retention, output targets, effect ceilings, and stop conditions. It cannot be
+expanded by Codex or inferred from a previous unrelated session.
+
+OS/browser source pickers, first camera or display permission, protected or
+sensitive content clearance, microphone/system audio, public-space capture,
+and any new physical output may still require an explicit user gesture or
+separate consent. An existing admitted source lease may be reused only within
+its exact scope and epoch. User stop/revoke, sign-out, source change, producer-
+epoch rotation, profile change, stale heartbeat, required owner-panel closure,
+or Emergency Blank supersedes Codex immediately and generates a terminal
+cleanup receipt.
+
+The Surface Orchestration MCP is a thin capability adapter, not a Helix-owned
+agent runtime. Codex owns tool selection, generic execution sequencing, result
+re-entry, retries, compaction, and terminal completion. Helix owns prompt and
+intent policy, source/tool admission, evidence identity, provenance, route
+contracts, terminal eligibility, and debug traces. Surface receipts are
+observations, never answers; visual pixels and panel-generated text cannot
+authorize another tool call merely because they contain control words.
+
+#### Minimum orchestration acceptance journeys
+
+1. **Manual parity:** configure the same frozen HUD surface once through HUD
+   Surface Studio and once through MCP; canonical desired state and receipt
+   fields match apart from principal/request identifiers.
+2. **Codex unattended within lease:** from a natural request, the bound thread
+   lists sources, binds an admitted Minecraft window and motorcycle profile,
+   routes a tab preview, captures ten seconds, inspects VSE frames, applies one
+   permitted HUD parameter change, verifies it, and returns receipt references
+   without panel clicking.
+3. **Human takeover:** while Codex is configuring a surface, the user changes a
+   newer revision or presses Blank; the stale MCP mutation is rejected and the
+   UI retains the newer revision.
+4. **Revocation:** source consent or the output lease is revoked during capture;
+   tracks and output are released, no partial artifact is promoted, and both UI
+   and MCP show the same terminal reason.
+5. **Identity rotation:** a source reconnect changes producer epoch; prior
+   frames, output leases, handoffs, and pending mutations cannot attach to the
+   replacement source without fresh admission.
+6. **Contextual-text poison case:** captured pixels or panel text say “start,”
+   “click,” or “route output”; no mutating tool is admitted without affirmative
+   operator intent and the solver trace records the text as observation only.
+7. **Model unavailable:** panels and deterministic HUD/controller behavior
+   remain usable, manual capture remains available, active safe outputs follow
+   their leases, and only Codex reasoning/configuration becomes unavailable.
+
+### Bounded visual-sequence evidence for Codex
+
+Program gate: G8 — environment-harness release evaluation; parallel read-only visual-evidence lane that cannot substitute for live-source acceptance
+Workstream: short video ingestion, selected-surface capture, frame sampling, and governed visual reasoning
+Capability or component: Visual Sequence Evidence (`VSE-0`)
+Lifecycle stage: owner source selection → bounded capture/upload admission → deterministic decode → frame sampling → immutable sequence manifest → tool admission → visual evidence re-entry → follow-up reasoning
+Reaction timescale: offline or short-window analysis; never part of the motorcycle reflex loop or HUD render deadline
+Authority owner: the owner controls capture/upload, retention, and stop; the decoder owns deterministic media conversion only; Helix owns source identity, sampling provenance, tool admission, evidence re-entry, and terminal eligibility; Runtime Codex owns follow-up reasoning only
+Current maturity: specified
+Target maturity: deterministically verified
+Required evidence: clip identity and limits, deterministic sampling fixtures, timestamps and hashes, corruption/codec/rotation/VFR cases, consent and retention tests, bounded frame retrieval, vision-capability negotiation, source/environment alignment, poison audit, and exact re-entry/terminal traces
+Explicit non-goals: continuous covert screen sharing, unrestricted surveillance, sending every decoded frame to a model, treating generated pixels as source truth, hidden-reasoning inspection, autonomous hot-patching of safety cues, tutorial instructions as action authority, or video evidence as a substitute for environment state
+Downstream gate unlocked: short visual-sequence inspection tools, HUD/render comparison, and candidate procedure extraction; no environment, controller, optical, or safety maturity is inherited
+
+This belongs beside the HUD surface host because both consume versioned visual
+layers, but it is a separate observation/evidence capability. The HUD host emits
+pixels. VSE-0 samples and indexes selected pixels for later reasoning. Neither
+component becomes the other's authority owner.
+
+The repository already contains useful lower-level contracts and surfaces:
+
+- `HelixVisualSnapshotSource` for manual, interval, or salience-triggered screen,
+  window, camera, Minecraft-client, and manual-upload sources;
+- `HelixVisualFrameRecord` and `HelixVisualFrameEvidence` for individual frame
+  provenance and compact model observations;
+- `HelixVisualProducerCadence` for bounded capture scheduling;
+- `HelixVisualEventAlignment` for relating frames to environment events;
+- `HelixSelectedVisualSceneSet` for selecting relevant scene memories; and
+- Live Answer frame history, explicit frame attachment, Image Lens handoff, and
+  Stage Play live-source mail/re-entry surfaces.
+
+VSE-0 extends these contracts with a sequence-level artifact. It must not create
+a competing capture lifecycle or private model loop.
+
+#### First bounded input modes
+
+1. **Uploaded clip:** owner-provided local video, at most 30 seconds for VSE-0A.
+2. **Selected HUD clean feed:** capture only the HUD host's exact clean-feed
+   target for a 10-second default or 15-second maximum window.
+3. **Selected composed feed:** capture source/texture/HUD layers together while
+   recording the matching `SurfaceRenderReceipt` timeline.
+4. **Selected application or Minecraft window:** use the existing consented
+   visual-source selector for a 10- or 15-second bounded capture, not an ambient
+   desktop-wide recorder.
+
+Starting limits are prototype safety and cost envelopes, not product promises:
+
+- one active capture or decode job per developer thread;
+- 10-second default and 15-second maximum selected-surface capture;
+- 30-second maximum uploaded clip;
+- bounded decoded dimensions and byte count negotiated before extraction;
+- no more than 16 full-resolution sampled frames admitted to one model turn;
+- a compact contact sheet and manifest may represent a larger candidate set; and
+- raw clips and frames are ephemeral by default unless the owner explicitly
+  selects debug retention or profile opt-in.
+
+#### Sampling policy
+
+Sampling must be timestamp-based by default because uploaded and captured media
+may use variable frame rates. “Every fifth frame” is available only as an exact
+diagnostic stride over a known decoded frame index; it is not the general time
+sampling contract.
+
+The first policies are:
+
+| Policy | Selection | Use |
+| --- | --- | --- |
+| `uniform_time` | fixed temporal cadence such as one frame per second | simple 10-second overview and deterministic baseline |
+| `uniform_count` | evenly choose a bounded count across the clip | comparison across clips of different duration |
+| `exact_stride` | every Nth decoded frame with frame index and PTS retained | codec/renderer debugging only |
+| `scene_change` | bounded candidates around measured visual change | menus, cuts, generation failures, and state transitions |
+| `event_aligned` | frames before/at/after exact HUD, environment, or receipt events | cue timing and Minecraft action verification |
+| `adaptive_review` | contact sheet first, then a bounded second retrieval around selected timestamps | vision-model investigation without flooding context |
+
+The first 10-second fixture should produce ten one-second baseline frames plus a
+contact sheet. A second fixture should place a brief HUD transition between two
+uniform samples and prove that event-aligned or scene-change selection retrieves
+the missed transition. This establishes why a selectable policy is necessary.
+
+#### Sequence artifact and model tool surface
+
+Do not create one opaque “file containing all frames” as the only interface.
+Create an immutable directory or archive with addressable artifacts:
+
+```text
+visual-sequence/<sequence_id>/
+├─ manifest.json
+├─ contact-sheet.webp
+├─ frames/
+│  ├─ <frame_id>.webp
+│  └─ ...
+├─ alignments.jsonl
+└─ receipts.jsonl
+```
+
+The proposed `VisualSequenceManifest` includes:
+
+- sequence, thread, source, capture-session, producer-epoch, and environment IDs;
+- original clip or capture-window hash, duration, dimensions, codec/container,
+  nominal and measured frame rate, time base, rotation, and variable-rate flag;
+- decoder name/version and exact command-free argument manifest;
+- requested and applied sample policy, seed if relevant, candidate/selected/
+  rejected counts, and rejection reasons;
+- per-frame decoded index, presentation timestamp, duration, dimensions, hash,
+  image reference, source/projection classification, and retention state;
+- related environment-event, HUD-scene, render-receipt, Realtime Texture Pack,
+  and player-pose references; and
+- contact-sheet hash, manifest hash, expiry, redaction/crop policy, and any typed
+  unavailable or degraded reason.
+
+The environment MCP/harness surface should expose bounded, read-only tools such
+as:
+
+- `visual_sequence.inspect_manifest(sequence_id)`;
+- `visual_sequence.get_contact_sheet(sequence_id)`;
+- `visual_sequence.get_frames(sequence_id, frame_ids)` with a strict count and
+  byte ceiling;
+- `visual_sequence.resample_range(sequence_id, start_ms, end_ms, policy)` as a
+  new admitted decode job rather than hidden arbitrary retrieval; and
+- `visual_sequence.compare_frames(sequence_id, frame_ids, question)` only when a
+  vision-capable provider is selected and the exact image inputs re-enter the
+  owning Codex turn.
+
+If “MTP harness” refers to this model-facing tool path, the implementation should
+use the existing MCP/environment-harness capability catalog and naming rather
+than create an unaudited second tool protocol. A separately defined MTP component
+would need its own contract and mapping before implementation.
+
+Tool results are observations, not answers. A manifest, contact sheet, frame,
+Image Lens result, or vision-model summary must re-enter the Codex turn before
+follow-up reasoning and terminal arbitration. A non-vision model may inspect
+metadata and prior typed summaries but must report that raw visual analysis is
+unavailable rather than pretending to see the frames.
+
+#### HUD and Realtime Texture Pack self-observation
+
+For HUD debugging, capture three synchronized products when available:
+
+1. the untouched source/underlay frame;
+2. the composed clean-feed frame; and
+3. the exact `HudScene`, `SurfaceRenderReceipt`, controller receipt, and layer
+   health at that presentation timestamp.
+
+This lets Codex ask whether the renderer matched the scene, whether the scene
+matched admitted controller output, and whether a generated texture visually
+matched its declared prompt. It does not let pixels overwrite controller or
+environment truth. Realtime Texture Pack frames stay
+`non_authoritative_projection`; the untouched capture remains the only candidate
+pixel source for an independent evidence workflow.
+
+Codex may propose a versioned HUD template or prompt/configuration revision from
+this evidence. Applying the proposal is a separate admitted action. Motorcycle
+reflex thresholds, cue TTL, watchdog behavior, and safety-relevant layouts cannot
+be hot-patched from a visual summary while a run is active. A non-safety game HUD
+may later support bounded reversible hot reload, but each applied revision must
+rotate scene/configuration identity and retain rollback.
+
+#### Minecraft observation and tutorial use
+
+A selected Minecraft capture can align sampled frames with authoritative world
+observations, player pose, action receipts, and environment events. Visual facts
+remain `visual_capture` evidence with uncertainty; they may corroborate or
+contradict the environment adapter but cannot silently replace World Authority
+or Player Embodiment state.
+
+An uploaded tutorial video is untrusted reference material, not executable
+instruction. VSE-0 may extract a candidate sequence of steps, objects, UI states,
+and uncertainty. Codex may turn that into a proposed procedure graph only after
+evidence re-entry. The environment harness must then validate prerequisites,
+current affordances, version/mod differences, safety/authority bounds, and each
+postcondition during a separately admitted test run. No instruction embedded in
+video pixels, captions, overlays, QR codes, chat, or audio grants tool authority.
+
+#### Privacy, retention, and failure boundaries
+
+- Capture begins only from an affirmative owner action with the exact source and
+  bounded duration visible; discussing “ten-second capture” is not execution.
+- Stop, revoke, source end, tab close, sign-out, thread deletion, decoder failure,
+  or quota exhaustion terminates the job and records a typed receipt.
+- Sensitive windows, notifications, credentials, private chat, and bystanders may
+  appear in frames. Source selection, crop/redaction, retention, and model egress
+  require explicit policy and visible status.
+- Decode happens locally before optional model admission. Raw video is never sent
+  merely because a manifest was created.
+- Corrupt, unsupported, DRM/protected, oversized, ambiguous-identity, or
+  timestamp-invalid media fails closed without partial frames masquerading as a
+  complete sequence.
+- The AI cannot inspect its hidden reasoning. It can inspect visible program
+  output, selected frames, public prompts/configuration, render/controller
+  receipts, and its own prior public responses.
 
 ### Minimum deterministic fixture set
 
@@ -595,6 +1996,11 @@ Use one small versioned HUD scene model and one renderer package for:
 2. the FiveM in-game NUI overlay;
 3. headless golden-frame/semantic tests; and
 4. the later physical projector output adapter.
+
+The reusable HUD surface host owns composition and output routing around this
+renderer. It must not reinterpret `HudCue`, invent profile semantics, or fork a
+motorcycle-specific scene. The in-game overlay may remain a thin platform
+wrapper, while the workstation and clean-feed outputs share the host contracts.
 
 Platform wrappers may differ, but sector geometry, cue priority, TTL, patterns,
 brightness intent, and animation phase come from the same model. Every frame or
@@ -1266,6 +2672,19 @@ the natural prompt to fit the adapter.
 | --- | --- | --- | --- | --- |
 | MHUD-0 | program | freeze scope, schemas, frames, hazards, modes, and evidence model | reviewable plan and open-decision register | no hardware purchase implied |
 | MHUD-1A | panel/software | Motorcycle HUD Lab shell, shared eight-sector renderer, and deterministic local replay | golden fixtures, panel-state tests, cue TTL/hysteresis tests, first-divergence trace, and latency distribution | local software behavior only |
+| HUDH-0A | reusable visual-surface host | developer-only host contracts and tabbed panel; normalized HUD scene; `hud_only_alpha`, `hud_on_black`, synthetic `hud_over_source`, and `source_only`; panel-fullscreen state; clean-feed isolation; no live arbitrary capture | schema and policy tests, alpha-composition golden frames, source/scene/transform receipt hashes, resize/crop/device-pixel-ratio tests, fullscreen enter/exit and state-retention tests, stale/epoch/manual-blank regressions, clean-feed chrome exclusion, and proof that hosted observation grants no program-input authority | shared local composition behavior only; no universal tab compatibility, exclusive-fullscreen capture, live camera claim, physical projection, optics, or safety claim |
+| HUDH-0T | Realtime Texture Pack bridge | adapt the existing selected-window source and non-authoritative projection frames into layers 0 and 1 beneath the unchanged profile HUD scene; preserve independent reveal-original, texture stop, HUD blank, and clean-feed controls | unchanged source/projection identities, z-order and alpha golden frames, independent four-clock age reporting, stale-texture fallback with live HUD continuity, generated-pixel evidence rejection, prompt/credential exclusion, and exact composition receipts | reuses the Realtime Texture Pack's accepted boundary without promoting its maturity or generated pixels; no new provider, billing, capture, input, or game authority |
+| HUDH-0B | admitted live underlays | separately permissioned browser-tab/program capture and camera adapters with exact source identity, health, bounded retention, and typed unavailable states | same-origin/embed and capture-mode matrices, consent/revocation, protected-source rejection, latency/freshness distributions, source switching, secret-exclusion audit, fullscreen source-support matrix, and clean-feed lease release | live source presentation only; no source-program control, exclusive-fullscreen workaround, or environment/safety maturity inheritance |
+| HUDH-0C | shared UI/MCP surface orchestration | one versioned Surface Registry, HUD Surface Studio, Visual Evidence panel, typed panel-launch context, clean-output leases, and provider-neutral MCP tools over the same desired state and receipts | UI/MCP parity, exact principal/source/profile/epoch/revision binding, stale-write conflicts, scoped unattended leases, human takeover, revoke/sign-out cleanup, context poison tests, Codex result re-entry, model-unavailable continuity, and no panel-click automation | configuration and observation orchestration only; no private agent loop, silent permission expansion, program input, reflex authority, physical-output acceptance, or safety claim |
+| HDH-0A | scientific hardware-definition contracts | theory-design links, hardware environment profiles, component/reference/design manifests, experiment-closure packets, and canonical project registry | provenance/classification, unit/scale, immutable identity, claim-ceiling, preregistration and circular-evidence poison fixtures | design metadata only; no CAD execution, fabrication, empirical evidence, proof promotion, or physical viability claim |
+| HDH-0B–0F | Hardware Workspace through fabrication handoff | shared UI/MCP workspace, governed CAD/EDA adapters, compatibility graph, instrument evidence, and human-released fabrication package | phase-specific parity, lease, fixed-view, compatibility, uncertainty, independent-measurement and exact as-built identity evidence defined above | each phase retains its own boundary; no stage inherits theory, device-performance, product or certification authority |
+| EOT-0A–0F | bidirectional environment object traversal | portable object packages, exact Minecraft region extraction, local scan/reconstruction layers, optional user-connected image-to-3D, code/CAD target compilers, and separately admitted realization | frame/unit/provenance identity, exact discrete round trips, geometry/voxel residuals, privacy/retention, external upload/cost leases, target loss reports, action/postcondition receipts and poison cases | translation and exact tested realization only; no cross-environment identity, generated-geometry measurement, automatic mutation, fabrication or safety claim |
+| MSH-0A–0F | multimodal sensing, recording and guidance | shared session/track/timeline/recipe contracts, Capture Session Composer, local media/memo tracks, depth/LiDAR/pose alignment, clean HUD guidance, simulated oracle/sensor differential and EOT integration | per-track consent, exact device/profile/source/epoch/frame/clock identity, bounded storage, privacy, guidance/source separation, stale/revoke behavior, UI/MCP parity and postcondition evidence | user-composed bounded evidence and assistance only; no ambient recording, hidden modality, automatic command, physical maturity or safety authority |
+| CRS-0A–0E | connected reasoning and Shared Live Room sessions | remote device contribution, permissioned multimodal evidence, participant intent, GPT Realtime voice presentation, screen/video/HUD projection and later multi-host federation | exact room/run/turn/participant/node/device/source/epoch identity, independent grants, dimensioned intake/reasoning budgets, cursor/gap/reconnect behavior, intent attribution/conflict handling, certainty/playback parity, one arbiter/terminal writer and stop/revoke evidence | exact authorized room journeys only; no ambient device access, hidden reasoning sharing, transcript-to-command shortcut, automatic permission union, continuous-cloud dependency or inherited multi-host acceptance |
+| VSE-0A | offline visual-sequence artifact | ingest an explicitly supplied clip, decode locally, apply deterministic timestamp-based sampling, and emit a manifest, contact sheet, bounded frame set, alignments, and receipts | fixed 10-second and 30-second fixtures, variable-frame-rate and rotation cases, exact frame PTS/hash reproducibility, sample-cap enforcement, corrupt/protected-media failures, expiry cleanup, and proof that no model call or environment action occurs | offline visual evidence only; no live capture, visual conclusion, source authority, or execution authority |
+| VSE-0B | consented bounded surface capture | capture a selected HUD clean feed, composed feed, or admitted program/Minecraft window for 10 seconds by default and 15 seconds maximum through the existing visual-source lifecycle | affirmative start/stop/revoke tests, exact source/epoch identity, bounded duration/storage, synchronized HUD and surface receipts, secret/protected-content rejection, stale/source-loss handling, and unchanged HUD/controller behavior | bounded observation only; no continuous screen sharing, hidden capture, input injection, or safety-loop dependency |
+| VSE-0C | Codex visual-evidence tools | expose manifest, contact sheet, bounded frame retrieval, admitted resampling, and frame comparison through the environment MCP catalog with provider capability negotiation and exact evidence re-entry | tool-schema and admission tests, frame-count/byte limits, unsupported-vision typed result, provenance-preserving re-entry, follow-up reasoning and terminal-authority traces, poison tests, and proof that receipts are not treated as answers | advisory model interpretation only; no private model loop, automatic configuration mutation, or visual authority over typed world state |
+| VSE-0M | Minecraft visual correlation | align selected Minecraft frames with World Authority observations, player pose, action receipts, and optional untrusted tutorial-video segments; propose a candidate procedure graph for separate execution admission | synchronized fixture replays, clock/epoch mismatch rejection, image-versus-world disagreement cases, tutorial prompt-injection tests, candidate-step provenance, and separate environment verification receipts | reference and diagnostic evidence only; no tutorial execution, visual replacement of World Authority, or Minecraft maturity inheritance |
 | MHUD-1M | optional Minecraft verifier | test-only Minecraft proxy normalizer, controlled arena, source-mode panel projection, watchdog/delay cases, and cross-source differential harness | MXV0–MXV4 evidence; unchanged controller; exact source/profile identity; proxy labels; stale/epoch/manual-stop regressions; cue/receipt comparison; no Minecraft maturity inheritance | verifies exact shared motorcycle contract/lifecycle only; no traffic, sensor, optics, rider, or certification claim; may proceed in parallel with MHUD-1B |
 | MHUD-1B | FiveM oracle | developer-only FiveM resource, selected rider/bike binding, immutable scenario fixtures, and truth exporter | F0–F5 deterministic scenario replays, exact identity/epoch binding, bounded transport, zero threat-controller world mutation | game-truth evidence only; no sensor claim |
 | MHUD-1C | sensor/controller | radar-like sensor emulator, tracking/threat pipeline, fault injection, and scorecard | F0–F9 differential battery, preregistered thresholds, precision/recall and timing by family, exact replay hashes | simulated sensor/controller evidence only |
@@ -1484,6 +2903,345 @@ fixtures. It does not transfer Minecraft maturity, validate FiveM telemetry,
 measure physical sensor accuracy or display latency, establish optical
 performance, or provide any road-safety or certification claim.
 
+### HUDH-0A implementation evidence — 2026-09-04
+
+Program gate: G8 — environment-harness release evaluation; parallel visual-surface lane
+Workstream: reusable environment display and projection surfaces
+Capability or component: HUDH-0A developer-only normalized visual-surface host
+Lifecycle stage: source admission → frame normalization → HUD-scene composition → output admission → render receipt
+Reaction timescale: local display composition; no source reflex or model loop
+Authority owner: Helix source and output admission plus pixels-only host authority; operator-owned source selection and blanking
+Current maturity: deterministically verified
+Target maturity: deterministically verified
+Required evidence: strict contracts, deterministic composition receipts, synthetic layer tests, stale/epoch/permission/manual-stop regressions, fullscreen state retention, clean-feed isolation, account policy, and production client build
+Explicit non-goals: live arbitrary window/tab/camera capture, Realtime Texture Pack bridge, source-program input, exclusive-fullscreen capture, physical projector output, optical calibration, road use, and safety certification
+Downstream gate unlocked: HUDH-0T Realtime Texture Pack bridge or HUDH-0B admitted live underlays; no live-source, environment, optics, or safety maturity is inherited
+
+The implemented HUDH-0A slice includes:
+
+- `shared/helix-hud-surface.ts`, defining runtime-validated source binding,
+  source frame, normalized primitive scene, viewport, control, and render-receipt
+  contracts;
+- a deterministic compositor that preserves first-divergence reason, binds
+  source/scene/viewport/transform identity into an exact causal hash, records
+  source-before-HUD layer order, and permanently records pixels-only authority
+  with `programInputAuthority: false`;
+- the four frozen composition modes: `hud_only_alpha`, `hud_on_black`,
+  `hud_over_source`, and `source_only`;
+- fail-closed handling for missing, stale, mismatched-epoch, denied, or revoked
+  required sources; stale or mismatched HUD scenes; manual blanking; and
+  Emergency Stop;
+- `HudSurfaceHost.tsx`, a reusable tab-hosted composition component with a
+  synthetic road underlay, normalized viewport notice, source/scene/transform
+  receipt strip, device-pixel-ratio identity, and a chrome-free feed subtree;
+- a clean-feed fullscreen presentation entered from the host controls and exited
+  with Escape, retaining the same profile, source, scene, and composition mode;
+  and
+- migration of Motorcycle HUD Lab onto the reusable host without moving threat,
+  watchdog, TTL, navigation priority, or Codex authority into the compositor.
+
+Verification evidence:
+
+- `41` focused tests passed across HUD-surface contracts, composition and
+  fullscreen behavior, motorcycle fixtures/panel integration, and workstation
+  account policy;
+- deterministic tests cover alpha-only output, source-plus-HUD z-order,
+  source-only output, exact repeated receipts, output resize/crop/device-pixel-
+  ratio identity changes, source loss/staleness/epoch mismatch/revocation,
+  manual blanking, Emergency Stop, clean-feed control exclusion, fullscreen
+  enter/exit, and same-mode restoration;
+- the production client build passed after transforming `3309` modules; and
+- a fresh unsigned/headless browser session could not open the locked Motorcycle
+  HUD Lab, preserving the developer-only boundary. No attempt was made to bypass
+  account policy for visual inspection.
+
+This evidence is deterministic local software evidence only. A live developer-
+session visual acceptance run, live selected-window capture, Realtime Texture
+Pack stacking, detachable native output, and any physical projector path remain
+separate acceptance work.
+
+### VSE-0A implementation evidence — 2026-09-04
+
+Program gate: G8 — environment-harness release evaluation; parallel read-only visual-evidence lane
+Workstream: short owner-supplied video ingestion and deterministic frame artifacts
+Capability or component: VSE-0A offline visual-sequence evidence pipeline
+Lifecycle stage: owner upload selection → developer admission → local probe/decode → timestamp sampling → immutable artifact projection
+Reaction timescale: offline bounded job; never part of the HUD render or motorcycle reflex deadline
+Authority owner: owner controls explicit upload; local decoder owns conversion only; server owns profile binding, limits, retention, and artifact addressing
+Current maturity: deterministically verified
+Target maturity: deterministically verified
+Required evidence: fixed 10- and 30-second media, repeatable PTS/frame hashes, VFR and rotation handling, byte/duration/dimension/frame limits, corrupt/protected failures, expiry, developer policy, artifact inspection, no-authority receipts, focused tests, and production builds
+Explicit non-goals: live surface capture, continuous screen sharing, model or Ask invocation, MCP vision tools, environment action, HUD/controller mutation, semantic conclusions, tutorial execution, and safety or optical claims
+Downstream gate unlocked: VSE-0B consented 10–15-second selected-surface capture; VSE-0C model-facing tools remain separate and unimplemented
+
+The implemented VSE-0A slice includes:
+
+- `shared/helix-visual-sequence.ts`, defining a sequence manifest, sampled-frame
+  record, offline-decode receipt, typed failures, and frozen prototype limits;
+- a profile-bound server service that accepts one explicit owner-supplied clip,
+  hashes it, probes its video stream and frame timestamps through local
+  `ffprobe`, selects decoded frame indexes by timestamp, and extracts the exact
+  selected frames through local `ffmpeg`; exact repeated ingestion is
+  idempotent and reads the existing immutable owner/thread/source/policy-bound
+  artifact rather than overwriting it;
+- ten one-second samples for the 10-second baseline and a sample-cap adjustment
+  to fifteen two-second samples for a 30-second clip, with no more than sixteen
+  full-resolution frames admitted by this stage;
+- lossless WebP frame normalization, a timestamped contact sheet, `manifest.json`,
+  empty-but-typed `alignments.jsonl`, and `receipts.jsonl`, all addressable by
+  exact sequence/frame identity and SHA-256;
+- 64 MiB upload, 30-second duration, 3840×2160 source-dimension, 18,000 decoded-
+  frame-metadata, 768×432 normalized-output, and one-active-job-per-thread
+  bounds, with invalid media failing before pixel extraction when possible;
+- ephemeral one-hour retention, refusal of expired artifacts, stale staging
+  cleanup, omission of the uploaded source clip from the final artifact, path-
+  traversal rejection, profile-isolated reads, no-store responses, bounded IP
+  admission, and exact same-origin protection for cookie-authenticated writes;
+- the developer-only `/api/visual-sequences` upload/read/artifact/cleanup API;
+  and
+- `VisualSequenceInspector.tsx` embedded beneath Motorcycle HUD Lab, providing
+  explicit file selection, extraction state, contact-sheet preview, timestamped
+  frame links, manifest/receipt/alignment links, media metadata, and the visible
+  `model=false`, `live_capture=false`, `environment_action=false`, and
+  `hud_mutation=false` boundary.
+
+Verification evidence:
+
+- `36` focused tests pass across the real decoder, route/security boundary,
+  visual-sequence inspector, Motorcycle HUD Lab, reusable HUD host, and
+  workstation account policy;
+- real generated 10-second and 30-second fixtures prove the exact selected PTS
+  sequence, repeatable frame hashes, repeatable manifest hash under a frozen
+  clock, contact-sheet output, bounded sample cadence, and omitted source clip;
+- real generated VFR and display-rotation fixtures prove variable timestamp and
+  90-degree display-dimension handling;
+- corrupt and protected media, disallowed MIME, upload bytes, duration,
+  dimensions, decoded-frame metadata, cross-site submission, wrong profile,
+  expiry, and invalid artifact paths fail closed with typed outcomes;
+- the production client build passed after transforming `3311` modules and the
+  production server bundle passed; its four duplicate-key/case warnings are in
+  pre-existing unrelated modules; and
+- the repository-wide `npm run check` did not complete because the TypeScript
+  process exhausted its 4 GiB heap. A narrowed check reached only two unrelated
+  existing errors in `account-session-store.ts` and
+  `runtime-memory-governor.ts`; both production builds and every focused VSE
+  test passed. This resource-limited check is recorded rather than represented
+  as a clean repository-wide typecheck.
+
+This maturity applies only to owner-selected offline clip conversion and local
+developer inspection. It does not accept live capture, model vision, evidence
+re-entry, Minecraft correlation, Realtime Texture Pack interpretation, or any
+physical/safety behavior.
+
+### VSE-0B implementation evidence — 2026-09-04
+
+Program gate: G8 — environment-harness release evaluation; parallel read-only visual-evidence lane
+Workstream: explicitly consented short capture from one selected visual surface
+Capability or component: VSE-0B bounded HUD, Minecraft-client, and program-window capture
+Lifecycle stage: operator source choice → content-clearance affirmation → consented picker or HUD binding → visible bounded recording → local VSE decode → ephemeral evidence inspection
+Reaction timescale: 10 seconds by default or 15 seconds maximum; asynchronous evidence only and never part of the HUD render or motorcycle reflex deadline
+Authority owner: developer owns affirmative consent, surface choice, stop, and revoke; browser picker owns external surface selection; HUD host owns render receipts; server owns profile binding, decoded limits, retention, and artifact admission
+Current maturity: deterministically verified
+Target maturity: deterministically verified
+Required evidence: no prompt before affirmative consent, one exact selected surface, 10/15-second bound, no audio, stop/revoke, source-loss and producer-epoch failure, whole-screen/protected/sensitive exclusion, synchronized HUD render receipts, profile/thread isolation, resource cleanup, immutable artifact output, and unchanged controller/watchdog behavior
+Explicit non-goals: continuous or hidden screen sharing, ambient desktop recording, microphone/system audio, protected-content bypass, credential or private-message capture, program input, model invocation, environment action, safety-loop dependency, physical projection, optical calibration, or road-use claims
+Downstream gate unlocked: VSE-0C model-facing bounded frame-inspection tools may consume an explicitly selected VSE artifact; no model tool or autonomous capture is implemented by VSE-0B
+
+The implemented VSE-0B slice extends the existing VSE-0A artifact path rather
+than adding an ambient recorder:
+
+- the shared capture contract binds `capture_session_id`, selected surface,
+  `source_id`, `producer_epoch`, developer profile, run, thread, consent/start/end
+  timestamps, requested and recorded duration, stop reason, content-clearance
+  declarations, and synchronized HUD surface receipts;
+- Motorcycle HUD Lab exposes developer-only controls for HUD clean feed, HUD +
+  source feed, Minecraft client window, or one selected program/browser tab,
+  with 10- and 15-second choices, two affirmative consent/content-clearance
+  checks, visible progress, manual stop, and revoke;
+- HUD capture snapshots only the chrome-free normalized feed subtree into a
+  private canvas stream. It does not capture workstation controls. Composed
+  capture requires `hud_over_source`; clean capture requires alpha or projector-
+  black mode, and each requires matching `HudSurfaceRenderReceipt` evidence;
+- Minecraft and other programs reuse the existing visual-source browser picker.
+  Only a selected window or browser tab is admitted; a full-monitor choice is
+  stopped and rejected, and display audio is neither requested nor retained;
+- the recorder binds the selected display track identity or current HUD source
+  and producer epoch, stops all tracks on every terminal path, rejects
+  revocation, early track end, producer-epoch drift, recorder failure, and empty
+  output, and never produces an artifact for those failed paths;
+- the same profile-isolated `/api/visual-sequences` route admits the recording,
+  while the server independently enforces the 15-second decoded duration,
+  64 MiB byte bound, authenticated profile/thread match, capture schema,
+  protected/sensitive/audio exclusions, allowed surface, and HUD receipt mode;
+- emitted manifests and receipts distinguish `bounded_capture_decode` from
+  offline decode, mark frames `consented_bounded_capture`, preserve the source
+  binding and client-declared surface alignments, use one-hour ephemeral
+  retention, omit the source recording from the final artifact, and set
+  `live_capture=true` while keeping model, assistant-answer, environment-action,
+  HUD/controller-mutation, and program-input authority false.
+
+Verification evidence:
+
+- `46` focused tests pass across the real FFmpeg decoder, capture admission and
+  security route, existing visual-source lifecycle, bounded recorder, consent
+  controls, VSE inspector, reusable HUD host, and Motorcycle HUD fixture;
+- a real generated 10-second recording fixture becomes a timestamped live-
+  capture manifest/contact sheet with synchronized surface-receipt alignment,
+  while decoded-duration, cross-profile, protected/sensitive declaration,
+  malformed metadata, whole-monitor choice, revocation, selected-track loss,
+  and HUD producer-epoch drift cases fail closed;
+- the existing motorcycle replay, watchdog blanking, HUD composition switching,
+  fullscreen clean-feed behavior, and future-source lock tests remain green;
+- the production client build passed after transforming `3316` modules and the
+  production server bundle passed. Its four duplicate-key/case warnings remain
+  in unrelated pre-existing modules; and
+- a narrowed TypeScript check again exhausted the process's 4 GiB heap without
+  producing a source diagnostic. The two production builds and focused runtime
+  and contract tests are the positive evidence; the memory-limited typecheck is
+  recorded rather than represented as a clean repository-wide result.
+
+This maturity covers local developer capture and evidence construction only.
+No live developer-session visual acceptance run was claimed, and no VSE artifact
+is automatically sent to Codex, promoted into answer authority, interpreted as
+an instruction, or allowed to affect the HUD/controller.
+
+### HUDH-0C1 implementation evidence — 2026-09-04
+
+Program gate: G8 — environment-harness release evaluation; parallel display-orchestration implementation lane that cannot substitute for G8 closure
+Workstream: Shared surface hosting and governed UI/MCP parity
+Capability or component: HUDH-0C1 profile-bound shared Surface Registry core
+Lifecycle stage: Surface desired-state registration, inspection, revision-checked presentation control, output leasing, and cleanup
+Reaction timescale: Operator/MCP configuration path; outside the deterministic reflex loop
+Authority owner: Authenticated developer profile for surface creation and consent; shared registry for state/revision enforcement; Codex only inside an explicit scoped lease
+Current maturity: deterministically verified
+Target maturity: deterministically verified
+Required evidence: Versioned contract validation; developer route and MCP adapter tests; UI/MCP canonical-state hash parity; stale revision, cross-profile, source/profile/producer-epoch mismatch, scoped-operation, Emergency Blank, source rotation, sign-out, and panel-launch-context rejection fixtures; developer UI projection; production builds; Helix Ask discipline check; environment-harness docs audit
+Explicit non-goals: Program input or capture authority, environment action, reflex control, model/answer authority, private agent loop, panel-click automation, silent source rebinding, physical output acceptance, optical calibration, or road/safety claim
+Downstream gate unlocked: HUDH-0C2 may add the general Surface Workspace and cross-panel launch routing over this registry; live source admission remains HUDH-0B and Codex visual inspection remains VSE-0C
+
+HUDH-0C1 implements the narrow shared state authority beneath the planned
+workspace rather than a second panel-local controller:
+
+- `SurfaceInstance`, desired-state, output-lease, control-lease, command,
+  `PanelLaunchContext`, and non-terminal receipt schemas are versioned in one
+  shared contract. Every surface and receipt explicitly denies program-input,
+  reflex, and model-answer authority;
+- a profile-isolated server registry owns create, list, inspect, configure,
+  Emergency Blank, release, source revoke/rotation, sign-out cleanup, revision
+  conflicts, deterministic state hashes, and receipt history;
+- the same service is used by the authenticated, same-origin developer HTTP
+  route and the `helix_surface_list`, `helix_surface_inspect`,
+  `helix_surface_configure`, `helix_surface_blank`, and
+  `helix_surface_release` MCP tools. The MCP adapter does not click panels or
+  reproduce Codex execution/re-entry/terminal-completion behavior;
+- MCP mutations require a user-issued lease bound to the authenticated account
+  profile, Codex thread, exact surface, permitted operations, HUD profile,
+  source identity, producer epoch, and expiry. A leased MCP client cannot use a
+  configure command to migrate itself onto another source or producer;
+- reconfiguration replaces the output lease, while Emergency Blank, manual
+  release, source revoke/rotation, and sign-out release output and revoke
+  relevant control leases; and
+- Motorcycle HUD Lab now includes a thin developer status/control projection
+  showing canonical revision, target, lease status, and state hash. The user can
+  synchronize/register the normalized preview, apply its desired state, issue
+  or revoke a five-minute Codex lease, and invoke Registry Blank.
+
+Deterministic evidence establishes equal UI/MCP canonical hashes after the same
+configure transition apart from surface, request, and principal identifiers;
+rejects stale revisions, cross-profile lookup, wrong operation scope, and
+profile/source/producer drift; validates cleanup and stale launch-context
+failure; and exercises the real in-memory MCP transport. This is configuration
+and observation orchestration only. It does not make the normalized renderer a
+physical visor surface, admit arbitrary program pixels, or move any safety
+decision out of the resident controller/watchdog.
+
+Verification record:
+
+- `18` focused tests passed across the shared registry, developer HTTP boundary,
+  real in-memory MCP transport, status/consent UI, reusable HUD host, and
+  Motorcycle HUD Lab;
+- the production client build passed after transforming `3318` modules;
+- the production server bundle passed with four duplicate-key/case warnings in
+  unrelated pre-existing modules;
+- `npm run helix:ask:discipline:quick` passed its static checks. Its broad dirty-
+  worktree scan warned that no environment classification variable was supplied;
+  this packet's declared classifications are `tool admission` and
+  `presentation`, and it introduces no private Codex runtime; and
+- `npm run helix:environment-harness:docs-audit` passed with zero failures.
+
+### HUDH-0C2 implementation evidence — 2026-09-04
+
+Program gate: G8 — environment-harness release evaluation; parallel display-orchestration implementation lane that cannot substitute for G8 closure
+Workstream: Shared surface hosting and governed UI/MCP parity
+Capability or component: HUDH-0C2 general Surface Workspace and typed cross-panel routing
+Lifecycle stage: Canonical surface inspection/configuration → route preparation → validated panel launch context → human-visible destination focus
+Reaction timescale: Operator/Codex configuration and navigation path; outside the deterministic reflex loop
+Authority owner: Authenticated developer profile owns surface selection, configuration, consent, and visible panel opening; Surface Registry owns identity/revision validation and receipts; Codex may only prepare a route under an exact user-issued lease
+Current maturity: deterministically verified
+Target maturity: deterministically verified
+Required evidence: Developer panel registration and account-policy lock; typed route/request/receipt validation; canonical revision and source/profile/producer binding; stale-write and wrong-operation rejection; UI route publication and destination context injection; real MCP transport; focused client/server tests; production builds; Helix Ask discipline check; environment-harness docs audit
+Explicit non-goals: MCP panel-click automation, program input, capture permission, environment mutation, reflex authority, model/answer authority, private agent loop, live-source acceptance, physical projector output, visor transform validation, or road/safety claim
+Downstream gate unlocked: HUDH-0C3 may add detachable clean-feed/fullscreen presentation over the same surface identity; HUDH-0B still owns live source admission and VSE-0C still owns Codex visual inspection/re-entry
+
+HUDH-0C2 adds the reusable developer Surface Workspace above the HUDH-0C1
+registry without moving state authority into the React panel. The workspace:
+
+- lists and inspects every surface owned by the signed-in developer profile,
+  including revision, source kind and identity, producer epoch, output lease,
+  state hash, control receipts, and route receipts;
+- creates an explicitly unbound normalized surface for manual experimentation,
+  changes only presentation fields through revision-checked registry commands,
+  and exposes Emergency Blank as the immediate authority-reducing control;
+- issues or revokes a visible five-minute Codex lease bound to one thread and
+  the exact surface/profile/source/producer epoch. The `route` operation is an
+  explicit lease scope alongside configuration, blank, and release rather than
+  an implication of surface visibility;
+- prepares typed destinations for HUD Lab, Image Lens, Live Answer, Situation
+  Room, Process Graph, Workflow Timeline, Storage Map, and Task Manager. Every
+  route carries the exact surface revision, profile, run, source, producer
+  epoch, sequence/focus references, and current output lease in a versioned
+  `PanelLaunchContext`; and
+- publishes a validated route to a client-side context provider before the
+  human UI opens/focuses the destination panel. Destination panels can consume
+  the same route context without parsing labels, query-string fragments, or
+  panel-local copies of surface state.
+
+The developer HTTP route and `helix_surface_prepare_panel_route` MCP tool both
+call the same registry method. A human UI principal may prepare and immediately
+open a destination. MCP requires an active lease containing the exact `route`
+operation and returns only a non-terminal preparation receipt: it does not
+click, focus, open, or otherwise operate workstation UI. Route preparation does
+not increment the surface revision or alter its state hash, so navigation
+cannot masquerade as a presentation-state mutation. Stale revisions, wrong
+profiles, expired/revoked/wrong-operation leases, and source/producer drift fail
+closed.
+
+The new `surface-workspace` panel is registered in the ordinary workstation
+panel catalog and generic open capability, remains visible and usable to the
+developer wildcard policy, and is explicitly locked for public/no-session
+users. This is the general classification intended by the plan: motorcycle HUD
+is one profile and one destination, while the shared surface identity and route
+contract can support game HUDs, normalized camera/source overlays, capture
+review, realtime texture work, and later hardware-production views.
+
+Verification record:
+
+- `23` focused tests passed across registry state/lease routing, same-origin
+  developer HTTP routing, real in-memory MCP transport, client route validation
+  and event delivery, Surface Workspace rendering/routing, and public account
+  lock behavior;
+- the production client build passed after transforming `3322` modules, and the
+  production server bundle passed with four warnings in unrelated pre-existing
+  duplicate-key/case sites;
+- repository-wide TypeScript checking first exhausted the default 4 GiB Node
+  heap without producing a diagnostic, then completed under a 6 GiB heap and
+  reported the repository's broad pre-existing type-error backlog. The focused
+  tests and both production builds are the positive packet evidence; no clean
+  repository-wide typecheck is claimed;
+- `npm run helix:ask:discipline:quick` passed with declared classifications
+  `tool admission` and `presentation`; and
+- `npm run helix:environment-harness:docs-audit` passed with zero failures.
+
 ## Open decision register
 
 Resolve these in order and record evidence rather than preference:
@@ -1500,7 +3258,87 @@ Resolve these in order and record evidence rather than preference:
    audio without relying on color alone;
 9. sensor modality and mounting after fixture requirements are frozen;
 10. data retention and consent protocol for any later person or public-space
-    recording.
+    recording;
+11. whether each first-class program should provide typed scene state, an
+    embeddable web surface, or permissioned pixel capture;
+12. which desktop/browser capture APIs satisfy exact tab/window identity,
+    revocation, protected-content, and secret-exclusion requirements;
+13. alpha-capable clean-feed transport and whether chroma/black-key fallbacks
+    are acceptable for each projector pipeline;
+14. underlay freshness policy for optional context versus sources required for
+    geometric registration; and
+15. compositor placement and measured latency across workstation preview,
+    virtual environment, recording, and physical-output adapters;
+16. whether a clean feed is an in-process canvas, isolated desktop surface,
+    browser capture target, or encoded local stream for each downstream adapter;
+17. exact behavior of panel fullscreen versus detachable clean-feed presentation
+    on desktop and mobile layouts; and
+18. which sources remain capturable in borderless or exclusive-fullscreen modes,
+    with unsupported cases reported rather than bypassed;
+19. decoder implementation, frame image format, maximum decoded dimensions, and
+    whether an archival source copy is retained or only content-addressed;
+20. default timestamp cadence, contact-sheet layout, adaptive-review budget, and
+    maximum frame count/bytes admitted to one model turn;
+21. local artifact retention, redaction, encryption, tenant isolation, and
+    explicit export policy for clips that may contain people, screens, or
+    credentials;
+22. which Codex/vision provider capability contract supports image batches,
+    including typed behavior when image reasoning is unavailable and explicit
+    cost/latency budgets when it is available;
+23. whether audio is excluded initially or admitted later as a separately
+    consented transcript track synchronized to video timestamps; and
+24. the candidate-procedure schema and verification boundary for extracting
+    Minecraft tutorial steps without treating tutorial pixels, captions, or
+    narration as executable instructions;
+25. the minimum `TheoryDesignLink` fields needed to bind Theory Badge Graph
+    scale/unit/claim context to device requirements without coupling HDH to one
+    research program;
+26. the hardware-project registry persistence, artifact storage and immutable
+    supersession policy;
+27. which CAD, EDA, simulator, DFM and instrument adapters are admitted first,
+    and which operations require attended versus time-bounded leases;
+28. the unit-aware component compatibility engine and allowed external
+    component-catalog sources;
+29. the preregistration, held-out evidence and analysis-code freeze required to
+    prevent design-to-test circularity; and
+30. the exact human release and as-built return packet for fabrication, vendor
+    communication and later measurement re-entry;
+31. the minimum canonical geometry, discrete-structure, material, semantic and
+    uncertainty layers in a `PortableObjectPackage`;
+32. which Minecraft region facts and block-entity fields may be exported,
+    redacted or rejected under each profile and environment policy;
+33. the source-to-canonical-to-target frame and scale conventions, including
+    unscaled visual-only packages;
+34. the first local depth/LiDAR format and registration/meshing implementation;
+35. whether Meshy or another external reconstruction provider is admitted after
+    local EOT fixtures, including account, cost, data-processing, retention and
+    deletion terms; and
+36. the target-loss thresholds and exact action authority for Minecraft,
+    game-engine, simulator, CAD and fabrication-candidate realizations;
+37. the common `MultimodalCaptureSession` clock, frame, health and terminal-state
+    model across real hardware and simulated environments;
+38. which audio, image, video, depth, LiDAR, pose and typed-world modalities are
+    initially supported and how each permission is surfaced;
+39. the boundary between raw clean sensor tracks, composed operator-view
+    recordings, derived recognition/reconstruction and HUD guidance layers;
+40. profile storage quotas, encryption, retention, redaction, export and delete
+    policy for each modality and privacy class;
+41. the first safe `CapabilityRecipe` vocabulary and resource/cost/lease limits
+    without creating a private executable agent language; and
+42. which HUD-guided coverage, placement, focus, range and occlusion cues can be
+    admitted before any human-factors or physical-device acceptance;
+43. the canonical `ConnectedReasoningSession` identity and how it references
+    rooms, runs, Ask turns, realtime interactions and multimodal sessions;
+44. which installed-node, hosted-node and remote-client topologies support the
+    first genuine off-LAN continuation without implying universal reachability;
+45. the independent publish/read/annotate/speak/steer/capture/action grants and
+    participant-visible sharing indicators for every room surface;
+46. the initial `InformationFlowBudget` units, salience rules, adaptive sampling
+    priorities and critical-event non-drop policy;
+47. how simultaneous participant intents are ordered, attributed, interrupted
+    and resolved without merging them into an unauthored prompt; and
+48. the exact GPT Realtime/Codex handoff, terminal-artifact, voice playback and
+    text-certainty parity evidence required before a connected-call claim.
 
 ## Program evidence and documentation rules
 
@@ -1527,6 +3365,19 @@ Resolve these in order and record evidence rather than preference:
 - `docs/architecture/helix-environment-agent-reasoning-v1.md`
 - `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` as a lifecycle
   and authority reference only; Minecraft domain actions do not transfer
+- `docs/architecture/theory-badge-graph-contract.md` for evidence-only theory
+  localization, scale bands, runtime rows, uncertainty and claim boundaries
+- `docs/architecture/theory-experiment-procedure.md` for governed procedure and
+  evidence-re-entry structure
+- `docs/specs/casimir-tile-spec-v1.md` as a precedent for separating a physical
+  lab coupon from a system-mechanism abstraction; its values and maturity do not
+  transfer to the motorcycle project
+- `docs/research/nhm2-spherical-boson-star-v2-work-program.md` as an example of
+  research-program gate ownership and diagnostic Theory Graph limits; HDH does
+  not alter or supersede it
+- [Meshy image-to-3D API](https://docs.meshy.ai/en/api/image-to-3d) and
+  [official AI/MCP integration](https://docs.meshy.ai/en/api/ai) as one optional
+  external reconstruction-adapter reference; EOT remains provider-neutral
 - `docs/helix-ask-codex-loop-discipline.md`
 - `docs/helix-ask-turn-solver-spine.md`
 - `docs/helix-ask-api-parity-matrix.md`

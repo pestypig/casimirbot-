@@ -18,6 +18,8 @@ const row = (
   trust_classification: "first_party",
   security_review_state: "approved",
   installation_status: "active",
+  installed_device_id: "desktop_device_device_check",
+  installed_device_status: "active",
   device_status: "active",
   reported_health_status: "online",
   last_contact_at: new Date(NOW.getTime() - 15_000),
@@ -70,6 +72,24 @@ describe("environment connector device check", () => {
   });
 
   it.each([
+    [null, null, "installed_node_unbound"],
+    ["desktop_device_device_check", "revoked", "installed_node_inactive"],
+  ] as const)(
+    "fails probe readiness when installed-node identity is %s / %s",
+    (installedDeviceId, installedDeviceStatus, expectedBlocker) => {
+      const check = projectEnvironmentDeviceCheck({
+        row: row({
+          installed_device_id: installedDeviceId,
+          installed_device_status: installedDeviceStatus,
+        }),
+        now: NOW,
+      });
+      expect(check.probe_ready).toBe(false);
+      expect(check.blocking_reasons).toContain(expectedBlocker);
+    },
+  );
+
+  it.each([
     ["offline", "offline", "connector_reported_offline"],
     ["unknown", "unknown", "connector_health_unknown"],
   ] as const)(
@@ -104,6 +124,8 @@ describe("environment connector device check", () => {
     const check = projectEnvironmentDeviceCheck({
       row: row({
         installation_status: "suspended",
+        installed_device_id: null,
+        installed_device_status: null,
         device_status: "revoked",
         environment_binding_id: null,
         binding_status: null,
@@ -120,6 +142,7 @@ describe("environment connector device check", () => {
     expect(check.probe_ready).toBe(false);
     expect(check.blocking_reasons).toEqual([
       "installation_inactive",
+      "installed_node_unbound",
       "device_inactive",
       "binding_missing",
       "adapter_admission_inactive",

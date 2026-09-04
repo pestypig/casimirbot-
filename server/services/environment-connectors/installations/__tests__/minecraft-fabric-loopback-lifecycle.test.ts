@@ -37,6 +37,22 @@ describe("Minecraft Fabric loopback lifecycle", () => {
     ).resolves.toEqual(receipt);
     expect(runner).toHaveBeenCalledWith({
       address: "localhost:25565",
+      restartClient: false,
+      signal: undefined,
+    });
+  });
+
+  it("forwards an explicit current-authority client restart", async () => {
+    const runner = vi.fn(async () => receipt);
+    await expect(
+      executeMinecraftFabricLoopbackLifecycle({
+        request: { address: "localhost:25565", restart_client: true },
+        runner,
+      }),
+    ).resolves.toEqual(receipt);
+    expect(runner).toHaveBeenCalledWith({
+      address: "localhost:25565",
+      restartClient: true,
       signal: undefined,
     });
   });

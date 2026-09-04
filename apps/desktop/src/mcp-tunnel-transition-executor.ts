@@ -3,11 +3,21 @@ import type {
   DesktopMcpTunnelState,
 } from "../../../shared/desktop-mcp-tunnel";
 
-export const DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS = 750 as const;
+// The native broker acknowledges locally before replacing the tunnel process,
+// but the acknowledgement still has to traverse the remote command channel.
+// A five-second drain still cut the response under observed installed-tunnel
+// latency and made a successful, exactly-once transition look like an HTTP 504
+// to Codex. Keep the bounded handoff delay long enough for the remote response
+// while remaining well inside the shortest supported Full Harness lease.
+export const DESKTOP_MCP_TRANSITION_RESPONSE_DRAIN_MS = 15_000 as const;
 
 export type DesktopMcpTunnelTransitionControllerPort = {
   getState(): DesktopMcpTunnelState;
   stop(): Promise<DesktopMcpTunnelState>;
+  switchScope?(
+    accountSessionId: string,
+    scope: DesktopMcpTunnelScope,
+  ): Promise<DesktopMcpTunnelState>;
   start(
     accountSessionId: string,
     scope: DesktopMcpTunnelScope,
@@ -51,12 +61,19 @@ export const startDesktopMcpTunnelForUserSession = async (input: {
   if (initial.processRunning && initial.scope === input.requestedScope) {
     return initial;
   }
-  if (initial.processRunning) await input.controller.stop();
   try {
-    const state = await input.controller.start(
-      input.accountSessionId,
-      input.requestedScope,
-    );
+    const state = initial.processRunning && input.controller.switchScope
+      ? await input.controller.switchScope(
+          input.accountSessionId,
+          input.requestedScope,
+        )
+      : await (async () => {
+          if (initial.processRunning) await input.controller.stop();
+          return input.controller.start(
+            input.accountSessionId,
+            input.requestedScope,
+          );
+        })();
     if (
       input.requestedScope === "full_helix_agent" &&
       (!state.ready || state.scope !== "full_helix_agent")
@@ -133,6 +150,15 @@ export const restoreDesktopMcpTunnelReadOnly = async (input: {
   controller: DesktopMcpTunnelTransitionControllerPort;
   accountSessionId: string;
 }): Promise<boolean> => {
+  const initial = input.controller.getState();
+  if (initial.processRunning && input.controller.switchScope) {
+    const state = await input.controller.switchScope(
+      input.accountSessionId,
+      "local_supervisor_coordination_and_device_check",
+    );
+    return state.ready &&
+      state.scope === "local_supervisor_coordination_and_device_check";
+  }
   await input.controller.stop();
   if (!input.controller.getState().configured) return false;
   const state = await input.controller.start(
@@ -149,11 +175,19 @@ export const executeDesktopMcpTunnelTransitionNow = async (input: {
   targetScope: DesktopMcpTunnelScope;
 }): Promise<DesktopMcpTunnelTransitionExecution> => {
   try {
-    await input.controller.stop();
-    const state = await input.controller.start(
-      input.accountSessionId,
-      input.targetScope,
-    );
+    const initial = input.controller.getState();
+    const state = initial.processRunning && input.controller.switchScope
+      ? await input.controller.switchScope(
+          input.accountSessionId,
+          input.targetScope,
+        )
+      : await (async () => {
+          await input.controller.stop();
+          return input.controller.start(
+            input.accountSessionId,
+            input.targetScope,
+          );
+        })();
     if (!state.ready || state.scope !== input.targetScope) {
       throw new Error("mcp_tunnel_requested_scope_not_ready");
     }

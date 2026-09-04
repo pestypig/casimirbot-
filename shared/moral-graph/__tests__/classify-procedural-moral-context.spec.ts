@@ -165,6 +165,62 @@ describe("procedural Moral context classifier", () => {
     });
   });
 
+  it("separates spite and anger signals from retaliation without fixing character", () => {
+    const classification = classify([
+      "Spite feels possessive and keeps reaffirming itself through retaliatory results.",
+      "I want to stop taking anger out on others, follow the path ahead, and repair any harm already done.",
+      "Calling someone an evil person should not make the pattern their permanent identity.",
+    ].join(" "));
+    const retaliatory = classification.classifications.find(
+      (entry) => entry.observedPattern === "retaliatory_affect_loop",
+    );
+
+    expect(validateProceduralMoralClassificationV1(classification)).toEqual([]);
+    expect(retaliatory).toMatchObject({
+      moralRootId: "feedback-loop-hygiene",
+      proceduralMove: "separate_signal_from_retaliation",
+      missingEvidence: expect.arrayContaining([
+        "underlying_affect_or_boundary_signal",
+        "retaliatory_urge_or_observed_action",
+        "affected_parties_and_harm",
+        "repair_obligation_if_harm_occurred",
+      ]),
+      warnings: expect.arrayContaining([
+        "anger_is_not_a_character_verdict",
+        "do_not_treat_all_anger_as_waste",
+        "purpose_does_not_erase_repair",
+        "avoid_evil_as_fixed_identity",
+      ]),
+    });
+    expect(classification.classifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        observedPattern: "identity_view",
+        proceduralMove: "reframe_without_finality",
+      }),
+      expect.objectContaining({
+        moralRootId: "purpose-as-inquiry",
+        proceduralMove: "choose_small_practice",
+      }),
+    ]));
+    expect(classification.recommendedNextMoves).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "procedural-moral-action:separate-signal-from-retaliation",
+        reasonCodes: expect.arrayContaining(["affect_is_not_action", "purpose_does_not_erase_repair"]),
+      }),
+    ]));
+  });
+
+  it("does not classify anger alone as retaliatory conduct", () => {
+    const classification = classify(
+      "I feel angry after a boundary violation, but I have not retaliated or taken it out on anyone.",
+    );
+
+    expect(classification.classifications.some(
+      (entry) => entry.observedPattern === "retaliatory_affect_loop",
+    )).toBe(false);
+    expect(classification.authority.character_verdict).toBe(false);
+  });
+
   it("classifies ignorance, guilt, and missing consideration as inquiry and repair posture", () => {
     const classification = classify(
       [

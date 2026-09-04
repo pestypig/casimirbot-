@@ -3,12 +3,18 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { DesktopMcpTunnelScope } from
   "../../../shared/desktop-mcp-tunnel";
+import { HELIX_USER_WORKSTATION_PANEL_IDS } from
+  "../../../shared/helix-account-session";
 
 const BROKER_SCHEMA = "casimir_desktop_mcp_tunnel_transition_broker/1" as const;
 const REQUEST_SCHEMA = "casimir_desktop_mcp_tunnel_transition_request/1" as const;
+const PRESENT_REQUEST_SCHEMA = "casimir_desktop_workstation_present_request/2" as const;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 const REF_PATTERN = /^[A-Za-z0-9:._-]{8,180}$/u;
 const ACCOUNT_SESSION_PATTERN = /^account_session:[A-Za-z0-9-]{8,128}$/u;
+const PANEL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u;
+const CONTROL_ID_PATTERN = /^[A-Za-z0-9._:-]{8,220}$/u;
+const PRESENTABLE_PANEL_IDS = new Set<string>(HELIX_USER_WORKSTATION_PANEL_IDS);
 const MAX_REQUEST_BYTES = 16 * 1_024;
 
 export type DesktopMcpTunnelTransitionBrokerRequest = Readonly<{
@@ -26,10 +32,26 @@ export type DesktopMcpTunnelTransitionBroker = Readonly<{
   close: () => Promise<void>;
 }>;
 
+export type DesktopWorkstationPresentRequest = Readonly<{
+  schema: typeof PRESENT_REQUEST_SCHEMA;
+  presentationRequestRef: string;
+  accountSessionId: string;
+  panelId: string;
+  targetId?: string;
+  controlId?: string;
+}>;
+
+type DesktopMcpTunnelNativeAcceptance = Readonly<{
+  nativeReceiptRef: string;
+  reconnectRequired: boolean;
+  catalogRefreshRequired: boolean;
+  stableScopeRouting: boolean;
+}>;
+
 export class DesktopMcpTunnelTransitionBrokerAdmission {
   private readonly entries = new Map<string, {
     fingerprint: string;
-    result: Promise<{ nativeReceiptRef: string }>;
+    result: Promise<DesktopMcpTunnelNativeAcceptance>;
   }>();
 
   constructor(private readonly maxEntries = 256) {
@@ -42,8 +64,10 @@ export class DesktopMcpTunnelTransitionBrokerAdmission {
     request: DesktopMcpTunnelTransitionBrokerRequest;
     execute: (
       request: DesktopMcpTunnelTransitionBrokerRequest,
-    ) => Promise<{ nativeReceiptRef: string }>;
-  }): Promise<{ nativeReceiptRef: string; idempotencyReplayed: boolean }> {
+    ) => Promise<DesktopMcpTunnelNativeAcceptance>;
+  }): Promise<DesktopMcpTunnelNativeAcceptance & {
+    idempotencyReplayed: boolean;
+  }> {
     const fingerprint = crypto.createHash("sha256")
       .update(JSON.stringify(input.request), "utf8")
       .digest("hex");
@@ -146,7 +170,10 @@ const send = (response: http.ServerResponse, status: number, body: unknown): voi
 export const startDesktopMcpTunnelTransitionBroker = async (input: {
   onTransition: (
     request: DesktopMcpTunnelTransitionBrokerRequest,
-  ) => Promise<{ nativeReceiptRef: string }>;
+  ) => Promise<DesktopMcpTunnelNativeAcceptance>;
+  onPresent: (
+    request: DesktopWorkstationPresentRequest,
+  ) => Promise<{ presentReceiptRef: string }>;
   token?: string;
 }): Promise<DesktopMcpTunnelTransitionBroker> => {
   const token = input.token ?? crypto.randomBytes(32).toString("base64url");
@@ -159,15 +186,58 @@ export const startDesktopMcpTunnelTransitionBroker = async (input: {
       send(response, 403, { ok: false, error: "loopback_required" });
       return;
     }
-    if (
-      request.method !== "POST" ||
-      request.url !== "/v1/transition" ||
-      !authorized(request, token)
-    ) {
+    if (request.method !== "POST" || !authorized(request, token)) {
       send(response, 401, { ok: false, error: "broker_unauthorized" });
       return;
     }
     try {
+      if (request.url === "/v1/present") {
+        const body = await readBody(request);
+        const presentationTargetCount = Number(
+          typeof (body as Record<string, unknown>)?.targetId === "string",
+        ) + Number(
+          typeof (body as Record<string, unknown>)?.controlId === "string",
+        );
+        if (
+          !isRecord(body) ||
+          body.schema !== PRESENT_REQUEST_SCHEMA ||
+          typeof body.presentationRequestRef !== "string" ||
+          !REF_PATTERN.test(body.presentationRequestRef) ||
+          typeof body.accountSessionId !== "string" ||
+          !ACCOUNT_SESSION_PATTERN.test(body.accountSessionId) ||
+          typeof body.panelId !== "string" ||
+          !PANEL_ID_PATTERN.test(body.panelId) ||
+          !PRESENTABLE_PANEL_IDS.has(body.panelId) ||
+          presentationTargetCount !== 1 ||
+          (body.targetId !== undefined &&
+            (typeof body.targetId !== "string" ||
+              !CONTROL_ID_PATTERN.test(body.targetId))) ||
+          (body.controlId !== undefined &&
+            (typeof body.controlId !== "string" ||
+              !CONTROL_ID_PATTERN.test(body.controlId))) ||
+          Object.keys(body).length !== 5
+        ) throw new Error("workstation_present_request_invalid");
+        const presented = await input.onPresent(
+          Object.freeze(body as DesktopWorkstationPresentRequest),
+        );
+        if (!REF_PATTERN.test(presented.presentReceiptRef)) {
+          throw new Error("workstation_present_receipt_invalid");
+        }
+        send(response, 202, {
+          schema: BROKER_SCHEMA,
+          ok: true,
+          accepted: true,
+          presentReceiptRef: presented.presentReceiptRef,
+          presentation_only: true,
+          authority_granted: false,
+          credential_included: false,
+        });
+        return;
+      }
+      if (request.url !== "/v1/transition") {
+        send(response, 404, { ok: false, error: "broker_route_not_found" });
+        return;
+      }
       const parsed = parseDesktopMcpTunnelTransitionBrokerRequest(
         await readBody(request),
       );
@@ -186,7 +256,10 @@ export const startDesktopMcpTunnelTransitionBroker = async (input: {
         nativeReceiptRef: accepted.nativeReceiptRef,
         idempotency_replayed: accepted.idempotencyReplayed,
         native_transition_resubmitted: !accepted.idempotencyReplayed,
-        response_drained_before_transition: true,
+        reconnect_required: accepted.reconnectRequired,
+        catalog_refresh_required: accepted.catalogRefreshRequired,
+        stable_scope_routing: accepted.stableScopeRouting,
+        response_drain_window_scheduled: !accepted.stableScopeRouting,
         credential_included: false,
         private_endpoint_included: false,
       });

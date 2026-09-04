@@ -13,6 +13,8 @@ import {
   DESKTOP_MCP_TUNNEL_START_CHANNEL,
   DESKTOP_MCP_TUNNEL_STATE_CHANNEL,
   DESKTOP_MCP_TUNNEL_STOP_CHANNEL,
+  DESKTOP_WORKSTATION_GUIDANCE_CHANNEL,
+  DESKTOP_WORKSTATION_GUIDANCE_PENDING_CHANNEL,
   DESKTOP_MINECRAFT_RUN_PROFILE_STATE_CHANNEL,
   DESKTOP_MINECRAFT_RUN_PROFILE_SELECT_CHANNEL,
   DESKTOP_MINECRAFT_PLAYER_PROFILE_SELECT_CHANNEL,
@@ -111,6 +113,15 @@ const desktopBridge = Object.freeze({
     ipcRenderer.on(DESKTOP_MCP_TUNNEL_STATE_CHANNEL, handler);
     return () => ipcRenderer.removeListener(DESKTOP_MCP_TUNNEL_STATE_CHANNEL, handler);
   },
+  onWorkstationGuidance: (listener: (state: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>
+      listener(state);
+    ipcRenderer.on(DESKTOP_WORKSTATION_GUIDANCE_CHANNEL, handler);
+    return () =>
+      ipcRenderer.removeListener(DESKTOP_WORKSTATION_GUIDANCE_CHANNEL, handler);
+  },
+  getPendingWorkstationGuidance: () =>
+    ipcRenderer.invoke(DESKTOP_WORKSTATION_GUIDANCE_PENDING_CHANNEL),
   onUpdateState: (listener: (state: unknown) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>
       listener(state);

@@ -1,10 +1,12 @@
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
 import { buildTerminalEquivalenceHarnessResult } from "../services/helix-ask/terminal-equivalence-harness";
 import { buildHelixTurnTerminalAuthority, hashHelixTerminalText } from "../services/helix-ask/turn-terminal-authority";
+import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -28,6 +30,24 @@ const finalText = (body: Record<string, unknown>): string =>
   String(body.selected_final_answer ?? body.answer ?? body.assistant_answer ?? body.text ?? "");
 
 describe("Helix stream/UI/backend terminal equivalence harness", () => {
+  beforeEach(() => {
+    resetHelixAskTurnAdmissionForTests();
+    resetRuntimeMemoryGovernorForTests({
+      memoryReader: () => ({
+        rss: 300 * 1024 * 1024,
+        heapTotal: 180 * 1024 * 1024,
+        heapUsed: 120 * 1024 * 1024,
+        external: 8 * 1024 * 1024,
+        arrayBuffers: 4 * 1024 * 1024,
+      }),
+      hostMemoryReader: () => ({
+        freeMiB: 4096,
+        totalMiB: 8192,
+        freeRatio: 0.5,
+      }),
+    });
+  });
+
   it("keeps non-stream, stream, debug, terminal authority, poison audit, route authority, and solver trace equivalent", async () => {
     const app = createApp();
     const question = "Open the NHM-2 white paper from the docs.";

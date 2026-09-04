@@ -76,6 +76,7 @@ export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
   "rag-admin",
   "situation-room-pipelines",
   "stage-play-badge-graph",
+  "surface-workspace",
   "workstation-workflow-timeline",
 ] as const;
 
@@ -172,6 +173,7 @@ export const HELIX_USER_ACCOUNT_POLICY: HelixAccountCapabilityPolicy = {
     "situation-room.live-source.set_rate",
     "room.floor.release",
     "room.floor.acquire",
+    "environment.action_authority.revoke",
   ],
   locked_workstation_capabilities: [
     "permission:write",

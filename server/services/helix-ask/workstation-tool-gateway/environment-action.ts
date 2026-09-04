@@ -456,7 +456,7 @@ const contextErrorOutcome = (
   if (!isEnvironmentActionBrokerError(error)) return "failed";
   switch (error.code) {
     case "action_authority_not_found":
-      return "subject_binding_required";
+      return "authority_stale";
     case "action_authority_inactive":
     case "action_policy_denied":
       return "permission_revoked";

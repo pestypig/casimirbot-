@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-08-29T16:27:13.196Z" hostname="LAPTOP-FPCDI341" time="0.772">
+<testsuite name="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-04T03:53:04.969Z" hostname="LAPTOP-FPCDI341" time="0.973">
   <properties/>
-  <testcase name="acceptsCommandOnlyPairingWithoutReplacingTheSourceCredential()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.7"/>
-  <testcase name="acceptsSeparatelyPairedPlayerActionConfiguration()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.022"/>
-  <testcase name="rejectsNonTlsRemotePairingEndpoints()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.018"/>
-  <testcase name="redeemsAndSelfRevokesWithoutPuttingManagementInAgentState()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.028"/>
+  <testcase name="acceptsCommandOnlyPairingWithoutReplacingTheSourceCredential()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.878"/>
+  <testcase name="acceptsSeparatelyPairedPlayerActionConfiguration()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.033"/>
+  <testcase name="rejectsNonTlsRemotePairingEndpoints()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.021"/>
+  <testcase name="redeemsAndSelfRevokesWithoutPuttingManagementInAgentState()" classname="com.casimirbot.helixsensor.pairing.ConnectorPairingClientTest" time="0.036"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

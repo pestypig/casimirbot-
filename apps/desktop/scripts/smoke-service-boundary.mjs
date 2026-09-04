@@ -77,6 +77,18 @@ const waitForServiceReady = async (origin, child) => {
   throw new Error("Desktop smoke child did not finish mounting API routes");
 };
 
+const waitForSnapshotContents = async (snapshotPath, expectedText) => {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    try {
+      const snapshot = await readFile(snapshotPath, "utf8");
+      if (snapshot.includes(expectedText)) return snapshot;
+    } catch {}
+    await delay(200);
+  }
+  throw new Error("Desktop local session did not reach the bounded deferred snapshot");
+};
+
 const expectStatus = async (url, expected, headers = {}) => {
   const response = await fetch(url, {
     cache: "no-store",
@@ -121,7 +133,9 @@ const child = spawn(
       CASIMIR_SKIP_LOCAL_ENV_FILE: "1",
       HELIX_LOCAL_DB_PATH: localDatabasePath,
       HELIX_LOCAL_PG_MEM_PERSIST: "1",
-      HELIX_LOCAL_PG_MEM_WRITE_MODE: "immediate",
+      HELIX_LOCAL_PG_MEM_WRITE_MODE: "deferred",
+      HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS: "2500",
+      HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS: "15000",
       CODEX_BIN: path.join(smokeStateRoot, "absent-agent", "codex.exe"),
       CODEX_HOME: path.join(smokeStateRoot, "absent-agent", "home"),
     },
@@ -211,8 +225,10 @@ try {
       Cookie: sessionCookie,
     },
   );
-  await access(localDatabasePath);
-  const snapshot = await readFile(localDatabasePath, "utf8");
+  const snapshot = await waitForSnapshotContents(
+    localDatabasePath,
+    "desktop-smoke-owner",
+  );
   if (
     !snapshot.includes('"schema":"helix.local_pg_mem_snapshot.v1"') ||
     !snapshot.includes("desktop-smoke-owner")

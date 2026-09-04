@@ -161,6 +161,7 @@ export function HelixAskMinimalRuntimeShell({
   const [composerDestination, setComposerDestination] =
     useState<HelixAskComposerDestinationKind>("helix_ask");
   const composerDestinationRef = useRef<HelixAskComposerDestinationKind>("helix_ask");
+  const composerDestinationChosenByOperatorRef = useRef(false);
   const [operatorNoteState, setOperatorNoteState] =
     useState<"idle" | "saving" | "saved" | "unavailable">("idle");
   const [boundAgentState, setBoundAgentState] =
@@ -962,6 +963,15 @@ export function HelixAskMinimalRuntimeShell({
   }, [setActiveChatSession, sharedReasoningBinding]);
 
   useEffect(() => {
+    const activeBinding = [currentReasoningBinding, sharedReasoningBinding].find(
+      (candidate) => candidate?.status === "active",
+    );
+    if (!activeBinding || composerDestinationChosenByOperatorRef.current) return;
+    composerDestinationRef.current = "bound_agent";
+    setComposerDestination("bound_agent");
+  }, [currentReasoningBinding, sharedReasoningBinding]);
+
+  useEffect(() => {
     const applyBinding = (binding: BrowserReasoningBinding | null) => {
       if (!binding) return;
       bindingInspectionSequenceRef.current += 1;
@@ -1087,6 +1097,7 @@ export function HelixAskMinimalRuntimeShell({
                 <HelixAskComposerDestinationStrip
                   model={composerDestinationModel}
                   onDestinationChange={(kind) => {
+                    composerDestinationChosenByOperatorRef.current = true;
                     composerDestinationRef.current = kind;
                     setComposerDestination(kind);
                     setOperatorNoteState("idle");

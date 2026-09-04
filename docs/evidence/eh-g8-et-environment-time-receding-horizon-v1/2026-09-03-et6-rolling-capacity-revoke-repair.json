@@ -1,0 +1,94 @@
+{
+  "schema": "helix.environment_time.et6_live_checkpoint.v1",
+  "recorded_at": "2026-09-03T23:58:07-04:00",
+  "program_gate": "G8",
+  "stage": "ET6",
+  "status": "incomplete",
+  "scope": "packaged rolling Minecraft motion, reconnect, interruption, authority reduction, stale rejection, and connector latency repair",
+  "exact_binding": {
+    "reasoning_binding_ref": "reasoning_binding:109b8560f2a0f1fdf1d780a876780324",
+    "binding_epoch": 1,
+    "client_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "provider_thread_identity_hash": "0660eab43f3781d6b88875eca202807478e2defa37e60fa846780e14b1a9c54d",
+    "helix_conversation_id": "26b37766-b6a7-40f5-a6c1-db39433ebdee",
+    "claim_replay_error": "reasoning_binding_claim_invalid",
+    "steering_delivery_count": 0,
+    "current_voice_pickup_claimed": false
+  },
+  "rolling_execution": {
+    "successful_cycles": 3,
+    "successful_action_evidence_refs": [
+      "environment_action_evidence:7d0d6260",
+      "environment_action_evidence:aab24168",
+      "environment_action_evidence:99f3c191"
+    ],
+    "movement_tick_counts": [8, 6, 14],
+    "scheduler_tick_counts": [10, 8, 16],
+    "dispatch_to_first_tick_ms": [70, 19, 26],
+    "resident_computation_ms": [18, 7, 4],
+    "stalled_ticks": 0,
+    "missed_ticks": 0,
+    "controls_released_after_each_cycle": true,
+    "world_mutation": false,
+    "inventory_mutation": false,
+    "manual_interruption": {
+      "outcome": "manual_override",
+      "reason": "screen_open",
+      "movement_ticks": 0,
+      "side_effects": 0,
+      "controls_released": true
+    },
+    "reconnect_recovery": {
+      "verified_client_restart_only": true,
+      "authority_widened": false,
+      "post_restart_cycle_succeeded": true
+    }
+  },
+  "authority_reduction": {
+    "authority_ref": "environment_action_authority:f4da9293-0562-4453-95c8-4a456be28877",
+    "initial_live_failure": "action_adapter_admission_inactive",
+    "repair": "authority reduction no longer depends on active environment, source, room, or adapter lifecycle admission",
+    "live_retest_operation": "environment.action_authority.revoke",
+    "live_retest_status": "suspended",
+    "emergency_control_ref": "environment_action_control:34447ea0-7324-4c3c-bf1d-6d6966dedd16",
+    "release_all_controls": true,
+    "stale_repeat_outcome": "wrong_environment",
+    "stale_repeat_action_request_created": false,
+    "stale_repeat_workflow_created": false,
+    "stale_repeat_execution_created": false,
+    "further_motion_possible_from_receipt": false
+  },
+  "connector_capacity": {
+    "broad_probe_negative": "result_stale",
+    "post_cycle_probe_failures": [
+      "connector_offline",
+      "subject_binding_stale",
+      "probe_timeout"
+    ],
+    "server_log_first_divergence": "periodic world-event and control-plane requests occupied the serialized transport while queued probe requests expired",
+    "repair": "on-demand probe polling/results now precede periodic control-plane and telemetry work; control-plane retries yield to queued probes",
+    "connector_core_tests": "pass",
+    "fabric_sensor_build_java": 21,
+    "fabric_sensor_build": "pass",
+    "post_repair_live_probe": "not_observed because the disconnected Minecraft client did not rejoin after the bounded server restart"
+  },
+  "shutdown": {
+    "minecraft_close": "normal main-window close",
+    "fabric_stop": "normal stop command",
+    "players_saved": true,
+    "all_dimensions_saved": true,
+    "rcon_stopped": true,
+    "forced_process_termination": false
+  },
+  "truth_boundaries": {
+    "steering_is_execution_authority": false,
+    "receipt_is_answer_authority": false,
+    "observation_is_terminal_authority": false,
+    "credentials_included": false,
+    "hidden_reasoning_included": false,
+    "changed_affordance_replan_claimed": false,
+    "latency_percentile_qualification_claimed": false,
+    "et6_promoted": false
+  },
+  "next_required_observation": "Run a fresh packaged client/server cycle with the repaired sensor, prove successful post-action observation re-entry and a typed authority-stale rejection, then complete the remaining changed-affordance and capacity percentile evidence."
+}

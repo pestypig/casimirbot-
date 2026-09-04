@@ -20,6 +20,8 @@ export type EnvironmentDeviceCheckRow = {
   trust_classification: string;
   security_review_state: string;
   installation_status: string;
+  installed_device_id: string | null;
+  installed_device_status: string | null;
   device_status: string;
   reported_health_status: HelixEnvironmentDeviceCheck["health"];
   last_contact_at: Date | string | null;
@@ -101,6 +103,11 @@ export function projectEnvironmentDeviceCheck(input: {
   const blockingReasons: HelixEnvironmentDeviceCheckBlockingReason[] = [];
   if (row.installation_status !== "active") {
     blockingReasons.push("installation_inactive");
+  }
+  if (!row.installed_device_id) {
+    blockingReasons.push("installed_node_unbound");
+  } else if (row.installed_device_status !== "active") {
+    blockingReasons.push("installed_node_inactive");
   }
   if (row.device_status !== "active") {
     blockingReasons.push("device_inactive");
@@ -215,6 +222,8 @@ export async function listEnvironmentConnectorDeviceChecks(input: {
         p.trust_classification,
         p.security_review_state,
         i.status AS installation_status,
+        i.installed_device_id,
+        installed_device.status AS installed_device_status,
         d.status AS device_status,
         d.health_status AS reported_health_status,
         d.last_contact_at,
@@ -235,6 +244,9 @@ export async function listEnvironmentConnectorDeviceChecks(input: {
         ON i.installation_id = d.installation_id
       JOIN helix_environment_connector_packages p
         ON p.package_version_id = i.package_version_id
+      LEFT JOIN helix_installed_devices installed_device
+        ON installed_device.profile_id = i.owner_profile_id
+       AND installed_device.device_id = i.installed_device_id
       LEFT JOIN helix_environment_connector_bindings eb
         ON eb.device_id = d.device_id
       LEFT JOIN helix_environment_adapter_admissions a

@@ -1240,6 +1240,8 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       activeConnectors[0] ??
       (await deps.materializeConnector({
         ownerProfileId: connectorOwnerProfileId,
+        installedDeviceId:
+          process.env.HELIX_DESKTOP_DEVICE_ID?.trim() || null,
         roomSourceBindingId: source.bindingId,
         credentialId: source.credentialId,
         roomId: source.roomId,

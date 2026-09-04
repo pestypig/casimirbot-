@@ -204,13 +204,15 @@ if (typeof window !== "undefined" && Boolean(import.meta.env?.DEV)) {
 
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
   const isProd = Boolean(import.meta.env?.PROD);
+  const isNativeDesktop =
+    typeof window.casimirDesktop?.getRuntimeSnapshot === "function";
   const isLocalhost = Boolean(
     window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1" ||
       window.location.hostname === "[::1]"
   );
   const isSecure = window.location.protocol === "https:" || isLocalhost;
-  if (isProd && isSecure) {
+  if (isProd && isSecure && !isNativeDesktop) {
     window.addEventListener("load", () => {
       navigator.serviceWorker
         .register(`/mobile-sw.js?v=${encodeURIComponent(buildStamp)}`, {

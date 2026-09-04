@@ -15,11 +15,20 @@ import {
 } from "@/lib/workstation/accountCapabilityPolicy";
 import { markInteraction } from "@/lib/workstation/performance/workstationInteractionScheduler";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
+import {
+  HELIX_SURFACE_PANEL_ROUTE_EVENT,
+  readLatestSurfacePanelRoute,
+} from "@/lib/workstation/surfacePanelRouting";
+import { SurfacePanelRouteProvider } from "./hud-surface/SurfacePanelRouteContext";
+import type { SurfacePanelRouteReceipt } from "@shared/helix-surface-registry";
 
 export function WorkstationPanelHost({ panelId }: { panelId: string }) {
   const def = getPanelDef(panelId);
   const [accountPolicy, setAccountPolicy] = useState<HelixAccountCapabilityPolicy | null>(() =>
     readCachedAccountCapabilityPolicy(),
+  );
+  const [surfaceRoute, setSurfaceRoute] = useState<SurfacePanelRouteReceipt | null>(() =>
+    readLatestSurfacePanelRoute(panelId),
   );
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
@@ -56,6 +65,17 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setSurfaceRoute(readLatestSurfacePanelRoute(panelId));
+    if (typeof window === "undefined") return;
+    const handleRoute = (event: Event) => {
+      const route = (event as CustomEvent<SurfacePanelRouteReceipt>).detail;
+      if (route?.target_panel_id === panelId) setSurfaceRoute(route);
+    };
+    window.addEventListener(HELIX_SURFACE_PANEL_ROUTE_EVENT, handleRoute as EventListener);
+    return () => window.removeEventListener(HELIX_SURFACE_PANEL_ROUTE_EVENT, handleRoute as EventListener);
+  }, [panelId]);
 
   if (!def || !LazyPanel) {
     return (
@@ -96,7 +116,7 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
 
   return (
     <div
-      className="h-full min-h-0 overflow-auto overscroll-contain"
+      className="relative h-full min-h-0 overflow-auto overscroll-contain"
       data-workstation-panel-id={panelId}
       data-workstation-panel-heavy={def.heavy ? "true" : "false"}
       onScrollCapture={() => markInteraction("scrolling", `panel:${panelId}:scroll`)}
@@ -119,7 +139,18 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
           />
         }
       >
-        <LazyPanel />
+        <SurfacePanelRouteProvider route={surfaceRoute}>
+          {surfaceRoute ? (
+            <div
+              className="pointer-events-none absolute right-2 top-2 z-50 max-w-[min(360px,80%)] rounded border border-violet-300/25 bg-slate-950/90 px-2 py-1 font-mono text-[9px] text-violet-200 shadow-lg"
+              data-testid="surface-route-context-banner"
+              title={surfaceRoute.context.source_id ?? undefined}
+            >
+              surface {surfaceRoute.surface_instance_id.slice(0, 12)} · r{surfaceRoute.surface_revision} · {surfaceRoute.context.source_id ?? "unbound"}
+            </div>
+          ) : null}
+          <LazyPanel />
+        </SurfacePanelRouteProvider>
       </Suspense>
     </div>
   );

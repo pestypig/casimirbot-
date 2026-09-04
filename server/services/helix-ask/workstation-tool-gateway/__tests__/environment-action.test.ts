@@ -570,7 +570,7 @@ describe("Minecraft player-action workstation gateway", () => {
     });
     expect(
       Date.parse(request.deadline_at) - Date.parse(request.created_at),
-    ).toBe(65_000);
+    ).toBe(75_000);
   });
 
   it("fails closed instead of converting an incomplete look request into current-focus success", async () => {
@@ -1416,6 +1416,49 @@ describe("Minecraft player-action workstation gateway", () => {
       },
     });
     expect(listRoomEnvironments).not.toHaveBeenCalled();
+  });
+
+  it("reports a missing revoked authority as authority_stale", async () => {
+    const enqueueAction = vi.fn();
+    const result = await executeEnvironmentActionGatewayCapability({
+      capabilityId: CAPABILITY_ID,
+      turnId: "ask:player-action:revoked-authority",
+      toolCallId: "tool_call:player-action-revoked-authority",
+      providerExecutionId: "provider_execution:player-action-revoked-authority",
+      arguments: {
+        destination: { x: 10, y: 64, z: 20 },
+        arrival_radius: 1,
+        allow_sprint: false,
+        allow_dig: false,
+        allow_place: false,
+        engine_preference: "native_fabric",
+      },
+      accountContext: accountContext(),
+      conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+      dependencies: deps({
+        resolveContext: vi.fn(async () => {
+          throw new EnvironmentActionBrokerError(
+            "action_authority_not_found",
+            404,
+            "Player-action authority was not found.",
+          );
+        }),
+        enqueueAction,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "blocked",
+      error: "authority_stale",
+      summary: "Player-action authority was not found.",
+      observation: {
+        outcome: "authority_stale",
+        provenance_valid: false,
+        eligible_for_current_turn_reentry: false,
+      },
+    });
+    expect(enqueueAction).not.toHaveBeenCalled();
   });
 
   it("keeps approve-each authority blocked until a typed approval path exists", async () => {

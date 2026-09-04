@@ -62,7 +62,7 @@ describe("AgentAccountBindingReadiness", () => {
     render(<AgentAccountBindingReadiness />);
 
     expect(
-      await screen.findByText("Linked for agent access"),
+      await screen.findByText("Account linked for agent access"),
     ).toBeInTheDocument();
     expect(screen.getByText("workos")).toBeInTheDocument();
     expect(screen.getByText("active")).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe("AgentAccountBindingReadiness", () => {
       await screen.findByText("Binding readiness unavailable"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Linked for agent access"),
+      screen.queryByText("Account linked for agent access"),
     ).not.toBeInTheDocument();
   });
 
@@ -261,9 +261,12 @@ describe("AgentAccountBindingReadiness", () => {
     });
 
     render(<AgentAccountBindingReadiness />);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Link Auth0" }),
+    const linkButton = await screen.findByRole("button", { name: "Link Auth0" });
+    expect(linkButton).toHaveAttribute(
+      "data-helix-guidance-target",
+      "auth0-account-link",
     );
+    fireEvent.click(linkButton);
     await waitFor(() =>
       expect(openAuth0AccountLink).toHaveBeenCalledWith(authorizationUrl),
     );
@@ -282,7 +285,7 @@ describe("AgentAccountBindingReadiness", () => {
       subject_included: false,
     });
     expect(
-      await screen.findByText("Linked for agent access"),
+      await screen.findByText("Account linked for agent access"),
     ).toBeInTheDocument();
   });
 

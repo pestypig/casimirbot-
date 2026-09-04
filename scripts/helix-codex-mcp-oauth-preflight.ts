@@ -11,6 +11,7 @@ const REQUIRED_G2_SCOPES = [
 const REQUIRED_G8_MONITOR_SCOPES = [
   ...REQUIRED_G2_SCOPES,
   "helix.agent_runs.write",
+  "helix.agent_runs.developer",
   "helix.brokerage.paper_observer.process",
 ] as const;
 

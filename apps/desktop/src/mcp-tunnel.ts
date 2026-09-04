@@ -92,6 +92,8 @@ type ControllerOptions = Readonly<{
   runtimeOrigin: string;
   desktopSessionSecret: string;
   storage: SecureStoragePort;
+  stableMcpRoute?: boolean;
+  routeScope?: (scope: DesktopMcpTunnelScope) => Promise<void> | void;
   publishState?: (state: DesktopMcpTunnelState) => void;
   onUnexpectedExit?: (event: Readonly<{
     accountSessionId: string;
@@ -150,6 +152,7 @@ export function buildMcpTunnelEnvironment(input: {
   accountSessionId: string;
   healthUrlFile: string;
   scope?: DesktopMcpTunnelScope;
+  stableMcpRoute?: boolean;
 }): NodeJS.ProcessEnv {
   const inheritedKeys = [
     "SystemRoot",
@@ -168,7 +171,9 @@ export function buildMcpTunnelEnvironment(input: {
   }
   const scope = input.scope ?? READ_ONLY_TUNNEL_SCOPE;
   const mcpUrl = new URL(
-    scope === "full_helix_agent"
+    input.stableMcpRoute
+      ? "/mcp"
+      : scope === "full_helix_agent"
       ? "/mcp"
       : "/mcp/local-supervisor-coordination",
     input.runtimeOrigin,
@@ -341,6 +346,10 @@ export class DesktopMcpTunnelController {
     return this.state;
   }
 
+  supportsStableScopeRouting(): boolean {
+    return this.options.stableMcpRoute === true && Boolean(this.options.routeScope);
+  }
+
   setRecoveryState(recovery: DesktopMcpTunnelRecoveryState): DesktopMcpTunnelState {
     return this.setState({ recovery: Object.freeze({ ...recovery }) });
   }
@@ -444,7 +453,7 @@ export class DesktopMcpTunnelController {
   ): Promise<DesktopMcpTunnelState> {
     if (this.child) {
       if (scope !== this.activeScope) {
-        throw new Error("Stop the tunnel before changing its capability scope");
+        return this.switchScope(accountSessionId, scope);
       }
       return this.state;
     }
@@ -453,6 +462,7 @@ export class DesktopMcpTunnelController {
     }
     if (!this.state.configured) throw new Error("Configure the tunnel first");
     const credentials = this.readCredentials();
+    await this.options.routeScope?.(scope);
     this.activeScope = scope;
     mkdirSync(this.runRoot, { recursive: true });
     const healthUrlFile = path.join(
@@ -467,6 +477,7 @@ export class DesktopMcpTunnelController {
       accountSessionId,
       healthUrlFile,
       scope: this.activeScope,
+      stableMcpRoute: this.options.stableMcpRoute,
     });
     this.stopping = false;
     this.activeAccountSessionId = accountSessionId;
@@ -591,9 +602,28 @@ export class DesktopMcpTunnelController {
     });
   }
 
+  async switchScope(
+    accountSessionId: string,
+    scope: DesktopMcpTunnelScope,
+  ): Promise<DesktopMcpTunnelState> {
+    if (!this.child || !this.state.ready) {
+      throw new Error("Tunnel must be ready before changing its capability scope");
+    }
+    if (this.activeAccountSessionId !== accountSessionId) {
+      throw new Error("Tunnel account session changed before scope transition");
+    }
+    if (!this.supportsStableScopeRouting() || !this.options.routeScope) {
+      throw new Error("Stable MCP scope routing is unavailable");
+    }
+    await this.options.routeScope(scope);
+    this.activeScope = scope;
+    return this.setState({ scope });
+  }
+
   async stop(): Promise<DesktopMcpTunnelState> {
     const child = this.child;
     if (!child) {
+      await this.options.routeScope?.(READ_ONLY_TUNNEL_SCOPE);
       this.activeScope = READ_ONLY_TUNNEL_SCOPE;
       return this.setState({
         status: this.state.configured ? "stopped" : "unconfigured",
@@ -617,6 +647,7 @@ export class DesktopMcpTunnelController {
     this.activeAccountSessionId = null;
     this.healthBase = null;
     this.stopping = false;
+    await this.options.routeScope?.(READ_ONLY_TUNNEL_SCOPE);
     this.activeScope = READ_ONLY_TUNNEL_SCOPE;
     return this.setState({
       status: this.state.configured ? "stopped" : "unconfigured",

@@ -4,6 +4,17 @@ export type ActiveDesktopAccount = Readonly<{
   accountType: "developer" | "user";
 }>;
 
+export type DesktopAccountSessionCookie = Readonly<{
+  url: string;
+  name: "helix_session";
+  value: string;
+  httpOnly: true;
+  secure: false;
+  sameSite: "lax";
+  path: "/";
+  expirationDate: number;
+}>;
+
 const ACCOUNT_SESSION_PATTERN = /^account_session:[A-Za-z0-9-]{8,128}$/u;
 
 export const parseActiveDesktopAccount = (
@@ -37,4 +48,46 @@ export const parseActiveDesktopAccount = (
     return null;
   }
   return Object.freeze({ sessionId, profileId, accountType });
+};
+
+/**
+ * A native presentation request arrives through the authenticated loopback
+ * broker only after the server has revalidated the installed-device trust and
+ * its delegated account session. Electron may nevertheless lose the renderer
+ * cookie during an external OAuth handoff. Restore only that exact still-live
+ * delegated session, and never replace a different active renderer identity.
+ */
+export const ensureDelegatedActiveDesktopAccount = async (input: {
+  origin: string;
+  delegatedAccountSessionId: string;
+  readActiveAccount: () => Promise<ActiveDesktopAccount>;
+  setCookie: (cookie: DesktopAccountSessionCookie) => Promise<void>;
+  nowMs?: number;
+}): Promise<ActiveDesktopAccount> => {
+  if (!ACCOUNT_SESSION_PATTERN.test(input.delegatedAccountSessionId)) {
+    throw new Error("native_delegated_account_session_invalid");
+  }
+  const current = await input.readActiveAccount().catch(() => null);
+  if (current && current.sessionId !== input.delegatedAccountSessionId) {
+    throw new Error("native_delegated_account_session_mismatch");
+  }
+  // Refresh even a currently readable cookie. A persisted Electron cookie can
+  // be seconds from expiry while the delegated server session is still live;
+  // validating and then returning it would make the presented panel regress
+  // immediately after the broker receipt.
+  await input.setCookie(Object.freeze({
+    url: input.origin,
+    name: "helix_session",
+    value: input.delegatedAccountSessionId,
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    path: "/",
+    expirationDate: (input.nowMs ?? Date.now()) / 1_000 + 7 * 24 * 60 * 60,
+  }));
+  const restored = await input.readActiveAccount();
+  if (restored.sessionId !== input.delegatedAccountSessionId) {
+    throw new Error("native_delegated_account_session_restore_failed");
+  }
+  return restored;
 };

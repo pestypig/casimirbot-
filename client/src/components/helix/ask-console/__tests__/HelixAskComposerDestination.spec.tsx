@@ -6,12 +6,28 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildHelixAskComposerDestinationModel,
   saveHelixOperatorNote,
+  shouldAutomaticallySelectBoundAgent,
 } from "../HelixAskComposerDestination";
 import { HelixAskComposerDestinationStrip } from
   "../HelixAskComposerDestinationStrip";
 import { buildHelixAskLegacyComposerState } from "../HelixAskLegacyComposerState";
 
 describe("Helix Ask composer destination", () => {
+  it("auto-selects an externally active binding unless the operator chose another destination", () => {
+    expect(shouldAutomaticallySelectBoundAgent({
+      bindingStatus: "active",
+      operatorSelectedDestination: false,
+    })).toBe(true);
+    expect(shouldAutomaticallySelectBoundAgent({
+      bindingStatus: "pending_claim",
+      operatorSelectedDestination: false,
+    })).toBe(false);
+    expect(shouldAutomaticallySelectBoundAgent({
+      bindingStatus: "active",
+      operatorSelectedDestination: true,
+    })).toBe(false);
+  });
+
   it("labels an available governed turn as Ask and a busy turn as Queue", () => {
     expect(buildHelixAskComposerDestinationModel({
       kind: "helix_ask",

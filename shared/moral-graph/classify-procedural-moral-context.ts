@@ -43,6 +43,34 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
     reasonCodes: ["rumination_loop", "right_effort"],
   },
   {
+    id: "retaliatory-affect-loop",
+    cues: [
+      /\b(?:spite|spiteful|spite-driven|resentment|resentful|revenge|vengeance|ill will|hostility)\b/i,
+      /\b(?:take|taking|took)\s+(?:the\s+)?(?:anger|frustration|irritation|pain)\s+out\s+on\b/i,
+      /\b(?:anger|irritation|injury|doubt)\b[\s\S]{0,100}\b(?:reaffirm|reinforc|self[-\s]?perpetuat|retaliat|possess)\w*\b/i,
+    ],
+    observedPattern: "retaliatory_affect_loop",
+    moralRootId: "feedback-loop-hygiene",
+    proceduralMove: "separate_signal_from_retaliation",
+    explanation:
+      "Anger, irritation, injury, or doubt is separated from retaliatory action: the affect may carry information, while spite can become a self-reinforcing strategy that narrows agency and transfers pain to others.",
+    missingEvidence: [
+      "underlying_affect_or_boundary_signal",
+      "retaliatory_urge_or_observed_action",
+      "short_term_reinforcement",
+      "affected_parties_and_harm",
+      "chosen_non_retaliatory_action",
+      "repair_obligation_if_harm_occurred",
+    ],
+    warnings: [
+      "anger_is_not_a_character_verdict",
+      "do_not_treat_all_anger_as_waste",
+      "purpose_does_not_erase_repair",
+      "avoid_evil_as_fixed_identity",
+    ],
+    reasonCodes: ["retaliatory_affect_loop", "feedback_loop_hygiene", "right_effort", "non_harm_and_repair"],
+  },
+  {
     id: "information-overload",
     cues: [/\b(?:too much information|overwhelm(?:ed|ing)?|dysregulated|dis regulated|tainted lens|take in too much)\b/i],
     observedPattern: "information_overload",
@@ -260,7 +288,10 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
   },
   {
     id: "identity-view",
-    cues: [/\b(?:essence|who we are|who i am|identity|private language|brothers|own lens|own feelings toward self)\b/i],
+    cues: [
+      /\b(?:essence|who we are|who i am|identity|private language|brothers|own lens|own feelings toward self)\b/i,
+      /\b(?:evil person|bad person|called evil|described as evil|considered bad|possessed by evil|spite-driven person|evil as (?:a )?(?:character|identity|nature))\b/i,
+    ],
     observedPattern: "identity_view",
     moralRootId: "identity-view-and-non-attachment",
     proceduralMove: "reframe_without_finality",
@@ -332,7 +363,10 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
   },
   {
     id: "purpose-as-inquiry",
-    cues: [/\b(?:evidence based purpose|investigate the dream|purpose formation|personal passion public truth|future projection)\b/i],
+    cues: [
+      /\b(?:evidence based purpose|investigate the dream|purpose formation|personal passion public truth|future projection)\b/i,
+      /\b(?:chosen purpose|path ahead|what (?:i|you|they|one) (?:truly )?(?:want|choose) to do|redirect(?:ed|ing)? (?:anger|energy|attention) toward)\b/i,
+    ],
     observedPattern: "aspiration_drift",
     moralRootId: "purpose-as-inquiry",
     proceduralMove: "choose_small_practice",
@@ -426,6 +460,15 @@ function confidenceFor(rule: ProceduralMoralPatternRule, text: string, reflectio
   return Math.round(raw * 100) / 100;
 }
 
+function proceduralRuleMatches(rule: ProceduralMoralPatternRule, text: string): boolean {
+  const cueMatched = rule.cues.some((cue) => cue.test(text));
+  if (!cueMatched) return false;
+  if (rule.id !== "retaliatory-affect-loop") return true;
+  const negatedRetaliation = /\b(?:not|never|haven't|hasn't|didn't|have not|has not|did not)\s+(?:\w+\s+){0,2}(?:retaliat\w*|take\w*\s+(?:it|anger|frustration|pain)\s+out)\b/i.test(text);
+  const affirmativeLoop = /\b(?:spite|spiteful|spite-driven|resentment|revenge|vengeance|ill will|hostility)\b|\b(?:reaffirm|reinforc|self[-\s]?perpetuat|possess)\w*\b/i.test(text);
+  return !negatedRetaliation || affirmativeLoop;
+}
+
 function buildRecommendedNextMoves(classifications: readonly ProceduralMoralClassificationEntryV1[]) {
   if (classifications.length === 0) {
     return [
@@ -474,6 +517,14 @@ function buildRecommendedNextMoves(classifications: readonly ProceduralMoralClas
         label: "Check whether the loop is live or stale.",
         description: "Ask which signal is current, which is inherited, and what should be retired.",
         reasonCodes: ["feedback_loop_hygiene", "liveness"],
+      });
+    }
+    if (classification.proceduralMove === "separate_signal_from_retaliation") {
+      moves.set("procedural-moral-action:separate-signal-from-retaliation", {
+        label: "Separate the signal from retaliation.",
+        description:
+          "Name what anger or irritation is reporting, distinguish urge from action, constrain harm, choose a non-retaliatory next practice, and preserve any repair obligation.",
+        reasonCodes: ["affect_is_not_action", "retaliatory_loop", "right_effort", "purpose_does_not_erase_repair"],
       });
     }
     if (classification.proceduralMove === "research_missing_considerations") {
@@ -526,7 +577,7 @@ export function classifyProceduralMoralContext(
   const text = input.text;
   const evidenceRefs = evidenceRefsFor(input);
   const classifications = PROCEDURAL_MORAL_PATTERN_RULES.filter((rule) =>
-    rule.cues.some((cue) => cue.test(text)),
+    proceduralRuleMatches(rule, text),
   ).map((rule): ProceduralMoralClassificationEntryV1 => ({
     id: `procedural-moral:${rule.id}`,
     observedPattern: rule.observedPattern,

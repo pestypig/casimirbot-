@@ -1,5 +1,9 @@
 ﻿import { useCallback, useEffect, useMemo, useRef } from "react";
-import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
+import {
+  panelRegistry,
+  getPanelDef,
+  type PanelDefinition,
+} from "@/lib/desktop/panelRegistry";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { DesktopWindow } from "@/components/desktop/DesktopWindow";
 import { DesktopTaskbar } from "@/components/desktop/DesktopTaskbar";
@@ -16,15 +20,23 @@ import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
 import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
-import { resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
+import {
+  resolvePanelIds,
+  type DesktopLayoutHash,
+} from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
-import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
+import {
+  fetchUiPreferences,
+  type EssenceEnvironmentContext,
+  type UiPreference,
+} from "@/lib/agi/preferences";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
 import NarratorReadRegionOverlay from "@/components/workstation/NarratorReadRegionOverlay";
+import WorkstationGuidanceOverlay from "@/components/workstation/WorkstationGuidanceOverlay";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useNarratorHoverFocusInspector } from "@/lib/narrator/hoverFocusInspector";
@@ -45,6 +57,10 @@ import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
 } from "@/lib/workstation/workstationActionLiveEvents";
+import {
+  coerceWorkstationGuidanceRequest,
+  requestWorkstationGuidance,
+} from "@/lib/workstation/workstationGuidance";
 import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
 import {
   encodeWorkstationViewStateSearch,
@@ -65,7 +81,16 @@ import {
   type HelixAccountCapabilityPolicy,
 } from "@shared/helix-account-session";
 
-const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
+const LAYOUT_COLLECTION_KEYS = [
+  "panels",
+  "windows",
+  "openPanels",
+  "items",
+  "children",
+  "columns",
+  "stack",
+  "slots",
+];
 const MAX_LAYOUT_DEPTH = 5;
 const PENDING_PANEL_KEY = "helix:pending-panel";
 const NOISE_GENS_PANEL_ID = "helix-noise-gens";
@@ -83,7 +108,7 @@ function collectPanelIdsFromStructure(
   input: unknown,
   target: Set<string>,
   depth = 0,
-  allowLeaf = false
+  allowLeaf = false,
 ): void {
   if (input === null || input === undefined || depth > MAX_LAYOUT_DEPTH) {
     return;
@@ -98,7 +123,9 @@ function collectPanelIdsFromStructure(
     return;
   }
   if (Array.isArray(input)) {
-    input.forEach((entry) => collectPanelIdsFromStructure(entry, target, depth + 1, true));
+    input.forEach((entry) =>
+      collectPanelIdsFromStructure(entry, target, depth + 1, true),
+    );
     return;
   }
   if (typeof input === "object") {
@@ -139,7 +166,9 @@ export default function DesktopPage({
   const { windows, registerFromManifest, open } = useDesktopStore();
   const workstationMode = useWorkstationLayoutStore((state) => state.mode);
   const { userSettings, updateSettings } = useHelixStartSettings();
-  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const interfaceLanguage = getInterfaceLanguageOption(
+    userSettings.interfaceLanguage,
+  );
   const { t } = useInterfaceText(interfaceLanguage.code);
   const {
     settingsOpen,
@@ -148,7 +177,11 @@ export default function DesktopPage({
     openSettings,
     handleSettingsOpenChange,
   } = useHelixSettingsDialog("preferences");
-  const { refresh: refreshProjects, selectProjects, projects } = useKnowledgeProjectsStore((state) => ({
+  const {
+    refresh: refreshProjects,
+    selectProjects,
+    projects,
+  } = useKnowledgeProjectsStore((state) => ({
     projects: state.projects,
     refresh: state.refresh,
     selectProjects: state.selectProjects,
@@ -168,7 +201,7 @@ export default function DesktopPage({
   const initialMobileSurface = useMemo(
     () =>
       typeof window !== "undefined"
-        ? parseWorkstationLinkMetaFromUrl(window.location.href).entry ?? "ask"
+        ? (parseWorkstationLinkMetaFromUrl(window.location.href).entry ?? "ask")
         : "ask",
     [],
   );
@@ -176,7 +209,8 @@ export default function DesktopPage({
     () =>
       generateSurfaceRecipe({
         seed: "helix-workstation-world-v1",
-        context: layoutVariant === "mobile" ? "mobile-shell" : "desktop-wallpaper",
+        context:
+          layoutVariant === "mobile" ? "mobile-shell" : "desktop-wallpaper",
         density: "medium",
         mood,
         orientation,
@@ -185,14 +219,21 @@ export default function DesktopPage({
   );
   const allowAutoOpen = false;
   const workstationEnabledFlag =
-    String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_SHELL ?? "1") !== "0";
+    String((import.meta as any)?.env?.VITE_HELIX_WORKSTATION_SHELL ?? "1") !==
+    "0";
   const processGraphSurfaceEnabled =
-    String((import.meta as any)?.env?.VITE_HELIX_PROCESS_GRAPH_SURFACE ?? "1") !== "0";
+    String(
+      (import.meta as any)?.env?.VITE_HELIX_PROCESS_GRAPH_SURFACE ?? "1",
+    ) !== "0";
   const workstationEnabled =
-    workstationEnabledFlag && (workstationMode === "workstation" || layoutVariant === "mobile");
+    workstationEnabledFlag &&
+    (workstationMode === "workstation" || layoutVariant === "mobile");
 
   const canOpenPanelForAccount = useCallback((panelId: string): boolean => {
-    return resolveHelixAccountPanelAccess(accountPolicyRef.current, panelId).state === "available";
+    return (
+      resolveHelixAccountPanelAccess(accountPolicyRef.current, panelId)
+        .state === "available"
+    );
   }, []);
 
   const filterPanelsForAccount = useCallback(
@@ -230,15 +271,22 @@ export default function DesktopPage({
       }
       panels.forEach((panelId) => openPanelUniversal(panelId));
       if (viewState.activeDocPath) {
-        useDocViewerStore.getState().viewDoc(viewState.activeDocPath, viewState.anchor);
+        useDocViewerStore
+          .getState()
+          .viewDoc(viewState.activeDocPath, viewState.anchor);
       }
-      const requestedFocusPanel = viewState.focusPanel ?? (viewState.activeDocPath ? "docs-viewer" : undefined);
-      const focusPanel = requestedFocusPanel && canOpenPanelForAccount(requestedFocusPanel)
-        ? requestedFocusPanel
-        : panels[0] ?? undefined;
+      const requestedFocusPanel =
+        viewState.focusPanel ??
+        (viewState.activeDocPath ? "docs-viewer" : undefined);
+      const focusPanel =
+        requestedFocusPanel && canOpenPanelForAccount(requestedFocusPanel)
+          ? requestedFocusPanel
+          : (panels[0] ?? undefined);
       if (focusPanel && workstationEnabled) {
         const store = useWorkstationLayoutStore.getState();
-        const hit = Object.values(store.groups).find((group) => group.panelIds.includes(focusPanel));
+        const hit = Object.values(store.groups).find((group) =>
+          group.panelIds.includes(focusPanel),
+        );
         if (hit) {
           store.setActivePanel(hit.id, focusPanel);
           store.focusGroup(hit.id);
@@ -249,30 +297,50 @@ export default function DesktopPage({
         openPanelUniversal(focusPanel);
       }
     },
-    [canOpenPanelForAccount, filterPanelsForAccount, openPanelUniversal, workstationEnabled],
+    [
+      canOpenPanelForAccount,
+      filterPanelsForAccount,
+      openPanelUniversal,
+      workstationEnabled,
+    ],
   );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     let canceled = false;
-    const applyPolicy = (policy: HelixAccountCapabilityPolicy | null | undefined) => {
+    const applyPolicy = (
+      policy: HelixAccountCapabilityPolicy | null | undefined,
+    ) => {
       accountPolicyRef.current = policy ?? HELIX_USER_ACCOUNT_POLICY;
     };
     const handlePolicyChange = (event: Event) => {
-      const detail = (event as CustomEvent<{ account_policy?: HelixAccountCapabilityPolicy | null }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          account_policy?: HelixAccountCapabilityPolicy | null;
+        }>
+      ).detail;
       applyPolicy(detail?.account_policy);
     };
-    window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+    window.addEventListener(
+      HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+      handlePolicyChange as EventListener,
+    );
     fetchAccountCapabilityPolicy()
       .then((policy) => {
         if (!canceled) applyPolicy(policy);
       })
       .catch(() => {
-        if (!canceled) applyPolicy(readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY);
+        if (!canceled)
+          applyPolicy(
+            readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY,
+          );
       });
     return () => {
       canceled = true;
-      window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, handlePolicyChange as EventListener);
+      window.removeEventListener(
+        HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+        handlePolicyChange as EventListener,
+      );
     };
   }, []);
 
@@ -309,8 +377,23 @@ export default function DesktopPage({
     };
     window.addEventListener("open-helix-panel", handleOpen as EventListener);
     return () => {
-      window.removeEventListener("open-helix-panel", handleOpen as EventListener);
+      window.removeEventListener(
+        "open-helix-panel",
+        handleOpen as EventListener,
+      );
     };
+  }, [openPanelUniversal]);
+
+  useEffect(() => {
+    const subscribe = window.casimirDesktop?.onWorkstationGuidance;
+    if (!subscribe) return;
+    const present = (candidate: unknown) => {
+      const request = coerceWorkstationGuidanceRequest(candidate);
+      if (!request) return;
+      if (request.panelId) openPanelUniversal(request.panelId);
+      requestWorkstationGuidance(request);
+    };
+    return subscribe(present);
   }, [openPanelUniversal]);
 
   useEffect(() => {
@@ -322,9 +405,15 @@ export default function DesktopPage({
       }
       openSettings("knowledge");
     };
-    window.addEventListener("open-knowledge-project", handleKnowledgeOpen as EventListener);
+    window.addEventListener(
+      "open-knowledge-project",
+      handleKnowledgeOpen as EventListener,
+    );
     return () => {
-      window.removeEventListener("open-knowledge-project", handleKnowledgeOpen as EventListener);
+      window.removeEventListener(
+        "open-knowledge-project",
+        handleKnowledgeOpen as EventListener,
+      );
     };
   }, [openSettings, selectProjects]);
 
@@ -340,11 +429,29 @@ export default function DesktopPage({
       if (actions.length === 0) return;
       const store = useWorkstationLayoutStore.getState();
       const runAction = async (action: HelixWorkstationAction) => {
+        const guidedPanelId =
+          "panel_id" in action ? action.panel_id : undefined;
+        const guidedControlId =
+          action.action === "run_panel_action" ? action.action_id : undefined;
+        if (guidedPanelId) {
+          requestWorkstationGuidance({
+            kind: "tool_activity",
+            panelId: guidedPanelId,
+            controlId: guidedControlId,
+            label: guidedControlId
+              ? `Using ${guidedControlId} in ${guidedPanelId}. No click or authority is implied by this highlight.`
+              : `${action.action.replaceAll("_", " ")} · ${guidedPanelId}`,
+            durationMs: 2600,
+          });
+        }
         const traceId = createWorkstationActionTraceId(action.action);
         const startedAtMs = Date.now();
         const publish = (args: {
           ok: boolean;
-          kind?: "workstation_action_receipt" | "workstation_procedural_step" | "situation_room_setup_execution_receipt";
+          kind?:
+            | "workstation_action_receipt"
+            | "workstation_procedural_step"
+            | "situation_room_setup_execution_receipt";
           message?: string;
           artifact?: Record<string, unknown> | null;
         }) => {
@@ -362,7 +469,10 @@ export default function DesktopPage({
         switch (action.action) {
           case "open_panel":
             if (!getPanelDef(action.panel_id)) {
-              publish({ ok: false, message: `Unknown panel: ${action.panel_id}` });
+              publish({
+                ok: false,
+                message: `Unknown panel: ${action.panel_id}`,
+              });
               return;
             }
             openPanelUniversal(action.panel_id);
@@ -370,7 +480,10 @@ export default function DesktopPage({
             return;
           case "focus_panel": {
             if (!getPanelDef(action.panel_id)) {
-              publish({ ok: false, message: `Unknown panel: ${action.panel_id}` });
+              publish({
+                ok: false,
+                message: `Unknown panel: ${action.panel_id}`,
+              });
               return;
             }
             if (!workstationEnabled) {
@@ -380,8 +493,9 @@ export default function DesktopPage({
             }
             const groupId =
               action.group_id ??
-              Object.values(store.groups).find((group) => group.panelIds.includes(action.panel_id))
-                ?.id;
+              Object.values(store.groups).find((group) =>
+                group.panelIds.includes(action.panel_id),
+              )?.id;
             if (groupId) {
               store.setActivePanel(groupId, action.panel_id);
               store.focusGroup(groupId);
@@ -389,12 +503,18 @@ export default function DesktopPage({
               return;
             }
             openPanelUniversal(action.panel_id);
-            publish({ ok: true, message: "Panel opened because no existing group owned it." });
+            publish({
+              ok: true,
+              message: "Panel opened because no existing group owned it.",
+            });
             return;
           }
           case "close_panel": {
             if (!workstationEnabled) {
-              publish({ ok: false, message: "Close panel ignored outside workstation mode." });
+              publish({
+                ok: false,
+                message: "Close panel ignored outside workstation mode.",
+              });
               return;
             }
             if (action.group_id) {
@@ -412,7 +532,10 @@ export default function DesktopPage({
           }
           case "close_active_panel": {
             if (!workstationEnabled) {
-              publish({ ok: false, message: "Close active panel ignored outside workstation mode." });
+              publish({
+                ok: false,
+                message: "Close active panel ignored outside workstation mode.",
+              });
               return;
             }
             const closed = store.closeActivePanel();
@@ -420,17 +543,26 @@ export default function DesktopPage({
               publish({ ok: false, message: "No active panel to close." });
               return;
             }
-            publish({ ok: true, message: `Closed active panel ${closed.panelId}.` });
+            publish({
+              ok: true,
+              message: `Closed active panel ${closed.panelId}.`,
+            });
             return;
           }
           case "focus_next_panel": {
             if (!workstationEnabled) {
-              publish({ ok: false, message: "Focus next panel ignored outside workstation mode." });
+              publish({
+                ok: false,
+                message: "Focus next panel ignored outside workstation mode.",
+              });
               return;
             }
             const focused = store.focusAdjacentPanel("next");
             if (!focused) {
-              publish({ ok: false, message: "No panel available to focus next." });
+              publish({
+                ok: false,
+                message: "No panel available to focus next.",
+              });
               return;
             }
             publish({ ok: true, message: `Focused ${focused.panelId}.` });
@@ -438,12 +570,19 @@ export default function DesktopPage({
           }
           case "focus_previous_panel": {
             if (!workstationEnabled) {
-              publish({ ok: false, message: "Focus previous panel ignored outside workstation mode." });
+              publish({
+                ok: false,
+                message:
+                  "Focus previous panel ignored outside workstation mode.",
+              });
               return;
             }
             const focused = store.focusAdjacentPanel("previous");
             if (!focused) {
-              publish({ ok: false, message: "No panel available to focus previous." });
+              publish({
+                ok: false,
+                message: "No panel available to focus previous.",
+              });
               return;
             }
             publish({ ok: true, message: `Focused ${focused.panelId}.` });
@@ -451,12 +590,18 @@ export default function DesktopPage({
           }
           case "reopen_last_closed_panel": {
             if (!workstationEnabled) {
-              publish({ ok: false, message: "Reopen panel ignored outside workstation mode." });
+              publish({
+                ok: false,
+                message: "Reopen panel ignored outside workstation mode.",
+              });
               return;
             }
             const reopened = store.reopenLastClosedPanel();
             if (!reopened) {
-              publish({ ok: false, message: "No recently closed panel to reopen." });
+              publish({
+                ok: false,
+                message: "No recently closed panel to reopen.",
+              });
               return;
             }
             publish({ ok: true, message: `Reopened ${reopened.panelId}.` });
@@ -468,7 +613,10 @@ export default function DesktopPage({
             return;
           case "set_chat_dock":
             if (!workstationEnabled) {
-              publish({ ok: false, message: "Set chat dock ignored outside workstation mode." });
+              publish({
+                ok: false,
+                message: "Set chat dock ignored outside workstation mode.",
+              });
               return;
             }
             if (typeof action.width_px === "number") {
@@ -508,7 +656,9 @@ export default function DesktopPage({
                 actionId === "open_doc_and_read");
             const targetGroupId =
               store.activeGroupId ??
-              Object.values(store.groups).find((group) => group.panelIds.includes("docs-viewer"))?.id;
+              Object.values(store.groups).find((group) =>
+                group.panelIds.includes("docs-viewer"),
+              )?.id;
             if (isProceduralDocsAction) {
               emitHelixWorkstationProceduralStep({
                 traceId,
@@ -653,7 +803,8 @@ export default function DesktopPage({
               kind:
                 result.artifact &&
                 typeof result.artifact === "object" &&
-                (result.artifact as Record<string, unknown>).kind === "situation_room_setup_execution_receipt"
+                (result.artifact as Record<string, unknown>).kind ===
+                  "situation_room_setup_execution_receipt"
                   ? "situation_room_setup_execution_receipt"
                   : undefined,
               message: result.message,
@@ -667,7 +818,10 @@ export default function DesktopPage({
             return;
           }
           case "run_job":
-            publish({ ok: true, message: "Delegated to workstation job executor." });
+            publish({
+              ok: true,
+              message: "Delegated to workstation job executor.",
+            });
             const payloadWithJobId = action.payload.job_id
               ? action.payload
               : { ...action.payload, job_id: traceId };
@@ -717,7 +871,10 @@ export default function DesktopPage({
             });
             return;
           case "toggle_mobile_drawer":
-            publish({ ok: false, message: "Toggle mobile drawer is not supported on desktop." });
+            publish({
+              ok: false,
+              message: "Toggle mobile drawer is not supported on desktop.",
+            });
             return;
           default:
             publish({ ok: false, message: "Unhandled workstation action." });
@@ -728,7 +885,10 @@ export default function DesktopPage({
         void runAction(action);
       }
     };
-    window.addEventListener(HELIX_WORKSTATION_ACTION_EVENT, handleWorkstationAction as EventListener);
+    window.addEventListener(
+      HELIX_WORKSTATION_ACTION_EVENT,
+      handleWorkstationAction as EventListener,
+    );
     return () => {
       window.removeEventListener(
         HELIX_WORKSTATION_ACTION_EVENT,
@@ -739,7 +899,12 @@ export default function DesktopPage({
       stopProcessGraphCapture();
       stopPerformanceSampler();
     };
-  }, [applyWorkstationViewState, openPanelUniversal, openSettings, workstationEnabled]);
+  }, [
+    applyWorkstationViewState,
+    openPanelUniversal,
+    openSettings,
+    workstationEnabled,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -757,7 +922,9 @@ export default function DesktopPage({
   const applyLayout = useCallback(
     (layout: DesktopLayoutHash) => {
       if (layout.projectSlug) {
-        const match = projects.find((project) => project.hashSlug === layout.projectSlug);
+        const match = projects.find(
+          (project) => project.hashSlug === layout.projectSlug,
+        );
         if (match) {
           selectProjects([match.id]);
         }
@@ -775,10 +942,24 @@ export default function DesktopPage({
     (context: EssenceEnvironmentContext | null | undefined) => {
       if (!context || !allowAutoOpen) return;
       const panelIds = new Set<string>();
-      collectPanelIdsFromStructure(context.template.defaultPanels ?? [], panelIds, 0, true);
-      collectPanelIdsFromStructure(context.template.defaultDesktopLayout, panelIds);
-      collectPanelIdsFromStructure(context.environment.userOverrides?.layout, panelIds);
-      collectPanelIdsFromStructure(context.environment.userOverrides?.widgets, panelIds);
+      collectPanelIdsFromStructure(
+        context.template.defaultPanels ?? [],
+        panelIds,
+        0,
+        true,
+      );
+      collectPanelIdsFromStructure(
+        context.template.defaultDesktopLayout,
+        panelIds,
+      );
+      collectPanelIdsFromStructure(
+        context.environment.userOverrides?.layout,
+        panelIds,
+      );
+      collectPanelIdsFromStructure(
+        context.environment.userOverrides?.widgets,
+        panelIds,
+      );
       panelIds.forEach((panelId) => {
         if (panelId && getPanelDef(panelId)) {
           if (autoOpenSuppressRef.current?.has(panelId)) {
@@ -802,7 +983,8 @@ export default function DesktopPage({
           accountPolicyRef.current = policy;
         })
         .catch(() => {
-          accountPolicyRef.current = readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY;
+          accountPolicyRef.current =
+            readCachedAccountCapabilityPolicy() ?? HELIX_USER_ACCOUNT_POLICY;
         });
       if (canceled) return;
       if (
@@ -814,7 +996,9 @@ export default function DesktopPage({
         return;
       }
       if (viewState.projectSlug) {
-        const match = projects.find((project) => project.hashSlug === viewState.projectSlug);
+        const match = projects.find(
+          (project) => project.hashSlug === viewState.projectSlug,
+        );
         if (!match) {
           return;
         }
@@ -840,15 +1024,17 @@ export default function DesktopPage({
       const panelSet = new Set<string>();
       Object.values(layout.groups).forEach((group) => {
         group.panelIds.forEach((panelId) => {
-          if (getPanelDef(panelId) && canOpenPanelForAccount(panelId)) panelSet.add(panelId);
+          if (getPanelDef(panelId) && canOpenPanelForAccount(panelId))
+            panelSet.add(panelId);
         });
       });
       const activeGroup = layout.groups[layout.activeGroupId] ?? null;
-      const focusPanel = activeGroup?.activePanelId &&
+      const focusPanel =
+        activeGroup?.activePanelId &&
         getPanelDef(activeGroup.activePanelId) &&
         canOpenPanelForAccount(activeGroup.activePanelId)
-        ? activeGroup.activePanelId
-        : undefined;
+          ? activeGroup.activePanelId
+          : undefined;
       const docState = useDocViewerStore.getState();
       const activeDocPath =
         docState.mode === "doc"
@@ -858,13 +1044,18 @@ export default function DesktopPage({
         panels: [...panelSet].sort((a, b) => a.localeCompare(b)),
         ...(focusPanel ? { focusPanel } : {}),
         ...(activeDocPath ? { activeDocPath } : {}),
-        ...(activeDocPath && docState.anchor ? { anchor: docState.anchor } : {}),
+        ...(activeDocPath && docState.anchor
+          ? { anchor: docState.anchor }
+          : {}),
       };
     };
     const syncUrl = () => {
       if (urlSyncRestoringRef.current) return;
       const viewState = buildViewState();
-      const nextSearch = encodeWorkstationViewStateSearch(viewState, window.location.search);
+      const nextSearch = encodeWorkstationViewStateSearch(
+        viewState,
+        window.location.search,
+      );
       const nextUrl = `${window.location.pathname}${nextSearch}`;
       const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       if (nextUrl !== currentUrl) {
@@ -900,8 +1091,15 @@ export default function DesktopPage({
       if (!detail) return;
       applyLayout(detail);
     };
-    window.addEventListener("apply-desktop-layout", handleApplyLayout as EventListener);
-    return () => window.removeEventListener("apply-desktop-layout", handleApplyLayout as EventListener);
+    window.addEventListener(
+      "apply-desktop-layout",
+      handleApplyLayout as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "apply-desktop-layout",
+        handleApplyLayout as EventListener,
+      );
   }, [applyLayout]);
 
   const clearSavedChoice = useCallback(() => {
@@ -964,27 +1162,33 @@ export default function DesktopPage({
     [openPanelUniversal],
   );
   return (
-    <Dialog
-      open={settingsOpen}
-      onOpenChange={handleSettingsOpenChange}
-    >
+    <Dialog open={settingsOpen} onOpenChange={handleSettingsOpenChange}>
       {userSettings.enableSplashCursor && <SplashCursor />}
       <div
         className="mood-transition-scope relative box-border h-screen w-screen overflow-hidden bg-slate-950 text-slate-100"
         data-layout-variant={layoutVariant}
-        style={layoutVariant === "mobile"
-          ? {
-              height: "100dvh",
-              paddingTop: "env(safe-area-inset-top, 0px)",
-              paddingRight: "env(safe-area-inset-right, 0px)",
-              paddingBottom: "env(safe-area-inset-bottom, 0px)",
-              paddingLeft: "env(safe-area-inset-left, 0px)",
-            }
-          : undefined}
+        style={
+          layoutVariant === "mobile"
+            ? {
+                height: "100dvh",
+                paddingTop: "env(safe-area-inset-top, 0px)",
+                paddingRight: "env(safe-area-inset-right, 0px)",
+                paddingBottom: "env(safe-area-inset-bottom, 0px)",
+                paddingLeft: "env(safe-area-inset-left, 0px)",
+              }
+            : undefined
+        }
       >
         <SurfaceStack recipe={wallpaperRecipe} />
-        {processGraphSurfaceEnabled ? <ProcessGraphSurfaceLayer mood={mood} orientation={orientation} mode="ambient" /> : null}
+        {processGraphSurfaceEnabled ? (
+          <ProcessGraphSurfaceLayer
+            mood={mood}
+            orientation={orientation}
+            mode="ambient"
+          />
+        ) : null}
         <NarratorReadRegionOverlay />
+        <WorkstationGuidanceOverlay />
         {workstationEnabled ? (
           <HelixWorkstationShell
             layoutVariant={layoutVariant}
@@ -1042,5 +1246,3 @@ export default function DesktopPage({
     </Dialog>
   );
 }
-
-

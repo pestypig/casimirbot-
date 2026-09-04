@@ -71,6 +71,17 @@ describe("Helix public-user UI capability audit", () => {
     );
     expect(roomRows.length).toBeGreaterThan(0);
     expect(roomRows.every((row) => row.account_scope === "user_feature_gated")).toBe(true);
+    expect(roomRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        capability_id: "environment.action_authority.revoke",
+        authority_state: "route_owned",
+        interaction_kind: "act",
+        requires_confirmation: true,
+        mutating: true,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+      }),
+    ]));
   });
 
   it("builds a nonterminal runtime-safe agent catalog for public UI discovery", () => {

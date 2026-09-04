@@ -201,6 +201,19 @@ export const materializeLegacyRoomSourceConnector = async (input: {
         installedDeviceId,
       ],
     );
+    const persistedInstallation = await db.query<{
+      installed_device_id: string | null;
+    }>(
+      `
+        SELECT installed_device_id
+        FROM helix_environment_connector_installations
+        WHERE installation_id = $1
+        LIMIT 1;
+      `,
+      [installationId],
+    );
+    installedDeviceId =
+      persistedInstallation.rows[0]?.installed_device_id ?? null;
     await db.query(
       `
         INSERT INTO helix_environment_connector_devices (

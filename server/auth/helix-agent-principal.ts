@@ -369,7 +369,9 @@ const resolveAccountType = (input: {
   trustedDeveloperProfile: boolean;
   token: HelixAgentVerifiedToken;
 }): HelixAccountType => {
-  return input.trustedDeveloperProfile && input.token.scopes.has(HELIX_AGENT_RUN_DEVELOPER_SCOPE)
+  const developerScopeRequired = process.env.NODE_ENV === "production";
+  return input.trustedDeveloperProfile &&
+      (!developerScopeRequired || input.token.scopes.has(HELIX_AGENT_RUN_DEVELOPER_SCOPE))
     ? "developer"
     : "user";
 };

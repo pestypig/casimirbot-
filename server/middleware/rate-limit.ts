@@ -92,3 +92,13 @@ export const createRateLimiter = (options: RateLimitOptions) => {
     next();
   };
 };
+
+/**
+ * Connector transports have their own bounded, route-local quotas. Counting
+ * their heartbeat/poll/evidence cadence against the generic browser/API IP
+ * bucket makes a healthy local connector evict itself during long actions.
+ */
+export const isDedicatedEnvironmentConnectorApiPath = (path: string): boolean => {
+  const normalized = path.startsWith("/api/") ? path.slice(4) : path;
+  return normalized.startsWith("/environment-action/v1/authorities/");
+};

@@ -45,6 +45,8 @@ type DesktopRuntimeBridge = Readonly<{
     listener: (state: unknown) => void,
   ) => () => void;
   onMcpTunnelState?: (listener: (state: unknown) => void) => () => void;
+  onWorkstationGuidance?: (listener: (state: unknown) => void) => () => void;
+  getPendingWorkstationGuidance?: () => Promise<unknown>;
   onUpdateState?: (listener: (state: unknown) => void) => () => void;
 }>;
 

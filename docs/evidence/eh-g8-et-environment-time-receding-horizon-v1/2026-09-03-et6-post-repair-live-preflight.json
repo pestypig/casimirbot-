@@ -1,0 +1,53 @@
+{
+  "schema": "helix.environment_time.et6_live_checkpoint.v1",
+  "recorded_at": "2026-09-03T08:34:00-04:00",
+  "program_gate": "G8",
+  "stage": "ET6",
+  "status": "incomplete",
+  "scope": "post-repair packaged EXE trusted-device preflight",
+  "package": {
+    "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+    "rebuilt_after_final_onramp_layout_repair": true,
+    "packaged_launch_smoke": "pass",
+    "packaged_onboarding_smoke": "pass",
+    "trusted_device_control_visible_on_fresh_packaged_profile": true,
+    "trusted_device_default_off": true,
+    "unauthenticated_trust_attempt_rejected": true,
+    "real_profile_process_started": true
+  },
+  "continuation": {
+    "client_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "service_instance_ref": "service_instance:cd9f66683227f4e93146be05fdf6cc50",
+    "client_session_ref": "supervisor_client:cdd702f74b2463575d93f8eda61ff981",
+    "local_supervisor_presence": "active",
+    "transition_request_ref": "desktop_tunnel_request:ebf2436d-e0e8-4703-9a1b-1146968f062d",
+    "requested_scope": "full_helix_agent",
+    "requested_lease_seconds": 300,
+    "transition_status": "pending_user_delegation",
+    "trusted_device_delegation_applied": false,
+    "environment_authority_granted": false,
+    "minecraft_mutation_executed": false
+  },
+  "positive_evidence": [
+    "The final rebuilt EXE reconnected the same exact continuation to a new packaged service epoch without creating or impersonating a provider task.",
+    "The new MCP response includes the trusted-device delegation fact and truthfully reported it false before attended opt-in.",
+    "A fresh 300-second transition request remains receipt-chained and fail-closed while pending.",
+    "Disposable packaged-native acceptance proves default-off presentation and rejects unauthenticated opt-in."
+  ],
+  "negative_evidence": [
+    "The active real profile has not yet performed the one-time trusted-device opt-in.",
+    "The full MCP transition has not executed and shadow Minecraft tools remain non-executable.",
+    "Minecraft is stopped, so no ET6 rolling cycle, latency percentile, interruption, reconnect, effect or revocation result is claimed."
+  ],
+  "authority": {
+    "startup_is_permission": false,
+    "trusted_device_policy_is_environment_authority": false,
+    "transition_receipt_is_execution_authority": false,
+    "steering_is_execution_authority": false,
+    "receipt_is_answer_authority": false,
+    "terminal_eligible": false,
+    "credentials_included": false,
+    "hidden_reasoning_included": false
+  },
+  "next_required_observation": "In the running packaged CasimirBot Agent Connections panel, the profile owner must enable Trust this device for Full Harness once. Enabling it must delegate this exact pending request, after which the same continuation may execute the finite transition and begin ET6 Minecraft measurement."
+}

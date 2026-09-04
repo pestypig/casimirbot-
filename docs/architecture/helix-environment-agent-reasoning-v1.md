@@ -11,10 +11,11 @@ and required evidence are maintained only in
 `docs/helix-environment-harness-work-program-v1.md`.
 
 Provider-neutral clock identity, rolling temporal plans, affordance frontiers,
-watermarks and interruption semantics are specified in
+watermarks and interruption semantics are defined in
 `docs/architecture/helix-environment-time-action-planning-v1.md`. That contract
-operationalizes the reaction-time hierarchy here without creating a second
-planner.
+is deterministically verified through ET5 and operationalizes the reaction-time
+hierarchy here without creating a second planner. Live capacity and cross-domain
+acceptance remain governed by the work program.
 
 ## Outcome
 

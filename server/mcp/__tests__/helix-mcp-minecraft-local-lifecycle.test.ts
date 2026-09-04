@@ -80,7 +80,10 @@ const authority = (
   ...overrides,
 });
 
-const connect = async (currentAuthority: HelixEnvironmentActionAuthority) => {
+const connect = async (
+  currentAuthority: HelixEnvironmentActionAuthority | null,
+  options: { trustedDevice?: boolean } = {},
+) => {
   const launch = vi.fn(async () => ({
     schema: "helix.minecraft.workstation_launch_receipt.v1" as const,
     status: "connected" as const,
@@ -116,8 +119,16 @@ const connect = async (currentAuthority: HelixEnvironmentActionAuthority) => {
       "claimPendingChatBinding" | "revokeRunRoomBindingForOwner" |
       "revokeClaimedRunChatBindingForOwner">,
     environmentActionAuthorityInspector: vi.fn(async () => ({
-      authorities: [currentAuthority],
+      authorities: currentAuthority ? [currentAuthority] : [],
       connectorReadiness: [],
+    })),
+    desktopFullHarnessTrustReader: vi.fn(async () => ({
+      trusted: options.trustedDevice === true,
+      delegatedAccountSessionId: options.trustedDevice
+        ? "account_session:mcp-local-lifecycle"
+        : null,
+      accountSessionReady: true,
+      agentAccountBindingReady: true,
     })),
     environmentActionAuthorityRevoker:
       revoke as unknown as HelixEnvironmentActionAuthorityRevoker,
@@ -156,12 +167,127 @@ describe("Helix MCP local Minecraft lifecycle", () => {
       expect(result.isError).not.toBe(true);
       expect(result.structuredContent).toMatchObject({
         status: "connected",
+        action_authority_id: AUTHORITY_ID,
+        launch_authority_basis: "active_player_embodiment",
         authority_widened: false,
         answer_authority: false,
         assistant_answer: false,
         terminal_eligible: false,
       });
       expect(connection.launch).toHaveBeenCalledOnce();
+      expect(connection.launch).toHaveBeenCalledWith({
+        request: { address: "localhost:25565", restart_client: false },
+      });
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("bootstraps the trusted workstation lifecycle before Player Embodiment exists", async () => {
+    const connection = await connect(null, { trustedDevice: true });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: ENVIRONMENT_ID,
+          operator_confirmation: true,
+          request: { address: "localhost:25565" },
+        },
+      });
+      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        status: "connected",
+        action_authority_id: null,
+        launch_authority_basis: "trusted_device_workstation_lifecycle",
+        authority_widened: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(connection.launch).toHaveBeenCalledOnce();
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("rejects authority-free bootstrap without installed-device trust", async () => {
+    const connection = await connect(null);
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: ENVIRONMENT_ID,
+          operator_confirmation: true,
+          request: { address: "localhost:25565" },
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        error: "account_policy_blocked",
+        retryable: false,
+        details: {
+          reason: "minecraft_local_lifecycle_device_trust_required",
+        },
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(connection.launch).not.toHaveBeenCalled();
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("does not let trusted workstation bootstrap replace a running client", async () => {
+    const connection = await connect(null, { trustedDevice: true });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: ENVIRONMENT_ID,
+          operator_confirmation: true,
+          request: {
+            address: "localhost:25565",
+            restart_client: true,
+          },
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result)).toContain(
+        "Replacing a running Minecraft client requires an exact active Player Embodiment authority.",
+      );
+      expect(connection.launch).not.toHaveBeenCalled();
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("forwards an explicit verified-client restart without widening authority", async () => {
+    const connection = await connect(authority());
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: ENVIRONMENT_ID,
+          action_authority_id: AUTHORITY_ID,
+          operator_confirmation: true,
+          request: { address: "localhost:25565", restart_client: true },
+        },
+      });
+      expect(result.isError).not.toBe(true);
+      expect(connection.launch).toHaveBeenCalledWith({
+        request: { address: "localhost:25565", restart_client: true },
+      });
+      expect(result.structuredContent).toMatchObject({
+        authority_widened: false,
+        terminal_eligible: false,
+      });
     } finally {
       await connection.client.close();
       await connection.server.close();

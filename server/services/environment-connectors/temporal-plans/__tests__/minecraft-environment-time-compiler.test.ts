@@ -5,6 +5,7 @@ import {
 } from "../../../../../shared/helix-environment-time";
 import {
   compileEnvironmentTimePlanToMinecraftFluidSequence,
+  compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact,
   compileEnvironmentTimePlanToMinecraftReactiveProgram,
   MinecraftEnvironmentTimeCompileError,
 } from "../minecraft-environment-time-compiler";
@@ -142,6 +143,18 @@ describe("Minecraft Environment Time compatibility compiler", () => {
     expect(serial.start_node_id).toBe(reactive.lanes[0].start_node_id);
     expect(serial.nodes.some((node) => node.node_kind === "checkpoint" && node.checkpoint_id === "checkpoint:walk")).toBe(true);
     expect(reactive.lanes[0].nodes.some((node) => node.node_kind === "checkpoint" && node.checkpoint_id === "checkpoint:walk")).toBe(true);
+    expect(compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact({
+      plan,
+      mutation_scope: fluidScope,
+      resource_bindings: resourceBindings,
+    })).toMatchObject({
+      source_plan_id: plan.plan_id,
+      source_plan_hash: plan.plan_hash,
+      source_goal_id: plan.identity.goal_id,
+      execution_authority: false,
+      answer_authority: false,
+      terminal_eligible: false,
+    });
   });
 
   it("fails closed on adapter, clock, capability, resource and condition mismatch", () => {

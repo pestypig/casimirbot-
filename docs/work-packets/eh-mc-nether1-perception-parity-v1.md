@@ -106,31 +106,34 @@ farthest safely reachable endpoint; do not make that endpoint the harness's
 strategy. Runtime Codex may select it as an explicit exploration policy when
 the goal is to escape or reveal more of a cave.
 
-Expose the installed Baritone planner as typed evidence rather than only as a
-mutating `navigate_to` executor. Planning evidence must identify the goal,
+Expose planner status as typed evidence rather than only as a mutating
+`navigate_to` executor. Planning evidence must identify the goal,
 movement restrictions, calculation state, partial/complete/no-path status,
 estimated cost, retained path primitives, reason for recalculation and whether
 the path crosses unknown coverage. Execution remains separately admitted and
 movement-only by default (`allow_dig=false`, `allow_place=false`). Block update,
 chunk load, path obstruction, measured deviation or stuck state may trigger a
 bounded replan against the same waypoint; a semantic route change must be
-re-entered before an alternate physical action.
+re-entered before an alternate physical action. The owned contract and staged
+implementation are governed by
+`docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`.
 
-The local frontier and Baritone plan are complementary. The frontier gives
+The local frontier and owned route plan are complementary. The frontier gives
 Runtime Codex human-like nearby peripheral traversability and candidate goals;
-Baritone supplies goal-directed A* execution and rerouting. Neither may assert
-that all paths were searched outside the declared loaded volume.
+the post-ET6 navigation lane supplies goal-directed execution and rerouting.
+Neither may assert that all paths were searched outside the declared loaded
+volume.
 
-Baritone is a reference implementation and temporary A/B oracle for this work,
-not the target architecture, copied implementation or required production
-dependency. CasimirBot must own the frontier graph, movement primitives, cost
-and risk model, planner observation contract, reroute lifecycle, cancellation,
-postconditions and native executor. Public Baritone behavior may inform test
-cases and parity measurements, but no Baritone source is to be copied or
-translated into the CasimirBot implementation. Acceptance must pass with the
-CasimirBot-native planner/executor path when Baritone is absent; an optional
-Baritone adapter may remain only as a separately labelled interoperability and
-comparison lane.
+Baritone is a temporary, isolated black-box comparison oracle for this work,
+not the target architecture, copied implementation, shipping component or
+production dependency. CasimirBot must own the frontier graph, movement
+primitives, cost and risk model, planner observation contract, reroute
+lifecycle, cancellation, postconditions and native executor. Public Baritone
+behavior may inform test cases and parity measurements, but no Baritone source,
+API or implementation structure is to be copied or translated into the
+CasimirBot implementation. Acceptance must pass with the CasimirBot-native
+planner/executor path when Baritone is absent; the temporary comparison adapter
+is omitted from shipping profiles.
 
 ### P2 — change delivery and anti-repetition contract
 

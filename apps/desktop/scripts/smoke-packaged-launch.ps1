@@ -6,16 +6,26 @@ param(
 $ErrorActionPreference = "Stop"
 
 $desktopRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$releaseRoot = [IO.Path]::GetFullPath((Join-Path $desktopRoot "release\win-unpacked"))
+$defaultReleaseRoot = [IO.Path]::GetFullPath((Join-Path $desktopRoot "release\win-unpacked"))
 $resolvedExecutable = if ($ExecutablePath) {
   (Resolve-Path -LiteralPath $ExecutablePath).Path
 } else {
-  (Resolve-Path -LiteralPath (Join-Path $releaseRoot "CasimirBot.exe")).Path
+  (Resolve-Path -LiteralPath (Join-Path $defaultReleaseRoot "CasimirBot.exe")).Path
 }
+$releaseRoot = [IO.Path]::GetFullPath((Split-Path $resolvedExecutable -Parent))
+$releaseContainer = [IO.Path]::GetFullPath((Split-Path $releaseRoot -Parent))
+$releaseContainerName = Split-Path $releaseContainer -Leaf
 if (-not $resolvedExecutable.StartsWith(
   $releaseRoot,
   [StringComparison]::OrdinalIgnoreCase
-)) {
+) -or
+  (Split-Path $releaseRoot -Leaf) -ne "win-unpacked" -or
+  -not $releaseContainer.StartsWith(
+    ($desktopRoot + [IO.Path]::DirectorySeparatorChar),
+    [StringComparison]::OrdinalIgnoreCase
+  ) -or
+  $releaseContainerName -notmatch '^release(?:-[A-Za-z0-9][A-Za-z0-9._-]*)?$'
+) {
   throw "Packaged executable resolved outside the expected release directory."
 }
 
@@ -59,7 +69,11 @@ $listenerCount = 0
 $friendsCoordinationConfigured = -not [string]::IsNullOrWhiteSpace(
   $env:HELIX_FRIENDS_PARTIES_COORDINATION_ORIGIN
 )
-$expectedLoopbackListeners = if ($friendsCoordinationConfigured) { 4 } else { 3 }
+# The packaged tree owns the service listener plus the provider-credential,
+# transition/presentation, and stable MCP scope-router listeners. Optional
+# friends coordination adds one more. Keep this exact so a missing broker or
+# an unexpected listener still fails closed.
+$expectedLoopbackListeners = if ($friendsCoordinationConfigured) { 5 } else { 4 }
 $userDataFileCount = 0
 $processCount = 0
 $readyReceiptValid = $false

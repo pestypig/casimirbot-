@@ -36,10 +36,12 @@ execution contract. Room controls remain `blocked_pending_contract` until an
 explicit room/participant/source/subject/lease/confirmation contract exists;
 each control graduates individually only after the full binding checklist
 passes. The first graduated room controls are shared-handler
-`room.floor.acquire` and exact-epoch `room.floor.release`; the room feature
-gate remains unchanged. MCP acquisition additionally requires its signed
-delegation artifact; this route binding does not transfer browser-session
-authority to an MCP caller.
+`room.floor.acquire`, exact-epoch `room.floor.release`, and the owner-exact,
+authority-reducing `environment.action_authority.revoke` emergency stop; the
+room feature gate remains unchanged. MCP acquisition additionally requires its
+signed delegation artifact. Revocation requires the exact owning profile,
+room, environment binding, and action-authority identity. These route bindings
+do not transfer browser-session authority to an MCP caller.
 
 ## Source ownership and delegated components
 

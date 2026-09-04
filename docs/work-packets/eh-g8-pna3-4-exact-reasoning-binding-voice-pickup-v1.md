@@ -1179,6 +1179,37 @@ make the isolated player-directory selection durable for node-hosted development
 or require its profile-store input explicitly, and rebuild/smoke the packaged
 desktop.
 
+## 2026-09-04 packaged ET6 lifecycle replay
+
+The canonical packaged EXE repeated the exact-task lifecycle on binding
+`reasoning_binding:2598a7e190298f9c191a347aa56f4bd2`, epoch 1, and continuation
+`codex-continuation:et6-minecraft-capacity-20260903-main`. A finalized typed
+steering event was picked up and acknowledged as advisory-only. This run did
+not repeat microphone capture and does not replace the accepted natural
+`gpt_live_finalized` event recorded on 2026-09-02.
+
+Under a separate finite sequence-only Player Embodiment lease, the current
+exact-bound journey completed fresh perception/action/evidence cycles,
+reconnect recovery, duplicate suppression and genuine physical W-key manual
+override. The first manual receipt exposed a contract mismatch: the raw GLFW
+latch released controls but emitted `raw_keyboard_input`, outside the sealed
+result enum, so the terminal envelope was rejected. The latch now maps raw
+keyboard and mouse presses to the existing stable reason vocabulary. After a
+full Java 21 build and five passing Fabric game tests, the repeated physical W
+press returned a provenance-valid terminal `request_canceled` receipt with
+`forward_key_pressed`, zero harness side effects and controls released.
+
+The action lease was revoked and a fresh-key motion attempt failed before
+workflow creation as `authority_stale`; a fresh observation proved zero further
+motion. The operator then revoked the exact reasoning binding, and an immediate
+MCP read against its exact ID, epoch, continuation and cursor failed closed as
+non-retryable `reasoning_binding_revoked`, delivering no steering. Minecraft
+and the Fabric server shut down normally. This strengthens the already-live-
+accepted PNA3.4 lifecycle but does not promote ET6: the separate complete
+`environment.capacity_report.v1` exit predicate remains unsatisfied. The
+detailed record is
+`docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json`.
+
 ## Stop/fail criteria
 
 Stop without promotion if:

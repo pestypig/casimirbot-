@@ -160,9 +160,9 @@ const stateCopy = (
   switch (state.kind) {
     case "linked":
       return {
-        title: "Linked for agent access",
-        body: "This signed-in profile has an active, server-verified agent binding. An AI client must still be explicitly configured with the MCP endpoint and complete its authorized OAuth connection.",
-        badge: "Active binding",
+        title: "Account linked for agent access",
+        body: "This signed-in profile has an active, server-verified OAuth account link. This does not bind a Helix chat to a particular AI task; complete the separate exact-task binding step below.",
+        badge: "Active account link",
         icon: Link2,
         tone: "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
       };
@@ -269,7 +269,9 @@ export function AgentAccountBindingReadiness() {
       const completion = parseDesktopAuth0AccountLinkCompletion(candidate);
       setLinkBusy(false);
       if (!completion) {
-        setLinkError("The desktop host returned an invalid account-link receipt.");
+        setLinkError(
+          "The desktop host returned an invalid account-link receipt.",
+        );
         return;
       }
       if (!completion.ok) {
@@ -363,7 +365,10 @@ export function AgentAccountBindingReadiness() {
           >
             {copy.badge}
           </span>
-          <button data-helix-control-id="workstation.panel.agent-access.agent-account-binding-readiness.refresh-binding-status" data-helix-interaction-kind="observe" data-helix-authority-state="client_local"
+          <button
+            data-helix-control-id="workstation.panel.agent-access.agent-account-binding-readiness.refresh-binding-status"
+            data-helix-interaction-kind="observe"
+            data-helix-authority-state="client_local"
             type="button"
             onClick={refresh}
             disabled={state.kind === "loading"}
@@ -379,14 +384,22 @@ export function AgentAccountBindingReadiness() {
             Refresh
           </button>
           {canStartLink ? (
-            <button data-helix-control-id="workstation.panel.agent-access.agent-account-binding-readiness.void-start-account-link" data-helix-interaction-kind="act" data-helix-authority-state="client_local"
+            <button
+              data-helix-guidance-target="auth0-account-link"
+              data-helix-guidance-label="Choose Link Auth0 to open the secure native sign-in window."
+              data-helix-control-id="workstation.panel.agent-access.agent-account-binding-readiness.void-start-account-link"
+              data-helix-interaction-kind="act"
+              data-helix-authority-state="client_local"
               type="button"
               onClick={() => void startAccountLink()}
               disabled={linkBusy}
               className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1.5 text-[11px] font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-wait disabled:opacity-50"
             >
               {linkBusy ? (
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                <LoaderCircle
+                  className="h-3.5 w-3.5 animate-spin"
+                  aria-hidden="true"
+                />
               ) : (
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               )}

@@ -19,6 +19,62 @@ afterEach(() => {
 });
 
 describe("Helix Ask bound-agent destination", () => {
+  it("defaults normal prompt submission to an active exact binding", async () => {
+    const sessionId = useAgiChatStore.getState().newSession(
+      "Already-bound chat",
+      "ctx:automatic-bound-agent",
+    );
+    useAgiChatStore.getState().setActive(sessionId);
+    const binding = {
+      reasoning_binding_id: "reasoning_binding:automatic-bound-agent",
+      helix_conversation_id: sessionId,
+      status: "active" as const,
+      continuation_transport: "polling" as const,
+      binding_epoch: 1,
+    };
+    rememberReasoningBinding(binding);
+    const steeringBodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/reasoning-bindings/steering/current")) {
+        steeringBodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({
+          ok: true,
+          binding,
+          event: { delivery_state: "pending" },
+        }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.includes("/reasoning-bindings/")) {
+        return new Response(JSON.stringify({ ok: true, binding }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("{}", { status: 503 });
+    }));
+
+    render(<HelixAskMinimalRuntimeShell contextId="ctx:automatic-bound-agent" />);
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Composer destination") as HTMLSelectElement).value)
+        .toBe("bound_agent");
+    });
+    fireEvent.change(screen.getByLabelText("Ask Helix"), {
+      target: { value: "Continue exploring safely" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit prompt" }));
+
+    await waitFor(() => expect(steeringBodies).toHaveLength(1));
+    expect(steeringBodies[0]).toMatchObject({
+      helix_conversation_id: sessionId,
+      origin: "typed",
+      instruction_text: "Continue exploring safely",
+    });
+  });
+
   it("preserves an operator-selected chat even when the shell context has an older session", async () => {
     useAgiChatStore.getState().newSession("Older context chat", "ctx:shell");
     const selectedSessionId = useAgiChatStore.getState().newSession(
