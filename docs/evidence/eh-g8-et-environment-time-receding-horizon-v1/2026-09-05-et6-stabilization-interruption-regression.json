@@ -1,0 +1,12 @@
+{
+  "et6_complete": false,
+  "scope": "Controller/sequence deterministic stabilization interruption and clock tests",
+  "initial_result": {"tests": 28, "failures": 1, "failed_fixture": "stabilizationHardStopsPreserveTheirFirstCause"},
+  "defect": "A repeated stabilization observation replaced the first clock/deadline/horizon failure with temporal_stabilization_not_admitted.",
+  "repair": "Retain the original hard-stop cause on subsequent observations.",
+  "fixtures": ["manualAndEmergencyStopWinBeforeAndDuringStabilization", "stabilizationHardStopsPreserveTheirFirstCause"],
+  "limitations": ["Simulated manual-input snapshot and direct controller Emergency Stop, not live keyboard capture", "No runtime delivery or successor execution", "No packaged deployment"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

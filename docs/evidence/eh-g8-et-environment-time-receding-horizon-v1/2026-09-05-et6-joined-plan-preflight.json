@@ -1,0 +1,19 @@
+{
+  "schema": "et6.joined_plan_preflight.v1",
+  "date": "2026-09-05",
+  "implementation": "Internal preflight joins service-owned exact-task verification, current goal/perception context, exact persisted frontier evidence/observation epoch, native executor feature, resident monotonic origin and world-frontier expiry, and real compatibility compilation. Task verification is repeated after asynchronous reads. No write or dispatch occurs.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__ --pool=forks --maxWorkers=1 --minWorkers=1",
+    "files_passed": 7,
+    "tests_passed": 62,
+    "exit_code": 0,
+    "preflight_scope": "Real plan validation and serial compilation; mocked live context, binding verifier and frontier reads. Negative cases include task run, absent frontier, identity mismatch, absent executor, blocked affordance, clock origin, world expiry and revocation during reads."
+  },
+  "limits": [
+    "No atomic admission writer or production tool invokes the new preflight yet.",
+    "Conditional affordances are not permission to execute; resident guards and broker admission remain mandatory.",
+    "Observed clock comparison does not establish dispatch-time clock alignment, watermark enforcement, or continuous rolling execution.",
+    "No live server migration, packaged rebuild or Minecraft action occurred."
+  ],
+  "et6_complete": false
+}

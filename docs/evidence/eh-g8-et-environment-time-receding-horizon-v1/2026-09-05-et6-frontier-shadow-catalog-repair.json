@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "classification": "tool admission: catalog presentation",
+  "finding": "The full MCP surface registered helix_environment_temporal_frontier_publish, but the restricted coordination catalog returned before that registration and omitted a matching shadow entry.",
+  "repair": "Share the exact frontier tool configuration across full and restricted registrations. The restricted handler only returns full_mcp_transition_required; it does not publish a frontier.",
+  "verification": {
+    "focused_test": "PASS: pre-advertises exact room and environment schemas while denying every shadow call",
+    "tests_passed": 1,
+    "tests_skipped": 21,
+    "exit_code": 0,
+    "assertions": ["Schema, metadata and annotation parity", "Restricted frontier call rejected", "mutation_executed false"],
+    "quick_discipline": "Exit 0; classifier detected zero sensitive files and skipped its battery. Not behavioral proof."
+  },
+  "deployment": "Source repair only; running EXE is unchanged.",
+  "limits": [
+    "User reported one reconnect; neither temporal tool became callable in subsequent task catalogs.",
+    "This omission explains incomplete restricted frontier advertising, not the separate submit-tool visibility gap or all hosted catalog behavior.",
+    "No temporal plan submitted, rolling cycles measured, or acceptance maturity advanced."
+  ]
+}

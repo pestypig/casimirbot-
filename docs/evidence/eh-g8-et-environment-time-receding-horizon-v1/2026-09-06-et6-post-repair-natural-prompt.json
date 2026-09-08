@@ -1,0 +1,64 @@
+{
+  "date": "2026-09-06",
+  "service_instance": "service_instance:d1378d765a382e4fbfbcb65066d3a5b2",
+  "binding": {
+    "id": "reasoning_binding:4e1d77ab5bd2f1eb8a73764080e18e17",
+    "epoch": 1,
+    "status": "active",
+    "claimed_at": "2026-09-06T07:45:05.341Z",
+    "run_id": "run_2089d71c-4213-4e69-ad51-e34cb3e3bbcf",
+    "transport": "polling",
+    "independent_external_identity_proven": false,
+    "steering_deliveries": 0
+  },
+  "perception": {
+    "evidence_ref": "environment_probe_evidence:e00ab386a9e274e259e4366c8415daef644d9d42",
+    "observed_at": "2026-09-06T07:45:25.692Z",
+    "position": [5.04, 65, 2.44],
+    "bounded_hazards": [],
+    "reachable_footholds": 30,
+    "horizontal_radius": 3,
+    "vertical_radius": 2
+  },
+  "prompt": "Walk across the open platform, choosing a clear route, and stop if I take control.",
+  "submission": {
+    "tool": "helix_run_continue",
+    "origin": "agent-authored debug prompt, not human voice or Helix chat mailbox pickup",
+    "idempotency_key": "et6-natural-platform-post-query-repair-20260906-0745",
+    "expected_version": 1,
+    "returned_version": 3,
+    "steps_used": 1,
+    "result_at": "2026-09-06T07:45:42.397Z",
+    "summary": "GENERIC_COLLAPSE",
+    "failure_code": "terminal_boundary_ineligible",
+    "final_status": "final_failure",
+    "observation_refs": [],
+    "evidence_refs": [],
+    "receipt_refs": []
+  },
+  "subsequent_real_chat_pickup": {
+    "event": "reasoning_steering:b5572219f6b842f1a3ccaabe3050cf4a",
+    "origin": "typed",
+    "created_at": "2026-09-06T07:48:59.216Z",
+    "acknowledged_at": "2026-09-06T07:49:33.858Z",
+    "instruction_sha256": "9923c5dddd8e1811dc34d51d6a0870747d1be144748b45c45e6ea593ab74bdd3",
+    "binding_epoch": 1,
+    "cursor": 1,
+    "execution_authority": false,
+    "post_pickup_actor_position": [5.04, 65, 2.44],
+    "post_pickup_actor_evidence": "environment_probe_evidence:21205f00d798f7fd50b48f21ebac87ff4bbbf4ba"
+  },
+  "live_query_repair_exercised": false,
+  "movement_proven_by_prompt": false,
+  "rolling_acceptance_proven": false,
+  "diagnosis": {
+    "executor_mode": "read",
+    "policy_read_only": true,
+    "source": "server/services/helix-agent-api/full-ask-turn-executor.ts and governed-external-turn-executor.ts",
+    "movement_acceptance_path": false,
+    "generic_failure_first_cause": "not proven",
+    "computer_use": "Exact EXE selected; screenshot showed a different foreground surface, so no input was sent. Reselection and activation failed: foreground window did not report a process id.",
+    "automated_chat_prompt_sent": false
+  },
+  "next": "Use the actual bound Helix chat steering path, not the read-only durable-run executor. No guard relaxation or blind retry."
+}

@@ -1,0 +1,48 @@
+{
+  "scope": "Pure hypercharge kinetic insertion to first order, no independent X-Z mass mixing/direct neutrino charge; leading heavy dark vector current; three massless active flavors. Baryonic UV completion and population production not supplied.",
+  "constants": {
+    "sin2theta_diagnostic": 0.23122,
+    "mZ_GeV": 91.1876,
+    "mX_GeV": 100.0,
+    "abs_Ce0_over_Cb": 0.0005807048664429298
+  },
+  "single_flavor_width": "Ce0^2 gap^9/(3780 pi^3 cos(theta)^4 mZ^4)",
+  "three_flavor_width": "Ce0^2 gap^9/(1260 pi^3 cos(theta)^4 mZ^4)",
+  "literature": "https://arxiv.org/pdf/2105.05255v1 equation B3 translates to the single-flavor coefficient; its flavor-sum convention remains unverified.",
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "three_flavor_neutrino_partial_lifetime_s": 6.449729651853555e+33,
+      "age_over_partial_lifetime": 6.744468737150674e-17,
+      "finite_propagator_factor": 1.000000002586678,
+      "endpoint_abs_Cnu_over_Ce": 8.419970661719234e-10
+    },
+    {
+      "mchi_GeV": 15.0,
+      "three_flavor_neutrino_partial_lifetime_s": 1.8817531340742e+35,
+      "age_over_partial_lifetime": 2.311674109229077e-18,
+      "finite_propagator_factor": 1.000000001238174,
+      "endpoint_abs_Cnu_over_Ce": 4.030415009387235e-10
+    },
+    {
+      "mchi_GeV": 40.0,
+      "three_flavor_neutrino_partial_lifetime_s": 3.0690532206010086e+38,
+      "age_over_partial_lifetime": 1.4173752252977044e-21,
+      "finite_propagator_factor": 1.0000000002433,
+      "endpoint_abs_Cnu_over_Ce": 7.919715457607477e-11
+    },
+    {
+      "mchi_GeV": 100.0,
+      "three_flavor_neutrino_partial_lifetime_s": 7.094055338496458e+40,
+      "age_over_partial_lifetime": 6.131894653251967e-24,
+      "finite_propagator_factor": 1.000000000073031,
+      "endpoint_abs_Cnu_over_Ce": 2.377241971144762e-11
+    }
+  ],
+  "checks": {
+    "symbolic_propagator": true,
+    "zero_momentum_cancellation": true,
+    "spectral_moment": 0.12698412698412698
+  },
+  "full_model_admitted": false
+}

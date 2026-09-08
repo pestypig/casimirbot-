@@ -42,6 +42,16 @@ star's matter model, stress tensor, regularity, positivity, stability or success
 to NHM2. A Casimir apparatus must independently close every source, material,
 observer and experimental gate below.
 
+The staged plan's
+[observable sidecar and downstream RB1/RB3 validation](./nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md#observable-sidecar-and-downstream-rb1rb3-validation)
+adds exact-member reporting, a separately frozen family atlas and nonlinear
+evolution follow-up. Their documentation/inventory may be prepared here, but
+their candidate computations remain downstream and separately authorized.
+The star control solves classical complex-scalar backreaction and tests a
+separate real quantum scalar on that background; it does not itself supply
+G3's converged joint semiclassical geometry/state witness. Neither these
+planned studies nor a later star PASS substitutes for apparatus closure.
+
 The complete bridge-validation ladder is therefore:
 
 1. the mini-boson star for a self-consistent matter-to-geometry solve;

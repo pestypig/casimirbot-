@@ -1,0 +1,43 @@
+{
+  "schema": "et6.session_recovery_checkpoint.v1",
+  "observed_date": "2026-09-07",
+  "continuation_ref": "01a060f9-ebfd-7251-9fd3-479a01dd3c40",
+  "service_instance_ref": "service_instance:69576c33311caececfc00d180e12118e",
+  "binding_id": "reasoning_binding:22dc1c01bc1eb3a8c499429ea3393de0",
+  "binding_epoch": 2,
+  "binding_status": "active",
+  "claimed_at": "2026-09-07T16:04:20.418Z",
+  "run_id": "run_9a38524a-e0f7-4c94-bee8-d214da937161",
+  "run_version": 2,
+  "independent_external_oauth_principal_proven": false,
+  "principal_basis": "native_desktop_derived_authenticated_mcp_client",
+  "source_recovery": {
+    "before": "connector_offline",
+    "handoff": "opaque_read_only_source_pairing",
+    "after": "fresh_online_directory_and_actor_probe",
+    "subject_binding_id": "environment_subject_binding:833d5923-1048-4351-997d-1e19d3563f8d",
+    "source_epoch": "adapter_epoch:9cf95f6c7c00fdcaedda9ad2fe526b73f5201738",
+    "actor_evidence_ref": "environment_probe_evidence:f5ad4f91dd517cc8b6e2769869561de35787a302",
+    "actor_observed_at": "2026-09-07T16:02:49.014Z",
+    "position": {"x": 2.84, "y": 65, "z": 0.06}
+  },
+  "movement_authority": {
+    "status": "expired",
+    "expires_at": "2026-09-07T15:30:00.000Z",
+    "ready_for_actions": false,
+    "active_workflow_count": 0,
+    "controls_asserted": false,
+    "renewed_in_this_checkpoint": false
+  },
+  "native_ui": {
+    "exe_window_id": 41945302,
+    "capture_recovered_after_activation": true,
+    "input_failures": ["coordinate input geometry is unavailable", "user input was detected in this window", "window bounds changed"],
+    "natural_prompt_submitted": false,
+    "latest_steering_delivery_count": 0
+  },
+  "rolling_successors_proven": 0,
+  "et6_live_accepted": false,
+  "nav1_unlocked": false,
+  "claims_or_credentials_included": false
+}

@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-06",
+  "scope": "Isolated startup of the timing-closure diagnostic package",
+  "supersedes_startup_gap_in": "et6-prelive-timing-artifact-refresh-20260906.json",
+  "executable": "apps/desktop/release-et6-timing-closure-20260906/win-unpacked/CasimirBot.exe",
+  "exe_sha256": "c8e217996fb0e452c57a53edddc6d8a2aa0d03ed05cb7d26122162c33958ddee",
+  "command": "apps/desktop/scripts/smoke-packaged-launch.ps1 -ExecutablePath apps/desktop/release-et6-timing-closure-20260906/win-unpacked/CasimirBot.exe -TimeoutSeconds 55",
+  "exit_code": 0,
+  "result": {
+    "Verdict": "PASS",
+    "Processes": 4,
+    "LoopbackListeners": 4,
+    "FriendsCoordinationBroker": "NOT_CONFIGURED",
+    "IsolatedUserDataFiles": 57,
+    "FullReadinessReceipt": "PASS",
+    "ServiceListenerReceipt": "PASS",
+    "ProviderCredentialKeyVault": "PASS",
+    "ProtocolRegistrationPreserved": "PASS",
+    "MinFreePhysicalGiB": 3.95,
+    "MaxCommitPercent": 72.0
+  },
+  "limits": [
+    "The earlier guard refusal remains valid historical evidence; this is a later successful attempt with sufficient initial headroom",
+    "This isolated diagnostic launch does not replace the installed app or prove a live provider or Minecraft session",
+    "Complete five-stage timing attribution and live capacity remain unproven",
+    "No ET6 live acceptance or NAV1 advancement"
+  ]
+}

@@ -846,6 +846,13 @@ export const environmentProbeFailureRepairAction = (
     : "ask_user";
 
 export const executeEnvironmentProbeGatewayCapability = async (input: {
+  /** Internal setup guard rechecked after async admission, never RPC input. */
+  assertCurrentTarget?: () => void | Promise<void>;
+  /** Internal server-resolved setup target, never model-authored arguments. */
+  expectedEnvironmentIdentity?: {
+    roomId: string; environmentBindingId: string; sourceId: string; worldId: string;
+    subjectBindingId: string; subjectNativeId: string;
+  };
   capabilityId?: string | null;
   turnId: string;
   toolCallId?: string | null;
@@ -1161,11 +1168,17 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       });
     }
     const allCandidates = await deps.listSourceCandidates(roomId);
+    const expected = input.expectedEnvironmentIdentity;
+    if (expected && (expected.roomId !== roomId || args.target !== "current_actor" ||
+        Object.values(expected).some(value => !value.trim()))) {
+      return fail({ outcome: "wrong_environment", summary: "The exact setup observation target does not match this room and actor." });
+    }
     const candidates = allCandidates.filter(
       (candidate) =>
         descriptor.adapter_profile_ids.includes(
           candidate.adapterAdmission.adapter_profile_id,
-        ) && candidate.roomId === roomId,
+        ) && candidate.roomId === roomId && (!expected ||
+          (candidate.sourceId === expected.sourceId && candidate.worldId === expected.worldId)),
     );
     if (candidates.length === 0) {
       return fail({
@@ -1214,7 +1227,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
     });
     const connectorOwnerProfileId =
       source.ownerProfileId ?? authority.accountProfileId;
-    const activeConnectors = await deps.listActiveConnectors({
+    const availableConnectors = await deps.listActiveConnectors({
       ownerProfileId: connectorOwnerProfileId,
       roomId: source.roomId,
       roomSourceBindingId: source.bindingId,
@@ -1225,6 +1238,11 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       producerEpochRef: source.adapterAdmission.producer_epoch_ref,
       capabilityId,
     });
+    const activeConnectors = expected ? availableConnectors.filter(candidate =>
+      candidate.environmentBindingId === expected.environmentBindingId) : availableConnectors;
+    if (expected && !activeConnectors.length) {
+      return fail({ outcome: "wrong_environment", summary: "The exact setup connector is unavailable; no replacement was created." });
+    }
     const pairedConnectors = activeConnectors.filter(
       (candidate) => !candidate.deviceId.startsWith("connector_device:legacy:"),
     );
@@ -1348,6 +1366,10 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
         throw error;
       }
     }
+    if (expected && (!resolvedSubject || resolvedSubject.subjectBindingId !== expected.subjectBindingId ||
+        resolvedSubject.subjectNativeId !== expected.subjectNativeId)) {
+      return fail({ outcome: "subject_binding_stale", summary: "The selected player changed before the setup observation." });
+    }
     const requestedFreshness = Number(args.freshness_requirement_ms);
     const freshnessRequirementMs = Number.isFinite(requestedFreshness)
       ? Math.floor(requestedFreshness)
@@ -1360,6 +1382,7 @@ export const executeEnvironmentProbeGatewayCapability = async (input: {
       now.getTime() + descriptor.timeout_ceiling_ms,
     );
     const deadlineAt = new Date(deadlineMs).toISOString();
+    await input.assertCurrentTarget?.();
     const dispatched = await deps.dispatchProbe({
       tenantId: authority.tenantId,
       ownerSubjectId: authority.subjectId,

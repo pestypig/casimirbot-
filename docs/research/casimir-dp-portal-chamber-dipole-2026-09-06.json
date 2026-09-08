@@ -1,0 +1,181 @@
+{
+  "checks": {
+    "analytic_finite_domain_vacuum": true,
+    "regular_origin_derivative": true,
+    "collocation_residual": true,
+    "refinement": true
+  },
+  "max_vacuum_relative_error": 1.8520318612047504e-10,
+  "max_refinement_absolute_change": 4.434230760352875e-13,
+  "rows": [
+    {
+      "cavity_radius_um": 50.0,
+      "wall_thickness_um": 100.0,
+      "max_relative_residual": 9.980102997336264e-09,
+      "samples": [
+        {
+          "distance_um": 1.0,
+          "dipole_j": 0.9999909021250449,
+          "dipole_propagator_over_vacuum": 1.0000164620640004,
+          "branch_potential_coefficient_over_vacuum": 0.5640021331201475,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0000039592311105
+        },
+        {
+          "distance_um": 10.0,
+          "dipole_j": 0.9988984980531175,
+          "dipole_propagator_over_vacuum": 1.0013505246895216,
+          "branch_potential_coefficient_over_vacuum": 0.5646501823489197,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.000601777070113
+        },
+        {
+          "distance_um": 100.0,
+          "dipole_j": 0.8052596840604482,
+          "dipole_propagator_over_vacuum": 0.9605008386289126,
+          "branch_potential_coefficient_over_vacuum": 0.5593074484102457,
+          "naive_translated_potential_over_fixed_chamber_dipole": 0.9373179690631775
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 50.0,
+      "wall_thickness_um": 1000.0,
+      "max_relative_residual": 9.975435798514992e-09,
+      "samples": [
+        {
+          "distance_um": 1.0,
+          "dipole_j": 1.0000124839568716,
+          "dipole_propagator_over_vacuum": 1.0000380444474624,
+          "branch_potential_coefficient_over_vacuum": 0.00018532742042461642,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.000008847598079
+        },
+        {
+          "distance_um": 10.0,
+          "dipole_j": 1.0009328770116115,
+          "dipole_propagator_over_vacuum": 1.003389897500148,
+          "branch_potential_coefficient_over_vacuum": 0.00018586981560082778,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.001142572662983
+        },
+        {
+          "distance_um": 100.0,
+          "dipole_j": 0.9018365756312093,
+          "dipole_propagator_over_vacuum": 1.0756962062625495,
+          "branch_potential_coefficient_over_vacuum": 0.00020095191478838994,
+          "naive_translated_potential_over_fixed_chamber_dipole": 0.9803148649723138
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 100.0,
+      "max_relative_residual": 9.939567140321128e-09,
+      "samples": [
+        {
+          "distance_um": 1.0,
+          "dipole_j": 0.9999898029338061,
+          "dipole_propagator_over_vacuum": 1.0000153628446662,
+          "branch_potential_coefficient_over_vacuum": 0.5989353910824713,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.000003414895517
+        },
+        {
+          "distance_um": 10.0,
+          "dipole_j": 0.9990104013335487,
+          "dipole_propagator_over_vacuum": 1.0014627026623513,
+          "branch_potential_coefficient_over_vacuum": 0.5997002906473075,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0003262099354748
+        },
+        {
+          "distance_um": 100.0,
+          "dipole_j": 0.9236259297854764,
+          "dipole_propagator_over_vacuum": 1.1016861985006121,
+          "branch_potential_coefficient_over_vacuum": 0.6483881297787453,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0282254311038213
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000.0,
+      "max_relative_residual": 9.983114969012475e-09,
+      "samples": [
+        {
+          "distance_um": 1.0,
+          "dipole_j": 1.0000127945106054,
+          "dipole_propagator_over_vacuum": 1.000038355009134,
+          "branch_potential_coefficient_over_vacuum": 0.0001982257783507199,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0000086341287422
+        },
+        {
+          "distance_um": 10.0,
+          "dipole_j": 1.001243798921424,
+          "dipole_propagator_over_vacuum": 1.0037015826394642,
+          "branch_potential_coefficient_over_vacuum": 0.0001988676177989004,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0009291672350764
+        },
+        {
+          "distance_um": 100.0,
+          "dipole_j": 1.0824780552224864,
+          "dipole_propagator_over_vacuum": 1.291162466492665,
+          "branch_potential_coefficient_over_vacuum": 0.00024512009885783716,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.1382396572391331
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 100.0,
+      "max_relative_residual": 9.985784475308065e-09,
+      "samples": [
+        {
+          "distance_um": 1.0,
+          "dipole_j": 0.9999747365585413,
+          "dipole_propagator_over_vacuum": 1.0000002960843022,
+          "branch_potential_coefficient_over_vacuum": 0.9922677706426036,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0000000653359205
+        },
+        {
+          "distance_um": 10.0,
+          "dipole_j": 0.997579322084117,
+          "dipole_propagator_over_vacuum": 1.0000281104989996,
+          "branch_potential_coefficient_over_vacuum": 0.9922921177427917,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.000005814843417
+        },
+        {
+          "distance_um": 100.0,
+          "dipole_j": 0.8400444952361434,
+          "dipole_propagator_over_vacuum": 1.001991603617087,
+          "branch_potential_coefficient_over_vacuum": 0.9939061906956855,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0001565164172688
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000.0,
+      "max_relative_residual": 9.978644090775441e-09,
+      "samples": [
+        {
+          "distance_um": 1.0,
+          "dipole_j": 0.9999754185798567,
+          "dipole_propagator_over_vacuum": 1.00000097812305,
+          "branch_potential_coefficient_over_vacuum": 0.9744576027309311,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0000002158483163
+        },
+        {
+          "distance_um": 10.0,
+          "dipole_j": 0.9976439601751045,
+          "dipole_propagator_over_vacuum": 1.0000929072590823,
+          "branch_potential_coefficient_over_vacuum": 0.974536632581472,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0000192197203557
+        },
+        {
+          "distance_um": 100.0,
+          "dipole_j": 0.8439227277555819,
+          "dipole_propagator_over_vacuum": 1.006617497177951,
+          "branch_potential_coefficient_over_vacuum": 0.9798059870830037,
+          "naive_translated_potential_over_fixed_chamber_dipole": 1.0005098592859274
+        }
+      ]
+    }
+  ],
+  "scope": "First source-displacement derivative at cavity center, l=1 static Green function with fixed chamber. Point source, no finite-displacement error proof, transport, eikonal integration or coherence rate."
+}

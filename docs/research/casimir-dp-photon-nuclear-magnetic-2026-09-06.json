@@ -1,0 +1,359 @@
+{
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "moments_muN": {
+    "129": [
+      0.5,
+      -0.7779607
+    ],
+    "131": [
+      1.5,
+      0.6918451
+    ]
+  },
+  "C13_moment_muN": 0.70241,
+  "checks": {
+    "eq3_eq4_normalization": true,
+    "carbon_point_limit": true,
+    "positive_components": true,
+    "more_full_than_high": true
+  },
+  "rows": [
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 1.4,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2707.1779693171043,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 8.467252486207641e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.441888919927798e-31,
+      "D_two_components_upper_per_raw_Xe_count": 9.111441378200421e-30
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 1.4,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.26067461493403266,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 5.184504556164046e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.944373043094032e-27,
+      "D_two_components_upper_per_raw_Xe_count": 5.578941860473449e-26
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 1.6,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2707.1779693171043,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 8.168657521819898e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.441888919927798e-31,
+      "D_two_components_upper_per_raw_Xe_count": 8.812846413812678e-30
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 1.6,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.26067461493403266,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 5.001674652858628e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.944373043094032e-27,
+      "D_two_components_upper_per_raw_Xe_count": 5.396111957168032e-26
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 1.8,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2707.1779693171043,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 7.843734487808901e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.441888919927798e-31,
+      "D_two_components_upper_per_raw_Xe_count": 8.487923379801681e-30
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 1.8,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.26067461493403266,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.80272405430536e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.944373043094032e-27,
+      "D_two_components_upper_per_raw_Xe_count": 5.197161358614763e-26
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 2.0,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2707.1779693171043,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 7.496900226492575e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.441888919927798e-31,
+      "D_two_components_upper_per_raw_Xe_count": 8.141089118485355e-30
+    },
+    {
+      "mass_GeV": 100.0,
+      "b_C13_fm": 2.0,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.26067461493403266,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 6123.006919433566,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.590357196111711e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.944373043094032e-27,
+      "D_two_components_upper_per_raw_Xe_count": 4.984794500421114e-26
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 1.4,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2737.4459607672356,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 9.231290464840774e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.372270605621383e-31,
+      "D_two_components_upper_per_raw_Xe_count": 9.868517525402911e-30
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 1.4,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.3385912481501668,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.874649265936415e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.364923284382456e-27,
+      "D_two_components_upper_per_raw_Xe_count": 5.21114159437466e-26
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 1.6,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2737.4459607672356,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 8.868628926050035e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.372270605621383e-31,
+      "D_two_components_upper_per_raw_Xe_count": 9.505855986612173e-30
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 1.6,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.3385912481501668,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.683143234295135e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.364923284382456e-27,
+      "D_two_components_upper_per_raw_Xe_count": 5.0196355627333806e-26
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 1.8,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2737.4459607672356,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 8.475907845531498e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.372270605621383e-31,
+      "D_two_components_upper_per_raw_Xe_count": 9.113134906093636e-30
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 1.8,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.3385912481501668,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.475764045636872e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.364923284382456e-27,
+      "D_two_components_upper_per_raw_Xe_count": 4.8122563740751177e-26
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 2.0,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2737.4459607672356,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 8.059018689298363e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.372270605621383e-31,
+      "D_two_components_upper_per_raw_Xe_count": 8.696245749860501e-30
+    },
+    {
+      "mass_GeV": 200.0,
+      "b_C13_fm": 2.0,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.3385912481501668,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 5280.571859917632,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.255622730925922e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.364923284382456e-27,
+      "D_two_components_upper_per_raw_Xe_count": 4.5921150593641676e-26
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 1.4,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2761.660353927341,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 9.920911953091765e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.317650086101208e-31,
+      "D_two_components_upper_per_raw_Xe_count": 1.0552676961701886e-29
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 1.4,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.40092455472307414,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.728399979276521e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.011051471622807e-27,
+      "D_two_components_upper_per_raw_Xe_count": 5.0295051264388015e-26
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 1.6,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2761.660353927341,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 9.494191138081894e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.317650086101208e-31,
+      "D_two_components_upper_per_raw_Xe_count": 1.0125956146692015e-29
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 1.6,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.40092455472307414,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.5250208239740954e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.011051471622807e-27,
+      "D_two_components_upper_per_raw_Xe_count": 4.826125971136376e-26
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 1.8,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2761.660353927341,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 9.034204019466145e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.317650086101208e-31,
+      "D_two_components_upper_per_raw_Xe_count": 9.665969028076266e-30
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 1.8,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.40092455472307414,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.3057866353819514e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.011051471622807e-27,
+      "D_two_components_upper_per_raw_Xe_count": 4.606891782544232e-26
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 2.0,
+      "window_keV": [
+        5.4,
+        270.0
+      ],
+      "Xe_charge_kernel": 2761.660353927341,
+      "Xe_magnetic_kernel": 63.29750298400074,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 8.548438273355038e-30,
+      "D_rigid_charge_upper_per_raw_Xe_count": 6.317650086101208e-31,
+      "D_two_components_upper_per_raw_Xe_count": 9.180203281965159e-30
+    },
+    {
+      "mass_GeV": 1000.0,
+      "b_C13_fm": 2.0,
+      "window_keV": [
+        200.0,
+        270.0
+      ],
+      "Xe_charge_kernel": 0.40092455472307414,
+      "Xe_magnetic_kernel": 0.1917951452271072,
+      "Xe_full_to_high_ratio": 4766.094086545094,
+      "D_nuclear_magnetic_upper_per_raw_Xe_count": 4.07426611038332e-26,
+      "D_rigid_charge_upper_per_raw_Xe_count": 3.011051471622807e-27,
+      "D_two_components_upper_per_raw_Xe_count": 4.375371257545601e-26
+    }
+  ],
+  "scope": "Two specified channels only, Born, mono-speed 776 km/s, Xe unit efficiency, GM=Helm; not full electromagnetic or experimental bound."
+}

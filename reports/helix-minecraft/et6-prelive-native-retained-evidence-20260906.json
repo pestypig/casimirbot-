@@ -1,0 +1,21 @@
+{
+  "scope": "Server-compiled native acceptance/activation evidence through retained-plan validation and broker event recording",
+  "integration_tests_enabled": 2,
+  "passed": true,
+  "targeted_typecheck": "passed",
+  "verified": [
+    "Native checkpoint measurements match compiled sequence",
+    "Native retained history and effect totals validate",
+    "Acceptance resolves exact child under matching plan hash, clock and checkpoint",
+    "Broker event handler records native events and advances child leased to running",
+    "Exact retries do not duplicate event rows",
+    "Conflicting replay and late acceptance reject without added event rows",
+    "Wrong-run retained chain rejects"
+  ],
+  "limits": [
+    "Admitted request/retention rows and prior resident cursor are seeded",
+    "Provided connector claim and transaction runner over minimal pg-mem tables",
+    "Initial broker enqueue/authorization and early-event capture not established",
+    "No complete HTTP disk-fault round trip, package refresh or live timing claim"
+  ]
+}

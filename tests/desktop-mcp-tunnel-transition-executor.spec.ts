@@ -206,12 +206,29 @@ describe("native desktop MCP tunnel transition executor", () => {
       requestedScopeReady: false,
       readOnlyFallbackAttempted: true,
       readOnlyFallbackReady: true,
+      failureReason: "transport_not_ready",
     });
     expect(port.stop).toHaveBeenCalledTimes(2);
     expect(port.start).toHaveBeenLastCalledWith(
       "account_session:fixture-owner",
       "local_supervisor_coordination_and_device_check",
     );
+  });
+
+  it("reports an account-session rejection without weakening it or exposing raw errors", async () => {
+    const port = { ...controller(), switchScope: vi.fn(async () => {
+      throw new Error("Tunnel account session changed before scope transition");
+    }) };
+    const result = await executeDesktopMcpTunnelTransitionNow({
+      controller: port,
+      accountSessionId: "private-session-value",
+      targetScope: "full_helix_agent",
+    });
+    expect(result.failureReason).toBe("account_session_changed");
+    expect(result.requestedScopeReady).toBe(false);
+    expect(result.readOnlyFallbackReady).toBe(false);
+    expect(JSON.stringify(result)).not.toContain("private-session-value");
+    expect(port.stop).not.toHaveBeenCalled();
   });
 
   it("uses the same exact stop/start downgrade path for lease expiry", async () => {

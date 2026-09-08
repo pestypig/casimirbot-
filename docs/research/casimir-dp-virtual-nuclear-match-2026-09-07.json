@@ -1,0 +1,16 @@
+{
+  "status": "conditional_uniform_nucleus_virtual_raw_normalization",
+  "mediator_GeV": 0.01,
+  "gap_GeV": 0.01,
+  "B_alpha_squared_over_gap_GeV_inverse": 7.825061806641244e-12,
+  "effective_alpha_product": 2.797331193591714e-07,
+  "raw_low_high_ratio": 15962.75266265606,
+  "carbon_forward_W_GeV_minus2": -1.535944699918771e-07,
+  "refinement_relative": 4.141131881851834e-12,
+  "assumptions": [
+    "100 GeV particle; mono-speed 776 km/s; density 0.003/cm3; 2.84 tonne-year",
+    "uniform nuclear charge radius 1.2 A^(1/3) fm; nuclear-only potential",
+    "local large-gap second Born; one raw high-window event, no detector acceptance",
+    "carbon forward coefficient only; no assembled diamond rate or external constraints"
+  ]
+}

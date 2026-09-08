@@ -1,0 +1,22 @@
+{
+  "scope": "Exact admitted action delivery diagnosis, not rolling acceptance",
+  "action_request_id": "et6-action-20260906-0720-1",
+  "source": "Read-only exact-row projection from packaged local persistence; no credential tables projected",
+  "recorded_outcome": "capability_unavailable",
+  "summary": "Temporal delivery failed source, compilation, paired identity, clock or inventory-sensor validation; no execution started.",
+  "started_at": null,
+  "completed_at": "2026-09-06T07:21:32.316992400Z",
+  "provenance_valid": true,
+  "side_effects_performed": false,
+  "player_motion_performed": false,
+  "controls_released": true,
+  "automatic_replay_performed": false,
+  "source_client_tick": 6700,
+  "completed_client_tick": 6781,
+  "elapsed_client_ticks": 81,
+  "plan_stop_unit": 60,
+  "plan_latest_start_unit": 40,
+  "interpretation": "The recorded completion clock is past the caller-authored stop and latest-start boundaries. Native decode rejects offsets at or above stop. This proves an unusable timing envelope, but the aggregate refusal does not prove which preceding integrity/identity check first threw.",
+  "next_action": "Prepare a fresh bounded caller plan with delivery allowance; retain existing product freshness and native safety checks. Do not replay the original action.",
+  "credentials_included": false
+}

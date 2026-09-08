@@ -33,6 +33,8 @@ import {
   type DesktopCodexPluginState,
 } from "@shared/codex-plugin";
 import AgentAccountBindingReadiness from "./AgentAccountBindingReadiness";
+import ConnectionExpiryNotice from "./ConnectionExpiryNotice";
+import EnvironmentSessionReadyUp from "./EnvironmentSessionReadyUp";
 import {
   AGENT_CONNECTION_SETUP_STORAGE_KEY,
   INITIAL_AGENT_CONNECTION_SETUP_STATE,
@@ -115,7 +117,7 @@ const continuationExplanation = (
 
 type RemoteState =
   | { kind: "idle" | "loading" | "signed_out" | "unavailable" }
-  | { kind: "loaded"; status: HelixAgentConnectionStatus };
+  | { kind: "loaded"; status: HelixAgentConnectionStatus; refreshing?: boolean };
 
 const restore = () => {
   if (typeof window === "undefined")
@@ -135,6 +137,7 @@ export function AgentConnectionSetup() {
   const [codexPlugin, setCodexPlugin] =
     useState<DesktopCodexPluginState | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [presentationError, setPresentationError] = useState<string | null>(null);
   const [disconnectConfirm, setDisconnectConfirm] = useState(false);
   const activeChatId = useAgiChatStore((state) => state.activeId);
   const rememberReasoningTaskBinding = useAgiChatStore(
@@ -144,6 +147,7 @@ export function AgentConnectionSetup() {
     useState<BrowserReasoningBinding | null>(null);
   const [claimHandle, setClaimHandle] = useState<string | null>(null);
   const [bindingBusy, setBindingBusy] = useState(false);
+  const [selectedRunVerification, setSelectedRunVerification] = useState<string | null>(null);
   const [onboardingPhase, setOnboardingPhase] =
     useState<AgentHarnessOnboardingPhase>("idle");
   const [onboardingTunnel, setOnboardingTunnel] =
@@ -157,6 +161,7 @@ export function AgentConnectionSetup() {
   const previousViewedStep = useRef(setup.viewedStep);
   const skipNextProfileRefresh = useRef(false);
   const pendingHarnessStart = useRef(false);
+  const revealBindingAfterStart = useRef(false);
   const suppressLocalGuidanceHandling = useRef(false);
 
   useEffect(() => {
@@ -181,7 +186,12 @@ export function AgentConnectionSetup() {
       const viewedStep = viewedStepOverride ?? setup.viewedStep;
       if (!selectedProfile) return;
       setOnboardingPhase("checking_readiness");
-      setRemote({ kind: "loading" });
+      // Keep the consent control mounted when returning to this window. A
+      // background read must not remove the target between pointerdown/click.
+      // The claim endpoint still validates current identity and presence.
+      setRemote((current) => current.kind === "loaded"
+        ? { ...current, refreshing: true }
+        : { kind: "loading" });
       setOperationError(null);
       try {
         const response = await fetch(
@@ -229,8 +239,12 @@ export function AgentConnectionSetup() {
           dispatch({ type: "view", step: "ready" });
         } else if (parsed.data.catalog_reenumeration_required) {
           dispatch({ type: "view", step: "check" });
+        } else if (revealBindingAfterStart.current) {
+          dispatch({ type: "view", step: "check" });
+          setDiagnosticStatus("Account access is linked. Waiting for this AI task to check in through CasimirBot. This page checks automatically; Check connection checks now. Neither action wakes the AI task or approves binding.");
         } else if (viewedStep === "account" || viewedStep === "authorize") {
           dispatch({ type: "view", step: "connect" });
+          setDiagnosticStatus("This exact AI task has not passed its connection check. Ask the same AI task to refresh its CasimirBot presence, then use Retry. Starting the harness alone does not create a task binding.");
         }
       } catch {
         setOnboardingPhase("action_required");
@@ -241,6 +255,10 @@ export function AgentConnectionSetup() {
   );
   const guidanceRefresh = useRef(refresh);
   guidanceRefresh.current = refresh;
+  const refreshBusy = useRef(false);
+  const readinessRefreshing = remote.kind === "loading" ||
+    (remote.kind === "loaded" && remote.refreshing === true);
+  refreshBusy.current = readinessRefreshing || bindingBusy;
 
   useEffect(() => {
     if (!setup.selectedProfile) return;
@@ -249,7 +267,30 @@ export function AgentConnectionSetup() {
       return;
     }
     void refresh();
-  }, [setup.selectedProfile]); // refresh is intentionally user-driven after the initial profile selection
+  }, [setup.selectedProfile]);
+
+  useEffect(() => {
+    if (!setup.selectedProfile || setup.viewedStep !== "ready") return;
+    let pending: number | undefined;
+    const recheckOnReturn = () => {
+      if (document.visibilityState === "hidden" || pending !== undefined) return;
+      // Focus and visibility commonly arrive together. Coalesce them into one
+      // read; never synthesize presence or activate the human-only bind control.
+      pending = window.setTimeout(() => {
+        pending = undefined;
+        if (document.visibilityState !== "hidden" && !refreshBusy.current) {
+          void guidanceRefresh.current();
+        }
+      }, 200);
+    };
+    window.addEventListener("focus", recheckOnReturn);
+    document.addEventListener("visibilitychange", recheckOnReturn);
+    return () => {
+      if (pending !== undefined) window.clearTimeout(pending);
+      window.removeEventListener("focus", recheckOnReturn);
+      document.removeEventListener("visibilitychange", recheckOnReturn);
+    };
+  }, [setup.selectedProfile, setup.viewedStep]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -268,12 +309,23 @@ export function AgentConnectionSetup() {
 
   useEffect(() => {
     const inspectTunnel = window.casimirDesktop?.getMcpTunnelState;
-    if (!inspectTunnel) return;
     let cancelled = false;
     const retryIds = new Set<number>();
+    let presentationGeneration = 0;
+    let failedPresentation: unknown = null;
     const handleGuidanceRequest = (candidate: unknown) => {
       if (suppressLocalGuidanceHandling.current) return;
       const request = coerceWorkstationGuidanceRequest(candidate);
+      if (request?.kind === "user_attention" && request.panelId === "agent-access" && request.targetId === "external-ai-connection-setup") {
+        // Resume navigation only. Opening setup never starts transport or
+        // grants trust, binding, or environment authority.
+        revealBindingAfterStart.current = true;
+        setPresentationError(null);
+        dispatch({ type: "choose", profile: "codex_app" });
+        void guidanceRefresh.current("codex_app", "account");
+        return;
+      }
+      if (!inspectTunnel) return;
       const presentsTrust = request?.targetId === "full-harness-trust";
       const presentsAgentAccountLink =
         request?.targetId === "auth0-account-link";
@@ -287,15 +339,32 @@ export function AgentConnectionSetup() {
           !presentsReasoningBinding)
       )
         return;
+      const generation = ++presentationGeneration;
+      failedPresentation = null;
+      for (const retryId of retryIds) window.clearTimeout(retryId);
+      retryIds.clear();
+      setPresentationError(null);
+      setOperationError(null);
       setOnboardingPhase("checking_readiness");
       dispatch({ type: "choose", profile: "codex_app" });
+      const reportPresentationFailure = (message: string) => {
+        if (cancelled || generation !== presentationGeneration) return;
+        failedPresentation = candidate;
+        setOnboardingPhase("action_required");
+        setPresentationError(message);
+      };
       const inspectPresentedTunnel = (attempt: number) => {
         void inspectTunnel()
           .then(parseDesktopMcpTunnelState)
           .then((tunnel) => {
-            if (cancelled) return;
+            if (cancelled || generation !== presentationGeneration) return;
             if (!tunnel?.ready || tunnel.scope !== "full_helix_agent") {
-              if (attempt >= 20) return;
+              if (attempt >= 20) {
+                reportPresentationFailure(
+                  "The binding panel request arrived, but the native Full Harness transport did not become ready within 5 seconds. Binding is not ready. Ask the connected AI task to inspect the transport; repeating account sign-in will not complete this check.",
+                );
+                return;
+              }
               const retryId = window.setTimeout(() => {
                 retryIds.delete(retryId);
                 inspectPresentedTunnel(attempt + 1);
@@ -307,7 +376,9 @@ export function AgentConnectionSetup() {
             setOnboardingPhase("checking_readiness");
             void guidanceRefresh.current("codex_app", "account");
           })
-          .catch(() => undefined);
+          .catch(() => reportPresentationFailure(
+            "CasimirBot could not read native Full Harness transport readiness. Binding readiness is unverified. Ask the connected AI task to inspect the native transport.",
+          ));
       };
       inspectPresentedTunnel(0);
     };
@@ -318,7 +389,7 @@ export function AgentConnectionSetup() {
       if (
         request?.kind === "user_attention" &&
         request.panelId === "agent-access" &&
-        (request.targetId === "full-harness-trust" ||
+        (request.targetId === "external-ai-connection-setup" || request.targetId === "full-harness-trust" ||
           request.targetId === "auth0-account-link" ||
           request.controlId === REASONING_BIND_CONTROL_ID)
       ) {
@@ -333,8 +404,17 @@ export function AgentConnectionSetup() {
         if (!cancelled && candidate) handleGuidanceRequest(candidate);
       })
       .catch(() => undefined);
+    const unsubscribeTunnel = window.casimirDesktop?.onMcpTunnelState?.((candidate) => {
+      if (cancelled || !failedPresentation) return;
+      const tunnel = parseDesktopMcpTunnelState(candidate);
+      if (!tunnel?.ready || tunnel.scope !== "full_helix_agent") return;
+      // A late native recovery resumes only the prior presentation/readiness
+      // check. It does not start transport, issue a claim or approve a run.
+      handleGuidanceRequest(failedPresentation);
+    });
     return () => {
       cancelled = true;
+      unsubscribeTunnel?.();
       for (const retryId of retryIds) window.clearTimeout(retryId);
       retryIds.clear();
       window.removeEventListener(
@@ -386,11 +466,45 @@ export function AgentConnectionSetup() {
     : null;
   const status = remote.kind === "loaded" ? remote.status : null;
 
+  const waitingForTaskPresence = (setup.viewedStep === "ready" || setup.viewedStep === "check") &&
+    status?.readiness.client_authorization === "active" &&
+    !status.catalog_reenumeration_required &&
+    (status.readiness.continuation_readiness === "unavailable" || !status.readiness.agent_ready);
+  useEffect(() => {
+    if (!waitingForTaskPresence || !setup.selectedProfile) return;
+    // Observe recovery from the authenticated task; never mint a heartbeat,
+    // wake a provider, issue a claim, or extend a permission from this UI.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "hidden" && !refreshBusy.current) {
+        void guidanceRefresh.current();
+      }
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [waitingForTaskPresence, setup.selectedProfile]);
+
+  useEffect(() => {
+    if (!revealBindingAfterStart.current || setup.viewedStep !== "ready" || !status) return;
+    revealBindingAfterStart.current = false;
+    const unavailable = status.readiness.continuation_readiness === "unavailable";
+    setDiagnosticStatus(unavailable
+      ? "The connection is visible, but this exact task's continuation is unavailable. Ask that same AI task to refresh its CasimirBot presence, then recheck here."
+      : "Connection checked. Review the exact-task binding below; Start Harness has not approved it for you.");
+    // Presentation only: wait until the binding target has mounted and never
+    // invoke its human-only control or recursively refresh from our own guide.
+    suppressLocalGuidanceHandling.current = true;
+    try {
+      requestWorkstationGuidance({
+        kind: "user_attention", panelId: "agent-access", targetId: "reasoning-task-binding",
+        label: unavailable ? "This task needs fresh continuation presence before you can bind it." : "Review the exact AI task and choose whether to bind this Helix chat.",
+        durationMs: 12000,
+      });
+    } finally { suppressLocalGuidanceHandling.current = false; }
+  }, [setup.viewedStep, status]);
+
   useEffect(() => {
     if (
-      setup.viewedStep !== "ready" ||
-      !status?.client_session_ref ||
-      status.readiness.continuation_readiness === "unavailable"
+      !["check", "ready"].includes(setup.viewedStep) ||
+      status?.readiness.client_authorization !== "active"
     )
       return;
     let cancelled = false;
@@ -420,6 +534,7 @@ export function AgentConnectionSetup() {
     setup.viewedStep,
     status?.client_session_ref,
     status?.readiness.continuation_readiness,
+    status?.readiness.client_authorization,
   ]);
 
   useEffect(() => {
@@ -438,27 +553,54 @@ export function AgentConnectionSetup() {
 
   useEffect(() => {
     if (!claimHandle || !reasoningBinding?.expires_at) return;
+    let cancelled = false;
     const expiresAt = Date.parse(reasoningBinding.expires_at);
     if (!Number.isFinite(expiresAt)) return;
-    const expire = () => {
-      setClaimHandle(null);
-      setReasoningBinding((current) =>
-        current?.status === "pending_claim"
-          ? { ...current, status: "expired" }
-          : current,
-      );
-      setOperationError(
-        "The show-once claim expired. Create a new binding claim instead of retrying the old value.",
-      );
+    const reconcileExpiry = async () => {
+      try {
+        const binding = await inspectReasoningBinding(
+          reasoningBinding.reasoning_binding_id,
+        );
+        if (cancelled) return;
+        setClaimHandle(null);
+        setReasoningBinding(binding);
+        rememberReasoningTaskBinding(binding);
+        setOperationError(
+          binding.status === "active"
+            ? null
+            : "The show-once claim expired. Create a new binding claim instead of retrying the old value.",
+        );
+      } catch {
+        if (cancelled) return;
+        setClaimHandle(null);
+        setReasoningBinding((current) =>
+          current?.status === "pending_claim"
+            ? { ...current, status: "expired" }
+            : current,
+        );
+        setOperationError(
+          "The show-once claim expired. Create a new binding claim instead of retrying the old value.",
+        );
+      }
     };
     const delay = expiresAt - Date.now();
     if (delay <= 0) {
-      expire();
-      return;
+      void reconcileExpiry();
+      return () => {
+        cancelled = true;
+      };
     }
-    const timeoutId = window.setTimeout(expire, delay);
-    return () => window.clearTimeout(timeoutId);
-  }, [claimHandle, reasoningBinding?.expires_at]);
+    const timeoutId = window.setTimeout(() => void reconcileExpiry(), delay);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    claimHandle,
+    reasoningBinding?.expires_at,
+    reasoningBinding?.reasoning_binding_id,
+    rememberReasoningTaskBinding,
+  ]);
 
   const mcpUrl = selected
     ? `${CASIMIRBOT_PUBLIC_ORIGIN}${selected.endpoint_path}`
@@ -471,6 +613,7 @@ export function AgentConnectionSetup() {
     )
       return;
     setOnboardingPhase("starting_native_harness");
+    revealBindingAfterStart.current = true;
     pendingHarnessStart.current = false;
     setOperationError(null);
     setDiagnosticStatus(null);
@@ -636,13 +779,13 @@ export function AgentConnectionSetup() {
               body: "CasimirBot authorization changed after this task last loaded its tools. Use the AI app's in-place MCP reload for this same task. In Codex, reload MCP server configuration or restart Codex and reopen this same task; do not create replacement tasks just to chase a catalog.",
             }
           : {
-              title: "Check the connection",
-              body: "In the relevant AI chat, ask: “Connect this chat to CasimirBot and check Agent Connections.” Then return here and Retry.",
+              title: "Waiting for your AI task",
+              body: "In the AI task you want to bind, ask: “Refresh this task’s CasimirBot presence.” Keep this page open: it checks automatically and continues to binding when that task is ready. No new task or repeated sign-in is needed. If CasimirBot tools are not installed in that AI app, use Advanced manual setup below.",
             };
       case "ready":
         return {
           title: "AI app connected",
-          body: "A fresh authenticated client session and declared chat thread reached this node's current coordination catalog.",
+          body: "Connection checked. Next: review the exact-task binding below. Connection readiness alone does not bind this chat or grant game actions.",
         };
     }
   }, [
@@ -679,9 +822,16 @@ export function AgentConnectionSetup() {
     setBindingBusy(true);
     setOperationError(null);
     try {
+      if (selectedRunVerification &&
+          selectedRunVerification !== status.verified_run_association?.verification_ref) {
+        throw new Error("reasoning_binding_run_association_stale");
+      }
       const issued = await issueReasoningBindingClaim({
         clientSessionRef: status.client_session_ref,
         helixConversationId: activeChatId,
+        runAssociation: status.verified_run_association &&
+          selectedRunVerification === status.verified_run_association.verification_ref
+          ? status.verified_run_association : undefined,
       });
       setReasoningBinding(issued.binding);
       rememberReasoningTaskBinding(issued.binding);
@@ -689,7 +839,9 @@ export function AgentConnectionSetup() {
     } catch (error) {
       const reason = error instanceof Error ? error.message : "";
       setOperationError(
-        reason === "reasoning_binding_target_inactive"
+        reason === "reasoning_binding_run_association_stale"
+          ? "The selected environment run changed or is no longer available. Refresh this task's presence, recheck the connection, and review the run again. Your existing chat binding was not replaced."
+          : reason === "reasoning_binding_target_inactive"
           ? "This exact AI task's short supervisor presence expired. Return to that same task, ask it to refresh its CasimirBot presence, then retry here. Do not restart CasimirBot or create a replacement task."
           : reason === "reasoning_binding_identity_mismatch"
             ? "The connected AI task does not match this browser session. Recheck Agent Connections from the exact task you intend to bind; do not reuse another task's claim."
@@ -855,7 +1007,7 @@ export function AgentConnectionSetup() {
           ) : null}
           <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300">
             {setup.viewedStep === "ready"
-              ? "Connected"
+              ? "Review task binding"
               : `Step ${Math.max(1, ["choose", "account", "authorize", "connect", "check", "ready"].indexOf(setup.viewedStep) + 1)} of 6`}
           </span>
         </div>
@@ -1009,11 +1161,11 @@ export function AgentConnectionSetup() {
           authenticated. Reconnecting a separate Device Check plugin, opening an
           app, or opening a tunnel alone does not pass it. If sign-in succeeds
           but the app immediately asks again, stop repeating the loop: the
-          connection needs administrator repair before Retry can pass.
+          connection needs administrator repair before a connection check can pass.
         </div>
       ) : null}
 
-      {setup.viewedStep === "ready" && status ? (
+      {setup.viewedStep === "ready" && status?.readiness.agent_ready ? (
         <div className="mt-4 flex items-start gap-3 rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-4">
           <CheckCircle2
             className="mt-0.5 h-5 w-5 shrink-0 text-emerald-200"
@@ -1048,7 +1200,12 @@ export function AgentConnectionSetup() {
         </div>
       ) : null}
 
-      {setup.viewedStep === "ready" && status ? (
+      {status?.heartbeat_expires_at ? (
+        <ConnectionExpiryNotice deadline={status.heartbeat_expires_at} label="AI task presence"
+          recovery="Ask the same AI task to refresh its CasimirBot presence. Keep this panel open for its automatic connection check. Keep any active binding; missing presence alone does not revoke it." />
+      ) : null}
+
+      {status && (setup.viewedStep === "ready" || (setup.viewedStep === "check" && reasoningBinding)) ? (
         <div
           className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-400/5 p-4 text-xs leading-5 text-cyan-50/85"
           data-helix-guidance-target="reasoning-task-binding"
@@ -1069,17 +1226,89 @@ export function AgentConnectionSetup() {
             the authenticated task shown above to poll for steering from the
             selected local Helix chat.
           </p>
+          {(reasoningBinding?.status === "pending_claim" || reasoningBinding?.status === "expired") && reasoningBinding.expires_at ? (
+            <ConnectionExpiryNotice deadline={reasoningBinding.expires_at} label="One-time binding claim"
+              recovery="Check the binding status before replacing the claim: the AI task may already have claimed it. If the server confirms expiry, review the verified environment run and generate a new claim here. Do not downgrade to chat-only for Minecraft." />
+          ) : null}
+          {reasoningBinding?.status === "active" ? (
+            <div className="mt-3 rounded border border-white/15 p-3" aria-label="Session recovery status">
+              <p>Chat binding: active. A missing heartbeat does not revoke this binding.</p>
+              <p>AI availability: {status.readiness.agent_ready && status.readiness.continuation_readiness !== "unavailable"
+                ? "current connection check passed; polling pickup still requires the AI task to run."
+                : "waiting for a fresh connection check from the same AI task."}</p>
+              <p>An associated run does not by itself prove current game connectivity or action permission.</p>
+              <EnvironmentSessionReadyUp key={`${reasoningBinding.reasoning_binding_id}:${reasoningBinding.binding_epoch}`}
+                binding={reasoningBinding} />
+              <p className="mt-2">Keep this binding while recovering the session. Do not replace it just because task presence or game permissions expired.</p>
+            </div>
+          ) : null}
           {status.readiness.continuation_readiness === "unavailable" ? (
             <p className="mt-2 text-amber-100">
               This task's continuation was unavailable at the last check.
-              Refresh its CasimirBot presence from the same AI task, then use
-              Recheck connection below. Do not create another task.
+              Ask that same AI task to refresh its CasimirBot presence.
+              While this panel is visible, it checks automatically every five seconds
+              and enables binding when the server confirms readiness.
+              Recheck connection only checks status: it cannot wake an idle task
+              or renew binding and environment permissions. Do not create another task.
             </p>
           ) : null}
           {!activeChatId ? (
             <p className="mt-2 text-amber-100">
               Open or create a Helix chat first.
             </p>
+          ) : null}
+          {status.verified_run_association ? (
+            <label className="mt-3 block rounded border border-cyan-300/20 p-3">
+              <input
+                type="checkbox"
+                data-helix-interaction-kind="human_only"
+                data-helix-authority-state="client_local"
+                data-helix-control-id="workstation.panel.agent-access.agent-connection-setup.bind-environment-run"
+                checked={selectedRunVerification === status.verified_run_association.verification_ref}
+                onChange={event => setSelectedRunVerification(event.target.checked
+                  ? status.verified_run_association!.verification_ref : null)}
+              />{" "}
+              Include this verified environment run in the new binding:
+              <span className="block break-all">{status.verified_run_association.run_id}</span>
+              <span className="block break-all">Room: {status.verified_run_association.room_id}</span>
+              This associates steering with the run; environment action permission remains separate.
+            </label>
+          ) : (
+            <div className="mt-3 rounded border border-amber-300/20 p-3">
+              <label className="block">
+                <input type="checkbox" checked={false} disabled aria-describedby="environment-run-preparation-needed" />{" "}
+                Include a verified environment run in the new binding
+              </label>
+              <p id="environment-run-preparation-needed" className="mt-2">
+                Environment session not ready to bind. This task has not published a current,
+                server-verified run. A run may need preparation, or its verification may have
+                expired after a state change. This does not mean Minecraft is disconnected.
+              </p>
+              <p className="mt-2">
+                Ask this same AI task to prepare or restore the Minecraft session through the
+                harness and refresh its presence with the exact run and room. Keep this panel
+                open: when verification arrives, review and select the run here before replacing
+                the binding. Checking the connection does not prepare a session or approve it.
+              </p>
+              <p className="mt-2">
+                Binding now creates a chat-only connection, not a Minecraft run association.
+                Do not generate another claim while waiting for the environment run.
+              </p>
+            </div>
+          )}
+          {selectedRunVerification &&
+            selectedRunVerification !== status.verified_run_association?.verification_ref ? (
+            <div className="mt-2 text-amber-100">
+              The selected environment run is no longer current. Review a fresh run above or explicitly choose chat-only.
+              <button
+                type="button"
+                data-helix-interaction-kind="human_only"
+                data-helix-authority-state="client_local"
+                data-helix-control-id="workstation.panel.agent-access.agent-connection-setup.clear-environment-run"
+                className="ml-2 rounded border border-white/20 px-2 py-1"
+                onClick={() => setSelectedRunVerification(null)}
+              >Use chat-only binding</button>
+            </div>
           ) : null}
           {claimHandle ? (
             <>
@@ -1119,6 +1348,7 @@ export function AgentConnectionSetup() {
               <strong>{reasoningBinding.status.replaceAll("_", " ")}</strong>.
               Transport:{" "}
               {reasoningBinding.continuation_transport.replaceAll("_", " ")}.
+              {" "}Environment run: {reasoningBinding.run_id ?? "none (chat-only)"}.
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -1130,6 +1360,7 @@ export function AgentConnectionSetup() {
               disabled={
                 !activeChatId ||
                 !status.client_session_ref ||
+                !status.readiness.agent_ready ||
                 status.readiness.continuation_readiness === "unavailable" ||
                 bindingBusy
               }
@@ -1187,7 +1418,25 @@ export function AgentConnectionSetup() {
         </p>
       ) : null}
 
+      {presentationError ? (
+        <p className="mt-3 text-xs text-rose-200" role="alert">
+          {presentationError}
+        </p>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap gap-2">
+        {window.casimirDesktop?.startMcpTunnel ? (
+          <button
+            type="button"
+            onClick={() => void startHarness()}
+            disabled={onboardingPhase === "starting_native_harness" || onboardingPhase === "checking_readiness"}
+            title="Restore the native Full Harness transport and recheck setup. Does not renew an idle AI task's presence, approve binding, or grant game actions."
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-50 disabled:opacity-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            Refresh harness connection
+          </button>
+        ) : null}
         {setup.viewedStep !== "choose" ? (
           <button
             type="button"
@@ -1201,10 +1450,10 @@ export function AgentConnectionSetup() {
           <button
             type="button"
             onClick={() => void refresh()}
-            disabled={remote.kind === "loading"}
+            disabled={readinessRefreshing}
             className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-50 disabled:opacity-50"
           >
-            {remote.kind === "loading" ? (
+            {readinessRefreshing ? (
               <LoaderCircle
                 className="h-3.5 w-3.5 animate-spin"
                 aria-hidden="true"
@@ -1212,7 +1461,7 @@ export function AgentConnectionSetup() {
             ) : (
               <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
             )}{" "}
-            {setup.viewedStep === "ready" ? "Recheck connection" : "Retry"}
+            {setup.viewedStep === "ready" ? "Recheck connection" : setup.viewedStep === "check" && !status?.catalog_reenumeration_required ? "Check connection" : "Retry"}
           </button>
         ) : null}
         {setup.viewedStep === "connect" ? (

@@ -1,0 +1,25 @@
+{
+  "schema": "casimirbot.et6.local_rollback_diagnostic.v1",
+  "date": "2026-09-06",
+  "scope": "Isolated installed pg-mem adapter; no live database mutations",
+  "procedure": [
+    "Create fresh newDb and createPg Pool",
+    "Create rollback_probe table",
+    "BEGIN",
+    "INSERT one row",
+    "ROLLBACK",
+    "SELECT count(*)"
+  ],
+  "expected_transactional_count": 0,
+  "observed_count": 1,
+  "verdict": "rollback_not_effective_in_isolated_adapter",
+  "production_path": "server/services/helix-ask/realtime-room/room-store/database.ts uses BEGIN/COMMIT/ROLLBACK without an alternate local transaction mechanism",
+  "live_correlation": "et6-succ-1959-1-action remained admitted after its failed retention; no temporal admission was observed",
+  "limitations": [
+    "Does not identify the exact failed retention predicate",
+    "Does not prove concurrent transaction isolation",
+    "Does not repair or replay the orphan request",
+    "Does not prove any rolling extension"
+  ],
+  "rolling_extensions_proven": 0
+}

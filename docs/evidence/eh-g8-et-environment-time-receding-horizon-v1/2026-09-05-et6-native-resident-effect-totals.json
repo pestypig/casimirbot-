@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 native cumulative effect normalization",
+  "implementation": "Preserve local per-plan measurements and emit separate resident_effect_totals computed from bounded history plus current sample. Final native result effect projection uses recomputed totals, including positive world-only counts, without rewriting original plan samples.",
+  "verification": {
+    "native_effect_sequence_runtime_tests": "PASS",
+    "cases": ["quiet final plan preserves earlier motion", "counts sum without changing original samples", "world-only earlier effect remains visible", "negative fractional nonnumeric nonfinite and overflowing counts rejected"],
+    "casimir": { "run_id": "2672", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": ["Server recomputation and final rolling result validation remain necessary; native totals are not independent authority.", "Temporal delivery remains disabled. No EXE rebuild, deployment or live Minecraft qualification ran."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

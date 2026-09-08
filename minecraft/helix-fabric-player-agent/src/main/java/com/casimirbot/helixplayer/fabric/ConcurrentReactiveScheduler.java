@@ -99,6 +99,8 @@ final class ConcurrentReactiveScheduler {
     private final List<Map<String, Object>> actionReceipts = new ArrayList<>();
     private final Set<String> settledRaceIds = new HashSet<>();
     private final Set<String> satisfiedCheckpoints = new LinkedHashSet<>();
+    private final List<Map<String, Object>> checkpointSettlements = new ArrayList<>();
+    private long startedNanos;
     private final Map<String, String> nodeOutcomes = new LinkedHashMap<>();
     private final Map<String, Boolean> lastConditionValues = new HashMap<>();
     private String programId = "";
@@ -174,6 +176,8 @@ final class ConcurrentReactiveScheduler {
         actionReceipts.clear();
         settledRaceIds.clear();
         satisfiedCheckpoints.clear();
+        checkpointSettlements.clear();
+        startedNanos = System.nanoTime();
         nodeOutcomes.clear();
         lastConditionValues.clear();
         programId = text(program, "program_id");
@@ -510,6 +514,13 @@ final class ConcurrentReactiveScheduler {
                         object(node.get("condition"))
                     )) {
                         satisfiedCheckpoints.add(text(node, "checkpoint_id"));
+                        checkpointSettlements.add(Map.of(
+                            "checkpoint_id", text(node, "checkpoint_id"),
+                            "node_id", lane.nodeId,
+                            "lane_id", lane.id,
+                            "tick_index", currentTick,
+                            "monotonic_elapsed_ns", Math.max(0L, System.nanoTime() - startedNanos)
+                        ));
                         transition(lane, text(node, "on_satisfied"));
                         continue;
                     }
@@ -539,6 +550,17 @@ final class ConcurrentReactiveScheduler {
         Map<String, Object> node,
         String kind
     ) {
+        // Rechecked while waiting for resources, but never a duration limit
+        // on an action that already began inside its start window.
+        if ("action".equals(kind) && lane.actionTicks == 0 &&
+            currentTick > longOr(node, "latest_start_tick", Long.MAX_VALUE)) {
+            captureActionEvidence(lane.id, lane.iteration, object(node.get("action")),
+                new ActionStep(ActionStatus.TIMED_OUT, "The action start window expired before execution.",
+                    Map.of("timeout_reason", "action_start_deadline_missed", "effect_prevented", true)));
+            releaseLaneAction(lane, "action_start_deadline_missed");
+            transition(lane, text(node, "on_timeout"), "timed_out");
+            return true;
+        }
         if ("maintain".equals(kind)) {
             boolean maintain = observeCondition(
                 lane.nodeId,
@@ -1120,6 +1142,7 @@ final class ConcurrentReactiveScheduler {
         result.put("condition_observations", List.copyOf(conditionObservations));
         result.put("condition_observation_count", conditionObservations.size());
         result.put("satisfied_checkpoint_ids", List.copyOf(satisfiedCheckpoints));
+        result.put("checkpoint_settlements", List.copyOf(checkpointSettlements));
         result.put("node_outcomes", Map.copyOf(nodeOutcomes));
         result.put("world_mutations_performed", worldMutationsPerformed);
         result.put("inventory_mutations_performed", inventoryMutationsPerformed);

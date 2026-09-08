@@ -1,0 +1,24 @@
+{
+  "status": "conditional_second_Born_potential_bound",
+  "maximum_relative_kinetic_energy_GeV": 3.17206825683207e-05,
+  "rows": [
+    {
+      "excited_fraction": 0.5,
+      "W_upper_GeV_minus2": 5.795967750823188e-14,
+      "D_independent_carbon_upper": 6.890060240300338e-38
+    },
+    {
+      "excited_fraction": 0.0062,
+      "W_upper_GeV_minus2": 4.6741675409864425e-12,
+      "D_independent_carbon_upper": 8.906532084821119e-34
+    },
+    {
+      "excited_fraction": 1e-06,
+      "W_upper_GeV_minus2": 2.8979838754115944e-08,
+      "D_independent_carbon_upper": 3.4450266751200493e-26
+    }
+  ],
+  "norm_relative_error": 0.0,
+  "zero_momentum_resolvent_relative_error": 2.220446049250313e-16,
+  "scope": "Ground-state incident particles, independent free carbon nuclei, NR Yukawa potential second Born only; no complete field-theory or solid matching"
+}

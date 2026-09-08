@@ -1,0 +1,31 @@
+{
+  "status": "ideal nonrelativistic endpoints; no operation, alignment, transport or rate claim",
+  "thermal": [
+    {
+      "T_K": 300.0,
+      "minimum_Boltzmann_exponent": 9593068.313814932
+    },
+    {
+      "T_K": 5000.0,
+      "minimum_Boltzmann_exponent": 575584.098828896
+    }
+  ],
+  "two_step": [
+    {
+      "projectile": "proton",
+      "assumed_kinetic_energy_MeV": 1.1,
+      "optimum_DM_mass_GeV": 10.699027245502275,
+      "max_two_step_transfer_fraction": 0.08791384481859713,
+      "max_Xe_recoil_keV": 96.70522930045684,
+      "minimum_projectile_energy_MeV_for_248keV": 2.8209436239733034
+    },
+    {
+      "projectile": "alpha",
+      "assumed_kinetic_energy_MeV": 2.2,
+      "optimum_DM_mass_GeV": 21.324639223208443,
+      "max_two_step_transfer_fraction": 0.25663719495243426,
+      "max_Xe_recoil_keV": 564.6018288953553,
+      "minimum_projectile_energy_MeV_for_248keV": 0.9663447266323375
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "scope": "Geometric exp(-gap/range) only; not a force, noise, decoherence or exclusion bound. Gap is nearest surface distance. No density or state-dependent scalar susceptibility assigned.",
+  "gap_m": 1e-05,
+  "rows": [
+    {
+      "mass_eV": 0.001,
+      "range_m": 0.00019732698039999998,
+      "gap_attenuation": 0.9505853681213475
+    },
+    {
+      "mass_eV": 0.01,
+      "range_m": 1.973269804e-05,
+      "gap_attenuation": 0.6024364648144663
+    },
+    {
+      "mass_eV": 0.01973269804,
+      "range_m": 9.999999999999999e-06,
+      "gap_attenuation": 0.3678794411714422
+    },
+    {
+      "mass_eV": 0.1,
+      "range_m": 1.973269804e-06,
+      "gap_attenuation": 0.006296692914108334
+    },
+    {
+      "mass_eV": 1.0,
+      "range_m": 1.973269804e-07,
+      "gap_attenuation": 9.797722513328221e-23
+    },
+    {
+      "mass_eV": 10.0,
+      "range_m": 1.9732698039999998e-08,
+      "gap_attenuation": 8.151759420291888e-221
+    }
+  ],
+  "mass_for_range_equals_gap_eV": 0.019732698039999996,
+  "full_model_admitted": false
+}

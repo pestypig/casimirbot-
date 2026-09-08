@@ -1,0 +1,35 @@
+{
+  "status": "four_shell_rigid_gaussian_forward_overlap_not_full_diamond_response",
+  "rows": [
+    {
+      "neighbors": 4,
+      "distance_nm": 0.1545855345755223,
+      "overlap_over_self": 0.011521180589779485,
+      "independent_difference": 2.3626933742804113e-15
+    },
+    {
+      "neighbors": 12,
+      "distance_nm": 0.25243712088359743,
+      "overlap_over_self": 0.000140057178191435,
+      "independent_difference": 6.020574663812006e-16
+    },
+    {
+      "neighbors": 12,
+      "distance_nm": 0.2960087625392194,
+      "overlap_over_self": 1.3700494757674175e-05,
+      "independent_difference": 2.8356426907093224e-15
+    },
+    {
+      "neighbors": 6,
+      "distance_nm": 0.357,
+      "overlap_over_self": 3.5929330245294144e-07,
+      "independent_difference": 2.3539058839086807e-15
+    }
+  ],
+  "amplitude_multiplier_four_shells": 1.047931970194322,
+  "assumptions": [
+    "rms cloud 0.1 nm, massless mediator, constant gap",
+    "ideal bulk diamond lattice 0.357 nm",
+    "four shells only, forward amplitude only; no quantum density fluctuations"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "casimirbot.et6.clock_window_repair.v1",
+  "recorded_at": "2026-09-05T19:52:10.407Z",
+  "classification": "tool admission; evidence normalization",
+  "policy_change": {
+    "old_frontier_world_ticks": 20,
+    "new_frontier_world_ticks": 100,
+    "nominal_tick_rate_hz": 20,
+    "perception_max_age_ms": 5000,
+    "resident_total_sample_and_receipt_age_max_ms": 5000,
+    "ticks_extrapolated": false,
+    "native_safety_guards_changed": false,
+    "execution_authority_extended": false,
+    "heartbeat_cadence_changed": false
+  },
+  "positive_evidence": {
+    "temporal_tests": 123,
+    "temporal_files": 13,
+    "mcp_boundary_tests": 3,
+    "mcp_files": 1,
+    "docs_audit": "PASS G8",
+    "host_build_exit": 0,
+    "stage_exit": 0,
+    "package_exit": 0,
+    "runtime_tree": "PASS",
+    "service_byte_equal": true,
+    "service_sha256": "4db70217e6b06ebaa925c61abf888214dc67a98d89edc4bf2a8351a6d4291f0d",
+    "runtime_manifest_sha256": "46dac37e555c76d05e96cffd933693bde590f1993033cffbe841e59cbd16ac97"
+  },
+  "package": "apps/desktop/release-et6-clock-window-20260905/win-unpacked/CasimirBot.exe",
+  "limits": {
+    "deployed": false,
+    "live_admission_proven": false,
+    "rolling_cycles_proven": 0,
+    "goal_complete": false,
+    "external_provider_identity_proven": false,
+    "heartbeat_sample_may_still_precede_perception": true,
+    "full_helix_discipline_not_run": true
+  },
+  "process_note": "Packaging was started while the stage command still had an outstanding session handle; stage completed successfully. Post-pack verification checked the complete prescribed runtime tree and byte-identical bundled service. No running EXE was replaced."
+}

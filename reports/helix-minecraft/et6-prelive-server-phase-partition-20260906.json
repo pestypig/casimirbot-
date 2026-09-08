@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-06",
+  "scope": "Actual ordered server timing partition",
+  "verification": { "correlated_tests_passed": 42, "connected_persistent_tests_passed": 2, "targeted_typescript": "passed" },
+  "phases": ["frontier response preparation", "response ready to proposal receipt", "proposal receipt to admission return", "admission return to delivery poll", "delivery poll to lease SQL", "lease SQL to commit and persistence return"],
+  "assertion": "Phase durations sum exactly to server response-preparation start through lease transaction return without adding nested work to the native budget",
+  "finding": "Required snapshot completion occurs in the lease transaction, not at initial admission return; a serial model that places it at admission is not faithful to production",
+  "limits": ["Not isolated disk I/O duration", "Not pure provider sampling", "Server partition is not complete cross-process attribution", "Positive stop-window capacity remains unproven"]
+}

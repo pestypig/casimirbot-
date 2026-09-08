@@ -1,0 +1,71 @@
+{
+  "schema": "casimirbot.cfp1.rights_primary_sources.v1",
+  "reviewed_utc": "2026-09-07T03:08:10Z",
+  "scope": "Primary-source text inspection supporting bounded rights questions. No legal classification, permission or clearance established. Summaries are paraphrases; actual terms and exact selected versions remain controlling review inputs.",
+  "sources": [
+    {
+      "id": "PS-MC-EULA",
+      "url": "https://www.minecraft.net/en-us/eula",
+      "section": "Using mods; fetched text lines 34-39",
+      "status": "read",
+      "observation": "Definition includes original modifications, tools and plugins; original Java mods are subject to monetization restrictions; modded-game redistribution is excluded.",
+      "product_inference": "The selected paid harness/companion relationship requires explicit reviewer classification; external-process placement or a free connector does not itself settle the terms question."
+    },
+    {
+      "id": "PS-MC-GUIDELINES",
+      "url": "https://www.minecraft.net/en-us/usage-guidelines",
+      "section": "Extended functionality and modifications, lines 703-712; Servers and hosting, 663-702; final permission guidance, 753-756",
+      "status": "read",
+      "observation": "The mod conditions address direct or indirect verification of outside-product access that affects in-game features. Server monetization permissions have their own conditions.",
+      "product_inference": "R-MC-01 must map actual entitlement signals/paywalls and determine the applicable permission basis; do not presume server conditions authorize local-mod monetization."
+    },
+    {
+      "id": "PS-APACHE",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "section": "4 Redistribution; 6 Trademarks",
+      "status": "read",
+      "observation": "Redistribution requirements include license delivery, retained notices and applicable NOTICE attribution; trademark rights are distinct.",
+      "product_inference": "Review selected tunnel-client NOTICE and third-party reports against exactly what the release stages."
+    },
+    {
+      "id": "PS-SHARP",
+      "url": "https://github.com/lovell/sharp/blob/v0.34.3/LICENSE",
+      "section": "Apache License Version 2.0",
+      "status": "read",
+      "observation": "Sharp wrapper license is Apache-2.0. The locally shipped Windows package additionally declares LGPL-3.0-or-later; this upstream wrapper license alone is not the binary closure."
+    },
+    {
+      "id": "PS-LIBVIPS",
+      "url": "https://www.libvips.org/",
+      "section": "Introduction",
+      "status": "read",
+      "observation": "Project describes libvips as LGPL-2.1-or-later. Do not substitute generic project metadata for exact prebuilt Windows package and transitive components."
+    },
+    {
+      "id": "PS-FABRIC-LOADER",
+      "url": "https://github.com/FabricMC/fabric-loader/blob/0.18.4/LICENSE",
+      "section": "Apache License Version 2.0",
+      "status": "read",
+      "observation": "Pinned loader source license is Apache-2.0; actual selected distribution notices/dependency closure remain to be mapped."
+    },
+    {
+      "id": "PS-FABRIC-API",
+      "url": "https://github.com/FabricMC/fabric-api/blob/0.136.1%2B1.21.8/LICENSE",
+      "section": "Apache License Version 2.0",
+      "status": "read",
+      "observation": "Pinned API source license is Apache-2.0; it does not grant rights in Mojang game assets or determine commercial mod classification."
+    },
+    {
+      "id": "PS-MAPLIBRE",
+      "url": "https://github.com/maplibre/maplibre-gl-js/blob/v4.7.1/LICENSE.txt",
+      "section": "License and included upstream attributions",
+      "status": "read",
+      "observation": "Local matching version's license text identifies BSD-style redistribution conditions and included Mapbox-v1 attributions. Exact Plotly-embedded map versions are not established by lockfile presence."
+    }
+  ],
+  "fetch_limits": [
+    "GNU LGPL HTML and plain-text fetch attempts returned internal fetch errors/timeouts; no fetched GNU-text analysis is claimed. Exact source/relink/license-fulfillment obligations remain assigned to reviewer.",
+    "Pinned Electron raw LICENSE fetch failed; actual local distributed LICENSE.electron.txt and LICENSES.chromium.html were inspected instead.",
+    "Pinned Mapbox v1.13.3 web LICENSE fetch failed; installed local Mapbox 1.13.3 and @plotly 1.13.4 license texts were inspected and hashed instead."
+  ]
+}

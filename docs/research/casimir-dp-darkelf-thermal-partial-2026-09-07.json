@@ -1,0 +1,50 @@
+{
+  "status": "conditional_partial_coefficient_not_allowed_point",
+  "source_revision": "352149fb53b614adbac6ee242045c56be25aad29",
+  "mass_eV": 100000000000.0,
+  "mediator_eV": 10000000.0,
+  "reference_proton_cross_section_cm2": 1e-38,
+  "density_cm3": 1,
+  "q_interval_eV": [
+    3472.8238790271034,
+    100000.0
+  ],
+  "omega_interval_eV": [
+    0.18,
+    0.6
+  ],
+  "rows": [
+    {
+      "particle_temperature_K": 300.0,
+      "rate_per_kg_year": 11.669349183494765,
+      "grid_rates": [
+        11.82953844999866,
+        11.70131783488989,
+        11.669349183494765
+      ],
+      "last_grid_fractional_change": 0.002732055640759068,
+      "mean_events_in_frozen_hold": 2.8608196845267066e-23,
+      "density_for_DP_comparator_if_only_this_channel_cm3": 1.0315737437687166e+21
+    },
+    {
+      "particle_temperature_K": 5000.0,
+      "rate_per_kg_year": 2885278.6537598963,
+      "grid_rates": [
+        2883719.077492889,
+        2885293.506234418,
+        2885278.6537598963
+      ],
+      "last_grid_fractional_change": 5.147647714087711e-06,
+      "mean_events_in_frozen_hold": 7.073455287203103e-18,
+      "density_for_DP_comparator_if_only_this_channel_cm3": 4172142683298643.5
+    }
+  ],
+  "limitations": [
+    "zero-temperature harmonic material response",
+    "untruncated conditional Maxwell particles",
+    "omits other q and energy intervals",
+    "not capture or transport",
+    "no xenon likelihood",
+    "grid convergence is not material-model uncertainty"
+  ]
+}

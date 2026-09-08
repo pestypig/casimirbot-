@@ -1,0 +1,1093 @@
+{
+  "schema": "casimirbot.cfp1.bounded_case_matrix.v1",
+  "status": "proposed; not executed or frozen",
+  "normal": {
+    "scenario": "BND-01",
+    "profiles": 2,
+    "repetitions_per_profile": 5,
+    "total_runs": 10,
+    "required_passes": 10
+  },
+  "adverse_and_lifecycle": {
+    "case_count": 88,
+    "profile_count": 2,
+    "total_runs": 176,
+    "required_passes": 176,
+    "cases": [
+      {
+        "case_id": "BND-02.wrong_block.scenario_native_or_client",
+        "group": "BND-02",
+        "variant": "wrong_block",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-02.missing_block.scenario_native_or_client",
+        "group": "BND-02",
+        "variant": "missing_block",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-02.unloaded_block.scenario_native_or_client",
+        "group": "BND-02",
+        "variant": "unloaded_block",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-02.stale_observation.scenario_native_or_client",
+        "group": "BND-02",
+        "variant": "stale_observation",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-02.stale_epoch.scenario_native_or_client",
+        "group": "BND-02",
+        "variant": "stale_epoch",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-03.reach_lost.scenario_native_or_client",
+        "group": "BND-03",
+        "variant": "reach_lost",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-03.focus_lost.scenario_native_or_client",
+        "group": "BND-03",
+        "variant": "focus_lost",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-03.target_obstructed.scenario_native_or_client",
+        "group": "BND-03",
+        "variant": "target_obstructed",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-04.interrupt_after_first_effect.scenario_native_or_client",
+        "group": "BND-04",
+        "variant": "interrupt_after_first_effect",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-05.other_actor_removes_target.scenario_native_or_client",
+        "group": "BND-05",
+        "variant": "other_actor_removes_target",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-06.duplicate_request.scenario_native_or_client",
+        "group": "BND-06",
+        "variant": "duplicate_request",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-06.restart_ambiguous_effect.scenario_native_or_client",
+        "group": "BND-06",
+        "variant": "restart_ambiguous_effect",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-06.replayed_result.scenario_native_or_client",
+        "group": "BND-06",
+        "variant": "replayed_result",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-07.manual_override.scenario_native_or_client",
+        "group": "BND-07",
+        "variant": "manual_override",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-07.emergency_stop.scenario_native_or_client",
+        "group": "BND-07",
+        "variant": "emergency_stop",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-07.effect_expiry.scenario_native_or_client",
+        "group": "BND-07",
+        "variant": "effect_expiry",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-07.eligibility_loss.scenario_native_or_client",
+        "group": "BND-07",
+        "variant": "eligibility_loss",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-07.client_disconnect.scenario_native_or_client",
+        "group": "BND-07",
+        "variant": "client_disconnect",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-07.owner_revoke.scenario_native_or_client",
+        "group": "BND-07",
+        "variant": "owner_revoke",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.signed_out.ui_request",
+        "group": "BND-08",
+        "variant": "signed_out",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.signed_out.direct_api",
+        "group": "BND-08",
+        "variant": "signed_out",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.signed_out.mcp",
+        "group": "BND-08",
+        "variant": "signed_out",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.signed_out.direct_service",
+        "group": "BND-08",
+        "variant": "signed_out",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.no_grant.ui_request",
+        "group": "BND-08",
+        "variant": "no_grant",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.no_grant.direct_api",
+        "group": "BND-08",
+        "variant": "no_grant",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.no_grant.mcp",
+        "group": "BND-08",
+        "variant": "no_grant",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.no_grant.direct_service",
+        "group": "BND-08",
+        "variant": "no_grant",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.expired_grant.ui_request",
+        "group": "BND-08",
+        "variant": "expired_grant",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.expired_grant.direct_api",
+        "group": "BND-08",
+        "variant": "expired_grant",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.expired_grant.mcp",
+        "group": "BND-08",
+        "variant": "expired_grant",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.expired_grant.direct_service",
+        "group": "BND-08",
+        "variant": "expired_grant",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.revoked_grant.ui_request",
+        "group": "BND-08",
+        "variant": "revoked_grant",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.revoked_grant.direct_api",
+        "group": "BND-08",
+        "variant": "revoked_grant",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.revoked_grant.mcp",
+        "group": "BND-08",
+        "variant": "revoked_grant",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.revoked_grant.direct_service",
+        "group": "BND-08",
+        "variant": "revoked_grant",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_profile.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_profile",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_profile.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_profile",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_profile.mcp",
+        "group": "BND-08",
+        "variant": "wrong_profile",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_profile.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_profile",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_node.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_node",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_node.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_node",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_node.mcp",
+        "group": "BND-08",
+        "variant": "wrong_node",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_node.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_node",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_client.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_client",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_client.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_client",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_client.mcp",
+        "group": "BND-08",
+        "variant": "wrong_client",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_client.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_client",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_room.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_room",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_room.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_room",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_room.mcp",
+        "group": "BND-08",
+        "variant": "wrong_room",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_room.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_room",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_player.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_player",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_player.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_player",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_player.mcp",
+        "group": "BND-08",
+        "variant": "wrong_player",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_player.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_player",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_world.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_world",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_world.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_world",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_world.mcp",
+        "group": "BND-08",
+        "variant": "wrong_world",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_world.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_world",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_source.ui_request",
+        "group": "BND-08",
+        "variant": "wrong_source",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_source.direct_api",
+        "group": "BND-08",
+        "variant": "wrong_source",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_source.mcp",
+        "group": "BND-08",
+        "variant": "wrong_source",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.wrong_source.direct_service",
+        "group": "BND-08",
+        "variant": "wrong_source",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.missing_scope.ui_request",
+        "group": "BND-08",
+        "variant": "missing_scope",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.missing_scope.direct_api",
+        "group": "BND-08",
+        "variant": "missing_scope",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.missing_scope.mcp",
+        "group": "BND-08",
+        "variant": "missing_scope",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.missing_scope.direct_service",
+        "group": "BND-08",
+        "variant": "missing_scope",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_grant.ui_request",
+        "group": "BND-08",
+        "variant": "forged_grant",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_grant.direct_api",
+        "group": "BND-08",
+        "variant": "forged_grant",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_grant.mcp",
+        "group": "BND-08",
+        "variant": "forged_grant",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_grant.direct_service",
+        "group": "BND-08",
+        "variant": "forged_grant",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_account_role.ui_request",
+        "group": "BND-08",
+        "variant": "forged_account_role",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_account_role.direct_api",
+        "group": "BND-08",
+        "variant": "forged_account_role",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_account_role.mcp",
+        "group": "BND-08",
+        "variant": "forged_account_role",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.forged_account_role.direct_service",
+        "group": "BND-08",
+        "variant": "forged_account_role",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.effect_ceiling_exhausted.ui_request",
+        "group": "BND-08",
+        "variant": "effect_ceiling_exhausted",
+        "transport": "ui_request",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.effect_ceiling_exhausted.direct_api",
+        "group": "BND-08",
+        "variant": "effect_ceiling_exhausted",
+        "transport": "direct_api",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.effect_ceiling_exhausted.mcp",
+        "group": "BND-08",
+        "variant": "effect_ceiling_exhausted",
+        "transport": "mcp",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-08.effect_ceiling_exhausted.direct_service",
+        "group": "BND-08",
+        "variant": "effect_ceiling_exhausted",
+        "transport": "direct_service",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-09.client_missing.scenario_native_or_client",
+        "group": "BND-09",
+        "variant": "client_missing",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-09.client_incompatible.scenario_native_or_client",
+        "group": "BND-09",
+        "variant": "client_incompatible",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-09.provider_limit.scenario_native_or_client",
+        "group": "BND-09",
+        "variant": "provider_limit",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-10.fresh_install.scenario_native_or_client",
+        "group": "BND-10",
+        "variant": "fresh_install",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-10.scope_upgrade.scenario_native_or_client",
+        "group": "BND-10",
+        "variant": "scope_upgrade",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-10.catalog_refresh.scenario_native_or_client",
+        "group": "BND-10",
+        "variant": "catalog_refresh",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-10.account_switch.scenario_native_or_client",
+        "group": "BND-10",
+        "variant": "account_switch",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-11.developer_superset.scenario_native_or_client",
+        "group": "BND-11",
+        "variant": "developer_superset",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      },
+      {
+        "case_id": "BND-11.purchase_never_promotes_role.scenario_native_or_client",
+        "group": "BND-11",
+        "variant": "purchase_never_promotes_role",
+        "transport": "scenario_native_or_client",
+        "profiles": [
+          "ordinary_profile_a",
+          "ordinary_profile_b"
+        ],
+        "repetitions_per_profile": 1,
+        "required": true
+      }
+    ]
+  },
+  "value_comparison": {
+    "scenario": "BND-12",
+    "paired_repeats_per_profile": 3,
+    "profiles": 2,
+    "conditions": [
+      "with_harness",
+      "without_harness"
+    ],
+    "total_runs": 12,
+    "rule": "Report all attempts; no asserted superiority threshold. This measures a candidate task, not willingness to pay."
+  },
+  "rules": [
+    "Every named variant required; no OR sampling.",
+    "For CFP2 eligibility states use approved pre-release fixture provenance only; CFP3 repeats with actual commercial lifecycle and CFP4 signed artifact.",
+    "UI request checks are server-bound requests from public UI state; UI visibility alone is not admission evidence.",
+    "Developer-superset cases arrange the developer role as the comparison subject, paired with each ordinary-user fixture; no role granted by purchase.",
+    "No missing version/hardware/rights decision counts as not-applicable or PASS."
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "tool admission",
+  "change": "Registered helix_environment_temporal_plan_submit with explicit OAuth catalog scope, serial-only compiler selection, authenticated client/session derivation, exact task association verification, current room participant resolution and existing temporal admission composition. Request metadata cannot inject participant or compiler-owned content. Returned admission is not physical execution or terminal proof.",
+  "checks": [
+    { "command": "npx vitest run server/mcp/__tests__/helix-mcp-environment-durable-goal.test.ts server/services/environment-connectors/temporal-plans/__tests__/temporal-plan-admission.test.ts --pool=forks --maxWorkers=1 --minWorkers=1", "exit_code": 0, "passed": 10 },
+    { "check": "esbuild full server/index.ts bundle with packages external and write:false", "exit_code": 0, "warnings": ["Duplicate traceId in agi.demonstration.ts", "Duplicate case in halobank-solar/derived.ts", "Duplicate benchmark_target_id in structure-mesa.ts", "Duplicate benchmark_target_id in oscillation-gyre.ts"] },
+    { "command": "npm run helix:ask:discipline:quick", "exit_code": 0, "limitation": "Classifier reported zero sensitive files and skipped its battery; not behavioral proof" }
+  ],
+  "failed_attempts": [
+    "Initial MCP positive fixture omitted required mutation-scope fields; input validation rejected it. Fixture repaired without changing schema.",
+    "Initial test incorrectly expected missing OAuth scopes to hide the registered tool. Corrected to verify insufficient_scope rejection before binding access, matching existing catalog behavior. Missing exact-task stores still prevents registration."
+  ],
+  "negative_evidence": ["Injected participant, arguments and compilation hash rejected over in-memory MCP", "Binding verification rejection prevents admission call", "Missing action scope rejected before binding verification"],
+  "limitations": ["MCP boundary test mocks admission and task stores; it is not end-to-end authenticated execution", "Bundle validation is not a TypeScript typecheck or deployment", "Native temporal feature advertisement remains gated", "No server restart, EXE build or live Minecraft action", "ET6 rolling capacity qualification remains incomplete; no maturity promotion"]
+}

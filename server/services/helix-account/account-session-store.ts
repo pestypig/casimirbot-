@@ -243,7 +243,7 @@ const readStoredPolicy = (
 };
 
 const storedPolicyHasSharedRoomsExperiment = (
-  value: HelixAccountCapabilityPolicy | string,
+  value: unknown,
 ): boolean => {
   const stored = readStoredPolicy(value);
   return Boolean(

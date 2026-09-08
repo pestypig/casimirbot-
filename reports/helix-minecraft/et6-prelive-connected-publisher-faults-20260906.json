@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-06",
+  "scope": "Expanded production publisher path under connected persistent delivery faults",
+  "shared_configuration": ["HELIX_NATIVE_PUBLICATION_INTEGRATION=1", "HELIX_NATIVE_BROKER_ROUNDTRIP=1", "HELIX_NATIVE_BROKER_PERSISTENCE=1"],
+  "test_file": "server/services/environment-connectors/events/__tests__/native-temporal-publication.test.ts",
+  "runs": [
+    { "fault": "HELIX_NATIVE_BROKER_SNAPSHOT_FAILURE=1", "passed": 2, "failed": 0, "exit_code": 0 },
+    { "fault": "HELIX_NATIVE_BROKER_LOST_RESPONSE=1", "passed": 2, "failed": 0, "exit_code": 0 },
+    { "fault": "HELIX_NATIVE_BROKER_LATE_RESPONSE=1", "passed": 2, "failed": 0, "exit_code": 0 }
+  ],
+  "verified_assertions": [
+    "Snapshot failure produces one rejection and no successful delivery diagnostic",
+    "Lost/uncertain delivery performs one delivery and one status reconciliation without child activation",
+    "Late delivery cancels the resident workflow, releases controls, and produces no child sequence event",
+    "Child remains leased with attempt_count 1 rather than being replayed",
+    "Saved retained-plan and action-request rows remain present"
+  ],
+  "limits": [
+    "Three mode runs overlap coverage and are not six distinct lifecycle scenarios",
+    "Authority/perception and successor-context resolution remain fixtures",
+    "Snapshot-failure fixture explicitly saves after clearing the fault; not power-loss durability proof",
+    "No live Minecraft capacity, provider latency or five-stage timing closure"
+  ]
+}

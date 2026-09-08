@@ -1,0 +1,231 @@
+{
+  "scope": "Finite pseudoscalar triangle subset only; no boxes, scalar internal loops, counterterms, RG or full Wilson matching",
+  "coupling_convention": "C is minus the effective scalar Lagrangian coefficient; same as prior positive tree potential convention",
+  "checks": {
+    "mass_eigenstate_sum_equals_matrix_inverse": true,
+    "B0_derivative_independent_check": true,
+    "finite_q_integral_positive_decreasing": true,
+    "zero_q_subset_cancellation": true
+  },
+  "rows": [
+    {
+      "kappa_A": 0.0,
+      "q_GeV": 0.0,
+      "I_GeV_m2": 3.123320557196886e-05,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "C_triangle_subset_GeV_m2": 7.920821392923793e-17,
+      "triangle_over_tree": 3.6611890387064933e-07,
+      "scalar_rate_factor_for_this_subset": 1.0000007322379418
+    },
+    {
+      "kappa_A": 0.0,
+      "q_GeV": 0.001,
+      "I_GeV_m2": 3.123320505613989e-05,
+      "C_tree_GeV_m2": 2.163455999859375e-10,
+      "C_triangle_subset_GeV_m2": 7.920829182414645e-17,
+      "triangle_over_tree": 3.6611926394294595e-07,
+      "scalar_rate_factor_for_this_subset": 1.0000007322386621
+    },
+    {
+      "kappa_A": 0.0,
+      "q_GeV": 0.05,
+      "I_GeV_m2": 3.123191632257396e-05,
+      "C_tree_GeV_m2": 2.163455648438456e-10,
+      "C_triangle_subset_GeV_m2": 7.940294381748059e-17,
+      "triangle_over_tree": 3.6701905063222455e-07,
+      "scalar_rate_factor_for_this_subset": 1.0000007340382362
+    },
+    {
+      "kappa_A": 0.0,
+      "q_GeV": 0.246,
+      "I_GeV_m2": 3.12021774758046e-05,
+      "C_tree_GeV_m2": 2.163447489992253e-10,
+      "C_triangle_subset_GeV_m2": 8.391779817205106e-17,
+      "triangle_over_tree": 3.878892303152297e-07,
+      "scalar_rate_factor_for_this_subset": 1.0000007757786111
+    },
+    {
+      "kappa_A": -3.000014370707188e-08,
+      "q_GeV": 0.0,
+      "I_GeV_m2": 3.123320557196886e-05,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "C_triangle_subset_GeV_m2": -9.16028987954948e-33,
+      "triangle_over_tree": -4.234100383622076e-23,
+      "scalar_rate_factor_for_this_subset": 1.0
+    },
+    {
+      "kappa_A": -3.000014370707188e-08,
+      "q_GeV": 0.001,
+      "I_GeV_m2": 3.123320505613989e-05,
+      "C_tree_GeV_m2": 2.163455999859375e-10,
+      "C_triangle_subset_GeV_m2": 7.920813339269773e-23,
+      "triangle_over_tree": 3.661185316357082e-13,
+      "scalar_rate_factor_for_this_subset": 1.0000000000007323
+    },
+    {
+      "kappa_A": -3.000014370707188e-08,
+      "q_GeV": 0.05,
+      "I_GeV_m2": 3.123191632257396e-05,
+      "C_tree_GeV_m2": 2.163455648438456e-10,
+      "C_triangle_subset_GeV_m2": 1.9801213070861385e-19,
+      "triangle_over_tree": 9.152585626219585e-10,
+      "scalar_rate_factor_for_this_subset": 1.000000001830517
+    },
+    {
+      "kappa_A": -3.000014370707188e-08,
+      "q_GeV": 0.246,
+      "I_GeV_m2": 3.12021774758046e-05,
+      "C_tree_GeV_m2": 2.163447489992253e-10,
+      "C_triangle_subset_GeV_m2": 4.788578763343537e-18,
+      "triangle_over_tree": 2.2134018900364826e-08,
+      "scalar_rate_factor_for_this_subset": 1.0000000442680381
+    },
+    {
+      "kappa_A": 1e-06,
+      "q_GeV": 0.0,
+      "I_GeV_m2": 3.123320557196886e-05,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "C_triangle_subset_GeV_m2": 2.7194693640972056e-15,
+      "triangle_over_tree": 1.2570023906643842e-05,
+      "scalar_rate_factor_for_this_subset": 1.000025140205819
+    },
+    {
+      "kappa_A": 1e-06,
+      "q_GeV": 0.001,
+      "I_GeV_m2": 3.123320505613989e-05,
+      "C_tree_GeV_m2": 2.163455999859375e-10,
+      "C_triangle_subset_GeV_m2": 2.7194693982181613e-15,
+      "triangle_over_tree": 1.2570024065175938e-05,
+      "scalar_rate_factor_for_this_subset": 1.000025140206136
+    },
+    {
+      "kappa_A": 1e-06,
+      "q_GeV": 0.05,
+      "I_GeV_m2": 3.123191632257396e-05,
+      "C_tree_GeV_m2": 2.163455648438456e-10,
+      "C_triangle_subset_GeV_m2": 2.719554686427338e-15,
+      "triangle_over_tree": 1.257042032911682e-05,
+      "scalar_rate_factor_for_this_subset": 1.0000251409986736
+    },
+    {
+      "kappa_A": 1e-06,
+      "q_GeV": 0.246,
+      "I_GeV_m2": 3.12021774758046e-05,
+      "C_tree_GeV_m2": 2.163447489992253e-10,
+      "C_triangle_subset_GeV_m2": 2.721545810269024e-15,
+      "triangle_over_tree": 1.2579671209301084e-05,
+      "scalar_rate_factor_for_this_subset": 1.0000251595006668
+    },
+    {
+      "kappa_A": -1e-06,
+      "q_GeV": 0.0,
+      "I_GeV_m2": 3.123320557196886e-05,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "C_triangle_subset_GeV_m2": -2.5610529362387297e-15,
+      "triangle_over_tree": -1.1837786098902544e-05,
+      "scalar_rate_factor_for_this_subset": 0.9999763245679353
+    },
+    {
+      "kappa_A": -1e-06,
+      "q_GeV": 0.001,
+      "I_GeV_m2": 3.123320505613989e-05,
+      "C_tree_GeV_m2": 2.163455999859375e-10,
+      "C_triangle_subset_GeV_m2": -2.561052814569868e-15,
+      "triangle_over_tree": -1.1837785537290043e-05,
+      "scalar_rate_factor_for_this_subset": 0.9999763245690586
+    },
+    {
+      "kappa_A": -1e-06,
+      "q_GeV": 0.05,
+      "I_GeV_m2": 3.123191632257396e-05,
+      "C_tree_GeV_m2": 2.163455648438456e-10,
+      "C_triangle_subset_GeV_m2": -2.5607487987923765e-15,
+      "triangle_over_tree": -1.183638222785237e-05,
+      "scalar_rate_factor_for_this_subset": 0.9999763273756441
+    },
+    {
+      "kappa_A": -1e-06,
+      "q_GeV": 0.246,
+      "I_GeV_m2": 3.12021774758046e-05,
+      "C_tree_GeV_m2": 2.163447489992253e-10,
+      "C_triangle_subset_GeV_m2": -2.553710213924922e-15,
+      "triangle_over_tree": -1.1803892748670627e-05,
+      "scalar_rate_factor_for_this_subset": 0.9999763923538345
+    },
+    {
+      "kappa_A": 0.001,
+      "q_GeV": 0.0,
+      "I_GeV_m2": 3.123320557196886e-05,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "C_triangle_subset_GeV_m2": 2.640340358381897e-12,
+      "triangle_over_tree": 0.012204271121677065,
+      "scalar_rate_factor_for_this_subset": 1.0245574864769653
+    },
+    {
+      "kappa_A": 0.001,
+      "q_GeV": 0.001,
+      "I_GeV_m2": 3.123320505613989e-05,
+      "C_tree_GeV_m2": 2.163455999859375e-10,
+      "C_triangle_subset_GeV_m2": 2.6403403146858395e-12,
+      "triangle_over_tree": 0.012204270920496937,
+      "scalar_rate_factor_for_this_subset": 1.0245574860696949
+    },
+    {
+      "kappa_A": 0.001,
+      "q_GeV": 0.05,
+      "I_GeV_m2": 3.123191632257396e-05,
+      "C_tree_GeV_m2": 2.163455648438456e-10,
+      "C_triangle_subset_GeV_m2": 2.6402311455536746e-12,
+      "triangle_over_tree": 0.012203768297535228,
+      "scalar_rate_factor_for_this_subset": 1.0245564685557307
+    },
+    {
+      "kappa_A": 0.001,
+      "q_GeV": 0.246,
+      "I_GeV_m2": 3.12021774758046e-05,
+      "C_tree_GeV_m2": 2.163447489992253e-10,
+      "C_triangle_subset_GeV_m2": 2.637711929895145e-12,
+      "triangle_over_tree": 0.01219216986821617,
+      "scalar_rate_factor_for_this_subset": 1.0245329887425276
+    },
+    {
+      "kappa_A": -0.001,
+      "q_GeV": 0.0,
+      "I_GeV_m2": 3.123320557196886e-05,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "C_triangle_subset_GeV_m2": -2.640181941954039e-12,
+      "triangle_over_tree": -0.012203538883869325,
+      "scalar_rate_factor_for_this_subset": 0.9757418485935516
+    },
+    {
+      "kappa_A": -0.001,
+      "q_GeV": 0.001,
+      "I_GeV_m2": 3.123320505613989e-05,
+      "C_tree_GeV_m2": 2.163455999859375e-10,
+      "C_triangle_subset_GeV_m2": -2.640181898102191e-12,
+      "triangle_over_tree": -0.012203538681969049,
+      "scalar_rate_factor_for_this_subset": 0.9757418489924243
+    },
+    {
+      "kappa_A": -0.001,
+      "q_GeV": 0.05,
+      "I_GeV_m2": 3.123191632257396e-05,
+      "C_tree_GeV_m2": 2.163455648438456e-10,
+      "C_triangle_subset_GeV_m2": -2.6400723396660397e-12,
+      "triangle_over_tree": -0.012203034259433964,
+      "scalar_rate_factor_for_this_subset": 0.9757428455262691
+    },
+    {
+      "kappa_A": -0.001,
+      "q_GeV": 0.246,
+      "I_GeV_m2": 3.12021774758046e-05,
+      "C_tree_GeV_m2": 2.163447489992253e-10,
+      "C_triangle_subset_GeV_m2": -2.6375440942988014e-12,
+      "triangle_over_tree": -0.012191394089755543,
+      "scalar_rate_factor_for_this_subset": 0.9757658419103407
+    }
+  ],
+  "kappa_zero_transfer_subset_cancellation": -3.000014370707188e-08,
+  "gchi_exact_mass_over_f": 1.3605442176870748,
+  "full_model_admitted": false
+}

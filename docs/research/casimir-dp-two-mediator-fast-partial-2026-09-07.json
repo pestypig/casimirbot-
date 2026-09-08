@@ -1,0 +1,59 @@
+{
+  "status": "fast_population_partial_channel_not_total_coherence",
+  "baseline_script_sha256": "0aa19095a27e2cbdaebb2e927aed83ec16f857a88f8d24c8bc6a1c63bd64fab4",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "speed_km_s": 776,
+      "rate_grids": [
+        2809293.6243626606,
+        2809131.496514058
+      ],
+      "partial_D_per_cm3": 6.886775393625351e-18,
+      "partial_D_at_fixed_density": 2.0660326180876052e-20,
+      "density_for_frozen_comparator_cm3": 4285236999229191.5
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "speed_km_s": 776,
+      "rate_grids": [
+        214277.9390214366,
+        214269.82897913796
+      ],
+      "partial_D_per_cm3": 5.252969423613647e-19,
+      "partial_D_at_fixed_density": 1.5758908270840942e-21,
+      "density_for_frozen_comparator_cm3": 5.618053779159991e+16
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "speed_km_s": 776,
+      "rate_grids": [
+        0.005755431641327221,
+        0.005755062146971554
+      ],
+      "partial_D_per_cm3": 1.4108923142875747e-26,
+      "partial_D_at_fixed_density": 4.232676942862724e-29,
+      "density_for_frozen_comparator_cm3": 2.0916879639426095e+24
+    }
+  ],
+  "assumptions": [
+    "isotropic mono-speed particles at 776 km/s and 0.003/cm3",
+    "same fixed nuclear-normalized products",
+    "q >= qBZ to 100 keV, omega 0.18-0.6 eV, multiphonon n>=2",
+    "event count proxy for resolved-branch loss in the covered channel"
+  ],
+  "limitations": [
+    "no low-q coherent elastic, one-phonon or other omitted channel",
+    "not a total upper bound, supplied captured population or complete branch-history prediction",
+    "no demonstrated measurability or boundary dependence"
+  ]
+}

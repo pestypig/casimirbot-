@@ -1,0 +1,48 @@
+{
+  "status": "conditional_inclusive_Born_fixed_charge_closure_bound",
+  "absolute_charge_inventory": 186235020076.269,
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "inclusive_Born_D_upper": 1.2617462088642132e-05,
+      "comparator_over_upper": 2338.9382519888754,
+      "density_needed_even_at_bound_cm3": 7.016814755966626,
+      "signed_integral_over_triangle_envelope": 0.9991965797933025
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "inclusive_Born_D_upper": 1.364154214194584e-09,
+      "comparator_over_upper": 21633525.311922688,
+      "density_needed_even_at_bound_cm3": 64900.57593576806,
+      "signed_integral_over_triangle_envelope": 0.9255540121874501
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "inclusive_Born_D_upper": 3.2685054544007418e-12,
+      "comparator_over_upper": 9029039459.735355,
+      "density_needed_even_at_bound_cm3": 27087118.379206065,
+      "signed_integral_over_triangle_envelope": 0.6399590944925453
+    }
+  ],
+  "assumptions": [
+    "fixed-number charge density operator sum_a Q_a exp(i q.r_a)",
+    "Born density coupling with isotropic target spectrum or isotropic orientation average",
+    "stationary normalized target ensemble; include all positive and negative energy transitions in closure",
+    "same fast population, fixed hold and canonical charge inventory"
+  ],
+  "limitations": [
+    "not a nonperturbative scattering theorem or general relativistic current bound",
+    "no additional external charged environment or externally supplied particles included",
+    "comparator is theoretical benchmark, not measured sensitivity",
+    "does not rule out captured populations, different operators or parameters"
+  ]
+}

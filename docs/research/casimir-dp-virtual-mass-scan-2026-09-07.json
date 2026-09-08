@@ -1,0 +1,174 @@
+{
+  "status": "conditional_mass_scan_not_allowed_region",
+  "kernel_source_sha256": "be31143da7148aa679c8bc09029d2198ece6ba7c1aca85ab8e9b3109ac2db66f",
+  "rows": [
+    {
+      "mediator_GeV": 0.003,
+      "gap_GeV": 0.01,
+      "effective_alpha": 2.611305956172343e-07,
+      "raw_low_high": 22229.94480435775,
+      "epsilon_floor": 1.4410161152496149e-05,
+      "radial_refinement": 1.5294830046919117e-07,
+      "energy_refinement": 8.326672684688674e-15,
+      "screened_intervals": [
+        {
+          "name": "E137_Andreas2012mt",
+          "lower": 2.39488955316034e-08,
+          "upper": 0.00014899550640671164,
+          "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e"
+        },
+        {
+          "name": "E141_Riordan1987aw",
+          "lower": 1.264039391338565e-05,
+          "upper": 0.002247543214133655,
+          "sha256": "cc2178b3c1ff9ca2439b9a765863c9221e1428e1423adad5aec9f289afb9aa31"
+        },
+        {
+          "name": "NA64_Banerjee2019hmi",
+          "lower": 8.748018210547729e-05,
+          "upper": 0.006847471276882539,
+          "sha256": "ecf558c5157316cf07d1eb4b2c7558735c7df34d7149f07b6d532f3db5d892bb"
+        }
+      ],
+      "not_covered_by_four_searches": [
+        [
+          0.006847471276882539,
+          0.01
+        ]
+      ]
+    },
+    {
+      "mediator_GeV": 0.01,
+      "gap_GeV": 0.01,
+      "effective_alpha": 2.797331193591714e-07,
+      "raw_low_high": 15962.752662656167,
+      "epsilon_floor": 4.631015358573394e-06,
+      "radial_refinement": 4.141131881851834e-12,
+      "energy_refinement": 6.8833827526759706e-15,
+      "screened_intervals": [
+        {
+          "name": "E137_Andreas2012mt",
+          "lower": 2.87011803941002e-08,
+          "upper": 4.0881193063836935e-05,
+          "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e"
+        },
+        {
+          "name": "E141_Riordan1987aw",
+          "lower": 2.435697699490657e-05,
+          "upper": 0.0004788482343042372,
+          "sha256": "cc2178b3c1ff9ca2439b9a765863c9221e1428e1423adad5aec9f289afb9aa31"
+        },
+        {
+          "name": "NA64_Banerjee2019hmi",
+          "lower": 9.884948506359192e-05,
+          "upper": 0.001391694385131656,
+          "sha256": "ecf558c5157316cf07d1eb4b2c7558735c7df34d7149f07b6d532f3db5d892bb"
+        },
+        {
+          "name": "NA48_Batley2015lha",
+          "lower": 0.0008067491275550794,
+          "upper": 0.01,
+          "sha256": "63b2b2d4f839ab3acc450e1c3ea0403ae0b97baa9d8e045651f3babfe6c3059b"
+        }
+      ],
+      "not_covered_by_four_searches": []
+    },
+    {
+      "mediator_GeV": 0.03,
+      "gap_GeV": 0.01,
+      "effective_alpha": 3.419060490376824e-07,
+      "raw_low_high": 5952.714469549695,
+      "epsilon_floor": 4.002433451824222e-06,
+      "radial_refinement": 9.876544027065393e-13,
+      "energy_refinement": 3.774758283725532e-15,
+      "screened_intervals": [
+        {
+          "name": "E137_Andreas2012mt",
+          "lower": 3.610197796566797e-08,
+          "upper": 1.214199917990034e-05,
+          "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e"
+        },
+        {
+          "name": "NA48_Batley2015lha",
+          "lower": 0.0006220661800540941,
+          "upper": 0.01,
+          "sha256": "63b2b2d4f839ab3acc450e1c3ea0403ae0b97baa9d8e045651f3babfe6c3059b"
+        }
+      ],
+      "not_covered_by_four_searches": [
+        [
+          1.214199917990034e-05,
+          0.0006220661800540941
+        ]
+      ]
+    },
+    {
+      "mediator_GeV": 0.1,
+      "gap_GeV": 0.01,
+      "effective_alpha": 6.789770415299334e-07,
+      "raw_low_high": 716.1933429767698,
+      "epsilon_floor": 7.948266582848728e-06,
+      "radial_refinement": 4.3520742565306136e-14,
+      "energy_refinement": 2.4424906541753444e-15,
+      "screened_intervals": [
+        {
+          "name": "E137_Andreas2012mt",
+          "lower": 5.196801726151132e-08,
+          "upper": 2.891853374863994e-06,
+          "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e"
+        },
+        {
+          "name": "NA48_Batley2015lha",
+          "lower": 0.0021096120247583567,
+          "upper": 0.01,
+          "sha256": "63b2b2d4f839ab3acc450e1c3ea0403ae0b97baa9d8e045651f3babfe6c3059b"
+        }
+      ],
+      "not_covered_by_four_searches": [
+        [
+          7.948266582848728e-06,
+          0.0021096120247583567
+        ]
+      ]
+    },
+    {
+      "mediator_GeV": 0.3,
+      "gap_GeV": 0.01,
+      "effective_alpha": 3.0364520315544227e-06,
+      "raw_low_high": 180.42055273453278,
+      "epsilon_floor": 3.5545428986000774e-05,
+      "radial_refinement": 6.8833827526759706e-15,
+      "energy_refinement": 1.9984014443252818e-15,
+      "screened_intervals": [
+        {
+          "name": "E137_Andreas2012mt",
+          "lower": 1.4993931521106505e-07,
+          "upper": 3.1398279837409067e-07,
+          "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e"
+        }
+      ],
+      "not_covered_by_four_searches": [
+        [
+          3.5545428986000774e-05,
+          0.01
+        ]
+      ]
+    },
+    {
+      "mediator_GeV": 1.0,
+      "gap_GeV": 0.01,
+      "effective_alpha": 3.2245807883165714e-05,
+      "raw_low_high": 207.77520391905006,
+      "epsilon_floor": 0.00037747708914753775,
+      "radial_refinement": 4.884981308350689e-15,
+      "energy_refinement": 2.3314683517128287e-15,
+      "screened_intervals": [],
+      "not_covered_by_four_searches": [
+        [
+          0.00037747708914753775,
+          0.01
+        ]
+      ]
+    }
+  ]
+}

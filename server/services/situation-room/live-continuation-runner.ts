@@ -78,7 +78,7 @@ const evidenceRefsFromResult = (result?: WorldEventIngestResult | null, event?: 
     result?.projection_id ? `projection:${result.projection_id}` : null,
     result?.minecraft_spatial_episode?.episode_id ? `minecraft_spatial_episode:${result.minecraft_spatial_episode.episode_id}` : null,
     result?.minecraft_route_rehearsal?.rehearsal_id ? `minecraft_route_rehearsal:${result.minecraft_route_rehearsal.rehearsal_id}` : null,
-    result?.minecraft_route_drift_event?.drift_id ? `minecraft_route_drift:${result.minecraft_route_drift_event.drift_id}` : null,
+    result?.minecraft_route_drift_event?.drift_event_id ?? null,
     ...(result?.synthetic_evidence ?? []).map((entry) => entry.evidence_id ? `synthetic_evidence:${entry.evidence_id}` : null),
   ]);
 

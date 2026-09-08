@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-05",
+  "classification": "tool admission and evidence normalization",
+  "changes": [
+    "Lock the active goal before re-locking and checking the unchanged running resident, matching authority-goal-action admission ordering.",
+    "Require the successor goal revision to remain current and its retained native checkpoint measurement to remain present in fresh running evidence.",
+    "After validated temporal workflow evidence only, update the associated successor delivery row's lifecycle without creating another workflow or result.",
+    "Recorded-success graph reads allow settled-success plan rows; ordinary event graph reads still reject terminal rows."
+  ],
+  "verification": {
+    "tests_passed": 58,
+    "exit_code": 0,
+    "files": ["minecraft-environment-time-compiler.test.ts", "action-result-canonicalization.test.ts", "temporal-ordinary-queue.test.ts"],
+    "positive": "Mocked transaction leases the exact successor once; duplicate read returns null with exactly one lease mutation.",
+    "negative": "Pending controls, stopped goal, changed goal revision, checkpoint mismatch, revoked binding and stale event each yield zero lease mutations.",
+    "diff_check": "Passed for broker and temporal event resolver."
+  },
+  "limitations": [
+    "Queries use a mocked transaction adapter for the new positive lease test, not PostgreSQL concurrency evidence.",
+    "The successor lifecycle UPDATE has regression coverage but no dedicated database-backed event-to-row assertion yet.",
+    "Route/native wiring, mixed-version qualification, and packaged live execution remain incomplete.",
+    "No server restart, EXE build, or Minecraft action performed."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

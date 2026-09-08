@@ -1,0 +1,29 @@
+{
+  "kind": "deterministic_characterization_not_live_acceptance",
+  "date": "2026-09-06",
+  "scope": "Existing native evidence outbox and temporal polling predicates",
+  "fixture": "PlayerActionRuntimeLifecycleTest.delayedProjectionBlocksSuccessorEvenAfterCriticalCheckpointAcknowledgement",
+  "conditions": {
+    "controller_state": "RUNNING",
+    "critical_checkpoint_acknowledged": true,
+    "one_environment_event_batch_unacknowledged": true,
+    "resync_required": false,
+    "emergency_stop": false,
+    "simulated_ticks": 200
+  },
+  "result": {
+    "eligible_successor_poll_opportunities": 0,
+    "eligible_after_projection_ack_at_simulated_tick_201": true,
+    "native_unit_tests": 23,
+    "unit_failures": 0,
+    "isolated_gradle_dependency_game_tests": 5,
+    "game_test_failures": 0
+  },
+  "interpretation": "Deferred polling recovers after full drain, but does not guarantee progress while an environment-event batch remains pending. Determine the exact required checkpoint/evidence acknowledgement boundary before changing the gate.",
+  "limits": [
+    "No live user Minecraft movement was dispatched.",
+    "No wall-clock latency or rolling capacity is inferred from simulated ticks.",
+    "This is a characterization of a liveness limitation, not a repair or permission to bypass evidence.",
+    "No process-crash durability, network failure recovery, or ET6 acceptance is established."
+  ]
+}

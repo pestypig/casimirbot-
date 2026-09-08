@@ -1,0 +1,26 @@
+{
+  "scope": "Conditional hadronic scale with dated Bhat and charged-kaon fK proxy. Flavor proof covers single QCD/QED penguin with one flavor-diagonal produced current; not all finite scheme corrections or bilocal insertions.",
+  "C_RGI_imag_GeV_minus2": 1.5989874072455352e-15,
+  "inputs": {
+    "mK": 0.497611,
+    "fK_proxy": 0.1557,
+    "Bhat": 0.7625,
+    "kappa": 0.92,
+    "dmK": 3.484e-15,
+    "experimental_magnitude": 0.002228
+  },
+  "M12_imag_GeV": 4.902649367604211e-18,
+  "conditional_epsilon_NP_magnitude": 0.0009154307934913452,
+  "fraction_of_experimental_magnitude": 0.4108755805616451,
+  "ratio_to_old_approximate_NP": 0.9076971211616326,
+  "symbolic_penguin_zeros": [
+    "0",
+    "0"
+  ],
+  "checks": {
+    "single_insertion_flavor_zero": true,
+    "matrix_normalization": true
+  },
+  "exclusion_or_fit": false,
+  "full_model_admitted": false
+}

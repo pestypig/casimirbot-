@@ -1,0 +1,182 @@
+{
+  "checks": {
+    "joint_loop_boundary": true,
+    "force_loop_product_identity": true,
+    "declared_yukawa_domain": true,
+    "inherited_Higgs_screen": true
+  },
+  "rows": [
+    {
+      "declared_cross_scale_loop_tolerance": 0.01,
+      "Delta_lambda_ceiling": 0.04013346062060049,
+      "matched_point": {
+        "b_GeV": 35.141696644288075,
+        "kappa_GeV": 282.6380134319102,
+        "y_chi": -0.28440875232011614,
+        "a_chi_GeV_inverse": 8.076979683515412e-05,
+        "a_N_GeV_inverse_recovered": 1.7905526447794945e-07,
+        "C_chiN_recovered": 1.8017705314359717e-10,
+        "lambda_threshold_shift": 0.04013346062060041,
+        "lambda_effective_for_same_light_product": 7.824241396654566e-24,
+        "force_curvature_relative_to_original": 0.1278079176375582,
+        "required_confinement_frequency_Hz": 3438370.546516296,
+        "conditional_Higgs_invisible_signal": 0.10695555099996142,
+        "passes_conditional_Higgs_screen": true,
+        "y_squared_over_4pi": 0.00643688944712937,
+        "threshold_over_4pi": 0.0031937193205762403
+      },
+      "conditional_force_and_signal_bounds": [
+        {
+          "force_allowance_label": "diagnostic_free_hold_10percent",
+          "allowed_curvature_frequency_Hz": 0.28238432113613754,
+          "light_product_scale_ceiling_relative_to_reference": 6.744904476296062e-15,
+          "lambda_effective_min": 1.1600225657978803e-09,
+          "conditional_common_halo_rigid_vacuum_D_upper": 1.4697089422224156e-30
+        },
+        {
+          "force_allowance_label": "1kHz",
+          "allowed_curvature_frequency_Hz": 1000.0,
+          "light_product_scale_ceiling_relative_to_reference": 8.458525133648657e-08,
+          "lambda_effective_min": 9.250124901242106e-17,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.311367582826079e-16
+        },
+        {
+          "force_allowance_label": "10kHz",
+          "allowed_curvature_frequency_Hz": 10000.0,
+          "light_product_scale_ceiling_relative_to_reference": 8.458525133648659e-06,
+          "lambda_effective_min": 9.250124901242104e-19,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.3113675828260797e-12
+        },
+        {
+          "force_allowance_label": "100kHz",
+          "allowed_curvature_frequency_Hz": 100000.0,
+          "light_product_scale_ceiling_relative_to_reference": 0.0008458525133648657,
+          "lambda_effective_min": 9.250124901242106e-21,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.3113675828260785e-08
+        },
+        {
+          "force_allowance_label": "1MHz",
+          "allowed_curvature_frequency_Hz": 1000000.0,
+          "light_product_scale_ceiling_relative_to_reference": 0.08458525133648657,
+          "lambda_effective_min": 9.250124901242106e-23,
+          "conditional_common_halo_rigid_vacuum_D_upper": 0.00023113675828260788
+        }
+      ]
+    },
+    {
+      "declared_cross_scale_loop_tolerance": 0.1,
+      "Delta_lambda_ceiling": 0.40133460620600486,
+      "matched_point": {
+        "b_GeV": 11.08814257936202,
+        "kappa_GeV": 895.7045070827204,
+        "y_chi": -0.9013161330058371,
+        "a_chi_GeV_inverse": 0.0008076979683515431,
+        "a_N_GeV_inverse_recovered": 1.7905526447794945e-07,
+        "C_chiN_recovered": 1.801770531435972e-10,
+        "lambda_threshold_shift": 0.4013346062060049,
+        "lambda_effective_for_same_light_product": 7.824241396654583e-23,
+        "force_curvature_relative_to_original": 0.01278079176375579,
+        "required_confinement_frequency_Hz": 1087308.236662941,
+        "conditional_Higgs_invisible_signal": 0.10694991070534567,
+        "passes_conditional_Higgs_screen": true,
+        "y_squared_over_4pi": 0.06464641196307921,
+        "threshold_over_4pi": 0.03193719320576247
+      },
+      "conditional_force_and_signal_bounds": [
+        {
+          "force_allowance_label": "diagnostic_free_hold_10percent",
+          "allowed_curvature_frequency_Hz": 0.28238432113613754,
+          "light_product_scale_ceiling_relative_to_reference": 6.744904476296077e-14,
+          "lambda_effective_min": 1.1600225657978803e-09,
+          "conditional_common_halo_rigid_vacuum_D_upper": 1.4697089422224223e-28
+        },
+        {
+          "force_allowance_label": "1kHz",
+          "allowed_curvature_frequency_Hz": 1000.0,
+          "light_product_scale_ceiling_relative_to_reference": 8.458525133648678e-07,
+          "lambda_effective_min": 9.250124901242104e-17,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.31136758282609e-14
+        },
+        {
+          "force_allowance_label": "10kHz",
+          "allowed_curvature_frequency_Hz": 10000.0,
+          "light_product_scale_ceiling_relative_to_reference": 8.458525133648677e-05,
+          "lambda_effective_min": 9.250124901242104e-19,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.3113675828260894e-10
+        },
+        {
+          "force_allowance_label": "100kHz",
+          "allowed_curvature_frequency_Hz": 100000.0,
+          "light_product_scale_ceiling_relative_to_reference": 0.008458525133648677,
+          "lambda_effective_min": 9.250124901242105e-21,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.311367582826089e-06
+        },
+        {
+          "force_allowance_label": "1MHz",
+          "allowed_curvature_frequency_Hz": 1000000.0,
+          "light_product_scale_ceiling_relative_to_reference": 0.8458525133648679,
+          "lambda_effective_min": 9.250124901242103e-23,
+          "conditional_common_halo_rigid_vacuum_D_upper": 0.023113675828260904
+        }
+      ]
+    },
+    {
+      "declared_cross_scale_loop_tolerance": 0.3,
+      "Delta_lambda_ceiling": 1.2040038186180146,
+      "matched_point": {
+        "b_GeV": 6.4006922684202845,
+        "kappa_GeV": 1551.6523421062736,
+        "y_chi": -1.5613735084482716,
+        "a_chi_GeV_inverse": 0.0024230939050546283,
+        "a_N_GeV_inverse_recovered": 1.7905526447794947e-07,
+        "C_chiN_recovered": 1.8017705314359717e-10,
+        "lambda_threshold_shift": 1.2040038186180142,
+        "lambda_effective_for_same_light_product": 2.3472724189963743e-22,
+        "force_curvature_relative_to_original": 0.004260263921251931,
+        "required_confinement_frequency_Hz": 627757.7031294465,
+        "conditional_Higgs_invisible_signal": 0.10694949488191414,
+        "passes_conditional_Higgs_screen": true,
+        "y_squared_over_4pi": 0.19400090190706076,
+        "threshold_over_4pi": 0.09581157961728737
+      },
+      "conditional_force_and_signal_bounds": [
+        {
+          "force_allowance_label": "diagnostic_free_hold_10percent",
+          "allowed_curvature_frequency_Hz": 0.28238432113613754,
+          "light_product_scale_ceiling_relative_to_reference": 2.0234713428888227e-13,
+          "lambda_effective_min": 1.1600225657978803e-09,
+          "conditional_common_halo_rigid_vacuum_D_upper": 1.3227380480001793e-27
+        },
+        {
+          "force_allowance_label": "1kHz",
+          "allowed_curvature_frequency_Hz": 1000.0,
+          "light_product_scale_ceiling_relative_to_reference": 2.537557540094602e-06,
+          "lambda_effective_min": 9.250124901242107e-17,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.0802308245434785e-13
+        },
+        {
+          "force_allowance_label": "10kHz",
+          "allowed_curvature_frequency_Hz": 10000.0,
+          "light_product_scale_ceiling_relative_to_reference": 0.00025375575400946027,
+          "lambda_effective_min": 9.250124901242104e-19,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.08023082454348e-09
+        },
+        {
+          "force_allowance_label": "100kHz",
+          "allowed_curvature_frequency_Hz": 100000.0,
+          "light_product_scale_ceiling_relative_to_reference": 0.02537557540094602,
+          "lambda_effective_min": 9.250124901242106e-21,
+          "conditional_common_halo_rigid_vacuum_D_upper": 2.0802308245434787e-05
+        },
+        {
+          "force_allowance_label": "1MHz",
+          "allowed_curvature_frequency_Hz": 1000000.0,
+          "light_product_scale_ceiling_relative_to_reference": 1.0,
+          "lambda_effective_min": 2.3472724189963743e-22,
+          "conditional_common_halo_rigid_vacuum_D_upper": 0.03230574269570576
+        }
+      ]
+    }
+  ],
+  "scope": "Restricted fixed C,aN,mu,heavy-mass family, explicit loop-drift tolerances, chamber-only force curvature and conditional vacuum local envelope. Weaken light product only; no actual trap assumption, full combined apparatus, loop matching or full portal viability."
+}

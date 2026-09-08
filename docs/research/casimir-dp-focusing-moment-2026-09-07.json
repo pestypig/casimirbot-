@@ -1,0 +1,45 @@
+{
+  "status": "idealized_collisionless_focusing_identity",
+  "rows": [
+    {
+      "chosen_escape_speed_km_s": 0.0,
+      "mono_local_speed_km_s": 776.0,
+      "mono_density_enhancement": 0.9999999999999999,
+      "inverse_speed_moment_ratio": 0.9999999999999998,
+      "Maxwell_numerical_ratio": 1.0
+    },
+    {
+      "chosen_escape_speed_km_s": 11.2,
+      "mono_local_speed_km_s": 776.0808205335318,
+      "mono_density_enhancement": 1.000104150172077,
+      "inverse_speed_moment_ratio": 1.0,
+      "Maxwell_numerical_ratio": 1.0
+    },
+    {
+      "chosen_escape_speed_km_s": 42.1,
+      "mono_local_speed_km_s": 777.1411776504962,
+      "mono_density_enhancement": 1.001470589755794,
+      "inverse_speed_moment_ratio": 1.0,
+      "Maxwell_numerical_ratio": 0.9999999999999996
+    },
+    {
+      "chosen_escape_speed_km_s": 600.0,
+      "mono_local_speed_km_s": 980.9057039287721,
+      "mono_density_enhancement": 1.2640537421762528,
+      "inverse_speed_moment_ratio": 1.0,
+      "Maxwell_numerical_ratio": 1.0000000000000004
+    }
+  ],
+  "assumptions": [
+    "stationary isotropic distribution at infinity in the potential rest frame",
+    "static spherical transparent gravitational potential with all unbound trajectories populated",
+    "nonrelativistic particle kinematics and no absorption or energy-changing collisions"
+  ],
+  "interpretation": "4 pi integral_v_escape^infty v F_infinity(sqrt(v^2-v_escape^2)) dv = 4 pi integral_0^infty u F_infinity(u) du",
+  "limitations": [
+    "not a moving-laboratory anisotropic halo simulation",
+    "not a capture or thermalization model",
+    "escape speeds are diagnostic choices, not a fitted site potential",
+    "actual recoil rates can change even when the inclusive inverse-speed bound is invariant"
+  ]
+}

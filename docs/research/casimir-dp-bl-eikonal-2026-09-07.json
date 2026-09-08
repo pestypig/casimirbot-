@@ -1,0 +1,41 @@
+{
+  "status": "conditional_uniform_sphere_eikonal_prediction_not_allowed_model",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-11,
+        1.0
+      ],
+      "eikonal_D": 0.1851033283528095,
+      "quadratic_phase_D": 0.5978081933876719,
+      "momentum_Born_D": 0.597808116393256,
+      "quadratic_recovery_relative": 1.2879453081815484e-07,
+      "combined_grid_tail_refinement": 8.30945663021776e-06,
+      "central_phase": 308.4415503079723
+    },
+    {
+      "masses_GeV": [
+        1e-09,
+        1.0
+      ],
+      "eikonal_D": 0.001027910167005251,
+      "quadratic_phase_D": 0.026836382956701144,
+      "momentum_Born_D": 0.02683638300882481,
+      "quadratic_recovery_relative": 1.9422761177168013e-09,
+      "combined_grid_tail_refinement": 1.3337791107126407e-06,
+      "central_phase": 40.55359248939393
+    }
+  ],
+  "formula": "sigma_dec(d_perp)=integral d^2b [1-cos(chi(b)-chi(b+d_perp))], averaged over incident directions",
+  "assumptions": [
+    "straight-line eikonal phase screen, uniform B-L sphere",
+    "same fixed incoming population and products",
+    "heavy 1-GeV mediator phase omitted as negligible in this macroscopic screen"
+  ],
+  "limitations": [
+    "not an exact partial-wave solution or full eikonal error bound",
+    "heavy phase omission not included in a rigorous total error budget",
+    "no external coupling constraints, environment or underground transport",
+    "constant separation during hold, not full branch history"
+  ]
+}

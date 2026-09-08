@@ -1,0 +1,20 @@
+{
+  "scope": "ET6 continuation route regression timeout diagnosis",
+  "classification": "test-only",
+  "negative_evidence": "Isolated suite reproduced first-test 20000ms timeout; second test passed after module import was cached.",
+  "repair": "Use a static route-module import so collection is separate from route lifecycle test deadlines. No timeout increase or production route change.",
+  "verification": {
+    "suite": "server/__tests__/live-continuation-tool-routes.test.ts",
+    "result": "2 passed",
+    "collection_ms": 30610,
+    "test_execution_ms": 83,
+    "total_seconds": 31.29
+  },
+  "limitations": [
+    "Test import cost is not measured live environment latency.",
+    "Broader TypeScript errors, temporal execution MCP admission, asynchronous delivery qualification and packaged live journey remain incomplete."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

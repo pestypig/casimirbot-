@@ -1,0 +1,84 @@
+{
+  "source": "https://arxiv.org/html/2609.04673v1",
+  "scope": "Leading nonrelativistic free-target kinematics, diagnostic xenon peak fixed at248keV; no population, mediator, cross section or detector likelihood specified.",
+  "vmax_km_s": 776,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "delta_GeV": -0.003281006648687921,
+      "targets": [
+        {
+          "target": "xenon_mean",
+          "E0_keV": 248.0,
+          "Emin_keV": 204.26688516424716,
+          "Emax_keV": 301.0962836709719
+        },
+        {
+          "target": "carbon12",
+          "E0_keV": 1549.4818607432856,
+          "Emin_keV": 1338.085077622672,
+          "Emax_keV": 1794.2760717712042
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 15.0,
+      "delta_GeV": -0.002270004432458614,
+      "targets": [
+        {
+          "target": "xenon_mean",
+          "E0_keV": 248.0,
+          "Emin_keV": 187.4475503582304,
+          "Emax_keV": 328.1131168823486
+        },
+        {
+          "target": "carbon12",
+          "E0_keV": 1300.8689359991192,
+          "Emin_keV": 1071.335140761657,
+          "Emax_keV": 1579.5803985710602
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 40.0,
+      "delta_GeV": -0.0010062516621719803,
+      "targets": [
+        {
+          "target": "xenon_mean",
+          "E0_keV": 248.00000000000006,
+          "Emin_keV": 132.95564425246067,
+          "Emax_keV": 462.5903649732549
+        },
+        {
+          "target": "carbon12",
+          "E0_keV": 786.5202551060963,
+          "Emin_keV": 560.1442609878212,
+          "Emax_keV": 1104.383557552166
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "delta_GeV": -0.0005513006648687921,
+      "targets": [
+        {
+          "target": "xenon_mean",
+          "E0_keV": 248.0,
+          "Emin_keV": 82.54585405937344,
+          "Emax_keV": 745.0889048378068
+        },
+        {
+          "target": "carbon12",
+          "E0_keV": 495.88607426642284,
+          "Emin_keV": 303.9785542393632,
+          "Emax_keV": 808.9485104193624
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "zero_speed_peak": true,
+    "endpoints_reproduce_vmax": true
+  },
+  "common_model_admitted": false
+}

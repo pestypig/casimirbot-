@@ -1,0 +1,120 @@
+{
+  "checks": {
+    "sphere_density_recovers_frozen_mass": true,
+    "conversion_via_particle_mass_units": true,
+    "illustrative_point_satisfies_declared_scale_criteria": true,
+    "sphere_linear_approximation_hierarchies": true
+  },
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "frozen_sphere_density_kg_m3": 3500.0,
+  "sphere_M_scale_GeV": 5.4384778175660236,
+  "rows": [
+    {
+      "Xe_density_kg_m3_assumed": 2700.0,
+      "mu_eV": 0.001,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 3411.3563908675105,
+      "M_Xe_density_twice_critical_max_GeV": 2412.1932370264835,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2700.0,
+      "mu_eV": 0.01,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 341.1356390867511,
+      "M_Xe_density_twice_critical_max_GeV": 241.21932370264835,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2700.0,
+      "mu_eV": 0.1,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 34.113563908675104,
+      "M_Xe_density_twice_critical_max_GeV": 24.121932370264833,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2700.0,
+      "mu_eV": 1.0,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 3.411356390867511,
+      "M_Xe_density_twice_critical_max_GeV": 2.412193237026483,
+      "robust_scale_window_exists": false
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2900.0,
+      "mu_eV": 0.001,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 3535.446015866476,
+      "M_Xe_density_twice_critical_max_GeV": 2499.9378523381474,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2900.0,
+      "mu_eV": 0.01,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 353.54460158664756,
+      "M_Xe_density_twice_critical_max_GeV": 249.99378523381472,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2900.0,
+      "mu_eV": 0.1,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 35.35446015866476,
+      "M_Xe_density_twice_critical_max_GeV": 24.99937852338147,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 2900.0,
+      "mu_eV": 1.0,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 3.535446015866476,
+      "M_Xe_density_twice_critical_max_GeV": 2.4999378523381472,
+      "robust_scale_window_exists": false
+    },
+    {
+      "Xe_density_kg_m3_assumed": 3100.0,
+      "mu_eV": 0.001,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 3655.3255172008508,
+      "M_Xe_density_twice_critical_max_GeV": 2584.7054606569454,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 3100.0,
+      "mu_eV": 0.01,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 365.532551720085,
+      "M_Xe_density_twice_critical_max_GeV": 258.4705460656945,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 3100.0,
+      "mu_eV": 0.1,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 36.5532551720085,
+      "M_Xe_density_twice_critical_max_GeV": 25.84705460656945,
+      "robust_scale_window_exists": true
+    },
+    {
+      "Xe_density_kg_m3_assumed": 3100.0,
+      "mu_eV": 1.0,
+      "M_weak_sphere_min_GeV": 17.197976907810318,
+      "M_Xe_restoration_max_GeV": 3.6553255172008505,
+      "M_Xe_density_twice_critical_max_GeV": 2.584705460656945,
+      "robust_scale_window_exists": false
+    }
+  ],
+  "illustrative_point": {
+    "mu_eV": 0.01,
+    "M_GeV": 30.0,
+    "sphere_density_size_parameter": 0.032863378857953,
+    "sphere_center_field_ratio_linear_massless_exterior": 0.9837903434546604,
+    "Xe_bulk_density_over_critical": 138.88198367895708,
+    "Xe_restored_linear_decay_length_m": 1.6804775256999858e-06,
+    "mu_R_dimensionless": 0.01400225969291876,
+    "sphere_density_term_over_mu_squared": 167.6161871987413
+  },
+  "scope": "Density benchmarks and scale criteria, not exclusions. Neglect halo/gas background term only conditionally; finite wall/target solution and two-scalar channel unresolved. Linear vertex vanishes at exact phi_bar=0, not all scattering."
+}

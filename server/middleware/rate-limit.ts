@@ -102,3 +102,18 @@ export const isDedicatedEnvironmentConnectorApiPath = (path: string): boolean =>
   const normalized = path.startsWith("/api/") ? path.slice(4) : path;
   return normalized.startsWith("/environment-action/v1/authorities/");
 };
+
+/**
+ * A paired action connector uses several independently serialized lanes
+ * (control/action polling, heartbeat, critical workflow evidence, and bounded
+ * environment projections). A healthy client can therefore sustain roughly
+ * ten authenticated requests per second while a workflow is active. Keep the
+ * route-local ceiling above that measured cadence; the shared IP ceiling still
+ * bounds all authorities on one host, and every request remains bearer- and
+ * authority-scoped.
+ */
+export const DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS = Object.freeze({
+  windowMs: 60_000,
+  perIp: 3_600,
+  perAuthority: 3_600,
+});

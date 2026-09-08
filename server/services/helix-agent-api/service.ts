@@ -155,12 +155,16 @@ const isTerminalLifecycle = (status: HelixAgentLifecycleStatus): boolean =>
 
 const publicRunRecommendedAction = (
   run: HelixAgentRunRecord,
+  expired: boolean,
 ): HelixAgentRun["recommended_next_action"] => {
   if (isTerminalLifecycle(run.lifecycleStatus)) {
     return {
       operation: "none",
       reason: `run_${run.lifecycleStatus}`,
     };
+  }
+  if (expired) {
+    return { operation: "none", reason: "run_expired" };
   }
   if (run.completionStatus === "needs_input") {
     return {
@@ -184,7 +188,10 @@ const publicRunRecommendedAction = (
   };
 };
 
-const publicRun = (run: HelixAgentRunRecord): HelixAgentRun => {
+const publicRun = (run: HelixAgentRunRecord, now: Date): HelixAgentRun => {
+  // Readiness is time-sensitive; inspection must not finalize the stored run.
+  const expired = !isTerminalLifecycle(run.lifecycleStatus) &&
+    now.getTime() >= new Date(run.expiresAt).getTime();
   const projection = {
     schema: HELIX_AGENT_RUN_SCHEMA,
     api_version: HELIX_AGENT_API_VERSION,
@@ -209,13 +216,15 @@ const publicRun = (run: HelixAgentRunRecord): HelixAgentRun => {
       steps_used: run.stepsUsed,
       expires_at: run.expiresAt,
     },
-    summary: run.latestSummary,
+    summary: expired
+      ? "The run budget has expired; this run is not ready for continuation. Stored lifecycle status is unchanged."
+      : run.latestSummary,
     unresolved_requirements: run.unresolvedRequirements,
     contradictions: run.contradictions,
     pending_questions: run.pendingQuestions,
     evidence: run.evidenceBundle,
     latest_result: run.latestResult,
-    recommended_next_action: publicRunRecommendedAction(run),
+    recommended_next_action: publicRunRecommendedAction(run, expired),
     created_at: run.createdAt,
     updated_at: run.updatedAt,
     completed_at: run.completedAt,
@@ -825,7 +834,7 @@ export class HelixAgentApiService {
           now: createdAt,
         })
       ).run;
-      const body = publicRun(created);
+      const body = publicRun(created, this.now());
       await this.store.completeIdempotency({
         owner: ownerFor(input.principal),
         operation,
@@ -862,7 +871,7 @@ export class HelixAgentApiService {
         "Agent run not found.",
       );
     }
-    return publicRun(run);
+    return publicRun(run, this.now());
   }
 
   async reenterEvidence(input: {
@@ -996,7 +1005,7 @@ export class HelixAgentApiService {
           "The run cannot receive evidence in its current lifecycle state.",
         );
       }
-      const body = publicRun(updated);
+      const body = publicRun(updated, this.now());
       await this.store.completeIdempotency({
         owner,
         operation,
@@ -1150,7 +1159,7 @@ export class HelixAgentApiService {
               eventId: this.id("evt"),
               now: this.now().toISOString(),
             })) ?? claim.run;
-          const body = publicRun(exhausted);
+          const body = publicRun(exhausted, this.now());
           await this.store.completeIdempotency({
             owner,
             operation,
@@ -1198,7 +1207,7 @@ export class HelixAgentApiService {
               eventId: this.id("evt"),
               now: this.now().toISOString(),
             })) ?? claim.run;
-          const body = publicRun(expired);
+          const body = publicRun(expired, this.now());
           await this.store.completeIdempotency({
             owner,
             operation,
@@ -1543,7 +1552,7 @@ export class HelixAgentApiService {
           },
         );
       }
-      const body = publicRun(finalized);
+      const body = publicRun(finalized, this.now());
       await this.store.completeIdempotency({
         owner,
         operation,
@@ -1662,7 +1671,7 @@ export class HelixAgentApiService {
       this.activeTurnControllers
         .get(cancelled.run.runId)
         ?.abort(new Error("agent_run_cancelled"));
-      const body = publicRun(cancelled.run);
+      const body = publicRun(cancelled.run, this.now());
       await this.store.completeIdempotency({
         owner,
         operation,

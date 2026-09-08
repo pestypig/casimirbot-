@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-06",
+  "scope": "Native successor HTTP and callback timing, connected to the correlated budget observer",
+  "classification": "evidence normalization; no controller or retry policy changes",
+  "verification": {
+    "focused_native_tests": "7 telemetry and 9 transport tests passed with compiled handoff enabled",
+    "connected_tests": 2,
+    "budget_tests": 21,
+    "targeted_typescript": "passed"
+  },
+  "sample_ms": {
+    "checkpoint_to_evidence_fence_observed": 270,
+    "fence_observed_to_poll": 1,
+    "http_roundtrip": 91,
+    "response_to_acceptance": 7,
+    "enclosing_checkpoint_to_acceptance": 366,
+    "nested_server_interval": 80
+  },
+  "interpretation": "Durations are individually ceiling-rounded; enclosing duration is authoritative for summing with safety margin. Nested server intervals are not added again.",
+  "negative_coverage": [
+    "Missing HTTP/poll/callback phase rejects coverage",
+    "Wrong checkpoint, regressing response, duplicate response and stale post-interruption marks cannot reset timing",
+    "Unmeasured reservation window still gives fits=false"
+  ],
+  "native_phase_coverage_complete": true,
+  "native_transport_coverage_complete": true,
+  "five_stage_attribution_complete": false,
+  "live_acceptance": false,
+  "limits": "One connected fixture sample with controlled ticks and precompiled proposal, not live capacity or a latency distribution. Source-only; artifact refresh remains."
+}

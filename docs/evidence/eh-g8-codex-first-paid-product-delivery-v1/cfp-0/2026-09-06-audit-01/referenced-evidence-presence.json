@@ -1,0 +1,672 @@
+{
+  "schema": "casimirbot.cfp0.reference_presence.v1",
+  "captured_utc": "2026-09-07T02:49:08.343Z",
+  "scope": "Syntactically extracted docs/evidence, docs/audits, artifacts and reports JSON/JSONL/MD references from the frozen graph. Existence is not content inspection, integrity or acceptance. Planned filenames and descriptive aliases require source-context triage.",
+  "reference_occurrences": 108,
+  "missing_occurrences": 1,
+  "rows": [
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g6-closure-audit-2026-08-23.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md",
+          "present": true
+        },
+        {
+          "path": "artifacts/helix-minecraft-guardian-v0.4/direct-codex/water-bucket-rescue/attempt-4-dynamic-collision-success.json",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g2-a0-b-partial-audit-2026-08-20.md",
+          "present": true
+        },
+        {
+          "path": "artifacts/g3-persistent-viability/g3-keyed-fire-program-live-036.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/helix-environment-g4-live-2026-08-22-deterministic/helix-minecraft-player-ask-5a72c8a7-4dc7-4546-bf88-15c41a66700f.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/g5-durable-survival-goal/owner-natural-progress-report-final.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/g5-durable-survival-goal/second-participant-natural-progress-report-authorized.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/g6-concurrent-environment-reasoning/a1-live-latest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/g6-concurrent-environment-reasoning/keyed-natural-ask-ask_g6-keyed-natural-1787531751670.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/g7-second-domain-transfer/live-tripath-acceptance-2026-08-24.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna1-packaging-ux-readiness-boundary-v1/2026-08-31-deterministic-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1/2026-09-02-current-service-typed-minecraft-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json",
+          "present": true
+        },
+        {
+          "path": "reports/helix-minecraft/nether1-baritone-movement-only-a0.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1/2026-09-03-deterministic-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g7-progress-audit-2026-08-23.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-environment-harness-g7-progress-audit-2026-08-24.md",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-minecraft-fluid-execution-audit-2026-08-12.md",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/helix-ask-codex-parity-work-program-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/audits/helix-ask-codex-parity-g0-closure-audit-2026-08-26.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-ask-codex-parity-g1-progress-audit-2026-08-26.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-ask-codex-parity-g1-runtime-transport-evidence-2026-08-26.md",
+          "present": true
+        },
+        {
+          "path": "docs/audits/helix-ask-codex-parity-g1-deterministic-closure-readiness-2026-08-26.md",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A0/c0-presence-lifecycle/attempt-2/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/c0-presence-mcp-contract/attempt-2/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/c0-presence-live/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/B/c0-presence-keyed-helix/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A0/c1-follow-baseline/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/c1-follow-mcp-live/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/B/c1-follow-keyed-helix/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/runtime/current-custody-evidence.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A0/c2-custody-baseline/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/c2-custody-mcp-live/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/B/c2-custody-keyed-helix/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/runtime/current-mining-evidence.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/real-client-differential/c3-stone-wood-pick/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/A1/c3-mining-mcp-deterministic/attempt-1/manifest.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/eh-mc-companion-survival-party-v1/B/c3-mining-owner-room-deterministic/attempt-1/manifest.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md",
+          "present": true
+        },
+        {
+          "path": "artifacts/g7-second-domain-transfer/live-tripath-acceptance-2026-08-24.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-public-ui-agent-affordance-manifest-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-pna1-packaging-ux-readiness-boundary-v1/2026-08-31-deterministic-acceptance.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-source-delivery-and-replit-handoff.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-desktop-cloud-signing-infrastructure-acceptance.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1/2026-09-01-pre-approval-checkpoint.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1/2026-09-01-deterministic-acceptance.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-shared-live-room-mcp-configuration-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "artifacts/helix-minecraft-combat-c0/a0-exact-zombie-defeated-v1.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/helix-minecraft-combat-c0/topology-correction-2026-08-26-v1.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/helix-minecraft-combat-c0/isolated-client-profile-preparation-v1.json",
+          "present": true
+        },
+        {
+          "path": "artifacts/helix-minecraft-combat-c0/isolated-client-live-launch-2026-08-26-v1.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a0/projectile-shield-a0-public-capture.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a1/bow-skeleton-a1-success-receipt.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/rec2c-staggered-v3-qualified-live-summary.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/rec2c-contact-use-v5-qualified-live-summary.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-live-preflight.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-native-node-a-preflight.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-local-supervisor-mcp-coordination-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "artifacts/training-trace.json",
+          "present": false
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "reports/helix-minecraft/g8-m3-authorization-readiness-20260825.json",
+          "present": true
+        },
+        {
+          "path": "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json",
+          "present": true
+        },
+        {
+          "path": "reports/helix-minecraft/nether1-baritone-movement-only-a0.json",
+          "present": true
+        },
+        {
+          "path": "reports/helix-minecraft/nether1-keyed-a1-action-reaction-20260824.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-trusted-device-onramp-repair.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-guided-attention-onramp.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-bound-steering-single-action-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-packaged-transition-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-delivery-renewal-live-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-capacity-reporter-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-packaged-trust-cache-repair.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-guidance-satisfied-repair.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-deferred-persistence-live-capacity.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-action-connector-rate-limit-repair.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-capacity-null-measurement-repair.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-zero-control-effect-truth-repair.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "reports/helix-minecraft/nether1-baritone-movement-only-a0.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-6-play-minecraft-with-helix-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": [
+        {
+          "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-deterministic-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-current-source-action-monitor-revoke-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-start-harness-catalog-checkpoint.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-exe-mcp-control-coverage.json",
+          "present": true
+        },
+        {
+          "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json",
+          "present": true
+        }
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md",
+      "inspection": "reference-metadata-only unless listed in inspection-manifest groups",
+      "references": []
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "scope": "Algebraic sensitivity with dated external SM magnitude, independent Gaussian width used illustratively, no joint likelihood or physical phase test.",
+  "reference_SM": 0.00216,
+  "measurement": 0.002228,
+  "illustrative_width": 0.00035345816386101483,
+  "branches": [
+    {
+      "branch": "same_sign",
+      "new_amplitude_interval": [
+        0.0,
+        0.0002854581638610149
+      ],
+      "yL_interval": [
+        0.0,
+        0.10639429909400437
+      ],
+      "deficit_interval": [
+        0.0,
+        8.5760159321149e-05
+      ],
+      "lower_yL_endpoint_at_fixed_gu_exists": false
+    },
+    {
+      "branch": "reversed_sign",
+      "new_amplitude_interval": [
+        0.0040345418361389844,
+        0.004741458163861015
+      ],
+      "yL_interval": [
+        0.40017944509674375,
+        0.4338637308955403
+      ],
+      "deficit_interval": [
+        0.0012119062415372147,
+        0.0014242093615362632
+      ],
+      "lower_yL_endpoint_at_fixed_gu_exists": true
+    }
+  ],
+  "reference_rows": [
+    {
+      "yL": 0.09916784176599759,
+      "yR": 0.006452967690041848,
+      "new_amplitude": 0.00024800000000000007,
+      "signed_total_reference": 0.001912,
+      "magnitude_total_reference": 0.001912,
+      "required_SM_same_sign": 0.002476,
+      "required_SM_reversed_sign": -0.00198,
+      "first_row_pull": 2.1792761070828424,
+      "mass_loop_ratio": 4.066483594601955
+    },
+    {
+      "yL": 0.2,
+      "yR": 0.0032,
+      "new_amplitude": 0.001008520102279449,
+      "signed_total_reference": 0.001151479897720551,
+      "magnitude_total_reference": 0.001151479897720551,
+      "required_SM_same_sign": 0.003236520102279449,
+      "required_SM_reversed_sign": -0.001219479897720551,
+      "first_row_pull": 1.8528851784698526,
+      "mass_loop_ratio": 1.0
+    },
+    {
+      "yL": 0.4173600101062603,
+      "yR": 0.001534227419668438,
+      "new_amplitude": 0.0043879999999999865,
+      "signed_total_reference": -0.0022279999999999865,
+      "magnitude_total_reference": 0.0022279999999999865,
+      "required_SM_same_sign": 0.0066159999999999865,
+      "required_SM_reversed_sign": 0.0021599999999999866,
+      "first_row_pull": 0.402772318476138,
+      "mass_loop_ratio": 0.2298685327404759
+    }
+  ],
+  "checks": {
+    "endpoints_reproduce_magnitude_band": true,
+    "reflection_center_reproduces_measurement": true,
+    "zero_is_not_fixed_gu_member": true
+  },
+  "full_model_admitted": false
+}

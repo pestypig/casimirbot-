@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-06",
+  "scope": "Native checkpoint evidence-fence observation timing",
+  "classification": "evidence normalization only",
+  "changes": [
+    "Record first client-thread observation of cleared required-evidence fence before successor poll",
+    "Split checkpoint-to-acceptance into checkpoint-to-fence-observed and fence-observed-to-acceptance",
+    "Do not reset on repeated progress, wrong key or duplicate observation",
+    "Clear on interruption and reject regressing acceptance time"
+  ],
+  "verification": {
+    "telemetry_tests": 6,
+    "runtime_transport_tests": 9,
+    "failures": 0,
+    "skipped": 0,
+    "compiled_handoff_enabled": true,
+    "game_test_task_excluded": true,
+    "same_origin_split": "Sum differs from enclosing duration by at most 1 ms due to ceiling rounding",
+    "diff_check": "passed"
+  },
+  "limits": [
+    "Fence observation includes client scheduling delay; not the exact HTTP acknowledgement timestamp",
+    "No private reasoning, controller ownership or polling policy changed",
+    "Production broker connected rerun and package/JAR refresh still required",
+    "No live Minecraft capacity or complete five-stage attribution claim"
+  ],
+  "live_acceptance": false
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "helix.development_diagnostic.v1",
+  "date": "2026-09-07",
+  "classification": "presentation",
+  "first_divergence": "Run association is hidden when connection readiness has no verified_run_association. Readiness depends on fresh exact supervisor presence and an exact current retained run version; UI recheck reads but does not prepare these facts.",
+  "related_workflow_gap": "Play Minecraft activation requires an active exact chat binding before requesting scoped durable-goal preparation. Chat-only bootstrap exists, but the transition back to environment-run approval is not a guided preparation workflow.",
+  "changed": [
+    "Unavailable run-association checkbox remains visible and disabled.",
+    "Explains preparation versus verification versus approval and warns against generating repeated chat-only claims.",
+    "Fresh verified association enables an unchecked control; no implicit selection or claim creation."
+  ],
+  "verification": {
+    "command": "npx vitest run client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx --maxWorkers=1 --minWorkers=1",
+    "passed": 33,
+    "failed": 0,
+    "new_regression": "Unavailable association becomes selectable after readiness refresh without creating a claim or auto-approving the run."
+  },
+  "not_proven": [
+    "One-button environment preparation and bootstrap-to-run approval progression",
+    "Packaged renderer visual acceptance of this change",
+    "ET6 three rolling extensions and remaining live lifecycle acceptance"
+  ],
+  "scope_boundary": "The full launcher onramp is reserved after ET6 in the canonical ET work packet. This narrow presentation repair does not implement that reservation, weaken exact identity/freshness checks, renew presence from the browser, or grant authority.",
+  "exe_rebuilt": false,
+  "et6_complete": false,
+  "nav1_unlocked": false
+}

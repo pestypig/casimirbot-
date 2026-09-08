@@ -6,6 +6,8 @@ export type BrowserReasoningBinding = Readonly<{
   status: "pending_claim" | "active" | "revoked" | "expired" | "superseded";
   continuation_transport: "polling" | "monitor_only" | "unavailable";
   binding_epoch: number;
+  run_id?: string | null;
+  mission_id?: string | null;
   /** Present on current server projections; optional only for older local snapshots. */
   service_instance_ref?: string;
   /** Present on current server projections; optional only for older local snapshots. */
@@ -120,12 +122,17 @@ const request = async (path: string, init: RequestInit): Promise<Record<string, 
 export const issueReasoningBindingClaim = async (input: {
   clientSessionRef: string;
   helixConversationId: string;
+  runAssociation?: { run_id: string; verification_ref: string };
 }): Promise<{ claim_handle: string; binding: BrowserReasoningBinding }> => {
   const body = await request("/api/account/session/agent-connections/reasoning-bindings/claims", {
     method: "POST",
     body: JSON.stringify({
       client_session_ref: input.clientSessionRef,
       helix_conversation_id: input.helixConversationId,
+      ...(input.runAssociation ? {
+        run_id: input.runAssociation.run_id,
+        run_verification_ref: input.runAssociation.verification_ref,
+      } : {}),
     }),
   });
   rememberReasoningBinding(body.binding as BrowserReasoningBinding);

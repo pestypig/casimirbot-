@@ -1,0 +1,22 @@
+{
+  "schema": "et6_deployment_recovery_evidence.v1",
+  "read_source_recovered_via_mcp": true,
+  "source_pairing_ref": "connector_pairing:05ad4534-01f6-4f45-b436-7011a95413ce",
+  "source_credential_expires_at": "2026-09-06T09:24:10.506Z",
+  "action_authority": "environment_action_authority:a9277a84-fe68-4b74-8d22-0e7c00cd11ee",
+  "action_policy_version": 5,
+  "action_policy_widened": false,
+  "action_authority_expires_at": "2026-09-06T09:20:00.000Z",
+  "installed_jar_sha256": "25b2bcc35f41c684c4c6f90b041d163e9bf6fed648524903f8a3431a042d9795",
+  "old_jar_backup": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/helix-backups/HelixFabricPlayerAgent-0.4.11.pre-walk-handoff-20260906.jar.bak",
+  "restart_attempts": [
+    {"address": "127.0.0.1:25565", "result": "internal_error", "client_unchanged": true, "diagnosis": "Incorrect default port supplied; no listener"},
+    {"address": "127.0.0.1:25566", "result": "internal_error", "client_exited": true, "replacement_client_observed": false, "diagnosis": "Partial lifecycle operation; launch failure cause not yet exposed"}
+  ],
+  "normal_client_shutdown_log": "04:26:28 Stopping!; Stopping worker threads",
+  "fabric_server_still_running_pid": 1868,
+  "updated_companion_loaded": false,
+  "live_rolling_extensions_proven": 0,
+  "next": "Expose typed MinecraftLocalLifecycleError through MCP, diagnose launch stage without blindly repeating restart",
+  "release_maturity_promoted": false
+}

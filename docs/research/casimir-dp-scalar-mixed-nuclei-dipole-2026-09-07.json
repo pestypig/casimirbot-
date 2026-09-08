@@ -1,0 +1,31 @@
+{
+  "scope": "Dipole coefficients only, additive nucleon scalar charges, measured isotope mass proxies. No plasma emission, screening, binding-charge derivative or statistical stellar bound. Unit electron charge/mass excludes trivial zero-coupling solution.",
+  "H_He_matched_charges_in_u": [
+    1.0072764523209352,
+    0.993476594835
+  ],
+  "H_He_matched_residuals": {
+    "H1": 0.0,
+    "He4": 0.0,
+    "C12": -0.0006509920930917179,
+    "O16": -0.0009692237121590175
+  },
+  "equal_weight_minimax_charges_in_u": [
+    1.0077643539891465,
+    0.9920195741656073
+  ],
+  "minimax_max_absolute_dipole_residual": 0.0004843771211838804,
+  "minimax_residuals": {
+    "H1": -0.0004843771211837655,
+    "He4": 0.00048437712118398757,
+    "C12": -0.00016629964623193771,
+    "O16": -0.0004843771211837655
+  },
+  "constraint_rank": 3,
+  "sources": [
+    "https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=H",
+    "https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=He",
+    "https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=O"
+  ],
+  "model_admitted": false
+}

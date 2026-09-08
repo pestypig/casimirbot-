@@ -224,6 +224,7 @@ describe("Shared Live Room Player Embodiment controls", () => {
     expect(await screen.findByText(/acknowledged pickup and is checking/i))
       .toBeTruthy();
     expect(await screen.findByText("ready")).toBeTruthy();
+    expect(screen.getByText(/Minecraft action permission:.*remaining/)).toBeTruthy();
     const calls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(calls.some((url) => url.includes("/reasoning-bindings/current")))
       .toBe(true);

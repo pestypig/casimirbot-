@@ -1,4 +1,15 @@
 import crypto from "node:crypto";
+import { publishTemporalPerceptionFrontier } from "../services/environment-connectors/temporal-plans/temporal-frontier-publisher";
+import { readyUpEnvironmentSession } from "../services/environment-connectors/session/ready-up-session";
+import { helixEnvironmentSessionMcpSchema, helixEnvironmentSessionMcpCommandSchema } from "@shared/helix-environment-session-request";
+import { prepareBrowserEnvironmentSession } from "../services/environment-connectors/session/prepare-browser-session";
+import { admitTemporalPlan } from "../services/environment-connectors/temporal-plans/temporal-plan-admission";
+import { temporalPlanErrorProjection } from "../services/environment-connectors/temporal-plans/temporal-plan-error";
+import { isEnvironmentActionBrokerError } from "../services/environment-connectors/actions/action-broker";
+import { temporalAdmissionRequestMetadataSchema } from "../services/environment-connectors/temporal-plans/temporal-admission-request-schema";
+import { helixEnvironmentTemporalPlanSchema } from "@shared/helix-environment-time";
+import { helixMinecraftFluidMutationScopeSchema } from "@shared/helix-minecraft-fluid-sequence";
+import { HELIX_MINECRAFT_REACTIVE_RESOURCES } from "@shared/helix-minecraft-reactive-program";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -8,6 +19,21 @@ import {
   SurfacePanelRouteTargetSchema,
 } from "@shared/helix-surface-registry";
 import { SurfaceRegistryService, surfaceRegistryService } from "../services/hud-surface/surface-registry-service";
+import {
+  HELIX_VISUAL_SEQUENCE_EVIDENCE_PACKET_SCHEMA,
+  VISUAL_SEQUENCE_LIMITS,
+  VisualSequenceEvidencePacketSchema,
+  VisualSequenceFrameSelectionSchema,
+  VisualSequenceReasoningAccessSchema,
+  VisualSequenceReasoningBindingSchema,
+  type VisualSequenceEvidenceAsset,
+  type VisualSequenceEvidencePacket,
+} from "@shared/helix-visual-sequence";
+import {
+  VisualSequenceService,
+  VisualSequenceServiceError,
+  visualSequenceService,
+} from "../services/visual-sequence/visual-sequence-service";
 import {
   HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
   HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
@@ -402,6 +428,7 @@ import {
 } from "../services/environment-connectors/actions/authority-store";
 import {
   executeMinecraftFabricLoopbackLifecycle,
+  MinecraftLocalLifecycleError,
 } from
   "../services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle";
 import {
@@ -1438,7 +1465,9 @@ const minecraftActorStatusOutputSchema = z
 const minecraftSituationProbeOutputSchema = z
   .object({
     operation: z.literal("minecraft.situation.probe"),
+    prior_turn_id: z.string().trim().min(1).max(320),
     probe_kind: z.enum(HELIX_MINECRAFT_MCP_SITUATION_PROBE_KINDS),
+    mcp_evidence: helixMcpEvidenceObservationSchema.nullable(),
     room_id: helixSharedLiveRoomIdSchema,
     ok: z.boolean(),
     status: z.enum(["completed", "blocked", "failed"]),
@@ -1786,6 +1815,14 @@ const minecraftLocalLifecycleLaunchOutputSchema = z
     terminal_eligible: z.literal(false),
   })
   .strict();
+
+// Older Codex connector catalogs published this field as a required string.
+// Keep one exact, non-authority compatibility value so those clients can ask
+// for the same trusted-device workstation bootstrap without presenting a fake
+// Player Embodiment identifier. The server normalizes it to null before any
+// authority lookup and all trust/restart restrictions still apply.
+const HELIX_MINECRAFT_TRUSTED_DEVICE_LIFECYCLE_BOOTSTRAP =
+  "trusted_device_workstation_lifecycle_bootstrap" as const;
 
 const environmentCommandAuthorityConfigureOutputSchema = z
   .object({
@@ -2176,6 +2213,8 @@ const toolError = (
 };
 
 const roomToolError = (error: unknown, requiredScopes: RequiredOAuthScopes) => {
+  const temporalProjection = temporalPlanErrorProjection(error);
+  if (temporalProjection) return { ...toolSuccess(temporalProjection), isError: true as const };
   if (
     error instanceof RobinhoodConnectionError ||
     error instanceof PaperTradingError
@@ -2830,6 +2869,25 @@ const callRoomObservationTool = async (
     const result = await operation();
     return environmentObservationToolResult(result.value, result.ok);
   } catch (error) {
+    if (error instanceof MinecraftLocalLifecycleError) {
+      // Do not collapse a known launch-stage failure into retryable internal
+      // error: a restart may already have stopped the previous client. Never
+      // expose runner messages, stderr, paths, or credential-bearing payloads.
+      const code = /^minecraft_[a-z0-9_]{1,100}$/.test(error.code)
+        ? error.code : "minecraft_local_lifecycle_unavailable";
+      return { ...toolSuccess({
+        schema: "helix.minecraft_local_lifecycle_error.v1",
+        error: code,
+        message: `Minecraft lifecycle stopped at ${code}. Inspect current client/server state before another launch.`,
+        retryable: false,
+        credential_included: false,
+        content_role: "minecraft_local_lifecycle_error_not_assistant_answer",
+        reentry_required: true,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+      }), isError: true as const };
+    }
     return roomToolError(error, requiredScopes);
   }
 };
@@ -2862,6 +2920,7 @@ const ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES = new Map<
   string,
   RequiredOAuthScopes
 >([
+  ["helix_environment_temporal_frontier_publish", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
   ["helix_room_source_list", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
   ["helix_room_source_create", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
   ["helix_environment_subject_list", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
@@ -3038,9 +3097,27 @@ const registerRoomTransitionShadowTools = (server: McpServer): void => {
   );
 };
 
+const temporalFrontierToolConfig = {
+  title: "Publish current environment planning frontier",
+  description: "Retains a bounded conditional capability frontier from current goal authority and prior perception evidence. This is planning context, not a strategy, executable plan, or permission to act.",
+  inputSchema: z.object({
+    room_id: helixSharedLiveRoomIdSchema,
+    goal_id: z.string().trim().min(1).max(320),
+    expected_revision: z.number().int().nonnegative(),
+    run_id: z.string().trim().min(1).max(320).nullable(),
+    turn_id: z.string().trim().min(1).max(320),
+    probe_request_id: z.string().trim().min(1).max(320),
+    prior_turn_id: z.string().trim().min(1).max(320),
+  }).strict(),
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+};
+
 const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
   const deny = (requiredScopes: RequiredOAuthScopes) =>
     async () => roomTransitionShadowError(requiredScopes);
+  server.registerTool("helix_environment_temporal_frontier_publish",
+    temporalFrontierToolConfig, deny(HELIX_MINECRAFT_ACTION_MCP_SCOPES));
   server.registerTool("helix_room_source_list", {
     title: "List room source bindings",
     description:
@@ -3322,6 +3399,8 @@ export const createHelixMcpServer = (input: {
   service?: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
   reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
+  environmentSessionReadyUp?: typeof readyUpEnvironmentSession;
+  environmentSessionAutoPrepare?: typeof prepareBrowserEnvironmentSession;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
   desktopMcpTunnelTransitionExecutor?: DesktopMcpTunnelTransitionExecutor;
   desktopFullHarnessTrustReader?: DesktopFullHarnessTrustReader;
@@ -3388,9 +3467,11 @@ export const createHelixMcpServer = (input: {
   environmentServerPairLocalHandoff?: HelixEnvironmentServerPairLocalHandoff;
   mcpEvidenceObservationStore?: HelixMcpEvidenceObservationStorePort;
   surfaceRegistryService?: SurfaceRegistryService;
+  visualSequenceService?: VisualSequenceService;
 }): McpServer => {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const hudSurfaceRegistry = input.surfaceRegistryService ?? surfaceRegistryService;
+  const visualSequences = input.visualSequenceService ?? visualSequenceService;
   const roomControlService =
     input.roomControlService ?? getSharedLiveRoomControlService();
   const roomBindingStore =
@@ -3806,6 +3887,44 @@ export const createHelixMcpServer = (input: {
           error.status >= 500,
         ), requiredScopes);
       }
+      const temporalProjection = temporalPlanErrorProjection(error);
+      if (temporalProjection) return { ...toolSuccess(temporalProjection), isError: true as const };
+      if (isEnvironmentActionBrokerError(error)) {
+        // Preserve broker refusals without exposing arbitrary exception text or
+        // suggesting that an uncertain mutating operation can be replayed.
+        return { ...toolSuccess({
+          schema: "helix.environment_action_broker_error.v1",
+          error: error.code,
+          message: "The action broker rejected this request; inspect the named prerequisite before proposing further work.",
+          retryable: false,
+          credential_included: false,
+          raw_content_included: false,
+          content_role: "environment_action_broker_error_not_assistant_answer",
+          reentry_required: true,
+          execution_authority: false,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        }), isError: true as const };
+      }
+      if (isEnvironmentDurableGoalError(error)) {
+        // Temporal admission resolves durable identity/evidence inside this
+        // wrapper too. Keep the typed refusal, never arbitrary exception text.
+        return { ...toolSuccess({
+          schema: "helix.environment_durable_goal_error.v1",
+          error: error.code,
+          message: "Temporal admission requires current durable-goal identity and evidence; revalidate the named prerequisite.",
+          retryable: false,
+          credential_included: false,
+          raw_content_included: false,
+          content_role: "environment_durable_goal_error_not_assistant_answer",
+          reentry_required: true,
+          execution_authority: false,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+        }), isError: true as const };
+      }
       return toolError(error, requiredScopes);
     }
   };
@@ -3970,6 +4089,74 @@ export const createHelixMcpServer = (input: {
       throw new HelixAgentApiServiceError(403, "developer_account_required", "Shared Surface Registry tools are restricted to developer accounts.", false);
     }
   };
+  const requireVisualSequenceDeveloper = () => {
+    requireHelixAgentApiScope(input.principal, HELIX_AGENT_RUN_READ_SCOPE);
+    if (input.principal.accountType !== "developer") {
+      throw new HelixAgentApiServiceError(403, "developer_account_required", "Visual Sequence evidence tools are restricted to developer accounts.", false);
+    }
+  };
+  const requireVisualReasoningBinding = (bindingInput: { reasoning_binding_id: string; binding_epoch: number }) => {
+    requireVisualSequenceDeveloper();
+    if (!input.reasoningTaskBindingStore || !input.principal.mcpClientRef) {
+      throw new HelixAgentApiServiceError(409, "visual_sequence_reasoning_binding_required", "Bind this Codex chat to the local harness before reading visual evidence.", false);
+    }
+    let binding;
+    try {
+      binding = input.reasoningTaskBindingStore.inspect({
+        profileRef: input.principal.accountProfileId,
+        bindingId: bindingInput.reasoning_binding_id,
+      });
+    } catch {
+      throw new HelixAgentApiServiceError(409, "visual_sequence_reasoning_binding_invalid", "The visual-evidence reasoning binding is unavailable.", false);
+    }
+    if (
+      binding.status !== "active" ||
+      binding.binding_epoch !== bindingInput.binding_epoch ||
+      binding.authenticated_mcp_client_ref !== input.principal.mcpClientRef
+    ) {
+      throw new HelixAgentApiServiceError(409, "visual_sequence_reasoning_binding_invalid", "The visual-evidence request is not bound to this active Codex chat epoch.", false);
+    }
+    return binding;
+  };
+  const visualToolError = (error: unknown) => toolError(
+    error instanceof VisualSequenceServiceError
+      ? new HelixAgentApiServiceError(error.status, error.code, error.message, error.status >= 500)
+      : error,
+    HELIX_AGENT_RUN_READ_SCOPE,
+  );
+  const buildVisualEvidencePacket = (args: {
+    manifest: Awaited<ReturnType<VisualSequenceService["getManifest"]>>;
+    bindingId: string;
+    bindingEpoch: number;
+    reasoningGrantId: string;
+    visionCapability: "image_input" | "unavailable";
+    assets: VisualSequenceEvidenceAsset[];
+  }): VisualSequenceEvidencePacket => {
+    const totalBytes = args.assets.reduce((sum, asset) => sum + asset.size_bytes, 0);
+    return VisualSequenceEvidencePacketSchema.parse({
+      schema: HELIX_VISUAL_SEQUENCE_EVIDENCE_PACKET_SCHEMA,
+      packet_id: `vse_packet_${crypto.createHash("sha256").update(JSON.stringify({ sequence: args.manifest.sequence_id, binding: args.bindingId, epoch: args.bindingEpoch, grant: args.reasoningGrantId, assets: args.assets.map((asset) => asset.sha256) })).digest("hex").slice(0, 32)}`,
+      sequence_id: args.manifest.sequence_id,
+      owner_profile_id: args.manifest.owner_profile_id,
+      source_id: args.manifest.source_id,
+      producer_epoch: args.manifest.producer_epoch,
+      manifest_sha256: args.manifest.manifest_sha256,
+      reasoning_binding_id: args.bindingId,
+      binding_epoch: args.bindingEpoch,
+      reasoning_grant_id: args.reasoningGrantId,
+      vision_capability: args.visionCapability,
+      status: args.visionCapability === "image_input" ? "ready" : "vision_unsupported",
+      assets: args.visionCapability === "image_input" ? args.assets : [],
+      total_image_bytes: args.visionCapability === "image_input" ? totalBytes : 0,
+      content_role: "visual_sequence_evidence_observation_not_assistant_answer",
+      reentry_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      environment_action: false,
+      hud_or_controller_mutated: false,
+      typed_world_state_authority: false,
+    });
+  };
   const surfaceMcpPrincipal = (threadId: string, controlLeaseId: string) => ({
     kind: "mcp_codex" as const,
     principal_id: input.principal.mcpClientRef ?? input.principal.subjectId,
@@ -3991,6 +4178,171 @@ export const createHelixMcpServer = (input: {
       requireSurfaceDeveloper();
       return { schema: "helix.surface_registry.v1", surfaces: hudSurfaceRegistry.list(input.principal.accountProfileId), assistant_answer: false, terminal_eligible: false };
     }),
+  );
+
+  server.registerTool(
+    "helix_visual_sequence_list",
+    {
+      title: "List visual-sequence evidence for the bound Codex chat",
+      description: "Lists only profile-owned, unexpired VSE artifacts carrying an active user-issued reasoning grant after verifying the exact active chat binding. This is observation only and cannot start capture, mutate a HUD, or answer the user.",
+      inputSchema: VisualSequenceReasoningBindingSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async (args) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
+      const binding = requireVisualReasoningBinding(args);
+      const [manifests, grants] = await Promise.all([
+        visualSequences.listManifests(input.principal.accountProfileId),
+        Promise.resolve(visualSequences.listReasoningGrants(input.principal.accountProfileId)),
+      ]);
+      const manifestsById = new Map(manifests.map((manifest) => [manifest.sequence_id, manifest]));
+      return {
+        schema: "helix.visual_sequence_catalog.v1",
+        reasoning_binding_id: binding.reasoning_binding_id,
+        binding_epoch: binding.binding_epoch,
+        sequences: grants.flatMap((grant) => {
+          const manifest = manifestsById.get(grant.sequence_id);
+          return manifest ? [{
+          sequence_id: manifest.sequence_id,
+          reasoning_grant_id: grant.reasoning_grant_id,
+          grant_expires_at: grant.expires_at,
+          source_id: manifest.source_id,
+          producer_epoch: manifest.producer_epoch,
+          created_at: manifest.created_at,
+          expires_at: manifest.expires_at,
+          duration_ms: manifest.source.duration_ms,
+          selected_frame_count: manifest.frames.length,
+          manifest_sha256: manifest.manifest_sha256,
+          }] : [];
+        }),
+        content_role: "visual_sequence_catalog_observation_not_assistant_answer",
+        reentry_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    }),
+  );
+
+  server.registerTool(
+    "helix_visual_sequence_inspect_manifest",
+    {
+      title: "Inspect a visual-sequence manifest",
+      description: "Returns the bounded manifest and provenance for one profile-owned sequence under the exact active Codex reasoning binding. Pixels are retrieved separately.",
+      inputSchema: VisualSequenceReasoningAccessSchema.extend({ sequence_id: z.string().regex(/^vse_[a-f0-9]{32}$/) }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async (args) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
+      const binding = requireVisualReasoningBinding(args);
+      const grant = visualSequences.requireReasoningGrant(input.principal.accountProfileId, args.sequence_id, args.reasoning_grant_id, "inspect_manifest");
+      const sequence = await visualSequences.getOwnedSequence(input.principal.accountProfileId, args.sequence_id);
+      return {
+        schema: "helix.visual_sequence_manifest_observation.v1",
+        reasoning_binding_id: binding.reasoning_binding_id,
+        binding_epoch: binding.binding_epoch,
+        reasoning_grant: grant,
+        ...sequence,
+        content_role: "visual_sequence_manifest_observation_not_assistant_answer",
+        reentry_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+      };
+    }),
+  );
+
+  server.registerTool(
+    "helix_visual_sequence_get_contact_sheet",
+    {
+      title: "Read a visual-sequence contact sheet",
+      description: "Returns one bounded contact-sheet image plus a provenance packet for Codex image reasoning. When image input is unavailable it returns a typed unsupported observation without pixels.",
+      inputSchema: VisualSequenceReasoningAccessSchema.extend({
+        sequence_id: z.string().regex(/^vse_[a-f0-9]{32}$/),
+        vision_capability: z.enum(["image_input", "unavailable"]),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async (args) => {
+      try {
+        requireVisualReasoningBinding(args);
+        visualSequences.requireReasoningGrant(input.principal.accountProfileId, args.sequence_id, args.reasoning_grant_id, "contact_sheet");
+        const sequence = await visualSequences.getOwnedSequence(input.principal.accountProfileId, args.sequence_id);
+        if (args.vision_capability === "unavailable") {
+          const packet = buildVisualEvidencePacket({ manifest: sequence.manifest, bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch, reasoningGrantId: args.reasoning_grant_id, visionCapability: args.vision_capability, assets: [] });
+          return toolSuccess(packet as unknown as RecordLike);
+        }
+        const artifact = await visualSequences.readOwnedArtifact(input.principal.accountProfileId, args.sequence_id, "contact-sheet.webp");
+        if (artifact.bytes.length > VISUAL_SEQUENCE_LIMITS.maxMcpImageBytes) {
+          throw new HelixAgentApiServiceError(413, "visual_sequence_frame_byte_limit_exceeded", "The contact sheet exceeds the bounded MCP evidence budget.", false);
+        }
+        const asset: VisualSequenceEvidenceAsset = {
+          kind: "contact_sheet", artifact_ref: sequence.manifest.contact_sheet.image_ref,
+          mime_type: "image/webp", sha256: sequence.manifest.contact_sheet.sha256,
+          size_bytes: artifact.bytes.length, frame_id: null, pts_ms: null,
+        };
+        const packet = buildVisualEvidencePacket({ manifest: sequence.manifest, bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch, reasoningGrantId: args.reasoning_grant_id, visionCapability: args.vision_capability, assets: [asset] });
+        return {
+          content: [
+            { type: "text" as const, text: JSON.stringify(packet) },
+            { type: "image" as const, data: artifact.bytes.toString("base64"), mimeType: "image/webp" },
+          ],
+          structuredContent: packet as unknown as RecordLike,
+        };
+      } catch (error) { return visualToolError(error); }
+    },
+  );
+
+  server.registerTool(
+    "helix_visual_sequence_get_frames",
+    {
+      title: "Read selected visual-sequence frames",
+      description: "Returns at most six exact timestamped WebP frames and a provenance packet under the active reasoning binding. It cannot resample, capture, execute screen text, or mutate the source.",
+      inputSchema: VisualSequenceFrameSelectionSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
+    },
+    async (rawArgs) => {
+      try {
+        const args = VisualSequenceFrameSelectionSchema.parse(rawArgs);
+        requireVisualReasoningBinding(args);
+        visualSequences.requireReasoningGrant(input.principal.accountProfileId, args.sequence_id, args.reasoning_grant_id, "frames");
+        const sequence = await visualSequences.getOwnedSequence(input.principal.accountProfileId, args.sequence_id);
+        if (args.vision_capability === "unavailable") {
+          const packet = buildVisualEvidencePacket({ manifest: sequence.manifest, bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch, reasoningGrantId: args.reasoning_grant_id, visionCapability: args.vision_capability, assets: [] });
+          return toolSuccess(packet as unknown as RecordLike);
+        }
+        const requested = [...new Set(args.frame_ids)];
+        if (requested.length !== args.frame_ids.length) {
+          throw new HelixAgentApiServiceError(400, "visual_sequence_frame_selection_invalid", "Frame selection contains duplicate identifiers.", false);
+        }
+        const frames = requested.map((frameId) => sequence.manifest.frames.find((frame) => frame.frame_id === frameId));
+        if (frames.some((frame) => !frame)) {
+          throw new HelixAgentApiServiceError(404, "visual_sequence_frame_selection_invalid", "One or more requested frames are not part of this sequence manifest.", false);
+        }
+        const artifacts = await Promise.all(frames.map(async (frame) => {
+          const artifactPath = frame!.image_ref.split(`/api/visual-sequences/${args.sequence_id}/artifacts/`, 2)[1];
+          if (!artifactPath) throw new HelixAgentApiServiceError(409, "visual_sequence_frame_selection_invalid", "A selected frame has no canonical artifact reference.", false);
+          const artifact = await visualSequences.readOwnedArtifact(input.principal.accountProfileId, args.sequence_id, artifactPath);
+          return { frame: frame!, bytes: artifact.bytes };
+        }));
+        const totalBytes = artifacts.reduce((sum, artifact) => sum + artifact.bytes.length, 0);
+        if (totalBytes > VISUAL_SEQUENCE_LIMITS.maxMcpImageBytes) {
+          throw new HelixAgentApiServiceError(413, "visual_sequence_frame_byte_limit_exceeded", "The selected frame images exceed the bounded MCP evidence budget.", false);
+        }
+        const assets: VisualSequenceEvidenceAsset[] = artifacts.map(({ frame, bytes }) => ({
+          kind: "frame", artifact_ref: frame.image_ref, mime_type: "image/webp", sha256: frame.sha256,
+          size_bytes: bytes.length, frame_id: frame.frame_id, pts_ms: frame.pts_ms,
+        }));
+        const packet = buildVisualEvidencePacket({ manifest: sequence.manifest, bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch, reasoningGrantId: args.reasoning_grant_id, visionCapability: args.vision_capability, assets });
+        return {
+          content: [
+            { type: "text" as const, text: JSON.stringify(packet) },
+            ...artifacts.map(({ bytes }) => ({ type: "image" as const, data: bytes.toString("base64"), mimeType: "image/webp" as const })),
+          ],
+          structuredContent: packet as unknown as RecordLike,
+        };
+      } catch (error) { return visualToolError(error); }
+    },
   );
 
   server.registerTool(
@@ -4182,6 +4534,103 @@ export const createHelixMcpServer = (input: {
     const coordinationStore = input.localSupervisorCoordinationStore;
     const reasoningStore = input.reasoningTaskBindingStore;
     if (reasoningStore) {
+      server.registerTool("helix_environment_session_ready_up", {
+        title: "Ready up this exact environment session",
+        description: "Checks an existing exact task/chat/run session and reuses healthy state. Can refresh the same selected player's observation epoch and recover restart/disconnect goals using fresh admitted perception. Does not launch applications, select a player, create a run, renew permissions, resume user stops, or execute gameplay. Returns remaining blockers; a repair receipt is not execution or answer authority.",
+        inputSchema: helixEnvironmentSessionMcpSchema,
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+      }, async (rawArgs: z.infer<typeof helixEnvironmentSessionMcpSchema>) => callLocalSupervisorTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        const args = helixEnvironmentSessionMcpCommandSchema.parse(rawArgs);
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        coordinationStore.authenticateClient({ profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId, clientSessionRef: identity.clientSessionRef });
+        const binding = { profileRef: input.principal.accountProfileId,
+          authenticatedMcpClientRef: identity.authenticatedClientRef, clientSessionRef: identity.clientSessionRef,
+          clientContinuationRef: args.client_continuation_ref, bindingId: args.reasoning_binding_id,
+          bindingEpoch: args.binding_epoch, helixConversationId: args.helix_conversation_id,
+          missionId: args.mission_id, runId: args.run_id };
+        reasoningStore.verifyTaskAssociation(binding);
+        if ("request_id" in args) {
+          const receipt = await (input.environmentSessionAutoPrepare ?? prepareBrowserEnvironmentSession)({
+            sessionId: input.principal.accountContext.session_id ?? "", profileRef: input.principal.accountProfileId,
+            bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch,
+            helixConversationId: args.helix_conversation_id, missionId: args.mission_id,
+            runId: args.run_id, requestId: args.request_id,
+          }, reasoningStore, coordinationStore.listPresence(), undefined, {
+            accountContext: input.principal.accountContext, target: binding,
+          });
+          return { ok: true, receipt, requested_by: "authenticated_mcp_task",
+            execution_authority: false, answer_authority: false, assistant_answer: false,
+            terminal_eligible: false, raw_content_included: false };
+        }
+        const participantId = await resolveSelfParticipantId(args.room_id);
+        const receipt = await (input.environmentSessionReadyUp ?? readyUpEnvironmentSession)({
+          context: { profileId: input.principal.accountProfileId, participantId,
+            roomId: args.room_id, runId: args.run_id, goalId: args.goal_id, expectedRevision: args.expected_revision,
+            turnId: args.turn_id, probeRequestId: args.probe_request_id, priorTurnId: args.prior_turn_id },
+          binding, environmentBindingId: args.environment_binding_id, sourceId: args.source_id,
+          worldId: args.world_id, subjectBindingId: args.subject_binding_id, actionAuthorityId: args.action_authority_id,
+        }, reasoningStore);
+        return { ok: true, receipt, execution_authority: false, answer_authority: false,
+          assistant_answer: false, terminal_eligible: false, raw_content_included: false };
+      }));
+
+      server.registerTool(
+        "helix_environment_temporal_plan_submit",
+        {
+          title: "Submit an exact-task Minecraft temporal plan",
+          description: "Submits a caller-authored serial plan through fresh perception, exact-task binding, compiler and broker admission. Requires current native temporal support and existing Player Embodiment authority. No reactive execution, strategy generation or completion authority is provided.",
+          inputSchema: z.object({
+            client_continuation_ref: localSupervisorContinuationSchema,
+            reasoning_binding_id: localSupervisorContinuationSchema,
+            binding_epoch: z.number().int().positive(),
+            helix_conversation_id: localSupervisorContinuationSchema,
+            mission_id: localSupervisorContinuationSchema.nullable(),
+            goal_id: localSupervisorContinuationSchema,
+            expected_revision: z.number().int().nonnegative(),
+            frontier_id: localSupervisorContinuationSchema,
+            probe_request_id: localSupervisorContinuationSchema,
+            prior_turn_id: localSupervisorContinuationSchema,
+            request: temporalAdmissionRequestMetadataSchema,
+            plan: helixEnvironmentTemporalPlanSchema,
+            mutation_scope: helixMinecraftFluidMutationScopeSchema,
+            resource_bindings: z.record(z.string().min(1).max(160), z.enum(HELIX_MINECRAFT_REACTIVE_RESOURCES)).optional(),
+            checkpoint: z.object({ event_id: localSupervisorContinuationSchema, checkpoint_id: localSupervisorContinuationSchema }).strict().optional(),
+          }).strict(),
+          annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+        },
+        async (args) => callLocalSupervisorTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+          requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+          requireCurrentRoomFeature();
+          const identity = localSupervisorIdentity(args.client_continuation_ref);
+          coordinationStore.authenticateClient({ profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId, clientSessionRef: identity.clientSessionRef });
+          const binding = { profileRef: input.principal.accountProfileId,
+            authenticatedMcpClientRef: identity.authenticatedClientRef, clientSessionRef: identity.clientSessionRef,
+            clientContinuationRef: args.client_continuation_ref, bindingId: args.reasoning_binding_id,
+            bindingEpoch: args.binding_epoch, helixConversationId: args.helix_conversation_id,
+            missionId: args.mission_id, runId: args.request.run_id };
+          reasoningStore.verifyTaskAssociation(binding);
+          const participantId = await resolveSelfParticipantId(args.request.room_id);
+          const receipt = await admitTemporalPlan({
+            preflight: { context: { profileId: input.principal.accountProfileId, participantId,
+              roomId: args.request.room_id, goalId: args.goal_id, expectedRevision: args.expected_revision,
+              runId: args.request.run_id, turnId: args.request.turn_id,
+              probeRequestId: args.probe_request_id, priorTurnId: args.prior_turn_id },
+              binding, plan: args.plan, frontierId: args.frontier_id,
+              compilation: { target: "serial", options: { mutation_scope: args.mutation_scope, resource_bindings: args.resource_bindings } } },
+            request: { ...args.request, participant_id: participantId },
+            checkpoint: args.checkpoint ? { eventId: args.checkpoint.event_id, checkpointId: args.checkpoint.checkpoint_id } : undefined,
+          }, reasoningStore);
+          return { ok: true, receipt, answer_authority: false, assistant_answer: false, terminal_eligible: false,
+            raw_content_included: false, reentry_required: true, admission_not_execution_proof: true };
+        }),
+      );
+
       server.registerTool(
         "helix_reasoning_task_binding_claim",
         {
@@ -5081,6 +5530,8 @@ export const createHelixMcpServer = (input: {
         ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_workstation_human_control_present", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ...(input.reasoningTaskBindingStore ? [
+          ["helix_environment_temporal_plan_submit", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+          ["helix_environment_session_ready_up", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
           ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
           ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
           ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
@@ -6496,6 +6947,22 @@ export const createHelixMcpServer = (input: {
   );
 
   server.registerTool(
+    "helix_environment_temporal_frontier_publish",
+    temporalFrontierToolConfig,
+    async (args) => callRoomObservationTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+      requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+      requireCurrentRoomFeature();
+      const participantId = await resolveSelfParticipantId(args.room_id);
+      const frontier = await publishTemporalPerceptionFrontier({ profileId: input.principal.accountProfileId,
+        participantId, roomId: args.room_id, goalId: args.goal_id, expectedRevision: args.expected_revision,
+        runId: args.run_id, turnId: args.turn_id, probeRequestId: args.probe_request_id, priorTurnId: args.prior_turn_id });
+      return { ok: true, value: { schema: "helix.environment_temporal_frontier.receipt.v1", ok: true,
+        frontier, execution_authority: false, answer_authority: false, assistant_answer: false,
+        terminal_eligible: false, raw_content_included: false } };
+    }),
+  );
+
+  server.registerTool(
     "helix_environment_goal_create",
     {
       title: "Create a durable environment goal",
@@ -7395,7 +7862,12 @@ export const createHelixMcpServer = (input: {
           profileId: input.principal.accountProfileId,
           environmentBindingId: argumentsValue.environment_binding_id,
         });
-        const actionAuthorityId = argumentsValue.action_authority_id ?? null;
+        const requestedActionAuthorityId =
+          argumentsValue.action_authority_id ?? null;
+        const actionAuthorityId = requestedActionAuthorityId ===
+          HELIX_MINECRAFT_TRUSTED_DEVICE_LIFECYCLE_BOOTSTRAP
+          ? null
+          : requestedActionAuthorityId;
         const authority = actionAuthorityId === null ? null :
           inspected.authorities.find((entry) =>
           entry.action_authority_id === actionAuthorityId &&
@@ -7662,10 +8134,12 @@ export const createHelixMcpServer = (input: {
         requireCurrentRoomFeature();
         const digest = crypto.randomUUID();
         const { kind, ...probeArguments } = probe;
+        // Public evidence locator for exact continuation, not a provider task ID.
+        const probeTurnId = `mcp_environment_probe_turn:${digest}`;
         const execution: EnvironmentProbeGatewayExecution =
           await environmentProbeExecutor({
             capabilityId: situationCapabilityByKind[kind],
-            turnId: `mcp_environment_probe_turn:${digest}`,
+            turnId: probeTurnId,
             toolCallId: `mcp_environment_probe_tool_call:${digest}`,
             providerExecutionId: `mcp_environment_probe_execution:${digest}`,
             arguments:
@@ -7822,10 +8296,62 @@ export const createHelixMcpServer = (input: {
             };
           }
         }
+        // Preserve the gateway's exact evidence and remaining freshness budget.
+        // Retention is not renewed perception and never grants action authority.
+        const probeObservation = execution.observation;
+        const projectionTime = Date.now();
+        const observedTime = Date.parse(probeObservation.observed_at);
+        const freshnessBudget = probe.freshness_requirement_ms ?? 5_000;
+        const reportedAge = probeObservation.freshness_age_ms;
+        const age = Math.max(reportedAge ?? Number.POSITIVE_INFINITY, projectionTime - observedTime);
+        let mcpEvidence: ReturnType<typeof buildHelixMcpEvidenceObservation> | null = null;
+        if (
+          execution.ok && execution.status === "completed" &&
+          probeObservation.outcome === "succeeded" &&
+          probeObservation.capability_id === situationCapabilityByKind[kind] &&
+          probeObservation.provenance_valid &&
+          probeObservation.eligible_for_current_turn_reentry &&
+          probeObservation.late_result_disposition === null &&
+          Number.isFinite(observedTime) && observedTime <= projectionTime &&
+          reportedAge !== null && reportedAge >= 0 && age < freshnessBudget
+        ) {
+          try {
+            const envelope = buildHelixMcpEvidenceObservation({
+              descriptor: requireMcpEvidenceDescriptor("helix_minecraft_situation_probe"),
+              request: { room_id, probe, prior_turn_id: probeTurnId },
+              payload: probeObservation,
+              producerRef: `casimirbot-profile:${input.principal.accountProfileId}`,
+              subjectRefs: [
+                `account-profile:${input.principal.accountProfileId}`, room_id,
+                probeObservation.probe_request_ref, probeObservation.capability_id,
+              ],
+              summary: "Observed one bounded Minecraft situation for exact durable-run re-entry.",
+              payloadSchema: probeObservation.schema,
+              supportRefs: [probeObservation.evidence_ref],
+              observedAt: probeObservation.observed_at,
+              freshness: {
+                state: "fresh", ageMs: age,
+                expiresAt: new Date(projectionTime + freshnessBudget - age).toISOString(),
+              },
+            });
+            await evidenceStore.put({
+              owner: { tenantId: input.principal.tenantId, accountProfileId: input.principal.accountProfileId },
+              toolName: "helix_minecraft_situation_probe", observation: envelope,
+            });
+            mcpEvidence = envelope;
+          } catch (error) {
+            // The probe still happened. Do not turn a storage failure into a
+            // fabricated durable reference or lose the original observation.
+            console.warn("[helix-mcp] Situation observation durable projection failed",
+              error instanceof Error ? error.name : "unknown_error");
+          }
+        }
         return {
           ok: execution.ok,
           value: {
             operation: "minecraft.situation.probe",
+            mcp_evidence: mcpEvidence,
+            prior_turn_id: probeTurnId,
             probe_kind: kind,
             room_id,
             ok: execution.ok,
@@ -9367,6 +9893,10 @@ export const createHelixMcpServer = (input: {
       ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_surface_list", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_surface_inspect", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_visual_sequence_list", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_visual_sequence_inspect_manifest", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_visual_sequence_get_contact_sheet", HELIX_AGENT_RUN_READ_SCOPE],
+      ["helix_visual_sequence_get_frames", HELIX_AGENT_RUN_READ_SCOPE],
       ["helix_surface_prepare_panel_route", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_surface_configure", HELIX_AGENT_RUN_WRITE_SCOPE],
       ["helix_surface_blank", HELIX_AGENT_RUN_WRITE_SCOPE],
@@ -9397,6 +9927,8 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_subject_select", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_create", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
+      ["helix_environment_temporal_frontier_publish", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_temporal_plan_submit", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_append", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],
@@ -9449,6 +9981,7 @@ export const createHelixMcpServer = (input: {
       ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ["helix_workstation_human_control_present", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ...(input.reasoningTaskBindingStore ? [
+        ["helix_environment_session_ready_up", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
         ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],

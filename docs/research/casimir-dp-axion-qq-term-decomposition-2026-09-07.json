@@ -1,0 +1,38 @@
+{
+  "scope": "Exact additive AST partition by explicit name mt. Algebraic partition only, not separation into physical gauge-invariant sectors; masses and parameters fixed.",
+  "term_counts": {
+    "explicit_mt": 1215,
+    "no_explicit_mt": 431
+  },
+  "rows": [
+    {
+      "operator": "qq1",
+      "library_imag": 3.5701611336708703e-13,
+      "explicit_mt_terms_imag": -2.1761642729347675e-15,
+      "no_explicit_mt_terms_imag": 3.5919227764001045e-13,
+      "selected_imag": -2.176164272936217e-15,
+      "explicit_mt_difference_imag": 1.4495319133436092e-27,
+      "library_log_slope_imag": 4.233346349329181e-13,
+      "explicit_mt_log_slope_imag": 1.919310332172108e-13,
+      "no_explicit_mt_log_slope_imag": 2.314036017181792e-13,
+      "selected_log_slope_imag": 1.9193103323365578e-13
+    },
+    {
+      "operator": "qq3",
+      "library_imag": 7.408781798343424e-13,
+      "explicit_mt_terms_imag": 3.8168590219432066e-13,
+      "no_explicit_mt_terms_imag": 3.5919227764001045e-13,
+      "selected_imag": 5.7664006935287e-14,
+      "explicit_mt_difference_imag": 3.2402189525903366e-13,
+      "library_log_slope_imag": 4.2333463493294334e-13,
+      "explicit_mt_log_slope_imag": 1.9193103321721277e-13,
+      "no_explicit_mt_log_slope_imag": 2.314036017181792e-13,
+      "selected_log_slope_imag": 1.9193103323365263e-13
+    }
+  ],
+  "reconstruction_max_relative_error": 3.186836679391874e-14,
+  "checks": {
+    "reconstruction": true
+  },
+  "qq_overlap_established": false
+}

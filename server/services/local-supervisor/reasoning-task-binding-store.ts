@@ -344,6 +344,72 @@ export class HelixReasoningTaskBindingStore {
     return this.projectBinding(binding);
   }
 
+  /** Exact association preflight only. Does not admit an environment effect. */
+  verifyTaskAssociation(input: {
+    profileRef: string; authenticatedMcpClientRef: string; clientSessionRef: string;
+    clientContinuationRef: string; bindingId: string; bindingEpoch: number;
+    helixConversationId: string; missionId: string | null; runId: string | null;
+  }): HelixReasoningTaskBindingProjection {
+    const binding = this.requireActiveOwnedBinding(input);
+    if (binding.service_instance_ref !== this.presence.serviceInstanceRef ||
+        binding.authenticated_mcp_client_ref !== input.authenticatedMcpClientRef ||
+        binding.provider_thread_ref_hash !== digest(input.clientContinuationRef) ||
+        binding.helix_conversation_id !== input.helixConversationId ||
+        binding.mission_id !== input.missionId || binding.run_id !== input.runId ||
+        binding.continuation_transport !== "polling") {
+      throw new HelixReasoningTaskBindingError("reasoning_binding_task_association_mismatch", 409);
+    }
+    const nowMs = this.now().getTime();
+    const current = this.presence.listPresence().some(entry =>
+      entry.active && entry.service_instance_ref === binding.service_instance_ref &&
+      entry.authenticated_profile_ref === input.profileRef &&
+      entry.authenticated_mcp_client_ref === input.authenticatedMcpClientRef &&
+      entry.client_session_ref === input.clientSessionRef &&
+      entry.conversation_thread_ref === input.clientContinuationRef &&
+      Date.parse(entry.observed_at) <= nowMs && Date.parse(entry.heartbeat_expires_at) > nowMs &&
+      entry.thread_observability_bridge?.requested_level === "continuation_ready" &&
+      entry.thread_observability_bridge.supported_levels.includes("continuation_ready"));
+    if (!current) throw new HelixReasoningTaskBindingError("reasoning_binding_target_inactive", 409);
+    return this.projectBinding(binding);
+  }
+
+  /**
+   * Internal owner-preparation target resolution, not provider authentication.
+   * The route must authenticate profileRef as its browser actor independently.
+   * Never expose the returned continuation through an HTTP projection or use it
+   * to claim, pick up, acknowledge, or execute on behalf of the external task.
+   */
+  resolveOwnedPreparationTarget(input: {
+    profileRef: string; bindingId: string; bindingEpoch: number;
+    helixConversationId: string; missionId: string | null; runId: string;
+  }) {
+    const binding = this.requireActiveOwnedBinding(input);
+    if (binding.helix_conversation_id !== input.helixConversationId ||
+        binding.mission_id !== input.missionId || binding.run_id !== input.runId) {
+      throw new HelixReasoningTaskBindingError("reasoning_binding_task_association_mismatch", 409);
+    }
+    const nowMs = this.now().getTime();
+    const target = this.presence.listPresence().find(entry =>
+      entry.active && entry.service_instance_ref === this.presence.serviceInstanceRef &&
+      entry.authenticated_profile_ref === input.profileRef &&
+      entry.authenticated_mcp_client_ref === binding.authenticated_mcp_client_ref &&
+      entry.client_session_ref === binding.client_session_ref &&
+      digest(entry.conversation_thread_ref) === binding.provider_thread_ref_hash &&
+      Date.parse(entry.observed_at) <= nowMs && Date.parse(entry.heartbeat_expires_at) > nowMs &&
+      entry.thread_observability_bridge?.requested_level === "continuation_ready" &&
+      entry.thread_observability_bridge.supported_levels.includes("continuation_ready"));
+    if (!target?.authenticated_mcp_client_ref) {
+      throw new HelixReasoningTaskBindingError("reasoning_binding_target_inactive", 409);
+    }
+    const association = { ...input,
+      authenticatedMcpClientRef: target.authenticated_mcp_client_ref,
+      clientSessionRef: target.client_session_ref,
+      clientContinuationRef: target.conversation_thread_ref,
+    };
+    this.verifyTaskAssociation(association);
+    return association;
+  }
+
   inspectCurrent(input: {
     profileRef: string;
     helixConversationId: string;

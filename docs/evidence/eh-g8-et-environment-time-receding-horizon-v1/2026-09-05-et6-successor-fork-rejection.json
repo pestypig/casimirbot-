@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 successor admission prerequisite",
+  "finding": "Retention allowed multiple distinct successor plans to share one predecessor, leaving an ambiguous resident continuation.",
+  "repair": "After locking the predecessor, reject a new append when a successor is already retained. Exact replay is handled before this check. Replacement is not silently treated as append.",
+  "verification": {
+    "focused_tests": { "passed": 16, "failed": 0 },
+    "negative_case": "Existing successor rejects admission before checkpoint evidence lookup or INSERT.",
+    "positive_case": "Initial successor retention and exact replay remain accepted."
+  },
+  "limitations": [
+    "Controlled SQL fixtures do not prove real PostgreSQL concurrency isolation.",
+    "This guard relies on the existing transactional predecessor/goal locks and sole retention writer; it is not a database uniqueness constraint.",
+    "Replacement after cancellation requires its own explicit lifecycle, still unimplemented.",
+    "Resident successor delivery and handoff remain unimplemented. No EXE build or live Minecraft test ran."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

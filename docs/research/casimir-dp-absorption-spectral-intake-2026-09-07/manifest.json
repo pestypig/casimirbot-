@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/GENIE-MC/Generator",
+  "commit": "6a91779ea7443dc7b6ea31ad89985f23be127e4d",
+  "scope": "Archived public source and legacy carbon table for normalization audit; source copyright notices retained. Not executed as a generator.",
+  "files": [
+    {
+      "sha256": "951d532b7b2430a1eb5d8d7c3a5d434b703956afa828bb0b462dd5e17dacac3e",
+      "file": "benhar-sf-12c.data",
+      "git_blob": "e9c030b94de9680c6321a70e9dcafaea5017805c",
+      "bytes": 125120
+    },
+    {
+      "sha256": "757877d0265c343bd5a7cda74db22d95567f9c82bd7e3e7fa67bd289471aa7ef",
+      "file": "SpectralFunc.cxx",
+      "git_blob": "5e8f1bdfaeaaf5d9e3f9f16f9df0833422f77b53",
+      "bytes": 6636
+    }
+  ]
+}

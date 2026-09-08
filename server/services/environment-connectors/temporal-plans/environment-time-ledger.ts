@@ -58,7 +58,9 @@ export class EnvironmentTimePlanLedger {
     current_identity: HelixEnvironmentTimeIdentity;
     monotonic_elapsed_ms: number;
   }) {
-    const plan = helixEnvironmentTemporalPlanSchema.parse(input.plan);
+    // Retained hash-linked records must never share mutable references with
+    // callers, including nested adapter arguments accepted by the schema.
+    const plan = structuredClone(helixEnvironmentTemporalPlanSchema.parse(input.plan));
     const existing = this.#records.get(plan.plan_id);
     if (existing) {
       if (existing.plan.plan_hash !== plan.plan_hash) {
@@ -67,11 +69,11 @@ export class EnvironmentTimePlanLedger {
           "The plan id already names different semantic content.",
         );
       }
-      return {
+      return structuredClone({
         created: false as const,
         plan: existing.plan,
         projection: reduceHelixEnvironmentTemporalPlanEvents(existing.events),
-      };
+      });
     }
     const currentness = evaluateHelixEnvironmentPlanCurrentness(input);
     if (!currentness.current) {
@@ -96,23 +98,51 @@ export class EnvironmentTimePlanLedger {
     });
     const record = { plan, events: [event] };
     this.#records.set(plan.plan_id, record);
-    return {
+    return structuredClone({
       created: true as const,
       plan,
       projection: reduceHelixEnvironmentTemporalPlanEvents(record.events),
-    };
+    });
   }
 
   get(planId: string) {
     const record = this.#require(planId);
-    return {
+    return structuredClone({
       plan: record.plan,
-      events: structuredClone(record.events),
+      events: record.events,
       projection: reduceHelixEnvironmentTemporalPlanEvents(record.events),
-    };
+    });
   }
 
   start(input: { plan_id: string; clocks: HelixEnvironmentThreeClock }) {
+    // An extension receipt is not a durable permission to start after its
+    // execution chain has stopped. Check every linked extension ancestor;
+    // explicit checkpoint recovery is a separate admission path.
+    let child = this.#require(input.plan_id);
+    const visited = new Set<string>();
+    while (child.plan.previous_plan_id !== null) {
+      if (visited.has(child.plan.plan_id)) {
+        throw new EnvironmentTimeLedgerError("temporal_plan_transition_invalid", "Extension ancestry is cyclic.");
+      }
+      visited.add(child.plan.plan_id);
+      const parent = this.#require(child.plan.previous_plan_id);
+      const linked = parent.events.some((event) =>
+        event.payload.kind === "extension_appended" &&
+        event.payload.extension_plan_id === child.plan.plan_id &&
+        event.payload.extension_plan_hash === child.plan.plan_hash,
+      );
+      if (!linked) break;
+      const state = reduceHelixEnvironmentTemporalPlanEvents(parent.events).state;
+      const terminal = parent.events.at(-1)?.payload;
+      if (state !== "running" && !(state === "settled" &&
+          terminal?.kind === "plan_settled" && terminal.outcome === "succeeded")) {
+        throw new EnvironmentTimeLedgerError(
+          "temporal_plan_transition_invalid",
+          "An admitted extension cannot start after its predecessor has stopped or begun stopping.",
+        );
+      }
+      child = parent;
+    }
     return this.#append(input.plan_id, input.clocks, { kind: "execution_started" });
   }
 
@@ -124,6 +154,18 @@ export class EnvironmentTimePlanLedger {
     affordance_revision: number;
     evidence_refs: string[];
   }) {
+    const record = this.#require(input.plan_id);
+    if (!record.plan.nodes.some((node) =>
+      node.kind === "checkpoint" && node.checkpoint_id === input.checkpoint_id,
+    ) || record.events.some((event) =>
+      event.payload.kind === "checkpoint_settled" &&
+      event.payload.checkpoint_id === input.checkpoint_id,
+    )) {
+      throw new EnvironmentTimeLedgerError(
+        "temporal_plan_checkpoint_mismatch",
+        "A finite plan may settle only an admitted, previously unsettled checkpoint.",
+      );
+    }
     return this.#append(input.plan_id, input.clocks, {
       kind: "checkpoint_settled",
       checkpoint_id: input.checkpoint_id,
@@ -281,7 +323,7 @@ export class EnvironmentTimePlanLedger {
         current_identity: input.current_identity,
         monotonic_elapsed_ms: input.monotonic_elapsed_ms,
       });
-      return { created: false as const, event: duplicate, successor: admitted };
+      return { created: false as const, event: structuredClone(duplicate), successor: admitted };
     }
     this.#assertCanAdmitSuccessor(
       successor,
@@ -354,7 +396,7 @@ export class EnvironmentTimePlanLedger {
         current_identity: input.current_identity,
         monotonic_elapsed_ms: input.monotonic_elapsed_ms,
       });
-      return { created: false as const, event: duplicate, replacement: admitted };
+      return { created: false as const, event: structuredClone(duplicate), replacement: admitted };
     }
     this.#assertCanAdmitSuccessor(
       replacement,
@@ -499,7 +541,7 @@ export class EnvironmentTimePlanLedger {
     try {
       const projection = reduceHelixEnvironmentTemporalPlanEvents(candidate);
       record.events.push(event);
-      return { event, projection };
+      return structuredClone({ event, projection });
     } catch (error) {
       throw new EnvironmentTimeLedgerError(
         "temporal_plan_transition_invalid",

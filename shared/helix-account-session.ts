@@ -77,6 +77,7 @@ export const HELIX_LOCKED_WORKSTATION_PANEL_IDS = [
   "situation-room-pipelines",
   "stage-play-badge-graph",
   "surface-workspace",
+  "visual-evidence",
   "workstation-workflow-timeline",
 ] as const;
 

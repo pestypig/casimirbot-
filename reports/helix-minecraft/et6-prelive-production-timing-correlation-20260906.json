@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-06",
+  "scope": "Production admission timing hook exercised in persistent connected broker/native fixture",
+  "checks": {
+    "connected_tests_passed": 2,
+    "targeted_typescript": "npx tsc --noEmit -p tsconfig.et6-temporal.json: passed",
+    "diagnostics_observed": 2,
+    "identities_verified": ["action_request_id", "run_id", "reasoning_binding_id", "reasoning_binding_epoch", "producer_epoch_ref"],
+    "private_fields_absent": ["client_continuation_ref", "request_payload"]
+  },
+  "sample_ms": {
+    "root_publication_to_receipt": 2,
+    "root_receipt_to_transaction_return": 32,
+    "child_publication_to_receipt": 1,
+    "child_receipt_to_transaction_return": 49
+  },
+  "initial_test_failure": "Diagnostic capture variable was inserted in an inner setup scope; moved to connected-run scope and rerun passed. No production change for this correction.",
+  "limits": [
+    "Frontiers use the production process clock in a fixture; this test does not invoke the authenticated frontier publication API",
+    "Precompiled plans replace external provider output; no provider sampling latency claim",
+    "Production admission diagnostics correctly leave required_snapshot_proven false even though this fixture later exercises strict lease persistence",
+    "The complete timing budget is still unverified",
+    "No installed app, live binding or Minecraft player session changed"
+  ],
+  "live_acceptance": false
+}

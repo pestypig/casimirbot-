@@ -1,0 +1,44 @@
+{
+  "scope": "Vector contact Ce=r Cb, leading gap/mchi expansion; finite electron mass exact at this order. Other decay channels and UV momentum dependence omitted.",
+  "r": 0.0005807048664429298,
+  "age_s": 4.35e+17,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "F_energy": 0.6964823328325566,
+      "F_invariant": 0.6964823328325564,
+      "lifetime_s_at_reference": 1250527537644471.8,
+      "max_present_strength_over_reference_no_replenishment": 0.0010575709694670072,
+      "pair_decay_closed": false
+    },
+    {
+      "mchi_GeV": 15.0,
+      "F_energy": 0.4582654459810166,
+      "F_invariant": 0.45826544598101593,
+      "lifetime_s_at_reference": 1.2705324677260452e+16,
+      "max_present_strength_over_reference_no_replenishment": 0.010744891361315657,
+      "pair_decay_closed": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "F_energy": 0.0,
+      "F_invariant": 0.0,
+      "lifetime_s_at_reference": null,
+      "max_present_strength_over_reference_no_replenishment": null,
+      "pair_decay_closed": true
+    },
+    {
+      "mchi_GeV": 100.0,
+      "F_energy": 0.0,
+      "F_invariant": 0.0,
+      "lifetime_s_at_reference": null,
+      "max_present_strength_over_reference_no_replenishment": null,
+      "pair_decay_closed": true
+    }
+  ],
+  "checks": {
+    "massless_limit": true,
+    "two_phase_space_forms": true
+  },
+  "full_model_admitted": false
+}

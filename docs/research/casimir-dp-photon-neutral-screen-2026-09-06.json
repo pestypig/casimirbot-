@@ -1,0 +1,105 @@
+{
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "checks": {
+    "neutral_zero_q": true,
+    "quadratic_amplitude_limit": true,
+    "quartic_size_scaling": true,
+    "screening_reduces_soft_channel": true,
+    "positive_partial_integral": true
+  },
+  "rows": [
+    {
+      "assumed_electron_rms_nm": 0.05,
+      "qR_cut": 1.0,
+      "qmax_eV": 0.7141704424363171,
+      "neutral_integral": 1.13011241929058e-18,
+      "bare_integral": 0.12114026148343715,
+      "neutral_to_bare_ratio": 9.328958064409446e-18,
+      "Natom_squared_Z_squared_times_integral": 9781.118367476647
+    },
+    {
+      "assumed_electron_rms_nm": 0.05,
+      "qR_cut": 10.0,
+      "qmax_eV": 7.141704424363171,
+      "neutral_integral": 5.345266822732171e-16,
+      "bare_integral": 0.5115125848070753,
+      "neutral_to_bare_ratio": 1.0449922409530197e-15,
+      "Natom_squared_Z_squared_times_integral": 4626326.249180526
+    },
+    {
+      "assumed_electron_rms_nm": 0.05,
+      "qR_cut": 80.0,
+      "qmax_eV": 57.13363539490537,
+      "neutral_integral": 1.0834122117491744e-15,
+      "bare_integral": 0.5117050764864454,
+      "neutral_to_bare_ratio": 2.1172590649056674e-15,
+      "Natom_squared_Z_squared_times_integral": 9376928.262181677
+    },
+    {
+      "assumed_electron_rms_nm": 0.1,
+      "qR_cut": 1.0,
+      "qmax_eV": 0.7141704424363171,
+      "neutral_integral": 1.8081798489377206e-17,
+      "bare_integral": 0.12114026148343715,
+      "neutral_to_bare_ratio": 1.4926332722048343e-16,
+      "Natom_squared_Z_squared_times_integral": 156497.89198182747
+    },
+    {
+      "assumed_electron_rms_nm": 0.1,
+      "qR_cut": 10.0,
+      "qmax_eV": 7.141704424363171,
+      "neutral_integral": 8.55242309323636e-15,
+      "bare_integral": 0.5115125848070753,
+      "neutral_to_bare_ratio": 1.6719868381072256e-14,
+      "Natom_squared_Z_squared_times_integral": 74021186.89766963
+    },
+    {
+      "assumed_electron_rms_nm": 0.1,
+      "qR_cut": 80.0,
+      "qmax_eV": 57.13363539490537,
+      "neutral_integral": 1.733437003012533e-14,
+      "bare_integral": 0.5117050764864454,
+      "neutral_to_bare_ratio": 3.38757046327339e-14,
+      "Natom_squared_Z_squared_times_integral": 150028901.72353747
+    },
+    {
+      "assumed_electron_rms_nm": 0.15,
+      "qR_cut": 1.0,
+      "qmax_eV": 0.7141704424363171,
+      "neutral_integral": 9.153910300236399e-17,
+      "bare_integral": 0.12114026148343715,
+      "neutral_to_bare_ratio": 7.556455787812513e-16,
+      "Natom_squared_Z_squared_times_integral": 792270.5621453234
+    },
+    {
+      "assumed_electron_rms_nm": 0.15,
+      "qR_cut": 10.0,
+      "qmax_eV": 7.141704424363171,
+      "neutral_integral": 4.3296609651850446e-14,
+      "bare_integral": 0.5115125848070753,
+      "neutral_to_bare_ratio": 8.464427061590365e-14,
+      "Natom_squared_Z_squared_times_integral": 374731979.47954905
+    },
+    {
+      "assumed_electron_rms_nm": 0.15,
+      "qR_cut": 80.0,
+      "qmax_eV": 57.13363539490537,
+      "neutral_integral": 8.775334697567233e-14,
+      "bare_integral": 0.5117050764864454,
+      "neutral_to_bare_ratio": 1.7149203908278372e-13,
+      "Natom_squared_Z_squared_times_integral": 759504859.2157831
+    }
+  ],
+  "scope": "Partial qR<=80 rigid elastic charge channel, isotropic mono-speed soft-transfer limit. No all-q or full material bound.",
+  "model": "Neutral spherical Gaussian electron cloud per carbon atom; a is rms radius, not measured diamond charge density.",
+  "rate_multiplier": "D_soft = flux*hold*alpha*mu_chi^2*(hbar*c)^2*Natom^2*Z^2*integral, mu_chi in GeV^-1 and hbar*c in GeV cm",
+  "missing": [
+    "magnetic response",
+    "electron excitations",
+    "bonding and dielectric response",
+    "surface charge",
+    "all-q atomic/crystal structure",
+    "matched xenon likelihood",
+    "Born and transport validity at inferred coupling"
+  ]
+}

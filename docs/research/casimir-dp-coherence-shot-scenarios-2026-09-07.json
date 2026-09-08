@@ -1,0 +1,41 @@
+{
+  "status": "illustrative_binary_readout_statistics_budget_not_measured_sensitivity",
+  "baseline_visibility": 0.5,
+  "nominal_normal_SNR": 5,
+  "hold_seconds": 0.25,
+  "rows": [
+    {
+      "D_hypothetical": 0.029511464722144533,
+      "fractional_visibility_loss": 0.029080253747730173,
+      "conservative_total_accepted_shots": 473002.68695170066,
+      "hold_only_serial_years": 0.003747137670099284
+    },
+    {
+      "D_hypothetical": 0.0005583442461599607,
+      "fractional_visibility_loss": 0.0005581884010177798,
+      "conservative_total_accepted_shots": 1283802969.3549945,
+      "hold_only_serial_years": 10.170315307208046
+    },
+    {
+      "D_hypothetical": 1e-05,
+      "fractional_visibility_loss": 9.999950000166668e-06,
+      "conservative_total_accepted_shots": 4000040000166.666,
+      "hold_only_serial_years": 31688.404696227422
+    },
+    {
+      "D_hypothetical": 4.0008228792481166e-19,
+      "fractional_visibility_loss": 4.0008228792481166e-19,
+      "conservative_total_accepted_shots": 2.4989717182576228e+39,
+      "hold_only_serial_years": 1.979690881323059e+31
+    }
+  ],
+  "assumptions": [
+    "independent Bernoulli readout",
+    "equal allocation to two settings",
+    "known same baseline visibility and phase",
+    "valid control isolates D",
+    "no drift, technical noise or selection bias",
+    "no preparation/reset overhead"
+  ],
+  "warning": "An upper bound on D is not an expected signal; this is neither a universal sample lower bound nor a discovery power calculation."
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "casimirbot.et6.admission_timing_followup.v1",
+  "recorded_date": "2026-09-05",
+  "cold_attempt": {
+    "observation_at": "2026-09-05T20:35:07.132Z",
+    "request_created_at": "2026-09-05T20:35:16.198Z",
+    "observation_age_before_submit_ms": 9066,
+    "admission_freshness_limit_ms": 5000,
+    "already_stale_before_submit": true,
+    "actual_live_exception_identified": false
+  },
+  "warm_hash": {
+    "implementation": "persistent Node crypto SHA-256 with the repository's localeCompare recursive canonical key ordering",
+    "crosschecked_plan_hash": "sha256:f16dd0f6bc4328e0bb92b9e97b013e6b77977c6d02adc9532e7d7dbc39933ee9",
+    "matches_repository_builder": true,
+    "no_freshness_limit_change": true
+  },
+  "warm_attempt": {
+    "timing": {
+      "started_at": "2026-09-05T20:48:33.745Z",
+      "probe_returned_at": "2026-09-05T20:48:38.862Z",
+      "frontier_returned_at": "2026-09-05T20:48:41.525Z"
+    },
+    "probe_evidence_ref": "environment_probe_evidence:c2daf75c1309ee1ea4c5db3c36f224004965107e",
+    "frontier_result": {
+      "schema": "helix.shared_live_room.error.v1",
+      "api_version": "v1",
+      "error": "internal_error",
+      "message": "The Shared Live Room API could not complete the request.",
+      "request_id": null,
+      "retryable": true,
+      "content_role": "room_control_error_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "error_code": "INVALID_ARGUMENT"
+    },
+    "hashing_reached": false,
+    "submission_called": false
+  },
+  "current_goal_revision": 17,
+  "authority_expiry": "2026-09-05T21:15:00.000Z",
+  "same_capability_scope": true,
+  "exe_restarted": false,
+  "binding_replaced": false,
+  "live_movement_proven": false,
+  "rolling_cycles_proven": 0,
+  "goal_complete": false,
+  "next": "Preserve the distinct frontier failure, finish bounded typed diagnostics before any necessary package change, then rerun the warm admission path with current authority and exact binding."
+}

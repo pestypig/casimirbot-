@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 checkpoint evidence re-entry identity prerequisite",
+  "implementation": "Resolve retained source-plan/compiler/action association before reading the resident action's workflow evidence. Match measured sequence_id or program_id to the retained compiler artifact in both environment and action events. Return plan-action and resident-action identities separately.",
+  "verification": {
+    "focused_tests": { "passed": 16, "failed": 0 },
+    "cases": ["missing resident association rejected", "wrong native plan rejected", "successor plan uses original resident action query", "predecessor sequence evidence cannot satisfy successor even with matching checkpoint names"]
+  },
+  "limitations": ["Controlled query fixtures are not PostgreSQL concurrency or live transport proof.", "Server event admission must still validate rolling plan evidence against retained associations; this internal reader does not authorize new event shapes.", "Temporal delivery remains disabled; migrations and EXE have not been deployed for this work.", "Original ET6 live qualification remains incomplete."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

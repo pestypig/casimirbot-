@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.helix-environment-actions.json",
+  "include": [
+    "types/supertest.d.ts",
+    "server/db/__tests__/temporal-persistence-reopen.test.ts",
+    "server/services/environment-connectors/temporal-plans/**/*.ts",
+    "server/services/environment-connectors/actions/**/*.ts",
+    "server/services/local-supervisor/reasoning-task-binding-store.ts"
+  ]
+}

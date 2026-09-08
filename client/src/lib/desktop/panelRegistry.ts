@@ -27,6 +27,7 @@ export type PanelId =
   | "image-lens"
   | "document-image-lens"
   | "surface-workspace"
+  | "visual-evidence"
   | "motorcycle-hud-lab"
   | "narrator"
   | "postulate-board"
@@ -418,6 +419,15 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 1180, h: 780 },
     defaultPosition: { x: 260, y: 140 },
     keywords: ["surface", "hud", "routing", "registry", "output", "overlay", "developer"],
+    heavy: false,
+  },
+  {
+    id: "visual-evidence",
+    title: "Visual Evidence",
+    loader: load(() => import("@/components/workstation/VisualEvidencePanel")),
+    defaultSize: { w: 1180, h: 780 },
+    defaultPosition: { x: 280, y: 150 },
+    keywords: ["visual", "video", "frames", "capture", "evidence", "codex", "vision", "developer"],
     heavy: false,
   },
   {

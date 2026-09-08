@@ -1,0 +1,140 @@
+{
+  "scope": "Conditional shared leading L10 kernel; not an LZ fit, full solid model or experimental bound",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "response_sha256": "c1a31d8b543cae5ade1c026fa14ec51e8ff1a858268404352eaf3217c731f08d",
+  "cN_GeV_minus2": 1.6497719025367554e-05,
+  "halo": "isotropic mono-speed 776 km/s, density 0.3 GeV/cm3 for both targets",
+  "Xe_exposure_tonne_year": 2.84,
+  "Xe_efficiency": 1,
+  "checks": {
+    "free_nucleon_normalization": true,
+    "carbon_parent_recovery": true,
+    "coupling_squared_scaling": true,
+    "isotropic_filter_error_small": true,
+    "nested_energy_windows": true,
+    "longitudinal_combination_cancels": true,
+    "independent_grid_integral": true
+  },
+  "rows": [
+    {
+      "mchi_GeV": 100.0,
+      "b_C13_fm": 1.4,
+      "Xe_raw_5p4_270_count": 27.474801229405582,
+      "Xe_raw_200_270_count": 12.878878713601186,
+      "D_center": 2.9506456241586054e-29,
+      "D_absolute_filter_error_bound": 5.042892901063776e-37,
+      "D_per_raw_Xe_ROI_count": 1.0739461223110157e-30,
+      "D_per_raw_Xe_high_count": 2.291073384395238e-30
+    },
+    {
+      "mchi_GeV": 100.0,
+      "b_C13_fm": 1.6,
+      "Xe_raw_5p4_270_count": 27.474801229405582,
+      "Xe_raw_200_270_count": 12.878878713601186,
+      "D_center": 2.789430446674371e-29,
+      "D_absolute_filter_error_bound": 4.78152906741436e-37,
+      "D_per_raw_Xe_ROI_count": 1.0152686541327602e-30,
+      "D_per_raw_Xe_high_count": 2.165895423588776e-30
+    },
+    {
+      "mchi_GeV": 100.0,
+      "b_C13_fm": 1.8,
+      "Xe_raw_5p4_270_count": 27.474801229405582,
+      "Xe_raw_200_270_count": 12.878878713601186,
+      "D_center": 2.615570991008968e-29,
+      "D_absolute_filter_error_bound": 4.499240701766468e-37,
+      "D_per_raw_Xe_ROI_count": 9.519890495912264e-31,
+      "D_per_raw_Xe_high_count": 2.0308996219109537e-30
+    },
+    {
+      "mchi_GeV": 100.0,
+      "b_C13_fm": 2.0,
+      "Xe_raw_5p4_270_count": 27.474801229405582,
+      "Xe_raw_200_270_count": 12.878878713601186,
+      "D_center": 2.4319171825453148e-29,
+      "D_absolute_filter_error_bound": 4.200525189412712e-37,
+      "D_per_raw_Xe_ROI_count": 8.851445956749982e-31,
+      "D_per_raw_Xe_high_count": 1.8882988469927932e-30
+    },
+    {
+      "mchi_GeV": 200.0,
+      "b_C13_fm": 1.4,
+      "Xe_raw_5p4_270_count": 13.737400614702791,
+      "Xe_raw_200_270_count": 6.439439356800593,
+      "D_center": 2.0147795526895678e-29,
+      "D_absolute_filter_error_bound": 3.261118106436705e-37,
+      "D_per_raw_Xe_ROI_count": 1.4666381284194337e-30,
+      "D_per_raw_Xe_high_count": 3.128812061195654e-30
+    },
+    {
+      "mchi_GeV": 200.0,
+      "b_C13_fm": 1.6,
+      "Xe_raw_5p4_270_count": 13.737400614702791,
+      "Xe_raw_200_270_count": 6.439439356800593,
+      "D_center": 1.8916509873141587e-29,
+      "D_absolute_filter_error_bound": 3.072164569334117e-37,
+      "D_per_raw_Xe_ROI_count": 1.3770079510453912e-30,
+      "D_per_raw_Xe_high_count": 2.9376019906397833e-30
+    },
+    {
+      "mchi_GeV": 200.0,
+      "b_C13_fm": 1.8,
+      "Xe_raw_5p4_270_count": 13.737400614702791,
+      "Xe_raw_200_270_count": 6.439439356800593,
+      "D_center": 1.759669239947058e-29,
+      "D_absolute_filter_error_bound": 2.869277930293428e-37,
+      "D_per_raw_Xe_ROI_count": 1.2809331905657091e-30,
+      "D_per_raw_Xe_high_count": 2.7326435461942795e-30
+    },
+    {
+      "mchi_GeV": 200.0,
+      "b_C13_fm": 2.0,
+      "Xe_raw_5p4_270_count": 13.737400614702791,
+      "Xe_raw_200_270_count": 6.439439356800593,
+      "D_center": 1.6212227903278592e-29,
+      "D_absolute_filter_error_bound": 2.6560267654432736e-37,
+      "D_per_raw_Xe_ROI_count": 1.180152516330277e-30,
+      "D_per_raw_Xe_high_count": 2.5176458702351326e-30
+    },
+    {
+      "mchi_GeV": 1000.0,
+      "b_C13_fm": 1.4,
+      "Xe_raw_5p4_270_count": 2.747480122940557,
+      "Xe_raw_200_270_count": 1.287887871360119,
+      "D_center": 5.2280293257743394e-30,
+      "D_absolute_filter_error_bound": 8.084189269438071e-38,
+      "D_per_raw_Xe_ROI_count": 1.902845186075055e-30,
+      "D_per_raw_Xe_high_count": 4.059382374843779e-30
+    },
+    {
+      "mchi_GeV": 1000.0,
+      "b_C13_fm": 1.6,
+      "Xe_raw_5p4_270_count": 2.747480122940557,
+      "Xe_raw_200_270_count": 1.287887871360119,
+      "D_center": 4.8769008026886945e-30,
+      "D_absolute_filter_error_bound": 7.569655707640154e-38,
+      "D_per_raw_Xe_ROI_count": 1.7750449810239476e-30,
+      "D_per_raw_Xe_high_count": 3.786743326915776e-30
+    },
+    {
+      "mchi_GeV": 1000.0,
+      "b_C13_fm": 1.8,
+      "Xe_raw_5p4_270_count": 2.747480122940557,
+      "Xe_raw_200_270_count": 1.287887871360119,
+      "D_center": 4.502669604332725e-30,
+      "D_absolute_filter_error_bound": 7.020221463152462e-38,
+      "D_per_raw_Xe_ROI_count": 1.6388360981165657e-30,
+      "D_per_raw_Xe_high_count": 3.496165857651508e-30
+    },
+    {
+      "mchi_GeV": 1000.0,
+      "b_C13_fm": 2.0,
+      "Xe_raw_5p4_270_count": 2.747480122940557,
+      "Xe_raw_200_270_count": 1.287887871360119,
+      "D_center": 4.112686652703829e-30,
+      "D_absolute_filter_error_bound": 6.446376104342805e-38,
+      "D_per_raw_Xe_ROI_count": 1.4968940515217e-30,
+      "D_per_raw_Xe_high_count": 3.193357701521393e-30
+    }
+  ]
+}

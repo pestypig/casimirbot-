@@ -566,6 +566,9 @@ const bindSubject = async (input: {
   targetParticipantId?: string;
   subjectRef: string;
   verificationMethod: "self_claim" | "owner_assigned";
+  /** Ready up may verify/reuse; explicit selection retains replacement semantics. */
+  reuseCurrentOnly?: boolean;
+  refreshCurrentEpoch?: { subjectBindingId: string; expectedProducerEpochRef: string };
 }): Promise<HelixRoomEnvironmentSubjectBinding> =>
   withSharedRealtimeRoomTransaction(async (db) => {
     const { room, member: actorMember } = await assertAccessibleMember(
@@ -676,6 +679,54 @@ const bindSubject = async (input: {
         "Another room member already selected this environment subject.",
       );
     }
+    if (input.reuseCurrentOnly) {
+      const existing = await db.query<SubjectBindingRow>(
+        `SELECT * FROM helix_room_environment_subject_bindings
+         WHERE room_id=$1 AND environment_binding_id=$2 AND participant_id=$3
+           AND profile_id=$4 AND status='active'
+         ORDER BY updated_at DESC LIMIT 1 FOR UPDATE;`,
+        [input.roomId, environment.environment_binding_id, targetParticipantId, targetMember.profile_id],
+      );
+      let row = existing.rows[0];
+      const expiry = row?.expires_at ? Date.parse(iso(row.expires_at)) : Infinity;
+      if (!row || row.subject_ref !== subject.subjectRef || row.subject_native_id !== subject.nativeId ||
+          row.source_id !== environment.source_id || row.world_id !== environment.world_id ||
+          row.room_source_binding_id !== environment.room_source_binding_id ||
+          (input.refreshCurrentEpoch && row.subject_binding_id !== input.refreshCurrentEpoch.subjectBindingId) ||
+          expiry <= Date.now() || Number.isNaN(expiry)) {
+        throw new RoomEnvironmentSubjectError("subject_binding_stale", 409,
+          "Ready up cannot reuse this player binding; explicit identity recovery is required.");
+      }
+      if (row.producer_epoch_ref !== environment.producer_epoch_ref) {
+        if (!input.refreshCurrentEpoch ||
+            row.producer_epoch_ref !== input.refreshCurrentEpoch.expectedProducerEpochRef) {
+          throw new RoomEnvironmentSubjectError("subject_binding_stale", 409,
+            "The player epoch changed; verify the exact prior binding before recovery.");
+        }
+        const priorEpoch = row.producer_epoch_ref;
+        const refreshedAt = new Date().toISOString();
+        const updated = await db.query<SubjectBindingRow>(
+          `UPDATE helix_room_environment_subject_bindings
+           SET producer_epoch_ref=$2, last_confirmed_at=$3, updated_at=$3
+           WHERE subject_binding_id=$1 AND producer_epoch_ref=$4 AND status='active'
+           RETURNING *;`,
+          [row.subject_binding_id, environment.producer_epoch_ref, refreshedAt, priorEpoch],
+        );
+        if (!updated.rows[0]) throw new RoomEnvironmentSubjectError("subject_binding_stale", 409,
+          "The player binding changed during epoch recovery.");
+        row = updated.rows[0];
+        await insertAuditEvent({ db, roomId: input.roomId, actorParticipantId,
+          eventType: "environment_subject_epoch_refreshed", createdAt: refreshedAt,
+          metadata: { subject_binding_id: row.subject_binding_id,
+            environment_binding_id: row.environment_binding_id,
+            previous_producer_epoch_ref: priorEpoch,
+            producer_epoch_ref: row.producer_epoch_ref,
+            expiry_extended: false, authority_granted: false } });
+      }
+      return projectBinding({ row, currentProducerEpochRef: environment.producer_epoch_ref,
+        heartbeat: context.heartbeat, heartbeatFresh: true });
+    }
+
     const now = new Date().toISOString();
     await db.query(
       `
@@ -797,6 +848,41 @@ export const bindOwnRoomEnvironmentSubject = async (input: {
     subjectRef: input.subjectRef,
     verificationMethod: "self_claim",
   });
+
+/** Check a previously selected player without replacing identity or renewing consent. */
+export const ensureOwnRoomEnvironmentSubject = async (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+  subjectRef: string;
+}): Promise<HelixRoomEnvironmentSubjectBinding> => bindSubject({
+  roomId: input.roomId,
+  actorProfileId: input.profileId,
+  environmentBindingId: input.environmentBindingId,
+  subjectRef: input.subjectRef,
+  verificationMethod: "self_claim",
+  reuseCurrentOnly: true,
+});
+
+/**
+ * Recover only the epoch of an existing active, unexpired self binding after
+ * validating the same player in the current admitted roster. Keeps identity,
+ * original verification and consent deadline; emits one audit event on change.
+ */
+export const refreshOwnRoomEnvironmentSubjectEpoch = async (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+  subjectRef: string;
+  subjectBindingId: string;
+  expectedProducerEpochRef: string;
+}): Promise<HelixRoomEnvironmentSubjectBinding> => bindSubject({
+  roomId: input.roomId, actorProfileId: input.profileId,
+  environmentBindingId: input.environmentBindingId, subjectRef: input.subjectRef,
+  verificationMethod: "self_claim", reuseCurrentOnly: true,
+  refreshCurrentEpoch: { subjectBindingId: input.subjectBindingId,
+    expectedProducerEpochRef: input.expectedProducerEpochRef },
+});
 
 export const assignRoomEnvironmentSubject = async (input: {
   roomId: string;

@@ -1,5 +1,6 @@
 import express from "express";
 import request from "supertest";
+import { planRouter } from "../routes/agi.plan";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   resetLiveContinuationJobsForTest,
@@ -10,7 +11,6 @@ import {
 } from "../services/situation-room/live-continuation-runner";
 
 const createApp = async (): Promise<express.Express> => {
-  const { planRouter } = await import("../routes/agi.plan");
   const app = express();
   app.use(express.json());
   app.use("/api/agi", planRouter);

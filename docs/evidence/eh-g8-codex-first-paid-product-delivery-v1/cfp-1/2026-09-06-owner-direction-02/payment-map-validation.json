@@ -1,0 +1,19 @@
+{
+  "captured_utc": "2026-09-07T03:38:12.868Z",
+  "docs_audit_ok": true,
+  "links_checked": 20,
+  "diff_exit": 0,
+  "files": [
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "70e1d07570ea438ce2e5d993f44ecf87e9fc99e44df209682c7e03c9e1d56f27"
+    },
+    {
+      "path": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-owner-direction-02/payment-to-capability-review.md",
+      "sha256": "5c865d650be12b8f31e4905deae5e2d4bde84aeb674b67fabdf725b294d4c6ee"
+    }
+  ],
+  "scope": "Documentation validation only; no legal clearance, runtime test or stage closure.",
+  "ok": true,
+  "failures": []
+}

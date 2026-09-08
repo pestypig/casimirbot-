@@ -1,0 +1,225 @@
+{
+  "status": "unbiased_lower_threshold_slab_pilot_not_detector_fold",
+  "source_sha256": "dcb25aeacd1d563858dfa057b5eb70185c1f92a79d49f00acb82a49bf7635113",
+  "history_archive": "casimir-dp-lower-energy-transport-2026-09-07.npz",
+  "history_sha256": "ff953b95ee3e1b88d6e2405924525637c9904cb188546aaa3a2d6903a45bcf77",
+  "labels": [
+    "unresolved_at_1000_collisions",
+    "far_exit",
+    "entrance_exit",
+    "below_declared_capability"
+  ],
+  "rows": [
+    {
+      "scale_relative_strong_root": 1.0,
+      "seed": 9101,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 200.0,
+      "speed_cut_kms": 601.1213517952707,
+      "status_counts": [
+        0,
+        4931,
+        0,
+        15069
+      ],
+      "far_exit_count": 4931,
+      "high_capable_far_exit_count": 4931,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 41
+    },
+    {
+      "scale_relative_strong_root": 1.0,
+      "seed": 9102,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 200.0,
+      "speed_cut_kms": 601.1213517952707,
+      "status_counts": [
+        0,
+        5041,
+        0,
+        14959
+      ],
+      "far_exit_count": 5041,
+      "high_capable_far_exit_count": 5041,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 40
+    },
+    {
+      "scale_relative_strong_root": 1.0,
+      "seed": 9101,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 5.4,
+      "speed_cut_kms": 98.7743172528805,
+      "status_counts": [
+        0,
+        13063,
+        0,
+        6937
+      ],
+      "far_exit_count": 13063,
+      "high_capable_far_exit_count": 4857,
+      "lower_speed_far_exit_count": 8206,
+      "maximum_collisions": 88
+    },
+    {
+      "scale_relative_strong_root": 1.0,
+      "seed": 9102,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 5.4,
+      "speed_cut_kms": 98.7743172528805,
+      "status_counts": [
+        0,
+        13041,
+        0,
+        6959
+      ],
+      "far_exit_count": 13041,
+      "high_capable_far_exit_count": 4932,
+      "lower_speed_far_exit_count": 8109,
+      "maximum_collisions": 89
+    },
+    {
+      "scale_relative_strong_root": 1.0,
+      "seed": 9101,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 1.0,
+      "speed_cut_kms": 42.50569841704601,
+      "status_counts": [
+        0,
+        13079,
+        0,
+        6921
+      ],
+      "far_exit_count": 13079,
+      "high_capable_far_exit_count": 4847,
+      "lower_speed_far_exit_count": 8232,
+      "maximum_collisions": 87
+    },
+    {
+      "scale_relative_strong_root": 1.0,
+      "seed": 9102,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 1.0,
+      "speed_cut_kms": 42.50569841704601,
+      "status_counts": [
+        0,
+        13129,
+        0,
+        6871
+      ],
+      "far_exit_count": 13129,
+      "high_capable_far_exit_count": 5011,
+      "lower_speed_far_exit_count": 8118,
+      "maximum_collisions": 92
+    },
+    {
+      "scale_relative_strong_root": 3.9,
+      "seed": 9101,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 200.0,
+      "speed_cut_kms": 601.1213517952707,
+      "status_counts": [
+        0,
+        0,
+        0,
+        20000
+      ],
+      "far_exit_count": 0,
+      "high_capable_far_exit_count": 0,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 55
+    },
+    {
+      "scale_relative_strong_root": 3.9,
+      "seed": 9102,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 200.0,
+      "speed_cut_kms": 601.1213517952707,
+      "status_counts": [
+        0,
+        0,
+        0,
+        20000
+      ],
+      "far_exit_count": 0,
+      "high_capable_far_exit_count": 0,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 59
+    },
+    {
+      "scale_relative_strong_root": 3.9,
+      "seed": 9101,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 5.4,
+      "speed_cut_kms": 98.7743172528805,
+      "status_counts": [
+        0,
+        0,
+        0,
+        20000
+      ],
+      "far_exit_count": 0,
+      "high_capable_far_exit_count": 0,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 110
+    },
+    {
+      "scale_relative_strong_root": 3.9,
+      "seed": 9102,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 5.4,
+      "speed_cut_kms": 98.7743172528805,
+      "status_counts": [
+        0,
+        0,
+        0,
+        20000
+      ],
+      "far_exit_count": 0,
+      "high_capable_far_exit_count": 0,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 113
+    },
+    {
+      "scale_relative_strong_root": 3.9,
+      "seed": 9101,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 1.0,
+      "speed_cut_kms": 42.50569841704601,
+      "status_counts": [
+        0,
+        0,
+        0,
+        20000
+      ],
+      "far_exit_count": 0,
+      "high_capable_far_exit_count": 0,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 121
+    },
+    {
+      "scale_relative_strong_root": 3.9,
+      "seed": 9102,
+      "N": 20000,
+      "stop_true_Xe_capability_keV": 1.0,
+      "speed_cut_kms": 42.50569841704601,
+      "status_counts": [
+        0,
+        0,
+        0,
+        20000
+      ],
+      "far_exit_count": 0,
+      "high_capable_far_exit_count": 0,
+      "lower_speed_far_exit_count": 0,
+      "maximum_collisions": 121
+    }
+  ],
+  "limitations": [
+    "Same idealized stationary point-nucleus silica slab and Born cross sections",
+    "Independent sequential random sampling after thresholds diverge; not paired trajectory replay",
+    "Finite sample counts cannot resolve rare high-energy tails",
+    "Even 1 keV stopping can omit reconstructed migration; no full response supplied",
+    "No capture density, detector response, or physically admitted parameter point"
+  ]
+}

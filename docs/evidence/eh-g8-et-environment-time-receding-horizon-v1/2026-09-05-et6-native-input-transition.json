@@ -1,0 +1,25 @@
+{
+  "et6_complete": false,
+  "scope": "Adjacent input segments inside one already-admitted native finite graph",
+  "repair": "Completed input segments follow their admitted edge in the same tick, instead of releasing controls and consuming an extra running tick. Input-owned controls release at terminal or handoff to an embedded workflow; existing scoped embedded cleanup is preserved.",
+  "verification": {
+    "native_filters": ["FluidSequenceEngineTest", "PlayerActionControllerTest"],
+    "result": "BUILD SUCCESSFUL",
+    "new_fixture": "Three adjacent two-tick segments: six running ticks without release calls, three entry pulses total, terminal release on tick seven",
+    "game_tests": "excluded with -x runGameTest",
+    "negative_history": [
+      "First run: 1 of 14 failed because the zero-input fixture still expected the removed transition tick",
+      "Second run: 1 of 55 failed because unconditional terminal release violated embedded action scoped cleanup",
+      "Final run passed after input-owned release tracking"
+    ]
+  },
+  "not_proven": [
+    "Cross-plan resident extension delivery",
+    "Three rolling ET6 cycles",
+    "Packaged EXE or live Minecraft execution",
+    "Capacity, latency, interruption, reconnect and revocation acceptance"
+  ],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

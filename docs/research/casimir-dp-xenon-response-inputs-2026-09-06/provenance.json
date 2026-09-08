@@ -1,0 +1,30 @@
+{
+  "retrieved_utc": "2026-09-07T01:03:22.728503+00:00",
+  "public_data": {
+    "api": "https://zenodo.org/api/records/7992017",
+    "title": "Data from: \"Search for New Physics in Electronic Recoil Data from XENONnT\"",
+    "download": "https://zenodo.org/api/records/7992017/files/zenodo.zip/content",
+    "declared_checksum": "md5:fab7d9ea3e9b3a2d8ba837554d3bf315",
+    "verified_md5": "fab7d9ea3e9b3a2d8ba837554d3bf315",
+    "sha256": "589d80b3f2606a9e1d9d1b54d5d5e760308e9aa98bdaec90e498814b1703d920",
+    "archive_entries": [
+      "zenodo/",
+      "zenodo/data_unbinned_1to30kev.txt",
+      "zenodo/bkg_model.txt",
+      "zenodo/bdm_limits.txt",
+      "zenodo/sa_limits.txt",
+      "zenodo/efficiency.txt",
+      "zenodo/readme.txt"
+    ]
+  },
+  "restricted_rdf": {
+    "api": "https://zenodo.org/api/records/21234978",
+    "access_right": "restricted",
+    "file_count": 0,
+    "title": "Charge correlations in collapse-induced spontaneus radiation"
+  },
+  "advertised_code": {
+    "url": "https://github.com/simonemanti/collapse",
+    "api_status": 404
+  }
+}

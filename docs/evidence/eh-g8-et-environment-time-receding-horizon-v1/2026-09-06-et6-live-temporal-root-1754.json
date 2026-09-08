@@ -1,0 +1,148 @@
+{
+  "schema": "et6.live_temporal_root_attempt.v1",
+  "plan_id": "plan:et6-root-1754",
+  "plan_hash": "sha256:ec93219420dc09446e8bb97f21ff240499a3ca0b325a5e9f35caf51d210e804d",
+  "binding_id": "reasoning_binding:a09e3a528a0693542224ca662012c338",
+  "binding_epoch": 1,
+  "run_id": "run_9fa4fc1a-463d-46d4-8491-8bd6f640c22a",
+  "request_created_at": "2026-09-06T17:53:12.710Z",
+  "observation_age_at_request_ms": 2489,
+  "admitted": true,
+  "terminal_result": {
+    "schema": "helix.environment_action.result.v1",
+    "action_request_id": "et6-action-root-1754",
+    "workflow_id": "et6-workflow-root-1754",
+    "action_execution_id": "environment_action_execution:4392e5a8-64aa-4a77-9872-444ab9aa49b9",
+    "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+    "capability_version": 1,
+    "action_kind": "execute_sequence",
+    "outcome": "connector_offline",
+    "summary": "The Helix action transport became unreachable; the client released every control and retained the terminal event for later delivery.",
+    "control_engine": "native_fabric",
+    "started_at": "2026-09-06T17:53:14.937520600Z",
+    "completed_at": "2026-09-06T17:53:15.638141500Z",
+    "progress_event_refs": [
+      "environment_action_event:00e674cd-c8f2-4aaf-b21a-74cac12df250",
+      "environment_action_event:c294cd1d-e856-4d9b-8e5e-850d100066db",
+      "environment_action_event:2f6a0ca0-d8b6-4d31-9a4b-b6a5bd32e2f3",
+      "environment_action_event:5d017b65-1757-4d3d-ac8e-bfd7657b14c9"
+    ],
+    "postconditions": [
+      {
+        "condition_id": "condition:et6-root-1754",
+        "condition_kind": "minecraft.player.sequence_checkpoints_satisfied",
+        "required": true,
+        "status": "not_checked",
+        "summary": "The workflow did not complete, so this postcondition was not claimed as satisfied.",
+        "evidence_refs": [
+          "environment_action_event:00e674cd-c8f2-4aaf-b21a-74cac12df250",
+          "environment_action_event:c294cd1d-e856-4d9b-8e5e-850d100066db",
+          "environment_action_event:2f6a0ca0-d8b6-4d31-9a4b-b6a5bd32e2f3",
+          "environment_action_event:5d017b65-1757-4d3d-ac8e-bfd7657b14c9"
+        ],
+        "checked_at": "2026-09-06T17:53:15.638141500Z"
+      }
+    ],
+    "evidence_refs": [
+      "environment_action_event:00e674cd-c8f2-4aaf-b21a-74cac12df250",
+      "environment_action_event:c294cd1d-e856-4d9b-8e5e-850d100066db",
+      "environment_action_event:2f6a0ca0-d8b6-4d31-9a4b-b6a5bd32e2f3",
+      "environment_action_event:5d017b65-1757-4d3d-ac8e-bfd7657b14c9"
+    ],
+    "verified_terminal_measurements": {},
+    "started_clock": {
+      "schema": "helix.environment_clock_snapshot.v1",
+      "clock_id": "minecraft_client_tick_clock:1b38011d-143d-48e4-a312-8945b5471c64",
+      "clock_kind": "minecraft_game_tick",
+      "tick_rate_hz": 20,
+      "tick_index": 34650,
+      "world_tick_index": 9173415,
+      "monotonic": {
+        "origin_id": "minecraft_monotonic_clock:730613b1-dab7-45a2-9cb2-cdc6a9ca7aed",
+        "elapsed_ms": 1733970.7935
+      },
+      "synchronization": "server_synchronized",
+      "observed_at": "2026-09-06T17:53:14.842139800Z"
+    },
+    "completed_clock": {
+      "schema": "helix.environment_clock_snapshot.v1",
+      "clock_id": "minecraft_client_tick_clock:1b38011d-143d-48e4-a312-8945b5471c64",
+      "clock_kind": "minecraft_game_tick",
+      "tick_rate_hz": 20,
+      "tick_index": 34664,
+      "world_tick_index": 9173429,
+      "monotonic": {
+        "origin_id": "minecraft_monotonic_clock:730613b1-dab7-45a2-9cb2-cdc6a9ca7aed",
+        "elapsed_ms": 1734668.225
+      },
+      "synchronization": "server_synchronized",
+      "observed_at": "2026-09-06T17:53:15.539208800Z"
+    },
+    "duration_ticks": 14,
+    "side_effects_performed": true,
+    "player_motion_performed": true,
+    "player_interaction_performed": false,
+    "inventory_mutation_performed": false,
+    "world_mutation_performed": false,
+    "manual_override_detected": false,
+    "manual_override_reason": null,
+    "controls_released": true,
+    "host_access_performed": false,
+    "automatic_replay_performed": false,
+    "model_invoked": false,
+    "assistant_answer": false,
+    "raw_content_included": false
+  },
+  "pre_position": {
+    "x": -1.19,
+    "y": 65,
+    "z": -1.08
+  },
+  "post_position": {
+    "x": -1.03,
+    "y": 65,
+    "z": -4.1
+  },
+  "post_evidence_ref": "environment_probe_evidence:24dfe3807a8460483744913c91530684d452c60c",
+  "client_log": {
+    "time": "13:53:15",
+    "reason": "action_connector_unavailable"
+  },
+  "prior_failures": [
+    {
+      "attempt": "1748",
+      "stage": "local_plan_validation",
+      "reason": "fractional_monotonic_milliseconds",
+      "dispatched": false
+    },
+    {
+      "attempt": "1750",
+      "stage": "connector_schema",
+      "reason": "postconditions_minItems",
+      "dispatched": false
+    },
+    {
+      "attempt": "1751",
+      "stage": "binding",
+      "reason": "reasoning_binding_target_inactive",
+      "dispatched": false
+    },
+    {
+      "attempt": "1752",
+      "stage": "evidence",
+      "reason": "durable_goal_evidence_identity_mismatch",
+      "age_at_request_ms": 5518,
+      "dispatched": false
+    },
+    {
+      "attempt": "1753",
+      "stage": "evidence",
+      "reason": "durable_goal_evidence_identity_mismatch",
+      "age_at_request_ms": 4043,
+      "dispatched": false
+    }
+  ],
+  "hash_optimization": "In-process ASCII SHA256 matched repository-generated hash; freshness policy unchanged.",
+  "rolling_extensions_proven": 0,
+  "goal_complete": false
+}

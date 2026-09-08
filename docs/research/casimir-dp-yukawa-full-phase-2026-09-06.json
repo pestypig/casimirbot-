@@ -1,0 +1,90 @@
+{
+  "evidence_class": "full_phase_rigid_elastic_eikonal_coherence_not_complete_model",
+  "parent_sha256": "ad4c2b1971e7e06a0d6b4658db81407ef2e85e7ddf10515a76ac2630a03a3526",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "rows": [
+    {
+      "mediator_eV": 0.001,
+      "alpha": 2.405322235956698e-13,
+      "D_full": 0.01825888244317445,
+      "D_quadratic": 0.02951156706391648,
+      "visibility_loss": 0.01809319897991207,
+      "D_Born_parent_soft": 0.02951146472214453,
+      "full_to_Born_ratio": 0.6187047174745456,
+      "weak_kernel_relative_difference": 3.467864875927873e-06,
+      "grid_refinement_relative_difference": 9.643317717689115e-06
+    },
+    {
+      "mediator_eV": 0.01,
+      "alpha": 2.997236885777704e-13,
+      "D_full": 0.011218393301531706,
+      "D_quadratic": 0.0295115476154291,
+      "visibility_loss": 0.011155701779115299,
+      "D_Born_parent_soft": 0.029511464722144536,
+      "full_to_Born_ratio": 0.38013678437023674,
+      "weak_kernel_relative_difference": 2.808850233071425e-06,
+      "grid_refinement_relative_difference": 7.652749844710982e-06
+    },
+    {
+      "mediator_eV": 0.1,
+      "alpha": 4.4526241949428574e-13,
+      "D_full": 0.0023548454043902894,
+      "D_quadratic": 0.02951153062799026,
+      "visibility_loss": 0.0023520749310564854,
+      "D_Born_parent_soft": 0.029511464722144533,
+      "full_to_Born_ratio": 0.07979425713232333,
+      "weak_kernel_relative_difference": 2.2332285554149678e-06,
+      "grid_refinement_relative_difference": 6.987927501977964e-06
+    },
+    {
+      "mediator_eV": 1.0,
+      "alpha": 1.414620611205511e-12,
+      "D_full": 0.00016801648063057616,
+      "D_quadratic": 0.029511514089866735,
+      "visibility_loss": 0.00016800236665216582,
+      "D_Born_parent_soft": 0.029511464722144526,
+      "full_to_Born_ratio": 0.0056932613210655585,
+      "weak_kernel_relative_difference": 1.6728319882641784e-06,
+      "grid_refinement_relative_difference": 0.00033755041027161425
+    },
+    {
+      "mediator_eV": 10.0,
+      "alpha": 4.777885340667339e-11,
+      "D_full": 2.8554126704189107e-05,
+      "D_quadratic": 0.02951150316292994,
+      "visibility_loss": 2.8553719038993368e-05,
+      "D_Born_parent_soft": 0.029511464722144536,
+      "full_to_Born_ratio": 0.0009675604709231165,
+      "weak_kernel_relative_difference": 1.3025712468639483e-06,
+      "grid_refinement_relative_difference": 0.00045164048468948614
+    }
+  ],
+  "checks": {
+    "weak_phase_recovers_quadratic": true,
+    "momentum_Born_kernel_recovered": true,
+    "full_phase_below_quadratic": true,
+    "grid_refinement_below_half_percent": true,
+    "tail_extension_stable": true,
+    "coincident_branches_zero": true,
+    "profile_boundary_continuity": true
+  },
+  "profile_quadrature_order": 96,
+  "profile_nodes": 1601,
+  "fine_grid": {
+    "radial_log_nodes": 4801,
+    "azimuth_nodes": 256,
+    "incident_cosine_nodes": 48,
+    "tail_mediator_lengths": 20
+  },
+  "assumptions": [
+    "same 1-TeV isotropic 776-km/s population as Born parent",
+    "real uniform Yukawa potential, rigid elastic sphere, straight trajectories",
+    "transverse branch separation d*sin(theta); longitudinal transfer neglected at small angle",
+    "no environmental transport, additional material, lattice or detector-response model"
+  ],
+  "limitations": [
+    "fixed old comparator-inverted couplings are not fits",
+    "numerical convergence does not bound physical eikonal or target errors",
+    "coherence prediction alone does not establish xenon compatibility"
+  ]
+}

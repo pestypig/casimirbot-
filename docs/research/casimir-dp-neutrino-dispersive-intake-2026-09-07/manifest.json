@@ -1,0 +1,55 @@
+{
+  "repository": "https://github.com/blackstonep/hipsofcobra",
+  "commit": "6a6dcfccf903317ea2104e27bb1dbbc7ad1d9fc7",
+  "files": [
+    {
+      "source_path": "LICENSE",
+      "local_name": "LICENSE",
+      "git_blob": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7",
+      "bytes": 35149,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "source_path": "README.md",
+      "local_name": "README.md",
+      "git_blob": "77564abf605a4a2eff09f8c05c1bdefcbbcb48f9",
+      "bytes": 803,
+      "sha256": "81cd7734b1eaeab10201dc841b803ad5ddee1b7df1f8b1a62d9be85f740b37f2"
+    },
+    {
+      "source_path": "hipsofcobra/classes.py",
+      "local_name": "classes.py",
+      "git_blob": "d512fc91ff652be346ea2545a8a1c834289b3cf8",
+      "bytes": 16559,
+      "sha256": "9adf77c1b3b366daeba0c837532a684351f8a18006bcddc49445d36f248a7c7a"
+    },
+    {
+      "source_path": "hipsofcobra/input/hips_c1.txt",
+      "local_name": "hips_c1.txt",
+      "git_blob": "89cb2c3a7a992653521a9c2e9eb84295a0c45737",
+      "bytes": 2981801,
+      "sha256": "8b3e9483148a4f60c3e4411282aeab97dfedb691ceb08a368191ec53f65a9c71"
+    },
+    {
+      "source_path": "hipsofcobra/input/hips_c2.txt",
+      "local_name": "hips_c2.txt",
+      "git_blob": "fa282fc1584322ed1f64902ca023fcdac8e01843",
+      "bytes": 2981479,
+      "sha256": "ce871e39daff75c68d61902fda8a714e7490024d4ebe64c56a675aaad68514a9"
+    },
+    {
+      "source_path": "hipsofcobra/input/hips_d1.txt",
+      "local_name": "hips_d1.txt",
+      "git_blob": "e5c0ef428e84e9605777dfa9845cc262e5b0e037",
+      "bytes": 3032630,
+      "sha256": "56108051ad059a8722abc59626d6b13194eb40d968dca6bfea72d719a7d93a45"
+    },
+    {
+      "source_path": "hipsofcobra/input/hips_d2.txt",
+      "local_name": "hips_d2.txt",
+      "git_blob": "1ff49406489df0dc90eabcb06acd99083bfcb56e",
+      "bytes": 2939837,
+      "sha256": "b9e683af53d637bd82d318428c2e630a74b245db239f3fb5d0e9e2ad4ed65dc1"
+    }
+  ]
+}

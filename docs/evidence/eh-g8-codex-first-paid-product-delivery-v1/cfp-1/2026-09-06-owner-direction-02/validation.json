@@ -1,0 +1,39 @@
+{
+  "captured_utc": "2026-09-07T03:35:55.777Z",
+  "docs_audit": {
+    "ok": true,
+    "active_gate": "G8",
+    "capability_rows": 40,
+    "acceptance_claims": 14
+  },
+  "local_links_checked": 19,
+  "diff_check_exit": 0,
+  "files": [
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "932dc4f9f47311d3a679c2e738b5c0f2e4f4fd5f225f82a522283b20adeeef69"
+    },
+    {
+      "path": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "sha256": "030f7a2c2350e9514e9beb93373a24f8cdfa40e424e798e03432d82ebbb22636"
+    },
+    {
+      "path": "docs/BUSINESS_MODEL.md",
+      "sha256": "46d8141bcaf3e9321c2f1f24e8d27eca7f88b79c557d689d9d99fe08f3d05c65"
+    },
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "2cd72d76bedd26ca541b4d161ef704273161d07d456c0f0632eaec6f6cbec418"
+    },
+    {
+      "path": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-owner-direction-02/commercial-scope-review.md",
+      "sha256": "8e6a7d2bb9ef46e82c8870acd4da3e74ca37711f8d8b395f860c2d442ad0cefa"
+    }
+  ],
+  "billing_scope": "Source inspection only: USD10 plan fixture and USD5 prepaid fixture. No dashboard or live payment verification.",
+  "rights_scope": "Comparison identifies specific server permissions and separate mod restrictions; no blanket legality verdict.",
+  "runtime_changes": false,
+  "stage_closed": false,
+  "ok": true,
+  "failures": []
+}

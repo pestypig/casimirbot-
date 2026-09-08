@@ -461,12 +461,12 @@ const classifyProjectedTaskBurstPressure = (
 const recoverForegroundMemoryPressure = (
   input: RuntimeAdmissionInput,
   memory: RuntimeAdmissionDecision["memory"],
-  host: RuntimeAdmissionDecision["host"],
+  host: ReturnType<RuntimeHostMemoryReader>,
   limits: RuntimeAdmissionDecision["limits"],
   pressure: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] },
 ): {
   memory: RuntimeAdmissionDecision["memory"];
-  host: RuntimeAdmissionDecision["host"];
+  host: ReturnType<RuntimeHostMemoryReader>;
   pressure: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] };
 } => {
   if (

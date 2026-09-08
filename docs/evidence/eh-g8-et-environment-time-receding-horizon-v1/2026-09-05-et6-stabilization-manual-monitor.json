@@ -1,0 +1,20 @@
+{
+  "et6_complete": false,
+  "defect": "Stabilization used NativeFabricControlBridge.releaseAll, which disarms ManualInputLatch while the workflow may continue executing.",
+  "repair": "Stabilization releases control resources through releaseResources without invoking the global lifecycle teardown.",
+  "verification": {
+    "native_filter": "*FluidSequenceEngineTest",
+    "result": "BUILD SUCCESSFUL",
+    "exit_code": 0,
+    "new_assertions": "Controller stabilization uses one scoped release and zero global releases before continuing the admitted stop segment.",
+    "limitation": "Native release semantics inspected in source; no live manual input test or packaged deployment",
+    "casimir_run": "2663",
+    "verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "deployed": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

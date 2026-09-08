@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-06",
+  "scope": "Pre-live reliability goal; not original live ET6 acceptance",
+  "requirements": [
+    { "item": 1, "requirement": "Admission/publication consistency and concurrency", "assessment": "deterministic evidence present", "evidence": ["actions/__tests__/action-admission-transaction.test.ts", "actions/__tests__/temporal-admission-publication.test.ts", "et6-prelive-refresh-regressions-20260906.json"], "limit": "Fixture authority inputs; not live authorization or PostgreSQL isolation qualification" },
+    { "item": 2, "requirement": "Uncertain successor delivery without replay", "assessment": "connected fault evidence present", "evidence": ["et6-prelive-connected-publisher-faults-20260906.json"], "limit": "No power-loss guarantee" },
+    { "item": 3, "requirement": "Outbox starvation and fail-closed required evidence", "assessment": "deterministic saturation and transport fault evidence present", "evidence": ["PlayerActionDeliveryOutboxTest.saturatedProjectionLanePreservesTerminalDeliveryAndCheckpointFence", "et6-prelive-refresh-regressions-20260906.json"], "limit": "In-memory outbox is not durable; saturation and HTTP faults are bounded complementary fixtures" },
+    { "item": 4, "requirement": "Restart evidence-gap handling", "assessment": "separate-process and full-schema evidence present", "evidence": ["server/db/__tests__/temporal-process-restart.test.ts", "server/db/__tests__/temporal-full-schema-snapshot.test.ts", "et6-prelive-refresh-regressions-20260906.json"], "limit": "Explicit connector_offline recovery, not automatic effect replay" },
+    { "item": 5, "requirement": "Complete timing path and bounded budget", "assessment": "connected simulated enclosing-budget and causal phase evidence present; serial five-stage representation remains inapplicable to lease-time persistence", "evidence": ["et6-prelive-server-phase-partition-20260906.json", "et6-prelive-connected-clock-envelope-20260906.json", "et6-prelive-checkpoint-window-budget-20260906.json", "et6-prelive-advancing-deadline-20260906.json"], "limit": "No exact network split, pure sampling latency or live capacity; native enclosing time and nested server durations must not be summed" },
+    { "item": 6, "requirement": "Regression, build, documentation and current package verification", "assessment": "INCOMPLETE", "evidence": ["et6-prelive-refresh-regressions-20260906.json", "et6-prelive-build-space-20260906.json"], "limit": "Current payload built/staged, but package remains older; 0.5 GiB free prevents safe packaging" }
+  ],
+  "completion": false,
+  "next_required_action": "Release disk space, package current staged source, verify byte identity and isolated startup, then rerun final completion audit",
+  "not_authorized_by_this_audit": ["live ET6 acceptance", "NAV1 advancement", "automatic environment authority renewal"]
+}

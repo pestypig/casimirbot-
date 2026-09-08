@@ -1,0 +1,59 @@
+{
+  "scope": "Four-species solar-minimum flux comparison, not oscillated interaction-weighted spectrum",
+  "full_model_admitted": false,
+  "repository": "https://github.com/JIECheng2021/atm_nu_flux_data",
+  "commit": "f5a8bab508c6ad5874070f0f6b83409baa96d3d2",
+  "sha256": {
+    "dune-with.d": "845124b03c3560f9744da35a66095636b38b196d137ba1f2b557af2a03b4dc0b",
+    "dune-without.d": "7a030f303e95587ba14ce7b73e2b904f8e4913acabea5f567dd78c07d80d7d71"
+  },
+  "checks": {
+    "new_grids_121_nodes": true,
+    "same_scenario_energy_grid": true,
+    "positive_ordered": true,
+    "nested_integrated_fluxes": true
+  },
+  "max_geV_species_with_without_relative_difference": 0.0,
+  "rows": [
+    {
+      "threshold_GeV": 1.0,
+      "integrated_flux_cm_m2_s_m1": {
+        "dune-with.d": 0.37234504845662825,
+        "dune-without.d": 0.37234504845662825,
+        "Honda2014": 0.36383052183010345
+      },
+      "new_over_Honda": 1.0234024528335224,
+      "with_over_without": 1.0
+    },
+    {
+      "threshold_GeV": 2.15846619029,
+      "integrated_flux_cm_m2_s_m1": {
+        "dune-with.d": 0.09442540776215877,
+        "dune-without.d": 0.09442540776215877,
+        "Honda2014": 0.09521238675154105
+      },
+      "new_over_Honda": 0.9917344894269281,
+      "with_over_without": 1.0
+    },
+    {
+      "threshold_GeV": 8.2646413199,
+      "integrated_flux_cm_m2_s_m1": {
+        "dune-with.d": 0.006739845373531136,
+        "dune-without.d": 0.006739845373531136,
+        "Honda2014": 0.006980278205375161
+      },
+      "new_over_Honda": 0.9655554084278647,
+      "with_over_without": 1.0
+    },
+    {
+      "threshold_GeV": 26.9908219039,
+      "integrated_flux_cm_m2_s_m1": {
+        "dune-with.d": 0.0006083491274417213,
+        "dune-without.d": 0.0006083491274417213,
+        "Honda2014": 0.0006228172454913466
+      },
+      "new_over_Honda": 0.9767698820892297,
+      "with_over_without": 1.0
+    }
+  ]
+}

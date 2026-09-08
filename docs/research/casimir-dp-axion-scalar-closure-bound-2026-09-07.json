@@ -1,0 +1,205 @@
+{
+  "scope": "All-final-state closure bound for rotationally averaged, non-energy-releasing Born scalar point-density contact model; not full physical-model bound",
+  "full_model_admitted": false,
+  "carbon_nucleus_count": 15505712695.496977,
+  "checks": {
+    "density_norm_sample_check": true,
+    "aligned_phase_saturation": true,
+    "closure_exceeds_independent": true,
+    "all_rows_below_DP_comparator": true
+  },
+  "rows": [
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "central",
+      "sigma_closure_cm2": 3.7958336516102754e-21,
+      "D_scalar_closure_upper": 5.037006185696791e-17,
+      "D_scalar_independent_upper": 2.4047096360386053e-30,
+      "closure_over_independent": 20946421597887.78
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "v0_220",
+      "sigma_closure_cm2": 3.7958336516102754e-21,
+      "D_scalar_closure_upper": 4.864135579378273e-17,
+      "D_scalar_independent_upper": 2.3221797368333154e-30,
+      "closure_over_independent": 20946421597887.785
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "vesc_528",
+      "sigma_closure_cm2": 3.7958336516102754e-21,
+      "D_scalar_closure_upper": 5.0215043462822365e-17,
+      "D_scalar_independent_upper": 2.3973089259258487e-30,
+      "closure_over_independent": 20946421597887.785
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "vesc_560",
+      "sigma_closure_cm2": 3.7958336516102754e-21,
+      "D_scalar_closure_upper": 5.0498014406920826e-17,
+      "D_scalar_independent_upper": 2.4108181997068653e-30,
+      "closure_over_independent": 20946421597887.78
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "summer_speed",
+      "sigma_closure_cm2": 3.7958336516102754e-21,
+      "D_scalar_closure_upper": 5.1787526391009005e-17,
+      "D_scalar_independent_upper": 2.4723805996643938e-30,
+      "closure_over_independent": 20946421597887.78
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "winter_speed",
+      "sigma_closure_cm2": 3.7958336516102754e-21,
+      "D_scalar_closure_upper": 4.900660864105773e-17,
+      "D_scalar_independent_upper": 2.3396172187233886e-30,
+      "closure_over_independent": 20946421597887.78
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "central",
+      "sigma_closure_cm2": 3.416846818981002e-20,
+      "D_scalar_closure_upper": 4.534097155570705e-16,
+      "D_scalar_independent_upper": 2.164616582968357e-29,
+      "closure_over_independent": 20946421603003.055
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "v0_220",
+      "sigma_closure_cm2": 3.416846818981002e-20,
+      "D_scalar_closure_upper": 4.378486442481586e-16,
+      "D_scalar_independent_upper": 2.0903267037525156e-29,
+      "closure_over_independent": 20946421603003.055
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "vesc_528",
+      "sigma_closure_cm2": 3.416846818981002e-20,
+      "D_scalar_closure_upper": 4.520143063912998e-16,
+      "D_scalar_independent_upper": 2.157954780813231e-29,
+      "closure_over_independent": 20946421603003.055
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "vesc_560",
+      "sigma_closure_cm2": 3.416846818981002e-20,
+      "D_scalar_closure_upper": 4.5456148958990155e-16,
+      "D_scalar_independent_upper": 2.1701152502570264e-29,
+      "closure_over_independent": 20946421603003.055
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "summer_speed",
+      "sigma_closure_cm2": 3.416846818981002e-20,
+      "D_scalar_closure_upper": 4.661691239734591e-16,
+      "D_scalar_independent_upper": 2.2255310850165696e-29,
+      "closure_over_independent": 20946421603003.055
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "winter_speed",
+      "sigma_closure_cm2": 3.416846818981002e-20,
+      "D_scalar_closure_upper": 4.411364938851044e-16,
+      "D_scalar_independent_upper": 2.1060231778293788e-29,
+      "closure_over_independent": 20946421603003.05
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "central",
+      "sigma_closure_cm2": 1.8608901993485885e-19,
+      "D_scalar_closure_upper": 2.469369394268637e-15,
+      "D_scalar_independent_upper": 1.1788979716431904e-28,
+      "closure_over_independent": 20946421604464.56
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "v0_220",
+      "sigma_closure_cm2": 1.8608901993485885e-19,
+      "D_scalar_closure_upper": 2.3846203650489003e-15,
+      "D_scalar_independent_upper": 1.138438063588216e-28,
+      "closure_over_independent": 20946421604464.555
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "vesc_528",
+      "sigma_closure_cm2": 1.8608901993485885e-19,
+      "D_scalar_closure_upper": 2.461769687936358e-15,
+      "D_scalar_independent_upper": 1.1752698071405439e-28,
+      "closure_over_independent": 20946421604464.555
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "vesc_560",
+      "sigma_closure_cm2": 1.8608901993485885e-19,
+      "D_scalar_closure_upper": 2.4756422098881527e-15,
+      "D_scalar_independent_upper": 1.1818926672231644e-28,
+      "closure_over_independent": 20946421604464.555
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "summer_speed",
+      "sigma_closure_cm2": 1.8608901993485885e-19,
+      "D_scalar_closure_upper": 2.5388599489509345e-15,
+      "D_scalar_independent_upper": 1.2120733540519387e-28,
+      "closure_over_independent": 20946421604464.555
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "winter_speed",
+      "sigma_closure_cm2": 1.8608901993485885e-19,
+      "D_scalar_closure_upper": 2.4025267199148435e-15,
+      "D_scalar_independent_upper": 1.146986709845831e-28,
+      "closure_over_independent": 20946421604464.555
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "central",
+      "sigma_closure_cm2": 3.7986591109315176e-19,
+      "D_scalar_closure_upper": 5.040755521780709e-15,
+      "D_scalar_independent_upper": 2.4064996002119895e-28,
+      "closure_over_independent": 20946421604793.395
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "v0_220",
+      "sigma_closure_cm2": 3.7986591109315176e-19,
+      "D_scalar_closure_upper": 4.867756237835397e-15,
+      "D_scalar_independent_upper": 2.3239082692393892e-28,
+      "closure_over_independent": 20946421604793.395
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "vesc_528",
+      "sigma_closure_cm2": 3.7986591109315176e-19,
+      "D_scalar_closure_upper": 5.025242143447252e-15,
+      "D_scalar_independent_upper": 2.399093381323554e-28,
+      "closure_over_independent": 20946421604793.39
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "vesc_560",
+      "sigma_closure_cm2": 3.7986591109315176e-19,
+      "D_scalar_closure_upper": 5.053560301027012e-15,
+      "D_scalar_independent_upper": 2.4126127108367525e-28,
+      "closure_over_independent": 20946421604793.395
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "summer_speed",
+      "sigma_closure_cm2": 3.7986591109315176e-19,
+      "D_scalar_closure_upper": 5.182607485297953e-15,
+      "D_scalar_independent_upper": 2.474220935241732e-28,
+      "closure_over_independent": 20946421604793.395
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "winter_speed",
+      "sigma_closure_cm2": 3.7986591109315176e-19,
+      "D_scalar_closure_upper": 4.90430871045248e-15,
+      "D_scalar_independent_upper": 2.3413587308536626e-28,
+      "closure_over_independent": 20946421604793.395
+    }
+  ]
+}

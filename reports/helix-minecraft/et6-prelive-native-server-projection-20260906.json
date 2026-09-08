@@ -1,0 +1,22 @@
+{
+  "scope": "Unchanged native runtime projection JSON through real server projection store",
+  "native_transport_tests": 7,
+  "enabled_server_integration_tests": 1,
+  "passed": true,
+  "verified": [
+    "Native projection content hashes survive Java JSON to TypeScript validation",
+    "Real pg-mem event storage and situation digest construction",
+    "Exact replay preserves digest identity and creates no duplicate event rows",
+    "Wrong-player replay rejected with 403",
+    "Tampered batch content rejected with 400",
+    "Old-epoch replay rejected with 403 after manifest epoch replacement"
+  ],
+  "producer_artifact": "minecraft/helix-fabric-player-agent/build/native-temporal-publication.json",
+  "enable_integration": "HELIX_NATIVE_PUBLICATION_INTEGRATION=1",
+  "limits": [
+    "Generated build artifact required; test explicitly skipped without opt-in",
+    "Minimal SQL schema, provided connector claim and transaction runner",
+    "Not real OAuth, workflow admission handler, full-schema durability or live Minecraft timing",
+    "No live session or installed artifact changed"
+  ]
+}

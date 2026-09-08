@@ -1,0 +1,14 @@
+{
+  "library_sha256": "8ed9cbfc1c7485e23506034dde6ffab8142439c69701718688c0a6427fa9d4e0",
+  "probe": "Hermitian up-basis phiq1_13=phiq1_31=1e-9 GeV^-2; SM-subtracted VddLL tensor. Probe is not our model point.",
+  "scope": "Extracted VddLL expression and original setup; isolated in-memory variant changes only hardcoded mt assignment to par[m_t]. Installed package unchanged.",
+  "original_relative_mass_response": 0.0,
+  "variant_relative_mass_response": 0.026668506577395282,
+  "probe_tensor_max_GeV_minus2": 3.562961946853002e-11,
+  "checks": {
+    "unmodified_parameter_invariance": true,
+    "variant_at_default_agrees": true,
+    "variant_mass_response_nonzero": true
+  },
+  "model_matching_validated": false
+}

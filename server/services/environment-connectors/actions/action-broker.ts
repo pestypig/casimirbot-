@@ -1,4 +1,13 @@
 import crypto from "node:crypto";
+import { temporalSuccessorCandidatesSql, temporalSuccessorStateSql, temporalSuccessorLeaseSql } from "./temporal-successor-query";
+import { temporalDeliveryStatusSql } from "./temporal-delivery-status";
+import { closeTemporalEpochGapSql } from "./temporal-epoch-gap";
+import { reactiveCheckpointMeasurementsValid } from "./reactive-checkpoint-measurements";
+import { serializeHelixEnvironmentPlanHashContent, canonicalEnvironmentTimeValue, helixEnvironmentTimeSha256 } from "@shared/helix-environment-time";
+import { retainTemporalAdmission } from "../temporal-plans/temporal-admission-retention";
+import { publishTemporalAdmission } from "./temporal-admission-publication";
+import { readTemporalPublicationClock, measureTemporalProposalReceipt } from "../temporal-plans/temporal-publication-clock";
+import { resolveTemporalEventChain, resolveTemporalResultChain, verifyTemporalResidentEffects, temporalResidentResultEffectsValid, verifyTemporalSuccessorAcceptance, retainAcceptedTemporalLease } from "../temporal-plans/temporal-event-plan";
 import {
   HELIX_ENVIRONMENT_ACTION_CONNECTOR_CONFIG_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_CONTROL_OBSERVATION_SCHEMA,
@@ -52,6 +61,7 @@ import {
 import { readSharedRealtimeRoomMembership } from "../../helix-ask/realtime-room/room-store";
 import type { Queryable } from "../../helix-ask/realtime-room/room-store/types";
 import { createCredentialUseTouchThrottle } from "../credential-use-throttle";
+import { readTemporalResidentClockObservation } from "../temporal-plans/resident-clock-observation";
 
 const DEFAULT_CREDENTIAL_TTL_MS = 24 * 60 * 60_000;
 const MAX_CREDENTIAL_TTL_MS = 7 * 24 * 60 * 60_000;
@@ -69,6 +79,7 @@ export type EnvironmentActionBrokerErrorCode =
   | "action_manifest_required"
   | "action_heartbeat_invalid"
   | "action_connector_stale"
+  | "action_connector_unavailable"
   | "action_event_stream_resync_required"
   | "action_request_invalid"
   | "action_request_conflict"
@@ -327,6 +338,7 @@ export const projectEnvironmentActionIdempotencyContent = (
   workflow_mode: request.workflow_mode,
   requested_control_engine: request.requested_control_engine,
   arguments: request.arguments,
+  ...(request.temporal_plan ? { temporal_plan: request.temporal_plan } : {}),
   preconditions: request.preconditions.map((condition) => ({
     condition_kind: condition.condition_kind,
     required: condition.required,
@@ -1031,6 +1043,7 @@ export const recordEnvironmentActionConnectorManifest = async (input: {
     };
   }
   await withSharedRealtimeRoomTransaction(async (tx) => {
+    await tx.query(closeTemporalEpochGapSql, [input.claim.authorityId, manifest.producer_epoch_ref]);
     await tx.query(
       `UPDATE helix_environment_action_connector_manifests
        SET status = 'superseded'
@@ -1162,10 +1175,10 @@ export const recordEnvironmentActionConnectorHeartbeat = async (input: {
        connector_installation_id, producer_epoch_ref, status,
        active_workflow_ids, controls_asserted, manual_input_detected,
        emergency_stop_latched, control_engines, latest_event_sequence,
-       payload_hash, created_at
+       payload_hash, created_at, clock_snapshot
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10,
-       $11::jsonb, $12, $13, $14
+       $11::jsonb, $12, $13, $14, $15::jsonb
      );`,
     [
       heartbeat.heartbeat_id,
@@ -1182,6 +1195,7 @@ export const recordEnvironmentActionConnectorHeartbeat = async (input: {
       heartbeat.latest_event_sequence,
       hash,
       heartbeat.created_at,
+      heartbeat.clock == null ? null : JSON.stringify(heartbeat.clock),
     ],
   );
   return { heartbeatId: heartbeat.heartbeat_id, replayed: false };
@@ -1516,6 +1530,52 @@ const placementPredictionValid = (input: {
   );
 };
 
+export const environmentActionSequenceCheckpointMeasurementsValid = (input: {
+  sequence: HelixMinecraftFluidSequenceArguments;
+  measurements: Record<string, unknown>;
+  require_complete?: boolean;
+}): boolean => {
+  // Older finite-sequence clients have no timing evidence. They remain
+  // compatible, but absence must never be used as rolling-extension proof.
+  const raw = input.measurements.checkpoint_settlements;
+  if (raw === undefined) return true;
+  const satisfied = input.measurements.satisfied_checkpoint_ids;
+  const observations = input.measurements.condition_observations;
+  const elapsed = input.measurements.scheduler_ticks_elapsed;
+  if (!Array.isArray(raw) || raw.length > input.sequence.nodes.length ||
+      !Array.isArray(satisfied) || !satisfied.every((id) => typeof id === "string") ||
+      new Set(satisfied).size !== satisfied.length || raw.length !== satisfied.length ||
+      !Array.isArray(observations) || typeof elapsed !== "number" ||
+      !Number.isSafeInteger(elapsed) || elapsed < 1 ||
+      elapsed > input.sequence.max_total_ticks + (input.require_complete === false ? 1 : 0)) return false;
+  const seen = new Set<string>();
+  let lastTick = -1;
+  let lastNanos = -1;
+  for (const value of raw) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const row = value as Record<string, unknown>;
+    const node = input.sequence.nodes.find((candidate) => candidate.node_id === row.node_id);
+    const tick = row.tick_index;
+    const ticksElapsed = row.scheduler_ticks_elapsed;
+    const nanos = row.monotonic_elapsed_ns;
+    if (!node || node.node_kind !== "checkpoint" || row.checkpoint_id !== node.checkpoint_id ||
+        seen.has(node.checkpoint_id) || !satisfied.includes(node.checkpoint_id) ||
+        typeof tick !== "number" || !Number.isSafeInteger(tick) || tick < 0 || tick < lastTick ||
+        typeof ticksElapsed !== "number" || !Number.isSafeInteger(ticksElapsed) ||
+        ticksElapsed !== tick + 1 || ticksElapsed > elapsed ||
+        typeof nanos !== "number" || !Number.isSafeInteger(nanos) || nanos < 0 || nanos < lastNanos ||
+        !observations.some((observation) => {
+          if (!observation || typeof observation !== "object") return false;
+          const fact = observation as Record<string, unknown>;
+          return fact.node_id === node.node_id && fact.tick_index === tick && fact.satisfied === true;
+        })) return false;
+    seen.add(node.checkpoint_id);
+    lastTick = tick;
+    lastNanos = nanos;
+  }
+  return input.require_complete === false || input.sequence.required_checkpoint_ids.every((id) => seen.has(id));
+};
+
 const sequenceConditionObservationsValid = (input: {
   sequence: HelixMinecraftFluidSequenceArguments;
   measurements: Record<string, unknown>;
@@ -1565,6 +1625,7 @@ const reactiveProgramMeasurementsValid = (input: {
   program: HelixMinecraftReactiveProgramArguments;
   measurements: Record<string, unknown>;
 }): boolean => {
+  if (!reactiveCheckpointMeasurementsValid(input.program, input.measurements)) return false;
   const parsedObservation =
     helixMinecraftReactiveProgramObservationSchema.safeParse({
       program_schema: input.measurements.program_schema,
@@ -2541,6 +2602,7 @@ export const environmentActionWorkflowMeasurementsValid = (input: {
           sequence: parsed.data,
           measurements,
         }) &&
+        environmentActionSequenceCheckpointMeasurementsValid({ sequence: parsed.data, measurements }) &&
         wholeNonnegative(measuredDuration) &&
         measuredDuration <= parsed.data.max_total_ticks
       );
@@ -2661,6 +2723,68 @@ export const canonicalizeEnvironmentActionResult = (input: {
   });
 };
 
+/** Validate each retained serial graph independently, then the resident ceiling.
+ * Local comparison views below are not emitted as synthetic action results. */
+export const temporalSequenceResultMeasurementsValid = (input: {
+  request: HelixEnvironmentActionRequest;
+  result: HelixEnvironmentActionResult;
+  measurements: Record<string, unknown>;
+  chain: Awaited<ReturnType<typeof resolveTemporalResultChain>>;
+}): boolean => {
+  const { request, result, measurements, chain } = input;
+  if (request.action_kind !== "execute_sequence" || result.outcome !== "succeeded" ||
+      !request.temporal_plan || chain.length < 1 || !result.controls_released) return false;
+  try {
+    verifyTemporalResidentEffects(measurements, chain);
+    if (!temporalResidentResultEffectsValid(measurements, result)) return false;
+    const totals = measurements.resident_effect_totals as Record<string, unknown>;
+    if (!totals || Number(totals.world_mutations_performed) > request.constraints.max_block_mutations ||
+        Number(totals.inventory_mutations_performed) > request.constraints.max_inventory_transfers ||
+        (totals.world_mutation_performed && !request.constraints.world_mutation_allowed)) return false;
+    const wallDuration = Date.parse(result.completed_at) - Date.parse(result.started_at ?? "");
+    if (!Number.isFinite(wallDuration) || wallDuration < 0 || wallDuration > request.constraints.max_duration_ms) return false;
+    const rootStart = request.temporal_plan.clocks.environment.sequence;
+    let previousBoundary = rootStart;
+    for (let index = 0; index < chain.length; index++) {
+      const entry = chain[index];
+      const admitted = helixEnvironmentActionRequestSchema.parse(entry.request);
+      const sample = entry.measurements;
+      const elapsed = sample.scheduler_ticks_elapsed;
+      if (typeof elapsed !== "number" || !Number.isSafeInteger(elapsed) || elapsed < 1 ||
+          entry.plan.clocks.monotonic.origin_id !== request.temporal_plan.clocks.monotonic.origin_id ||
+          entry.plan.clocks.environment.kind !== "tick" ||
+          entry.plan.clocks.environment.resolution_unit !== "minecraft_tick") return false;
+      const localTick = elapsed - 1;
+      const absoluteTick = entry.plan.clocks.environment.sequence + localTick;
+      if (!Number.isSafeInteger(absoluteTick) || absoluteTick < previousBoundary) return false;
+      const worldCount = Number(sample.world_mutations_performed);
+      const inventoryCount = Number(sample.inventory_mutations_performed);
+      if (inventoryCount > admitted.constraints.max_inventory_transfers) return false;
+      const flags = {
+        player_motion_performed: sample.player_motion_performed === true,
+        player_interaction_performed: sample.player_interaction_performed === true,
+        inventory_mutation_performed: sample.inventory_mutation_performed === true || inventoryCount > 0,
+        world_mutation_performed: worldCount > 0,
+      };
+      if (!environmentActionWorkflowMeasurementsValid({ request: admitted,
+        result: { ...result, ...flags, duration_ticks: localTick,
+          side_effects_performed: Object.values(flags).some(Boolean) }, measurements: sample })) return false;
+      if (index < chain.length - 1) {
+        if (localTick !== entry.plan.watermarks.committed_through_unit) return false;
+        previousBoundary = absoluteTick;
+      } else {
+        const residentTick = entry.plan.clocks.environment.sequence - rootStart + localTick;
+        if (!Number.isSafeInteger(residentTick) || residentTick < 0 || measurements.resident_tick_index !== residentTick ||
+            result.duration_ticks == null || result.duration_ticks < residentTick ||
+            !result.completed_clock || result.completed_clock.tick_index < rootStart + residentTick) return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const readRecordedWorkflowEvidence = async (input: {
   db: Queryable;
   request: HelixEnvironmentActionRequest;
@@ -2693,8 +2817,9 @@ export const readRecordedWorkflowEvidence = async (input: {
   const selected = await input.db.query<{
     event_id: string;
     event_payload: unknown;
+    producer_epoch_ref?: string;
   }>(
-    `SELECT event_id, event_payload
+    `SELECT event_id, event_payload, producer_epoch_ref
      FROM helix_environment_action_workflow_events
      WHERE action_request_id = $1 AND workflow_id = $2
      ORDER BY sequence;`,
@@ -2705,7 +2830,7 @@ export const readRecordedWorkflowEvidence = async (input: {
       parseJson(row.event_payload, null),
     );
     return parsed.success
-      ? [{ eventId: row.event_id, event: parsed.data }]
+      ? [{ eventId: row.event_id, event: parsed.data, producerEpoch: row.producer_epoch_ref }]
       : [];
   });
   const byId = new Map(events.map((entry) => [entry.eventId, entry.event]));
@@ -2747,10 +2872,21 @@ export const readRecordedWorkflowEvidence = async (input: {
       terminalMeasurements: {},
     };
   }
+  if (input.result.outcome === "succeeded" && input.request.temporal_plan &&
+      terminal.event.measurements.completed_sequence_measurements !== undefined) {
+    try {
+      if (!terminal.producerEpoch) throw new Error("temporal_terminal_epoch_missing");
+      const chain = await resolveTemporalResultChain(input.db, input.request, terminal.event.measurements, terminal.producerEpoch);
+      return { valid: temporalSequenceResultMeasurementsValid({ ...input,
+        measurements: terminal.event.measurements, chain }), terminalMeasurements: terminal.event.measurements };
+    } catch {
+      return { valid: false, terminalMeasurements: terminal.event.measurements };
+    }
+  }
   return {
     valid:
       input.result.outcome === "succeeded"
-        ? environmentActionWorkflowMeasurementsValid({
+        ? temporalResidentResultEffectsValid(terminal.event.measurements, input.result) && environmentActionWorkflowMeasurementsValid({
             request: input.request,
             result: input.result,
             measurements: terminal.event.measurements,
@@ -2803,6 +2939,22 @@ type EnvironmentActionManifestCapability = {
   effect_class: EnvironmentActionExecutionContext["capability"]["effectClass"];
   workflow_modes: Array<"single_action" | "long_running">;
   control_engines: Array<"native_fabric" | "baritone">;
+  execution_features?: string[];
+};
+
+/** Requires an advertised implementation feature, never an inferred version number. */
+export const environmentActionStartDeadlineSupported = (
+  actionKind: string,
+  args: Record<string, unknown>,
+  executionFeatures: readonly string[] = [],
+): boolean => {
+  const nodes = actionKind === "execute_sequence" ? args.nodes :
+    actionKind === "execute_reactive_program" && Array.isArray(args.lanes)
+      ? args.lanes.flatMap(lane => lane && typeof lane === "object" && "nodes" in lane && Array.isArray(lane.nodes) ? lane.nodes : [])
+      : [];
+  const requiresDeadline = Array.isArray(nodes) && nodes.some(node =>
+    node && typeof node === "object" && Object.hasOwn(node, "latest_start_tick"));
+  return !requiresDeadline || executionFeatures.includes("latest_start_tick_v1");
 };
 
 const resolveEnvironmentActionAuthorityBase = async (input: {
@@ -2814,6 +2966,7 @@ const resolveEnvironmentActionAuthorityBase = async (input: {
   context: EnvironmentActionAuthorityContext;
   allowedCapabilityIds: string[];
   manifestCapabilities: EnvironmentActionManifestCapability[];
+  producerEpochRef: string;
 }> => {
   const membership = await readSharedRealtimeRoomMembership({
     roomId: input.roomId,
@@ -2850,6 +3003,7 @@ const resolveEnvironmentActionAuthorityBase = async (input: {
       : null,
   );
   const manifest = await assertFreshConnector(db, {
+    ownerProfileId: authority.owner_profile_id,
     authorityId: authority.action_authority_id,
     credentialId: authority.credential_id!,
     connectorInstallationId: authority.connector_installation_id!,
@@ -2893,6 +3047,7 @@ const resolveEnvironmentActionAuthorityBase = async (input: {
       manifestId: manifest.manifest_id,
     },
     allowedCapabilityIds: parseStringArray(authority.allowed_capability_ids),
+    producerEpochRef: manifest.producer_epoch_ref,
     manifestCapabilities: parseJson<EnvironmentActionManifestCapability[]>(
       manifest.capabilities,
       [],
@@ -2911,6 +3066,39 @@ export const resolveEnvironmentActionAuthorityContext = async (input: {
   participantId: string;
 }): Promise<EnvironmentActionAuthorityContext> =>
   (await resolveEnvironmentActionAuthorityBase(input)).context;
+
+export const projectEnvironmentTemporalActionCatalog = (input: {
+  allowedCapabilityIds: string[];
+  manifestCapabilities: EnvironmentActionManifestCapability[];
+}) => ({
+  capabilities: input.manifestCapabilities.slice(0, 256).map((capability) => ({
+    capability_id: capability.capability_id,
+    capability_version: capability.capability_version,
+    action_kind: capability.action_kind,
+    effect_class: capability.effect_class,
+    native_fabric_available: capability.control_engines.includes("native_fabric"),
+    start_deadline_supported: capability.execution_features?.includes("latest_start_tick_v1") === true,
+    policy_listed: input.allowedCapabilityIds.includes(capability.capability_id),
+  })),
+  truncated: input.manifestCapabilities.length > 256,
+  execution_authority: false as const,
+  answer_authority: false as const,
+  terminal_eligible: false as const,
+});
+
+/** Internal frontier input only; normal action admission remains mandatory. */
+export const resolveEnvironmentTemporalActionCatalog = async (
+  input: Parameters<typeof resolveEnvironmentActionAuthorityContext>[0],
+) => {
+  const resolved = await resolveEnvironmentActionAuthorityBase(input);
+  const residentClock = await readTemporalResidentClockObservation(await readSharedRealtimeRoomDatabase(), {
+    authorityId: resolved.context.actionAuthorityId, manifestId: resolved.context.manifestId,
+    producerEpochRef: resolved.producerEpochRef,
+  });
+  return { context: resolved.context, action_producer_epoch_ref: resolved.producerEpochRef,
+    resident_clock_observation: residentClock,
+    ...projectEnvironmentTemporalActionCatalog(resolved) };
+};
 
 export type EnvironmentActionWorkflowControlContext = {
   actionAuthorityId: string;
@@ -3123,7 +3311,12 @@ export const enqueueEnvironmentAction = async (input: {
   profileId: string;
   requestingParticipantId?: string | null;
   request: unknown;
+}, temporal?: {
+  /** Internal only. No route/tool may expose this before resident delivery exists. */
+  retention: Omit<Parameters<typeof retainTemporalAdmission>[1], "actionRequestId">;
+  revalidateTask: () => void;
 }): Promise<HelixEnvironmentActionRequest> => {
+  const proposalReceivedClock = readTemporalPublicationClock();
   const parsed = helixEnvironmentActionRequestSchema.safeParse(input.request);
   if (!parsed.success) {
     throw new EnvironmentActionBrokerError(
@@ -3133,6 +3326,28 @@ export const enqueueEnvironmentAction = async (input: {
     );
   }
   const request = parsed.data;
+  if (request.temporal_plan && !temporal) {
+    throw new EnvironmentActionBrokerError("action_policy_denied", 409,
+      "Temporal metadata requires the internal temporal admission path.");
+  }
+  if (request.temporal_plan) {
+    const canonical = serializeHelixEnvironmentPlanHashContent(request.temporal_plan);
+    if (Buffer.byteLength(canonical, "utf8") > 262144) throw new EnvironmentActionBrokerError("action_request_invalid", 400,
+      "Temporal plan exceeds the native canonical transport bound.");
+    request.temporal_plan_canonical_json = canonical;
+  }
+  // Snapshot retention data before any await; caller mutation cannot change a
+  // validated plan into different metadata while the broker is waiting for SQL.
+  const temporalRetention = temporal ? structuredClone(temporal.retention) : null;
+  if (temporalRetention) {
+    const { compilation_hash, ...content } = temporalRetention.preflight.compilation;
+    const canonical = JSON.stringify(canonicalEnvironmentTimeValue(content));
+    if (compilation_hash !== helixEnvironmentTimeSha256(content) || Buffer.byteLength(canonical, "utf8") > 262144) {
+      throw new EnvironmentActionBrokerError("action_request_invalid", 400, "Temporal compilation integrity or size is invalid.");
+    }
+    request.temporal_compilation_hash = compilation_hash;
+    request.temporal_compilation_canonical_json = canonical;
+  }
   if (
     request.action_kind === "execute_sequence" &&
     !helixMinecraftFluidSequenceArgumentsSchema.safeParse(request.arguments)
@@ -3197,7 +3412,12 @@ export const enqueueEnvironmentAction = async (input: {
       "A participant may enqueue player actions only for its exact paired identity.",
     );
   }
-  const db = await readSharedRealtimeRoomDatabase();
+  const admittedRequest = await withSharedRealtimeRoomTransaction(async (tx) => {
+  const db = tx;
+  // Serialize admission against authority revocation/policy updates. All
+  // currentness reads below and the idempotent INSERT share this transaction.
+  await db.query(`SELECT action_authority_id FROM helix_environment_action_authorities
+    WHERE action_authority_id=$1 FOR UPDATE`, [request.action_authority_id]);
   const authority = assertAuthorityUsable(
     await readAuthorityConnectorRow(db, request.action_authority_id),
   );
@@ -3231,6 +3451,7 @@ export const enqueueEnvironmentAction = async (input: {
     );
   }
   const manifest = await assertFreshConnector(db, {
+    ownerProfileId: authority.owner_profile_id,
     authorityId: authority.action_authority_id,
     credentialId: authority.credential_id!,
     connectorInstallationId: authority.connector_installation_id!,
@@ -3255,6 +3476,7 @@ export const enqueueEnvironmentAction = async (input: {
       effect_class: string;
       workflow_modes: string[];
       control_engines: string[];
+      execution_features?: string[];
     }>
   >(manifest.capabilities, []);
   const capability = manifestCapabilities.find(
@@ -3265,6 +3487,26 @@ export const enqueueEnvironmentAction = async (input: {
       candidate.effect_class === request.effect_class &&
       candidate.workflow_modes.includes(request.workflow_mode),
   );
+  if (temporal && (!capability?.execution_features?.includes("temporal_plan_v1") ||
+      !["execute_sequence", "execute_reactive_program"].includes(request.action_kind))) {
+    throw new EnvironmentActionBrokerError("action_policy_denied", 409,
+      "The current connector does not support resident temporal-plan execution. Finite fallback is forbidden.");
+  }
+  if (temporal && (!request.temporal_plan || request.temporal_plan.plan_hash !== temporalRetention?.preflight.plan.plan_hash)) {
+    throw new EnvironmentActionBrokerError("action_policy_denied", 409,
+      "The delivered temporal source plan must match its retained admission.");
+  }
+  const retain = async (actionRequestId: string, unpublished = false) => {
+    if (!temporal || !temporalRetention) return;
+    temporal.revalidateTask();
+    await retainTemporalAdmission(tx, { ...temporalRetention, actionRequestId, unpublished });
+    // Binding state is in-process, not transaction-owned. Check again after SQL.
+    temporal.revalidateTask();
+  };
+  if (!environmentActionStartDeadlineSupported(request.action_kind, request.arguments, capability?.execution_features)) {
+    throw new EnvironmentActionBrokerError("action_policy_denied", 409,
+      "The current connector does not advertise enforcement of action start deadlines.");
+  }
   if (
     !capability ||
     (request.requested_control_engine !== "adapter_selected" &&
@@ -3303,7 +3545,6 @@ export const enqueueEnvironmentAction = async (input: {
     );
   }
   const requestHash = hashEnvironmentActionIdempotencyContent(request);
-  return withSharedRealtimeRoomTransaction(async (tx) => {
     const physicalIdentityDuplicate = await tx.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
        WHERE run_id = $1 AND turn_id = $2 AND tool_call_id = $3
@@ -3321,6 +3562,7 @@ export const enqueueEnvironmentAction = async (input: {
           request,
         })
       ) {
+        await retain(existing.action_request_id);
         return requestProjection(existing);
       }
       throw new EnvironmentActionBrokerError(
@@ -3348,6 +3590,7 @@ export const enqueueEnvironmentAction = async (input: {
           "The player-action idempotency key was already used for different content.",
         );
       }
+      await retain(duplicate.rows[0].action_request_id);
       return requestProjection(duplicate.rows[0]);
     }
     await tx.query(
@@ -3363,7 +3606,7 @@ export const enqueueEnvironmentAction = async (input: {
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
          $15, $16, $17, $18, $19, $20, $21, $22, $23::jsonb, $24, $25,
-         $26, $27, $28, 'admitted', $29, $30, $30
+         $26, $27, $28, $31, $29, $30, $30
        );`,
       [
         request.action_request_id,
@@ -3396,8 +3639,13 @@ export const enqueueEnvironmentAction = async (input: {
         Number(authority.policy_version),
         request.deadline_at,
         request.created_at,
+        temporal ? "queued" : "admitted",
       ],
     );
+    if (temporal) {
+      await publishTemporalAdmission(tx, request.action_request_id,
+        () => retain(request.action_request_id, true));
+    }
     const inserted = await tx.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
        WHERE action_request_id = $1 LIMIT 1;`,
@@ -3405,6 +3653,33 @@ export const enqueueEnvironmentAction = async (input: {
     );
     return requestProjection(inserted.rows[0]!);
   });
+  if (temporalRetention) {
+    // Public lifecycle timing only. No request content, continuation secret,
+    // authority renewal, or durable-snapshot claim is emitted here.
+    try {
+    const finished = readTemporalPublicationClock();
+    console.info("[temporal-admission-timing]", {
+      action_request_id: admittedRequest.action_request_id,
+      run_id: admittedRequest.run_id,
+      plan_id: temporalRetention.preflight.plan.plan_id,
+      producer_epoch_ref: temporalRetention.preflight.plan.identity.producer_epoch,
+      reasoning_binding_id: temporalRetention.bindingId,
+      reasoning_binding_epoch: temporalRetention.bindingEpoch,
+      checkpoint_id: temporalRetention.checkpoint?.checkpointId ?? null,
+      clock_origin: proposalReceivedClock.origin_id,
+      proposal_received_ms: proposalReceivedClock.elapsed_ms,
+      transaction_returned_ms: finished.elapsed_ms,
+      frontier_id: temporalRetention.preflight.frontier?.frontier_id ?? null,
+      ...measureTemporalProposalReceipt(temporalRetention.preflight.frontier?.clocks?.monotonic, proposalReceivedClock),
+      proposal_receipt_to_transaction_return_ms: finished.elapsed_ms - proposalReceivedClock.elapsed_ms,
+      required_snapshot_proven: false,
+    });
+    } catch {
+      // Observation failure must never turn a committed admission into an
+      // apparent action failure (and provoke a caller retry).
+    }
+  }
+  return admittedRequest;
 };
 
 export const leasePendingEnvironmentActions = async (input: {
@@ -3421,6 +3696,7 @@ export const leasePendingEnvironmentActions = async (input: {
     `SELECT 1 AS present
      FROM helix_environment_action_requests
      WHERE action_authority_id = $1
+       AND (request_payload->'temporal_plan'->>'previous_plan_id') IS NULL
        AND (
          status = 'admitted'
          OR (status = 'leased' AND lease_expires_at <= now())
@@ -3456,6 +3732,7 @@ export const leasePendingEnvironmentActions = async (input: {
     const candidates = await db.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
        WHERE action_authority_id = $1 AND connector_manifest_id = $2
+         AND (request_payload->'temporal_plan'->>'previous_plan_id') IS NULL
          AND status = 'admitted' AND deadline_at > now()
        ORDER BY created_at LIMIT $3 FOR UPDATE;`,
       [
@@ -3471,6 +3748,7 @@ export const leasePendingEnvironmentActions = async (input: {
       `SELECT count(*)::int AS queue_depth, min(created_at) AS oldest_created_at
        FROM helix_environment_action_requests
        WHERE action_authority_id = $1 AND connector_manifest_id = $2
+         AND (request_payload->'temporal_plan'->>'previous_plan_id') IS NULL
          AND status = 'admitted' AND deadline_at > now();`,
       [input.claim.authorityId, currentManifest.manifest_id],
     );
@@ -3502,8 +3780,177 @@ export const leasePendingEnvironmentActions = async (input: {
       queueDepthAtLease,
       oldestPendingAgeMs,
     };
-  });
+  }, { requireLocalSnapshot: true });
 };
+
+/** Internal resident-only delivery. A route must supply the server-owned binding
+ * store; a connector's claim is never used to impersonate the reasoning client. */
+export const leasePendingEnvironmentTemporalSuccessor = async (input: {
+  claim: EnvironmentActionConnectorClaim;
+  residentActionRequestId: string; predecessorPlanId: string; predecessorPlanHash: string; checkpointId: string;
+  bindingStore: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
+}): Promise<HelixEnvironmentActionRequest | null> => {
+  const pollReceived = readTemporalPublicationClock();
+  let leaseTimingIdentity: Record<string, unknown> | undefined;
+  let leaseSqlFinishedMs: number | null = null;
+  const delivered = await withSharedRealtimeRoomTransaction(async db => {
+  await db.query(`SELECT action_authority_id FROM helix_environment_action_authorities
+    WHERE action_authority_id=$1 FOR UPDATE`, [input.claim.authorityId]);
+  const authority = assertAuthorityUsable(await readAuthorityConnectorRow(db, input.claim.authorityId));
+  if (authority.owner_profile_id !== input.claim.ownerProfileId || authority.credential_id !== input.claim.credentialId ||
+      Number(authority.policy_version) !== input.claim.policyVersion || authority.credential_status !== "active" ||
+      !authority.credential_expires_at || Date.parse(iso(authority.credential_expires_at)) <= Date.now()) return null;
+  const manifest = await assertFreshConnector(db, input.claim);
+  const roots = await db.query<ActionRequestRow>(`SELECT * FROM helix_environment_action_requests
+    WHERE action_request_id=$1 AND action_authority_id=$2`, [input.residentActionRequestId, input.claim.authorityId]);
+  const root = roots.rows[0];
+  if (!root || root.status !== "running" || root.connector_manifest_id !== manifest.manifest_id ||
+      Date.parse(iso(root.deadline_at)) <= Date.now()) return null;
+  const resident = requestProjection(root);
+  if (!resident.temporal_plan || resident.action_kind !== "execute_sequence" ||
+      resident.environment_binding_id !== input.claim.environmentBindingId || resident.room_id !== input.claim.roomId ||
+      resident.source_id !== input.claim.sourceId || resident.world_id !== input.claim.worldId ||
+      resident.participant_id !== input.claim.participantId || resident.subject_binding_id !== input.claim.subjectBindingId ||
+      resident.subject_native_id !== input.claim.subjectNativeId || Number(root.policy_version) !== input.claim.policyVersion) return null;
+  // Match admission's authority -> goal -> action lock order. Re-read the
+  // resident after locking; a preliminary snapshot is not execution authority.
+  const goals = await db.query(`SELECT current_sequence,status FROM helix_environment_durable_goals
+    WHERE goal_id=$1 FOR UPDATE`, [resident.temporal_plan.identity.goal_id]);
+  if (goals.rows[0]?.status !== "active") return null;
+  const lockedRoots = await db.query<ActionRequestRow>(`SELECT * FROM helix_environment_action_requests
+    WHERE action_request_id=$1 AND action_authority_id=$2 FOR UPDATE`, [input.residentActionRequestId, input.claim.authorityId]);
+  const lockedRoot = lockedRoots.rows[0];
+  if (!lockedRoot || lockedRoot.status !== "running" || lockedRoot.connector_manifest_id !== manifest.manifest_id ||
+      Date.parse(iso(lockedRoot.deadline_at)) <= Date.now() ||
+      environmentConnectorSha256(requestProjection(lockedRoot)) !== environmentConnectorSha256(resident)) return null;
+  const controls = await db.query(`SELECT 1 FROM helix_environment_action_control_requests
+    WHERE action_authority_id=$1 AND status IN ('pending','leased') LIMIT 1`, [input.claim.authorityId]);
+  if (controls.rows.length) return null;
+  const latest = await db.query(`SELECT event_payload,event_hash,producer_epoch_ref,created_at
+    FROM helix_environment_action_workflow_events WHERE action_request_id=$1 AND workflow_id=$2
+    ORDER BY sequence DESC LIMIT 1`, [resident.action_request_id, resident.workflow_id]);
+  const eventRow = latest.rows[0];
+  if (!eventRow || eventRow.producer_epoch_ref !== manifest.producer_epoch_ref) return null;
+  const eventRaw = parseJson(eventRow.event_payload, null);
+  const event = helixEnvironmentActionWorkflowEventSchema.safeParse(eventRaw);
+  const eventAge = Date.now() - Date.parse(iso(eventRow.created_at));
+  if (!event.success || eventAge < 0 || eventAge > 5000 || environmentConnectorSha256(eventRaw) !== eventRow.event_hash ||
+      event.data.action_request_id !== resident.action_request_id || event.data.workflow_id !== resident.workflow_id ||
+      event.data.workflow_state !== "running" || event.data.manual_override_detected ||
+      event.data.measurements.sequence_id !== input.predecessorPlanId) return null;
+  const candidates = await db.query<{ request_payload: unknown; action_request_id: string; deadline_at: Date | string;
+    checkpoint_association: unknown; reasoning_binding_id: string; reasoning_binding_epoch: number;
+    client_continuation_ref: string }>(temporalSuccessorCandidatesSql, [resident.action_request_id, input.predecessorPlanId, input.predecessorPlanHash,
+      input.claim.authorityId, manifest.manifest_id]);
+  if (candidates.rows.length !== 1) return null;
+  const candidate = candidates.rows[0];
+  const association = parseJson<Record<string, unknown> | null>(candidate.checkpoint_association, null);
+  if (!association || association.resident_action_request_id !== resident.action_request_id ||
+      association.workflow_id !== resident.workflow_id || association.plan_id !== input.predecessorPlanId ||
+      association.plan_hash !== input.predecessorPlanHash || association.checkpoint_id !== input.checkpointId) return null;
+  const settlements = event.data.measurements.checkpoint_settlements;
+  if (!Array.isArray(settlements) || !settlements.some(value => {
+    const row = recordMeasurement(value);
+    return row?.node_id === association.native_node_id && row?.checkpoint_id === association.checkpoint_id &&
+      row?.tick_index === association.native_tick_index && row?.monotonic_elapsed_ns === association.workflow_monotonic_elapsed_ns;
+  })) return null;
+  const binding = input.bindingStore.inspect({ profileRef: input.claim.ownerProfileId, bindingId: candidate.reasoning_binding_id });
+  if (binding.status !== "active" || binding.binding_epoch !== Number(candidate.reasoning_binding_epoch) ||
+      binding.run_id !== resident.run_id || binding.provider_thread_ref_hash !== crypto.createHash("sha256")
+        .update(candidate.client_continuation_ref).digest("hex")) return null;
+  const successor = helixEnvironmentActionRequestSchema.parse(parseJson(candidate.request_payload, null));
+  if (!successor.temporal_plan || successor.temporal_plan.previous_plan_id !== input.predecessorPlanId ||
+      successor.temporal_plan.previous_plan_hash !== input.predecessorPlanHash || successor.run_id !== resident.run_id ||
+      successor.temporal_plan.identity.producer_epoch !== manifest.producer_epoch_ref ||
+      successor.temporal_plan.identity.goal_id !== resident.temporal_plan.identity.goal_id ||
+      successor.temporal_plan.identity.goal_revision !== Number(goals.rows[0].current_sequence)) return null;
+  // One-shot lease: an uncertain delivery is not re-leased by this endpoint.
+  const now = new Date();
+  if (Date.parse(iso(lockedRoot.deadline_at)) <= now.getTime()) return null;
+  const updated = await db.query<ActionRequestRow>(temporalSuccessorLeaseSql, [candidate.action_request_id, now.toISOString(),
+      new Date(Math.min(Date.parse(iso(candidate.deadline_at)), Date.parse(iso(root.deadline_at)), now.getTime() + DEFAULT_LEASE_MS)).toISOString()]);
+  if (updated.rows[0]) {
+    leaseSqlFinishedMs = readTemporalPublicationClock().elapsed_ms;
+    leaseTimingIdentity = {
+      reasoning_binding_id: candidate.reasoning_binding_id,
+      reasoning_binding_epoch: Number(candidate.reasoning_binding_epoch),
+    };
+  }
+  return updated.rows[0] ? requestProjection(updated.rows[0]) : null;
+}, { requireLocalSnapshot: true });
+  if (delivered) {
+    try {
+      const finished = readTemporalPublicationClock();
+      console.info("[temporal-delivery-timing]", {
+        ...leaseTimingIdentity,
+        action_request_id: delivered.action_request_id,
+        resident_action_request_id: input.residentActionRequestId,
+        run_id: delivered.run_id,
+        plan_id: delivered.temporal_plan?.plan_id,
+        producer_epoch_ref: delivered.temporal_plan?.identity.producer_epoch,
+        checkpoint_id: input.checkpointId,
+        clock_origin: pollReceived.origin_id,
+        poll_received_ms: pollReceived.elapsed_ms,
+        lease_sql_finished_ms: leaseSqlFinishedMs,
+        transaction_returned_ms: finished.elapsed_ms,
+        poll_to_transaction_return_ms: finished.elapsed_ms - pollReceived.elapsed_ms,
+        // Includes COMMIT and configured snapshot wait, not isolated disk I/O.
+        lease_sql_to_transaction_return_ms: leaseSqlFinishedMs == null ? null : finished.elapsed_ms - leaseSqlFinishedMs,
+        configured_persistence_barrier_completed: true,
+        native_pickup_proven: false,
+        execution_authority: false,
+        live_acceptance: false,
+      });
+    } catch {
+      // No diagnostic failure may mask or replay the completed one-shot lease.
+    }
+  }
+  return delivered;
+};
+
+/** Read-only uncertainty inspection. Recorded status is not proof of effects. */
+export const readEnvironmentTemporalDeliveryState = async (input: {
+  claim: EnvironmentActionConnectorClaim;
+  residentActionRequestId: string; predecessorPlanId: string; predecessorPlanHash: string; checkpointId: string;
+  bindingStore: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
+}) => withSharedRealtimeRoomTransaction(async db => {
+  const authority = assertAuthorityUsable(await readAuthorityConnectorRow(db, input.claim.authorityId));
+  if (authority.owner_profile_id !== input.claim.ownerProfileId || authority.credential_id !== input.claim.credentialId ||
+      Number(authority.policy_version) !== input.claim.policyVersion || authority.credential_status !== "active" ||
+      !authority.credential_expires_at || Date.parse(iso(authority.credential_expires_at)) <= Date.now()) return null;
+  const manifest = await assertFreshConnector(db, input.claim);
+  const roots = await db.query<ActionRequestRow>(`SELECT * FROM helix_environment_action_requests
+    WHERE action_request_id=$1 AND action_authority_id=$2`, [input.residentActionRequestId, input.claim.authorityId]);
+  const root = roots.rows[0];
+  if (!root || root.connector_manifest_id !== manifest.manifest_id || Number(root.policy_version) !== input.claim.policyVersion) return null;
+  const resident = requestProjection(root);
+  if (!resident.temporal_plan || resident.environment_binding_id !== input.claim.environmentBindingId ||
+      resident.room_id !== input.claim.roomId || resident.source_id !== input.claim.sourceId ||
+      resident.world_id !== input.claim.worldId || resident.participant_id !== input.claim.participantId ||
+      resident.subject_binding_id !== input.claim.subjectBindingId || resident.subject_native_id !== input.claim.subjectNativeId) return null;
+  const found = await db.query(temporalSuccessorStateSql,
+  [input.residentActionRequestId, input.predecessorPlanId, input.predecessorPlanHash, input.claim.authorityId, manifest.manifest_id, resident.run_id]);
+  if (found.rows.length !== 1) return null;
+  const row = found.rows[0];
+  const association = parseJson<Record<string, unknown> | null>(row.checkpoint_association, null);
+  const plan = parseJson<any>(row.source_plan, null);
+  if (!association || association.resident_action_request_id !== resident.action_request_id ||
+      association.workflow_id !== resident.workflow_id || association.plan_id !== input.predecessorPlanId ||
+      association.plan_hash !== input.predecessorPlanHash || association.checkpoint_id !== input.checkpointId ||
+      plan?.identity?.producer_epoch !== manifest.producer_epoch_ref ||
+      plan?.identity?.goal_id !== resident.temporal_plan.identity.goal_id ||
+      plan?.identity?.environment_id !== input.claim.environmentBindingId ||
+      plan?.identity?.source_id !== input.claim.sourceId || plan?.identity?.subject_id !== input.claim.subjectBindingId ||
+      plan?.identity?.authority_id !== input.claim.authorityId || plan?.identity?.authority_revision !== input.claim.policyVersion ||
+      plan?.previous_plan_id !== input.predecessorPlanId || plan?.previous_plan_hash !== input.predecessorPlanHash) return null;
+  const binding = input.bindingStore.inspect({ profileRef: input.claim.ownerProfileId, bindingId: row.reasoning_binding_id });
+  if (binding.status !== "active" || binding.binding_epoch !== Number(row.reasoning_binding_epoch) ||
+      binding.run_id !== resident.run_id || binding.provider_thread_ref_hash !== crypto.createHash("sha256")
+        .update(row.client_continuation_ref).digest("hex")) return null;
+  return { action_request_id: row.action_request_id as string, recorded_status: row.status as string,
+    effects_verified: false as const, automatic_replay_allowed: false as const,
+    execution_authority: false as const, answer_authority: false as const, terminal_eligible: false as const };
+});
 
 export const leasePendingEnvironmentActionControls = async (input: {
   claim: EnvironmentActionConnectorClaim;
@@ -3579,18 +4026,44 @@ export const submitEnvironmentActionWorkflowEvent = async (input: {
   event: HelixEnvironmentActionWorkflowEvent;
   replayed: boolean;
 }> => {
-  const parsed = helixEnvironmentActionWorkflowEventSchema.safeParse(
-    input.event,
-  );
-  if (!parsed.success) {
+  const results = await submitEnvironmentActionWorkflowEvents({
+    claim: input.claim, events: [input.event],
+  });
+  return results[0];
+};
+
+/** Ordered evidence ingestion, never workflow execution or event coalescing.
+ * Bound each batch to one workflow and keep every event/hash/sequence. The
+ * transaction's strict snapshot completes before any receipt is returned. */
+export const submitEnvironmentActionWorkflowEvents = async (input: {
+  claim: EnvironmentActionConnectorClaim;
+  events: unknown;
+}): Promise<Array<{ event: HelixEnvironmentActionWorkflowEvent; replayed: boolean }>> => {
+  if (!Array.isArray(input.events) || input.events.length < 1 || input.events.length > 32) {
+    throw new EnvironmentActionBrokerError("action_event_invalid", 400,
+      "A workflow evidence batch requires between 1 and 32 events.");
+  }
+  const parsed = input.events.map(event => helixEnvironmentActionWorkflowEventSchema.safeParse(event));
+  if (parsed.some(event => !event.success)) {
     throw new EnvironmentActionBrokerError(
       "action_event_invalid",
       400,
       "The player workflow event is invalid.",
     );
   }
-  const event = parsed.data;
+  const events = parsed.map(event => {
+    if (!event.success) throw new Error("Unreachable invalid workflow event.");
+    return event.data;
+  });
+  if (events.some((event, index) => event.action_request_id !== events[0].action_request_id ||
+      event.workflow_id !== events[0].workflow_id ||
+      (index > 0 && event.sequence !== events[index - 1].sequence + 1))) {
+    throw new EnvironmentActionBrokerError("action_event_invalid", 400,
+      "A workflow evidence batch must contain one exact workflow in contiguous order.");
+  }
   return withSharedRealtimeRoomTransaction(async (db) => {
+    const results: Array<{ event: HelixEnvironmentActionWorkflowEvent; replayed: boolean }> = [];
+    for (const event of events) {
     const requestResult = await db.query<ActionRequestRow>(
       `SELECT * FROM helix_environment_action_requests
        WHERE action_request_id = $1 AND action_authority_id = $2
@@ -3619,7 +4092,8 @@ export const submitEnvironmentActionWorkflowEvent = async (input: {
           "A different workflow event is already recorded at this sequence.",
         );
       }
-      return { event, replayed: true };
+      results.push({ event, replayed: true });
+      continue;
     }
     const latest = await db.query<{ sequence: number | string }>(
       `SELECT sequence FROM helix_environment_action_workflow_events
@@ -3656,6 +4130,61 @@ export const submitEnvironmentActionWorkflowEvent = async (input: {
         "The workflow belongs to a superseded connector manifest.",
       );
     }
+    let validatedTemporalEvidence = false;
+    if (event.measurements.checkpoint_settlements !== undefined ||
+        event.measurements.completed_sequence_measurements !== undefined ||
+        event.measurements.resident_handoff_count !== undefined ||
+        event.measurements.resident_effect_totals !== undefined || event.measurements.temporal_successor_acceptance !== undefined) {
+      const admitted = requestProjection(request);
+      if (!admitted.temporal_plan && (event.measurements.completed_sequence_measurements !== undefined ||
+          event.measurements.resident_handoff_count !== undefined || event.measurements.resident_effect_totals !== undefined ||
+          event.measurements.temporal_successor_acceptance !== undefined)) {
+        throw new EnvironmentActionBrokerError("action_event_invalid", 400,
+          "Resident rolling evidence requires an admitted temporal plan.");
+      }
+      let evidencePlans = [{ arguments: admitted.arguments, measurements: event.measurements, require_complete: event.workflow_state === "succeeded" }];
+      if (admitted.temporal_plan) {
+        try {
+          evidencePlans = await resolveTemporalEventChain(db, admitted, event.measurements, manifest.producer_epoch_ref, event.workflow_state === "succeeded");
+        } catch {
+          throw new EnvironmentActionBrokerError("action_event_invalid", 409,
+            "Temporal checkpoint evidence has no matching delivered resident plan.");
+        }
+      }
+      for (const evidence of evidencePlans) {
+        const sequence = helixMinecraftFluidSequenceArgumentsSchema.safeParse(evidence.arguments);
+        const reactive = helixMinecraftReactiveProgramArgumentsSchema.safeParse(evidence.arguments);
+        const valid = admitted.action_kind === "execute_reactive_program"
+          ? reactive.success && reactiveCheckpointMeasurementsValid(reactive.data, evidence.measurements)
+          : admitted.action_kind === "execute_sequence" && sequence.success &&
+            sequenceConditionObservationsValid({ sequence: sequence.data, measurements: evidence.measurements }) &&
+            environmentActionSequenceCheckpointMeasurementsValid({
+              sequence: sequence.data,
+              measurements: evidence.measurements,
+              require_complete: evidence.require_complete,
+            });
+        if (!valid) {
+          throw new EnvironmentActionBrokerError(
+            "action_event_invalid",
+            400,
+            "Checkpoint settlement evidence does not match the admitted sequence and native timing.",
+          );
+        }
+      }
+      if (admitted.temporal_plan) {
+        try {
+          verifyTemporalResidentEffects(event.measurements, evidencePlans);
+          const acceptedSuccessor = await verifyTemporalSuccessorAcceptance(db, admitted, event.measurements, manifest.producer_epoch_ref, event.clock);
+          if (acceptedSuccessor) {
+            await retainAcceptedTemporalLease(db, acceptedSuccessor, iso(request.deadline_at));
+          }
+          validatedTemporalEvidence = true;
+        } catch {
+          throw new EnvironmentActionBrokerError("action_event_invalid", 400,
+            "Resident effects or successor acceptance do not match the retained plans, checkpoint and native clock.");
+        }
+      }
+    }
     await db.query(
       `INSERT INTO helix_environment_action_workflow_events (
          event_id, action_request_id, workflow_id, sequence, event_type,
@@ -3674,6 +4203,12 @@ export const submitEnvironmentActionWorkflowEvent = async (input: {
         event.created_at,
       ],
     );
+    if (validatedTemporalEvidence && typeof event.measurements.sequence_id === "string") {
+      // Evidence above has been checked against the retained graph chain. This
+      // updates its delivery row, not a second workflow or synthetic result.
+      await db.query(temporalDeliveryStatusSql,
+        [event.action_request_id, event.measurements.sequence_id, event.workflow_state]);
+    }
     await db.query(
       `UPDATE helix_environment_action_requests
        SET status = $2, updated_at = now(),
@@ -3684,8 +4219,12 @@ export const submitEnvironmentActionWorkflowEvent = async (input: {
        WHERE action_request_id = $1;`,
       [event.action_request_id, event.workflow_state],
     );
-    return { event, replayed: false };
-  });
+    results.push({ event, replayed: false });
+    }
+    return results;
+  }, { requireLocalSnapshot: true, snapshotTables: [
+    "helix_environment_action_workflow_events", "helix_environment_action_requests",
+  ] });
 };
 
 const observationFromRows = (
@@ -3922,7 +4461,9 @@ export const submitEnvironmentActionResult = async (input: {
       observation: observationFromRows(request, stored.rows[0]!),
       replayed: false,
     };
-  });
+  }, { requireLocalSnapshot: true, snapshotTables: [
+    "helix_environment_action_results", "helix_environment_action_requests",
+  ] });
 };
 
 const controlObservationFromRows = (

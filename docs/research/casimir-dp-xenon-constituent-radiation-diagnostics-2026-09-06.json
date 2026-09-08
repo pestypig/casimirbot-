@@ -1,0 +1,136 @@
+{
+  "evidence_class": "conditional_source_emission_and_COM_diagnostics_not_detector_fit",
+  "source_refs": {
+    "shell_table": "https://arxiv.org/html/2506.05507v2#A1",
+    "DP_equation_10": "https://wigner.hu/~diosi/prints/2024prl132_250203.pdf"
+  },
+  "source_sha256": {
+    "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+    "docs/research/casimir-dp-lz-mechanism-bridge-diagnostics-2026-09-06.json": "cc3be312e5fdcefe3a0be5985ec5521df4cfb33db27c3e2e80bbaec82eb234bb"
+  },
+  "constants": {
+    "G_SI": 6.6743e-11,
+    "charge_C": 1.602176634e-19,
+    "epsilon0_F_m": 8.8541878188e-12,
+    "c_m_s": 299792458.0,
+    "hbar_J_s": 1.054571817e-34,
+    "u_kg": 1.66053906892e-27,
+    "year_s": 31557600.0
+  },
+  "shell_table_columns": [
+    "orbital",
+    "occupation",
+    "mean_radius_in_1e_minus_10_m"
+  ],
+  "shell_table": [
+    [
+      "1s",
+      2,
+      0.015
+    ],
+    [
+      "2s",
+      2,
+      0.064
+    ],
+    [
+      "2p",
+      6,
+      0.055
+    ],
+    [
+      "3s",
+      2,
+      0.17
+    ],
+    [
+      "3p",
+      6,
+      0.165
+    ],
+    [
+      "3d",
+      10,
+      0.149
+    ],
+    [
+      "4s",
+      2,
+      0.395
+    ],
+    [
+      "4p",
+      6,
+      0.412
+    ],
+    [
+      "4d",
+      10,
+      0.461
+    ],
+    [
+      "5s",
+      2,
+      1.024
+    ],
+    [
+      "5p",
+      6,
+      1.231
+    ]
+  ],
+  "model": {
+    "R0_m": 1e-07,
+    "comparison_R0_m": 4.9e-10,
+    "alpha": 1.25,
+    "beta": 1.04,
+    "xenon_mean_mass_u": 131.293,
+    "energy_band_keV": [
+      1,
+      140
+    ],
+    "medium_assumption": "additive_atomic_emission",
+    "atomic_approximation": "published_clamped_mean_orbital_distances"
+  },
+  "results": {
+    "raw_photons_per_tonne_year": 3.352137807542951e-05,
+    "log_energy_integral": 3.352137807543318e-05,
+    "alpha_sweep": {
+      "1.0": 3.386827396091786e-05,
+      "1.25": 3.352137807542951e-05,
+      "1.5": 3.324726162774052e-05
+    },
+    "bound_parameter_raw_photons_per_tonne_year": 285.2916180865923,
+    "integrated_ratio_to_bound_parameter": 1.1749864331890408e-07,
+    "pure_R0_cubed_ratio": 1.1764899999999998e-07,
+    "atomic_triangle_upper_photons_per_tonne_year": 0.00028542490757141705,
+    "high_energy_approximation_photons_per_tonne_year": 7.26776385019812e-05,
+    "colored_Ec10_raw_photons_per_tonne_year": 5.6096474557001874e-06,
+    "colored_Ec100_raw_photons_per_tonne_year": 2.6114142243487924e-05,
+    "raw_exposure_for_one_photon_tonne_year": 29831.70911857528,
+    "sphere_COM_heating_W": 6.824403064099977e-41,
+    "sphere_COM_heating_from_small_separation_W": 6.824403062349079e-41,
+    "sphere_to_point_COM_heating_ratio": 0.22228351940842883,
+    "prior_ideal_sphere_coherence_loss": 0.008442423462132968
+  },
+  "checks": {
+    "occupations_sum_to_Z": true,
+    "formal_fully_coherent_neutral_charge_sum_zero": true,
+    "absolute_charge_pair_weight_matches_triangle_bound": true,
+    "expanded_pair_count_matches_grouped_formula": true,
+    "linear_log_energy_integrals_agree_1e_8": true,
+    "joule_to_keV_jacobian_agrees": true,
+    "positive_sampled_spectrum": true,
+    "atomic_triangle_bound_respected": true,
+    "sphere_coherence_diffusion_identity_1e_8": true,
+    "colored_spectrum_never_exceeds_white": true
+  },
+  "limitations": [
+    "No detector-response or likelihood replay.",
+    "No new confidence limit.",
+    "No RDF or liquid inter-atomic correlation calculation.",
+    "No measured sphere density or charge mapping.",
+    "Colored variants are not the frozen white-noise model.",
+    "Photon spectra are not nuclear-recoil spectra."
+  ]
+}

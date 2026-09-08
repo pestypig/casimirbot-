@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { helixEnvironmentTemporalPlanSchema, serializeHelixEnvironmentPlanHashContent } from "./helix-environment-time";
 
 export const HELIX_ENVIRONMENT_ACTION_READ_SCOPE =
   "helix.environment_actions.read" as const;
@@ -156,6 +157,12 @@ export const helixEnvironmentClockSnapshotSchema = z
     tick_rate_hz: z.number().finite().positive().max(1_000),
     tick_index: z.number().int().nonnegative(),
     world_tick_index: z.number().int().nonnegative().nullable(),
+    // Optional for legacy producers. Only comparable within this exact origin;
+    // absence must not be interpreted as zero elapsed time.
+    monotonic: z.object({
+      origin_id: identifierSchema,
+      elapsed_ms: z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    }).strict().optional(),
     synchronization: z.enum([
       "server_synchronized",
       "client_local",
@@ -312,8 +319,21 @@ const actionConnectorCapabilitySchema = z
       .max(2),
     requires_world_mutation_scope: z.boolean(),
     requires_confirmation: z.boolean(),
+    execution_features: z.array(z.enum(["latest_start_tick_v1", "temporal_plan_v1"])).max(2).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((capability, context) => {
+    const features = capability.execution_features ?? [];
+    if (new Set(features).size !== features.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["execution_features"], message: "Execution features must be unique." });
+    }
+    if (features.includes("temporal_plan_v1") && (capability.action_kind !== "execute_sequence" ||
+        !features.includes("latest_start_tick_v1") || !capability.control_engines.includes("native_fabric") ||
+        !capability.workflow_modes.includes("long_running"))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["execution_features"],
+        message: "Temporal v1 requires the serial native Fabric long-running executor with start-deadline enforcement." });
+    }
+  });
 
 const actionConnectorControlEngineSchema = z.union([
   z
@@ -749,6 +769,10 @@ export const helixEnvironmentActionRequestSchema = z
       "baritone",
     ]),
     arguments: environmentArgumentsSchema,
+    temporal_plan: helixEnvironmentTemporalPlanSchema.optional(),
+    temporal_plan_canonical_json: z.string().max(262144).optional(),
+    temporal_compilation_canonical_json: z.string().max(262144).optional(),
+    temporal_compilation_hash: z.string().regex(/^sha256:[a-f0-9]{64}$/u).optional(),
     preconditions: z.array(helixEnvironmentActionConditionSchema).max(64),
     postconditions: z.array(helixEnvironmentActionConditionSchema).min(1).max(64),
     idempotency_key: z.string().trim().min(8).max(320),
@@ -782,6 +806,16 @@ export const helixEnvironmentActionRequestSchema = z
   })
   .strict()
   .superRefine((request, context) => {
+    if ((request.temporal_compilation_canonical_json !== undefined || request.temporal_compilation_hash !== undefined) &&
+        (!request.temporal_plan || request.temporal_compilation_canonical_json === undefined || request.temporal_compilation_hash === undefined)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["temporal_compilation_hash"],
+        message: "Compilation transport requires its source plan, canonical content and hash together." });
+    }
+    if (request.temporal_plan_canonical_json !== undefined && (!request.temporal_plan ||
+        request.temporal_plan_canonical_json !== serializeHelixEnvironmentPlanHashContent(request.temporal_plan))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["temporal_plan_canonical_json"],
+        message: "Canonical transport must be the exact validated temporal plan hash content." });
+    }
     if (
       request.effect_class === "world_mutation" &&
       !request.constraints.world_mutation_allowed

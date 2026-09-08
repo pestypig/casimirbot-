@@ -1,0 +1,34 @@
+{
+  "scope": "Audit arithmetic only. 80 TeV is a reported preliminary bound at 247.5 MeV; transfer to the prior 247 MeV benchmark is illustrative, not an interpolated or reproduced limit.",
+  "checks": {
+    "recast_total": true,
+    "background_total": true,
+    "inverse_fourth_power": true,
+    "efficiency_rounding": true
+  },
+  "raw_KamLAND_candidates": 18,
+  "recast_residual_total": 15,
+  "recast_background_total": 20.0,
+  "independent_25pct_total_sd": 1.832007096056126,
+  "fully_correlated_25pct_total_sd": 5.0,
+  "rate_factor": 0.0004270034790039061,
+  "inverse_rate_factor": 2341.901293949065,
+  "rows": [
+    {
+      "form": "Helm",
+      "conditional_Xe_raw": 0.001746714602915103,
+      "conditional_local_D_le_2N": 3.6587422958033756e-29
+    },
+    {
+      "form": "KN",
+      "conditional_Xe_raw": 9.623298824673489e-05,
+      "conditional_local_D_le_2N": 2.650751875570634e-29
+    },
+    {
+      "form": "point",
+      "conditional_Xe_raw": 11.928917395372613,
+      "conditional_local_D_le_2N": 1.8796296295227166e-27
+    }
+  ],
+  "independent_exclusion": false
+}

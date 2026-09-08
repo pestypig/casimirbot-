@@ -169,6 +169,37 @@ overrule current-turn execution and re-entry facts.
 Exactly one gate is active. A blocked gate may receive design clarification but
 must not receive runtime implementation that assumes its prerequisites passed.
 
+## G8 paid-product delivery coordination
+
+The paid Codex-first product direction is defined in
+`docs/architecture/casimirbot-environment-harness-product-goal-v1.md` and staged
+for delegation in
+`docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md`.
+This section is the sole current stage ledger for that delivery lane. G8
+remains the only active environment program gate; CFP stages are bounded
+delivery tasks, not new program gates or inherited capability acceptance.
+
+| Stage | State | Dependency and advancement evidence |
+| --- | --- | --- |
+| CFP-0 — Baseline and plan reconciliation | closed (inventory only) | Reviewed 39 recursively linked packets plus the ET6 supplement, assigned 14 release gaps, and prepared the CFP-1 handoff. Closure evidence: `docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md`; validation and packet matrix under `docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-0/2026-09-06-audit-01/`. No product or G8 acceptance is implied. |
+| CFP-1 — Product and rights boundary | active (specification) | `docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md`: owner selected subscription for the broader harness, Minecraft as visible technical proof of concept, and component-by-component distribution-rights review. Reuse applicable Stripe subscription foundations; credit purchases/bundles and managed model/API services are excluded from the initial offer. Exact subscription benefit mapping, lifecycle terms, commercial rights and acceptance freeze remain open. Child implementation remains unadmitted. |
+| CFP-2 — Useful installed capability | blocked | CFP-1 closure plus existing PNA and selected environment prerequisites; current installed external-Codex useful-task and interruption/recovery evidence. |
+| CFP-3 — Paid entitlement and distributable build | blocked | CFP-2 closure; software entitlement and sandbox commerce tests, signed artifact, and reviewed customer download/update path. |
+| CFP-4 — Integrated reliability audit | blocked | CFP-3 closure; one signed artifact passes the frozen installed matrix and retains applicable G8 prerequisite evidence. |
+| CFP-5 — Attended paid pilot | blocked | CFP-4 closure; explicit owner production activation and attended commercial/external-user acceptance with rollback evidence. |
+| CFP-6 — Release decision | blocked | CFP-5 closure; all applicable G8 requirements, claim/evidence review, and owner release decision. |
+
+CFP-0's read-only audits and CFP-1's later specifications may coexist with
+already permitted G8 lanes because they do not execute or change those lanes'
+open prerequisites. Implementation remains blocked by the exact technical
+prerequisites of the capability selected, regardless of commercial priority.
+This coordination does not stop an existing authorized work packet or erase
+G8 room, voice, temporal, navigation, parity, or integration requirements.
+Moving a feature outside the proposed offer does not close G8; a scope change
+requires an explicit canonical contract decision. No repository visibility,
+license, production charge, or external publication changes are authorized by
+this planning record alone.
+
 ## Canonical capability status
 
 The status is capability-specific. Evidence paths identify the exact accepted
@@ -176,6 +207,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 
 | Capability or component | Current maturity | Evidence | Open requirement |
 | --- | --- | --- | --- |
+| Codex-first paid installed-product delivery | specified | `docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md`; `docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md` | Complete CFP-1 product/rights/offer specification and the ordered delivery contracts above. Existing software, billing, connection, or environment evidence does not establish rights to relicense, a paid installed journey, or release readiness. |
 | Environment-harness product and authority architecture | specified | `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Advance through the gated program below. |
 | Keyed natural water-bucket rescue benchmark | live accepted | `artifacts/helix-minecraft-guardian-v0.4/keyed-helix/water-bucket-rescue/attempt-34-balanced-clear-screen/guardian_water_bucket_rescue`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Retain unchanged as a regression; it does not accept other guardian or fluid workflows. |
 | Direct Fabric water-bucket rescue feasibility | live accepted | `artifacts/helix-minecraft-guardian-v0.4/direct-codex/water-bucket-rescue/attempt-4-dynamic-collision-success.json`; `docs/architecture/helix-environment-agent-reasoning-v1.md` | Use as a feasibility oracle, not a hardcoded strategy. |
@@ -210,7 +242,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Operator-visible Codex steering and action-reaction fidelity | specified | `docs/helix-environment-harness-work-program-v1.md`; `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Prove a bounded, evidence-linked sense-decide-act-observe loop in which an authenticated Codex task receives every admitted material change and action receipt needed for the next decision, the operator can inspect the same ordered trace, latency and gap states are explicit, and neither surface receives raw tick spam, credentials, hidden reasoning, or a second mutation authority. This is required before the full Nether journey is used as G8 release evidence. |
 | Provider-neutral environment time and receding-horizon action planning | deterministically verified | `docs/architecture/helix-environment-time-action-planning-v1.md`; `docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md`; `docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json`; `shared/helix-environment-time.ts`; `server/services/environment-connectors/temporal-plans/` | ET0–ET5 are deterministically verified: strategy-free shared clocks/plans/frontiers/interruptions, hash-linked lifecycle and rolling recovery, and fail-closed Minecraft compilation to existing finite and concurrent schemas. ET6 must measure runway, stalls, reaction latency, evidence volume and duplicate effects in Minecraft before tuning. ET7 second-adapter conformance and ET8 installed multi-surface acceptance remain specified. |
 | Provider-neutral spatial navigation with Minecraft capacity reference | deterministically verified | `docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`; `docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json`; `shared/helix-environment-navigation.ts`; `shared/__tests__/helix-environment-navigation.spec.ts`; `docs/architecture/helix-environment-time-action-planning-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md`; `docs/work-packets/eh-mc-companion-survival-party-v1.md` | NAV0 is deterministically verified: strict hash-bound spatial, topology, request, plan, feedback and black-box benchmark contracts; adversarial currentness/route/effect/interrupt fixtures; and a non-voxel navmesh-shaped conformance fixture. NAV1–NAV9 remain specified and cannot begin until ET6 passes. Minecraft will own voxel foothold/traversal compilation; FiveM remains contract-only here. Baritone remains isolated, non-shipping and supplies no code, API, structure or product capability. Live-accepted NAV8 is required before companion C4/S6 or the unknown-world Nether journey may rely on fluent goal-directed movement. |
-| Minecraft tactical perception parity | specified | `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `server/mcp/__tests__/helix-mcp-minecraft-action.test.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `shared/__tests__/helix-minecraft-perception-benchmark.spec.ts`; `minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricManifestContractTest.java` | The typed MCP reads, bounded snapshot, actor-status catalog-compatibility projection, consecutive-change monitor projection, semantic action idempotency and deterministic critical-hazard benchmark are implementation prerequisites only. The unrestarted-task compatibility call is live-proven, but the Minecraft client was rejected by the dedicated server with `Invalid session`, so no P3/P4 gameplay evidence was produced. Keep this capability `specified` until the screenshot/human ground-truth record and authenticated `keepInventory=false` Survival course prove the packet thresholds, explicit unknowns, latency, zero duplicate effects and safe control release. |
+| Minecraft tactical perception parity | specified | `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `server/mcp/__tests__/helix-mcp-minecraft-action.test.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `shared/__tests__/helix-minecraft-perception-benchmark.spec.ts`; `minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricManifestContractTest.java` | The typed MCP reads, bounded snapshot, actor-status catalog-compatibility projection, consecutive-change monitor projection, semantic action idempotency and deterministic critical-hazard benchmark are implementation prerequisites only. The unrestarted-task compatibility call is live-proven. The earlier dedicated-server `Invalid session` failure produced no gameplay evidence in that attempt; later observations in the linked perception packet record partial authenticated Survival, narrow movement and sensor evidence. They do not complete the screenshot-labelled P3 benchmark or the full P4 course, and do not accept the separately gated NAV program. Keep this capability `specified` until the screenshot/human ground-truth record and authenticated `keepInventory=false` Survival course prove the packet thresholds, explicit unknowns, latency, zero duplicate effects and safe control release. |
 | Responsive Player Embodiment sensing and consecutive native mining | deterministically verified | `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/PlayerSensorFrameTest.java`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/MiningTargetAffordanceTest.java`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/ConcurrentReactiveSchedulerTest.java` | Preserve the 4 ms p95 tick budget, exact frame identity, typed bounded failures, same-tick handoff, postcondition verification, and control release while completing the remaining N0 compositions and keyed A1/B parity. |
 | Baritone v1.15.0 non-shipping navigation comparison | deterministically verified | `docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md`; `reports/helix-minecraft/nether1-baritone-movement-only-a0.json`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/BaritoneFacadeTest.java` | Preserve this only as attributed, local, evaluation-only compatibility evidence. Baritone is not a planned product engine, release dependency, or durable harness capability, and shipping profiles must omit it. Use the observed capability requirements to test an independently implemented provider-neutral planner without copying Baritone code, assets, APIs, or implementation structure. This does not promote the Nether objective or admit Baritone mining/building/inventory behavior. |
 | N0 controlled-course fixture planner | implemented | `docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md`; `scripts/fixtures/minecraft-nether1-n0-course-v1.json`; `scripts/helix-minecraft-nether1-n0-course-plan.ts`; `server/__tests__/minecraft-nether1-n0-course-plan.test.ts` | Preserve exact server/dimension/player/origin/snapshot binding, credential-free non-execution, origin-relative compositions, setup-receipt ineligibility, World Authority release before the course, and snapshot restoration before N1–N4. The account mismatch is now repaired deterministically by the Auth0 profile-session convergence slice; require its live exact-callback proof to project room `1ac9...` before snapshot or authority creation. Live setup, verification, release and restoration receipts remain required for promotion. |
@@ -269,6 +301,29 @@ contract check. Baritone is retained only as an isolated, non-shipping
 black-box benchmark. NAV0 specification may proceed during ET6, but runtime
 NAV1–NAV9 work, companion C4/S6 reliance and unknown-world Nether reliance do
 not begin until the packet's declared prerequisites pass.
+
+## ET6 prerequisite build coordination
+
+At the user's 2026-09-07 request, repeated ET6 live acceptance attempts are
+deferred in favor of the build-first prerequisite packet
+`docs/work-packets/eh-g8-et6-continuous-session-build-v1.md`.
+G8 remains the sole active gate. ET6 remains specified and unproven; existing
+ET0–ET5 and NAV0 evidence is unchanged, and NAV1 remains gated on ET6 closure.
+
+| Stage | State | Advancement evidence |
+| --- | --- | --- |
+| CS0 — First-divergence baseline | closed (inventory only) | CS0 inspected baseline and frozen first CS1 regression in `docs/work-packets/eh-g8-et6-continuous-session-build-v1.md`; retained exact runtime failure, implementation reuse map and 11/11 focused existing-boundary tests. No integrated readiness claim. |
+| CS1 — Idempotent Ready up | active | Shared UI/MCP identity, expiry and bounded recovery matrix without unnecessary rotation. |
+| CS2 — Exact-chat prompt ingress | pending CS1 | Natural prompt submission, exact pickup/ack and negative identity/idempotency tests. |
+| CS3 — Continuous moving runway | pending CS2 | Instrumented real executor successor mechanics; simulations remain non-live evidence. |
+| CS4 — Packaged interruption/re-entry rehearsal | pending CS3 | Exact artifacts, ordinary UI/MCP journey, interruption and stale rejection without ad hoc repair. |
+| CS5 — Original ET6 acceptance | deferred pending CS4 | All original capacity criteria and canonical capture; no reduced substitute. |
+
+These are prerequisite development stages, not replacement acceptance gates.
+Do not mark the persistent ET6 objective complete merely to replace its task.
+Product goal controls must be deliberately paused or replaced by the user;
+this repository plan governs the next engineering work without claiming a
+runtime goal-control operation occurred.
 
 ## Closed gate: G1 canonical lifecycle authority
 

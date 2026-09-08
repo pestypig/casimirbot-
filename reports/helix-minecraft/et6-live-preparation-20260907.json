@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-09-07T03:29:54.733Z",
+  "scope": "Live ET6 preparation, not movement acceptance",
+  "old_build": "release-et6-cold-start-recovery-20260906",
+  "old_build_closed_normally": true,
+  "new_build": "release-et6-prelive-final-20260906",
+  "new_exe_sha256_verified": "1f0651534ea72209ba3739c5b22f30dce680d0d6ac15657a07914e30956546ed",
+  "new_build_process_observed": true,
+  "service_instance_ref": "service_instance:ce66ebb0ece6de4c07af37a05ee0ad7c",
+  "continuation_ref": "01a060f9-ebfd-7251-9fd3-479a01dd3c40",
+  "presence_refreshed": true,
+  "full_transport_transition": "Existing trusted-device delegation applied; execution accepted; subsequent room.list succeeded",
+  "plugin_reconnect_requested": false,
+  "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+  "connector_readiness_observation": "mcp_evidence_observation:helix.environment.device_check.inspect:65ae6858-c2cd-4ebb-8301-8ae19732dc6f",
+  "connector_findings": "Seven historical connectors returned, all stale/offline with expired credential/admission; none probe-ready",
+  "minecraft_process_changed": false,
+  "movement_submitted": false,
+  "next": "Verify current companion/runtime and restore supported connector readiness before fresh exact run binding and action authority",
+  "original_et6_requirements_retained": ["controlled N0 and unknown-world segment", "horizon/queue/concurrency sweep and measured timing", "three rolling cycles", "changed-affordance replan", "local intervention", "user steering interruption", "reconnect", "zero duplicate effects", "final revocation"]
+}

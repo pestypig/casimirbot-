@@ -1,0 +1,279 @@
+{
+  "scope": "Leading-order VLL running with nf5->4->3, continuous alpha and C at diagnostic thresholds. Three-flavor EFT evaluated at 2/3/4 GeV after charm decoupling; no threshold or NDR finite corrections. RGI is LO only, not a completed NLO Bhat matching.",
+  "weak_C_imag_GeV_minus2": 2.774544209290372e-15,
+  "rows": [
+    {
+      "bottom_threshold_GeV": 4.18,
+      "charm_threshold_GeV": 1.3,
+      "hadronic_scale_GeV": 2.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 4.18,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.20867358466037939,
+          "C_factor": 0.8421314735728099,
+          "ODE_relative_error": 2.809530386116421e-12
+        },
+        {
+          "from_GeV": 4.18,
+          "to_GeV": 1.3,
+          "nf": 4,
+          "alpha_start": 0.20867358466037939,
+          "alpha_end": 0.30834356760386505,
+          "C_factor": 0.9105500447668639,
+          "ODE_relative_error": 1.3871126469666706e-12
+        },
+        {
+          "from_GeV": 1.3,
+          "to_GeV": 2.0,
+          "nf": 3,
+          "alpha_start": 0.30834356760386505,
+          "alpha_end": 0.2590548295404888,
+          "C_factor": 1.0394643519377698,
+          "ODE_relative_error": 8.635314685534468e-13
+        }
+      ],
+      "alpha_nf3": 0.2590548295404888,
+      "C_running_imag_GeV_minus2": 2.211489939724074e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.6380515557811113e-15,
+      "RGI_over_weak": 0.5903858191540821
+    },
+    {
+      "bottom_threshold_GeV": 4.18,
+      "charm_threshold_GeV": 1.3,
+      "hadronic_scale_GeV": 3.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 4.18,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.20867358466037939,
+          "C_factor": 0.8421314735728099,
+          "ODE_relative_error": 2.809530386116421e-12
+        },
+        {
+          "from_GeV": 4.18,
+          "to_GeV": 1.3,
+          "nf": 4,
+          "alpha_start": 0.20867358466037939,
+          "alpha_end": 0.30834356760386505,
+          "C_factor": 0.9105500447668639,
+          "ODE_relative_error": 1.3871126469666706e-12
+        },
+        {
+          "from_GeV": 1.3,
+          "to_GeV": 3.0,
+          "nf": 3,
+          "alpha_start": 0.30834356760386505,
+          "alpha_end": 0.22517589665835974,
+          "C_factor": 1.0723491712559443,
+          "ODE_relative_error": 1.5007994846882866e-12
+        }
+      ],
+      "alpha_nf3": 0.22517589665835974,
+      "C_running_imag_GeV_minus2": 2.2814533270746973e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.638051555781111e-15,
+      "RGI_over_weak": 0.5903858191540821
+    },
+    {
+      "bottom_threshold_GeV": 4.18,
+      "charm_threshold_GeV": 1.3,
+      "hadronic_scale_GeV": 4.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 4.18,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.20867358466037939,
+          "C_factor": 0.8421314735728099,
+          "ODE_relative_error": 2.809530386116421e-12
+        },
+        {
+          "from_GeV": 4.18,
+          "to_GeV": 1.3,
+          "nf": 4,
+          "alpha_start": 0.20867358466037939,
+          "alpha_end": 0.30834356760386505,
+          "C_factor": 0.9105500447668639,
+          "ODE_relative_error": 1.3871126469666706e-12
+        },
+        {
+          "from_GeV": 1.3,
+          "to_GeV": 4.0,
+          "nf": 3,
+          "alpha_start": 0.30834356760386505,
+          "alpha_end": 0.2060561182448386,
+          "C_factor": 1.0937041548652848,
+          "ODE_relative_error": 1.8827162051593405e-12
+        }
+      ],
+      "alpha_nf3": 0.2060561182448386,
+      "C_running_imag_GeV_minus2": 2.3268866613944265e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.6380515557811115e-15,
+      "RGI_over_weak": 0.5903858191540822
+    }
+  ],
+  "threshold_diagnostics": [
+    {
+      "bottom_threshold_GeV": 3.5,
+      "charm_threshold_GeV": 1.3,
+      "hadronic_scale_GeV": 3.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 3.5,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.21855386209294314,
+          "C_factor": 0.8320295793880795,
+          "ODE_relative_error": 3.08619796385301e-12
+        },
+        {
+          "from_GeV": 3.5,
+          "to_GeV": 1.3,
+          "nf": 4,
+          "alpha_start": 0.21855386209294314,
+          "alpha_end": 0.3065628308277117,
+          "C_factor": 0.9219966796155018,
+          "ODE_relative_error": 1.1368683772161603e-12
+        },
+        {
+          "from_GeV": 1.3,
+          "to_GeV": 3.0,
+          "nf": 3,
+          "alpha_start": 0.3065628308277117,
+          "alpha_end": 0.22422474280310073,
+          "C_factor": 1.0719777459964406,
+          "ODE_relative_error": 1.4999113062685865e-12
+        }
+      ],
+      "alpha_nf3": 0.22422474280310073,
+      "C_running_imag_GeV_minus2": 2.2816316991890495e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.6366393699498973e-15,
+      "RGI_over_weak": 0.5898768397597421
+    },
+    {
+      "bottom_threshold_GeV": 5.0,
+      "charm_threshold_GeV": 1.3,
+      "hadronic_scale_GeV": 3.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 5.0,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.19957125780761886,
+          "C_factor": 0.851986684268959,
+          "ODE_relative_error": 2.546851618490109e-12
+        },
+        {
+          "from_GeV": 5.0,
+          "to_GeV": 1.3,
+          "nf": 4,
+          "alpha_start": 0.19957125780761886,
+          "alpha_end": 0.31016122282468533,
+          "C_factor": 0.8995856491275054,
+          "ODE_relative_error": 1.6062706720276765e-12
+        },
+        {
+          "from_GeV": 1.3,
+          "to_GeV": 3.0,
+          "nf": 3,
+          "alpha_start": 0.31016122282468533,
+          "alpha_end": 0.2261437187816741,
+          "C_factor": 1.072727833147569,
+          "ODE_relative_error": 1.5067946890212625e-12
+        }
+      ],
+      "alpha_nf3": 0.2261437187816741,
+      "C_running_imag_GeV_minus2": 2.281164078242186e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.6394056199841736e-15,
+      "RGI_over_weak": 0.5908738503768424
+    },
+    {
+      "bottom_threshold_GeV": 4.18,
+      "charm_threshold_GeV": 1.1,
+      "hadronic_scale_GeV": 3.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 4.18,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.20867358466037939,
+          "C_factor": 0.8421314735728099,
+          "ODE_relative_error": 2.809530386116421e-12
+        },
+        {
+          "from_GeV": 4.18,
+          "to_GeV": 1.1,
+          "nf": 4,
+          "alpha_start": 0.20867358466037939,
+          "alpha_end": 0.33095342133420835,
+          "C_factor": 0.8952166363462273,
+          "ODE_relative_error": 1.6862067298006878e-12
+        },
+        {
+          "from_GeV": 1.1,
+          "to_GeV": 3.0,
+          "nf": 3,
+          "alpha_start": 0.33095342133420835,
+          "alpha_end": 0.22428073834436923,
+          "C_factor": 1.090309954806484,
+          "ODE_relative_error": 1.829869589187183e-12
+        }
+      ],
+      "alpha_nf3": 0.22428073834436923,
+      "C_running_imag_GeV_minus2": 2.2806028868565395e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.6359921678854824e-15,
+      "RGI_over_weak": 0.5896435754771808
+    },
+    {
+      "bottom_threshold_GeV": 4.18,
+      "charm_threshold_GeV": 1.6,
+      "hadronic_scale_GeV": 3.0,
+      "segments": [
+        {
+          "from_GeV": 162.6,
+          "to_GeV": 4.18,
+          "nf": 5,
+          "alpha_start": 0.108,
+          "alpha_end": 0.20867358466037939,
+          "C_factor": 0.8421314735728099,
+          "ODE_relative_error": 2.809530386116421e-12
+        },
+        {
+          "from_GeV": 4.18,
+          "to_GeV": 1.6,
+          "nf": 4,
+          "alpha_start": 0.20867358466037939,
+          "alpha_end": 0.2842099335423846,
+          "C_factor": 0.9285360584323306,
+          "ODE_relative_error": 1.0245138071240945e-12
+        },
+        {
+          "from_GeV": 1.6,
+          "to_GeV": 3.0,
+          "nf": 3,
+          "alpha_start": 0.2842099335423846,
+          "alpha_end": 0.22629854107058592,
+          "C_factor": 1.0519389968833015,
+          "ODE_relative_error": 1.1550760348200129e-12
+        }
+      ],
+      "alpha_nf3": 0.22629854107058592,
+      "C_running_imag_GeV_minus2": 2.2822377098424e-15,
+      "C_RGI_LO_imag_GeV_minus2": 1.6404266736261598e-15,
+      "RGI_over_weak": 0.5912418580800778
+    }
+  ],
+  "checks": {
+    "LO_RGI_scale_invariance": true,
+    "analytic_ODE_agreement": true
+  },
+  "full_model_admitted": false
+}

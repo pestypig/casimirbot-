@@ -1,0 +1,23 @@
+{
+  "schema": "et6.deadline_feature_admission.v1",
+  "date": "2026-09-05",
+  "implementation": "Authenticated capability manifests may advertise latest_start_tick_v1. Only the two native graph capabilities advertise it. enqueueEnvironmentAction rejects deadline-bearing graphs without the feature before insertion. Temporal catalog projection exposes support as a non-authoritative Boolean.",
+  "verification": {
+    "server_tests_passed": 12,
+    "server_tests_scope": "Compatibility predicate, temporal catalog and existing manifest-admission lease fixtures; not an end-to-end enqueue fixture.",
+    "native_compile_and_lifecycle_tests": "passed",
+    "casimir_run_id": "2655",
+    "casimir_verdict": "PASS",
+    "casimir_first_fail": null,
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_integrity_ok": true,
+    "certificate_status": "GREEN"
+  },
+  "limits": [
+    "No packaged deployment or live mixed-version test was performed.",
+    "Old servers reject the new manifest field; upgrade coordination is still required.",
+    "Existing lease selection binds requests to connector_manifest_id; source inspection is not a downgrade-race test.",
+    "No rolling execution, runtime clock alignment, or ET6 live capacity acceptance is established by this repair."
+  ],
+  "et6_complete": false
+}

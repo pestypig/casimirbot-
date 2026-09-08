@@ -1,0 +1,14 @@
+{
+  "status": "rigid_electron_density_smooth_sphere_at_nominal_Xe_reference_not_total_response",
+  "partial_D": 5.37074675171824e-19,
+  "outer_tail_D_bound": 5.0769407006975724e-24,
+  "loose_full_D_bound": 1.4928857233536187e-17,
+  "central_phase": 1.3476452205617516e-07,
+  "atom_count": 15519585028.038734,
+  "source_sha256": "e4da7ed8bb4716093a2f3c5dbe3b818d6eaaa19942d8c75c95b12387e3b2e96b",
+  "assumptions": [
+    "uniform rigid sphere with six electron-density contact amplitudes per carbon atom",
+    "coefficient at nominal XENON1T electron-reference count; same speed, density and frozen hold",
+    "no internal excitations, microscopic lattice response, nuclear coupling or full detector fit"
+  ]
+}

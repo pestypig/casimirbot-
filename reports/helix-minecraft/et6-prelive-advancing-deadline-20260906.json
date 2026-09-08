@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-06",
+  "scope": "Reservation expiry while successor HTTP is in flight",
+  "clock": "Fixture clock advances from System.nanoTime elapsed milliseconds at nominal 50 ms per tick, beginning before polling; no scripted tick advance",
+  "fault": "Transport waits until at least 100 ms after polling begins; reservation stop is one nominal tick",
+  "verification": {
+    "focused_native_transport_suite": "passed with compiled handoff enabled",
+    "connected_persistent_mode": "HELIX_NATIVE_BROKER_ADVANCING_CLOCK=1",
+    "connected_tests_passed": 2,
+    "connected_exit_code": 0,
+    "successor_activated": false,
+    "controls_released": true,
+    "child_lease_attempt_count": 1
+  },
+  "limits": [
+    "Nominal elapsed-time fixture clock is not measured Minecraft tick scheduling",
+    "Clock advancement is tested; an independently running game client thread is not",
+    "Proves rejection after expiry, not a successful sustained-motion capacity budget",
+    "Complete timing attribution and artifact refresh remain open"
+  ]
+}

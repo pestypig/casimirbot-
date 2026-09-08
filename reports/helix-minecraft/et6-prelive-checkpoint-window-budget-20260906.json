@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-06",
+  "scope": "Connected checkpoint-through-acceptance budget under advancing fixture clock",
+  "mode": "HELIX_NATIVE_BROKER_WIDE_RUNWAY=1 with persistence and roundtrip",
+  "result": { "passed": 2, "failed": 0 },
+  "sample": { "checkpoint_to_stop_window_ms": 993, "checkpoint_to_acceptance_ms": 333, "safety_margin_ms": 10, "total_budget_ms": 343, "margin_ms": 650, "fits": true },
+  "basis": "Clock starts before the first checkpoint; test reads that telemetry checkpoint mark to derive the remaining fixed one-second deadline window, rounded down",
+  "negative": "The same connected records evaluated with a one-ms window reject as budget_exhausted",
+  "limits": ["Nominal elapsed fixture clock, not actual Minecraft scheduler", "Provider proposal and authority inputs remain fixtures", "Post-acceptance activation is scripted", "No live capacity claim", "Final requirement audit and package refresh remain"]
+}

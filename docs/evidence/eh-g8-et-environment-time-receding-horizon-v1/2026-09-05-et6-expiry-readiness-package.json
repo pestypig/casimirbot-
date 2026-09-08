@@ -1,0 +1,20 @@
+{
+  "scope": "Packaged expired-run readiness repair; not live capacity acceptance",
+  "package": "apps/desktop/release-et6-expiry-readiness-20260905-2118/win-unpacked/CasimirBot.exe",
+  "version": "0.1.0-alpha.11",
+  "host_build_exit_code": 0,
+  "runtime_stage_exit_code": 0,
+  "package_exit_code": 0,
+  "bundled_service_equals_built_service": true,
+  "service_sha256": "7efe8bb47855847e15589dc9903779c1f063cb09d617a8d07c113412664db0db",
+  "runtime_tree_verification": "PASS; existing verifier executed with only packed output location redirected in memory and module paths preserved",
+  "renderer_files": 635,
+  "renderer_sha256": "4caf3a1ae1aab25fd60ec9dea6e4b7d001eaf51d21a4e0a492c367acc5b1d048",
+  "runtime_manifest_sha256": "bc70d5869f1ec774eb85de557cd55eceda9a5ab2623bcb53318187094cf7b9d1",
+  "tunnel_version": "0.0.13",
+  "tunnel_sha256": "83f08fb39b1c154747debd31b81b65dd4ee834cacf5a073b6301b2688699bc76",
+  "deployed": false,
+  "running_exe_restarted": false,
+  "live_movement_dispatched": false,
+  "et6_capacity_acceptance": "incomplete"
+}

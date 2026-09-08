@@ -1,0 +1,92 @@
+{
+  "status": "exploratory_point_potential_zero_energy_diagnostic",
+  "effective_proton_alpha": 2.962226282872868e-06,
+  "equation": "u_xx = sign*lambda*exp(-x)/x*u; x=m_med*r; a*m_med=x-u/u_x",
+  "potential": "V=sign*Z*alpha_p*exp(-m_med*r)/r",
+  "rows": [
+    {
+      "A": 12,
+      "Z": 6,
+      "lambda_strength": 0.03573898810308797,
+      "sign": -1,
+      "dimensionless_scattering_length": -0.03639104154618167,
+      "zero_energy_sigma_to_Born": 1.0368226295964853,
+      "convergence_absolute": 2.987121661135461e-10
+    },
+    {
+      "A": 12,
+      "Z": 6,
+      "lambda_strength": 0.03573898810308797,
+      "sign": 1,
+      "dimensionless_scattering_length": 0.03511321166205761,
+      "zero_energy_sigma_to_Born": 0.9652873280900183,
+      "convergence_absolute": 2.9390179179245024e-10
+    },
+    {
+      "A": 16,
+      "Z": 8,
+      "lambda_strength": 0.06147570459689774,
+      "sign": -1,
+      "dimensionless_scattering_length": -0.06343469274020208,
+      "zero_energy_sigma_to_Born": 1.0647475541002007,
+      "convergence_absolute": 3.368114676050027e-10
+    },
+    {
+      "A": 16,
+      "Z": 8,
+      "lambda_strength": 0.06147570459689774,
+      "sign": 1,
+      "dimensionless_scattering_length": 0.05965057070438462,
+      "zero_energy_sigma_to_Born": 0.9415040144425825,
+      "convergence_absolute": 3.2665781191099086e-10
+    },
+    {
+      "A": 28,
+      "Z": 14,
+      "lambda_strength": 0.1715781112554518,
+      "sign": -1,
+      "dimensionless_scattering_length": -0.18791470659156317,
+      "zero_energy_sigma_to_Born": 1.199493157494095,
+      "convergence_absolute": 4.2454217918930226e-10
+    },
+    {
+      "A": 28,
+      "Z": 14,
+      "lambda_strength": 0.1715781112554518,
+      "sign": 1,
+      "dimensionless_scattering_length": 0.15817807270007478,
+      "zero_energy_sigma_to_Born": 0.8499018874674846,
+      "convergence_absolute": 3.9099035120671033e-10
+    },
+    {
+      "A": 131,
+      "Z": 54,
+      "lambda_strength": 1.758288315675443,
+      "sign": -1,
+      "dimensionless_scattering_length": 29.7910181172412,
+      "zero_energy_sigma_to_Born": 287.07178585737455,
+      "convergence_absolute": 8.00132937683884e-09
+    },
+    {
+      "A": 131,
+      "Z": 54,
+      "lambda_strength": 1.758288315675443,
+      "sign": 1,
+      "dimensionless_scattering_length": 0.9816037721477571,
+      "zero_energy_sigma_to_Born": 0.31166803085800593,
+      "convergence_absolute": 4.945164278069569e-10
+    }
+  ],
+  "attractive_s_wave_zero_energy_pole_strength": 1.6798077733776486,
+  "checks": [
+    "source hash",
+    "weak-coupling Born recovery both signs",
+    "radial endpoint and tolerance convergence"
+  ],
+  "limitations": [
+    "point nuclei, no extended charge profile or atomic screening",
+    "zero energy only, not LZ finite-speed correction",
+    "not full diamond or captured-population calculation",
+    "no exclusion or bound-state formation rate"
+  ]
+}

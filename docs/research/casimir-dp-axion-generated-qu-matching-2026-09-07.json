@@ -1,0 +1,31 @@
+{
+  "source": "https://arxiv.org/pdf/1811.04961 (v2), Eq. 2.24 first bracket and Eq. 2.28",
+  "scope": "Only generated qu1/qu8 finite matching added to previous selected projection. qq J/K matching, full UV boundary, full SM running, QCD below weak scale and observable conversion remain incomplete.",
+  "convention": "Down-type q basis; right-handed up basis diagonal; i=1,j=0, top index=2; dimensionful Hamiltonian coefficient in GeV^-2.",
+  "I1": 0.0071822750602633266,
+  "rows": [
+    {
+      "rtol": 1e-07,
+      "previous_projection_imag": 2.707712777840167e-15,
+      "singlet_imag": -1.3490001796138846e-19,
+      "octet_imag": -5.580478505969719e-21,
+      "shift_imag": -1.404804964673582e-19,
+      "partial_updated_imag": 2.7075722973436998e-15,
+      "fractional_shift": -5.188160931138856e-05
+    },
+    {
+      "rtol": 1e-09,
+      "previous_projection_imag": 2.707712777849716e-15,
+      "singlet_imag": -1.3490001796220932e-19,
+      "octet_imag": -5.5804785056921065e-21,
+      "shift_imag": -1.4048049646790142e-19,
+      "partial_updated_imag": 2.707572297353248e-15,
+      "fractional_shift": -5.1881609311406214e-05
+    }
+  ],
+  "checks": {
+    "current_normalization": true,
+    "tolerance_stability": true
+  },
+  "full_model_admitted": false
+}

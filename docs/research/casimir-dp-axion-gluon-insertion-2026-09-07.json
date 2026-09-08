@@ -1,0 +1,47 @@
+{
+  "scope": "Selected messenger EFT insertions with LO scalar trace matching; not full two-loop matching",
+  "full_model_admitted": false,
+  "fTG_assumed": 0.9,
+  "delta_fn_messenger": 2.0198691671411354e-05,
+  "checks": {
+    "single_SM_heavy_flavor_trace_normalization": true,
+    "Higgs_shift_matches_heavy_fraction": true,
+    "opposite_insertion_signs": true,
+    "baseline_recovered": true
+  },
+  "rows": [
+    {
+      "Q_GeV": 0.0,
+      "Cg_Lagrangian_GeV_m3": -3.122321781706027e-17,
+      "Caa_potential_GeV_m2": -2.3454881224175668e-17,
+      "Ch_potential_GeV_m2": 1.4566326896221637e-14,
+      "total_over_tree": 6.722055828728417e-05
+    },
+    {
+      "Q_GeV": 0.05,
+      "Cg_Lagrangian_GeV_m3": -3.122192897994155e-17,
+      "Caa_potential_GeV_m2": -2.3453913049732087e-17,
+      "Ch_potential_GeV_m2": 1.4566324529193897e-14,
+      "total_over_tree": 6.722056274479652e-05
+    },
+    {
+      "Q_GeV": 0.246,
+      "Cg_Lagrangian_GeV_m3": -3.119219964306102e-17,
+      "Caa_potential_GeV_m2": -2.3431580371867433e-17,
+      "Ch_potential_GeV_m2": 1.4566269599214106e-14,
+      "total_over_tree": 6.722066556325023e-05
+    }
+  ],
+  "contact_linear_interference_forecasts": [
+    {
+      "include_selected_messenger_terms": false,
+      "Xe_total_full": 1.374501642971214,
+      "D_free_nuclei_upper": 2.1797230165466445e-29
+    },
+    {
+      "include_selected_messenger_terms": true,
+      "Xe_total_full": 1.3745995413578174,
+      "D_free_nuclei_upper": 2.1799972035538893e-29
+    }
+  ]
+}

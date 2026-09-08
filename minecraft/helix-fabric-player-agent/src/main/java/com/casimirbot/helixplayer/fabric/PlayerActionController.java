@@ -5,6 +5,7 @@ import static com.casimirbot.helixplayer.fabric.PlayerActionWorkflow.*;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 public final class PlayerActionController {
     private static final int INTERACTION_FOCUS_ACQUISITION_TICKS = 10;
@@ -13,6 +14,15 @@ public final class PlayerActionController {
     private final EventListener listener;
     private final Runnable releaseOwnedControls;
     private ActionRequest active;
+    record TemporalClockSample(String origin, long tick, double elapsedMs) {}
+    private TemporalPlanWindow temporalWindow;
+    private Supplier<TemporalClockSample> temporalClock;
+    private long lastTemporalExecutionTick = -1;
+    private String temporalStabilizationNode;
+    private boolean temporalStabilizing;
+    private TemporalPlanWindow temporalSuccessor;
+    private String temporalSuccessorStabilizationNode;
+    private long temporalResidentStartTick;
     private State state;
     private long sequence;
     private long elapsedTicks;
@@ -79,6 +89,13 @@ public final class PlayerActionController {
         Objects.requireNonNull(request, "request");
         if (active != null && !terminal(state)) return false;
         active = request;
+        temporalWindow = null;
+        temporalClock = null;
+        lastTemporalExecutionTick = -1;
+        temporalStabilizationNode = null;
+        temporalStabilizing = false;
+        temporalSuccessor = null;
+        temporalSuccessorStabilizationNode = null;
         state = State.RUNNING;
         sequence = 0;
         elapsedTicks = 0;
@@ -155,8 +172,58 @@ public final class PlayerActionController {
             );
             return;
         }
-        actionTicks++;
         try {
+            if (temporalWindow != null) {
+                TemporalClockSample clock = temporalClock.get();
+                if (temporalSuccessor != null && temporalWindow.handoffDue(clock.tick())) {
+                    if (!temporalWindow.handoffAllowed(clock.origin(), clock.tick(), clock.elapsedMs())) {
+                        settle(State.CANCELED, "workflow.canceled", "temporal_handoff_clock_or_deadline_invalid");
+                        return;
+                    }
+                    temporalWindow = temporalSuccessor;
+                    temporalStabilizationNode = temporalSuccessorStabilizationNode;
+                    temporalSuccessor = null;
+                    temporalSuccessorStabilizationNode = null;
+                }
+                TemporalPlanWindow.Observation window = temporalStabilizing
+                    ? temporalWindow.observeStabilization(clock.origin(), clock.tick(), clock.elapsedMs())
+                    : temporalWindow.observe(clock.origin(), clock.tick(), clock.elapsedMs());
+                if (window.mustStabilize() || window.decisionRequired()) {
+                    Map<String, Object> measurements = new LinkedHashMap<>(lastMeasurements);
+                    measurements.put("temporal_window_reason", window.reason());
+                    measurements.put("temporal_remaining_ticks", window.remainingTicks());
+                    lastMeasurements = Map.copyOf(measurements);
+                }
+                if (window.mustStabilize()) {
+                    TemporalPlanWindow.Observation stabilization = window;
+                    if (!temporalStabilizing && "temporal_runway_exhausted".equals(window.reason()) &&
+                        temporalStabilizationNode != null) {
+                        stabilization = temporalWindow.observeStabilization(clock.origin(), clock.tick(), clock.elapsedMs());
+                    }
+                    if (!temporalStabilizing && "temporal_runway_exhausted".equals(window.reason()) &&
+                        temporalStabilizationNode != null &&
+                        !stabilization.mustStabilize() &&
+                        bridge.enterWorkflowStabilization(active.actionKind(), temporalStabilizationNode)) {
+                        temporalStabilizing = true;
+                    } else {
+                        String reason = stabilization.mustStabilize() ? stabilization.reason() : window.reason();
+                        Map<String, Object> measurements = new LinkedHashMap<>(lastMeasurements);
+                        measurements.put("temporal_window_reason", reason);
+                        measurements.put("temporal_remaining_ticks", 0L);
+                        lastMeasurements = Map.copyOf(measurements);
+                        settle(State.CANCELED, "workflow.canceled", reason);
+                        return;
+                    }
+                }
+                if (window.decisionRequired()) emit("workflow.progress", 0.0,
+                    "The admitted temporal window requires a new decision.", false, false);
+                // A repeated sample can update deadline/stop checks, but cannot
+                // execute the same native tick twice (including entry pulses).
+                long residentTick = clock.tick() - temporalResidentStartTick;
+                if (residentTick == lastTemporalExecutionTick) return;
+                lastTemporalExecutionTick = residentTick;
+            }
+            actionTicks++;
             runAction(snapshot);
         } catch (IllegalArgumentException error) {
             settle(State.FAILED, "workflow.failed", error.getMessage());
@@ -185,6 +252,64 @@ public final class PlayerActionController {
                     error.getClass().getSimpleName() + ")."
             );
         }
+    }
+
+    /** Internal initial-window attachment only; never attaches to another action
+     * or changes a running window. Runtime admission/delivery is not implemented
+     * yet and must not advertise this as rolling-extension support. */
+    synchronized boolean attachTemporalWindow(String actionRequestId, TemporalPlanWindow window,
+                                              Supplier<TemporalClockSample> clock) {
+        return attachTemporalWindow(actionRequestId, window, clock, null);
+    }
+
+    synchronized boolean attachTemporalWindow(String actionRequestId, TemporalPlanWindow window,
+                                              Supplier<TemporalClockSample> clock, String admittedStabilizationNode) {
+        if (active == null || state != State.RUNNING || actionTicks != 0 || temporalWindow != null ||
+            !active.actionRequestId().equals(actionRequestId) ||
+            !("execute_sequence".equals(active.actionKind()) || "execute_reactive_program".equals(active.actionKind()))) return false;
+        Objects.requireNonNull(window, "window");
+        Objects.requireNonNull(clock, "clock");
+        temporalWindow = window;
+        temporalResidentStartTick = window.sourceStartTick();
+        temporalClock = clock;
+        temporalStabilizationNode = admittedStabilizationNode;
+        return true;
+    }
+
+    /** Internal, already-admitted serial successor. The runtime must verify
+     * source/compiler/task/authority identity before this call. */
+    synchronized boolean queueTemporalSuccessor(String actionRequestId, String predecessorSequenceId,
+        String checkpointId, Map<String, Object> arguments, TemporalPlanWindow next, String stabilizationNode) {
+        if (active == null || state != State.RUNNING || temporalWindow == null || temporalStabilizing ||
+            temporalSuccessor != null || !active.actionRequestId().equals(actionRequestId) ||
+            !"execute_sequence".equals(active.actionKind())) return false;
+        TemporalClockSample clock = temporalClock.get();
+        if (!temporalWindow.canReserve(next, clock.origin(), clock.tick(), clock.elapsedMs()) ||
+            next.sourceStartTick() < temporalResidentStartTick) return false;
+        if (!bridge.queueTemporalSequenceSuccessor(predecessorSequenceId, checkpointId, arguments,
+            temporalWindow.committedTick() - temporalResidentStartTick, clock.tick() - temporalResidentStartTick,
+            temporalWindow.stopTick() - temporalResidentStartTick, next.sourceStartTick() - temporalResidentStartTick)) return false;
+        temporalWindow.reserveHandoff();
+        temporalSuccessor = next;
+        temporalSuccessorStabilizationNode = stabilizationNode;
+        Map<String, Object> accepted = new LinkedHashMap<>(lastMeasurements);
+        Map<String, Object> acceptanceTiming = new LinkedHashMap<>(Map.of(
+            "sequence_id", String.valueOf(arguments.get("sequence_id")),
+            "predecessor_sequence_id", predecessorSequenceId,
+            "checkpoint_id", checkpointId,
+            "accepted_client_tick", clock.tick(),
+            "accepted_monotonic_elapsed_ms", clock.elapsedMs(),
+            "committed_client_tick", temporalWindow.committedTick(),
+            "lead_ticks", temporalWindow.committedTick() - clock.tick(),
+            "queue_depth", 1,
+            "execution_started", false,
+            "terminal_eligible", false
+        ));
+        acceptanceTiming.put("stop_client_tick", temporalWindow.stopTick());
+        accepted.put("temporal_successor_acceptance", Map.copyOf(acceptanceTiming));
+        lastMeasurements = Map.copyOf(accepted);
+        emit("workflow.progress", progress(), "The resident executor accepted one successor; execution has not started.", false, false);
+        return true;
     }
 
     public synchronized boolean resume(String workflowId) {
@@ -248,6 +373,12 @@ public final class PlayerActionController {
 
     public synchronized State state() {
         return state;
+    }
+
+    /** Tick-local measured progress for the owning serial interpreter. This is
+     * not a public event, execution command, or terminal product. */
+    synchronized Map<String, Object> measuredProgress() {
+        return Map.copyOf(lastMeasurements);
     }
 
     public synchronized String activeWorkflowId() {
@@ -1047,6 +1178,14 @@ public final class PlayerActionController {
         }
     }
 
+    /** Observation-only boundary predicate. The next tick still performs all
+     * manual/safety and measured-motion checks; it cannot apply another walk
+     * input once this duration has been consumed. */
+    synchronized boolean walkCompletionPending() {
+        return active != null && state == State.RUNNING && "walk".equals(active.actionKind()) &&
+            actionTicks >= Math.max(1L, (long) Math.ceil(number(active.arguments(), "duration_ms") / 50.0));
+    }
+
     private void walk(PlayerSnapshot snapshot) {
         if (actionStartX == null) {
             actionStartX = snapshot.x();
@@ -1284,18 +1423,28 @@ public final class PlayerActionController {
             active.actionKind(),
             active.arguments(),
             active.controlEngine(),
-            actionTicks
+            temporalWindow == null ? actionTicks : Math.addExact(lastTemporalExecutionTick, 1)
         );
+        boolean residentHandoff = "execute_sequence".equals(active.actionKind()) &&
+            step.measurements().get("resident_handoff_count") instanceof Number currentHandoffs &&
+            currentHandoffs.longValue() > (lastMeasurements.get("resident_handoff_count") instanceof Number previousHandoffs
+                ? previousHandoffs.longValue() : 0L);
         lastMeasurements = step.measurements();
         switch (step.status()) {
-            case SUCCEEDED -> settle(State.SUCCEEDED, "workflow.succeeded", step.summary());
+            case SUCCEEDED -> {
+                if (temporalStabilizing) {
+                    settle(State.CANCELED, "workflow.canceled", step.summary());
+                } else {
+                    settle(State.SUCCEEDED, "workflow.succeeded", step.summary());
+                }
+            }
             case FAILED -> settle(State.FAILED, "workflow.failed", step.summary());
             case RUNNING -> {
-                if (actionTicks == 1 || actionTicks % 20 == 0) {
+                if (residentHandoff || actionTicks == 1 || actionTicks % 20 == 0) {
                     emit(
                         "workflow.progress",
                         step.progressFraction(),
-                        step.summary(),
+                        residentHandoff ? "The resident executor began the admitted successor sequence." : step.summary(),
                         false,
                         false
                     );
@@ -1335,14 +1484,23 @@ public final class PlayerActionController {
         boolean manualOverrideDetected,
         boolean controlsReleased
     ) {
+        // Queue acceptance belongs to this event only. Clear it before invoking
+        // the listener, which can synchronously cancel on evidence backpressure.
+        Map<String, Object> eventMeasurements = lastMeasurements;
+        if (lastMeasurements.containsKey("temporal_successor_acceptance")) {
+            Map<String, Object> retained = new LinkedHashMap<>(lastMeasurements);
+            retained.remove("temporal_successor_acceptance");
+            lastMeasurements = Map.copyOf(retained);
+        }
         listener.onEvent(new WorkflowEvent(
+            active.actionRequestId(),
             active.workflowId(),
             sequence++,
             eventType,
             state,
             progressFraction,
             summary,
-            lastMeasurements,
+            eventMeasurements,
             manualOverrideDetected,
             controlsReleased
         ));

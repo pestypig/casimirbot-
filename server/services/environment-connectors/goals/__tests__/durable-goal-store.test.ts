@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Queryable } from "../../../helix-ask/realtime-room/room-store/types";
 import { migration059 } from "../../../../db/migrations/059_environment_durable_goals";
 import { helixEnvironmentDurableGoalSha256 } from "@shared/helix-environment-durable-goal";
+import { recoverEnvironmentSessionGoal } from "../../session/recover-session-goal";
 import {
   EnvironmentDurableGoalStore,
   resolveCurrentEnvironmentDurableGoalIdentity,
@@ -138,7 +139,123 @@ const createHarness = async () => {
   };
 };
 
+it("Ready up recovers through the real ledger once without completing milestones", async () => {
+  const harness = await createHarness();
+  try {
+    const store = harness.makeStore();
+    const request = { ownerProfileId: "profile:owner", roomId: "room:one", participantId: "participant:one",
+      environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one",
+      runId: "run:one", turnId: "turn:one" };
+    const created = await store.create({ ...request, objective });
+    const recovering = await store.append({ ...request, goalId: created.goal_id, expectedRevision: created.revision,
+      payload: { kind: "recovery_required", reason: "fabric_restart", last_recoverable_checkpoint_id: null } });
+    const current = { ...identity, producer_epoch_ref: "epoch:two", authority_policy_version: 2 };
+    harness.setCurrentIdentity(current);
+    const input = { context: { profileId: "profile:owner", participantId: "participant:one", roomId: "room:one",
+      runId: "run:one", goalId: created.goal_id, expectedRevision: recovering.revision,
+      turnId: "turn:recovery", probeRequestId: "probe:recovery", priorTurnId: "turn:prior" },
+      binding: { profileRef: "profile:owner", runId: "run:one", authenticatedMcpClientRef: "client:one",
+        clientSessionRef: "session:one", clientContinuationRef: "task:one", bindingId: "binding:one", bindingEpoch: 1,
+        helixConversationId: "chat:one", missionId: null },
+      environmentBindingId: "environment:one", sourceId: "source:one", worldId: "minecraft:overworld",
+      subjectBindingId: "subject:one", actionAuthorityId: "authority:one" };
+    const dependencies = { goals: store, database: async () => harness.pool as unknown as Queryable,
+      identity: async () => current,
+      perception: async () => ({ evidence: { observation: { evidence_ref: "digest:two",
+        result: { observation_revision: 2 } } } }) as never };
+    // Exact binding and connector/probe readers are fixture ports; ledger and
+    // reducer, evidence-hash validation and revision checks are real here.
+    const bindingStore = { verifyTaskAssociation: () => ({}) as never };
+    const first = await recoverEnvironmentSessionGoal(input, bindingStore, dependencies);
+    expect(first.goal).toMatchObject({ status: "active", revision: recovering.revision + 3,
+      recovery: { required: false } });
+    expect(first.goal.milestones[0].completed_postcondition_ids).toEqual([]);
+    const before = await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events WHERE goal_id=$1 ORDER BY sequence", [created.goal_id]);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect(await recoverEnvironmentSessionGoal(input, bindingStore, dependencies)).toMatchObject({ changed: false,
+        goal: { revision: first.goal.revision }, execution_authority: false });
+    }
+    const after = await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events WHERE goal_id=$1 ORDER BY sequence", [created.goal_id]);
+    expect(after.rows).toEqual(before.rows);
+  } finally { await harness.pool.end(); }
+});
+
 describe("EnvironmentDurableGoalStore", () => {
+  it("discovers the exact unfinished session goal without newest-run fallback", async () => {
+    const harness = await createHarness();
+    try {
+      const store = harness.makeStore();
+      const request = { ownerProfileId: "profile:owner", roomId: "room:one", participantId: "participant:one",
+        environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one",
+        runId: "run:one", turnId: "turn:create", objective };
+      const input = { profileId: request.ownerProfileId, participantId: request.participantId,
+        roomId: request.roomId, runId: request.runId };
+      expect(await store.findForSession(input)).toBeNull();
+      const first = await store.create(request);
+      await store.create({ ...request, runId: "run:other" });
+      expect(await store.findForSession(input)).toEqual(first);
+      for (const change of [{ profileId: "profile:other" }, { participantId: "participant:other" },
+        { roomId: "room:other" }, { runId: "" }]) {
+        expect(await store.findForSession({ ...input, ...change })).toBeNull();
+      }
+      const paused = await store.append({ ...request, goalId: first.goal_id, expectedRevision: first.revision,
+        payload: { kind: "goal_paused", reason: "operator pause" } });
+      expect(await store.findForSession(input)).toEqual(paused);
+      await store.create(request);
+      await expect(store.findForSession(input)).rejects.toMatchObject({ code: "durable_goal_session_ambiguous" });
+      await store.append({ ...request, goalId: first.goal_id, expectedRevision: paused.revision,
+        payload: { kind: "goal_canceled", reason: "operator cancel" } });
+      expect((await store.findForSession(input))?.goal_id).not.toBe(first.goal_id);
+    } finally { await harness.pool.end(); }
+  });
+
+  it.each(["goal_paused", "goal_canceled", "recovery_required"] as const)(
+    "rejects temporal planning after %s without changing goal history", async (kind) => {
+      const harness = await createHarness();
+      try {
+        const store = harness.makeStore();
+        const request = { ownerProfileId: "profile:owner", roomId: "room:one", participantId: "participant:one", environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one", runId: "run:one", turnId: "turn:create" };
+        const created = await store.create({ ...request, objective });
+        const stopped = await store.append({ ...request, goalId: created.goal_id,
+          expectedRevision: created.revision,
+          payload: kind === "recovery_required"
+            ? { kind, reason: "manual_override", last_recoverable_checkpoint_id: null }
+            : { kind, reason: "Operator stopped work" } });
+        await expect(store.resolveTemporalAdmissionContext({ goalId: created.goal_id,
+          profileId: "profile:owner", participantId: "participant:one",
+          expectedRevision: stopped.revision, roomId: "room:one", runId: "run:one", turnId: "turn:proposal" }))
+          .rejects.toMatchObject({ code: "durable_goal_authority_stale" });
+        expect(await store.inspect({ goalId: created.goal_id, profileId: "profile:owner", participantId: "participant:one" })).toEqual(stopped);
+      } finally { await harness.pool.end(); }
+    },
+  );
+
+  it.each(["current", "revision", "room", "run", "grant", "epoch", "unavailable"])(
+    "resolves temporal context only from a current authorized goal (%s)", async (scenario) => {
+      const harness = await createHarness();
+      try {
+        const store = harness.makeStore();
+        const created = await store.create({ ownerProfileId: "profile:owner", roomId: "room:one", participantId: "participant:one", environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one", runId: "run:one", turnId: "turn:create", objective });
+        if (scenario === "grant") await harness.pool.query("UPDATE helix_environment_durable_goal_participants SET scopes='[\"read\"]'::jsonb");
+        if (scenario === "epoch") harness.setCurrentIdentity({ ...identity, producer_epoch_ref: "epoch:changed" } as typeof identity);
+        if (scenario === "unavailable") harness.setIdentityAvailable(false);
+        const result = store.resolveTemporalAdmissionContext({ goalId: created.goal_id,
+          profileId: "profile:owner", participantId: "participant:one",
+          expectedRevision: scenario === "revision" ? 99 : created.revision,
+          roomId: scenario === "room" ? "room:other" : "room:one",
+          runId: scenario === "run" ? "run:other" : "run:one", turnId: "turn:proposal" });
+        if (scenario === "current") {
+          await expect(result).resolves.toMatchObject({ goal_id: created.goal_id,
+            goal_revision: created.revision, execution_authority: false,
+            identity: { producer_epoch_ref: "epoch:one", turn_id: "turn:proposal" } });
+        } else {
+          await expect(result).rejects.toThrow();
+        }
+        expect((await store.inspect({ goalId: created.goal_id, profileId: "profile:owner", participantId: "participant:one" })).revision).toBe(created.revision);
+      } finally { await harness.pool.end(); }
+    },
+  );
+
   it("resolves a public subject reference to the server-owned native identity", async () => {
     const memory = newDb();
     const { Pool } = memory.adapters.createPg();

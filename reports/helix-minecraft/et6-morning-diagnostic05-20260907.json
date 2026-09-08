@@ -1,0 +1,52 @@
+{
+  "scope": "Bounded live temporal diagnostic, not ET6 rolling acceptance",
+  "timings": [
+    {
+      "stage": "probe",
+      "ms": 4247
+    },
+    {
+      "stage": "frontier",
+      "ms": 1811
+    },
+    {
+      "stage": "submit",
+      "ms": 2123
+    }
+  ],
+  "admitted": true,
+  "workflow": "workflow:et6-morning-diagnostic05",
+  "terminal_record": {
+    "outcome": "succeeded",
+    "player_motion_performed": true,
+    "controls_released": true,
+    "attempt_count": 1
+  },
+  "post": {
+    "actor": {
+      "air": 300,
+      "food_level": 20,
+      "freezing": false,
+      "health": 20,
+      "max_health": 20,
+      "on_fire": false,
+      "on_ground": true,
+      "pitch": 4.65,
+      "position": {
+        "x": 2.84,
+        "y": 65,
+        "z": 0.06
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.08,
+        "z": 0
+      },
+      "yaw": 94.23
+    },
+    "evidence_ref": "environment_probe_evidence:e994a9d30e0c28d9819b14c7bac95c937e4ff5d1"
+  },
+  "rolling_extensions_proven": 0,
+  "helix_prompt_submission_proven": false,
+  "et6_complete": false
+}

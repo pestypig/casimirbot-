@@ -1417,13 +1417,33 @@ final class NativeFabricWorkflowEngine {
         }
         Slot resultSlot = menu.getSlot(0);
         if (matches(resultSlot.getItem(), outputId)) {
+            ItemStack output = resultSlot.getItem();
+            int destination = -1;
+            for (int index = 1; index < menu.slots.size(); index++) {
+                Slot slot = menu.getSlot(index);
+                if (slot.container != player.getInventory() || !slot.mayPlace(output) ||
+                    (!slot.getItem().isEmpty() && !ItemStack.isSameItemSameComponents(slot.getItem(), output))) continue;
+                int capacity = slot.getMaxStackSize(output) - slot.getItem().getCount();
+                if (craftResultFits(requested, produced, output.getCount(), capacity, menu.getCarried().isEmpty())) {
+                    destination = index;
+                    break;
+                }
+            }
+            if (destination < 0) {
+                return WorkflowStep.failed("One crafting result cannot fit the remaining admitted count, empty cursor and inventory space.",
+                    Map.of("output_item_id", outputId, "produced_count", produced, "requested_count", requested,
+                        "result_batch_count", output.getCount(), "reason_code", "craft_result_budget_or_space_unavailable"));
+            }
+            // QUICK_MOVE can craft repeatedly from the grid. PICKUP takes one
+            // displayed batch, then deposits it into the prechecked player slot.
             minecraft.gameMode.handleInventoryMouseClick(
                 menu.containerId,
                 0,
                 0,
-                ClickType.QUICK_MOVE,
+                ClickType.PICKUP,
                 player
             );
+            minecraft.gameMode.handleInventoryMouseClick(menu.containerId, destination, 0, ClickType.PICKUP, player);
             pendingTicks = 0;
             return WorkflowStep.running(
                 Math.min(0.99, (double) produced / requested),
@@ -1461,6 +1481,11 @@ final class NativeFabricWorkflowEngine {
                 "crafting_table_menu", menu instanceof CraftingMenu
             )
         );
+    }
+
+    static boolean craftResultFits(int requested, int produced, int batch, int capacity, boolean cursorEmpty) {
+        return cursorEmpty && requested > 0 && produced >= 0 && batch > 0 && capacity >= batch &&
+            (long) produced + batch <= requested;
     }
 
     private WorkflowStep consume(long actionTicks) {

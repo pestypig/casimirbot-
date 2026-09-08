@@ -1,0 +1,30 @@
+{
+  "schema": "casimirbot.et6.repair_evidence.v1",
+  "recorded_at": "2026-09-05T18:29:00Z",
+  "stage": "run_association_query_and_stale_ui",
+  "tests": {
+    "validator_suite": "4 passed; includes executing production SQL against a pg-mem projection schema",
+    "query_negatives": ["other profile", "changed run version", "completed run", "cancelled run", "expired run", "other tenant", "other issuer", "other subject", "changed room-binding version", "revoked room binding", "other room", "other participant"],
+    "ui_suite": "27 passed; includes selected-run request, stale preview rejection without a request, and explicit chat-only recovery",
+    "initial_test_failure": "The reset hook returned its mock function, which Vitest invoked as cleanup with no SQL arguments. Fixed the hook to return void; rerun passed. Not a production query failure."
+  },
+  "build_preparation": {
+    "minecraft_client_pid": 34532,
+    "normal_window_close_requested": true,
+    "server_observed_player_disconnect_at": "2026-09-05T18:28:12Z",
+    "client_process_absent_after_close": true,
+    "fabric_session": 75069,
+    "fabric_stop_command": "stop",
+    "fabric_exit_code": 0,
+    "all_dimensions_saved": true,
+    "fabric_process_absent_after_stop": true,
+    "action_authority_id": "environment_action_authority:ba3dc6a3-1e4c-4f7b-8076-9f1b1458a4a3",
+    "revoke_response_status": "suspended",
+    "revoke_response_revoked_at": null,
+    "emergency_control_request": "environment_action_control:4c8ea4cc-e144-41ed-bca4-b3ed2acdb46d",
+    "final_revocation_not_claimed": true
+  },
+  "not_proven": ["full migrations and live PostgreSQL concurrency", "new EXE deployment", "full ET6 rolling acceptance"],
+  "goal_complete": false,
+  "maturity_promoted": false
+}

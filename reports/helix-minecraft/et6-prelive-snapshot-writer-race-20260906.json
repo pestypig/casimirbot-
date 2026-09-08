@@ -1,0 +1,32 @@
+{
+  "scope": "Offline pre-live persistence reliability; no live environment action",
+  "classification": "evidence normalization and delivery persistence barrier",
+  "characterization": {
+    "test": "server/db/__tests__/temporal-persistence-reopen.test.ts",
+    "fault": "Hold deferred atomic rename while strict delivery snapshot starts",
+    "before_repair": "FAIL: observed two rename calls while first was held; deferred rename failed ENOENT on shared process temporary path",
+    "repair": "Deferred persistence joins persistImmediateLocalSnapshot common writer lane; strict caller retains rejecting save policy",
+    "after_repair": "PASS: strict barrier waits for held writer, then disk contains newer leased state before return",
+    "timing_note": "100 ms contention wait is test orchestration, not measured capacity or a production deadline"
+  },
+  "verification": {
+    "focused_persistence_restart_scheduler": { "files": 3, "tests": 5, "passed": true },
+    "targeted_typecheck": { "command": "npx tsc -p tsconfig.et6-temporal.json --noEmit", "passed": true },
+    "server_battery_before_this_last_repair": { "files": 23, "tests": 211, "passed": true },
+    "native_current_source": { "suites": 40, "tests": 291, "failures": 0, "errors": 0, "skipped": 0, "game_tests_excluded": true }
+  },
+  "desktop_service_before_this_last_repair": {
+    "sha256": "51e4020b2a18ef4be1591b03fd15ff494a584ef807f4067f03e384446f77f4c9",
+    "bytes": 62417658,
+    "node_syntax_check_passed": true,
+    "dependency_manifest_hash_matched": true,
+    "contains_latest_writer_repair": false,
+    "installed": false
+  },
+  "limits": [
+    "Minimal migration fixture and mocked authentication/broker in persistence test, not complete production integration",
+    "No power-loss or fsync guarantee",
+    "Runtime callback/timing and assembled package verification remain open",
+    "No ET6 live qualification or NAV1 advancement"
+  ]
+}

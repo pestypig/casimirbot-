@@ -1,0 +1,33 @@
+{
+  "status": "necessary_not_sufficient_conditional_requirements",
+  "source_sha256": "19067cb95c34ee24a57e1b6e97e94f936cf08dcc27b6927fb8604528dcca63cf",
+  "K": 1.3504604480446566e-26,
+  "rows": [
+    {
+      "target_D": 1e-06,
+      "necessary_excited_fraction_max": 1.1620931321919601e-10,
+      "minimum_alphaD_epsilon_squared": 1.4628775895038898e-07,
+      "epsilon_at_alphaD_point1": 0.0012094947662159973,
+      "population_reduction_from_point0062": 53352006.205435984
+    },
+    {
+      "target_D": 0.001,
+      "necessary_excited_fraction_max": 3.6748611511725085e-12,
+      "minimum_alphaD_epsilon_squared": 4.626025120588827e-06,
+      "epsilon_at_alphaD_point1": 0.006801488896255603,
+      "population_reduction_from_point0062": 1687138573.3912191
+    },
+    {
+      "target_D": 0.029511464722144533,
+      "necessary_excited_fraction_max": 6.764653438482186e-13,
+      "minimum_alphaD_epsilon_squared": 2.513062960962914e-05,
+      "epsilon_at_alphaD_point1": 0.015852643189584865,
+      "population_reduction_from_point0062": 9165288445.864744
+    }
+  ],
+  "caveats": [
+    "Hypothetical thresholds except frozen theoretical comparator; none is measured sensitivity",
+    "No population evolution, laboratory exclusion, or perturbative validity at extrapolated points established",
+    "Inherited additive-amplitude envelope is not a full solid or field-theory bound"
+  ]
+}

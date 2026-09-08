@@ -1,0 +1,15 @@
+{
+  "schema": "et6.action_admission_transaction.v1",
+  "date": "2026-09-05",
+  "repair": "Existing enqueueEnvironmentAction now locks the action-authority row and performs authority, manifest, heartbeat, catalog, duplicate and insertion queries through one transaction client instead of separating admission reads from insertion.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/actions/__tests__ --pool=forks --maxWorkers=1 --minWorkers=1",
+    "files_passed": 13,
+    "tests_passed": 98,
+    "exit_code": 0,
+    "transaction_fixture": "Mocked transaction client proves active insertion and revoked rejection execute within the transaction and lock authority first. It does not simulate real database concurrency.",
+    "discipline_quick": "exit 0; no sensitive files classified, battery skipped"
+  },
+  "limits": "Temporal-plan retention is not wired into this transaction yet. Room membership remains separately read. Other identity/credential/manifest revocation races and live concurrent behavior are not proven by the mock fixture. No live enqueue, migration, restart, or game action occurred.",
+  "et6_complete": false
+}

@@ -1,0 +1,93 @@
+{
+  "scope": "Conditional fixed-path coupling optimization with width and production scaling together; separate flux domains, no detector acceptance or full theory uncertainty",
+  "full_model_admitted": false,
+  "checks": {
+    "path_scaling": true,
+    "envelope_above_located_maximum": true,
+    "interior_optimum": true,
+    "quadrature_refinement": true
+  },
+  "rows": [
+    {
+      "best_located_x": 0.002511961652415377,
+      "best_located_count": 4.426383225054e-05,
+      "pointwise_global_envelope": 4.6612155273160486e-05,
+      "r_GeV_inverse": 0.00447747579711169,
+      "grid_boundary_max": 3.1279358732434895e-17,
+      "quadrature_relative": 2.2028409873975363e-08,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "domain": "DUNE_below_10TeV",
+      "path_m": 0.01,
+      "equal_yukawa": 0.00447747579711169,
+      "same_x_local_D_independent_carbon_upper": 2.4235921585655774e-25
+    },
+    {
+      "best_located_x": 11.269161238761384,
+      "best_located_count": 1.3485355731359331e-16,
+      "pointwise_global_envelope": 1.3898087573092394e-16,
+      "r_GeV_inverse": 0.03664400163653393,
+      "grid_boundary_max": 2.093802385159665e-32,
+      "quadrature_relative": 1.8944546598120837e-08,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "domain": "NuFlux_above_10TeV_off_horizon_unattenuated",
+      "path_m": 0.01,
+      "equal_yukawa": 0.03664400163653393
+    },
+    {
+      "best_located_x": 0.0031083143763640585,
+      "best_located_count": 6.080575665844069e-05,
+      "pointwise_global_envelope": 6.403318973615307e-05,
+      "r_GeV_inverse": 0.00472238325149828,
+      "grid_boundary_max": 3.472580869389856e-17,
+      "quadrature_relative": 2.1634453895025274e-08,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "domain": "DUNE_below_10TeV",
+      "path_m": 0.01,
+      "equal_yukawa": 0.0472238325149828,
+      "same_x_local_D_independent_carbon_upper": 6.157076305577872e-24
+    },
+    {
+      "best_located_x": 13.951256140536099,
+      "best_located_count": 1.8505871352191995e-16,
+      "pointwise_global_envelope": 1.9072260739199283e-16,
+      "r_GeV_inverse": 0.038653010413184336,
+      "grid_boundary_max": 2.3209254285722778e-32,
+      "quadrature_relative": 1.8944546820165442e-08,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "domain": "NuFlux_above_10TeV_off_horizon_unattenuated",
+      "path_m": 0.01,
+      "equal_yukawa": 0.3865301041318434
+    },
+    {
+      "best_located_x": 0.0026313718989807214,
+      "best_located_count": 9.719025893593386e-07,
+      "pointwise_global_envelope": 1.0149793224222497e-06,
+      "r_GeV_inverse": 0.004529763768962237,
+      "grid_boundary_max": 6.516713847097843e-19,
+      "quadrature_relative": 2.8667125118175818e-08,
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "domain": "DUNE_below_10TeV",
+      "path_m": 0.01,
+      "equal_yukawa": 0.04529763768962237,
+      "same_x_local_D_independent_carbon_upper": 2.464972720875363e-24
+    },
+    {
+      "best_located_x": 2.9609639783111814,
+      "best_located_count": 1.51130286871173e-16,
+      "pointwise_global_envelope": 1.5575576985587207e-16,
+      "r_GeV_inverse": 0.026235435434613152,
+      "grid_boundary_max": 8.930646003888242e-32,
+      "quadrature_relative": 1.8944546598120837e-08,
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "domain": "NuFlux_above_10TeV_off_horizon_unattenuated",
+      "path_m": 0.01,
+      "equal_yukawa": 0.2623543543461315
+    }
+  ]
+}

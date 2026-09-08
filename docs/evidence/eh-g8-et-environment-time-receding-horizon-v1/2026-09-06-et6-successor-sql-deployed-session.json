@@ -1,0 +1,39 @@
+{
+  "schema": "et6.packaged_session_preparation.v1",
+  "package": "release-et6-successor-sql-20260906",
+  "service_ready_at": "2026-09-06T18:01:30.369Z",
+  "service_instance_ref": "service_instance:e9faa017a62c885a52d38e1251288344",
+  "transport": {
+    "initial_rejection": "full_mcp_transition_required",
+    "request_ref": "desktop_tunnel_request:6ad43479-9033-404b-b0b2-de7d0170dc17",
+    "trusted_device_delegation_applied": true,
+    "execution_receipt_ref": "desktop_tunnel_receipt:50762d46-c93f-4e28-aff9-17d3a3d37b83",
+    "subsequent_authority_inspect_succeeded": true,
+    "plugin_reconnect_performed": false,
+    "codex_restart_performed": false,
+    "independent_external_oauth_client_bound": false
+  },
+  "binding": {
+    "previous_binding_id": "reasoning_binding:a09e3a528a0693542224ca662012c338",
+    "post_restart_read_error": "reasoning_binding_not_found",
+    "new_human_claim_received": false,
+    "human_control_presentation_request": "workstation_present_request:9624cf7d-cc2f-4061-809f-f3e6005a5dac",
+    "presentation_accepted": true,
+    "visible_ui_independently_verified": false,
+    "control_invoked": false
+  },
+  "run_id": "run_cfb36029-f83d-4714-a5d3-f4892bc5749c",
+  "run_room_binding_ref": "agent_room_binding:3774c049-1186-4ad1-bd64-7b3aaf037838",
+  "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+  "run_expires_at": "2026-09-06T19:08:07.319Z",
+  "authority_id": "environment_action_authority:db096888-475c-4ec8-9b76-53f32c02d953",
+  "authority_expiry_extended_to": "2026-09-06T19:08:07.319Z",
+  "authority_policy_version_unchanged": 10,
+  "capabilities": ["look", "navigate", "sequence.execute", "walk"],
+  "manual_override_policy": "cancel",
+  "last_readiness": {"heartbeat_received_at": "2026-09-06T18:06:56.500Z", "ready_for_actions": true, "active_workflow_count": 0, "controls_asserted": false, "manual_input_detected": false},
+  "new_movement_submitted": false,
+  "live_successor_poll_fix_verified": false,
+  "rolling_extensions_proven": 0,
+  "goal_complete": false
+}

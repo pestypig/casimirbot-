@@ -1,0 +1,16 @@
+{
+  "schema": "et6.admission_identity_source_audit.v1",
+  "date": "2026-09-05",
+  "kind": "source_and_catalog_inspection",
+  "available_production_sources": [
+    "resolveEnvironmentActionAuthorityContext resolves current Player Embodiment context.",
+    "resolveCurrentEnvironmentDurableGoalIdentity checks active binding, subject, authority and action manifest identity.",
+    "EnvironmentDurableGoalStore.inspect enforces participant read grants and reconstructs hash-checked goal events."
+  ],
+  "missing_production_source": "Repository TypeScript/TSX search excluding tests, external code, packaged releases and artifacts found buildHelixEnvironmentAffordanceFrontier only at its definition. No production frontier revision producer was found in that scope.",
+  "callable_catalog_check": "No CasimirBot tool name matching temporal, affordance, chat send/submit, prompt submit or helix_ask was found in the current catalog. This name search is not proof that every equivalent capability is absent.",
+  "decision": "Produce and retain authenticated bounded frontier state before exposing temporal-plan admission. Never validate plan currentness against revisions supplied by that same plan.",
+  "live_mutations": false,
+  "production_admission_implemented": false,
+  "et6_complete": false
+}

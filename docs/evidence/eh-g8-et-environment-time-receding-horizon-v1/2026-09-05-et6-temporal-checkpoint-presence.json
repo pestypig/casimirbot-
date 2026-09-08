@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "first_divergence": "The shared finite-sequence checkpoint validator deliberately accepts absent timing evidence. Merely routing rolling fields into that validator did not reject omitted checkpoint arrays.",
+  "repair": "Temporal chain resolution now requires checkpoint_settlements and satisfied_checkpoint_ids arrays for current and historical samples. Legacy finite-sequence compatibility is unchanged.",
+  "additional_foundation": "A distinct recorded-success chain reader permits an already-succeeded root resident row for final-result inspection, while ordinary workflow-event reads still reject it. Canceled root rows remain rejected. The reader returns retained per-plan requests and graphs, but is not yet wired into final-result acceptance.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts server/services/environment-connectors/temporal-plans/__tests__/temporal-resident-effects.test.ts server/services/environment-connectors/actions/__tests__/action-result-canonicalization.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "tests_passed": 69,
+    "negative": "Missing current or historical checkpoint arrays, ordinary event reads after root success, and canceled-root final-chain reads are rejected."
+  },
+  "limitations": [
+    "Corrects an omission left by the server-resident-effect-totals snapshot; that prior immutable snapshot is not full checkpoint-absence rejection proof.",
+    "Empty arrays establish shape only; required checkpoint completion remains the broker validator's responsibility.",
+    "Rolling final-result integration, delivery transport, and packaged live qualification remain incomplete.",
+    "No packaged build or live Minecraft action performed."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

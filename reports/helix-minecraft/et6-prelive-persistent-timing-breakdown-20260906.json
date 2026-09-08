@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-06",
+  "scope": "Connected broker/native timing diagnostic with actual local snapshot persistence",
+  "verification": "Two native-publication integration tests passed; connected mode ran native Gradle handoff through broker HTTP fixture",
+  "server_phase_durations_ms": {
+    "poll_to_evidence_read": 1.9345,
+    "fixture_frontier_preparation": 2.7147,
+    "admission": 53.9107,
+    "admitted_to_lease_start": 0.01,
+    "lease_including_required_snapshot": 25.0079
+  },
+  "native_ms": {
+    "checkpoint_to_acceptance": 393,
+    "acceptance_to_activation": 9,
+    "checkpoint_to_activation": 402
+  },
+  "required_snapshot_enabled": true,
+  "provider_proposal_latency_ms": null,
+  "snapshot_separate_latency_ms": null,
+  "live_window_budget_ms": null,
+  "complete_five_stage_budget": false,
+  "live_acceptance": false,
+  "limits": [
+    "One diagnostic sample, not a latency distribution",
+    "Native and server monotonic clocks have separate origins; their timestamps are not subtracted",
+    "Native simulated tick held during HTTP; 402 ms does not establish live runway fit",
+    "Fixture frontier preparation is not provider reasoning or proposal latency",
+    "Snapshot cost is included in the lease interval but not separately attributed",
+    "No installed app or live player session changed"
+  ]
+}

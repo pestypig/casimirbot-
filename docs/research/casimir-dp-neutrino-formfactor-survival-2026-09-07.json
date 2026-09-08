@@ -1,0 +1,102 @@
+{
+  "scope": "Necessary survival condition only, conditional on stated dipion kernel and isospin approximation; no dispersive numerical input admitted",
+  "full_model_admitted": false,
+  "checks": {
+    "complex_amplitude_squared": true,
+    "probability_inversion": true,
+    "path_scaling": true,
+    "normalization_separate_from_shape": true
+  },
+  "rows": [
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "incident_GeV": 10.0,
+      "LO_slice_lab_length_m": 0.0002047692137919511,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.0014193520320536755,
+      "max_weighted_rms_abs_F": 0.03767428873985115
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "incident_GeV": 100.0,
+      "LO_slice_lab_length_m": 0.0020579515782615495,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.014264633342008826,
+      "max_weighted_rms_abs_F": 0.11943464046083459
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "incident_GeV": 10000.0,
+      "LO_slice_lab_length_m": 0.20580595267264765,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 1.4265381583749925,
+      "max_weighted_rms_abs_F": 1.1943777285159802
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "incident_GeV": 10.0,
+      "LO_slice_lab_length_m": 0.00025448533557094065,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.0017639579284484904,
+      "max_weighted_rms_abs_F": 0.04199949914520994
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "incident_GeV": 100.0,
+      "LO_slice_lab_length_m": 0.0025576036958111486,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.017727957907411936,
+      "max_weighted_rms_abs_F": 0.1331463777479956
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "incident_GeV": 10000.0,
+      "LO_slice_lab_length_m": 0.25577378531916095,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 1.7728887815512113,
+      "max_weighted_rms_abs_F": 1.331498697540186
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "incident_GeV": 10.0,
+      "LO_slice_lab_length_m": 5.302676567148375e-05,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.0003675535311940186,
+      "max_weighted_rms_abs_F": 0.019171685663864266
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "incident_GeV": 100.0,
+      "LO_slice_lab_length_m": 0.0005411065457400088,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.003750664765622182,
+      "max_weighted_rms_abs_F": 0.06124267111762992
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "incident_GeV": 10000.0,
+      "LO_slice_lab_length_m": 0.05412161180330267,
+      "hypothetical_path_m": 0.1,
+      "target_survival": 0.5,
+      "max_weighted_abs_F_squared": 0.37514242628819094,
+      "max_weighted_rms_abs_F": 0.6124887152333428
+    }
+  ]
+}

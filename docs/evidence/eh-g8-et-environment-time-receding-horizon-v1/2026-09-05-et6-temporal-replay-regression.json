@@ -1,0 +1,18 @@
+{
+  "et6_complete": false,
+  "verification": {
+    "suite": "environment-connectors actions and temporal-plans tests",
+    "files_passed": 20,
+    "tests_passed": 163,
+    "new_assertions": [
+      "Identical temporal action matches stored idempotency content",
+      "Removing temporal metadata changes the action hash and rejects stored-content matching",
+      "Changing the validated temporal deadline changes the action hash and rejects matching"
+    ],
+    "typescript": "Overall exit 1; no filtered diagnostics for temporal-plans, action-broker, action-admission-transaction or reasoning-task-binding. Not a clean project typecheck."
+  },
+  "limitations": ["No live duplicate-delivery test", "Native temporal delivery and extensions incomplete"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

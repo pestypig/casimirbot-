@@ -1,0 +1,75 @@
+{
+  "checks": {
+    "integration_refinement": true,
+    "phase_envelope_bounds_transverse": true,
+    "near_ceiling_area_scaling": true
+  },
+  "refinement_relative_change": 1.712193054004274e-09,
+  "alpha_vacuum": 1.4709028174801422e-13,
+  "speed_km_s": 776.0,
+  "mass_GeV": 1000.0,
+  "lambda_effective_assumed": 1e-24,
+  "rows": [
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000.0,
+      "impact_cut_um": 1.0,
+      "D_far_transverse_leading_dipole": 5.506961759615679e-10,
+      "D_far_any_orientation_leading_dipole_upper": 5.5069617942096e-10,
+      "D_close_geometric_upper": 0.0003656813848778519,
+      "conditional_sum_upper": 0.0003656819355740313,
+      "max_phase_amplitude_rad": 0.001048903999249407
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000.0,
+      "impact_cut_um": 2.0,
+      "D_far_transverse_leading_dipole": 4.809740812406181e-10,
+      "D_far_any_orientation_leading_dipole_upper": 4.809740821064151e-10,
+      "D_close_geometric_upper": 0.0014627255395114076,
+      "conditional_sum_upper": 0.0014627260204854897,
+      "max_phase_amplitude_rad": 0.0005244978573388548
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000.0,
+      "impact_cut_um": 5.0,
+      "D_far_transverse_leading_dipole": 3.887647514301239e-10,
+      "D_far_any_orientation_leading_dipole_upper": 3.887647515691406e-10,
+      "D_close_geometric_upper": 0.009142034621946297,
+      "conditional_sum_upper": 0.009142035010711048,
+      "max_phase_amplitude_rad": 0.00020989512698808195
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000.0,
+      "impact_cut_um": 1.0,
+      "D_far_transverse_leading_dipole": 0.009688390941238224,
+      "D_far_any_orientation_leading_dipole_upper": 0.010518534520392992,
+      "D_close_geometric_upper": 0.0003656813848778519,
+      "conditional_sum_upper": 0.010884215905270844,
+      "max_phase_amplitude_rad": 5.155572653288824
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000.0,
+      "impact_cut_um": 2.0,
+      "D_far_transverse_leading_dipole": 0.008986948983582824,
+      "D_far_any_orientation_leading_dipole_upper": 0.009443906807505729,
+      "D_close_geometric_upper": 0.0014627255395114076,
+      "conditional_sum_upper": 0.010906632347017137,
+      "max_phase_amplitude_rad": 2.5768955848555692
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000.0,
+      "impact_cut_um": 5.0,
+      "D_far_transverse_leading_dipole": 0.007145527827171046,
+      "D_far_any_orientation_leading_dipole_upper": 0.00722217364840461,
+      "D_close_geometric_upper": 0.009142034621946297,
+      "conditional_sum_upper": 0.016364208270350906,
+      "max_phase_amplitude_rad": 1.0287256981588357
+    }
+  ],
+  "scope": "Mono-speed unattenuated straight trajectories, symmetric branch displacement to first order, static propagator and point-source tail. Near disk has normalized-overlap bound only; no finite-displacement error bound, full transport, halo average or accepted-shot prediction."
+}

@@ -1,0 +1,192 @@
+{
+  "scope": "UNVALIDATED DIAGNOSTIC: table/series overlap discrepancy unresolved. Tabulated one-loop electron spectral width; leading heavy-dark-current/contact approximation. Low-mass table gap filled by six-term series. Interpolation comparison is not a theory error bound; other decay channels omitted.",
+  "source": "https://arxiv.org/src/1705.00619 anc/enhancement.txt",
+  "table_rows": 89,
+  "series_join_relative_difference": 0.005895336143100449,
+  "overlap_comparison": [
+    {
+      "mass_MeV": 0.16078239642448422,
+      "table": 1.041856242394471,
+      "series": 1.047998335156174,
+      "series_over_table_minus_one": 0.005895336143100449
+    },
+    {
+      "mass_MeV": 0.197248647650624,
+      "table": 1.0671799575413403,
+      "series": 1.0734688091239462,
+      "series_over_table_minus_one": 0.0058929626050086
+    },
+    {
+      "mass_MeV": 0.22795411599705762,
+      "table": 1.0933723739980308,
+      "series": 1.0998130252960938,
+      "series_over_table_minus_one": 0.005890629259738933
+    },
+    {
+      "mass_MeV": 0.2549884879754378,
+      "table": 1.1204683592683597,
+      "series": 1.127070479560808,
+      "series_over_table_minus_one": 0.005892286237122457
+    },
+    {
+      "mass_MeV": 0.279419360460223,
+      "table": 1.148513630259377,
+      "series": 1.1552828912042223,
+      "series_over_table_minus_one": 0.005893931744908043
+    },
+    {
+      "mass_MeV": 0.3018794941694451,
+      "table": 1.1775520902447623,
+      "series": 1.1844943405238104,
+      "series_over_table_minus_one": 0.005895493147657804
+    },
+    {
+      "mass_MeV": 0.3227805430939108,
+      "table": 1.2076302015113984,
+      "series": 1.2147514124884504,
+      "series_over_table_minus_one": 0.005896847369450953
+    },
+    {
+      "mass_MeV": 0.3424081322048295,
+      "table": 1.2387971672004063,
+      "series": 1.2461033464451552,
+      "series_over_table_minus_one": 0.005897801059119523
+    },
+    {
+      "mass_MeV": 0.3609700527744649,
+      "table": 1.2711051285143145,
+      "series": 1.2786021918724724,
+      "series_over_table_minus_one": 0.0058980671149684305
+    },
+    {
+      "mass_MeV": 0.37862306982010485,
+      "table": 1.304609378805195,
+      "series": 1.3123029701805498,
+      "series_over_table_minus_one": 0.005897237518253107
+    },
+    {
+      "mass_MeV": 0.39548891134897834,
+      "table": 1.33936859623016,
+      "series": 1.3472638425578722,
+      "series_over_table_minus_one": 0.005894752460177566
+    },
+    {
+      "mass_MeV": 0.41166434020935067,
+      "table": 1.3754450968542564,
+      "series": 1.3835462838646584,
+      "series_over_table_minus_one": 0.005889865781578685
+    },
+    {
+      "mass_MeV": 0.42722778350664414,
+      "table": 1.4129051102997185,
+      "series": 1.4212152625729353,
+      "series_over_table_minus_one": 0.005881606777863535
+    },
+    {
+      "mass_MeV": 0.44224385693868046,
+      "table": 1.4518190802883124,
+      "series": 1.4603394267532694,
+      "series_over_table_minus_one": 0.005868738454150257
+    },
+    {
+      "mass_MeV": 0.45676654759296903,
+      "table": 1.4922656648140984,
+      "series": 1.5009912961081748,
+      "series_over_table_minus_one": 0.005847237190948373
+    },
+    {
+      "mass_MeV": 0.4708415115513924,
+      "table": 1.5343175147659889,
+      "series": 1.5432474600521826,
+      "series_over_table_minus_one": 0.005820141659241607
+    },
+    {
+      "mass_MeV": 0.4845077698035399,
+      "table": 1.5780633781140694,
+      "series": 1.5871887818385801,
+      "series_over_table_minus_one": 0.0057826598418477815
+    },
+    {
+      "mass_MeV": 0.49779898453090476,
+      "table": 1.6235948870272932,
+      "series": 1.6329006087328173,
+      "series_over_table_minus_one": 0.005731553960829805
+    },
+    {
+      "mass_MeV": 0.5107444360930425,
+      "table": 1.6710080809358985,
+      "series": 1.6804729882325817,
+      "series_over_table_minus_one": 0.005664190020782112
+    },
+    {
+      "mass_MeV": 0.5233697822763558,
+      "table": 1.7204067330566242,
+      "series": 1.7300008903345376,
+      "series_over_table_minus_one": 0.005576679684848429
+    },
+    {
+      "mass_MeV": 0.5356976563323756,
+      "table": 1.7719071022082813,
+      "series": 1.781584435847737,
+      "series_over_table_minus_one": 0.00546153555533202
+    },
+    {
+      "mass_MeV": 0.5477481437668228,
+      "table": 1.8256187427358899,
+      "series": 1.8353291307536963,
+      "series_over_table_minus_one": 0.00531895723378395
+    },
+    {
+      "mass_MeV": 0.5595391666362597,
+      "table": 1.8816743387481947,
+      "series": 1.8913461066131378,
+      "series_over_table_minus_one": 0.005139979679681161
+    },
+    {
+      "mass_MeV": 0.5710867963803751,
+      "table": 1.9402100216121565,
+      "series": 1.9497523670194021,
+      "series_over_table_minus_one": 0.004918202308488606
+    },
+    {
+      "mass_MeV": 0.5824055107912356,
+      "table": 2.0013777145239544,
+      "series": 2.010671040098529,
+      "series_over_table_minus_one": 0.0046434641033188395
+    },
+    {
+      "mass_MeV": 0.5935084068486309,
+      "table": 2.065327258105662,
+      "series": 2.0742316370559997,
+      "series_over_table_minus_one": 0.004311364659228323
+    }
+  ],
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "enhancement_factors": {
+        "pchip": 7.430133101685497,
+        "linear": 7.436614067336187
+      },
+      "interpolation_fractional_difference": 0.000872254313885712,
+      "conditional_electron_loop_only_lifetime_s": 9.344394863022669e+28,
+      "age_over_lifetime": 4.6551971141691335e-12
+    },
+    {
+      "mchi_GeV": 100.0,
+      "enhancement_factors": {
+        "pchip": 1.4843682780955307,
+        "linear": 1.4846166390734086
+      },
+      "interpolation_fractional_difference": 0.00016731762699517816,
+      "conditional_electron_loop_only_lifetime_s": 1.1999651725866352e+33,
+      "age_over_lifetime": 3.625105210864725e-16
+    }
+  ],
+  "checks": {
+    "monotonic_grid": true,
+    "low_mass_series_join_pass": false,
+    "no_high_mass_extrapolation": true
+  },
+  "full_model_admitted": false
+}

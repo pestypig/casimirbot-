@@ -1,0 +1,323 @@
+{
+  "binding_epoch": 5,
+  "client_continuation_ref": "fixture:identity-1",
+  "reasoning_binding_id": "fixture:identity-2",
+  "helix_conversation_id": "fixture:identity-3",
+  "mission_id": null,
+  "expected_revision": 13,
+  "goal_id": "fixture:identity-4",
+  "frontier_id": "fixture:identity-5",
+  "prior_turn_id": "fixture:identity-6",
+  "probe_request_id": "fixture:identity-7",
+  "mutation_scope": {
+    "allowed_block_ids": [],
+    "allowed_regions": [],
+    "combat_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 0,
+    "world_mutation_allowed": false
+  },
+  "plan": {
+    "schema": "environment.temporal_action_plan.v1",
+    "plan_id": "fixture:identity-8",
+    "previous_plan_id": null,
+    "previous_plan_hash": null,
+    "identity": {
+      "environment_id": "fixture:identity-9",
+      "source_id": "fixture:identity-10",
+      "subject_id": "fixture:identity-11",
+      "producer_epoch": "fixture:identity-12",
+      "authority_id": "fixture:identity-13",
+      "authority_revision": 3,
+      "goal_id": "fixture:identity-4",
+      "goal_revision": 13,
+      "observation_revision": 7654445,
+      "affordance_revision": 5
+    },
+    "clocks": {
+      "environment": {
+        "kind": "tick",
+        "sequence": 5560,
+        "resolution_unit": "minecraft_tick",
+        "nominal_units_per_second": 20
+      },
+      "monotonic": {
+        "origin_id": "fixture:identity-14",
+        "elapsed_ms": 277950
+      },
+      "audit_at": "2026-09-05T20:35:09.971543Z"
+    },
+    "adapter_id": "minecraft.fabric_client",
+    "adapter_version": "0.4.11",
+    "compiler_version": "environment.minecraft_temporal_plan_compilation.v1",
+    "resident_executor_version": "0.4.11",
+    "start_node_id": "segment_one",
+    "maximum_total_units": 200,
+    "monotonic_deadline_elapsed_ms": 292950,
+    "watermarks": {
+      "decision_unit": 40,
+      "stop_unit": 180,
+      "committed_through_unit": 200,
+      "stabilization_node_id": "failure"
+    },
+    "lanes": [
+      {
+        "lane_id": "move",
+        "priority": 1,
+        "resource_keys": [
+          "camera",
+          "locomotion"
+        ]
+      }
+    ],
+    "effect_ceiling": {},
+    "nodes": [
+      {
+        "kind": "action",
+        "node_id": "segment_one",
+        "lane_id": "move",
+        "capability_id": "com.casimirbot.minecraft.player.navigate",
+        "capability_version": "1",
+        "arguments": {
+          "action_kind": "navigate_to",
+          "destination": {
+            "x": 3.5,
+            "y": 65,
+            "z": 2.5
+          },
+          "arrival_radius": 0.3,
+          "allow_sprint": false,
+          "allow_dig": false,
+          "allow_place": false,
+          "engine_preference": "native_fabric"
+        },
+        "required_resources": [
+          "camera",
+          "locomotion"
+        ],
+        "timing": {
+          "earliest_start_unit": 0,
+          "latest_start_unit": 140,
+          "maximum_duration_units": 60
+        },
+        "preconditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.player_grounded",
+            "arguments": {
+              "expected": true
+            }
+          },
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.hazard_clear",
+            "arguments": {
+              "hazard_kinds": [
+                "lava",
+                "fire",
+                "magma",
+                "cactus",
+                "powder_snow",
+                "hostile",
+                "void_fall"
+              ],
+              "radius": 3
+            }
+          }
+        ],
+        "completion_conditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.position_within",
+            "arguments": {
+              "position": {
+                "x": 3.5,
+                "y": 65,
+                "z": 2.5
+              },
+              "radius": 0.5
+            }
+          }
+        ],
+        "abort_guards": [],
+        "effect_budget": {},
+        "on_success_node_id": "checkpoint_one",
+        "on_failure_node_id": "failure",
+        "on_timeout_node_id": "failure"
+      },
+      {
+        "kind": "action",
+        "node_id": "segment_two",
+        "lane_id": "move",
+        "capability_id": "com.casimirbot.minecraft.player.navigate",
+        "capability_version": "1",
+        "arguments": {
+          "action_kind": "navigate_to",
+          "destination": {
+            "x": 1.5,
+            "y": 65,
+            "z": 2.5
+          },
+          "arrival_radius": 0.3,
+          "allow_sprint": false,
+          "allow_dig": false,
+          "allow_place": false,
+          "engine_preference": "native_fabric"
+        },
+        "required_resources": [
+          "camera",
+          "locomotion"
+        ],
+        "timing": {
+          "earliest_start_unit": 0,
+          "latest_start_unit": 140,
+          "maximum_duration_units": 60
+        },
+        "preconditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.player_grounded",
+            "arguments": {
+              "expected": true
+            }
+          },
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.hazard_clear",
+            "arguments": {
+              "hazard_kinds": [
+                "lava",
+                "fire",
+                "magma",
+                "cactus",
+                "powder_snow",
+                "hostile",
+                "void_fall"
+              ],
+              "radius": 3
+            }
+          }
+        ],
+        "completion_conditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.position_within",
+            "arguments": {
+              "position": {
+                "x": 1.5,
+                "y": 65,
+                "z": 2.5
+              },
+              "radius": 0.5
+            }
+          }
+        ],
+        "abort_guards": [],
+        "effect_budget": {},
+        "on_success_node_id": "success",
+        "on_failure_node_id": "failure",
+        "on_timeout_node_id": "failure"
+      },
+      {
+        "kind": "checkpoint",
+        "node_id": "checkpoint_one",
+        "checkpoint_id": "platform_first_foothold",
+        "required_evidence_kinds": [
+          "position"
+        ],
+        "condition": {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.position_within",
+          "arguments": {
+            "position": {
+              "x": 3.5,
+              "y": 65,
+              "z": 2.5
+            },
+            "radius": 0.5
+          }
+        },
+        "wait_up_to_units": 10,
+        "on_satisfied_node_id": "segment_two",
+        "on_timeout_node_id": "failure"
+      },
+      {
+        "kind": "terminal",
+        "node_id": "success",
+        "outcome": "succeeded",
+        "reason_code": "bounded_segment_observed"
+      },
+      {
+        "kind": "terminal",
+        "node_id": "failure",
+        "outcome": "failed",
+        "reason_code": "stop_on_boundary_or_failed_condition"
+      }
+    ],
+    "automatic_replay": false,
+    "adapter_strategy_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "plan_hash": "sha256:a21ec8a273289e3cec237bd164690ef6a347dfc87a2e7e91dad73fe9fe7b315d"
+  },
+  "request": {
+    "schema": "helix.environment_action.request.v1",
+    "action_authority_id": "fixture:identity-13",
+    "action_kind": "execute_sequence",
+    "action_request_id": "fixture:identity-8",
+    "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+    "capability_version": 1,
+    "catalog_snapshot_id": "fixture:identity-15",
+    "approval_ref": null,
+    "confirmation_state": "not_required",
+    "constraints": {
+      "automatic_replay_allowed": false,
+      "combat_allowed": false,
+      "host_access_allowed": false,
+      "manual_override_policy": "cancel",
+      "max_block_mutations": 0,
+      "max_distance_blocks": 5,
+      "max_duration_ms": 15000,
+      "max_inventory_transfers": 0,
+      "require_postcondition_verification": true,
+      "world_mutation_allowed": false
+    },
+    "created_at": "2026-09-05T20:35:16.198Z",
+    "deadline_at": "2026-09-05T20:35:31.198Z",
+    "effect_class": "continuous_control",
+    "environment_binding_id": "fixture:identity-9",
+    "idempotency_key": "fixture:identity-8",
+    "postconditions": [
+      {
+        "condition_id": "et6:sequence_completed",
+        "condition_kind": "sequence_completed",
+        "required": true,
+        "parameters": {}
+      },
+      {
+        "condition_id": "et6:controls_released",
+        "condition_kind": "controls_released",
+        "required": true,
+        "parameters": {}
+      }
+    ],
+    "preconditions": [],
+    "provider_execution_id": "fixture:identity-16",
+    "room_id": "shared_realtime_room:mcp-minecraft-action",
+    "run_id": "fixture:identity-18",
+    "source_id": "fixture:identity-10",
+    "subject_binding_id": "fixture:identity-11",
+    "subject_native_id": "fixture:identity-19",
+    "tool_call_id": "fixture:identity-8",
+    "turn_id": "fixture:identity-8",
+    "workflow_id": "fixture:identity-8",
+    "workflow_mode": "long_running",
+    "requested_control_engine": "native_fabric",
+    "world_id": "minecraft:minehut:479f4368-ada",
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  }
+}

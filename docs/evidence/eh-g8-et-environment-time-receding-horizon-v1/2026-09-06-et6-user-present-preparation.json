@@ -1,0 +1,34 @@
+{
+  "scope": "User-present packaged EXE preparation; not live capacity acceptance",
+  "observed_at": "2026-09-06T06:27:48.787Z",
+  "service_instance_ref": "service_instance:33bd5202b5de4bd95ae9e358e114e828",
+  "run_id": "run_f567eefd-623e-4e53-add9-e197f6a3365a",
+  "room_binding_ref": "agent_room_binding:4721d05c-6b7a-46b9-a381-4d42f63f6402",
+  "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+  "action_authority_id": "environment_action_authority:86198c21-d6ff-46f7-9c41-53210526ea8f",
+  "authority_expires_at": "2026-09-06T07:08:30.000Z",
+  "authority_scope": ["look", "navigate", "sequence.execute", "walk"],
+  "manual_override": "cancel",
+  "positive": [
+    "Read-only source restored through opaque local MCP pairing; fresh online active admission observed",
+    "DatDamPig reverified against fresh source epoch",
+    "Movement connector ready with admitted manifest and fresh heartbeat at 06:24; zero active workflows and no asserted controls",
+    "Run-to-room link created through helix_room_bind_run",
+    "Presence with explicit read and retained_runtime resource claims returned server-verified room, connector and retained run identity"
+  ],
+  "negative": [
+    "Initial max_steps 120 rejected by connector schema; corrected to supported 64 before run creation",
+    "Initial presence omitted resource_claims and returned null verified identities; declaring run_ref alone was insufficient",
+    "EXE observation initially showed chat-only; no human binding requested against that projection",
+    "Native UI click failed with coordinate input geometry unavailable; window recovery capture failed with CreateForMonitor 0x80070057"
+  ],
+  "remaining": [
+    "Verify refreshed EXE run preview and actual human-only task/run association",
+    "Independent external-provider task identity proof remains distinct from native client-declared continuation",
+    "Full original ET6 rolling, latency, interruption, reconnect, revocation and shutdown battery"
+  ],
+  "movement_dispatched": false,
+  "rolling_cycles_proven": 0,
+  "capacity_acceptance": "not_proven",
+  "credentials_included": false
+}

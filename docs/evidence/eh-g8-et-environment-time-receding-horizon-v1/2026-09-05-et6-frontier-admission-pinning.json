@@ -1,0 +1,14 @@
+{
+  "schema": "et6.frontier_admission_pinning.v1",
+  "date": "2026-09-05",
+  "repair": "Expired frontier candidate selection and deletion both exclude frontier references retained by temporal plan admissions. The existing newest-revision preservation and goal-scoped maintenance grant remain unchanged.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-frontier-store.test.ts server/db/migrations/__tests__/083_environment_temporal_plan_admissions.spec.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "tests_passed": 2,
+    "fixture_result": "Four unpinned expired frontiers removed; pinned first frontier and newest revision retained; repeat cleanup removes zero."
+  },
+  "admission_integration_constraint": "reasoning-task-binding-store.ts owns active binding state in the service epoch. Stored admission binding IDs are provenance only; the future writer must validate the exact live principal, continuation, binding epoch and task/run association through that store.",
+  "limits": "Isolated database tests do not prove concurrent admission/cleanup races. The foreign key is the final deletion boundary; atomic admission should share the goal lock. No live pruning, admission, deployment or Minecraft execution occurred.",
+  "et6_complete": false
+}

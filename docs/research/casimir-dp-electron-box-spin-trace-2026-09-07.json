@@ -1,0 +1,24 @@
+{
+  "status": "rest_spin_average_vector_trace_not_physical_diagram_sum",
+  "candidate_sha256": "54fc7fe2ae81ff6062486128741a26c7bfa3931b5baf18e0286934bbd8134884",
+  "max_gamma_trace_relative_error": 7.098007990568834e-16,
+  "rows": [
+    {
+      "routing_sign": -1,
+      "normalized_trace_integral_GeV_minus2": 0.06496027597378831,
+      "coordinate_relative_difference": 4.345857007592713e-12
+    },
+    {
+      "routing_sign": 1,
+      "normalized_trace_integral_GeV_minus2": -0.06372187364965742,
+      "coordinate_relative_difference": 5.46052092431637e-12
+    }
+  ],
+  "missing": [
+    "Majorana routing multiplicities and relative signs",
+    "gauge completion check",
+    "spin-dependent amplitude and operator separation",
+    "finite momentum expansion",
+    "known-limit normalization check"
+  ]
+}

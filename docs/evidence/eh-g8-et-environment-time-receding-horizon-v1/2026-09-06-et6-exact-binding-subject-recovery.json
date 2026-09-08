@@ -1,0 +1,48 @@
+{
+  "schema": "et6_exact_binding_recovery_evidence.v1",
+  "observed_at": "2026-09-06T12:56:14.029Z",
+  "service_instance_ref": "service_instance:d1378d765a382e4fbfbcb65066d3a5b2",
+  "run_id": "run_9175e2a3-76e2-4da8-8723-3b40b6828f6d",
+  "reasoning_binding_id": "reasoning_binding:a08642dfd2cf593be01d4e7ff5534ab1",
+  "binding_epoch": 2,
+  "claim_succeeded": true,
+  "continuation_identity_basis": "authenticated MCP client and client-declared same-task continuation; not independent provider thread proof",
+  "negative_evidence": {
+    "initial_perception": "producer_epoch_mismatch",
+    "explanation": "Renewing source transport did not reverify participant subject identity; connector readiness alone was insufficient for end-to-end readiness."
+  },
+  "recovery": {
+    "subject_binding_id": "environment_subject_binding:abe932af-a2da-4881-a928-515fc3834bb6",
+    "authority_id": "environment_action_authority:45363d9f-2822-4260-86d5-96a35e5d4116",
+    "authority_policy_version": 6,
+    "goal_revision": 9,
+    "goal_status": "active",
+    "checkpoint": {
+      "checkpoint_id": "et6-recovery-checkpoint-20260906-1255",
+      "event_id": "environment_durable_goal_event:ec7f4d2a-d07c-4915-b8e6-a90e45d6defd",
+      "observation_revision": 1788699322635,
+      "verified_facts": {
+        "position": {
+          "x": 2.96,
+          "y": 65,
+          "z": 1.88
+        },
+        "on_ground": true,
+        "traversal_verified": false,
+        "client_input_state": "unobserved"
+      },
+      "evidence_refs": [
+        "environment_probe_evidence:90baae569f4395308627cf8854c2907a99187757"
+      ]
+    },
+    "connector_ready": true
+  },
+  "steering": {
+    "read_ok": true,
+    "delivery_count": 0
+  },
+  "live_rolling_extensions_proven": 0,
+  "movement_dispatched_this_recovery": false,
+  "voice_proven": false,
+  "release_maturity_promoted": false
+}

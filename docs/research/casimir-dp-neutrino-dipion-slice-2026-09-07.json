@@ -1,0 +1,94 @@
+{
+  "scope": "LO isospin-symmetric pion slice only, below 0.35/0.45/0.5GeV; no error-qualified hadronic lower bound or acceptance",
+  "full_model_admitted": false,
+  "B0_GeV": 2.8521074326137774,
+  "checks": {
+    "phase_space_factorization": true,
+    "positive_slice": true,
+    "same_product_repartition": true,
+    "chiral_mass_identity": true
+  },
+  "rows": [
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "dipion_upper_GeV": 0.35,
+      "partial_width_LO_GeV": 9.588011034526378e-12,
+      "proper_length_from_slice_m": 2.0580595880566528e-05,
+      "lab_length_E10GeV_from_slice_m": 0.0002047692137919511,
+      "relative_integral_difference": 8.881784197001252e-16
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "dipion_upper_GeV": 0.45,
+      "partial_width_LO_GeV": 3.7632344041888574e-11,
+      "proper_length_from_slice_m": 5.243547417093e-06,
+      "lab_length_E10GeV_from_slice_m": 5.217133110770712e-05,
+      "relative_integral_difference": 4.440892098500626e-16
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "dipion_upper_GeV": 0.5,
+      "partial_width_LO_GeV": 5.653049658659455e-11,
+      "proper_length_from_slice_m": 3.4906288165668345e-06,
+      "lab_length_E10GeV_from_slice_m": 3.4730448163692505e-05,
+      "relative_integral_difference": -5.551115123125783e-16
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "dipion_upper_GeV": 0.35,
+      "partial_width_LO_GeV": 7.714902223987748e-12,
+      "proper_length_from_slice_m": 2.5577379294122002e-05,
+      "lab_length_E10GeV_from_slice_m": 0.00025448533557094065,
+      "relative_integral_difference": -9.992007221626409e-16
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "dipion_upper_GeV": 0.45,
+      "partial_width_LO_GeV": 2.738786456804877e-11,
+      "proper_length_from_slice_m": 7.204905658479325e-06,
+      "lab_length_E10GeV_from_slice_m": 7.168611033877309e-05,
+      "relative_integral_difference": 8.881784197001252e-16
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "dipion_upper_GeV": 0.5,
+      "partial_width_LO_GeV": 3.8750383799276195e-11,
+      "proper_length_from_slice_m": 5.092258735349243e-06,
+      "lab_length_E10GeV_from_slice_m": 5.066606543920709e-05,
+      "relative_integral_difference": 1.3322676295501878e-15
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "dipion_upper_GeV": 0.35,
+      "partial_width_LO_GeV": 1.822996072963496e-11,
+      "proper_length_from_slice_m": 1.0824322845590205e-05,
+      "lab_length_E10GeV_from_slice_m": 5.302676567148375e-05,
+      "relative_integral_difference": 0.0
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "dipion_upper_GeV": 0.45,
+      "partial_width_LO_GeV": 6.998157418346399e-11,
+      "proper_length_from_slice_m": 2.8196990808278586e-06,
+      "lab_length_E10GeV_from_slice_m": 1.3813291099689507e-05,
+      "relative_integral_difference": 4.440892098500626e-16
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "dipion_upper_GeV": 0.5,
+      "partial_width_LO_GeV": 1.0377242264292423e-10,
+      "proper_length_from_slice_m": 1.901535835575434e-06,
+      "lab_length_E10GeV_from_slice_m": 9.315344396815211e-06,
+      "relative_integral_difference": -2.220446049250313e-16
+    }
+  ]
+}

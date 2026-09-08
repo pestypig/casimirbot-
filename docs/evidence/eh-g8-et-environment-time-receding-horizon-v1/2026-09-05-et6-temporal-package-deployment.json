@@ -1,0 +1,39 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "classification": "qualification runtime deployment",
+  "previous_turn": "progress: independent desktop package integrity verification",
+  "deployment": {
+    "old_minecraft_pid": 19912,
+    "old_desktop_pid": 33688,
+    "shutdown": "Both verified processes accepted CloseMainWindow and subsequently exited without force termination.",
+    "new_desktop_pid": 6136,
+    "new_desktop_path": "apps/desktop/release-et6-temporal-20260905/win-unpacked/CasimirBot.exe",
+    "new_desktop_window_observed": true,
+    "native_mod_directory": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods",
+    "native_mod": "HelixFabricPlayerAgent-0.4.10.jar",
+    "native_sha256": "30d028d209482c2d14c245408db3e86f77ab7305d923be7d87b2fa9be7762d07",
+    "rollback_file": "HelixFabricPlayerAgent-0.4.0.jar.pre-temporal-20260905.disabled",
+    "rollback_sha256": "127ba523cf5f6fb5f0e37e7d49391b74449cf9c935a2f97aca9862dc83774356",
+    "minecraft_relaunched": false,
+    "fabric_pid_preserved": 5216,
+    "keyed_server_pid_preserved": 34892
+  },
+  "coordination": {
+    "same_continuation": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "new_service_instance": "service_instance:4da500a79ed7fbcaf798fd7259a6dd62",
+    "presence_update": "PASS at 2026-09-05T17:04:13.971Z; finite heartbeat, not permanent readiness",
+    "prior_binding_read": "reasoning_binding_not_found; nonretryable, no stale binding reused",
+    "initial_authority_inspect": "full_mcp_transition_required; no mutation",
+    "transport_transition": "Trusted device delegation applied, native transition accepted, subsequent full-scope authority inspection succeeded without app restart or reconnect loop.",
+    "transition_request": "desktop_tunnel_request:a1a40095-c2b5-45e3-864b-25a291683212",
+    "post_transition_authorities": [],
+    "post_transition_connector_readiness": [],
+    "independent_external_oauth_binding_proven": false
+  },
+  "remaining": [
+    "Restore exact task binding through supported consent flow; old service binding is not current.",
+    "Recover observation source identity if required, configure finite Player Embodiment and launch updated companion through harness lifecycle.",
+    "Verify live temporal tool catalog and execute the full original ET6 qualification; no live capacity result is claimed here."
+  ]
+}

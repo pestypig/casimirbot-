@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 internal serial handoff follow-up",
+  "findings": [
+    "An unfinished predecessor input could continue at an early supplied handoff boundary before terminal mismatch was detected.",
+    "Loading a successor cleared ownership of still-held predecessor inputs, so a successor typed action could miss releasing them."
+  ],
+  "repairs": [
+    "Reject unfinished input or typed action execution at the boundary, and any processing after a missed boundary, before predecessor effects.",
+    "Carry held-input ownership across graph load; successor typed actions release inherited controls through scoped release."
+  ],
+  "verification": {
+    "native_controller_and_sequence_tests": "PASS",
+    "cases": ["early boundary asserts released movement immediately", "handoff to hotbar asserts released movement and zero global disarm", "existing three-handoff and interruption regression cases"],
+    "casimir": { "run_id": "2667", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": ["Internal native engine only; runtime temporal delivery remains disabled.", "No packaged build, live Minecraft action, or original ET6 capacity qualification occurred."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

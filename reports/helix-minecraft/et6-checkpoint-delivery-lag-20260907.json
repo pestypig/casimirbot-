@@ -1,0 +1,172 @@
+{
+  "workflow_id": "workflow:et6-window-20260907-1626-root",
+  "method": "read-only exact workflow join of persisted environment events to their batch receipt timestamps; timestamps are same-host wall-clock differences, not Codex pickup latency",
+  "events": [
+    {
+      "sequence": 5,
+      "event_id": "environment_event:f16350d4-0023-4ba3-970b-7e048738cdbf",
+      "observed_at": "2026-09-07T16:27:44.524Z",
+      "received_at": "2026-09-07T16:27:44.549Z",
+      "delay_ms": 25
+    },
+    {
+      "sequence": 6,
+      "event_id": "environment_event:822be0d8-af3a-479a-8cfc-1ecd3850db95",
+      "observed_at": "2026-09-07T16:27:44.527Z",
+      "received_at": "2026-09-07T16:27:46.615Z",
+      "delay_ms": 2088
+    },
+    {
+      "sequence": 7,
+      "event_id": "environment_event:44a941b3-5747-45d7-b8c8-288a6cec0465",
+      "observed_at": "2026-09-07T16:27:44.527Z",
+      "received_at": "2026-09-07T16:27:49.417Z",
+      "delay_ms": 4890
+    },
+    {
+      "sequence": 8,
+      "event_id": "environment_event:3d4eda8b-594d-4863-b835-1e0665885660",
+      "observed_at": "2026-09-07T16:27:45.426Z",
+      "received_at": "2026-09-07T16:27:52.145Z",
+      "delay_ms": 6719
+    },
+    {
+      "sequence": 9,
+      "event_id": "environment_event:2c106129-127c-4b1c-b28a-0572ebbb9daa",
+      "observed_at": "2026-09-07T16:27:46.426Z",
+      "received_at": "2026-09-07T16:27:54.645Z",
+      "delay_ms": 8219
+    },
+    {
+      "sequence": 10,
+      "event_id": "environment_event:1b44ea79-62e0-4537-80fe-907e37629025",
+      "observed_at": "2026-09-07T16:27:47.427Z",
+      "received_at": "2026-09-07T16:27:57.252Z",
+      "delay_ms": 9825
+    },
+    {
+      "sequence": 11,
+      "event_id": "environment_event:4026dbb1-ac4c-46d9-a159-8727437dbb6d",
+      "observed_at": "2026-09-07T16:27:48.427Z",
+      "received_at": "2026-09-07T16:28:01.090Z",
+      "delay_ms": 12663
+    },
+    {
+      "sequence": 12,
+      "event_id": "environment_event:f324612b-d5fe-460f-ad9c-55662e4093c9",
+      "observed_at": "2026-09-07T16:27:49.428Z",
+      "received_at": "2026-09-07T16:28:03.972Z",
+      "delay_ms": 14544
+    },
+    {
+      "sequence": 13,
+      "event_id": "environment_event:27afe8bc-5111-4e9b-975d-5c0163783408",
+      "observed_at": "2026-09-07T16:27:50.429Z",
+      "received_at": "2026-09-07T16:28:06.554Z",
+      "delay_ms": 16125
+    },
+    {
+      "sequence": 14,
+      "event_id": "environment_event:60bc1470-b159-4af8-a05f-f27c7e2e9dbd",
+      "observed_at": "2026-09-07T16:27:51.431Z",
+      "received_at": "2026-09-07T16:28:08.949Z",
+      "delay_ms": 17518
+    },
+    {
+      "sequence": 15,
+      "event_id": "environment_event:9df2fee9-d6b1-49a7-99da-53fd4376ffec",
+      "observed_at": "2026-09-07T16:27:52.432Z",
+      "received_at": "2026-09-07T16:28:11.387Z",
+      "delay_ms": 18955
+    },
+    {
+      "sequence": 16,
+      "event_id": "environment_event:56b1a523-8d13-4c2a-968f-c97e17330060",
+      "observed_at": "2026-09-07T16:27:53.433Z",
+      "received_at": "2026-09-07T16:28:15.309Z",
+      "delay_ms": 21876
+    },
+    {
+      "sequence": 17,
+      "event_id": "environment_event:44e9a7db-1308-4080-b085-20814bdcfc29",
+      "observed_at": "2026-09-07T16:27:54.434Z",
+      "received_at": "2026-09-07T16:28:18.030Z",
+      "delay_ms": 23596
+    },
+    {
+      "sequence": 18,
+      "event_id": "environment_event:098ddce8-eb49-4d76-9ab7-dec3a5e14a01",
+      "observed_at": "2026-09-07T16:27:55.437Z",
+      "received_at": "2026-09-07T16:28:20.595Z",
+      "delay_ms": 25158
+    },
+    {
+      "sequence": 19,
+      "event_id": "environment_event:94a02148-56dc-426b-b4c7-225e0148b2f3",
+      "observed_at": "2026-09-07T16:27:55.537Z",
+      "received_at": "2026-09-07T16:28:23.353Z",
+      "delay_ms": 27816
+    }
+  ],
+  "snapshot_size_observation": {
+    "saved_at": "2026-09-07T16:31:04.035Z",
+    "serialization_ms": 295.3755,
+    "largest_tables": [
+      {
+        "name": "helix_operator_activity_events",
+        "rows": 21471,
+        "bytes": 48419405
+      },
+      {
+        "name": "helix_environment_situation_digests",
+        "rows": 2121,
+        "bytes": 22947443
+      },
+      {
+        "name": "helix_environment_events",
+        "rows": 1801,
+        "bytes": 6166066
+      },
+      {
+        "name": "helix_room_source_ingress_requests",
+        "rows": 1676,
+        "bytes": 5879250
+      },
+      {
+        "name": "helix_mcp_evidence_observations",
+        "rows": 202,
+        "bytes": 3449785
+      },
+      {
+        "name": "helix_environment_capability_catalog_snapshots",
+        "rows": 48,
+        "bytes": 2529428
+      },
+      {
+        "name": "helix_environment_event_batches",
+        "rows": 1801,
+        "bytes": 1322119
+      },
+      {
+        "name": "helix_environment_probe_results",
+        "rows": 140,
+        "bytes": 1181986
+      },
+      {
+        "name": "helix_environment_probe_observations",
+        "rows": 143,
+        "bytes": 1155252
+      },
+      {
+        "name": "helix_environment_action_workflow_events",
+        "rows": 353,
+        "bytes": 1031379
+      }
+    ]
+  },
+  "interpretation": {
+    "confirmed": "projection delivery backlog grows beyond five-second checkpoint freshness",
+    "hypothesis": "full snapshot durability barriers contribute to service time; causality not yet profiled",
+    "constraints": "Do not weaken durability, identity, freshness or checkpoint fences. No ET6 capacity pass."
+  }
+}

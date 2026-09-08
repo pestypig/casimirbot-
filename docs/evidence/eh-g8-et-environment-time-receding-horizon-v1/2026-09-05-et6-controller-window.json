@@ -1,0 +1,23 @@
+{
+  "et6_complete": false,
+  "scope": "Internal initial native window attachment to the existing controller",
+  "implemented": [
+    "Exact action ID and before-first-input attachment only; second attachment rejected",
+    "Clock-origin/regression, monotonic deadline and stop-unit checks before input",
+    "One decision notice; normal cancellation/release on exhausted window",
+    "Existing manual-input and disconnection checks retain priority"
+  ],
+  "verification": {
+    "filters": ["TemporalPlanWindowTest", "FluidSequenceEngineTest", "PlayerActionControllerTest"],
+    "new_controller_case": "First segment runs, stop boundary cancels before successor pulse, subsequent tick does not replay",
+    "game_tests": "excluded"
+  },
+  "limitations": [
+    "No runtime delivery caller; native feature not advertised",
+    "Cross-plan extension and admitted nonterminal stabilization remain unimplemented",
+    "No packaged or live ET6 qualification"
+  ],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

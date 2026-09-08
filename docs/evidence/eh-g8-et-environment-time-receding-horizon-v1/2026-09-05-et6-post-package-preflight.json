@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-09-05T21:09:28.989Z",
+  "scope": "Post-package live MCP preflight, no execution",
+  "presence": {
+    "ok": true,
+    "service_instance_ref": "service_instance:52c7024c54649ac963710a7fd1717906",
+    "continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "conversation_identity_basis": "client_declared",
+    "independent_external_task_identity_proven": false
+  },
+  "previous_binding_read": {
+    "error": "reasoning_binding_not_found",
+    "retryable": false,
+    "old_claim_retried": false
+  },
+  "environment_authority_inspect": {
+    "error": "full_mcp_transition_required",
+    "meaning": "Catalog continuity advertises this tool, but full governed MCP execution is not currently available.",
+    "mutation_executed": false
+  },
+  "disposition": "Do not dispatch movement. Restore governed full MCP access and obtain a fresh human-approved exact run association before live acceptance.",
+  "restart_performed": false,
+  "capacity_result": "not measured"
+}

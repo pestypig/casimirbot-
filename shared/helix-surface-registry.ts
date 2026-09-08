@@ -125,6 +125,7 @@ export const PanelLaunchContextSchema = z.object({
 
 export const SURFACE_PANEL_ROUTE_TARGETS = {
   surface_workspace: "surface-workspace",
+  visual_evidence: "visual-evidence",
   hud_lab: "motorcycle-hud-lab",
   image_lens: "image-lens",
   live_answer: "live-answer-environment",
@@ -137,6 +138,7 @@ export const SURFACE_PANEL_ROUTE_TARGETS = {
 
 export const SurfacePanelRouteTargetSchema = z.enum([
   "surface_workspace",
+  "visual_evidence",
   "hud_lab",
   "image_lens",
   "live_answer",

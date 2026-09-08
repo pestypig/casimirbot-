@@ -1,0 +1,280 @@
+{
+  "scope": "Conditional normalized fundamental-basis prescription, central NLO subtractions, phase samples only; not a validated dispersive solution or full decay model",
+  "full_model_admitted": false,
+  "checks": {
+    "zero_identity": true,
+    "real_basis_invariance": true,
+    "subtraction_value_recovered": true,
+    "quadrature_refinement": true,
+    "positive_finite_widths": true
+  },
+  "condition_number_range": [
+    1.0296040974159946,
+    1.1661270423180974
+  ],
+  "quadrature_relative_change": 2.4581448598848255e-07,
+  "source_mass_subtractions_GeV2": {
+    "GammaPi0": 0.017690841465617245,
+    "GammaK0": 0.013715080225885698
+  },
+  "rows": [
+    {
+      "mass_prescription": "source_common_mass",
+      "mpi_GeV": 0.134,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "width_GeV": {
+        "mean": 2.220724188856831e-11,
+        "std_phase_samples_only": 3.915744776968918e-14,
+        "minimum": 2.212539134680501e-11,
+        "maximum": 2.2318273283108874e-11
+      },
+      "ratio_to_same_mass_LO_slice": {
+        "mean": 2.2188450486405644,
+        "std_phase_samples_only": 0.003912431338260961,
+        "minimum": 2.2106669205222076,
+        "maximum": 2.229938792800968
+      },
+      "E10_lab_length_m": {
+        "mean": 8.84096996191536e-05,
+        "std_phase_samples_only": 1.5586785593414566e-07,
+        "minimum": 8.7969595876148e-05,
+        "maximum": 8.873648608489045e-05
+      },
+      "log_survival_10cm_slice_only": {
+        "mean": -1131.1011269025,
+        "std_phase_samples_only": 1.9944409810621753,
+        "minimum": -1136.7563872953283,
+        "maximum": -1126.9321607386416
+      },
+      "max_relative_linear_vs_pchip": 0.0011853530451918504,
+      "raw_over_normalized_width": {
+        "mean": 1.002149040892573,
+        "std_phase_samples_only": 0.0010722532707169107,
+        "minimum": 0.9993525068595122,
+        "maximum": 1.0047189793504854
+      },
+      "reciprocal_channel_factor_over_paper": {
+        "mean": 0.9898551249991628,
+        "std_phase_samples_only": 0.0009984390635911936,
+        "minimum": 0.9876029265766305,
+        "maximum": 0.9924190464741137
+      }
+    },
+    {
+      "mass_prescription": "source_common_mass",
+      "mpi_GeV": 0.134,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "width_GeV": {
+        "mean": 1.793795739345672e-11,
+        "std_phase_samples_only": 3.154893594696687e-14,
+        "minimum": 1.7871962522646464e-11,
+        "maximum": 1.802744286185761e-11
+      },
+      "ratio_to_same_mass_LO_slice": {
+        "mean": 2.2142450172222943,
+        "std_phase_samples_only": 0.0038943717329108208,
+        "minimum": 2.2060986708658725,
+        "maximum": 2.2252910214118655
+      },
+      "E10_lab_length_m": {
+        "mean": 0.00010945145596115016,
+        "std_phase_samples_only": 1.9247343113185948e-07,
+        "minimum": 0.00010890781884115815,
+        "maximum": 0.00010985528191885389
+      },
+      "log_survival_10cm_slice_only": {
+        "mean": -913.6498770931332,
+        "std_phase_samples_only": 1.606909907193768,
+        "minimum": -918.2077197400291,
+        "maximum": -910.2885018661768
+      },
+      "max_relative_linear_vs_pchip": 0.0012211815364235878,
+      "raw_over_normalized_width": {
+        "mean": 1.0021521821969437,
+        "std_phase_samples_only": 0.001072072277422379,
+        "minimum": 0.9993581628034615,
+        "maximum": 1.0047230628322974
+      },
+      "reciprocal_channel_factor_over_paper": {
+        "mean": 0.989912061533259,
+        "std_phase_samples_only": 0.0009997061667473394,
+        "minimum": 0.9876588572546782,
+        "maximum": 0.9924785219682022
+      }
+    },
+    {
+      "mass_prescription": "source_common_mass",
+      "mpi_GeV": 0.134,
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "width_GeV": {
+        "mean": 4.225933981873966e-11,
+        "std_phase_samples_only": 7.447235603673069e-14,
+        "minimum": 4.210364529533691e-11,
+        "maximum": 4.2470521934379595e-11
+      },
+      "ratio_to_same_mass_LO_slice": {
+        "mean": 2.2178185557721632,
+        "std_phase_samples_only": 0.003908394542337125,
+        "minimum": 2.2096475288579756,
+        "maximum": 2.2289016350801316
+      },
+      "E10_lab_length_m": {
+        "mean": 2.2874916210848395e-05,
+        "std_phase_samples_only": 4.030592835993884e-08,
+        "minimum": 2.2761101389436578e-05,
+        "maximum": 2.2959433774200212e-05
+      },
+      "log_survival_10cm_slice_only": {
+        "mean": -4371.614286704077,
+        "std_phase_samples_only": 7.703963597422595,
+        "minimum": -4393.460504789543,
+        "maximum": -4355.508109802394
+      },
+      "max_relative_linear_vs_pchip": 0.0011932940314276497,
+      "raw_over_normalized_width": {
+        "mean": 1.002149741028002,
+        "std_phase_samples_only": 0.0010722127514861248,
+        "minimum": 0.9993537678296881,
+        "maximum": 1.0047198892515516
+      },
+      "reciprocal_channel_factor_over_paper": {
+        "mean": 0.9898678149597945,
+        "std_phase_samples_only": 0.000998719289987289,
+        "minimum": 0.9876153956734214,
+        "maximum": 0.9924322981032191
+      }
+    },
+    {
+      "mass_prescription": "charged_mass_hybrid_sensitivity",
+      "mpi_GeV": 0.13957039,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "width_GeV": {
+        "mean": 2.1572916711870617e-11,
+        "std_phase_samples_only": 3.871482730681806e-14,
+        "minimum": 2.1491967974914336e-11,
+        "maximum": 2.168238193689569e-11
+      },
+      "ratio_to_same_mass_LO_slice": {
+        "mean": 2.2499886061021583,
+        "std_phase_samples_only": 0.004037836955056787,
+        "minimum": 2.241545902768966,
+        "maximum": 2.2614054910955215
+      },
+      "E10_lab_length_m": {
+        "mean": 9.100928862459224e-05,
+        "std_phase_samples_only": 1.633006235011701e-07,
+        "minimum": 9.054952943281709e-05,
+        "maximum": 9.135177772738812e-05
+      },
+      "log_survival_10cm_slice_only": {
+        "mean": -1098.7924806606297,
+        "std_phase_samples_only": 1.971896600861546,
+        "minimum": -1104.3679699538877,
+        "maximum": -1094.669446920014
+      },
+      "max_relative_linear_vs_pchip": 0.0006466578615026419,
+      "raw_over_normalized_width": {
+        "mean": 1.0021433720929602,
+        "std_phase_samples_only": 0.0010806495845718843,
+        "minimum": 0.9993126165232075,
+        "maximum": 1.0047215031533214
+      },
+      "reciprocal_channel_factor_over_paper": {
+        "mean": 0.9894628904694202,
+        "std_phase_samples_only": 0.0009856663526535566,
+        "minimum": 0.9872260539856701,
+        "maximum": 0.9919987722218226
+      }
+    },
+    {
+      "mass_prescription": "charged_mass_hybrid_sensitivity",
+      "mpi_GeV": 0.13957039,
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "width_GeV": {
+        "mean": 1.733245547861722e-11,
+        "std_phase_samples_only": 3.103918504680903e-14,
+        "minimum": 1.726761935989519e-11,
+        "maximum": 1.7420240079579996e-11
+      },
+      "ratio_to_same_mass_LO_slice": {
+        "mean": 2.2466201146073126,
+        "std_phase_samples_only": 0.004023276306880378,
+        "minimum": 2.2382161046472877,
+        "maximum": 2.257998689934914
+      },
+      "E10_lab_length_m": {
+        "mean": 0.00011327510861088892,
+        "std_phase_samples_only": 2.0282375670844126e-07,
+        "minimum": 0.00011270392786778714,
+        "maximum": 0.00011370006718635678
+      },
+      "log_survival_10cm_slice_only": {
+        "mean": -882.809311585125,
+        "std_phase_samples_only": 1.580946312952695,
+        "minimum": -887.2805224438131,
+        "maximum": -879.5069561049417
+      },
+      "max_relative_linear_vs_pchip": 0.0006528101414728926,
+      "raw_over_normalized_width": {
+        "mean": 1.00214577511366,
+        "std_phase_samples_only": 0.0010804867954781164,
+        "minimum": 0.9993170202649154,
+        "maximum": 1.004724578710509
+      },
+      "reciprocal_channel_factor_over_paper": {
+        "mean": 0.989506141060902,
+        "std_phase_samples_only": 0.0009862076390957598,
+        "minimum": 0.9872693145622672,
+        "maximum": 0.9920429778975562
+      }
+    },
+    {
+      "mass_prescription": "charged_mass_hybrid_sensitivity",
+      "mpi_GeV": 0.13957039,
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "width_GeV": {
+        "mean": 4.100352812302377e-11,
+        "std_phase_samples_only": 7.355042085375369e-14,
+        "minimum": 4.084977511926793e-11,
+        "maximum": 4.121150180070244e-11
+      },
+      "ratio_to_same_mass_LO_slice": {
+        "mean": 2.2492383037781196,
+        "std_phase_samples_only": 0.004034589983254931,
+        "minimum": 2.240804221122329,
+        "maximum": 2.260646647972525
+      },
+      "E10_lab_length_m": {
+        "mean": 2.3575507034003335e-05,
+        "std_phase_samples_only": 4.2282313471431974e-08,
+        "minimum": 2.3456457871531082e-05,
+        "maximum": 2.3664165910052822e-05
+      },
+      "log_survival_10cm_slice_only": {
+        "mean": -4241.703966903788,
+        "std_phase_samples_only": 7.608591898891564,
+        "minimum": -4263.218280769033,
+        "maximum": -4225.798634952893
+      },
+      "max_relative_linear_vs_pchip": 0.0006480154419665762,
+      "raw_over_normalized_width": {
+        "mean": 1.0021439066555133,
+        "std_phase_samples_only": 0.0010806132412071936,
+        "minimum": 0.9993135964727592,
+        "maximum": 1.004722187129159
+      },
+      "reciprocal_channel_factor_over_paper": {
+        "mean": 0.9894725117273856,
+        "std_phase_samples_only": 0.000985785076326727,
+        "minimum": 0.9872356803061709,
+        "maximum": 0.9920086023530671
+      }
+    }
+  ]
+}

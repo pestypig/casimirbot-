@@ -1,0 +1,21 @@
+{
+  "status": "exactly_one_collision_component_in_conditional_slab",
+  "source_sha256": "16e728335769bbfa142a873a44d585de38118fb5a686705517d8866246d7e9f1",
+  "maximum_loss_keV": 1.0,
+  "initial_slab_optical_depth": 21.078608143297952,
+  "soft_optical_depth": 6.371438701711157,
+  "outgoing_cosine_lower_bound": 0.9996094836417417,
+  "postcollision_optical_depth_multiplier_upper": 1.003385800525221,
+  "one_soft_to_uncollided_transmission_lower": 5.932568983949013,
+  "one_soft_to_uncollided_transmission_quadrature": 6.2760781635457,
+  "uncollided_plus_one_soft_relative_to_uncollided": 7.2760781635457,
+  "minimum_diagnostic_xenon_endpoint_after_max_loss_keV": 329.3776070808725,
+  "limitations": [
+    "infinite laterally uniform slab",
+    "normal incident uniform beam",
+    "point-nucleus Born law",
+    "no second collision in this component",
+    "not complete transport",
+    "not accepted detector counts"
+  ]
+}

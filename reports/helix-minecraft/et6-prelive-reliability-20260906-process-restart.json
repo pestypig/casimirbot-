@@ -1,0 +1,9 @@
+{
+  "scope": "Real snapshot writer/restorer across three fresh Node/Vitest process lifetimes using a minimal schema",
+  "test": "server/db/__tests__/temporal-process-restart.test.ts",
+  "result": "passed",
+  "phases": ["Persist running temporal request", "Reopen, verify running, mark replacement-epoch evidence gap and persist", "Reopen and verify connector_offline with explicit no-replay reason"],
+  "processes": 3,
+  "live_environment_actions": 0,
+  "limitations": ["Orderly process exits after explicit snapshot barrier", "Not power-loss or forced-kill testing", "Not full migration/schema acceptance", "Not EXE restart acceptance"]
+}

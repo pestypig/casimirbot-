@@ -1,0 +1,46 @@
+{
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "theta": 0.0018802369112853573,
+      "speed_diagnostics": [
+        {
+          "speed_km_s": 10.0,
+          "kR": 1868260.4340792,
+          "central_potential_over_kinetic_energy": 0.0006431731817307967,
+          "sampled_max_deflection_rad": 0.0005958599576497764
+        },
+        {
+          "speed_km_s": 300.0,
+          "kR": 56047813.022376,
+          "central_potential_over_kinetic_energy": 7.14636868589774e-07,
+          "sampled_max_deflection_rad": 6.620666196108626e-07
+        }
+      ],
+      "distant_impact_D_bound_within_eikonal": 7.135145033035332e-20,
+      "speed_at_central_potential_equals_kinetic_km_s": 0.2536085924669739
+    },
+    {
+      "mchi_GeV": 100.0,
+      "theta": 0.005426354653096825,
+      "speed_diagnostics": [
+        {
+          "speed_km_s": 10.0,
+          "kR": 4670651.085198,
+          "central_potential_over_kinetic_energy": 0.0004067784368413432,
+          "sampled_max_deflection_rad": 0.00037685492653295293
+        },
+        {
+          "speed_km_s": 300.0,
+          "kR": 140119532.55594,
+          "central_potential_over_kinetic_energy": 4.519760409348258e-07,
+          "sampled_max_deflection_rad": 4.187276961477255e-07
+        }
+      ],
+      "distant_impact_D_bound_within_eikonal": 7.135145033035332e-20,
+      "speed_at_central_potential_equals_kinetic_km_s": 0.20168749015279636
+    }
+  ],
+  "scope": "Real static 1eV Yukawa sphere. Sampled derivative diagnostic, not a rigorous exact-scattering error estimate. Tail inequality valid within the same eikonal phase model; its final integral evaluated numerically. Low-speed exact scattering and full material response unresolved.",
+  "full_model_admitted": false
+}

@@ -1,0 +1,31 @@
+{
+  "scope": "Exact one-sided 95% binomial simulation-precision planning only. Assumes iid unweighted events drawn from the actual signal distribution and complete selection. No transport was run; no physical acceptance bound exists.",
+  "checks": {
+    "threshold_bracketing": true,
+    "binomial_tail": true,
+    "zero_trial_minimality": true
+  },
+  "critical_acceptance": 0.00040092900642778735,
+  "rows": [
+    {
+      "unweighted_trials": 10000,
+      "min_accepted_for_lower_bound_above_ceiling": 9,
+      "lower_bound": 0.00046960036453372415,
+      "previous_lower_bound": 0.0003981423915603646
+    },
+    {
+      "unweighted_trials": 100000,
+      "min_accepted_for_lower_bound_above_ceiling": 52,
+      "lower_bound": 0.00040735974627039475,
+      "previous_lower_bound": 0.0003985076260459423
+    },
+    {
+      "unweighted_trials": 1000000,
+      "min_accepted_for_lower_bound_above_ceiling": 435,
+      "lower_bound": 0.00040127827496228593,
+      "previous_lower_bound": 0.0004003177170398024
+    }
+  ],
+  "minimum_trials_if_zero_pass_for_upper_bound_below_ceiling": 7471,
+  "exclusion_admitted": false
+}

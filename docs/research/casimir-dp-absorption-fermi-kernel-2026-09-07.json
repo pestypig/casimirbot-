@@ -1,0 +1,250 @@
+{
+  "scope": "On-shell independent-nucleon RFG diagnostic, point vector nucleon current; no separation energy, spectral function, FSI, detector transport or acceptance. Not an accepted knockout prediction or model-independent bound.",
+  "checks": {
+    "free_target_limit": true,
+    "heavy_limit": true,
+    "pauli_reduces_rate": true,
+    "adaptive_refinement": true
+  },
+  "free_rate_over_sigma0": 0.8199856682271363,
+  "max_refinement_relative": 6.921067052800822e-10,
+  "m_GeV": 0.247,
+  "nucleon_mass_GeV": 0.939,
+  "Lambda_GeV": 11500.0,
+  "rows": [
+    {
+      "A": 12,
+      "Z": 6,
+      "nucleon": "p",
+      "pF_GeV": 0.2205266203703704,
+      "rate_over_sigma0_unblocked": 0.8403921279254679,
+      "rate_over_sigma0_blocked": 0.5852993827612146,
+      "blocking_fraction": 0.6964598588114371,
+      "blocked_mean_T_MeV": 47.74222894413461
+    },
+    {
+      "A": 12,
+      "Z": 6,
+      "nucleon": "n",
+      "pF_GeV": 0.2205266203703704,
+      "rate_over_sigma0_unblocked": 0.8403921279254679,
+      "rate_over_sigma0_blocked": 0.5852993827612146,
+      "blocking_fraction": 0.6964598588114371,
+      "blocked_mean_T_MeV": 47.74222894413461
+    },
+    {
+      "A": 13,
+      "Z": 6,
+      "nucleon": "p",
+      "pF_GeV": 0.21679600102582955,
+      "rate_over_sigma0_unblocked": 0.8397105936200754,
+      "rate_over_sigma0_blocked": 0.594760071671092,
+      "blocking_fraction": 0.7082917331160759,
+      "blocked_mean_T_MeV": 46.78742755183947
+    },
+    {
+      "A": 13,
+      "Z": 6,
+      "nucleon": "n",
+      "pF_GeV": 0.22822691696883676,
+      "rate_over_sigma0_unblocked": 0.8418349507323536,
+      "rate_over_sigma0_blocked": 0.5663739426132564,
+      "blocking_fraction": 0.6727850181565161,
+      "blocked_mean_T_MeV": 49.76035599887708
+    },
+    {
+      "A": 124,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.2497301636757736,
+      "rate_over_sigma0_unblocked": 0.846120765718797,
+      "rate_over_sigma0_blocked": 0.5177563910675766,
+      "blocking_fraction": 0.6119178396806417,
+      "blocked_mean_T_MeV": 55.72099338606327
+    },
+    {
+      "A": 124,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.2722946416792351,
+      "rate_over_sigma0_unblocked": 0.8510226998391194,
+      "rate_over_sigma0_blocked": 0.47302007642836574,
+      "blocking_fraction": 0.5558254515629105,
+      "blocked_mean_T_MeV": 62.46582977464921
+    },
+    {
+      "A": 126,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.24852118263515172,
+      "rate_over_sigma0_unblocked": 0.8458697984667118,
+      "rate_over_sigma0_blocked": 0.5203290634543909,
+      "blocking_fraction": 0.6151408460233231,
+      "blocked_mean_T_MeV": 55.3735314238935
+    },
+    {
+      "A": 126,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.2735329549568419,
+      "rate_over_sigma0_unblocked": 0.8513036552840291,
+      "rate_over_sigma0_blocked": 0.47073689358780424,
+      "blocking_fraction": 0.5529600286172242,
+      "blocked_mean_T_MeV": 62.84999355698267
+    },
+    {
+      "A": 128,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.24733531961527164,
+      "rate_over_sigma0_unblocked": 0.845624786292355,
+      "rate_over_sigma0_blocked": 0.5228706692803814,
+      "blocking_fraction": 0.618324672781778,
+      "blocked_mean_T_MeV": 55.03411614771703
+    },
+    {
+      "A": 128,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.2747253855686147,
+      "rate_over_sigma0_unblocked": 0.8515753721759449,
+      "rate_over_sigma0_blocked": 0.4685543706797003,
+      "blocking_fraction": 0.550220668644339,
+      "blocked_mean_T_MeV": 63.22127794048882
+    },
+    {
+      "A": 129,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.24675081698980209,
+      "rate_over_sigma0_unblocked": 0.845504443063722,
+      "rate_over_sigma0_blocked": 0.5241300427407515,
+      "blocking_fraction": 0.6199021744244697,
+      "blocked_mean_T_MeV": 54.86733390069817
+    },
+    {
+      "A": 129,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.2753052122544479,
+      "rate_over_sigma0_unblocked": 0.8517079114083117,
+      "rate_over_sigma0_blocked": 0.46749876370013543,
+      "blocking_fraction": 0.5488956453710983,
+      "blocked_mean_T_MeV": 63.40229660870326
+    },
+    {
+      "A": 130,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.2461718099731769,
+      "rate_over_sigma0_unblocked": 0.8453855057040194,
+      "rate_over_sigma0_blocked": 0.52538191089132,
+      "blocking_fraction": 0.6214702137030288,
+      "blocked_mean_T_MeV": 54.70245349887966
+    },
+    {
+      "A": 130,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.27587452365900283,
+      "rate_over_sigma0_unblocked": 0.851838311305804,
+      "rate_over_sigma0_blocked": 0.46646588454783294,
+      "blocking_fraction": 0.5475990905278443,
+      "blocked_mean_T_MeV": 63.58033719779999
+    },
+    {
+      "A": 131,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.24559820855236164,
+      "rate_over_sigma0_unblocked": 0.8452679480528307,
+      "rate_over_sigma0_blocked": 0.5266263575497607,
+      "blocking_fraction": 0.6230288972424702,
+      "blocked_mean_T_MeV": 54.53944110383213
+    },
+    {
+      "A": 131,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.2764336128221051,
+      "rate_over_sigma0_unblocked": 0.8519666246345541,
+      "rate_over_sigma0_blocked": 0.46545499496542525,
+      "blocking_fraction": 0.5463300809055511,
+      "blocked_mean_T_MeV": 63.75547458508308
+    },
+    {
+      "A": 132,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.24502992481279365,
+      "rate_over_sigma0_unblocked": 0.8451517446163679,
+      "rate_over_sigma0_blocked": 0.5278634650031281,
+      "blocking_fraction": 0.6245783297089879,
+      "blocked_mean_T_MeV": 54.3782630230967
+    },
+    {
+      "A": 132,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.2769827616353489,
+      "rate_over_sigma0_unblocked": 0.8520929023868689,
+      "rate_over_sigma0_blocked": 0.4644653887013134,
+      "blocking_fraction": 0.5450877332744593,
+      "blocked_mean_T_MeV": 63.92778093027489
+    },
+    {
+      "A": 134,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.2439089688333151,
+      "rate_over_sigma0_unblocked": 0.844923301617178,
+      "rate_over_sigma0_blocked": 0.5303159837385205,
+      "blocking_fraction": 0.627649850256821,
+      "blocked_mean_T_MeV": 54.06127910876133
+    },
+    {
+      "A": 134,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.27805231325579,
+      "rate_over_sigma0_unblocked": 0.8523395467165401,
+      "rate_over_sigma0_blocked": 0.4625473506698486,
+      "blocking_fraction": 0.542679677895641,
+      "blocked_mean_T_MeV": 64.26417775732426
+    },
+    {
+      "A": 136,
+      "Z": 54,
+      "nucleon": "p",
+      "pF_GeV": 0.2428082783355987,
+      "rate_over_sigma0_unblocked": 0.8446999852907678,
+      "rate_over_sigma0_blocked": 0.5327400972130049,
+      "blocking_fraction": 0.6306855765240978,
+      "blocked_mean_T_MeV": 53.751248578677625
+    },
+    {
+      "A": 136,
+      "Z": 54,
+      "nucleon": "n",
+      "pF_GeV": 0.27908523048815337,
+      "rate_over_sigma0_unblocked": 0.8525786195601368,
+      "rate_over_sigma0_blocked": 0.46070669853411744,
+      "blocking_fraction": 0.5403685806381184,
+      "blocked_mean_T_MeV": 64.59005868740508
+    }
+  ],
+  "forecasts": [
+    {
+      "blocked": false,
+      "Xe_primary_2p84ty": 180.51864694876653,
+      "local_encounters_hold": 1.5399103199941e-25,
+      "conditional_local_D_le_2N": 3.0798206399882e-25
+    },
+    {
+      "blocked": true,
+      "Xe_primary_2p84ty": 104.27601530356398,
+      "local_encounters_hold": 1.0723552953247378e-25,
+      "conditional_local_D_le_2N": 2.1447105906494756e-25
+    }
+  ]
+}

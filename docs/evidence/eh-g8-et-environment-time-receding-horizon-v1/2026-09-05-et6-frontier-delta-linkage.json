@@ -1,0 +1,8 @@
+{
+  "schema": "et6.frontier_delta_linkage.v1",
+  "date": "2026-09-05",
+  "implementation": "Writer verifies the previous stored payload and uses it for delta construction only within the same identity, observation producer and clock domain before environment-sequence expiry. Observation revision regression in that domain rejects publication.",
+  "verification": {"sql_tests_passed": 1, "failed": 0, "new_assertions": ["initial capability newly available", "unchanged successor has no new or material changes", "observation regression rejected", "observation epoch change resets baseline"]},
+  "limits": "Expiry, changed capability, corrupt predecessor and clock-domain reset branches need additional fixtures. No production caller, retention cleanup or resident dispatch is established.",
+  "et6_complete": false
+}

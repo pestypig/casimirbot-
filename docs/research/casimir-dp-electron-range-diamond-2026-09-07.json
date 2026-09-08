@@ -1,0 +1,87 @@
+{
+  "status": "single_yukawa_electron_density_response_scan",
+  "rows": [
+    {
+      "mediator_eV": 1.0,
+      "response": "withLFE",
+      "D_per_Wref_squared": 1.0888569913187136e-23,
+      "formal_Wref_for_DP_GeV_minus2": 52060694878.78719,
+      "refinement_relative": 0.0015847115430196457
+    },
+    {
+      "mediator_eV": 1000.0,
+      "response": "withLFE",
+      "D_per_Wref_squared": 4.211085711457071e-23,
+      "formal_Wref_for_DP_GeV_minus2": 26472706336.537903,
+      "refinement_relative": 0.001615768623926539
+    },
+    {
+      "mediator_eV": 10000.0,
+      "response": "withLFE",
+      "D_per_Wref_squared": 2.164415024797935e-20,
+      "formal_Wref_for_DP_GeV_minus2": 1167683416.8838024,
+      "refinement_relative": 0.002567169211216913
+    },
+    {
+      "mediator_eV": 100000.0,
+      "response": "withLFE",
+      "D_per_Wref_squared": 1.0654780115669006e-19,
+      "formal_Wref_for_DP_GeV_minus2": 526287598.9751043,
+      "refinement_relative": 0.0033742476270315347
+    },
+    {
+      "mediator_eV": 1000000.0,
+      "response": "withLFE",
+      "D_per_Wref_squared": 1.1022911149058131e-19,
+      "formal_Wref_for_DP_GeV_minus2": 517424786.51602495,
+      "refinement_relative": 0.0033929571330277852
+    },
+    {
+      "mediator_eV": 1.0,
+      "response": "noLFE",
+      "D_per_Wref_squared": 1.5163540521864122e-23,
+      "formal_Wref_for_DP_GeV_minus2": 44115892974.37101,
+      "refinement_relative": 0.0017011349072095783
+    },
+    {
+      "mediator_eV": 1000.0,
+      "response": "noLFE",
+      "D_per_Wref_squared": 5.864453520591791e-23,
+      "formal_Wref_for_DP_GeV_minus2": 22432703090.296738,
+      "refinement_relative": 0.0017308765483022848
+    },
+    {
+      "mediator_eV": 10000.0,
+      "response": "noLFE",
+      "D_per_Wref_squared": 2.9324865123960354e-20,
+      "formal_Wref_for_DP_GeV_minus2": 1003176548.2306118,
+      "refinement_relative": 0.0026650071097047423
+    },
+    {
+      "mediator_eV": 100000.0,
+      "response": "noLFE",
+      "D_per_Wref_squared": 1.3702144775579418e-19,
+      "formal_Wref_for_DP_GeV_minus2": 464088820.29722774,
+      "refinement_relative": 0.0035386817641286372
+    },
+    {
+      "mediator_eV": 1000000.0,
+      "response": "noLFE",
+      "D_per_Wref_squared": 1.4150244985052853e-19,
+      "formal_Wref_for_DP_GeV_minus2": 456681483.4084616,
+      "refinement_relative": 0.003566163761593688
+    }
+  ],
+  "formula": "D=2 n c M t/(pi alpha_EM v hbarc rho) integral dq q^3 A(q)^2 [1-sinc(qd/hbar)] integral dOmega ELF",
+  "assumptions": [
+    "bulk isotropic zero-temperature electronic response",
+    "fixed separated branches during hold",
+    "W(q)=Wref*(qref^2+mA^2)/(q^2+mA^2), qref=1 keV, Wref=1 GeV^-2"
+  ],
+  "limitations": [
+    "only 5.5-50 eV and q within tabulated 0-30.614 keV domain",
+    "local-field comparison is not a total uncertainty bound",
+    "no subgap phonons, finite-surface response, preparation or recombination history",
+    "not a captured-population or measurability prediction"
+  ]
+}

@@ -1,0 +1,13 @@
+# Slow resonance: branch resolution and failed independent-target extrapolation
+
+Exploratory S1 diagnostic, September 7, 2026. No shared signal is admitted.
+
+For stationary free nuclei, isotropic incident directions and pure elastic s-wave scattering in the center-of-mass frame, let k=mu*v/hbar and x=k*d. The momentum-transfer magnitude is q/hbar=k*sqrt(2*(1-cos(theta))). Averaging the real branch factor over the transfer direction gives 1-sinc(q*d/hbar). Its uniform scattering-angle average is exactly F(x)=1-sinc(x)^2. The companion script independently integrates this angular expression at five x values; absolute errors are below 1e-12.
+
+Combining F with the elastic s-wave unitarity ceiling yields D <= n*v*t*N*4*pi*F(k*d)/k^2 for the independent-target model. Since F(x)=x^2/3+O(x^4), the fixed-density expression tends to zero linearly with speed. A divergent total scattering rate is therefore not a divergent decoherence rate. This derivation specializes the [collisional decoherence framework](https://arxiv.org/abs/1609.04145); the cross-section ceiling follows from [elastic partial-wave unitarity](https://arxiv.org/abs/2101.00142).
+
+For the frozen separation and 100 GeV incident mass, a formal independent-carbon maximum occurs at x=1.99795, speed 0.0470 m/s. It gives D=0.08536 if every carbon scatter saturates unitarity and the entire local density is assigned to that speed. **This is an invalid solid-state extrapolation, not an 8-percent prediction.** The diagnostic N*sigma/(pi*R^2) is about 1.27e10; independent dilute collisions cannot be assumed. The incident wavelength and momentum transfers also require the bound-solid response. The overlap diagnostic signals breakdown of this approximation; it is not a universal geometric cross-section bound.
+
+The first-lobe numerical peak exceeds the analytic bound 1/pi on F(x)/x for x>=pi. The calculation fixes neither a potential that attains the ceiling nor the population's origin, shielding, velocity distribution or xenon normalization. Assigning the full density here and again to the fast LZ population would double count it. The formal slow component cannot produce a 248 keV elastic xenon recoil.
+
+Decision: do not use a 1/v enhancement of the earlier independent-carbon result as a viable lead. A slow resonant proposal must solve the finite object's scattering and branch overlap with a consistent population budget, then use the same potential for xenon and transport. This result closes an erroneous extrapolation while preserving the possibility of a separately derived collective mechanism. The research goal remains active.

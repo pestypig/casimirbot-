@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 resident controller evidence normalization prerequisite",
+  "finding": "A tick skipping past stop and maximum horizon could report runway exhaustion after stabilization preflight had found the hard horizon limit.",
+  "repair": "Preserve the stabilization preflight hard-stop reason in terminal summary and temporal_window_reason measurements.",
+  "verification": {
+    "native_tests": { "passed": 69, "failed": 0, "game_tests_run": false },
+    "new_case": "Delayed tick 100 to 104 with stop unit 1 and maximum 4 cancels with temporal_horizon_exhausted, releases controls, does not enter stabilization, and emits no additional input pulse.",
+    "casimir": { "run_id": "2664", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" }
+  },
+  "limitations": [
+    "Runtime still rejects temporal delivery; these controller tests do not prove production attachment or resident successor handoff.",
+    "No EXE packaging, game deployment or live Minecraft action occurred.",
+    "Casimir gate result does not establish live ET6 capacity or physical viability."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

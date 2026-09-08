@@ -1,0 +1,44 @@
+{
+  "status": "algebraic_uncollided_branches_only",
+  "source_sha256": "b96dedea2ee78f9e10bfbc5d6a2e74fe177aa6b49ef722fb511fac172bcd8f68",
+  "equation": "C*a*exp(-tau0*a)=1",
+  "unattenuated_reference_count": 11240.057695019577,
+  "reference_silica_tau": 0.00016606850189368867,
+  "rows": [
+    {
+      "branch": 0,
+      "cross_section_multiplier": 8.89675161736757e-05,
+      "zero_momentum_proton_cross_section_cm2": 2.6768285811578202e-39,
+      "silica_optical_depth": 1.4774702128164842e-08,
+      "uncollided_fraction": 0.9999999852252979,
+      "raw_uncollided_high_count": 1.0,
+      "diagnostic_xenon_column_g_cm2": 300,
+      "point_xenon_optical_depth": 4.625957806541734e-11,
+      "straight_track_fixed_energy_P_at_least_two": 1.069974281362226e-21,
+      "effective_proton_alpha": 3.971223495032361e-11,
+      "point_xenon_range_strength_2muZalpha_over_med": 2.3571986754095217e-05
+    },
+    {
+      "branch": -1,
+      "cross_section_multiplier": 126927.18909930163,
+      "zero_momentum_proton_cross_section_cm2": 3.818948107349377e-30,
+      "silica_optical_depth": 21.078608143297952,
+      "uncollided_fraction": 7.00933468160265e-10,
+      "raw_uncollided_high_count": 1.0000000000000013,
+      "diagnostic_xenon_column_g_cm2": 300,
+      "point_xenon_optical_depth": 0.06599710169834393,
+      "straight_track_fixed_energy_P_at_least_two": 0.0020843195982907766,
+      "effective_proton_alpha": 1.4999815854376353e-06,
+      "point_xenon_range_strength_2muZalpha_over_med": 0.890343897983877
+    }
+  ],
+  "limitations": [
+    "not total flux or accepted count",
+    "point nuclei",
+    "chosen columns",
+    "fixed-speed straight-track Poisson xenon diagnostic",
+    "Born extrapolation not authenticated at strong branch",
+    "no captured distribution",
+    "no external-constraint recast"
+  ]
+}

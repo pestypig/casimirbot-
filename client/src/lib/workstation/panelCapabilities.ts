@@ -59,6 +59,20 @@ function makeCapabilities(
 }
 
 export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelCapabilities> = {
+  "visual-evidence": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Visual Evidence",
+        description: "Open the developer Visual Evidence panel for consented capture, frame inspection, and Codex reasoning grants.",
+        risk: "low",
+        aliases: ["open visual evidence", "show video frames", "open codex vision bridge"],
+      },
+    ],
+  }),
   "surface-workspace": makeCapabilities({
     can_read_state: true,
     can_run_action: true,

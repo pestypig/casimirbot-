@@ -1,0 +1,14 @@
+{
+  "status": "electron_line_transversality_and_conditional_forward_SI_coefficient",
+  "trace_json_sha256": "f3d0db4a15f8175bc4b3f0cd51850b8bab6172aa825daaeffd9fea97086baf2c",
+  "max_Ward_absolute_residual": 2.1981180706400633e-16,
+  "wrong_relative_sign_control_max": 2.0000000000000004,
+  "conditional_W_magnitude_GeV_minus2": 1.803077258773171e-12,
+  "trace_sum_GeV_minus2": 0.0012384023241308884,
+  "limitations": [
+    "on-shell forward free electron with vector coupling only",
+    "not a complete Majorana operator derivation",
+    "no material or finite-momentum validation",
+    "overall sign convention not fixed by cross-section limit"
+  ]
+}

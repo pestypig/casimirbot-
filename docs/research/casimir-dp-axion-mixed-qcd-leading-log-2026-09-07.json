@@ -1,0 +1,119 @@
+{
+  "scope": "Six-flavour one-loop QCD beta, Yukawa running and VLL homogeneous running applied to verified electroweak source. Fixed matching scales; no mixed two-loop anomalous dimension or finite QCD matching. Alpha range is diagnostic, not a confidence interval.",
+  "rows": [
+    {
+      "M_GeV": 2000.0,
+      "alpha_s_low": 0.106,
+      "alpha_s_high": 0.08176695578963515,
+      "hard_over_Klow": -1.0352642269391894,
+      "source_over_Klow": 4.160269730900745,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 6.831063682415914,
+      "no_QCD_over_Klow": 7.225276703311103,
+      "ratio_to_no_QCD": 0.9454397337178058,
+      "ODE_relative_error": 1.2356782264077992e-13
+    },
+    {
+      "M_GeV": 2000.0,
+      "alpha_s_low": 0.108,
+      "alpha_s_high": 0.0829519183756745,
+      "hard_over_Klow": -1.0289180831242983,
+      "source_over_Klow": 4.14718156672709,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 6.82432166205715,
+      "no_QCD_over_Klow": 7.225276703311103,
+      "ratio_to_no_QCD": 0.9445066178475616,
+      "ODE_relative_error": 1.247890679678676e-13
+    },
+    {
+      "M_GeV": 2000.0,
+      "alpha_s_low": 0.11,
+      "alpha_s_high": 0.08412674580859122,
+      "hard_over_Klow": -1.0226377895986836,
+      "source_over_Klow": 4.1341852507232275,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 6.817605639578902,
+      "no_QCD_over_Klow": 7.225276703311103,
+      "ratio_to_no_QCD": 0.9435771001620771,
+      "ODE_relative_error": 1.383337888682945e-13
+    },
+    {
+      "M_GeV": 5000.0,
+      "alpha_s_low": 0.106,
+      "alpha_s_high": 0.07546768440244178,
+      "hard_over_Klow": -0.9232363923268906,
+      "source_over_Klow": 5.354420488250889,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 8.137242274378357,
+      "no_QCD_over_Klow": 9.057858167059413,
+      "ratio_to_no_QCD": 0.8983627392147686,
+      "ODE_relative_error": 2.0194956817931597e-13
+    },
+    {
+      "M_GeV": 5000.0,
+      "alpha_s_low": 0.108,
+      "alpha_s_high": 0.07647597665799633,
+      "hard_over_Klow": -0.916115488011069,
+      "source_over_Klow": 5.33305939374257,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 8.12300208418586,
+      "no_QCD_over_Klow": 9.057858167059413,
+      "ratio_to_no_QCD": 0.8967906026312786,
+      "ODE_relative_error": 1.986188991054405e-13
+    },
+    {
+      "M_GeV": 5000.0,
+      "alpha_s_low": 0.11,
+      "alpha_s_high": 0.07747342716429798,
+      "hard_over_Klow": -0.9090874519690033,
+      "source_over_Klow": 5.311887528465274,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 8.10885825495063,
+      "no_QCD_over_Klow": 9.057858167059413,
+      "ratio_to_no_QCD": 0.8952291044300077,
+      "ODE_relative_error": 2.02171612784241e-13
+    },
+    {
+      "M_GeV": 20000.0,
+      "alpha_s_low": 0.106,
+      "alpha_s_high": 0.0675896991037434,
+      "hard_over_Klow": -0.7887006240694102,
+      "source_over_Klow": 6.931041152765177,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 9.848398707150125,
+      "no_QCD_over_Klow": 11.830446889299193,
+      "ratio_to_no_QCD": 0.8324621038667729,
+      "ODE_relative_error": 3.1386004906153175e-13
+    },
+    {
+      "M_GeV": 20000.0,
+      "alpha_s_low": 0.108,
+      "alpha_s_high": 0.06839734338375801,
+      "hard_over_Klow": -0.7810607233328563,
+      "source_over_Klow": 6.895946505500158,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 9.82094396062166,
+      "no_QCD_over_Klow": 11.830446889299193,
+      "ratio_to_no_QCD": 0.830141418368975,
+      "ODE_relative_error": 3.098632461728812e-13
+    },
+    {
+      "M_GeV": 20000.0,
+      "alpha_s_low": 0.11,
+      "alpha_s_high": 0.06919409290097614,
+      "hard_over_Klow": -0.7735457842000183,
+      "source_over_Klow": 6.861244079330295,
+      "EW_finite_over_Klow": 3.7060581784543585,
+      "total_over_Klow": 9.793756473584637,
+      "no_QCD_over_Klow": 11.830446889299193,
+      "ratio_to_no_QCD": 0.8278433236907752,
+      "ODE_relative_error": 3.2174263253637037e-13
+    }
+  ],
+  "checks": {
+    "analytic_matches_ODE": true,
+    "zero_QCD_limit": true,
+    "zero_interval_limit": true
+  },
+  "full_QCD_matching_completed": false
+}

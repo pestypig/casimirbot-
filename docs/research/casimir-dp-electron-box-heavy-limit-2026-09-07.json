@@ -1,0 +1,29 @@
+{
+  "status": "forward_SI_heavy_limit_check_not_full_matching",
+  "validation_M_GeV": 1.0,
+  "validation_electron_mass_GeV": 0.0001,
+  "validation_gap_GeV": 0.0001,
+  "rows": [
+    {
+      "mediator_GeV": 10.0,
+      "trace_sum_GeV_minus2": 2.7411065388377494e-09,
+      "published_limit_GeV_minus2": 2.684063709061632e-09,
+      "ratio": 1.0212524127439806,
+      "quadrature_relative_difference": 9.969802761133906e-14
+    },
+    {
+      "mediator_GeV": 30.0,
+      "trace_sum_GeV_minus2": 5.0427595862269584e-11,
+      "published_limit_GeV_minus2": 5.0314474410000164e-11,
+      "ratio": 1.0022482884616386,
+      "quadrature_relative_difference": 2.5424107263916085e-14
+    },
+    {
+      "mediator_GeV": 100.0,
+      "trace_sum_GeV_minus2": 5.600581401955987e-13,
+      "published_limit_GeV_minus2": 5.600321797303621e-13,
+      "ratio": 1.0000463553098844,
+      "quadrature_relative_difference": 0.0
+    }
+  ]
+}

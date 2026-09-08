@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-06",
+  "classification": "evidence normalization",
+  "scope": "Production frontier response-ready diagnostic boundary",
+  "implementation": "Record request receipt and response readiness on the server monotonic clock after store.publish and successor-context resolution; preserve the existing hash-bound draft clock",
+  "verification": {
+    "publisher_tests_passed": 11,
+    "simulated_publication_delay_ms": 23,
+    "simulated_successor_context_delay_ms": 17,
+    "observed_simulated_response_preparation_ms": 40,
+    "failed_context_emits_no_ready_record": true,
+    "diagnostic_sink_failure_does_not_fail_response": true,
+    "targeted_typescript": "passed",
+    "quick_discipline": "passed with classification-not-declared warning; classification recorded here"
+  },
+  "limits": [
+    "Response readiness is before transport serialization/delivery and is not provider receipt",
+    "This record does not measure model sampling or authorize execution",
+    "Cross-phase correlation and complete end-to-end budget attribution remain open",
+    "Diagnostic package predates this server source change; artifact refresh remains",
+    "No live ET6 acceptance or NAV advancement"
+  ]
+}

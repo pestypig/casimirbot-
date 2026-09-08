@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-06",
+  "classification": "evidence normalization",
+  "scope": "Offline response-ready/admission correlation validation",
+  "tests_passed": 41,
+  "positive": "Matching frontier/run/producer/checkpoint and same-origin ordered marks expose preparation and response-ready-to-proposal intervals without adding them to the enclosing budget",
+  "negative": [
+    "Mismatched frontier, run, producer epoch or checkpoint rejected",
+    "Restarted clock origin rejected",
+    "Missing, nonfinite, regressing and post-proposal response readiness rejected",
+    "Legacy missing response record remains null and uncorrelated"
+  ],
+  "limits": [
+    "Synthetic unit records, not connected production publisher evidence",
+    "Connected fixture still inserts a fixture frontier and must exercise production response-ready publication before correlation closure",
+    "stage_breakdown_complete remains false",
+    "No provider sampling duration or live capacity claim"
+  ]
+}

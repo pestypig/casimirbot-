@@ -1,0 +1,17 @@
+{
+  "scope": "ET6 navigation projection build prerequisites",
+  "classification": "evidence normalization",
+  "repairs": [
+    "Reject non-finite candidate waypoint coordinates and pass a concrete coordinate pair to direction calculation.",
+    "Navigation projection type preserves pending_identity and superseded lifecycle values.",
+    "Route-state snapshot uses the explicit environment snapshot contract, preserving evidence-only literal fields."
+  ],
+  "verification": {
+    "tests": "23 passed across route rehearsal, navigation lifecycle and continuation hook suites",
+    "temporal_typecheck": "FAIL with 6 remaining diagnostics; navigation/projection diagnostics resolved"
+  },
+  "limitations": ["No live terrain/replanning, movement-capacity, full build or packaged acceptance proven."],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

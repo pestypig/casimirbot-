@@ -801,6 +801,51 @@ describe("provider-neutral environment time contract", () => {
     expect(report.exit_satisfied).toBe(false);
   });
 
+  it("preserves unknown lead-time and observation-byte measurements as null", () => {
+    const report = buildHelixEnvironmentCapacityReport({
+      report_id: "capacity_report:et6:missing-lead-and-bytes",
+      samples: [
+        capacitySample(1, {
+          lead_time_ticks: null,
+          observation_input_bytes: null,
+          observation_output_bytes: null,
+        }),
+      ],
+      evidence_refs: ["evidence:et6:missing-lead-and-bytes"],
+    });
+
+    expect(report.lead_time_ticks_p50).toBeNull();
+    expect(report.observation_input_bytes).toBeNull();
+    expect(report.observation_output_bytes).toBeNull();
+    expect(report.missing_measurements).toEqual(expect.arrayContaining([
+      "planning:lead_time_ticks",
+      "observation:input_bytes",
+      "observation:output_bytes",
+    ]));
+    expect(report.exit_criteria.required_measurements_complete).toBe(false);
+    expect(report.exit_satisfied).toBe(false);
+  });
+
+  it("preserves an unmeasured course classification as null", () => {
+    const report = buildHelixEnvironmentCapacityReport({
+      report_id: "capacity_report:et6:missing-course",
+      samples: [
+        capacitySample(1, {
+          course: null,
+        }),
+      ],
+      evidence_refs: ["evidence:et6:missing-course"],
+    });
+
+    expect(report.courses_observed).toEqual([]);
+    expect(report.missing_measurements).toContain("course:classification");
+    expect(report.exit_criteria.controlled_and_unknown_world_observed).toBe(
+      false,
+    );
+    expect(report.exit_criteria.required_measurements_complete).toBe(false);
+    expect(report.exit_satisfied).toBe(false);
+  });
+
   it("rejects mixed exact reasoning bindings in one capacity report", () => {
     expect(() =>
       buildHelixEnvironmentCapacityReport({

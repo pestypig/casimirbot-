@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-06",
+  "scope": "Offline enclosing-interval budget audit over correlated production diagnostics and native acceptance",
+  "verification": {
+    "correlated_budget_adversarial_tests": 13,
+    "connected_persistent_tests": 2,
+    "targeted_typescript": "passed",
+    "legacy_five_stage_tests": "6 passed before connected run"
+  },
+  "positive": "Deterministic known-window fixture counts the native enclosing duration once, not plus overlapping server durations",
+  "negative": [
+    "Epoch, binding, checkpoint and action mismatch rejected",
+    "Clock origin mismatch or reversed server marks rejected",
+    "Missing persistence barrier and late native acceptance rejected",
+    "Server duration exceeding the enclosing native interval rejected",
+    "Exact-boundary and exhausted windows rejected",
+    "Connected successful pickup with unmeasured window reports fits=false and window_unmeasured"
+  ],
+  "limits": [
+    "Observer only; inputs are already verified lifecycle records, not authorization inputs",
+    "Native acceptance is linked by unique successor plan, run, checkpoint, producer epoch and resident action; native record does not independently assert provider binding",
+    "Complete five-stage attribution remains false; unallocated transport/provider portions are not invented",
+    "Known-window test is simulated; no real Minecraft runway fit or live capacity claim",
+    "Source-only, not packaged in installed EXE"
+  ],
+  "live_acceptance": false
+}

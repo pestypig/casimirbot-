@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 durable resident identity prerequisite",
+  "implementation": "Migration 086 adds a foreign-key resident_action_request_id to retained temporal plans. Initial retention uses its own action; successors inherit the locked predecessor's association. Retention returns the association on new admission and replay. Missing legacy associations fail closed without heuristic backfill.",
+  "verification": {
+    "focused_preflight_retention_tests": { "passed": 9, "failed": 0 },
+    "cases": ["initial resident identity", "successor inheritance", "missing inherited identity rejected", "initial replay", "migration foreign key rejects nonexistent resident action"]
+  },
+  "limitations": [
+    "pg-mem migration execution and controlled query fixtures do not prove PostgreSQL concurrency isolation.",
+    "Migration was not deployed to the running keyed server or EXE.",
+    "Successor transport and checkpoint/evidence resolution must still use this association; current checkpoint reader remains predecessor-action based.",
+    "This association grants no action, workflow or terminal authority and does not settle any successor action.",
+    "Original packaged live ET6 qualification remains incomplete."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,23 @@
+{
+  "status": "stellar_tension_not_robust_rejection",
+  "rows": [
+    {
+      "trial_SM_coupling": 1e-12,
+      "dark_coupling": 10.721275336975,
+      "dark_alpha": 9.147091740226388
+    },
+    {
+      "trial_SM_coupling": 3e-12,
+      "dark_coupling": 3.5737584456583327,
+      "dark_alpha": 1.0163435266918206
+    },
+    {
+      "trial_SM_coupling": 1e-11,
+      "dark_coupling": 1.0721275336974998,
+      "dark_alpha": 0.09147091740226385
+    }
+  ],
+  "source_pdf_sha256": "2951da8c1df7d145be34467de551713c0bcc47eeda0f8005f9130e962689498b",
+  "source": "https://arxiv.org/html/1611.05852",
+  "note": "Trial couplings bracket a visual order-of-magnitude reading, not confidence intervals."
+}

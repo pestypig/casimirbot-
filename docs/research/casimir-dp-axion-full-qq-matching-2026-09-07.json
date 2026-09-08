@@ -1,0 +1,58 @@
+{
+  "scope": "Full qq1/qq3 VddLL finite expression, with loop mt configured in memory to 162.6; current/qu pieces remain selected. Frozen restricted UV boundary and top-self/QCD running. Not complete EW prediction or observable.",
+  "matching_parameters": {
+    "m_t": 162.6,
+    "m_W": 80.379,
+    "GF": 1.1665648996947716e-05,
+    "alpha_s": 0.108,
+    "alpha_e": 0.007818608287724784
+  },
+  "rows": [
+    {
+      "operators": [
+        "qq1"
+      ],
+      "broad_real": -5.4291584346581386e-17,
+      "broad_imag": -6.645536775237655e-18,
+      "selected_real": 5.214515329214047e-20,
+      "selected_imag": -2.3699614073610035e-20,
+      "difference_real": -5.4343729499873525e-17,
+      "difference_imag": -6.621837161164045e-18,
+      "amplification_relative_difference": 4.435802184699922e-11
+    },
+    {
+      "operators": [
+        "qq3"
+      ],
+      "broad_real": -5.59141531599985e-17,
+      "broad_imag": -1.5012403703438235e-17,
+      "selected_real": 1.5608339570658602e-18,
+      "selected_imag": -7.093872613188506e-19,
+      "difference_real": -5.747498711706436e-17,
+      "difference_imag": -1.4303016442119384e-17,
+      "amplification_relative_difference": 6.939021595260145e-12
+    },
+    {
+      "operators": [
+        "qq1",
+        "qq3"
+      ],
+      "broad_real": -1.102057375075902e-16,
+      "broad_imag": -2.1657940478677187e-17,
+      "selected_real": 1.6129791103580013e-18,
+      "selected_imag": -7.330868753924604e-19,
+      "difference_real": -1.118187166179482e-16,
+      "difference_imag": -2.0924853603284725e-17,
+      "amplification_relative_difference": 9.029770354512348e-12
+    }
+  ],
+  "previous_selected_imag_GeV_minus2": 2.7377230375606335e-15,
+  "with_broader_qq_imag_GeV_minus2": 2.716798183957349e-15,
+  "fractional_total_change": -0.007643159412476175,
+  "checks": {
+    "amplification_stability": true,
+    "operator_linearity": true,
+    "previous_selected_reproduced": true
+  },
+  "full_model_admitted": false
+}

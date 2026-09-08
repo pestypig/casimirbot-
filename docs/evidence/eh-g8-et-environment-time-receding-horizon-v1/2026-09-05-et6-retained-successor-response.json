@@ -1,0 +1,21 @@
+{
+  "scope": "ET6 bounded retention of received successor during evidence backpressure",
+  "classification": "tool admission",
+  "repair": "Retain one received response on the resident state instead of discarding it on transient evidence backpressure. Drain after controls and evidence delivery, with current identity, interruption revision, clock and checkpoint validation. Consume before attempting queueing; do not replay uncertain work.",
+  "verification": {
+    "native_suites": "PlayerActionRuntimeLifecycleTest, TemporalPlanDeliveryPreflightTest, FluidSequenceEngineTest PASS",
+    "slot_fixture": "One response retained through backpressure; competing response rejected; exactly one consumption; interruption invalidates retained response.",
+    "casimir_run": "2681",
+    "verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "limitations": [
+    "Interruption revision integration compiled but full asynchronous pause/response/resume HTTP interleaving has not been tested.",
+    "Memory-only response retention is not restart recovery or retry of a lost lease response.",
+    "Production wiring and packaged live qualification remain outstanding; no measured capacity promotion."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

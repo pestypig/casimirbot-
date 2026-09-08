@@ -1,0 +1,1199 @@
+{
+  "schema": "casimirbot.cfp0.licensing_inventory.v1",
+  "captured_utc": "2026-09-07T02:35:39.925Z",
+  "head": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+  "inventory": [
+    {
+      "path": "package.json",
+      "sha256": "7a85515b909c8769d98c29ef81535c1c8fa6219ed903719eb004bc0ebe9fa291",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "2c755f40f32cbf527964c668e760292d8fbeeb60cd4973dc1d1fa2e07840c888",
+      "license": null,
+      "private": null
+    },
+    {
+      "path": "sdk/package.json",
+      "sha256": "03ef1214b00c052bb863714982d1cb594d10ef4fd2af92c98caa44cd2928049b",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "cli/package.json",
+      "sha256": "c63e16629daa39ba162d6092946c6b7273ad79859c3dcd32805c45c42d803f9f",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "sha256": "5c0533e803ce91e67d2644badd7e92a203570dca1182f7a8ee0c729bf068c939",
+      "license": null,
+      "private": true
+    },
+    {
+      "path": "packages/create-casimir-verifier/LICENSE",
+      "sha256": "d2ad01b7f9a41b728135d18d838648f1dfa6f6784cd99707ae8b50fce26f6957",
+      "license": "MIT License",
+      "private": null
+    },
+    {
+      "path": "minecraft/helix-fabric-player-agent/src/main/resources/fabric.mod.json",
+      "sha256": "3a8258991cd8b21fd137939cb7f5cfc9a626e86939d291c6f5bb2617acaf872a",
+      "license": null,
+      "private": null
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/main/resources/fabric.mod.json",
+      "sha256": "baa1a4cb50a9fad752fefaef920ba8ca161c0549097b0a42a29b2fe52a26ee19",
+      "license": null,
+      "private": null
+    }
+  ],
+  "root_license_history": "No matching tracked history found in available local refs",
+  "package_license_change_commits": [
+    "cc3b9d8a72369226133424782117bfaf1804af6e 2026-01-02 feat: expand GR/warp tooling and verification",
+    "d4d99ae98d6a858d9b1c62c665d2fa3c81547b50 2025-08-11 Add files via upload",
+    "515bc564dd0b7fb4e8ab8c0030eff81c39bd0c9d 2025-07-27 Saved your changes before starting work"
+  ],
+  "distinct_author_identity_count": 6,
+  "lockfile_license_counts": {
+    "MIT": 1103,
+    "Apache-2.0": 171,
+    "ISC": 139,
+    "UNDECLARED": 143,
+    "MIT-0": 1,
+    "Python-2.0": 1,
+    "LGPL-3.0-or-later": 9,
+    "Apache-2.0 AND LGPL-3.0-or-later AND MIT": 1,
+    "Apache-2.0 AND LGPL-3.0-or-later": 3,
+    "BSD-3-Clause": 88,
+    "BSD-2-Clause": 18,
+    "SEE LICENSE IN LICENSE.txt": 2,
+    "CC-BY-4.0": 1,
+    "Unlicense": 3,
+    "(MPL-2.0 OR Apache-2.0)": 1,
+    "Zlib": 1,
+    "BlueOak-1.0.0": 3,
+    "Public Domain": 1,
+    "CC0-1.0": 1,
+    "0BSD": 1,
+    "MIT AND ISC": 1
+  },
+  "lockfile_review_candidates": [
+    {
+      "path": "node_modules/@babel/generator",
+      "version": "7.26.9",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@babel/runtime",
+      "version": "7.27.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@babel/traverse",
+      "version": "7.26.9",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@floating-ui/core",
+      "version": "1.6.9",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@floating-ui/dom",
+      "version": "1.6.13",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@floating-ui/react-dom",
+      "version": "2.1.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@floating-ui/utils",
+      "version": "0.2.9",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@hookform/resolvers",
+      "version": "3.10.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-darwin-arm64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-darwin-x64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linux-arm",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linux-arm64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linux-ppc64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linux-s390x",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linux-x64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linuxmusl-arm64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-libvips-linuxmusl-x64",
+      "version": "1.2.0",
+      "license": "LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-wasm32",
+      "version": "0.34.3",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-win32-arm64",
+      "version": "0.34.3",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-win32-ia32",
+      "version": "0.34.3",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@img/sharp-win32-x64",
+      "version": "0.34.3",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@mapbox/jsonlint-lines-primitives",
+      "version": "2.0.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@plotly/mapbox-gl",
+      "version": "1.13.4",
+      "license": "SEE LICENSE IN LICENSE.txt",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/number",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/primitive",
+      "version": "1.1.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-accordion",
+      "version": "1.2.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-alert-dialog",
+      "version": "1.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-arrow",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-aspect-ratio",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-avatar",
+      "version": "1.1.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-checkbox",
+      "version": "1.1.5",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-collapsible",
+      "version": "1.1.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-collection",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-compose-refs",
+      "version": "1.1.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-context",
+      "version": "1.1.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-context-menu",
+      "version": "2.2.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-dialog",
+      "version": "1.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-direction",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-dismissable-layer",
+      "version": "1.1.6",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-dropdown-menu",
+      "version": "2.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-focus-guards",
+      "version": "1.1.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-focus-scope",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-hover-card",
+      "version": "1.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-id",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-label",
+      "version": "2.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-menu",
+      "version": "2.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-menubar",
+      "version": "1.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-navigation-menu",
+      "version": "1.2.6",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-popover",
+      "version": "1.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-popper",
+      "version": "1.2.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-portal",
+      "version": "1.1.5",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-presence",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-primitive",
+      "version": "2.0.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-progress",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-radio-group",
+      "version": "1.2.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-roving-focus",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-scroll-area",
+      "version": "1.2.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-select",
+      "version": "2.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-separator",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-slider",
+      "version": "1.2.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-slot",
+      "version": "1.2.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-switch",
+      "version": "1.1.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-tabs",
+      "version": "1.1.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-toggle",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-toggle-group",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-tooltip",
+      "version": "1.2.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-callback-ref",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-controllable-state",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-escape-keydown",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-layout-effect",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-previous",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-rect",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-size",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/react-visually-hidden",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@radix-ui/rect",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@replit/vite-plugin-cartographer",
+      "version": "0.2.7",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@replit/vite-plugin-runtime-error-modal",
+      "version": "0.0.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@tailwindcss/node",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@tailwindcss/node/node_modules/jiti",
+      "version": "2.4.2",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@tailwindcss/node/node_modules/tailwindcss",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-android-arm64",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-darwin-arm64",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-darwin-x64",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-freebsd-x64",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-linux-arm-gnueabihf",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-linux-arm64-gnu",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-linux-arm64-musl",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-linux-x64-gnu",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-linux-x64-musl",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-win32-arm64-msvc",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/oxide-win32-x64-msvc",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": true
+    },
+    {
+      "path": "node_modules/@tailwindcss/vite",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/@tailwindcss/vite/node_modules/tailwindcss",
+      "version": "4.1.3",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/busboy",
+      "version": "1.6.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/class-variance-authority",
+      "version": "0.7.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/clsx",
+      "version": "2.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/cmdk",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/date-fns",
+      "version": "3.6.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/detect-node-es",
+      "version": "1.1.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/difflib",
+      "version": "0.2.4",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/dom-helpers",
+      "version": "5.2.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/dreamopt",
+      "version": "0.8.0",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/embla-carousel",
+      "version": "8.6.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/embla-carousel-react",
+      "version": "8.6.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/embla-carousel-reactive-utils",
+      "version": "8.6.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/enhanced-resolve",
+      "version": "5.18.1",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/fast-equals",
+      "version": "5.2.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/get-nonce",
+      "version": "1.0.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/glsl-resolve/node_modules/xtend",
+      "version": "2.2.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/graceful-fs",
+      "version": "4.2.11",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/input-otp",
+      "version": "1.4.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/khroma",
+      "version": "2.1.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/lightningcss",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/lightningcss-darwin-arm64",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-darwin-x64",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-freebsd-x64",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-linux-arm-gnueabihf",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-linux-arm64-gnu",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-linux-arm64-musl",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-linux-x64-gnu",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-linux-x64-musl",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-win32-arm64-msvc",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lightningcss-win32-x64-msvc",
+      "version": "1.29.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": true
+    },
+    {
+      "path": "node_modules/lilconfig",
+      "version": "3.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/lucide-react",
+      "version": "0.453.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/magic-string",
+      "version": "0.30.17",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/mapbox-gl",
+      "version": "1.13.3",
+      "license": "SEE LICENSE IN LICENSE.txt",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/modern-screenshot",
+      "version": "4.6.0",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/motion-dom",
+      "version": "11.13.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/motion-utils",
+      "version": "11.13.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/next-themes",
+      "version": "0.4.6",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/passport-local",
+      "version": "1.0.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/passport-strategy",
+      "version": "1.0.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/pause",
+      "version": "0.0.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/prop-types",
+      "version": "15.8.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/prop-types/node_modules/react-is",
+      "version": "16.13.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-day-picker",
+      "version": "8.10.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-hook-form",
+      "version": "7.55.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-remove-scroll",
+      "version": "2.6.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-remove-scroll-bar",
+      "version": "2.3.8",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-resizable-panels",
+      "version": "2.1.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-smooth",
+      "version": "4.0.4",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-style-singleton",
+      "version": "2.2.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/react-transition-group",
+      "version": "4.4.5",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/recharts",
+      "version": "2.15.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/regenerator-runtime",
+      "version": "0.14.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/stack-trace",
+      "version": "0.0.9",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/streamsearch",
+      "version": "1.1.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/tailwind-merge",
+      "version": "2.6.0",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/tailwindcss",
+      "version": "3.4.17",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/tailwindcss-animate",
+      "version": "1.0.7",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/tapable",
+      "version": "2.2.1",
+      "license": "UNDECLARED",
+      "dev": true,
+      "optional": false
+    },
+    {
+      "path": "node_modules/tw-animate-css",
+      "version": "1.2.5",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/use-callback-ref",
+      "version": "1.3.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/use-sidecar",
+      "version": "1.1.3",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/vaul",
+      "version": "1.1.2",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    },
+    {
+      "path": "node_modules/webgl-constants",
+      "version": "1.1.1",
+      "license": "UNDECLARED",
+      "dev": false,
+      "optional": false
+    }
+  ],
+  "limitations": [
+    "No authorship assignment or contributor agreement was established by commit identity.",
+    "Lockfile includes development/optional/transitive dependencies; not a shipped SBOM or legal compatibility verdict.",
+    "Missing metadata is an inventory gap, not proof of no license.",
+    "Available local refs only; no public history recall, remote visibility, or contract review performed."
+  ]
+}

@@ -6,6 +6,7 @@ import {
   ensureDatabase,
   flushLocalDatabaseSnapshotIfEnabled,
   getPool,
+  requireLocalDatabaseSnapshotIfEnabled,
   resetDbClient,
 } from "../db/client";
 import {
@@ -22,6 +23,10 @@ import { InstalledSecurityStore } from
   "../services/helix-account/installed-security-store";
 import { BillingEntitlementStore } from
   "../services/helix-account/billing-entitlement-store";
+
+import { temporalSuccessorLeaseSql } from "../services/environment-connectors/actions/temporal-successor-query";
+import { closeTemporalEpochGapSql } from "../services/environment-connectors/actions/temporal-epoch-gap";
+import { withSharedRealtimeRoomTransaction } from "../services/helix-ask/realtime-room/room-store/database";
 
 describe("local pg-mem persistence", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "casimirbot-local-db-"));
@@ -703,6 +708,105 @@ describe("local pg-mem persistence", () => {
       result_payload: { summary: "The time is 1000." },
       payload: { outcome: "succeeded" },
     });
+    // Seed temporal evidence against the restored real FK graph, then restart
+    // again. This tests persistence only, not plan validity or action admission.
+    const insert = async (table: string, row: Record<string, unknown>) => {
+      const columns = Object.keys(row);
+      await getPool().query(`INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(",")})`,
+        Object.values(row).map(value => value instanceof Date ? value.toISOString()
+          : value !== null && typeof value === "object" ? JSON.stringify(value) : value));
+    };
+    const authority = (await getPool().query("SELECT * FROM helix_environment_action_authorities")).rows[0];
+    const hash = `sha256:${"a".repeat(64)}`;
+    const identity = Object.fromEntries(["action_authority_id", "environment_binding_id", "room_id", "source_id", "world_id", "participant_id", "subject_binding_id", "subject_native_id"].map(key => [key, authority[key]]));
+    await insert("helix_environment_capability_catalog_snapshots", {
+      catalog_snapshot_id: "catalog:temporal-persistence", environment_binding_id: authority.environment_binding_id,
+      catalog_hash: hash, adapter_profile_id: "game.minecraft.player.fabric.v1", adapter_profile_version: 1,
+      adapter_contract_hash: hash, manifest_hash: hash, capability_descriptors: [],
+    });
+    await insert("helix_environment_action_connector_manifests", {
+      ...identity, manifest_id: "manifest:temporal-persistence", connector_installation_id: "installation:command-persistence",
+      producer_epoch_ref: "epoch:persistence", domain: "minecraft", domain_adapter: "minecraft.fabric_client.v1",
+      adapter_profile_id: "game.minecraft.player.fabric.v1", adapter_version: "test", protocol_version: "1",
+      manifest_hash: hash, capabilities: [], available_control_engines: ["native_fabric"], safety_policy: {},
+    });
+    await insert("helix_environment_action_requests", {
+      ...identity, action_request_id: "action:temporal-persistence", workflow_id: "workflow:temporal-persistence",
+      connector_manifest_id: "manifest:temporal-persistence", catalog_snapshot_id: "catalog:temporal-persistence",
+      run_id: "run:persistence", turn_id: "turn:temporal-persistence", provider_execution_id: "execution:persistence",
+      tool_call_id: "call:persistence", capability_id: "com.casimirbot.minecraft.player.sequence.execute", capability_version: 1,
+      action_kind: "execute_sequence", effect_class: "continuous_control", workflow_mode: "long_running",
+      requested_control_engine: "native_fabric", request_payload: { fixture: true }, request_hash: hash,
+      idempotency_key: "temporal:persistence", confirmation_state: "not_required", policy_version: 1,
+      status: "canceled", deadline_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+    await insert("helix_environment_temporal_frontiers", {
+      frontier_id: "frontier:persistence", goal_id: "environment_durable_goal:persistence", goal_revision: 1,
+      frontier_revision: 1, observation_evidence_ref: "observation:persistence",
+      observation_producer_epoch_ref: "observation-epoch:persistence", action_producer_epoch_ref: "epoch:persistence",
+      identity_hash: hash, payload_hash: hash, frontier_payload: { capabilities: ["walk"], execution_authority: false },
+      observed_at: new Date().toISOString(), retained_until: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const retainedPlan = {
+      plan_id: "plan:persistence", plan_hash: hash, source_plan: { nodes: [{ id: "checkpoint" }] },
+      compilation_hash: hash, compilation_artifact: { arguments: { sequence_id: "sequence:persistence" } },
+      action_request_id: "action:temporal-persistence", resident_action_request_id: "action:temporal-persistence",
+      frontier_id: "frontier:persistence", goal_id: "environment_durable_goal:persistence", goal_revision: 1,
+      reasoning_binding_id: "binding:persistence", reasoning_binding_epoch: 1,
+      client_continuation_ref: "continuation:persistence",
+      checkpoint_association: { event_id: "event:persistence", evidence_refs: ["evidence:persistence"] },
+    };
+    await insert("helix_environment_temporal_plan_admissions", retainedPlan);
+    const originalAction = (await getPool().query("SELECT * FROM helix_environment_action_requests WHERE action_request_id='action:temporal-persistence'")).rows[0];
+    const chain = [retainedPlan];
+    for (let index = 1; index <= 3; index++) {
+      const actionId = `action:temporal-successor-${index}`;
+      await insert("helix_environment_action_requests", { ...originalAction,
+        action_request_id: actionId, workflow_id: `workflow:successor-${index}`,
+        status: index === 1 ? "admitted" : "canceled",
+        request_payload: { temporal_plan: { plan_id: `plan:successor-${index}` } },
+        tool_call_id: `call:successor-${index}`, idempotency_key: `successor-${index}` });
+      const previous = chain.at(-1)!;
+      const successor = { ...retainedPlan, plan_id: `plan:successor-${index}`,
+        action_request_id: actionId, previous_plan_id: previous.plan_id,
+        previous_plan_hash: previous.plan_hash };
+      await insert("helix_environment_temporal_plan_admissions", successor);
+      chain.push(successor);
+    }
+    // Real schema + production lease CAS + strict disk barrier. Earlier
+    // admission/authorization is seeded, not proven by this persistence test.
+    await withSharedRealtimeRoomTransaction(async client => {
+      const leased = await client.query(temporalSuccessorLeaseSql,
+        ["action:temporal-successor-1", new Date().toISOString(), new Date(Date.now() + 30000).toISOString()]);
+      expect(leased.rows).toHaveLength(1);
+    }, { requireLocalSnapshot: true });
+    const savedLease = JSON.parse(fs.readFileSync(snapshotPath, "utf8")).tables.helix_environment_action_requests
+      .find((row: any) => row.action_request_id === "action:temporal-successor-1");
+    expect(savedLease).toMatchObject({ status: "leased", attempt_count: 1 });
+    await flushLocalDatabaseSnapshotIfEnabled();
+    await resetDbClient();
+    // SQL row order is not a dependency contract. A child-first snapshot must
+    // restore the exact chain without dropping children or guessing parents.
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+    snapshot.tables.helix_environment_temporal_plan_admissions.reverse();
+    fs.writeFileSync(snapshotPath, JSON.stringify(snapshot));
+    await ensureDatabase();
+    const restoredPlans = (await getPool().query("SELECT * FROM helix_environment_temporal_plan_admissions")).rows;
+    expect(restoredPlans).toHaveLength(4);
+    expect(restoredPlans).toEqual(expect.arrayContaining(chain.map(plan => expect.objectContaining(plan))));
+    expect((await getPool().query("SELECT frontier_payload FROM helix_environment_temporal_frontiers")).rows).toEqual([
+      { frontier_payload: { capabilities: ["walk"], execution_authority: false } },
+    ]);
+    expect((await getPool().query("SELECT status FROM helix_environment_action_requests WHERE action_request_id='action:temporal-persistence'")).rows[0].status).toBe("canceled");
+    expect((await getPool().query("SELECT status,attempt_count FROM helix_environment_action_requests WHERE action_request_id='action:temporal-successor-1'")).rows[0])
+      .toMatchObject({ status: "leased", attempt_count: 1 });
+    await getPool().query(closeTemporalEpochGapSql, [authority.action_authority_id, "epoch:replacement"]);
+    await requireLocalDatabaseSnapshotIfEnabled(["helix_environment_action_requests"]);
+    await resetDbClient();
+    await ensureDatabase();
+    expect((await getPool().query("SELECT status,attempt_count,cancellation_reason FROM helix_environment_action_requests WHERE action_request_id='action:temporal-successor-1'")).rows[0])
+      .toMatchObject({ status: "connector_offline", attempt_count: 1,
+        cancellation_reason: "producer_epoch_replaced_evidence_incomplete_no_replay" });
     const durableJsonRestored = await getPool().query<{
       objective_payload: unknown;
       scopes: unknown;

@@ -1,0 +1,177 @@
+{
+  "scope": "Vector temporal-current leading heavy-target rate, exact line kinematics inserted; selected elastic nuclear forms only, no incoherent nuclear/solid channels or detector fit",
+  "full_model_admitted": false,
+  "checks": {
+    "temporal_spin_trace": true,
+    "heavy_limit_phase_space": true,
+    "speed_cancellation": true,
+    "exclusive_form_bounds": true
+  },
+  "mchi_GeV": 0.247,
+  "Lambda_GeV": 11500.0,
+  "rho_GeV_cm3": 0.3,
+  "sigma_NC_cm2": 1.0808504844216564e-46,
+  "sigma_vphysical_cm3_s": 3.240308234552591e-36,
+  "neglected_recoil_amplitude_scale_m_over_carbon": 0.02209711610611201,
+  "rows": [
+    {
+      "form_prescription": "Helm",
+      "Xe_raw_all_lines_2p84ty": 4.090633188726606,
+      "local_expected_absorptions_hold": 4.284206658384048e-26,
+      "local_independent_encounter_D_le_2N": 8.568413316768096e-26,
+      "isotopes": [
+        {
+          "A": 124,
+          "recoil_keV": 263.79529375046104,
+          "raw_events": 0.006454035547524164
+        },
+        {
+          "A": 126,
+          "recoil_keV": 259.6160417761384,
+          "raw_events": 0.005340068005216661
+        },
+        {
+          "A": 128,
+          "recoil_keV": 255.5654983494138,
+          "raw_events": 0.10030731499254916
+        },
+        {
+          "A": 129,
+          "recoil_keV": 253.58404969030977,
+          "raw_events": 1.2908924633701613
+        },
+        {
+          "A": 130,
+          "recoil_keV": 251.63796500838427,
+          "raw_events": 0.18472353218595716
+        },
+        {
+          "A": 131,
+          "recoil_keV": 249.71610273349822,
+          "raw_events": 0.8907907885948205
+        },
+        {
+          "A": 132,
+          "recoil_keV": 247.82806962746227,
+          "raw_events": 1.0397013655797727
+        },
+        {
+          "A": 134,
+          "recoil_keV": 244.1307393966942,
+          "raw_events": 0.3375048998862719
+        },
+        {
+          "A": 136,
+          "recoil_keV": 240.54108272958493,
+          "raw_events": 0.23491872056433283
+        }
+      ]
+    },
+    {
+      "form_prescription": "KN",
+      "Xe_raw_all_lines_2p84ty": 0.22536815969561358,
+      "local_expected_absorptions_hold": 3.103899623668389e-26,
+      "local_independent_encounter_D_le_2N": 6.207799247336779e-26,
+      "isotopes": [
+        {
+          "A": 124,
+          "recoil_keV": 263.79529375046104,
+          "raw_events": 6.063771803608095e-05
+        },
+        {
+          "A": 126,
+          "recoil_keV": 259.6160417761384,
+          "raw_events": 3.9952262884335936e-06
+        },
+        {
+          "A": 128,
+          "recoil_keV": 255.5654983494138,
+          "raw_events": 0.0002680907328338332
+        },
+        {
+          "A": 129,
+          "recoil_keV": 253.58404969030977,
+          "raw_events": 0.011769440214450507
+        },
+        {
+          "A": 130,
+          "recoil_keV": 251.63796500838427,
+          "raw_events": 0.003755339557133609
+        },
+        {
+          "A": 131,
+          "recoil_keV": 249.71610273349822,
+          "raw_events": 0.03332508493958452
+        },
+        {
+          "A": 132,
+          "recoil_keV": 247.82806962746227,
+          "raw_events": 0.06420322535030032
+        },
+        {
+          "A": 134,
+          "recoil_keV": 244.1307393966942,
+          "raw_events": 0.04718485898867806
+        },
+        {
+          "A": 136,
+          "recoil_keV": 240.54108272958493,
+          "raw_events": 0.06479748696830821
+        }
+      ]
+    },
+    {
+      "form_prescription": "point",
+      "Xe_raw_all_lines_2p84ty": 27936.347083634628,
+      "local_expected_absorptions_hold": 2.2009535307621255e-24,
+      "local_independent_encounter_D_le_2N": 4.401907061524251e-24,
+      "isotopes": [
+        {
+          "A": 124,
+          "recoil_keV": 263.79529375046104,
+          "raw_events": 23.682272328153232
+        },
+        {
+          "A": 126,
+          "recoil_keV": 259.6160417761384,
+          "raw_events": 22.859890671780246
+        },
+        {
+          "A": 128,
+          "recoil_keV": 255.5654983494138,
+          "raw_events": 506.33952771172375
+        },
+        {
+          "A": 129,
+          "recoil_keV": 253.58404969030977,
+          "raw_events": 7107.817524387396
+        },
+        {
+          "A": 130,
+          "recoil_keV": 251.63796500838427,
+          "raw_events": 1113.0914816155357
+        },
+        {
+          "A": 131,
+          "recoil_keV": 249.71610273349822,
+          "raw_events": 5895.01250638108
+        },
+        {
+          "A": 132,
+          "recoil_keV": 247.82806962746227,
+          "raw_events": 7585.461657602545
+        },
+        {
+          "A": 134,
+          "recoil_keV": 244.1307393966942,
+          "raw_events": 3031.6163081403874
+        },
+        {
+          "A": 136,
+          "recoil_keV": 240.54108272958493,
+          "raw_events": 2650.4659147960288
+        }
+      ]
+    }
+  ]
+}

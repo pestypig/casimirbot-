@@ -1,0 +1,58 @@
+{
+  "classification": "presentation",
+  "et6_complete": false,
+  "package": {
+    "directory": "apps/desktop/release-et6-transition-diagnostic-20260905/win-unpacked",
+    "manifest_generated_at": "2026-09-05T07:13:55.308Z",
+    "client_tree_sha256": "3c24a63f45f60767aab4728e7acb998fc81c9a515a8bef9aa63aeb7d15e83342",
+    "server_sha256": "bae47cd469bdb630ec87989ba4eaa3a4f47517920060647bba30a234df658f4f",
+    "staged_runtime_files_byte_matched": 645,
+    "asar_host_preload_service_match": true,
+    "launch_pid": 33688,
+    "previous_running_build_retained": true
+  },
+  "verification": {
+    "initial_focused_run": "37 passed; one test checked the readiness spinner before the independent request settled",
+    "test_repair": "Await readiness settlement, then assert the sanitized native error remains visible",
+    "focused_rerun": "38 passed: 26 AgentConnectionSetup and 12 native transition executor tests",
+    "client_build": "passed, 37.09 seconds",
+    "host_build": "passed with four previously observed unrelated duplicate-key/case warnings",
+    "packaging": "passed after operator reclaimed disk space",
+    "diff_check": "passed with CRLF warnings"
+  },
+  "live": {
+    "service_instance_ref": "service_instance:a75cd5b59ac01ff0b907962910d0cb80",
+    "continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "presentation_before_transport_execution": "Displayed explicit five-second native transport readiness failure despite current polling presence",
+    "native_execution_outcome": {
+      "requested_scope": "full_helix_agent",
+      "requested_scope_ready": true,
+      "observed_scope": "full_helix_agent",
+      "observed_status": "ready",
+      "observed_ready": true,
+      "failure_code": null
+    },
+    "presentation_after_execution": "A subsequent MCP presentation cleared the error and exposed the enabled Bind current Helix chat control",
+    "operator_created_claim": true,
+    "claim_consumed_at": "2026-09-05T07:21:43.806Z",
+    "reasoning_binding_id": "reasoning_binding:682844c34203856dec59b416501137db",
+    "binding_epoch": 1,
+    "claim_result_status": "active",
+    "continuation_transport": "polling",
+    "helix_conversation_id": "a0be8ac6-b1c4-4ca5-a9bd-f7859b2c1bc7",
+    "mission_id": null,
+    "run_id": null,
+    "steering_read": "successful; zero deliveries; no acknowledgement fabricated",
+    "minecraft_preflight": "Saved exact environment has error connection status, no fresh observation, stale subject binding; authority inspection rejected action_adapter_admission_inactive",
+    "minecraft_action_attempted": false
+  },
+  "limitations": [
+    "The successful MCP identity is native_tunnel_client_plus_server_derived_continuation, not independent external OAuth principal proof.",
+    "Claim success does not prove mission binding, steering delivery, GPT Live, Minecraft authority, capacity acceptance, or terminal eligibility.",
+    "Native presentation request acceptance alone did not execute the transport transition.",
+    "This checkpoint does not close the end-to-end onboarding defect or ET6."
+  ],
+  "claim_handle_included": false,
+  "credentials_included": false,
+  "hidden_reasoning_included": false
+}

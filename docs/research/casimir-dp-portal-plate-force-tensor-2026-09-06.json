@@ -1,0 +1,73 @@
+{
+  "checks": {
+    "independent_normal_curvature": true,
+    "Helmholtz_trace_identity": true,
+    "one_unstable_two_restoring_directions": true,
+    "quadrature_refinement": true
+  },
+  "normal_crosscheck_relative_error": 4.340972026284362e-14,
+  "quadrature_relative_change": 1.2589929099249275e-13,
+  "rows": [
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "plate_thickness_um": 0.1,
+      "normal_acceleration_curvature_s_inverse_squared": 1982965554169.8623,
+      "parallel_acceleration_curvature_s_inverse_squared": -916712127545.7408,
+      "normal_instability_frequency_Hz": 224118.50496471432,
+      "parallel_restoring_frequency_Hz": 152383.03532727994,
+      "trace_s_inverse_squared": 149541299078.38074,
+      "relative_Helmholtz_trace_error": 9.103828801926284e-15
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "plate_thickness_um": 1.0,
+      "normal_acceleration_curvature_s_inverse_squared": 19742408432256.473,
+      "parallel_acceleration_curvature_s_inverse_squared": -9132268944683.504,
+      "normal_instability_frequency_Hz": 707164.0881554111,
+      "parallel_restoring_frequency_Hz": 480960.57499952515,
+      "trace_s_inverse_squared": 1477870542889.4597,
+      "relative_Helmholtz_trace_error": 1.7763568394002505e-15
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "plate_thickness_um": 10.0,
+      "normal_acceleration_curvature_s_inverse_squared": 185412351127635.9,
+      "parallel_acceleration_curvature_s_inverse_squared": -86120745525989.25,
+      "normal_instability_frequency_Hz": 2167152.4449240305,
+      "parallel_restoring_frequency_Hz": 1476977.9850131313,
+      "trace_s_inverse_squared": 13170860075657.406,
+      "relative_Helmholtz_trace_error": 1.4432899320127035e-15
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "plate_thickness_um": 0.1,
+      "normal_acceleration_curvature_s_inverse_squared": 5880518539952.005,
+      "parallel_acceleration_curvature_s_inverse_squared": -2718525619618.404,
+      "normal_instability_frequency_Hz": 385947.24344742025,
+      "parallel_restoring_frequency_Hz": 262413.90661593963,
+      "trace_s_inverse_squared": 443467300715.19806,
+      "relative_Helmholtz_trace_error": 9.103828801926284e-15
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "plate_thickness_um": 1.0,
+      "normal_acceleration_curvature_s_inverse_squared": 58546452592208.84,
+      "parallel_acceleration_curvature_s_inverse_squared": -27081901008371.773,
+      "normal_instability_frequency_Hz": 1217784.4508268505,
+      "parallel_restoring_frequency_Hz": 828246.6820719611,
+      "trace_s_inverse_squared": 4382650575465.294,
+      "relative_Helmholtz_trace_error": 1.7763568394002505e-15
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "plate_thickness_um": 10.0,
+      "normal_acceleration_curvature_s_inverse_squared": 549843524033678.94,
+      "parallel_acceleration_curvature_s_inverse_squared": -255392555697761.22,
+      "normal_instability_frequency_Hz": 3731983.2754571177,
+      "parallel_restoring_frequency_Hz": 2543456.1150498963,
+      "trace_s_inverse_squared": 39058412638156.445,
+      "relative_Helmholtz_trace_error": 1.4432899320127035e-15
+    }
+  ],
+  "scope": "Linearized scalar force tensor at symmetry center of isolated square plates, vacuum background and weak-source approximation. Scalar-induced restoring directions are not an authenticated apparatus trap. No global trajectory or decoherence prediction."
+}

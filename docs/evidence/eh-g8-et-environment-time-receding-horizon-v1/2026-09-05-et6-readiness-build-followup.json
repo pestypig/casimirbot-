@@ -1,0 +1,22 @@
+{
+  "scope": "Verification follow-up for expired-run readiness repair",
+  "focused_service_tests": "21 passed in the prior recorded run",
+  "api_parity_matrix": {
+    "status": "incomplete, operator-agent cancelled",
+    "session_id": 36295,
+    "reason": "No test result output after repeated live-session observations; active worker exceeded 2 GB working set with increasing CPU use. Stopped the exact test session to bound resource use.",
+    "product_regression_proven": false,
+    "worker_exit_verified": true,
+    "retry_required_for_parity_claim": true
+  },
+  "server_build": {
+    "command": "npm run build:server",
+    "exit_code": 0,
+    "warnings": "Four existing duplicate-key/case warnings in demonstration, halobank and starsim files; unrelated files preserved."
+  },
+  "live_runtime_preserved": true,
+  "exe_rebuilt_or_restarted": false,
+  "connector_diagnosis": "Current readiness remains unproven; client log confirms prior pairing, not present manifest admission. No credential files inspected and no gameplay authority renewed.",
+  "live_movement_dispatched": false,
+  "et6_acceptance": "incomplete"
+}

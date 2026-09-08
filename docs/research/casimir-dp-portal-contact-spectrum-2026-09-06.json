@@ -1,0 +1,214 @@
+{
+  "checks": {
+    "free_nucleon_normalization": true,
+    "direct_speed_fold": true,
+    "positive_windows": true,
+    "heavy_propagator_rate_correction_below_1e_minus5": true,
+    "count_ceiling_inverts": true
+  },
+  "source_sha256": "80b833d29116dbecfd6a8e436af383feb38c003d931349db6a9ca023792685fc",
+  "C_chiN_GeV_inverse_squared": 1.8017705314359717e-10,
+  "max_direct_fold_relative_error": 1.369233837422712e-09,
+  "max_heavy_propagator_relative_rate_reduction": 8.885013341952686e-06,
+  "rows": [
+    {
+      "halo": "central",
+      "mass_GeV": 100.0,
+      "sigma_nucleon_cm2": 3.482051705714871e-48,
+      "Xe_raw_5p4_269p9": 1.6386189298122198,
+      "Xe_raw_200_270": 6.756607742506089e-05,
+      "full_over_high": 24252.09501957029,
+      "C_conditional_upper_GeV_inverse_squared": 8.647063180516263e-09,
+      "raw_high_at_conditional_count_ceiling": 0.15562057358463893,
+      "raw_full_for_one_raw_high": 24252.09501957029
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 200.0,
+      "sigma_nucleon_cm2": 3.5146714179548695e-48,
+      "Xe_raw_5p4_269p9": 0.9518606691236765,
+      "Xe_raw_200_270": 0.00036002771406680776,
+      "full_over_high": 2643.853881057186,
+      "C_conditional_upper_GeV_inverse_squared": 1.1345429068486728e-08,
+      "raw_high_at_conditional_count_ceiling": 1.4275088969990848,
+      "raw_full_for_one_raw_high": 2643.853881057186
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 1000.0,
+      "sigma_nucleon_cm2": 3.541098351594325e-48,
+      "Xe_raw_5p4_269p9": 0.20823672841838484,
+      "Xe_raw_200_270": 0.00022804325694179972,
+      "full_over_high": 913.1457391504024,
+      "C_conditional_upper_GeV_inverse_squared": 2.4256545455677663e-08,
+      "raw_high_at_conditional_count_ceiling": 4.1331025002494854,
+      "raw_full_for_one_raw_high": 913.1457391504024
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 100.0,
+      "sigma_nucleon_cm2": 3.482051705714871e-48,
+      "Xe_raw_5p4_269p9": 1.6660959832036988,
+      "Xe_raw_200_270": 4.486945414032895e-05,
+      "full_over_high": 37132.07604427265,
+      "C_conditional_upper_GeV_inverse_squared": 8.575463590390292e-09,
+      "raw_high_at_conditional_count_ceiling": 0.10164055823527873,
+      "raw_full_for_one_raw_high": 37132.07604427265
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 200.0,
+      "sigma_nucleon_cm2": 3.5146714179548695e-48,
+      "Xe_raw_5p4_269p9": 0.9746914111150389,
+      "Xe_raw_200_270": 0.0003070737228343343,
+      "full_over_high": 3174.128356273855,
+      "C_conditional_upper_GeV_inverse_squared": 1.1211766552720742e-08,
+      "raw_high_at_conditional_count_ceiling": 1.1890271954865685,
+      "raw_full_for_one_raw_high": 3174.128356273855
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 1000.0,
+      "sigma_nucleon_cm2": 3.541098351594325e-48,
+      "Xe_raw_5p4_269p9": 0.21394435478674362,
+      "Xe_raw_200_270": 0.00022058910823225154,
+      "full_over_high": 969.8772369190964,
+      "C_conditional_upper_GeV_inverse_squared": 2.393079906673439e-08,
+      "raw_high_at_conditional_count_ceiling": 3.8913429389925116,
+      "raw_full_for_one_raw_high": 969.8772369190964
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 100.0,
+      "sigma_nucleon_cm2": 3.482051705714871e-48,
+      "Xe_raw_5p4_269p9": 1.6407638369911741,
+      "Xe_raw_200_270": 6.308554778915618e-05,
+      "full_over_high": 26008.553376993998,
+      "C_conditional_upper_GeV_inverse_squared": 8.641409346328743e-09,
+      "raw_high_at_conditional_count_ceiling": 0.14511091343177568,
+      "raw_full_for_one_raw_high": 26008.553376993998
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 200.0,
+      "sigma_nucleon_cm2": 3.5146714179548695e-48,
+      "Xe_raw_5p4_269p9": 0.9535568676509214,
+      "Xe_raw_200_270": 0.00035674712929688806,
+      "full_over_high": 2672.920927297394,
+      "C_conditional_upper_GeV_inverse_squared": 1.133533388367936e-08,
+      "raw_high_at_conditional_count_ceiling": 1.4119852551682972,
+      "raw_full_for_one_raw_high": 2672.920927297394
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 1000.0,
+      "sigma_nucleon_cm2": 3.541098351594325e-48,
+      "Xe_raw_5p4_269p9": 0.20866169256534084,
+      "Xe_raw_200_270": 0.00022773291464355964,
+      "full_over_high": 916.2561893696022,
+      "C_conditional_upper_GeV_inverse_squared": 2.4231832208556873e-08,
+      "raw_high_at_conditional_count_ceiling": 4.119071697809045,
+      "raw_full_for_one_raw_high": 916.2561893696022
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 100.0,
+      "sigma_nucleon_cm2": 3.482051705714871e-48,
+      "Xe_raw_5p4_269p9": 1.6368380090228092,
+      "Xe_raw_200_270": 7.129156915189966e-05,
+      "full_over_high": 22959.769696403062,
+      "C_conditional_upper_GeV_inverse_squared": 8.65176601242558e-09,
+      "raw_high_at_conditional_count_ceiling": 0.1643799126681117,
+      "raw_full_for_one_raw_high": 22959.769696403062
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 200.0,
+      "sigma_nucleon_cm2": 3.5146714179548695e-48,
+      "Xe_raw_5p4_269p9": 0.9504831299341915,
+      "Xe_raw_200_270": 0.00036263561441116126,
+      "full_over_high": 2621.0418727834067,
+      "C_conditional_upper_GeV_inverse_squared": 1.1353647580767209e-08,
+      "raw_high_at_conditional_count_ceiling": 1.4399330956001757,
+      "raw_full_for_one_raw_high": 2621.0418727834067
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 1000.0,
+      "sigma_nucleon_cm2": 3.541098351594325e-48,
+      "Xe_raw_5p4_269p9": 0.2078946455263281,
+      "Xe_raw_200_270": 0.0002282876934894722,
+      "full_over_high": 910.6695255822691,
+      "C_conditional_upper_GeV_inverse_squared": 2.4276493873771693e-08,
+      "raw_high_at_conditional_count_ceiling": 4.144340873997701,
+      "raw_full_for_one_raw_high": 910.6695255822691
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 100.0,
+      "sigma_nucleon_cm2": 3.482051705714871e-48,
+      "Xe_raw_5p4_269p9": 1.6246742305702162,
+      "Xe_raw_200_270": 8.29070987120282e-05,
+      "full_over_high": 19596.32233921735,
+      "C_conditional_upper_GeV_inverse_squared": 8.684093084517656e-09,
+      "raw_high_at_conditional_count_ceiling": 0.19259353220689196,
+      "raw_full_for_one_raw_high": 19596.32233921735
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 200.0,
+      "sigma_nucleon_cm2": 3.5146714179548695e-48,
+      "Xe_raw_5p4_269p9": 0.9343789904140941,
+      "Xe_raw_200_270": 0.0003955083074230108,
+      "full_over_high": 2362.476268835337,
+      "C_conditional_upper_GeV_inverse_squared": 1.145107037316612e-08,
+      "raw_high_at_conditional_count_ceiling": 1.597529248171147,
+      "raw_full_for_one_raw_high": 2362.476268835337
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 1000.0,
+      "sigma_nucleon_cm2": 3.541098351594325e-48,
+      "Xe_raw_5p4_269p9": 0.20303067270711828,
+      "Xe_raw_200_270": 0.0002362081332624352,
+      "full_over_high": 859.5414133413618,
+      "C_conditional_upper_GeV_inverse_squared": 2.45655668108262e-08,
+      "raw_high_at_conditional_count_ceiling": 4.390858752114393,
+      "raw_full_for_one_raw_high": 859.5414133413618
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 100.0,
+      "sigma_nucleon_cm2": 3.482051705714871e-48,
+      "Xe_raw_5p4_269p9": 1.6507961910709372,
+      "Xe_raw_200_270": 5.437244275770963e-05,
+      "full_over_high": 30360.898045855516,
+      "C_conditional_upper_GeV_inverse_squared": 8.615111189104068e-09,
+      "raw_high_at_conditional_count_ceiling": 0.12430873855820904,
+      "raw_full_for_one_raw_high": 30360.898045855516
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 200.0,
+      "sigma_nucleon_cm2": 3.5146714179548695e-48,
+      "Xe_raw_5p4_269p9": 0.9686681738858338,
+      "Xe_raw_200_270": 0.0003265192845528664,
+      "full_over_high": 2966.649198721363,
+      "C_conditional_upper_GeV_inverse_squared": 1.1246570254586598e-08,
+      "raw_high_at_conditional_count_ceiling": 1.2721844359627539,
+      "raw_full_for_one_raw_high": 2966.649198721363
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 1000.0,
+      "sigma_nucleon_cm2": 3.541098351594325e-48,
+      "Xe_raw_5p4_269p9": 0.2133771716860687,
+      "Xe_raw_200_270": 0.00021967349180434224,
+      "full_over_high": 971.3378247572924,
+      "C_conditional_upper_GeV_inverse_squared": 2.396258348139245e-08,
+      "raw_high_at_conditional_count_ceiling": 3.885491578089972,
+      "raw_full_for_one_raw_high": 971.3378247572924
+    }
+  ],
+  "scope": "Isoscalar scalar contact, Helm nuclear approximation, 2.84 tonne years, rho=.3 GeV/cm3. True recoil energy before efficiency/smearing. Conditional 50 percent acceptance floor with all 1831 events; not an LZ likelihood or full portal/solid prediction."
+}

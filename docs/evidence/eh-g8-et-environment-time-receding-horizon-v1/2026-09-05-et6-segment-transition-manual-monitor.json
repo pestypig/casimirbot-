@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 native execution transition prerequisite",
+  "finding": "Input segment to typed workflow transitions and recoverable input failure edges used global release, whose native implementation disarms ManualInputLatch while the parent sequence can remain active.",
+  "repair": "Release segment resources without global disarm on these transitions. Preserve global release for terminal settlement.",
+  "verification": {
+    "native_tests": { "passed": 72, "failed": 0, "game_tests_run": false },
+    "new_case": "Input to hotbar workflow keeps global release count zero while running; manual takeover on the following tick cancels and releases.",
+    "initial_failure": "One new test incorrectly expected exactly one release during takeover. Existing takeover and terminal cleanup both release; assertion corrected to require release, retaining zero-global-release assertion before takeover.",
+    "casimir": { "run_id": "2665", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": ["Test bridge verifies release dispatch; not a live GLFW takeover capture.", "Resident successor handoff remains unimplemented; production temporal deliveries are still rejected.", "No game deployment, EXE rebuild or live Minecraft action occurred."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

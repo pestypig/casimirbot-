@@ -1,0 +1,63 @@
+{
+  "captured_utc": "2026-09-07T03:46:07.952Z",
+  "scope": "Subscription-only documentation reconciliation, no runtime or legal acceptance",
+  "docs_audit": {
+    "exit_code": 0,
+    "stdout": "\n> rest-express@1.0.0 helix:environment-harness:docs-audit\n> tsx scripts/audit-environment-harness-work-program.ts\n\n{\n  \"schema\": \"casimirbot.environment_harness_work_program_audit.v1\",\n  \"work_program\": \"docs/helix-environment-harness-work-program-v1.md\",\n  \"active_gate\": \"G8\",\n  \"backlink_files_checked\": 6,\n  \"canonical_link_targets_checked\": 7,\n  \"capability_status_rows_checked\": 40,\n  \"allowed_maturity_terms\": [\n    \"projected\",\n    \"specified\",\n    \"implemented\",\n    \"deterministically verified\",\n    \"live accepted\",\n    \"integrated accepted\",\n    \"release-ready\"\n  ],\n  \"acceptance_claims_checked\": 14,\n  \"ok\": true,\n  \"failures\": []\n}\n",
+    "stderr": ""
+  },
+  "relative_links_checked": 35,
+  "broken_links": [],
+  "artifacts": [
+    {
+      "file": "docs/BUSINESS_MODEL.md",
+      "sha256": "b81258817b738eee7c44fb666ced9be2c5d2eb158ca3cb8955ac91ab4c7b24e7"
+    },
+    {
+      "file": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "sha256": "ba9793717541710ca118b91b494ba749266074ab1ca92e3d2910fabd7d79cac6"
+    },
+    {
+      "file": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "65223bb190294e8363a4d53d4ffe7c12ea5edbd360d0e3dfd77b98f272cff24c"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "sha256": "9d34d8c0eee1cbf2d19aee0048f9377826306a06add77a4608ee3811a409a006"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "ec77a777ff66daf8248480324547f23baf259bd6816985e1f12fbbcccba48536"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "sha256": "522593153c5e892daa72b7e437a45f431a9283e33ae5fd66e93f51bd7ff1d27f"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp3-software-commerce-v1.md",
+      "sha256": "89671b01aaf11b705115413d4c2fb539f70bc7161b450ab924af8c7647e5189a"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp3-license-enforcement-v1.md",
+      "sha256": "ae409bd67e038e7355ce11c4e084c30e728f48aeb36f981d42f9fd9f04ebf021"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp3-distribution-migration-v1.md",
+      "sha256": "c0043cda0e051a6f8b7d0c593581424f05eda7f46a9530940f82988652c73743"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "sha256": "5dffe3faa0de763f165430038358874b6d3a99c196ff110d0574ceb0e548c301"
+    },
+    {
+      "file": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-subscription-only-03/owner-decisions.json",
+      "sha256": "f6c7c6696c5046baf575c2545bf9879b0d1040c2b6532b5b62808d7898e12aec"
+    },
+    {
+      "file": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-subscription-only-03/subscription-offer-reconciliation.md",
+      "sha256": "a36c5760d3742afadb607c05adafc80a105dabf86da5ad22870f475ddde886ae"
+    }
+  ],
+  "runtime_tests": "not run: no runtime edits",
+  "stage_closure": false
+}

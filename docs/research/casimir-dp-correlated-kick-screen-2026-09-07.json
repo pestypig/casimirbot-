@@ -1,0 +1,113 @@
+{
+  "status": "toy statistics only; no predicted hit rate, scattering kernel or allowed point",
+  "rows": [
+    {
+      "x_qsep_over_hbar": 0.0001,
+      "hits_per_burst": 1,
+      "D_per_mean_hit_unclustered": 1.6666666658333333e-09,
+      "D_per_mean_hit_independent_burst": 1.6666666658333335e-09,
+      "D_per_mean_hit_aligned_burst": 1.6666666658333333e-09,
+      "aligned_over_unclustered": 1.0,
+      "COM_impulse_variance_ratio_aligned_to_independent": 1
+    },
+    {
+      "x_qsep_over_hbar": 0.0001,
+      "hits_per_burst": 10,
+      "D_per_mean_hit_unclustered": 1.6666666658333333e-09,
+      "D_per_mean_hit_independent_burst": 1.6666666533333335e-09,
+      "D_per_mean_hit_aligned_burst": 1.666666583333335e-08,
+      "aligned_over_unclustered": 9.999999505000009,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10
+    },
+    {
+      "x_qsep_over_hbar": 0.0001,
+      "hits_per_burst": 10000,
+      "D_per_mean_hit_unclustered": 1.6666666658333333e-09,
+      "D_per_mean_hit_independent_burst": 1.6666527784104844e-09,
+      "D_per_mean_hit_aligned_burst": 1.585290151921035e-05,
+      "aligned_over_unclustered": 9511.74091628208,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10000
+    },
+    {
+      "x_qsep_over_hbar": 0.01,
+      "hits_per_burst": 1,
+      "D_per_mean_hit_unclustered": 1.6666583333546647e-05,
+      "D_per_mean_hit_independent_burst": 1.6666583333546647e-05,
+      "D_per_mean_hit_aligned_burst": 1.6666583333546647e-05,
+      "aligned_over_unclustered": 1.0,
+      "COM_impulse_variance_ratio_aligned_to_independent": 1
+    },
+    {
+      "x_qsep_over_hbar": 0.01,
+      "hits_per_burst": 10,
+      "D_per_mean_hit_unclustered": 1.6666583333546647e-05,
+      "D_per_mean_hit_independent_burst": 1.6665333401599687e-05,
+      "D_per_mean_hit_aligned_burst": 0.00016658335317184524,
+      "aligned_over_unclustered": 9.995051165438618,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10
+    },
+    {
+      "x_qsep_over_hbar": 0.01,
+      "hits_per_burst": 10000,
+      "D_per_mean_hit_unclustered": 1.6666583333546647e-05,
+      "D_per_mean_hit_independent_burst": 1.535187453799922e-05,
+      "D_per_mean_hit_aligned_burst": 0.00010050636564110975,
+      "aligned_over_unclustered": 6.030412090449855,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10000
+    },
+    {
+      "x_qsep_over_hbar": 0.1,
+      "hits_per_burst": 1,
+      "D_per_mean_hit_unclustered": 0.0016658335317184525,
+      "D_per_mean_hit_independent_burst": 0.0016658335317184525,
+      "D_per_mean_hit_aligned_burst": 0.0016658335317184525,
+      "aligned_over_unclustered": 1.0,
+      "COM_impulse_variance_ratio_aligned_to_independent": 1
+    },
+    {
+      "x_qsep_over_hbar": 0.1,
+      "hits_per_burst": 10,
+      "D_per_mean_hit_unclustered": 0.0016658335317184525,
+      "D_per_mean_hit_independent_burst": 0.0016534013365123977,
+      "D_per_mean_hit_aligned_burst": 0.01585290151921035,
+      "aligned_over_unclustered": 9.516498027781143,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10
+    },
+    {
+      "x_qsep_over_hbar": 0.1,
+      "hits_per_burst": 10000,
+      "D_per_mean_hit_unclustered": 0.0016658335317184525,
+      "D_per_mean_hit_independent_burst": 9.999999425428137e-05,
+      "D_per_mean_hit_aligned_burst": 9.99173120459468e-05,
+      "aligned_over_unclustered": 0.05998037027317693,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10000
+    },
+    {
+      "x_qsep_over_hbar": 1.0,
+      "hits_per_burst": 1,
+      "D_per_mean_hit_unclustered": 0.1585290151921035,
+      "D_per_mean_hit_independent_burst": 0.1585290151921035,
+      "D_per_mean_hit_aligned_burst": 0.1585290151921035,
+      "aligned_over_unclustered": 1.0,
+      "COM_impulse_variance_ratio_aligned_to_independent": 1
+    },
+    {
+      "x_qsep_over_hbar": 1.0,
+      "hits_per_burst": 10,
+      "D_per_mean_hit_unclustered": 0.1585290151921035,
+      "D_per_mean_hit_independent_burst": 0.08220117002675971,
+      "D_per_mean_hit_aligned_burst": 0.1054402111088937,
+      "aligned_over_unclustered": 0.6651161680473607,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10
+    },
+    {
+      "x_qsep_over_hbar": 1.0,
+      "hits_per_burst": 10000,
+      "D_per_mean_hit_unclustered": 0.1585290151921035,
+      "D_per_mean_hit_independent_burst": 0.0001,
+      "D_per_mean_hit_aligned_burst": 0.00010000305614388889,
+      "aligned_over_unclustered": 0.0006308186297802104,
+      "COM_impulse_variance_ratio_aligned_to_independent": 10000
+    }
+  ]
+}

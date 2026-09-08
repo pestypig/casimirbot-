@@ -1,0 +1,52 @@
+{
+  "scope": "Stationary homogeneous thermal bath with zero chemical potential; equal internal degeneracies, leading recoil-free detailed balance; both g12 and gB capped at4pi. One populated polarization gives conservative thermal-energy comparison. Not a nonthermal-spectrum or transport exclusion; no full gauge/thermalization model.",
+  "balance": "f*=nV/(1+2nV)=1/(1+exp(gap/T)); S=x f*=1 requires T=gap/log(x-1), x>2.",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-06,
+      "max_squared_product_scale": 1.0885152428575373e+24,
+      "min_bath_temperature_keV": 18.180827596687894,
+      "required_excited_fraction": 9.186825876455628e-25,
+      "required_resonant_occupation": 9.186825876455628e-25,
+      "min_one_polarization_energy_density_GeV_cm3": 4.6763543618165476e+21,
+      "ratio_to_frozen_local_DM_density": 1.5587847872721826e+22
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-09,
+      "max_squared_product_scale": 1.088515242902991e+24,
+      "min_bath_temperature_keV": 18.180827596674177,
+      "required_excited_fraction": 9.186825876071934e-25,
+      "required_resonant_occupation": 9.186825876071934e-25,
+      "min_one_polarization_energy_density_GeV_cm3": 4.6781449522629344e+21,
+      "ratio_to_frozen_local_DM_density": 1.5593816507543116e+22
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-06,
+      "max_squared_product_scale": 1.4835544843392037e+24,
+      "min_bath_temperature_keV": 9.905416835121084,
+      "required_excited_fraction": 6.740568078599503e-25,
+      "required_resonant_occupation": 6.740568078599503e-25,
+      "min_one_polarization_energy_density_GeV_cm3": 4.1167157894649545e+20,
+      "ratio_to_frozen_local_DM_density": 1.3722385964883182e+21
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-09,
+      "max_squared_product_scale": 1.483554484412074e+24,
+      "min_bath_temperature_keV": 9.905416835112343,
+      "required_excited_fraction": 6.740568078268406e-25,
+      "required_resonant_occupation": 6.740568078268406e-25,
+      "min_one_polarization_energy_density_GeV_cm3": 4.1220200873303035e+20,
+      "ratio_to_frozen_local_DM_density": 1.374006695776768e+21
+    }
+  ],
+  "checks": {
+    "balance": true,
+    "blackbody_integral": true,
+    "integration_cutoff": true
+  },
+  "full_model_admitted": false
+}

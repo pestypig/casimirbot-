@@ -1,0 +1,36 @@
+{
+  "status": "conditional_point_nucleus_column_only",
+  "source_sha256": "c92d809cdf9dbaac381e73a78eaed8191c974f8bd78fd86910d16c17b064ca34",
+  "column_g_cm2": 400000.0,
+  "composition": "Si-28 O-16 twice, mass-number molar approximation",
+  "rows": [
+    {
+      "A": 28,
+      "Z": 14,
+      "multiplicity": 1,
+      "cross_section_cm2": 2.51538031117969e-32,
+      "optical_depth": 0.00010098649521951811
+    },
+    {
+      "A": 16,
+      "Z": 8,
+      "multiplicity": 2,
+      "cross_section_cm2": 8.10534110746293e-33,
+      "optical_depth": 6.508200667417055e-05
+    }
+  ],
+  "optical_depth": 0.00016606850189368867,
+  "uncollided_fraction": 0.9998339452867167,
+  "first_order_mean_loss_fraction": 4.091718045260761e-06,
+  "required_fast_fraction_at_stated_source_and_coupling": 8.896751485920715e-05,
+  "optical_depth_if_every_collision_removed_fast_particle": 9.327239256443367,
+  "raw_high_counts_from_uncollided_component": 11238.191230461744,
+  "limitations": [
+    "point nuclei",
+    "independent Born collisions",
+    "chosen column, not site geology",
+    "no electrons or material excitations",
+    "no redistributed spectrum",
+    "not an experimental exclusion"
+  ]
+}

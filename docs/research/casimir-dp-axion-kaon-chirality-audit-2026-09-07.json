@@ -1,0 +1,120 @@
+{
+  "scope": "Six independent JMS down-quark structures and both sd/ds orientations; H=-L, correct chirality-specific rotations, tree and linearized one-loop matching. Non-top external masses zero consistently with Yukawa approximation. Not full UV or low-energy hadronic prediction.",
+  "rows": [
+    {
+      "operator": "VddLL",
+      "orientation": "sd",
+      "tree_real": 1.0944760735425012e-14,
+      "tree_imag": 1.280983297358709e-15,
+      "finite_real": -3.440858547632525e-15,
+      "finite_imag": 1.493560911931663e-15,
+      "total_abs": 8.000415215053754e-15
+    },
+    {
+      "operator": "VddLL",
+      "orientation": "ds",
+      "tree_real": 1.0944760735425915e-14,
+      "tree_imag": -1.280983297358709e-15,
+      "finite_real": -3.440858547632289e-15,
+      "finite_imag": -1.4935609119316634e-15,
+      "total_abs": 8.000415215054822e-15
+    },
+    {
+      "operator": "VddRR",
+      "orientation": "sd",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "VddRR",
+      "orientation": "ds",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "V1ddLR",
+      "orientation": "sd",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "V1ddLR",
+      "orientation": "ds",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "V8ddLR",
+      "orientation": "sd",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "V8ddLR",
+      "orientation": "ds",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "S1ddRR",
+      "orientation": "sd",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "S1ddRR",
+      "orientation": "ds",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "S8ddRR",
+      "orientation": "sd",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    },
+    {
+      "operator": "S8ddRR",
+      "orientation": "ds",
+      "tree_real": -0.0,
+      "tree_imag": -0.0,
+      "finite_real": -0.0,
+      "finite_imag": -0.0,
+      "total_abs": 0.0
+    }
+  ],
+  "max_nonVLL_abs_GeV_minus2": 0.0,
+  "checks": {
+    "VLL_reproduced": true,
+    "nonVLL_null_within_floor": true,
+    "amplification": true
+  },
+  "full_model_admitted": false
+}

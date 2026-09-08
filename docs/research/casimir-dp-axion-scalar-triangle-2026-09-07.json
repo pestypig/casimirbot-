@@ -1,0 +1,59 @@
+{
+  "scope": "CP-even scalar trilinear triangle subset at Q=0, no full renormalization or box matching",
+  "checks": {
+    "matrix_log_derivative_matches": true,
+    "internal_mass_exchange_symmetry": true,
+    "positive_parameter_integrals": true,
+    "loop_subset_small_at_examined_points": true
+  },
+  "rows": [
+    {
+      "lambda_PhiH": 0.01,
+      "delta_y_h": -3.0395553350995375e-05,
+      "delta_y_radial": 0.061441985637186905,
+      "C_scalar_triangle_GeV_m2": 2.1741193167711916e-12,
+      "C_tree_GeV_m2": 7.211519999999999e-11,
+      "scalar_triangle_over_tree": 0.030147865037761692,
+      "scalar_rate_factor_subset": 1.0612046238418587
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "delta_y_h": -9.143144312264354e-05,
+      "delta_y_radial": 0.06144243255784559,
+      "C_scalar_triangle_GeV_m2": 6.540267042046464e-12,
+      "C_tree_GeV_m2": 2.1634559999999995e-10,
+      "scalar_triangle_over_tree": 0.030230645051466103,
+      "scalar_rate_factor_subset": 1.0613751820031596
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "delta_y_h": -0.00021448694066350215,
+      "delta_y_radial": 0.061444701874966,
+      "C_scalar_triangle_GeV_m2": 1.5344421755087966e-11,
+      "C_tree_GeV_m2": 5.048064e-10,
+      "scalar_triangle_over_tree": 0.030396646625494378,
+      "scalar_rate_factor_subset": 1.061717249377064
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "delta_y_h": -0.0003076444555960457,
+      "delta_y_radial": 0.06144764292687551,
+      "C_scalar_triangle_GeV_m2": 2.201066204769718e-11,
+      "C_tree_GeV_m2": 7.21152e-10,
+      "scalar_triangle_over_tree": 0.0305215295079223,
+      "scalar_rate_factor_subset": 1.0619746227793474
+    }
+  ],
+  "J_matrix_GeV_m2": [
+    [
+      3.555711931554129e-05,
+      3.9788721715933035e-06
+    ],
+    [
+      3.9788721715933035e-06,
+      1.2841796260801483e-06
+    ]
+  ],
+  "max_derivative_relative_error": 1.4253926261531547e-07,
+  "full_model_admitted": false
+}

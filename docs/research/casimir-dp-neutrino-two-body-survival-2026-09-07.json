@@ -1,0 +1,156 @@
+{
+  "scope": "Two-body partial width only, Dirac per-flavor; 10cm hypothetical path, no detector acceptance or phi-decay calculation",
+  "full_model_admitted": false,
+  "checks": {
+    "Dirac_trace_width": true,
+    "threshold_closes": true,
+    "partial_width_quadratic": true,
+    "flight_repartition_preserves_product": true
+  },
+  "rows": [
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 0.1,
+      "two_body_open": true,
+      "incident_GeV": 10.0,
+      "ychi": 0.002,
+      "width_GeV": 3.899693993109165e-08,
+      "proper_length_m": 5.060063193385959e-09,
+      "lab_length_m": 5.034573186608384e-08,
+      "log_escape_probability_10cm": -1986265.6931076716,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 0.1581657813700905,
+      "ychi_for_10cm_mean_flight": 1.4190945263242168e-06,
+      "yq_required_at_fixed_product": 2.8186987729146735
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 0.1,
+      "two_body_open": true,
+      "incident_GeV": 100.0,
+      "ychi": 0.002,
+      "width_GeV": 3.899693993109165e-08,
+      "proper_length_m": 5.060063193385959e-09,
+      "lab_length_m": 5.059797634316678e-07,
+      "log_escape_probability_10cm": -197636.36261216787,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 1.5895823076620286,
+      "ychi_for_10cm_mean_flight": 4.498798788261896e-06,
+      "yq_required_at_fixed_product": 0.8891262286361097
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 0.1,
+      "two_body_open": true,
+      "incident_GeV": 10000.0,
+      "ychi": 0.002,
+      "width_GeV": 3.899693993109165e-08,
+      "proper_length_m": 5.060063193385959e-09,
+      "lab_length_m": 5.060063042596074e-05,
+      "log_escape_probability_10cm": -1976.259962735461,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 158.96656881321036,
+      "ychi_for_10cm_mean_flight": 4.49891677744591e-05,
+      "yq_required_at_fixed_product": 0.08891029102945196
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "two_body_open": false,
+      "stability": "undetermined: off-shell and other channels not computed"
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "two_body_open": false,
+      "stability": "undetermined: off-shell and other channels not computed"
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 0.1,
+      "two_body_open": true,
+      "incident_GeV": 10.0,
+      "ychi": 0.002,
+      "width_GeV": 7.91800815474151e-08,
+      "proper_length_m": 2.492129037298799e-09,
+      "lab_length_m": 1.2208573632648172e-08,
+      "log_escape_probability_10cm": -8190965.055293599,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 0.03835436523513754,
+      "ychi_for_10cm_mean_flight": 6.988153871416448e-07,
+      "yq_required_at_fixed_product": 5.72397241617868
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 0.1,
+      "two_body_open": true,
+      "incident_GeV": 100.0,
+      "ychi": 0.002,
+      "width_GeV": 7.91800815474151e-08,
+      "proper_length_m": 2.492129037298799e-09,
+      "lab_length_m": 1.2458121899611526e-07,
+      "log_escape_probability_10cm": -802689.2079384633,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 0.39138344237345685,
+      "ychi_for_10cm_mean_flight": 2.2323191438153754e-06,
+      "yq_required_at_fixed_product": 1.7918584854150321
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 0.1,
+      "two_body_open": true,
+      "incident_GeV": 10000.0,
+      "ychi": 0.002,
+      "width_GeV": 7.91800815474151e-08,
+      "proper_length_m": 2.492129037298799e-09,
+      "lab_length_m": 1.246064462825708e-05,
+      "log_escape_probability_10cm": -8025.266989255868,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 39.146269623125555,
+      "ychi_for_10cm_mean_flight": 2.232545151011023e-05,
+      "yq_required_at_fixed_product": 0.1791677090243202
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 1.0,
+      "two_body_open": true,
+      "incident_GeV": 10.0,
+      "ychi": 0.02,
+      "width_GeV": 4.476232774459556e-06,
+      "proper_length_m": 4.408327054077846e-11,
+      "lab_length_m": 2.1595745898791353e-10,
+      "log_escape_probability_10cm": -463054161.0771439,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 6.784503666443479e-06,
+      "ychi_for_10cm_mean_flight": 9.294244648983876e-07,
+      "yq_required_at_fixed_product": 430.37386587809624
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 1.0,
+      "two_body_open": true,
+      "incident_GeV": 100.0,
+      "ychi": 0.02,
+      "width_GeV": 4.476232774459556e-06,
+      "proper_length_m": 4.408327054077846e-11,
+      "lab_length_m": 2.203717182822283e-09,
+      "log_escape_probability_10cm": -45377873.70334464,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 6.923181712144077e-05,
+      "ychi_for_10cm_mean_flight": 2.9689844612744494e-06,
+      "yq_required_at_fixed_product": 134.72620191090468
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 1.0,
+      "two_body_open": true,
+      "incident_GeV": 10000.0,
+      "ychi": 0.02,
+      "width_GeV": 4.476232774459556e-06,
+      "proper_length_m": 4.408327054077846e-11,
+      "lab_length_m": 2.2041634282923951e-07,
+      "log_escape_probability_10cm": -453686.86693741125,
+      "longest_lab_length_with_yq_below_sqrt4pi_m": 0.006924583633634678,
+      "ychi_for_10cm_mean_flight": 2.9692850508446612e-05,
+      "yq_required_at_fixed_product": 13.471256317618058
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "two_body_open": false,
+      "stability": "undetermined: off-shell and other channels not computed"
+    }
+  ]
+}

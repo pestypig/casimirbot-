@@ -1,0 +1,20 @@
+{
+  "source": "Read-only exact-request projection from packaged service persisted action-results table",
+  "snapshot_saved_at": "2026-09-07T04:40:08.141Z",
+  "action_request_id": "action_request:et6-live-20260907-diagnostic03",
+  "status": "failed",
+  "outcome": "capability_unavailable",
+  "summary": "Temporal delivery failed source, compilation, paired identity, clock or inventory-sensor validation; no execution started.",
+  "completed_at": "2026-09-07T04:37:40.035Z",
+  "received_at": "2026-09-07T04:37:40.058Z",
+  "started_at": null,
+  "controls_released": true,
+  "player_motion_performed": false,
+  "side_effects_performed": false,
+  "verified_terminal_measurements": {},
+  "admission_proven": true,
+  "successful_execution_proven": false,
+  "rolling_extensions_proven": 0,
+  "next_boundary": "Native temporal validation; compound reason requires narrower diagnosis",
+  "et6_complete": false
+}

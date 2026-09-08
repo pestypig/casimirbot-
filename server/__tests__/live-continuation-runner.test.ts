@@ -89,6 +89,18 @@ const ingestResult = (event: HelixWorldEvent, overrides: Partial<WorldEventInges
 });
 
 describe("live continuation runner", () => {
+  it("preserves the canonical route-drift evidence ID without adding another prefix", async () => {
+    const job = upsertLiveContinuationJob({ thread_id: "thread:minecraft", room_id: "room:overworld",
+      source_ids: ["source:paper"], objective: "Observe route changes.", now: "2026-06-02T02:19:59.000Z" });
+    const tick = await runLiveContinuationTick({ job, trigger: "world_event",
+      worldEventResult: ingestResult(minecraftEvent(), {
+        minecraft_route_drift_event: { drift_event_id: "minecraft_route_drift:canonical" } as never,
+      }), now: "2026-06-02T02:20:01.000Z" });
+    expect(tick.evidence_refs).toContain("minecraft_route_drift:canonical");
+    expect(tick.evidence_refs).not.toContain("minecraft_route_drift:minecraft_route_drift:canonical");
+    expect(tick).toMatchObject({ assistant_answer: false, terminal_eligible: false });
+  });
+
   beforeEach(() => {
     resetLiveContinuationJobsForTest();
     resetLiveContinuationRunnerForTest();

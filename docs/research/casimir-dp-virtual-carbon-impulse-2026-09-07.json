@@ -1,0 +1,15 @@
+{
+  "status": "independent_free_carbon_impulse_benchmark_not_inclusive_solid_bound",
+  "total_cross_section_cm2": 1.0126285899519122e-40,
+  "mean_events_in_hold": 9.146464943084534e-26,
+  "decoherence_filter_bound_twice_events": 1.8292929886169067e-25,
+  "forward_amplitude_cross_section_envelope_cm2": 2.9542378135966563e-40,
+  "max_free_carbon_recoil_keV": 121.15491612587995,
+  "refinement_relative": 6.217248937900877e-15,
+  "assumptions": [
+    "same xenon-normalized virtual nuclear interaction",
+    "independent stationary free carbon nuclei",
+    "entire kinematic interval; low-q portion not validated as solid impulse response",
+    "no coherent pair terms, electrons or phonon response; not added to continuum result"
+  ]
+}

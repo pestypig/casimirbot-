@@ -1,0 +1,18 @@
+{
+  "et6_complete": false,
+  "classification": "adapter execution",
+  "change": "FluidSequenceEngine can enter an already-present stabilization graph without resetting clocks, effect counters, checkpoints or node history. It cancels an active child before redirecting, releases inputs, and rejects missing, repeated, settled or potentially replaying targets.",
+  "verification": {
+    "native_filter": "*FluidSequenceEngineTest",
+    "result": "BUILD SUCCESSFUL",
+    "exit_code": 0,
+    "new_fixture": "stabilizationPreservesPerformedEvidenceAndCannotReplayOrRestart",
+    "proven": ["input release", "retained executed-node history", "current input node recorded canceled", "rejected target leaves input state unchanged", "no repeated stabilization or restart"],
+    "not_proven": ["child cancellation effect aggregation under live mutation", "runtime watermark routing", "reactive scheduler stabilization", "cross-plan continuation", "live Minecraft execution"]
+  },
+  "runtime_caller_present": false,
+  "deployed": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

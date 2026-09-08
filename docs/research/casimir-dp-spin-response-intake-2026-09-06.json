@@ -1,0 +1,46 @@
+{
+  "upstream_commit": "50581c637069305a3def3865462ef1b4ed9a616d",
+  "records": [
+    {
+      "source": "https://api.github.com/repos/bradkav/WIMpy_NREFT/contents/WIMpy/Nuclei.txt?ref=50581c637069305a3def3865462ef1b4ed9a616d",
+      "file": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\docs\\research\\casimir-dp-spin-response-intake-2026-09-06\\WIMpy__Nuclei.txt",
+      "sha256": "f10638d10f196e98d69887e72e46909e131306946fd3f4b64aa177d2fd79b813"
+    },
+    {
+      "source": "https://api.github.com/repos/bradkav/WIMpy_NREFT/contents/WIMpy/WS1.py?ref=50581c637069305a3def3865462ef1b4ed9a616d",
+      "file": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\docs\\research\\casimir-dp-spin-response-intake-2026-09-06\\WIMpy__WS1.py",
+      "sha256": "c1a31d8b543cae5ade1c026fa14ec51e8ff1a858268404352eaf3217c731f08d"
+    },
+    {
+      "source": "https://api.github.com/repos/bradkav/WIMpy_NREFT/contents/WIMpy/WS2.py?ref=50581c637069305a3def3865462ef1b4ed9a616d",
+      "file": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\docs\\research\\casimir-dp-spin-response-intake-2026-09-06\\WIMpy__WS2.py",
+      "sha256": "bcb52680c7dcf397a9bbe2b8577b1cd5d3121f766b36eb9b6c7a250ce5afa086"
+    },
+    {
+      "source": "https://api.github.com/repos/bradkav/WIMpy_NREFT/contents/LICENSE.md?ref=50581c637069305a3def3865462ef1b4ed9a616d",
+      "file": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\docs\\research\\casimir-dp-spin-response-intake-2026-09-06\\LICENSE.md",
+      "sha256": "b84122bafe1db4faf284a084f70348f015085b6f5a34c1668dbc0646eeec1e76"
+    }
+  ],
+  "coverage": {
+    "WS1": {
+      "C12": false,
+      "C13": false,
+      "Xe129": true,
+      "Xe131": true
+    },
+    "WS2": {
+      "C12": false,
+      "C13": false,
+      "Xe129": true,
+      "Xe131": true
+    }
+  },
+  "checks": {
+    "missing_C13_rejected": true,
+    "Xe129_coverage_present": true,
+    "Xe131_coverage_present": true
+  },
+  "joint_prediction_admitted": false,
+  "meaning": "Coverage is not normalization, provenance equivalence to LZ, or numerical validation. C12 zero-spin absence differs physically from missing C13."
+}

@@ -1,0 +1,46 @@
+{
+  "source": "https://arxiv.org/pdf/2411.04268v3",
+  "source_locations": "eqs 81, 98-100, 111-112; footnote 35",
+  "inputs": {
+    "C_RGI_imag_GeV_minus2": 1.5989874072455352e-15,
+    "nf_lattice": "2+1",
+    "Bhat": 0.7533,
+    "Bhat_sigma": 0.0091,
+    "fK_charged_proxy_GeV": 0.1557,
+    "fK_sigma_GeV": 0.0007,
+    "mK_GeV": 0.497611,
+    "kappa": 0.92,
+    "dmK_GeV": 3.484e-15
+  },
+  "conditional_epsilon_NP_magnitude": 0.0009043855957206955,
+  "fraction_observed": 0.4059181309338849,
+  "ratio_to_previous_bag": 0.9879344262295083,
+  "input_only_covariance_scenarios": [
+    {
+      "rho": -1,
+      "relative_sigma": 0.003088529928814183
+    },
+    {
+      "rho": 0,
+      "relative_sigma": 0.015059234460917451
+    },
+    {
+      "rho": 1,
+      "relative_sigma": 0.02107183114910962
+    }
+  ],
+  "excluded_uncertainties": [
+    "neutral/isospin conversion",
+    "UV matching",
+    "SM input scheme",
+    "QCD truncation",
+    "CKM and signed SM amplitude",
+    "kappa and mass inputs"
+  ],
+  "checks": {
+    "bag_linear_scaling": true,
+    "covariance_extrema": true
+  },
+  "model_admitted": false,
+  "exclusion_or_fit": false
+}

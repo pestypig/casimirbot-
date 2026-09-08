@@ -494,6 +494,11 @@ connectors/hardware-tools/
 ├─ simulation/
 ├─ dfm-and-slicer/
 └─ instruments/
+connectors/laboratory-providers/                       # CPE profiles; no implied access
+├─ oqtant/
+├─ amazon-braket/
+├─ cloud-lab/
+└─ mhs/
 hardware/projects/
 ├─ motorcycle-hud/
 │  ├─ theory-design-links/
@@ -562,6 +567,78 @@ Stop or fail the path when:
 The first implementation goal for this lane is HDH-0A. It can proceed as a
 separate planning/contract packet while HUDH-0C2 builds the reusable visual
 workspace, provided neither claims completion of the other's open dependency.
+
+## Callable physical experiments and cloud laboratories
+
+Program gate: G8 — environment-harness release evaluation; nonperturbing parallel scientific-environment planning lane that cannot substitute for G8 or a research-program gate
+Workstream: Cloud laboratories, self-driving laboratories, and programmable scientific hardware
+Capability or component: Callable Physical Experiment Environment (`CPE-0`)
+Lifecycle stage: frozen experiment requirement → capability match → feasibility/quote → human approval → physical execution → calibrated evidence → independent analysis → research-program review
+Reaction timescale: asynchronous human-approved experimental work; deterministic apparatus controllers and interlocks remain outside model reasoning
+Authority owner: the user owns provider choice, spending, submission and data release; the provider owns apparatus operation and physical safety; Helix owns compatibility, identity, budgets, provenance and evidence admission; Runtime Codex proposes and analyzes but cannot self-authorize or promote theory maturity
+Current maturity: specified
+Target maturity: deterministically verified provider-neutral contracts and a read-only capability registry; live maturity remains provider- and apparatus-specific
+Required evidence: dated provider capability snapshots; exact requirement/capability/quote/approval/job/instrument/calibration identity; field-level compatibility; cost and idempotency controls; raw/failed/aborted/negative results; uncertainty, deviations and independent replay; stale, credential, cost, calibration, prompt-injection and circular-evidence poison cases
+Explicit non-goals: universal laboratory access, arbitrary apparatus construction, autonomous purchasing, hidden/unbounded experimentation, model-visible credentials, LLM replacement of fast control/interlocks, job-completion-as-validation, cross-domain evidence inheritance, or automatic NHM2/Casimir/warp/device/safety promotion
+Downstream gate unlocked: CPE-0A may define the read-only provider capability registry and compatibility matrix; no account connection, quote, booking, job submission or physical execution is authorized
+
+The detailed provider-neutral plan is
+`docs/work-packets/eh-cpe-0-callable-physical-experiment-environment-v1.md`.
+It fills the missing boundary between the Hardware Definition digital thread
+and a real external experiment. The harness must first translate a theory or
+device question into an `ExperimentRequirementSpec`: exact sample and geometry,
+permitted interventions, observable, range/sensitivity/cadence, calibration,
+controls, nuisance model, uncertainty, falsifiers, cost ceiling, data policy and
+frozen analysis. Only then may it compare that requirement with a dated
+`LaboratoryCapabilityManifest`.
+
+Compatibility has four explicit outcomes:
+
+```text
+compatible
+compatible_with_commissioning
+incompatible
+unknown
+```
+
+Matching on words such as `quantum`, `bosonic`, `Casimir`, or `materials` is
+forbidden. Oqtant is a meaningful example of remote manipulation and
+measurement of a supported rubidium-87 BEC, and Aquila is a meaningful example
+of physical neutral atoms executing a supported analog Hamiltonian program.
+Neither becomes Casimir-apparatus, gravitational, spacetime, or NHM2 evidence
+without an independently frozen requirement whose exact controls and
+observables the platform can satisfy.
+
+The architecture deliberately preserves the successful environment-harness
+split. Codex may select a scientific question, propose an experiment batch and
+analyze measurements. Helix admits a provider capability, exact protocol,
+budget and evidence route. The user approves consequential external execution.
+The laboratory scheduler and deterministic apparatus controller execute under
+their own interlocks. Raw measurements, calibration state, exact executed
+protocol, failures, negative results, deviations and uncertainty return as
+nonterminal evidence. Only the owning research program may change a claim
+ceiling.
+
+Cloud-lab access, self-driving experiment selection, and laboratory automation
+are three independent classifications. A public API does not prove current
+entitlement; a research preview does not prove deployment; a completed job does
+not prove the provider ran the requested calibrated protocol; and an
+interoperability standard does not supply laboratory time or unsupported
+apparatus capability.
+
+The staged lane is:
+
+| Phase | Build | Promotion boundary |
+| --- | --- | --- |
+| CPE-0A | read-only provider capability registry, requirement schema and compatibility matrix | documentation/compatibility planning only |
+| CPE-0B | shadow feasibility and quote normalization | no booking or experiment |
+| CPE-0C | one attended, approved, idempotent single-provider job | execution receipt only; no scientific conclusion |
+| CPE-0D | calibrated raw evidence ingestion and independent replay | exact empirical result only |
+| CPE-0E | bounded multi-round/self-driving loop with frozen search and cost envelopes | exact optimization study only |
+| CPE-0F | local/MHS-style instrument profile with independent interlocks | exact device/configuration only |
+
+The first goal is `CPE-0A`. It requires no provider credential, account, quote,
+purchase, external submission, or apparatus run.
 
 ## Bidirectional cross-environment object traversal
 
@@ -2678,6 +2755,7 @@ the natural prompt to fit the adapter.
 | HUDH-0C | shared UI/MCP surface orchestration | one versioned Surface Registry, HUD Surface Studio, Visual Evidence panel, typed panel-launch context, clean-output leases, and provider-neutral MCP tools over the same desired state and receipts | UI/MCP parity, exact principal/source/profile/epoch/revision binding, stale-write conflicts, scoped unattended leases, human takeover, revoke/sign-out cleanup, context poison tests, Codex result re-entry, model-unavailable continuity, and no panel-click automation | configuration and observation orchestration only; no private agent loop, silent permission expansion, program input, reflex authority, physical-output acceptance, or safety claim |
 | HDH-0A | scientific hardware-definition contracts | theory-design links, hardware environment profiles, component/reference/design manifests, experiment-closure packets, and canonical project registry | provenance/classification, unit/scale, immutable identity, claim-ceiling, preregistration and circular-evidence poison fixtures | design metadata only; no CAD execution, fabrication, empirical evidence, proof promotion, or physical viability claim |
 | HDH-0B–0F | Hardware Workspace through fabrication handoff | shared UI/MCP workspace, governed CAD/EDA adapters, compatibility graph, instrument evidence, and human-released fabrication package | phase-specific parity, lease, fixed-view, compatibility, uncertainty, independent-measurement and exact as-built identity evidence defined above | each phase retains its own boundary; no stage inherits theory, device-performance, product or certification authority |
+| CPE-0A–0F | callable physical experiment environment | provider capability registry, exact experiment compatibility, feasibility/quote, human-approved execution, calibrated evidence return, bounded self-driving iteration, and local/MHS-style instrument profiles | capability snapshot, field-level match, account/credential isolation, cost/idempotency/cancellation, raw/failed/negative evidence, calibration/uncertainty, independent replay, interlocks and provider-specific attended acceptance | each result is apparatus/provider-specific; no universal lab access, automatic theory promotion, or cross-domain evidence inheritance |
 | EOT-0A–0F | bidirectional environment object traversal | portable object packages, exact Minecraft region extraction, local scan/reconstruction layers, optional user-connected image-to-3D, code/CAD target compilers, and separately admitted realization | frame/unit/provenance identity, exact discrete round trips, geometry/voxel residuals, privacy/retention, external upload/cost leases, target loss reports, action/postcondition receipts and poison cases | translation and exact tested realization only; no cross-environment identity, generated-geometry measurement, automatic mutation, fabrication or safety claim |
 | MSH-0A–0F | multimodal sensing, recording and guidance | shared session/track/timeline/recipe contracts, Capture Session Composer, local media/memo tracks, depth/LiDAR/pose alignment, clean HUD guidance, simulated oracle/sensor differential and EOT integration | per-track consent, exact device/profile/source/epoch/frame/clock identity, bounded storage, privacy, guidance/source separation, stale/revoke behavior, UI/MCP parity and postcondition evidence | user-composed bounded evidence and assistance only; no ambient recording, hidden modality, automatic command, physical maturity or safety authority |
 | CRS-0A–0E | connected reasoning and Shared Live Room sessions | remote device contribution, permissioned multimodal evidence, participant intent, GPT Realtime voice presentation, screen/video/HUD projection and later multi-host federation | exact room/run/turn/participant/node/device/source/epoch identity, independent grants, dimensioned intake/reasoning budgets, cursor/gap/reconnect behavior, intent attribution/conflict handling, certainty/playback parity, one arbiter/terminal writer and stop/revoke evidence | exact authorized room journeys only; no ambient device access, hidden reasoning sharing, transcript-to-command shortcut, automatic permission union, continuous-cloud dependency or inherited multi-host acceptance |
@@ -3242,6 +3320,70 @@ Verification record:
   `tool admission` and `presentation`; and
 - `npm run helix:environment-harness:docs-audit` passed with zero failures.
 
+### VSE-0C1 implementation record — 2026-09-04
+
+Program gate: G8 — environment-harness release evaluation; parallel bounded visual-evidence implementation lane that cannot substitute for G8 closure
+Workstream: Visual Sequence Evidence and governed Codex evidence re-entry
+Capability or component: VSE-0C1 MCP Visual Sequence Reader and Codex Chat Bridge
+Lifecycle stage: User-selected VSE artifact → short-lived reasoning grant → exact bound-chat MCP retrieval → evidence re-entry
+Reaction timescale: Operator-requested diagnostic/reasoning path; outside the resident controller, HUD render, and safety-reflex loops
+Authority owner: Authenticated developer profile owns capture and explicit evidence exposure; Visual Sequence service owns profile/artifact/grant validation; active Runtime Codex binding owns only the admitted read request; the completed Codex solver retains answer authority
+Current maturity: implemented
+Target maturity: deterministically verified
+Required evidence: Versioned grant and evidence-packet schema tests; profile, sequence, grant, binding-ID, binding-epoch, and MCP-client identity rejection tests; six-frame and 12 MiB limit tests; unavailable-vision response; expiry/revoke/restart fail-closed behavior; real MCP image-content re-entry; poisoned screen-text fixtures; developer panel/account-lock checks; typed Surface Workspace routing; focused builds, Ask discipline check, and environment-harness docs audit
+Explicit non-goals: Continuous or hidden screen sharing, autonomous capture, arbitrary resampling, automatic HUD reconfiguration, program input, environment mutation, typed-world-state replacement, reflex authority, private model/tool loop, physical projection, optical/CAD validation, human-factors result, or road/safety claim
+Downstream gate unlocked: VSE-0C1T may deterministically verify this implemented slice; later VSE-0C increments may add admitted resampling and comparison only after the retrieval boundary is verified; VSE-0M remains the separate Minecraft visual-correlation stage
+
+VSE-0C1 turns the VSE-0A/VSE-0B outputs into a reusable, bounded Codex
+observation source. It does not make the Motorcycle HUD Lab itself the model
+interface. The new developer-only `Visual Evidence` panel lists profile-owned,
+unexpired sequence manifests, displays the normalized contact sheet and exact
+timestamped frame set, provides the existing local-clip import control, receives
+VSE-0B surface captures made by admitted source panels, and can expose one
+selected sequence to Codex for five minutes. Reissuing a
+grant revokes the previous active grant for that sequence; explicit revocation,
+expiry, process restart, artifact expiry, sign-out/profile mismatch, or missing
+identity fails closed. Grants are intentionally process-local and do not revive
+after a harness restart.
+
+The full environment MCP catalog now supplies four observational tools:
+
+- `helix_visual_sequence_list` lists only sequences with an active user-issued
+  grant after validating the exact active reasoning binding and authenticated
+  MCP client;
+- `helix_visual_sequence_inspect_manifest` returns the immutable manifest,
+  decode receipt, and grant provenance without pixels;
+- `helix_visual_sequence_get_contact_sheet` returns one WebP contact sheet and
+  a versioned evidence packet, or a typed `vision_unsupported` result without
+  pixels; and
+- `helix_visual_sequence_get_frames` returns at most six exact manifest frames
+  with timestamp/hash provenance under a total 12 MiB image budget.
+
+Every pixel-bearing result binds the owner profile, sequence, source, producer
+epoch, manifest hash, reasoning grant, reasoning binding ID and binding epoch.
+Its content role is explicitly an observation rather than an assistant answer;
+`reentry_required` is true, `terminal_eligible` is false, and environment,
+typed-world, HUD and controller authority remain false. Text visible inside a
+frame is untrusted evidence, never an executable command. Codex owns image
+reasoning and ordinary tool-result re-entry; the harness does not implement a
+private sampler, model loop, retry loop, terminal writer, or hidden automation.
+
+The panel is registered as `visual-evidence`, remains available through the
+developer wildcard policy, and is locked for public/no-session users. It is a
+typed `visual_evidence` destination in the general Surface Workspace, so a HUD,
+Minecraft client, or other admitted program surface can route its exact
+`sequence_id` into this workspace without inventing a motorcycle-specific
+bridge. This preserves the intended modularity: HUD rendering demonstrates
+working mechanisms, VSE captures bounded visual evidence, Surface Workspace
+routes identity, and Runtime Codex reasons over deliberately admitted evidence.
+
+Patch classifications are `tool admission`, `evidence normalization`,
+`evidence re-entry`, and `presentation`. Per the user's direction, functional
+tests, production builds, discipline checks, and documentation audit are
+deferred to the next VSE-0C1T goal. Therefore this record claims only
+`implemented`; it is not deterministic, live, integrated, optical, or safety
+acceptance evidence.
+
 ## Open decision register
 
 Resolve these in order and record evidence rather than preference:
@@ -3339,6 +3481,21 @@ Resolve these in order and record evidence rather than preference:
     and resolved without merging them into an unauthored prompt; and
 48. the exact GPT Realtime/Codex handoff, terminal-artifact, voice playback and
     text-certainty parity evidence required before a connected-call claim.
+49. the minimum `ExperimentRequirementSpec` fields needed to compare a theory
+    prediction with a real provider without matching on domain labels alone;
+50. which provider capability facts are static documentation, current live
+    availability, account entitlement, calibration state, or commissioning
+    estimates, and how quickly each expires;
+51. the first contrasting read-only CPE-0A provider snapshots and manufactured
+    compatibility/incompatibility fixtures;
+52. the approval strength, idempotency, reconciliation, cancellation and cost
+    ceilings required before any external experiment submission;
+53. the raw, failed, aborted, negative, calibration, uncertainty and deviation
+    artifacts required before a provider result can enter an
+    `ExperimentClosurePacket`; and
+54. whether any NHM2/Casimir frozen observable is actually compatible with a
+    documented remote platform, requires commissioning, is incompatible, or
+    remains unknown—without granting progress to the active research gate.
 
 ## Program evidence and documentation rules
 
@@ -3369,6 +3526,9 @@ Resolve these in order and record evidence rather than preference:
   localization, scale bands, runtime rows, uncertainty and claim boundaries
 - `docs/architecture/theory-experiment-procedure.md` for governed procedure and
   evidence-re-entry structure
+- `docs/work-packets/eh-cpe-0-callable-physical-experiment-environment-v1.md`
+  for provider-neutral remote-laboratory capability, compatibility, approval,
+  execution and calibrated-evidence boundaries
 - `docs/specs/casimir-tile-spec-v1.md` as a precedent for separating a physical
   lab coupon from a system-mechanism abstraction; its values and maturity do not
   transfer to the motorcycle project

@@ -1,0 +1,25 @@
+{
+  "scope": "Server compiler artifacts through native handoff and server projection storage",
+  "compiler_fixture_tests": 1,
+  "native_transport_tests_enabled": 8,
+  "server_projection_tests_enabled": 2,
+  "passed": true,
+  "verified": [
+    "Hash-linked predecessor/successor compiler artifacts",
+    "Server canonical bytes consumed unchanged by native preflight",
+    "Compiled walk queued without early activation and applied at committed tick",
+    "Runtime identity advancement and paired event/projection publication",
+    "Workflow event schema and real server projection hash/storage/digest compatibility"
+  ],
+  "fixture_failures_corrected": [
+    "Future activation tick incorrectly used as observed clock origin",
+    "Canonical hash bytes reserialized at receiver",
+    "Fixture engine enum native instead of native_fabric"
+  ],
+  "limits": [
+    "Simulated clocks and perception, no live capacity measurement",
+    "Broker admission and retained-plan workflow validation not yet joined",
+    "Minimal projection storage fixture, not full authenticated persistence graph",
+    "No installed artifact or live session changed"
+  ]
+}

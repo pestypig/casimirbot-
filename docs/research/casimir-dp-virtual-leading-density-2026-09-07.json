@@ -1,0 +1,35 @@
+{
+  "status": "conditional_leading_NR_density_component_not_full_model_prediction",
+  "source_sha256": {
+    "casimir-dp-electron-scalar-twist-fit-2026-09-07.json": "d70de5ed2b689e2dd88b6fdb76396f0732d16423ce7508ab000bfa1c5dad6b39",
+    "casimir-dp-electron-unit-contact-2026-09-07.json": "3dcaf0f4eb4ab7e66f4b67f3175098b2a93bcfce8195539ec298343c3bf6a9d9",
+    "casimir-dp-electron-box-ward-2026-09-07.json": "b973041240db7f6df31375ddc50166a7a8f10f7034e0c8e78b877bf7add6010f"
+  },
+  "W_density_GeV_minus2": 1.8030772587731946e-12,
+  "rows": [
+    {
+      "response": "withLFE",
+      "D_leading_density_covered": 3.5849014699167266e-43,
+      "inherited_grid_refinement_relative": 0.0033931484705127524
+    },
+    {
+      "response": "noLFE",
+      "D_leading_density_covered": 4.601895694966135e-43,
+      "inherited_grid_refinement_relative": 0.003566450326495052
+    }
+  ],
+  "coverage": {
+    "energy_eV": [
+      5.5,
+      50
+    ],
+    "momentum_max_keV": 30.614
+  },
+  "limitations": [
+    "leading nonrelativistic density term only",
+    "complete Majorana and nonforward matching unresolved",
+    "no kinetic/stress or spin response included",
+    "no subgap surface or multi-constituent contribution",
+    "not measured sensitivity or exclusion"
+  ]
+}

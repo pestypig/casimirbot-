@@ -12,6 +12,14 @@ import {
   type HelixAgentClientReadiness,
 } from "@shared/helix-agent-client-readiness";
 import type { HelixLocalSupervisorPresence } from "@shared/helix-local-supervisor-coordination";
+import { helixEnvironmentSessionRequestSchema, helixEnvironmentSessionSelectionSchema } from "@shared/helix-environment-session-request";
+import { readyUpEnvironmentSession } from "../services/environment-connectors/session/ready-up-session";
+import { prepareBrowserEnvironmentSession } from "../services/environment-connectors/session/prepare-browser-session";
+import { isEnvironmentDurableGoalError } from "../services/environment-connectors/goals/durable-goal-store";
+import { isRoomEnvironmentSubjectError } from "../services/environment-connectors/subjects/subject-binding-store";
+import { isEnvironmentActionAuthorityError } from "../services/environment-connectors/actions/authority-store";
+import { readSharedRealtimeRoomMembership } from "../services/helix-ask/realtime-room/room-store";
+import { resolveReasoningRunAssociation } from "../services/local-supervisor/reasoning-run-association";
 import {
   helixAgentAccountLinkStore,
   type HelixAgentAccountBindingProjection,
@@ -43,9 +51,15 @@ export type AgentConnectionsRouterDependencies = {
   coordinationStore: PresenceStore;
   reasoningBindingStore?: Pick<
     HelixReasoningTaskBindingStore,
-    "issueClaim" | "dispatch" | "revoke" | "inspect" | "inspectEvent"
+    "issueClaim" | "dispatch" | "revoke" | "inspect" | "inspectEvent" | "inspectCurrent" | "inspectLatest"
   >;
   resolveSession?: (sessionId?: string | null) => Promise<SessionRecord | null>;
+  resolveRunAssociation?: typeof resolveReasoningRunAssociation;
+  preparationBindingStore?: Pick<HelixReasoningTaskBindingStore,
+    "resolveOwnedPreparationTarget" | "verifyTaskAssociation">;
+  prepareEnvironmentSession?: typeof readyUpEnvironmentSession;
+  prepareBrowserSession?: typeof prepareBrowserEnvironmentSession;
+  readPreparationMembership?: typeof readSharedRealtimeRoomMembership;
 };
 
 const setPrivateHeaders = (res: Response): void => {
@@ -134,6 +148,7 @@ export const createAgentConnectionsRouter = (
   );
   const bindingStore = dependencies.bindingStore ?? helixAgentAccountLinkStore;
   const resolveSession = dependencies.resolveSession ?? getAccountSessionById;
+  const resolveRunAssociation = dependencies.resolveRunAssociation ?? resolveReasoningRunAssociation;
 
   router.get("/session/agent-connections/readiness", async (req: Request, res: Response) => {
     try {
@@ -203,6 +218,8 @@ export const createAgentConnectionsRouter = (
         authenticated_mcp_client_ref: presence?.authenticated_mcp_client_ref ?? null,
         client_session_ref: presence?.client_session_ref ?? null,
         conversation_thread_ref: presence?.conversation_thread_ref ?? null,
+        verified_run_association: presence && !authorizationChangedAfterPresence
+          ? await resolveRunAssociation(presence) : null,
         proof_basis: presence ? "authenticated_presence_tool" : "none",
         observed_at: presence?.observed_at ?? null,
         heartbeat_expires_at: presence?.heartbeat_expires_at ?? null,
@@ -252,6 +269,7 @@ export const createAgentConnectionsRouter = (
     helix_conversation_id: z.string().trim().min(3).max(320),
     mission_id: z.string().trim().min(3).max(320).nullable().optional(),
     run_id: z.string().trim().min(3).max(320).nullable().optional(),
+    run_verification_ref: z.string().trim().min(3).max(320).optional(),
     expires_in_seconds: z.number().int().min(30).max(300).optional(),
   }).strict();
   const steeringDispatchSchema = z.object({
@@ -303,6 +321,71 @@ export const createAgentConnectionsRouter = (
     });
   };
 
+  router.post("/session/agent-connections/environment-session/ready-up", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      // Browser actor and external target are deliberately different identities.
+      // Reject caller-supplied provider identity; derive it internally only.
+      const browserSelection = helixEnvironmentSessionSelectionSchema;
+      const body = z.union([browserSelection,
+        helixEnvironmentSessionRequestSchema.omit({ client_continuation_ref: true })]).parse(req.body);
+      const targetStore = dependencies.preparationBindingStore;
+      if (!targetStore) throw new HelixReasoningTaskBindingError("reasoning_binding_unavailable", 503);
+      const authorization = await bindingStore.listBindings({ session: {
+        sessionId: session.session_id, profileId: session.profile.profile_id,
+      } });
+      if (!newestActiveBinding(authorization.bindings)) {
+        throw new HelixReasoningTaskBindingError("reasoning_binding_identity_mismatch", 403);
+      }
+      if ("request_id" in body) {
+        const receipt = await (dependencies.prepareBrowserSession ?? prepareBrowserEnvironmentSession)({
+          sessionId: session.session_id, profileRef: session.profile.profile_id,
+          bindingId: body.reasoning_binding_id, bindingEpoch: body.binding_epoch,
+          helixConversationId: body.helix_conversation_id, missionId: body.mission_id,
+          runId: body.run_id, requestId: body.request_id,
+        }, targetStore, dependencies.coordinationStore.listPresence());
+        setPrivateHeaders(res);
+        res.status(200).json({ ok: true, ...receipt, requested_by: "authenticated_browser_owner",
+          execution_authority: false, answer_authority: false, terminal_eligible: false });
+        return;
+      }
+      const target = targetStore.resolveOwnedPreparationTarget({
+        profileRef: session.profile.profile_id, bindingId: body.reasoning_binding_id,
+        bindingEpoch: body.binding_epoch, helixConversationId: body.helix_conversation_id,
+        missionId: body.mission_id, runId: body.run_id,
+      });
+      const membership = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({
+        profileId: session.profile.profile_id, roomId: body.room_id,
+      });
+      if (!membership || membership.roomStatus === "closed") {
+        throw new HelixReasoningTaskBindingError("reasoning_binding_identity_mismatch", 403);
+      }
+      const receipt = await (dependencies.prepareEnvironmentSession ?? readyUpEnvironmentSession)({
+        binding: target,
+        context: { profileId: session.profile.profile_id, participantId: membership.participantId,
+          roomId: body.room_id, runId: body.run_id, goalId: body.goal_id,
+          expectedRevision: body.expected_revision, turnId: body.turn_id,
+          probeRequestId: body.probe_request_id, priorTurnId: body.prior_turn_id },
+        environmentBindingId: body.environment_binding_id, sourceId: body.source_id,
+        worldId: body.world_id, subjectBindingId: body.subject_binding_id,
+        actionAuthorityId: body.action_authority_id,
+      }, targetStore);
+      setPrivateHeaders(res);
+      res.status(200).json({ ok: true, ...receipt, requested_by: "authenticated_browser_owner",
+        execution_authority: false, answer_authority: false, terminal_eligible: false });
+    } catch (error) {
+      // Environment recovery failures must not masquerade as broken task
+      // binding. Expose typed codes only, never backend messages or identities.
+      if (isEnvironmentDurableGoalError(error) || isRoomEnvironmentSubjectError(error) ||
+          isEnvironmentActionAuthorityError(error)) {
+        setPrivateHeaders(res);
+        res.status(error.statusCode).json({ schema: "helix.environment_session_error.v1", ok: false,
+          error: error.code, execution_authority: false, answer_authority: false,
+          assistant_answer: false, terminal_eligible: false, credential_included: false });
+      } else { reasoningFailure(res, error); }
+    }
+  });
+
   router.post("/session/agent-connections/reasoning-bindings/claims", async (req, res) => {
     try {
       if (!dependencies.reasoningBindingStore) {
@@ -310,6 +393,23 @@ export const createAgentConnectionsRouter = (
       }
       const session = await resolveBrowserIdentity(req);
       const body = claimIssueSchema.parse(req.body);
+      if (body.run_id || body.run_verification_ref) {
+        const authorization = await bindingStore.listBindings({
+          session: { sessionId: session.session_id, profileId: session.profile.profile_id },
+        });
+        if (!newestActiveBinding(authorization.bindings)) {
+          throw new HelixReasoningTaskBindingError("reasoning_binding_run_association_stale", 409);
+        }
+        const target = dependencies.coordinationStore.listPresence().find(entry =>
+          entry.active && entry.service_instance_ref === dependencies.coordinationStore.serviceInstanceRef &&
+          entry.authenticated_profile_ref === session.profile.profile_id &&
+          entry.client_session_ref === body.client_session_ref);
+        const association = target ? await resolveRunAssociation(target) : null;
+        if (!association || association.run_id !== body.run_id ||
+            association.verification_ref !== body.run_verification_ref || body.mission_id) {
+          throw new HelixReasoningTaskBindingError("reasoning_binding_run_association_stale", 409);
+        }
+      }
       const result = dependencies.reasoningBindingStore.issueClaim({
         profileRef: session.profile.profile_id,
         clientSessionRef: body.client_session_ref,

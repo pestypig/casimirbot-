@@ -1,0 +1,160 @@
+{
+  "scope": "Frozen subset boundary and top-self/QCD trajectory; least-squares membership diagnostic in real Hermitian tensor span. No fitted physical inputs or replacement by projected tensor. Responses are explicit-mt library minus selected qq3 matching only.",
+  "basis_labels": [
+    "diag1",
+    "diag2",
+    "diag3",
+    "real12",
+    "imag12",
+    "real13",
+    "imag13",
+    "real23",
+    "imag23"
+  ],
+  "rows": [
+    {
+      "stage": "high_boundary",
+      "qq3_Frobenius_norm_GeV_minus2": 6.068651718539659e-12,
+      "family": {
+        "rank": 9,
+        "relative_Frobenius_residual": 0.02608723597656863,
+        "max_absolute_residual_GeV_minus2": 1.5831434944115283e-13,
+        "coefficients_GeV_minus2": [
+          8.579448729107874e-12,
+          -1.3575120228485339e-28,
+          -2.1153116047473423e-31,
+          3.2284067464607643e-28,
+          3.439329255493894e-31,
+          -1.3122214291561414e-29,
+          2.0561243768657443e-30,
+          5.660030815553767e-30,
+          0.0
+        ]
+      },
+      "family_plus_pure_up": {
+        "rank": 10,
+        "relative_Frobenius_residual": 2.9187781247655897e-16,
+        "max_absolute_residual_GeV_minus2": 1.3379080974746392e-27,
+        "coefficients_GeV_minus2": [
+          8.579448729107874e-12,
+          -1.3575120228485339e-28,
+          -2.1153116047473423e-31,
+          3.2284067464607643e-28,
+          3.439329255493894e-31,
+          -1.3122214291561414e-29,
+          2.0561243768657443e-30,
+          5.660030815553767e-30,
+          0.0,
+          -1.5831434944115417e-13
+        ]
+      },
+      "rotation_roundtrip_relative_error": 1.4640517431589102e-16
+    },
+    {
+      "stage": "low_1e-7",
+      "qq3_Frobenius_norm_GeV_minus2": 1.546816942624946e-11,
+      "family": {
+        "rank": 9,
+        "relative_Frobenius_residual": 0.010790518956966247,
+        "max_absolute_residual_GeV_minus2": 1.6689171783861233e-13,
+        "coefficients_GeV_minus2": [
+          -2.1874021333296917e-11,
+          9.535600859435493e-28,
+          -1.395717075229034e-15,
+          -1.2416678592900881e-28,
+          -3.749644096772903e-30,
+          7.109764201654586e-29,
+          -6.076346579573754e-29,
+          -3.1716318903167274e-29,
+          1.341649831705082e-29
+        ]
+      },
+      "family_plus_pure_up": {
+        "rank": 10,
+        "relative_Frobenius_residual": 0.0001578397734465437,
+        "max_absolute_residual_GeV_minus2": 1.4031134841937477e-15,
+        "coefficients_GeV_minus2": [
+          -2.1874021333296917e-11,
+          9.535600859435493e-28,
+          -1.395717075229034e-15,
+          -1.2416678592900881e-28,
+          -3.749644096772903e-30,
+          7.109764201654586e-29,
+          -6.076346579573754e-29,
+          -3.1716318903167274e-29,
+          1.341649831705082e-29,
+          -1.6689171783861127e-13
+        ]
+      },
+      "rotation_roundtrip_relative_error": 3.937233310214811e-16
+    },
+    {
+      "stage": "low_1e-9",
+      "qq3_Frobenius_norm_GeV_minus2": 1.5468169426444547e-11,
+      "family": {
+        "rank": 9,
+        "relative_Frobenius_residual": 0.010790518956440955,
+        "max_absolute_residual_GeV_minus2": 1.6689171783234943e-13,
+        "coefficients_GeV_minus2": [
+          -2.187402133357292e-11,
+          -2.0984941363538807e-27,
+          -1.3957170760137672e-15,
+          1.4200767032583585e-26,
+          -7.651401903853058e-30,
+          -4.891579140951456e-28,
+          -1.7177046184992628e-28,
+          6.78351978943844e-29,
+          5.366599326888012e-29
+        ]
+      },
+      "family_plus_pure_up": {
+        "rank": 10,
+        "relative_Frobenius_residual": 0.00015783977451426005,
+        "max_absolute_residual_GeV_minus2": 1.4031134990838793e-15,
+        "coefficients_GeV_minus2": [
+          -2.187402133357292e-11,
+          -2.0984941363538807e-27,
+          -1.3957170760137672e-15,
+          1.4200767032583585e-26,
+          -7.651401903853058e-30,
+          -4.891579140951456e-28,
+          -1.7177046184992628e-28,
+          6.78351978943844e-29,
+          5.366599326888012e-29,
+          -1.6689171783234756e-13
+        ]
+      },
+      "rotation_roundtrip_relative_error": 1.5311125138565243e-16
+    }
+  ],
+  "checks": {
+    "rotation_roundtrip": true,
+    "boundary_decomposition": true,
+    "tolerance_stability": true,
+    "response_linearity": true
+  },
+  "remainder_responses_GeV_minus2": {
+    "full": {
+      "real": 1.4873443172600358e-17,
+      "imag": -6.75986776977783e-18
+    },
+    "family": {
+      "real": 1.487392205379911e-17,
+      "imag": -6.760085785885523e-18
+    },
+    "outside_family": {
+      "real": -4.788811987499085e-22,
+      "imag": 2.1801610769222656e-22
+    },
+    "family_plus_pure": {
+      "real": 1.487392205379911e-17,
+      "imag": -6.760085785885523e-18
+    },
+    "outside_family_plus_pure": {
+      "real": -4.788811987499107e-22,
+      "imag": 2.1801610769222477e-22
+    }
+  },
+  "candidate_in_tested_family": false,
+  "full_model_admitted": false
+}

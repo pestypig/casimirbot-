@@ -6,6 +6,7 @@ import type { HelixAgentAccountBindingProjection } from "../../services/helix-ac
 import { createAgentConnectionsRouter } from "../agent-connections";
 import { HelixReasoningTaskBindingStore } from
   "../../services/local-supervisor/reasoning-task-binding-store";
+import { EnvironmentDurableGoalError } from "../../services/environment-connectors/goals/durable-goal-store";
 
 const SESSION_ID = "session-owned";
 const PROFILE_ID = "profile-owned";
@@ -58,7 +59,11 @@ const presence = (overrides: Partial<HelixLocalSupervisorPresence> = {}): HelixL
   ...overrides,
 });
 
-const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presence?: HelixLocalSupervisorPresence[] }) => {
+const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presence?: HelixLocalSupervisorPresence[];
+  resolveRunAssociation?: Parameters<typeof createAgentConnectionsRouter>[0]["resolveRunAssociation"];
+  prepareEnvironmentSession?: Parameters<typeof createAgentConnectionsRouter>[0]["prepareEnvironmentSession"];
+  prepareBrowserSession?: Parameters<typeof createAgentConnectionsRouter>[0]["prepareBrowserSession"];
+  readPreparationMembership?: Parameters<typeof createAgentConnectionsRouter>[0]["readPreparationMembership"] }) => {
   const listBindings = vi.fn(async () => ({
     schema: "helix.agent_account_bindings.v1" as const,
     oauth_ready: (input?.bindings ?? [binding]).some((entry) => entry.status === "active"),
@@ -78,7 +83,12 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
     bindingStore: { listBindings } as never,
     coordinationStore,
     reasoningBindingStore: reasoningStore,
+    preparationBindingStore: reasoningStore,
+    prepareEnvironmentSession: input?.prepareEnvironmentSession,
+    prepareBrowserSession: input?.prepareBrowserSession,
+    readPreparationMembership: input?.readPreparationMembership,
     resolveSession,
+    resolveRunAssociation: input?.resolveRunAssociation,
   }));
   return { app, listBindings, coordinationStore, reasoningStore, resolveSession };
 };
@@ -89,6 +99,96 @@ const getReadiness = (app: express.Express, profile = "codex_app") =>
     .set("Cookie", `helix_session=${SESSION_ID}`);
 
 describe("owner-scoped AI app connection readiness", () => {
+  it("prepares as the browser owner without accepting or exposing provider identity", async () => {
+    const prepare = vi.fn().mockResolvedValue({ readiness: { ready: false }, repairs: [],
+      execution_authority: false, answer_authority: false, terminal_eligible: false });
+    const membership = vi.fn().mockResolvedValue({ participantId: "participant-owned", roomStatus: "active" });
+    const automatic = vi.fn().mockResolvedValue({ readiness: { ready: false }, repairs: [] });
+    const harness = setup({ prepareEnvironmentSession: prepare, prepareBrowserSession: automatic, readPreparationMembership: membership,
+      presence: [presence({ observed_at: new Date().toISOString(),
+        heartbeat_expires_at: new Date(Date.now() + 120_000).toISOString(),
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only", "continuation_ready"], requested_level: "continuation_ready",
+          declaration_basis: "authenticated_client_declaration", provider_thread_content_included: false,
+          hidden_reasoning_included: false, answer_authority: false, terminal_eligible: false,
+        } })] });
+    const issued = harness.reasoningStore.issueClaim({ profileRef: PROFILE_ID,
+      clientSessionRef: "client-session-owned", helixConversationId: "chat-owned", runId: "run-owned" });
+    const bound = harness.reasoningStore.claim({ profileRef: PROFILE_ID,
+      authenticatedMcpClientRef: "mcp-client-owned", clientSessionRef: "client-session-owned",
+      claimHandle: issued.claim_handle });
+    const body = { reasoning_binding_id: bound.reasoning_binding_id, binding_epoch: bound.binding_epoch,
+      helix_conversation_id: "chat-owned", mission_id: null, room_id: "room-owned", run_id: "run-owned",
+      goal_id: "goal-owned", expected_revision: 4, turn_id: "turn-owned", probe_request_id: "probe-owned",
+      prior_turn_id: "prior-owned", environment_binding_id: "environment-owned", source_id: "source-owned",
+      world_id: "world-owned", subject_binding_id: "subject-owned", action_authority_id: "authority-owned" };
+    const post = (value = body) => request(harness.app)
+      .post("/api/account/session/agent-connections/environment-session/ready-up")
+      .set("Cookie", `helix_session=${SESSION_ID}`).send(value);
+    const response = await post().expect(200);
+    expect(response.body).toMatchObject({ requested_by: "authenticated_browser_owner",
+      readiness: { ready: false }, execution_authority: false });
+    expect(JSON.stringify(response.body)).not.toContain("thread-owned");
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(prepare.mock.calls[0][0]).toMatchObject({
+      context: expect.objectContaining({ profileId: PROFILE_ID, participantId: "participant-owned" }),
+      binding: expect.objectContaining({ clientContinuationRef: "thread-owned", profileRef: PROFILE_ID }),
+    });
+    expect(prepare.mock.calls[0][1] === harness.reasoningStore).toBe(true);
+    const automaticBody = { reasoning_binding_id: bound.reasoning_binding_id, binding_epoch: bound.binding_epoch,
+      helix_conversation_id: "chat-owned", mission_id: null, run_id: "run-owned", request_id: "ready-up:one" };
+    const automaticResponse = await post(automaticBody as typeof body).expect(200);
+    expect(automaticResponse.body.requested_by).toBe("authenticated_browser_owner");
+    expect(automatic.mock.calls[0][0]).toEqual({ sessionId: SESSION_ID, profileRef: PROFILE_ID,
+      bindingId: bound.reasoning_binding_id, bindingEpoch: bound.binding_epoch,
+      helixConversationId: "chat-owned", missionId: null, runId: "run-owned", requestId: "ready-up:one" });
+    expect(automatic.mock.calls[0][1] === harness.reasoningStore).toBe(true);
+    automatic.mockRejectedValueOnce(new EnvironmentDurableGoalError("durable_goal_session_ambiguous", 409,
+      "private backend context must not be returned"));
+    const ambiguous = await post(automaticBody as typeof body).expect(409);
+    expect(ambiguous.body.error).toBe("durable_goal_session_ambiguous");
+    expect(JSON.stringify(ambiguous.body)).not.toContain("private backend");
+    await post({ ...body, helix_conversation_id: "other-chat" }).expect(409);
+    await post({ ...body, client_continuation_ref: "forged" } as typeof body).expect(400);
+    membership.mockResolvedValueOnce(null);
+    await post().expect(403);
+    harness.listBindings.mockResolvedValueOnce({ schema: "helix.agent_account_bindings.v1", oauth_ready: false, bindings: [] });
+    await post().expect(403);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    harness.reasoningStore.revoke({ profileRef: PROFILE_ID, bindingId: bound.reasoning_binding_id });
+    await post().expect(409);
+    expect(prepare).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds only the explicitly selected current run and preserves the claim on stale selection", async () => {
+    const association = { run_id: "run-owned", run_version: 2, room_id: "room-owned",
+      room_binding_id: "room-binding-owned", room_binding_version: 3, verification_ref: "verified-run-2" };
+    const resolveRunAssociation = vi.fn(async () => association);
+    const harness = setup({ resolveRunAssociation });
+    const post = (body: Record<string, unknown>) => request(harness.app)
+      .post("/api/account/session/agent-connections/reasoning-bindings/claims")
+      .set("Cookie", `helix_session=${SESSION_ID}`).send({
+        client_session_ref: "client-session-owned", helix_conversation_id: "chat-owned", ...body,
+      });
+    const issued = await post({ run_id: association.run_id,
+      run_verification_ref: association.verification_ref }).expect(201);
+    expect(issued.body.binding.run_id).toBe("run-owned");
+    for (const body of [
+      { run_id: "run-other", run_verification_ref: association.verification_ref },
+      { run_id: "run-owned" },
+      { run_id: "run-owned", run_verification_ref: "old-version" },
+      { run_id: "run-owned", run_verification_ref: association.verification_ref, mission_id: "unverified-mission" },
+      { client_session_ref: "other-task", run_id: "run-owned", run_verification_ref: association.verification_ref },
+    ]) {
+      const rejected = await post(body).expect(409);
+      expect(rejected.body.error).toBe("reasoning_binding_run_association_stale");
+    }
+    expect(harness.reasoningStore.inspectCurrent({ profileRef: PROFILE_ID,
+      helixConversationId: "chat-owned" })).toMatchObject({
+      reasoning_binding_id: issued.body.binding.reasoning_binding_id, status: "pending_claim",
+    });
+  });
+
   it("does not apply its small JSON parser to sibling account routes", async () => {
     const { app } = setup();
     app.post(
@@ -311,8 +411,6 @@ describe("owner-scoped AI app connection readiness", () => {
       .send({
         client_session_ref: "client-session-owned",
         helix_conversation_id: "helix-chat-owned",
-        mission_id: "mission-owned",
-        run_id: "run-owned",
       })
       .expect(201);
     expect(claim.headers["cache-control"]).toBe("no-store");

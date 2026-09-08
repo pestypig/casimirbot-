@@ -1,0 +1,23 @@
+{
+  "scope": "ET6 pre-live reliability characterization; not live acceptance",
+  "date": "2026-09-06",
+  "production_behavior_changed": false,
+  "fixture": "server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts",
+  "observations": [
+    "Newer workflow event with unchanged checkpoint and older environment action_event_ref is rejected as temporal_checkpoint_action_event_mismatch.",
+    "Matching environment action_event_ref restores checkpoint evidence validation in the fixture.",
+    "Matching references with manual_override_detected=true remain rejected."
+  ],
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts server/services/environment-connectors/actions/__tests__/temporal-admission-publication.test.ts --pool=forks",
+    "test_files_passed": 2,
+    "tests_passed": 18,
+    "tests_failed": 0
+  },
+  "limitations": [
+    "Checkpoint reader fixture uses mocked query results; no concurrent database transaction or native HTTP transport is exercised.",
+    "This establishes a required evidence-pair dependency, not permission to ignore projection backlog.",
+    "No live movement, timing measurement, rolling extension, restart recovery or lost-response reconciliation is proven."
+  ],
+  "next_repair_constraint": "Coordinate required evidence pairs without suppressing newer stop/manual state, weakening freshness, or replaying uncertain actions."
+}

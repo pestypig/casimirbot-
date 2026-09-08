@@ -1,0 +1,30 @@
+{
+  "schema": "et6.runtime_dispatch_inspection.v1",
+  "date": "2026-09-05",
+  "evidence_kind": "source_inspection",
+  "live_capacity_proven": false,
+  "findings": [
+    {
+      "source": "minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/PlayerActionRuntime.java",
+      "symbol": "pollControlsThenActions",
+      "observed": "Controls are polled first. Ordinary action polling returns early when emergencyStopLatched, activeEnvelope, localDiagnosticEnvelope, or a nonempty deliveryOutbox is present. Idle polling requests limit=1.",
+      "implication": "The existing ordinary action queue cannot append work to an active workflow. Removing the early-return guard would not establish governed rolling execution."
+    },
+    {
+      "source": "server/services/environment-connectors/actions/action-broker.ts",
+      "symbol": "enqueueEnvironmentAction",
+      "observed": "Admission validates membership, exact authority identity, approval policy, fresh connector, advertised capability/engine and current catalog before idempotent request creation.",
+      "requirement": "A temporal integration must retain this admission boundary rather than dispatching compiled plans directly."
+    },
+    {
+      "source": "server/services/environment-connectors/actions/action-broker.ts",
+      "symbol": "leasePendingEnvironmentActions",
+      "observed": "Expired leased actions are failed as outcome unknown, not replayed. Current admitted requests receive bounded leases.",
+      "requirement": "Extension and reconnect handling must preserve unknown-outcome no-replay semantics."
+    }
+  ],
+  "next_implementation_requirement": "Introduce an explicitly admitted checkpoint-bound extension transport and settlement path connected to the temporal ledger/compiler, preserving a single active controller, cancellation precedence, fresh identity, and evidence delivery. Do not count separately completed finite actions as continuous rolling execution.",
+  "mutating_live_actions_performed": false,
+  "runtime_code_changed": false,
+  "et6_complete": false
+}

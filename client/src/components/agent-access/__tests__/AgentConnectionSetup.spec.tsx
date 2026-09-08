@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -142,12 +143,76 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   clearPendingWorkstationGuidance();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("AgentConnectionSetup", () => {
+  it("recovers cold-start setup to binding by read-only polling", async () => {
+    let current = connectionStatus(false);
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT) ? response(current) : response({}, 404));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    requestWorkstationGuidance({ kind: "user_attention", panelId: "agent-access", targetId: "external-ai-connection-setup", label: "Set up connection" });
+    await act(async () => { render(<AgentConnectionSetup />); });
+    expect(screen.getByText("Waiting for your AI task")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check connection" })).toBeInTheDocument();
+    expect(screen.queryByText("Add CasimirBot to Codex App")).not.toBeInTheDocument();
+    current = connectionStatus(true);
+    current.readiness.continuation_readiness = "polling";
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(screen.getByText("Review task binding")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
+  it.each([false, true])("resumes confirmed destination setup when panel already mounted: %s", async (mounted) => {
+    const fetchMock = nativeFetch(() => response(connectionStatus(true)));
+    vi.stubGlobal("fetch", fetchMock);
+    if (mounted) render(<AgentConnectionSetup />);
+    act(() => requestWorkstationGuidance({ kind: "user_attention", panelId: "agent-access", targetId: "external-ai-connection-setup", label: "Continue connection setup" }));
+    if (!mounted) render(<AgentConnectionSetup />);
+    expect(await screen.findByText("Review task binding")).toBeInTheDocument();
+    expect(screen.getByText("Bind the current Helix chat to this exact AI task")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBeDisabled();
+    expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
+  it("observes task recovery without focus or consent mutation and stops after readiness", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app", viewed_step: "ready",
+    }));
+    let current = connectionStatus(true);
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT)
+        ? response(current)
+        : response({ error: "reasoning_binding_not_found" }, 404));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    let unmount!: () => void;
+    await act(async () => { ({ unmount } = render(<AgentConnectionSetup />)); });
+    expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBeDisabled();
+    expect(screen.getByText(/cannot wake an idle task/)).toBeInTheDocument();
+    const initial = fetchMock.mock.calls.length;
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(initial);
+    visibility.mockReturnValue("visible");
+    current = { ...current, readiness: { ...current.readiness, continuation_readiness: "polling" } };
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBeEnabled();
+    const recovered = fetchMock.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(recovered);
+    expect(fetchMock.mock.calls.every(([, init]) =>
+      !init?.method || init.method === "GET",
+    )).toBe(true);
+    unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(recovered);
+  });
+
   it("adopts an already-active native Full Harness when MCP guidance arrives", async () => {
     const startMcpTunnel = vi.fn(async () => fullTunnelState);
     window.casimirDesktop = Object.freeze({
@@ -255,6 +320,63 @@ describe("AgentConnectionSetup", () => {
     );
   });
 
+  it("recovers failed presentation after a late native ready event without granting permission", async () => {
+    let publish: ((state: unknown) => void) | undefined;
+    const unsubscribe = vi.fn();
+    const getMcpTunnelState = vi.fn()
+      .mockRejectedValueOnce(new Error("not ready"))
+      .mockResolvedValue(fullTunnelState);
+    const startMcpTunnel = vi.fn();
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      getMcpTunnelState, startMcpTunnel,
+      onMcpTunnelState: (listener: (state: unknown) => void) => { publish = listener; return unsubscribe; },
+    });
+    const fetchMock = nativeFetch(() => response(connectionStatus(true)));
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(<AgentConnectionSetup />);
+    requestWorkstationGuidance({ kind: "user_attention", panelId: "agent-access",
+      controlId: "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat", label: "Review binding." });
+    await screen.findByText(/could not read native Full Harness transport readiness/);
+    act(() => publish?.({ ...fullTunnelState, ready: false }));
+    expect(getMcpTunnelState).toHaveBeenCalledTimes(1);
+    act(() => publish?.(fullTunnelState));
+    expect(await screen.findByText("AI app connected")).toBeInTheDocument();
+    expect(screen.queryByText(/could not read native Full Harness transport readiness/)).not.toBeInTheDocument();
+    expect(startMcpTunnel).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/claims"))).toBe(false);
+    view.unmount();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it.each(["rejected", "not-ready"])("reports %s native presentation instead of silently abandoning it", async (mode) => {
+    const getMcpTunnelState = vi.fn(() => mode === "rejected"
+      ? Promise.reject(new Error("private diagnostic must not leak"))
+      : Promise.resolve({ ...fullTunnelState, ready: false, healthy: false, status: "starting" }));
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null),
+      getMcpTunnelState,
+    });
+    vi.stubGlobal("fetch", nativeFetch(() => response(connectionStatus(true))));
+    render(<AgentConnectionSetup />);
+    requestWorkstationGuidance({
+      kind: "user_attention",
+      panelId: "agent-access",
+      controlId: "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+      label: "Review binding.",
+    });
+    const message = mode === "rejected"
+      ? /could not read native Full Harness transport readiness/
+      : /did not become ready within 5 seconds/;
+    expect(await screen.findByText(message, {}, { timeout: 6500 })).toHaveAttribute("role", "alert");
+    expect(screen.queryByText(/private diagnostic must not leak/)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Checking connection…" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(message)).toHaveAttribute("role", "alert");
+    expect(getMcpTunnelState).toHaveBeenCalledTimes(mode === "rejected" ? 1 : 21);
+  }, 8000);
+
   it("waits for the accepted tunnel transition before rechecking binding readiness", async () => {
     const getMcpTunnelState = vi
       .fn()
@@ -336,6 +458,21 @@ describe("AgentConnectionSetup", () => {
     expect(window.location.search).not.toContain("native_presentation");
   });
 
+  it("shows the presence deadline while waiting, without a binding section", async () => {
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app",
+      viewed_step: "check",
+    }));
+    const current = connectionStatus(false);
+    current.heartbeat_expires_at = "2026-08-31T12:01:00.000Z";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(current)));
+    render(<AgentConnectionSetup />);
+    expect(await screen.findByText(/AI task presence:/)).toBeInTheDocument();
+    expect(screen.queryByText("Bind the current Helix chat to this exact AI task")).not.toBeInTheDocument();
+    expect(screen.getByText(/Keep any active binding/)).toBeInTheDocument();
+  });
+
   it("keeps exact-task binding discoverable when continuation needs a recheck", async () => {
     useAgiChatStore.setState({ activeId: "helix-chat-test" });
     window.localStorage.setItem(
@@ -360,7 +497,79 @@ describe("AgentConnectionSetup", () => {
     ).toBeDisabled();
     const recheck = screen.getByRole("button", { name: "Recheck connection" });
     fireEvent.click(recheck);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT))).toHaveLength(2));
+  });
+
+  it("rechecks stale continuation on return without issuing a binding or duplicating focus reads", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    window.localStorage.setItem(
+      AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      JSON.stringify({
+        schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+        selected_profile: "codex_app",
+        viewed_step: "ready",
+      }),
+    );
+    let current = connectionStatus(true);
+    let releaseRead: (() => void) | undefined;
+    let holdRead = false;
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT)
+        ? (holdRead
+            ? new Promise<Response>((resolve) => { releaseRead = () => resolve(response(current)); })
+            : response(current))
+        : response({ error: "reasoning_binding_not_found" }, 404),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = render(<AgentConnectionSetup />);
+    expect(await screen.findByRole("button", { name: "Bind current Helix chat" })).toBeDisabled();
+    const readinessCalls = () => fetchMock.mock.calls.filter(([url]) =>
+      url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT),
+    ).length;
+    current = {
+      ...current,
+      readiness: buildHelixAgentClientReadiness({
+        agentSelected: true,
+        provider_application: "available",
+        client_authorization: "active",
+        client_presence: "online",
+        catalog_sync: "current",
+        thread_attachment: "attached",
+        continuation_readiness: "polling",
+        environment_readiness: "not_selected",
+      }),
+    };
+    fireEvent.focus(window);
+    fireEvent(document, new Event("visibilitychange"));
+    await waitFor(() => expect(readinessCalls()).toBe(2));
+    expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBeEnabled();
+    expect(fetchMock.mock.calls.every(([, init]) => !init || !(init as RequestInit).method || (init as RequestInit).method === "GET")).toBe(true);
+
+    // Returning to click consent must not unmount the pointer target while
+    // the read is pending, even if another focus event arrives meanwhile.
+    holdRead = true;
+    const bindButton = screen.getByRole("button", { name: "Bind current Helix chat" });
+    fireEvent.focus(window);
+    await waitFor(() => expect(readinessCalls()).toBe(3));
+    expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBe(bindButton);
+    expect(bindButton).toBeEnabled();
+    fireEvent.focus(window);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(readinessCalls()).toBe(3);
+    holdRead = false;
+    releaseRead!();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Recheck connection" })).toBeEnabled());
+
+    // A refreshed response can also withdraw readiness; focus is not proof.
+    current = connectionStatus(true);
+    fireEvent.focus(window);
+    await waitFor(() => expect(readinessCalls()).toBe(4));
+    expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBeDisabled();
+
+    fireEvent.focus(window);
+    unmount();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(readinessCalls()).toBe(4);
   });
 
   it("starts the native full harness once and then diagnoses the exact Codex connection", async () => {
@@ -382,6 +591,10 @@ describe("AgentConnectionSetup", () => {
     await waitFor(() => expect(startMcpTunnel).toHaveBeenCalledTimes(1));
     expect(startMcpTunnel).toHaveBeenCalledWith({ scope: "full_helix_agent" });
     expect(await screen.findByText("AI app connected")).toBeInTheDocument();
+    expect(guidance).toHaveBeenCalledWith(expect.objectContaining({
+      detail: expect.objectContaining({ targetId: "reasoning-task-binding" }),
+    }));
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
       `${AGENT_CONNECTION_READINESS_ENDPOINT}?client_profile=codex_app`,
       expect.objectContaining({
@@ -411,12 +624,13 @@ describe("AgentConnectionSetup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start Harness" }));
 
     expect(
-      await screen.findByText("Add CasimirBot to Codex App"),
+      await screen.findByText("Waiting for your AI task"),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT))).toHaveLength(1);
+    expect(screen.getByText(/Neither action wakes the AI task or approves binding/)).toBeInTheDocument();
   });
 
-  it("keeps Start Harness available after persisted setup and performs one fresh diagnosis", async () => {
+  it.each(["Start Harness", "Refresh harness connection"])("keeps %s available after persisted setup and performs one native refresh", async buttonName => {
     window.localStorage.setItem(
       AGENT_CONNECTION_SETUP_STORAGE_KEY,
       JSON.stringify({
@@ -439,7 +653,7 @@ describe("AgentConnectionSetup", () => {
 
     render(<AgentConnectionSetup />);
     const startButton = await screen.findByRole("button", {
-      name: "Start Harness",
+      name: buttonName,
     });
     fireEvent.click(startButton);
 
@@ -551,12 +765,12 @@ describe("AgentConnectionSetup", () => {
     expect(screen.getByText("Add CasimirBot to Codex App")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "I added it" }));
-    expect(screen.getByText("Check the connection")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for your AI task")).toBeInTheDocument();
     expect(screen.getByText(/stop repeating the loop/i)).toBeInTheDocument();
     expect(
       screen.getByText(/separate Device Check plugin/i),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
     expect(await screen.findByText("AI app connected")).toBeInTheDocument();
     expect(
       screen.getByText(/does not expose private reasoning/i),
@@ -655,6 +869,7 @@ describe("AgentConnectionSetup", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(response(connectionStatus(true)))
+      .mockResolvedValueOnce(response({}, 404))
       .mockResolvedValueOnce(
         response({ operation: "agent_account_binding.revoke" }),
       )
@@ -666,7 +881,7 @@ describe("AgentConnectionSetup", () => {
     expect(
       screen.getByText(/every AI client linked through it/i),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: "DELETE" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm disconnect" }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -677,6 +892,44 @@ describe("AgentConnectionSetup", () => {
         }),
       ),
     );
+  });
+
+  it("keeps an active binding inspectable on cold start while task presence is unavailable", async () => {
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app",
+      viewed_step: "check",
+    }));
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    const binding = {
+      reasoning_binding_id: "reasoning_binding:recovery-test",
+      helix_conversation_id: "helix-chat-test",
+      status: "active",
+      continuation_transport: "polling",
+      binding_epoch: 2,
+      service_instance_ref: "service-ref",
+      run_id: "run:retained",
+    };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT)) return response(connectionStatus(false));
+      if (url.includes("reasoning-bindings/")) return response({ binding });
+      return response({}, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentConnectionSetup />);
+    expect(await screen.findByText(/Binding state:/)).toHaveTextContent("active");
+    expect(screen.getByText(/AI availability:/)).toHaveTextContent("waiting for a fresh connection check");
+    expect(screen.getByText(/An associated run does not by itself/)).toHaveTextContent("action permission");
+    expect(screen.getByRole("button", { name: "Ready up" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Replace binding" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Check binding" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Check binding" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("reasoning_binding%3Arecovery-test"),
+      expect.objectContaining({ method: "GET" }),
+    ));
+    expect(fetchMock.mock.calls.every(([, init]: any[]) => !init?.method || init.method === "GET")).toBe(true);
+    expect(screen.queryByText(/Catalog probe: current/)).not.toBeInTheDocument();
   });
 
   it("rehydrates the current exact reasoning binding after readiness reload", async () => {
@@ -823,6 +1076,148 @@ describe("AgentConnectionSetup", () => {
       screen.queryByDisplayValue("reasoning_claim:fresh-test-value"),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Bind current Helix chat" })).toBeInTheDocument();
+  });
+
+  it("reconciles a consumed claim at its deadline instead of expiring the active binding locally", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    window.localStorage.setItem(
+      AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      JSON.stringify({
+        schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+        selected_profile: "codex_app",
+        viewed_step: "ready",
+      }),
+    );
+    const candidate = connectionStatus(true);
+    candidate.readiness = buildHelixAgentClientReadiness({
+      agentSelected: true,
+      provider_application: "available",
+      client_authorization: "active",
+      client_presence: "online",
+      catalog_sync: "current",
+      thread_attachment: "attached",
+      continuation_readiness: "polling",
+      environment_readiness: "not_selected",
+    });
+    candidate.thread_observability_bridge.negotiated_level =
+      "continuation_ready";
+    const pending = {
+      reasoning_binding_id: "reasoning_binding:deadline-test",
+      helix_conversation_id: "helix-chat-test",
+      status: "pending_claim",
+      continuation_transport: "polling",
+      binding_epoch: 4,
+      service_instance_ref: "service-ref",
+      expires_at: new Date(Date.now() + 500).toISOString(),
+    };
+    const active = {
+      ...pending,
+      status: "active",
+      claimed_at: new Date().toISOString(),
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(candidate))
+      .mockResolvedValueOnce(
+        response({ error: "reasoning_binding_not_found" }, 404),
+      )
+      .mockResolvedValueOnce(
+        response({
+          claim_handle: "reasoning_claim:deadline-test-value",
+          binding: pending,
+        }, 201),
+      )
+      .mockResolvedValueOnce(response({ binding: active }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AgentConnectionSetup />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Bind current Helix chat" }),
+    );
+    expect(
+      await screen.findByDisplayValue("reasoning_claim:deadline-test-value"),
+    ).toBeInTheDocument();
+
+    await waitFor(
+      () =>
+        expect(screen.getByText(/Binding state:/i)).toHaveTextContent("active"),
+      { timeout: 2_000 },
+    );
+    expect(
+      screen.queryByText(/show-once claim expired/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByDisplayValue("reasoning_claim:deadline-test-value"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps unavailable run association visible and requires selection after verification arrives", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY, selected_profile: "codex_app", viewed_step: "ready",
+    }));
+    const base = connectionStatus(true);
+    base.readiness.continuation_readiness = "polling";
+    base.thread_observability_bridge.negotiated_level = "continuation_ready";
+    const association = { run_id: "run-prepared", run_version: 2, room_id: "room-current",
+      room_binding_id: "room-binding-current", room_binding_version: 1, verification_ref: "verified-prepared" };
+    let candidate = { ...base, verified_run_association: null as typeof association | null };
+    const fetchMock = vi.fn(async (url: string) => String(url).includes("/readiness")
+      ? response(candidate) : response({ error: "reasoning_binding_not_found" }, 404));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentConnectionSetup />);
+    const unavailable = await screen.findByRole("checkbox", { name: /Include a verified environment run/i });
+    expect(unavailable).toBeDisabled();
+    expect(unavailable).not.toBeChecked();
+    expect(screen.getByText(/Checking the connection does not prepare a session or approve it/i)).toBeInTheDocument();
+    candidate = { ...base, verified_run_association: association };
+    fireEvent.click(screen.getByRole("button", { name: "Recheck connection" }));
+    const available = await screen.findByRole("checkbox", { name: /Include this verified environment run/i });
+    expect(available).toBeEnabled();
+    expect(available).not.toBeChecked();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/claims"))).toBe(false);
+    expect(screen.queryByText(/Environment session not ready to bind/i)).not.toBeInTheDocument();
+  });
+
+  it("never silently downgrades a selected run after refresh and allows explicit chat-only recovery", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY, selected_profile: "codex_app", viewed_step: "ready",
+    }));
+    const base = connectionStatus(true);
+    base.readiness.continuation_readiness = "polling";
+    base.thread_observability_bridge.negotiated_level = "continuation_ready";
+    const association = { run_id: "run-current", run_version: 1, room_id: "room-current",
+      room_binding_id: "room-binding-current", room_binding_version: 1, verification_ref: "verified-current" };
+    let candidate = { ...base, verified_run_association: association as typeof association | null };
+    const claims: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes("/readiness")) return response(candidate);
+      if (String(url).endsWith("/claims")) {
+        claims.push(JSON.parse(init!.body as string));
+        return response({ error: "reasoning_binding_target_inactive" }, 409);
+      }
+      return response({ error: "reasoning_binding_not_found" }, 404);
+    }));
+    render(<AgentConnectionSetup />);
+    const choice = await screen.findByRole("checkbox", { name: /Include this verified environment run/i });
+    expect(choice).not.toBeChecked();
+    fireEvent.click(choice);
+    fireEvent.click(screen.getByRole("button", { name: "Bind current Helix chat" }));
+    await waitFor(() => expect(claims).toHaveLength(1));
+    expect(claims[0]).toMatchObject({ run_id: "run-current", run_verification_ref: "verified-current" });
+    await screen.findByText(/short supervisor presence expired/i);
+    candidate = { ...base, verified_run_association: null };
+    fireEvent.click(screen.getByRole("button", { name: "Recheck connection" }));
+    const clear = await screen.findByRole("button", { name: "Use chat-only binding" });
+    fireEvent.click(screen.getByRole("button", { name: "Bind current Helix chat" }));
+    await screen.findByText(/selected environment run changed/i);
+    expect(claims).toHaveLength(1);
+    fireEvent.click(clear);
+    fireEvent.click(screen.getByRole("button", { name: "Bind current Helix chat" }));
+    await waitFor(() => expect(claims).toHaveLength(2));
+    expect(claims[1]).not.toHaveProperty("run_id");
+    expect(claims[1]).not.toHaveProperty("run_verification_ref");
   });
 
   it("explains how to recover when the exact AI task presence expired", async () => {

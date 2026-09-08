@@ -1,0 +1,26 @@
+{
+  "scope": "ET6 governed transport recovery, not gameplay acceptance",
+  "observed_at": "2026-09-05T21:13:50.673Z",
+  "service_instance_ref": "service_instance:52c7024c54649ac963710a7fd1717906",
+  "continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+  "transition_request_ref": "desktop_tunnel_request:9f26606b-1671-4af7-ad38-9266240566a6",
+  "initial_request": "900-second lease rejected by connector schema maximum; no transition created by that request",
+  "accepted_lease_seconds": 300,
+  "trusted_device_delegation_applied": true,
+  "transition_accepted": true,
+  "recovery_verified_by": "Previously unavailable environment.action_authority.inspect returned an authenticated room-scoped authority and connector readiness observation.",
+  "reconnect_required": false,
+  "user_click_performed": false,
+  "app_restart_performed": false,
+  "environment_authority_granted_by_transition": false,
+  "independent_external_oauth_client_bound": false,
+  "connector_readiness": {
+    "state": "awaiting_manifest",
+    "ready_for_actions": false,
+    "active_workflow_count": 0,
+    "controls_asserted": false
+  },
+  "remaining_prerequisites": ["fresh connector manifest", "valid finite authority", "human-approved exact run association"],
+  "movement_dispatched": false,
+  "rolling_capacity_result": "not measured"
+}

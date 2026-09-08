@@ -1,0 +1,43 @@
+{
+  "status": "conditional_minimal_charge_two_Higgs_completion_not_experimental_constraint",
+  "rows": [
+    {
+      "alpha_D": 0.001,
+      "epsilon": 0.00010355265146615672,
+      "v_D_GeV": 0.044603102903819275,
+      "y": 0.15853309190424045,
+      "alpha_y": 0.002,
+      "scalar_mass_ceiling_GeV": 0.22360679774997894
+    },
+    {
+      "alpha_D": 0.01,
+      "epsilon": 3.274622363826297e-05,
+      "v_D_GeV": 0.014104739588693908,
+      "y": 0.5013256549262001,
+      "alpha_y": 0.019999999999999997,
+      "scalar_mass_ceiling_GeV": 0.07071067811865475
+    },
+    {
+      "alpha_D": 0.1,
+      "epsilon": 1.0355265146615672e-05,
+      "v_D_GeV": 0.004460310290381928,
+      "y": 1.5853309190424043,
+      "alpha_y": 0.2,
+      "scalar_mass_ceiling_GeV": 0.022360679774997897
+    },
+    {
+      "alpha_D": 0.5,
+      "epsilon": 4.631015358573394e-06,
+      "v_D_GeV": 0.001994711402007164,
+      "y": 3.544907701811031,
+      "alpha_y": 0.9999999999999994,
+      "scalar_mass_ceiling_GeV": 0.01
+    }
+  ],
+  "alpha_D_ceiling": 0.5,
+  "assumptions": [
+    "equal Majorana Yukawa couplings",
+    "alpha_D<=1, y^2/(4pi)<=1, lambda<=4pi are chosen loose perturbativity criteria",
+    "scalar portal and full loop matching not specified"
+  ]
+}

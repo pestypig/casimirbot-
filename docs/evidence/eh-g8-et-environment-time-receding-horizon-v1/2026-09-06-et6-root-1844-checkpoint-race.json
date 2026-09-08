@@ -1,0 +1,21 @@
+{
+  "schema": "et6.live_checkpoint_race_diagnostic.v1",
+  "workflow_id": "et6-root-1844-workflow",
+  "started_at": "2026-09-06T18:44:16.534920900Z",
+  "completed_at": "2026-09-06T18:44:24.444212Z",
+  "outcome": "request_canceled",
+  "reason": "temporal_runway_exhausted",
+  "controls_released": true,
+  "initial_checkpoint_observed_at": "2026-09-06T18:44:16.536Z",
+  "checkpoint_tick_index": 42,
+  "perception_observed_at": "2026-09-06T18:44:19.158Z",
+  "later_running_progress_observed_at": "2026-09-06T18:44:20.438Z",
+  "later_progress_same_checkpoint": true,
+  "frontier_successor_context": "no_current_verified_checkpoint",
+  "post_position": {"x": -1.03, "y": 65, "z": -6.7},
+  "hypothesis": "The successor context compares perception time with the latest progress envelope, not the original settled checkpoint time. A new progress envelope can race ahead of the probe even though its checkpoint is unchanged. Other caught rejection causes have not yet been excluded.",
+  "next_action": "Reproduce the unchanged-checkpoint progress race deterministically before changing eligibility; retain exact latest-event, authority, revocation and freshness checks.",
+  "successors_submitted": 0,
+  "rolling_extensions_proven": 0,
+  "goal_complete": false
+}

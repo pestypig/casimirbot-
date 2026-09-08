@@ -1,0 +1,21 @@
+{
+  "scope": "ET6 probe and evidence-transform build prerequisites",
+  "classification": "evidence normalization",
+  "repairs": [
+    "Legacy probe projection narrows purpose, orientation and relative side to their contract enum values instead of accepting arbitrary strings.",
+    "Live-transform result base uses its explicit result contract rather than a readonly tuple assertion."
+  ],
+  "verification": {
+    "probe_suites": "31 tests passed including existing local snapshot restart/lease fixture",
+    "transform_suite": "2 tests passed",
+    "temporal_typecheck": "FAIL with 9 remaining diagnostics; probe and transform diagnostics resolved"
+  },
+  "limitations": [
+    "Probe restart fixture is not temporal native reconnect qualification.",
+    "Remaining account, memory-governor, navigation and Stage Play diagnostics prevent a clean temporal typecheck.",
+    "No live runtime restart or packaged deployment."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

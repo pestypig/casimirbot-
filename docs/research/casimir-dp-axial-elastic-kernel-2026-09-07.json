@@ -1,0 +1,34 @@
+{
+  "scope": "Axial fermion current and conserved spin-zero target current (k+kprime), physical vertex coefficient CA, unit Dirac spin average. Spinful nuclear magnetic responses, solid excitations and population history omitted.",
+  "exact_spin_average": "|M|^2/(CA^2 Q^2 F^2)=8 pCM^2 s (1+cos(theta))",
+  "NR_kernel": "d sigma/d q^2 = CA(q)^2 Q^2 F(q)^2/(4 pi) * (1-q^2/(4 mu^2 v^2))",
+  "trace_cases": 18,
+  "max_trace_relative_error": 5.922384804790681e-10,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "diagonal_over_transition_vertex": 8.201171244435541e-05,
+      "CA_GeV_minus2": 2.715715521133269e-13,
+      "contact_spinzero_total_ratio_to_equal_Cb_vector_at_v_1e_minus3": 3.3629604890278193e-15
+    },
+    {
+      "mchi_GeV": 15.0,
+      "diagonal_over_transition_vertex": 3.783054471790981e-05,
+      "CA_GeV_minus2": 1.2168925834540526e-13,
+      "contact_spinzero_total_ratio_to_equal_Cb_vector_at_v_1e_minus3": 7.155750568268869e-16
+    },
+    {
+      "mchi_GeV": 40.0,
+      "diagonal_over_transition_vertex": 6.288993784818631e-06,
+      "CA_GeV_minus2": 1.9485446167193777e-14,
+      "contact_spinzero_total_ratio_to_equal_Cb_vector_at_v_1e_minus3": 1.9775721412743682e-17
+    },
+    {
+      "mchi_GeV": 100.0,
+      "diagonal_over_transition_vertex": 1.378247863028473e-06,
+      "CA_GeV_minus2": 4.21155877537513e-15,
+      "contact_spinzero_total_ratio_to_equal_Cb_vector_at_v_1e_minus3": 9.497835859712764e-19
+    }
+  ],
+  "full_model_admitted": false
+}

@@ -1,0 +1,45 @@
+{
+  "observed_at": "2026-09-07T04:24:09.015Z",
+  "scope": "Post-update readiness only; not ET6 live capacity acceptance",
+  "exe": {
+    "relative_path": "apps/desktop/release-et6-broker-diagnostics-20260907/win-unpacked/CasimirBot.exe",
+    "sha256": "c6a7dd60b5a6855dd8fa88cb11567908c25549f230816e9febc671de3503eaf9",
+    "all_observed_casimirbot_process_paths_match": true,
+    "isolated_startup_smoke_proven": false,
+    "free_disk_bytes": 4877086720
+  },
+  "mcp": {
+    "service_instance_ref": "service_instance:07e4855c4b7e33d5f0626b853e0b4eab",
+    "transport_restored_via_trusted_device_delegation": true,
+    "run_inspect_succeeded": true,
+    "run_ref": "run_cc12b167-8120-4f5b-bea0-f5bc880ee038",
+    "run_status": "waiting",
+    "run_expires_at": "2026-09-07T04:40:20.140Z",
+    "retained_run_presence_server_verified": true,
+    "binding_approval_presentation_accepted": true,
+    "binding_control_invoked": false,
+    "revoked_binding_restored": false
+  },
+  "minecraft": {
+    "server_pid_observed": 22668,
+    "client_pid_observed": 15064,
+    "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+    "authority_inspect_error": "action_adapter_admission_inactive",
+    "adapter_admission_status": "expired",
+    "credential_status": "expired",
+    "credential_expired_at": "2026-09-07T04:08:01.087Z",
+    "last_contact_at": "2026-09-07T04:07:42.977Z",
+    "probe_ready": false,
+    "movement_issued_this_check": false,
+    "zero_motion_proven": false
+  },
+  "voice": { "room_media_bridge_connected": false, "live_voice_proven": false },
+  "et6_complete": false,
+  "nav1_unlocked": false,
+  "next_requirements": [
+    "Restore current observation connector through supported opaque pairing before planning",
+    "Obtain fresh human-approved exact run binding",
+    "Verify finite current player action authority and fresh controller readiness",
+    "Resume original live rolling-extension acceptance; do not count readiness as execution"
+  ]
+}

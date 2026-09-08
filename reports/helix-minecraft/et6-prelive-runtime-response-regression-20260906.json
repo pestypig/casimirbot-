@@ -1,0 +1,31 @@
+{
+  "scope": "Real runtime polling method with synthetic resident state and loopback HTTP; no game effects",
+  "runtime_cases_passed": [
+    "Truncated HTTP response plus canceled post-failure client callback retains status-only recovery",
+    "Malformed action_request remains status-only",
+    "Explicit null action_request permits subsequent delivery poll",
+    "Explicit null with canceled return callback conservatively remains status-only"
+  ],
+  "native_regression": { "tests": 295, "failures": 0, "errors": 0, "game_tests_excluded": true },
+  "companion": {
+    "path": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+    "sha256": "b27c51192b44bf47555d7c24f85330b66faec788c23b3a76e75f953bfa35a130",
+    "build_passed": true,
+    "installed": false
+  },
+  "desktop_service": {
+    "path": "apps/desktop/dist/service.mjs",
+    "sha256": "418074d30c1318ee8691e0cbd6163b5fa0c80ea9d1e6dbc0a78fd31d0aff0993",
+    "build_passed": true,
+    "syntax_passed": true,
+    "dependency_manifest_matches": true,
+    "known_unrelated_build_warnings": 4,
+    "installed": false
+  },
+  "limits": [
+    "Synthetic state uses test reflection; does not establish admission, authorization or physical execution",
+    "Interruption tests callback cancellation, not a measured twelve-second timeout",
+    "Full broker-to-controller execution and complete timing budget remain unverified",
+    "No assembled EXE acceptance, live ET6 qualification or NAV advancement"
+  ]
+}

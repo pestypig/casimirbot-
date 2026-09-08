@@ -1,0 +1,80 @@
+{
+  "status": "conditional_partial_elastic_response_only",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "a": [
+    2.31,
+    1.02,
+    1.5886,
+    0.865
+  ],
+  "b": [
+    20.8439,
+    10.2075,
+    0.5687,
+    51.6512
+  ],
+  "c": 0.2156,
+  "raw_f_zero": 5.9992,
+  "electron_normalization": 1.0001333511134818,
+  "inferred_atomic_rms_m": 8.121452005368605e-11,
+  "assumptions": [
+    "isolated neutral carbon fit",
+    "point nucleus over this interval",
+    "uniform rigid sphere",
+    "isotropic momentum directions",
+    "kinematic support reaches stated cutoff",
+    "Born vector exchange"
+  ],
+  "exclusions": [
+    "no bonded-diamond response",
+    "no all-q bound",
+    "no inelastic response",
+    "no capture density",
+    "no absolute decoherence rate",
+    "no LZ accepted count"
+  ],
+  "rows": [
+    {
+      "mediator_eV": 10000000.0,
+      "qR_cut": 1,
+      "q_max_eV": 0.7141704424363171,
+      "screened_to_bare_integral": 1.0025830901050948e-16,
+      "endpoint_charge_squared": 2.0734512232448116e-16
+    },
+    {
+      "mediator_eV": 10000000.0,
+      "qR_cut": 10,
+      "q_max_eV": 7.141704424363171,
+      "screened_to_bare_integral": 5.446904600447148e-14,
+      "endpoint_charge_squared": 2.0734456347505935e-12
+    },
+    {
+      "mediator_eV": 10000000.0,
+      "qR_cut": 80,
+      "q_max_eV": 57.13363539490537,
+      "screened_to_bare_integral": 3.1414180525600733e-12,
+      "endpoint_charge_squared": 8.491376823410676e-09
+    },
+    {
+      "mediator_eV": 100000000.0,
+      "qR_cut": 1,
+      "q_max_eV": 0.7141704424363171,
+      "screened_to_bare_integral": 1.002583090105096e-16,
+      "endpoint_charge_squared": 2.0734512232448116e-16
+    },
+    {
+      "mediator_eV": 100000000.0,
+      "qR_cut": 10,
+      "q_max_eV": 7.141704424363171,
+      "screened_to_bare_integral": 5.446904600449558e-14,
+      "endpoint_charge_squared": 2.0734456347505935e-12
+    },
+    {
+      "mediator_eV": 100000000.0,
+      "qR_cut": 80,
+      "q_max_eV": 57.13363539490537,
+      "screened_to_bare_integral": 3.1414180526610855e-12,
+      "endpoint_charge_squared": 8.491376823410676e-09
+    }
+  ]
+}

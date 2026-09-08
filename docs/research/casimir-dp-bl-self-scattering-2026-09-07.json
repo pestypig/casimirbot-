@@ -1,0 +1,109 @@
+{
+  "status": "conditional_classical_self_scattering_diagnostic_not_halo_exclusion",
+  "rows": [
+    {
+      "g_SM": 1e-12,
+      "alpha_dark": 9.147091740226385,
+      "relative_speed_kms": 30,
+      "beta": 0.018268880159798297,
+      "classical_parameter": 10006922.85594456,
+      "sigma_transfer_cm2_per_g": 36668505794.23614
+    },
+    {
+      "g_SM": 1e-12,
+      "alpha_dark": 9.147091740226385,
+      "relative_speed_kms": 200,
+      "beta": 0.00041104980359546163,
+      "classical_parameter": 66712819.03963041,
+      "sigma_transfer_cm2_per_g": 36159206.600879826
+    },
+    {
+      "g_SM": 1e-12,
+      "alpha_dark": 9.147091740226385,
+      "relative_speed_kms": 1000,
+      "beta": 1.6441992143818467e-05,
+      "classical_parameter": 333564095.198152,
+      "sigma_transfer_cm2_per_g": 81739.82162964677
+    },
+    {
+      "g_SM": 1e-12,
+      "alpha_dark": 9.147091740226385,
+      "relative_speed_kms": 3000,
+      "beta": 1.8268880159798296e-06,
+      "classical_parameter": 1000692285.5944562,
+      "sigma_transfer_cm2_per_g": 1210.4189280854653
+    },
+    {
+      "g_SM": 3e-12,
+      "alpha_dark": 1.0163435266918206,
+      "relative_speed_kms": 30,
+      "beta": 0.0020298755733109217,
+      "classical_parameter": 10006922.85594456,
+      "sigma_transfer_cm2_per_g": 701179369.91423
+    },
+    {
+      "g_SM": 3e-12,
+      "alpha_dark": 1.0163435266918206,
+      "relative_speed_kms": 200,
+      "beta": 4.567220039949574e-05,
+      "classical_parameter": 66712819.03963041,
+      "sigma_transfer_cm2_per_g": 572213.2830905679
+    },
+    {
+      "g_SM": 3e-12,
+      "alpha_dark": 1.0163435266918206,
+      "relative_speed_kms": 1000,
+      "beta": 1.8268880159798296e-06,
+      "classical_parameter": 333564095.198152,
+      "sigma_transfer_cm2_per_g": 1210.4189280854653
+    },
+    {
+      "g_SM": 3e-12,
+      "alpha_dark": 1.0163435266918206,
+      "relative_speed_kms": 3000,
+      "beta": 2.0298755733109218e-07,
+      "classical_parameter": 1000692285.5944562,
+      "sigma_transfer_cm2_per_g": 17.428447602679007
+    },
+    {
+      "g_SM": 1e-11,
+      "alpha_dark": 0.09147091740226389,
+      "relative_speed_kms": 30,
+      "beta": 0.00018268880159798303,
+      "classical_parameter": 10006922.85594456,
+      "sigma_transfer_cm2_per_g": 7885443.521547937
+    },
+    {
+      "g_SM": 1e-11,
+      "alpha_dark": 0.09147091740226389,
+      "relative_speed_kms": 200,
+      "beta": 4.1104980359546185e-06,
+      "classical_parameter": 66712819.03963041,
+      "sigma_transfer_cm2_per_g": 5751.660669299626
+    },
+    {
+      "g_SM": 1e-11,
+      "alpha_dark": 0.09147091740226389,
+      "relative_speed_kms": 1000,
+      "beta": 1.6441992143818472e-07,
+      "classical_parameter": 333564095.198152,
+      "sigma_transfer_cm2_per_g": 11.591166240284334
+    },
+    {
+      "g_SM": 1e-11,
+      "alpha_dark": 0.09147091740226389,
+      "relative_speed_kms": 3000,
+      "beta": 1.8268880159798302e-08,
+      "classical_parameter": 1000692285.5944562,
+      "sigma_transfer_cm2_per_g": 0.1632293505544565
+    }
+  ],
+  "source": "https://arxiv.org/html/1302.3898",
+  "equation": 38,
+  "assumptions": [
+    "repulsive light Yukawa potential only",
+    "point particles; 100 GeV mass, 1 eV mediator",
+    "transfer cross section proxy; not identical-particle viscosity or full halo transport",
+    "heavy-mediator dark coupling, radiation and collective screening not specified"
+  ]
+}

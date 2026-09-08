@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 native evidence identity prerequisite",
+  "finding": "WorkflowEvent carried no action-request identity; runtime selected the current envelope's action ID after matching only workflow ID.",
+  "repair": "Controller events carry their originating action-request ID. Runtime requires exact action and workflow matches before deferred or published event handling, checks diagnostic identity too, and publishes the event's matched action ID.",
+  "verification": {
+    "native_sequence_controller_runtime_tests": "PASS",
+    "cases": ["controller emits originating action ID", "exact envelope accepted", "same workflow with successor action rejected", "wrong workflow rejected", "missing identity rejected"],
+    "casimir": { "run_id": "2670", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": ["No production successor envelope transfer or temporal transport is enabled.", "This prevents relabeling but does not implement multi-plan action settlement or evidence admission.", "No EXE rebuild or live Minecraft qualification ran."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

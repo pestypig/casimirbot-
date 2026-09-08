@@ -30,6 +30,7 @@ export type DesktopMcpTunnelTransitionExecution = Readonly<{
   requestedScopeReady: boolean;
   readOnlyFallbackAttempted: boolean;
   readOnlyFallbackReady: boolean;
+  failureReason?: "account_session_changed" | "transport_not_ready" | "scope_router_unavailable" | "transition_failed";
 }>;
 
 export type DesktopMcpTunnelReadOnlyAutoStartOutcome = Readonly<{
@@ -199,7 +200,15 @@ export const executeDesktopMcpTunnelTransitionNow = async (input: {
       readOnlyFallbackReady: input.targetScope ===
         "local_supervisor_coordination_and_device_check",
     });
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const failureReason = message === "Tunnel account session changed before scope transition"
+      ? "account_session_changed" as const
+      : message === "Tunnel must be ready before changing its capability scope" || message === "mcp_tunnel_requested_scope_not_ready"
+        ? "transport_not_ready" as const
+        : message === "Stable MCP scope routing is unavailable"
+          ? "scope_router_unavailable" as const
+          : "transition_failed" as const;
     const readOnlyFallbackReady = await restoreDesktopMcpTunnelReadOnly({
       controller: input.controller,
       accountSessionId: input.accountSessionId,
@@ -210,6 +219,7 @@ export const executeDesktopMcpTunnelTransitionNow = async (input: {
       requestedScopeReady: false,
       readOnlyFallbackAttempted: true,
       readOnlyFallbackReady,
+      failureReason,
     });
   }
 };

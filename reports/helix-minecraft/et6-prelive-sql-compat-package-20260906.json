@@ -1,0 +1,37 @@
+{
+  "scope": "ET6 pre-live SQL compatibility diagnostic package refresh",
+  "date": "2026-09-06",
+  "classification": "deterministic regression and isolated package readiness; not live ET6 acceptance",
+  "checks": {
+    "focused_admission_restart_timing_lease": { "passed": 31, "files": 6 },
+    "full_migrated_schema_snapshot": { "passed": 1, "files": 1 },
+    "native_test_build": { "passed": 300, "suites": 41, "failures": 0, "errors": 0, "skipped": 0, "excluded_task": "runGameTest" },
+    "host_service_build": "passed with four existing unrelated bundle warnings",
+    "runtime_stage": "passed",
+    "package": "passed on retry",
+    "runtime_files_hash_matched": 645,
+    "asar_dist_payloads_hash_matched": ["main.cjs", "preload.cjs", "service.mjs", "service-dependencies.json"]
+  },
+  "package_directory": "apps/desktop/release-et6-sql-compat-20260906/win-unpacked",
+  "exe_sha256": "4bd30fb42f2a44940a99c1c31459c026a489488a2693627c5295cce959fde67f",
+  "service_sha256": "0364d2fb85c665a393ace874f4c4e98faa4850963efaeedffce0a6c206b3b1a5",
+  "initial_package_failure": "Icon converter WebAssembly.Memory could not allocate memory; same configuration retry passed. No product guard disabled.",
+  "isolated_launch": {
+    "verdict": "PASS",
+    "processes": 4,
+    "loopback_listeners": 4,
+    "full_readiness_receipt": "PASS",
+    "service_listener_receipt": "PASS",
+    "provider_credential_key_vault": "PASS",
+    "protocol_registration_preserved": "PASS",
+    "min_free_physical_gib": 5.32,
+    "max_commit_percent": 64.6,
+    "temporary_processes_and_userdata_cleaned": true
+  },
+  "limits": [
+    "Diagnostic directory package, not installed, published or release-qualified.",
+    "Installed app, keyed server, user bindings and Minecraft were not replaced or restarted.",
+    "No live movement, three rolling extensions, provider timing or NAV1 advancement claimed.",
+    "Regression counts overlap previous reports and are not cumulative unique coverage."
+  ]
+}

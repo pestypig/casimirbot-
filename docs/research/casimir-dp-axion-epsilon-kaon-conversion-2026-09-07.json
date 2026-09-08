@@ -1,0 +1,54 @@
+{
+  "scope": "Aligned up-singlet diagnostic with fixed CKM and approximate eta factors. No global fit, complete uncertainty, or exclusion.",
+  "inputs": {
+    "GF_GeV_minus2": 1.1663787e-05,
+    "MW_GeV": 80.379,
+    "mK_GeV": 0.497611,
+    "fK_reference_GeV": 0.1557,
+    "BhatK_reference": 0.7625,
+    "kappa_epsilon": 0.92,
+    "delta_mK_GeV": 3.484e-15
+  },
+  "dimensionless_prefactor": 12746.328144589852,
+  "experimental_epsilon_magnitude": 0.002228,
+  "rows": [
+    {
+      "yL": 0.1,
+      "epsilon_NP_magnitude": 0.000252179331100514,
+      "fraction_of_measured_magnitude": 0.11318641431800448,
+      "ratio_to_dated_diagnostic_scale": 1.0168521415343306
+    },
+    {
+      "yL": 0.2,
+      "epsilon_NP_magnitude": 0.001008520102279449,
+      "fraction_of_measured_magnitude": 0.45265713746833436,
+      "ratio_to_dated_diagnostic_scale": 4.06661331564294
+    },
+    {
+      "yL": 0.4,
+      "epsilon_NP_magnitude": 0.004030928145578579,
+      "fraction_of_measured_magnitude": 1.8092137098647125,
+      "ratio_to_dated_diagnostic_scale": 16.25374252249427
+    },
+    {
+      "yL": 0.6,
+      "epsilon_NP_magnitude": 0.009057793597163686,
+      "fraction_of_measured_magnitude": 4.06543698256898,
+      "ratio_to_dated_diagnostic_scale": 36.52336127888583
+    }
+  ],
+  "dated_diagnostic_scale": 0.000248,
+  "conditional_root": {
+    "yL": 0.09916784176599759,
+    "yR_at_fixed_gu": 0.006452967690041848,
+    "first_row_deficit": 7.45067250420882e-05,
+    "A_mass_loop_relative_to_reference": 4.066483594601955
+  },
+  "checks": {
+    "archived_rows_reproduced": true,
+    "zero_mixing_zero_effect": true,
+    "diagnostic_root_reproduced": true,
+    "fixed_low_energy_coupling": true
+  },
+  "full_model_admitted": false
+}

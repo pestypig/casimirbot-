@@ -1,0 +1,152 @@
+{
+  "status": "conditional_transport_scan_not_normalized_model",
+  "transport_script_sha256": "dcb25aeacd1d563858dfa057b5eb70185c1f92a79d49f00acb82a49bf7635113",
+  "rows": [
+    {
+      "relative_to_prior_strong_root": 0.5,
+      "seed": 3000,
+      "N": 30000,
+      "capable_exit_count": 22230,
+      "above_650_exit_count": 18515,
+      "above_650_fraction": 0.6171666666666666,
+      "binomial_95_interval": [
+        0.6116384768362825,
+        0.6226721590650014
+      ],
+      "subset_coefficient_lower_estimate": 296941036.95687413,
+      "subset_coefficient_sampling_interval": [
+        294281226.3912862,
+        299589926.9731632
+      ],
+      "fraction_for_subset_coefficient_one": 2.0784148698056176e-09,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 1441354330,
+      "conclusion": "resolved_large_raw_subset"
+    },
+    {
+      "relative_to_prior_strong_root": 1,
+      "seed": 3001,
+      "N": 30000,
+      "capable_exit_count": 7483,
+      "above_650_exit_count": 4223,
+      "above_650_fraction": 0.14076666666666668,
+      "binomial_95_interval": [
+        0.1368494832034075,
+        0.14475355091702402
+      ],
+      "subset_coefficient_lower_estimate": 135455792.500014,
+      "subset_coefficient_sampling_interval": [
+        131686397.35165702,
+        139292258.74963263
+      ],
+      "fraction_for_subset_coefficient_one": 1.0392074349028088e-09,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 2882708660,
+      "conclusion": "resolved_large_raw_subset"
+    },
+    {
+      "relative_to_prior_strong_root": 2,
+      "seed": 3002,
+      "N": 30000,
+      "capable_exit_count": 76,
+      "above_650_exit_count": 23,
+      "above_650_fraction": 0.0007666666666666667,
+      "binomial_95_interval": [
+        0.0004860610200977812,
+        0.0011501557128628958
+      ],
+      "subset_coefficient_lower_estimate": 1475483.4134503065,
+      "subset_coefficient_sampling_interval": [
+        935445.6170595812,
+        2213524.7963664993
+      ],
+      "fraction_for_subset_coefficient_one": 5.196037174514044e-10,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 5765417322,
+      "conclusion": "resolved_large_raw_subset"
+    },
+    {
+      "relative_to_prior_strong_root": 3,
+      "seed": 3003,
+      "N": 30000,
+      "capable_exit_count": 0,
+      "above_650_exit_count": 0,
+      "above_650_fraction": 0.0,
+      "binomial_95_interval": [
+        0.0,
+        0.0001229550888738576
+      ],
+      "subset_coefficient_lower_estimate": 0.0,
+      "subset_coefficient_sampling_interval": [
+        0.0,
+        354948.6408900363
+      ],
+      "fraction_for_subset_coefficient_one": 3.4640247830093623e-10,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 8648125983,
+      "conclusion": "unresolved_rare_tail_not_zero"
+    },
+    {
+      "relative_to_prior_strong_root": 4,
+      "seed": 3004,
+      "N": 30000,
+      "capable_exit_count": 0,
+      "above_650_exit_count": 0,
+      "above_650_fraction": 0.0,
+      "binomial_95_interval": [
+        0.0,
+        0.0001229550888738576
+      ],
+      "subset_coefficient_lower_estimate": 0.0,
+      "subset_coefficient_sampling_interval": [
+        0.0,
+        473264.8545200484
+      ],
+      "fraction_for_subset_coefficient_one": 2.598018587257022e-10,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 11530834644,
+      "conclusion": "unresolved_rare_tail_not_zero"
+    },
+    {
+      "relative_to_prior_strong_root": 6,
+      "seed": 3005,
+      "N": 30000,
+      "capable_exit_count": 0,
+      "above_650_exit_count": 0,
+      "above_650_fraction": 0.0,
+      "binomial_95_interval": [
+        0.0,
+        0.0001229550888738576
+      ],
+      "subset_coefficient_lower_estimate": 0.0,
+      "subset_coefficient_sampling_interval": [
+        0.0,
+        709897.2817800726
+      ],
+      "fraction_for_subset_coefficient_one": 1.7320123915046811e-10,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 17296251967,
+      "conclusion": "unresolved_rare_tail_not_zero"
+    },
+    {
+      "relative_to_prior_strong_root": 8,
+      "seed": 3006,
+      "N": 30000,
+      "capable_exit_count": 0,
+      "above_650_exit_count": 0,
+      "above_650_fraction": 0.0,
+      "binomial_95_interval": [
+        0.0,
+        0.0001229550888738576
+      ],
+      "subset_coefficient_lower_estimate": 0.0,
+      "subset_coefficient_sampling_interval": [
+        0.0,
+        946529.7090400968
+      ],
+      "fraction_for_subset_coefficient_one": 1.299009293628511e-10,
+      "all_zero_trials_needed_for_one_sided_95_upper_below_that_fraction": 23061669290,
+      "conclusion": "unresolved_rare_tail_not_zero"
+    }
+  ],
+  "limits": [
+    "intervals quantify Monte Carlo sampling only",
+    "subset coefficient is not accepted event count",
+    "no-survivor sample is not zero flux",
+    "no external constraints or captured distribution"
+  ]
+}

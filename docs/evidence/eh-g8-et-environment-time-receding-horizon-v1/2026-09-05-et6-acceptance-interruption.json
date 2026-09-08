@@ -1,0 +1,28 @@
+{
+  "scope": "ET6 native acceptance evidence during immediate cancellation",
+  "classification": "evidence normalization",
+  "defect": "Controller retained a one-shot successor acceptance measurement for subsequent events, including immediate cancellation.",
+  "repair": "Capture the acceptance in its original event and remove it from retained measurements before invoking the event listener, including synchronous cancellation callbacks.",
+  "native_test": {
+    "suite": "FluidSequenceEngineTest",
+    "result": "PASS",
+    "cases": "Immediate and reentrant cancellation preserve exactly one acceptance, release controls, and perform no successor pulse. Existing three-window handoff regressions also pass."
+  },
+  "casimir": {
+    "run_id": "2679",
+    "verdict": "PASS",
+    "firstFail": null,
+    "deltas": [],
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "limitations": [
+    "Native bridge fixture, not packaged Minecraft live acceptance.",
+    "No HTTP reconnect or lost-delivery proof yet.",
+    "Existing keyed-server Casimir gate is not proof that this native patch is deployed."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

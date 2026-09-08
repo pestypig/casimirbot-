@@ -1,0 +1,187 @@
+{
+  "schema": "casimirbot.cfp0.inspection_annotations.v1",
+  "groups": [
+    {
+      "id": "E00",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+        "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+        "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md"
+      ],
+      "finding": "Planning contract and bounded baseline; no executable acceptance."
+    },
+    {
+      "id": "E01",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json"
+      ],
+      "finding": "Sandbox fixture with live_accepted false. Agent verified four named source hashes match current inspected files; no test rerun, hosted transaction or software-capability grant."
+    },
+    {
+      "id": "E02",
+      "kind": "source-inspected",
+      "paths": [
+        "shared/helix-account-session.ts",
+        "server/routes/agi.workstation-tool-gateway.ts",
+        "server/services/helix-ask/workstation-tool-gateway/account-policy.ts",
+        "server/mcp/helix-mcp-server.ts",
+        "shared/helix-billing-entitlement.ts",
+        "server/services/helix-account/billing-entitlement-store.ts"
+      ],
+      "finding": "User rooms/gateway features locked; Minecraft local lifecycle requires trusted developer. Billing schema sandbox-only. No software-entitlement admission integration found in these inspected boundaries; not an exhaustive absence proof."
+    },
+    {
+      "id": "E03",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+        "docs/evidence/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1/2026-09-03-deterministic-checkpoint.json"
+      ],
+      "finding": "Historical connection/recovery and production OAuth metadata results; signed current release pending. Independent client proves bounded discovery/Device Check, not continuation. Disposable onboarding did not prove signed-in time-to-ready."
+    },
+    {
+      "id": "E04",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json"
+      ],
+      "finding": "Recorded unpacked EXE/ASAR identities, 350ms step (~1.255 blocks), post-observation and stale denial; earlier reasoning evidence composed; native impersonation rejected. No useful paid ordinary-user full journey."
+    },
+    {
+      "id": "E05",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+        "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json"
+      ],
+      "finding": "Shared deterministic schemas/compiler/fixtures only. ET6 capacity and NAV runtime/live conformance excluded."
+    },
+    {
+      "id": "E06",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+        "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+        "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md"
+      ],
+      "finding": "Inline later perception scene/checkpoints inspected; raw screenshots not opened. Full benchmark/Nether not accepted; canonical Invalid-session-only wording requires reconciliation."
+    },
+    {
+      "id": "E07",
+      "kind": "result-inspected",
+      "paths": [
+        "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json",
+        "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json"
+      ],
+      "finding": "Narrow monitor/look/cursor trace; direct three-stone record lacks observation re-entry. Not unknown-world Nether or closed-task wake."
+    },
+    {
+      "id": "E08",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-native-node-a-preflight.json"
+      ],
+      "finding": "One node ready but coordination-only/stale unbound connector and no isolated second node. Federation/NFO scope dependencies require contract reconciliation."
+    },
+    {
+      "id": "E09",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+        "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md"
+      ],
+      "finding": "Inline private replay and REC2C limits inspected; underlying raw traces/screenshots not independently revalidated. Broader public gameplay claims remain excluded."
+    },
+    {
+      "id": "E10",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+        "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+        "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+        "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+        "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+        "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+        "docs/helix-ask-codex-parity-work-program-v1.md"
+      ],
+      "finding": "Canonical G5-G7 closed regression scope retained. Separate Helix parity G1 remains active. No fresh financial or parity run."
+    },
+    {
+      "id": "E11",
+      "kind": "source-inspected",
+      "paths": [
+        ".github/workflows/desktop-release.yml",
+        "apps/desktop/electron-builder.config.cjs",
+        "apps/desktop/scripts/release-signing-config.cjs",
+        "apps/desktop/scripts/site-release-metadata-lib.mjs",
+        "apps/desktop/scripts/provider-neutral-runtime-guard-lib.mjs",
+        "apps/desktop/scripts/stage-runtime.mjs",
+        "apps/desktop/src/updater.ts",
+        "apps/desktop/release-slice.v1.json"
+      ],
+      "finding": "Fail-closed signing configuration and release workflow; download/updater source-repo coupling; bundled runtime guard. Local artifact hashes captured separately; no signature/network/update run."
+    },
+    {
+      "id": "E12",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-05-et6-terminal-resident-effect-consistency.json"
+      ],
+      "finding": "61-test effect-consistency record; explicitly no production transport/package/live capacity, et6_complete false. Supplemental current ET6 repair packet inspected separately; later startup success is diagnostic only."
+    },
+    {
+      "id": "E13",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md"
+      ],
+      "finding": "Optional display/provider stages only; no provider execution in audit; raw output images not evaluated."
+    }
+  ],
+  "implementation_sources": [
+    "client/src/components/agent-access/AgentConnectionSetup.tsx",
+    "client/src/components/agent-access/agentHarnessOnboarding.ts",
+    "client/src/components/agent-access/agentConnectionSetupState.ts",
+    "server/routes/agent-connections.ts",
+    "server/services/local-supervisor/reasoning-task-binding-store.ts",
+    "apps/desktop/src/mcp-tunnel-recovery-supervisor.ts",
+    "server/services/helix-ask/workstation-tool-gateway/environment-action.ts",
+    "server/services/helix-ask/workstation-tool-gateway/environment-action-control.ts",
+    "server/services/environment-connectors/actions/action-broker.ts",
+    "server/services/environment-connectors/actions/authority-store.ts",
+    "server/services/environment-connectors/goals/durable-goal-store.ts",
+    "apps/desktop/src/provider-credential-key.ts",
+    "apps/desktop/src/main.ts",
+    "server/routes/stripe-sandbox-webhook.ts",
+    "server/routes/installed-account-services.ts"
+  ],
+  "tests_located_not_rerun": [
+    "server/routes/__tests__/stripe-sandbox-acceptance.test.ts",
+    "server/services/helix-account/__tests__/billing-entitlement-store.test.ts",
+    "server/services/helix-ask/workstation-tool-gateway/__tests__/account-policy.test.ts",
+    "server/routes/__tests__/agent-connections.test.ts",
+    "server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts",
+    "server/mcp/__tests__/helix-mcp-minecraft-local-lifecycle.test.ts",
+    "client/src/components/agent-access/__tests__/agentHarnessOnboarding.spec.ts",
+    "client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx",
+    "tests/desktop-mcp-tunnel-recovery-supervisor.spec.ts",
+    "tests/desktop-provider-credential-key.spec.ts",
+    "tests/desktop-provider-credential-broker.spec.ts",
+    "tests/desktop-provider-neutral-runtime-guard.spec.ts",
+    "server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts",
+    "server/services/environment-connectors/actions/__tests__/execution-lease-claim.test.ts",
+    "server/services/environment-connectors/temporal-plans/__tests__/temporal-resident-effects.test.ts",
+    "tests/desktop-release-signing.spec.ts",
+    "tests/desktop-site-release-metadata.spec.ts",
+    "tests/desktop-release-slice.spec.ts",
+    "shared/__tests__/desktop-update.spec.ts"
+  ]
+}

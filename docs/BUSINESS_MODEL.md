@@ -2,6 +2,32 @@
 
 Status: draft (pivoted for Dot framework + Helix Ask + Go Board).
 
+Planning precedence: the current installed-product commercial direction is
+defined in `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`.
+Reconcile this draft through
+`docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md`; current stage
+and dependencies live only in `docs/helix-environment-harness-work-program-v1.md`.
+The open-source-core funnel, seat/voice pricing, and mission-overwatch milestones
+below are earlier proposals, not mandatory terms of the paid Codex-first
+harness. They remain visible for the staged audit; no license, price, or
+publication change follows from this note.
+
+## Current paid-harness specification
+
+`docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md` separates
+software use and required hosted identity/connection operation. The selected
+initial offer is recurring subscription for the broader harness, with no
+credit purchases, credit bundles or CasimirBot-funded model/API service. Users
+connect their supported external reasoning application. Minecraft is a visible
+technical proof of concept. Existing Stripe $5/$10 presets are billing
+groundwork; subscription benefits and interval remain to define. Earlier
+credit/provider proposals below are deferred outside this initial offer. Commercial permission, component distribution
+rights, trial and exact service/expiry terms remain to finish; no sale or
+source-license change is approved here.
+The subscription must define expiry and preserve owner safety/recovery access.
+The prepared cost worksheet measures hosting, support, payment and update costs
+without pretending that model resale is the value of the base product.
+
 ## One sentence
 Helix is a constraint-first mission overwatch platform that converts live system
 events into actionable callouts, operator board state, and auditable decisions.

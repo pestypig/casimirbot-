@@ -1,0 +1,101 @@
+{
+  "checks": {
+    "free_charge_limit": true,
+    "quadrature_agreement_below_one_percent": true,
+    "nonnegative_rates": true,
+    "spin_trace_convention": true
+  },
+  "rows": [
+    {
+      "mass_GeV": 100.0,
+      "grid_integral_eV3": 109.30574631880077,
+      "simpson_trapezoid_relative_difference": 0.0015133112634162504,
+      "local_grid_scattering_count": 2.1461716396018724e-28,
+      "D_density_grid_upper": 4.292343279203745e-28,
+      "xenon": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "raw_Xe_counts_at_reference_moment": 753.3694096699797,
+          "D_density_grid_upper_per_raw_Xe_count": 5.697527964513511e-31
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "raw_Xe_counts_at_reference_moment": 0.12303912433593546,
+          "D_density_grid_upper_per_raw_Xe_count": 3.488600315038247e-27
+        }
+      ]
+    },
+    {
+      "mass_GeV": 200.0,
+      "grid_integral_eV3": 109.3097165044888,
+      "simpson_trapezoid_relative_difference": 0.001513297980793249,
+      "local_grid_scattering_count": 1.0731247962510067e-28,
+      "D_density_grid_upper": 2.1462495925020133e-28,
+      "xenon": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "raw_Xe_counts_at_reference_moment": 380.80005959605217,
+          "D_density_grid_upper_per_raw_Xe_count": 5.636158762103996e-31
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "raw_Xe_counts_at_reference_moment": 0.07211341303515412,
+          "D_density_grid_upper_per_raw_Xe_count": 2.9762141357194555e-27
+        }
+      ]
+    },
+    {
+      "mass_GeV": 1000.0,
+      "grid_integral_eV3": 109.31289269679232,
+      "simpson_trapezoid_relative_difference": 0.001513287351512238,
+      "local_grid_scattering_count": 2.1463119556811984e-29,
+      "D_density_grid_upper": 4.292623911362397e-29,
+      "xenon": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "raw_Xe_counts_at_reference_moment": 76.81846868098042,
+          "D_density_grid_upper_per_raw_Xe_count": 5.588010259862435e-31
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "raw_Xe_counts_at_reference_moment": 0.01611769874578065,
+          "D_density_grid_upper_per_raw_Xe_count": 2.663298265508366e-27
+        }
+      ]
+    }
+  ],
+  "reference_mu_GeV_inverse": 1e-06,
+  "speed_km_s": 776,
+  "rhoDM_GeV_cm3": 0.3,
+  "bulk_density_kg_m3": 3512.47892480049,
+  "target_volume_cm3_mass_normalized": 8.804338288102633e-14,
+  "geometric_volume_cm3": 8.835729338221293e-14,
+  "roundoff_negative_cells_clipped_in_memory": 17741,
+  "integration_window_eV": [
+    5.5,
+    150.0
+  ],
+  "q_window_eV": [
+    37.28939427819144,
+    74616.07795066106
+  ],
+  "scope": "Born longitudinal density channel, bulk transfer by mass, mono-speed, finite grid. D<=2N only for this component; not a total-rate upper bound or LZ fit. Spin/current/mixed responses and external exclusions unresolved."
+}

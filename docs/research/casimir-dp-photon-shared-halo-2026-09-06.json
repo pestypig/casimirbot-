@@ -1,0 +1,261 @@
+{
+  "checks": {
+    "halo_moments_direct_integrals": true,
+    "xenon_direct_speed_fold": true,
+    "positive_nested_Xe_windows": true,
+    "positive_material_components": true,
+    "density_kernel_direct_speed_fold": true
+  },
+  "max_moment_relative_error": 4.7177438622370005e-08,
+  "halo_tuples_km_s": {
+    "central": [
+      238.0,
+      544.0,
+      250.2
+    ],
+    "v0_220": [
+      220.0,
+      544.0,
+      250.2
+    ],
+    "vesc_528": [
+      238.0,
+      528.0,
+      250.2
+    ],
+    "vesc_560": [
+      238.0,
+      560.0,
+      250.2
+    ],
+    "summer_speed": [
+      238.0,
+      544.0,
+      265.1
+    ],
+    "winter_speed": [
+      238.0,
+      544.0,
+      235.3
+    ]
+  },
+  "rows": [
+    {
+      "halo": "central",
+      "mass_GeV": 100.0,
+      "Xe_raw_full": 322.91425834034266,
+      "Xe_raw_high": 0.002829299888200286,
+      "Xe_full_over_high": 114132.21330374703,
+      "D_density_grid_upper": 2.9712541113554046e-29,
+      "D_spin_bubble_grid_upper": 2.0328350310689566e-26,
+      "density_upper_per_Xe_full": 9.201371678743852e-32,
+      "spin_upper_per_Xe_full": 6.29527801440841e-29,
+      "spin_upper_per_Xe_high": 7.184940131468497e-24
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 200.0,
+      "Xe_raw_full": 173.76735613775037,
+      "Xe_raw_high": 0.01256849867787398,
+      "Xe_full_over_high": 13825.62552547795,
+      "D_density_grid_upper": 1.4857567807261254e-29,
+      "D_spin_bubble_grid_upper": 1.0165113738223581e-26,
+      "density_upper_per_Xe_full": 8.550264064260282e-32,
+      "spin_upper_per_Xe_full": 5.849840824052939e-29,
+      "spin_upper_per_Xe_high": 8.087770861700928e-25
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 1000.0,
+      "Xe_raw_full": 36.70378636280724,
+      "Xe_raw_high": 0.007538019367328166,
+      "Xe_full_over_high": 4869.155221581344,
+      "D_density_grid_upper": 2.9717211390741076e-30,
+      "D_spin_bubble_grid_upper": 2.033172926766301e-27,
+      "density_upper_per_Xe_full": 8.096497483119121e-32,
+      "spin_upper_per_Xe_full": 5.539409222440766e-29,
+      "spin_upper_per_Xe_high": 2.6972243339923317e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 100.0,
+      "Xe_raw_full": 310.0529053343028,
+      "Xe_raw_high": 0.0018625842065811444,
+      "Xe_full_over_high": 166463.832474677,
+      "D_density_grid_upper": 2.475499636122869e-29,
+      "D_spin_bubble_grid_upper": 1.9022242406088426e-26,
+      "density_upper_per_Xe_full": 7.984120108320724e-32,
+      "spin_upper_per_Xe_full": 6.135160186800512e-29,
+      "spin_upper_per_Xe_high": 1.0212822775408686e-23
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 200.0,
+      "Xe_raw_full": 167.76746759908502,
+      "Xe_raw_high": 0.010483903136237776,
+      "Xe_full_over_high": 16002.386269594017,
+      "D_density_grid_upper": 1.2378655841049e-29,
+      "D_spin_bubble_grid_upper": 9.512061769659516e-27,
+      "density_upper_per_Xe_full": 7.37846020935975e-32,
+      "spin_upper_per_Xe_full": 5.669789206326074e-29,
+      "spin_upper_per_Xe_high": 9.073015694680472e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 1000.0,
+      "Xe_raw_full": 35.56924575092687,
+      "Xe_raw_high": 0.007106928336898588,
+      "Xe_full_over_high": 5004.86906083663,
+      "D_density_grid_upper": 2.4759164106698905e-30,
+      "D_spin_bubble_grid_upper": 1.9025628507337983e-27,
+      "density_upper_per_Xe_full": 6.960834727864233e-32,
+      "spin_upper_per_Xe_full": 5.348898495223844e-29,
+      "spin_upper_per_Xe_high": 2.677053658830142e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 100.0,
+      "Xe_raw_full": 321.77787706751593,
+      "Xe_raw_high": 0.002616150624326606,
+      "Xe_full_over_high": 122996.69372069935,
+      "D_density_grid_upper": 2.903139246267023e-29,
+      "D_spin_bubble_grid_upper": 2.021321409496949e-26,
+      "density_upper_per_Xe_full": 9.02218410017629e-32,
+      "spin_upper_per_Xe_full": 6.281728961350666e-29,
+      "spin_upper_per_Xe_high": 7.726318930956947e-24
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 200.0,
+      "Xe_raw_full": 173.2298468883313,
+      "Xe_raw_high": 0.012397467234838708,
+      "Xe_full_over_high": 13973.003001897834,
+      "D_density_grid_upper": 1.4516979092482472e-29,
+      "D_spin_bubble_grid_upper": 1.0107546022724737e-26,
+      "density_upper_per_Xe_full": 8.380183526826363e-32,
+      "spin_upper_per_Xe_full": 5.834760120315951e-29,
+      "spin_upper_per_Xe_high": 8.152912067652855e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 1000.0,
+      "Xe_raw_full": 36.601155336402336,
+      "Xe_raw_high": 0.007508162918898052,
+      "Xe_full_over_high": 4874.848312664766,
+      "D_density_grid_upper": 2.903601093812631e-30,
+      "D_spin_bubble_grid_upper": 2.021659446463026e-27,
+      "density_upper_per_Xe_full": 7.933085901593938e-32,
+      "spin_upper_per_Xe_full": 5.523485332312307e-29,
+      "spin_upper_per_Xe_high": 2.6926153152251236e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 100.0,
+      "Xe_raw_full": 323.84978633091765,
+      "Xe_raw_high": 0.003011189236795253,
+      "Xe_full_over_high": 107548.79911685137,
+      "D_density_grid_upper": 3.0302721967175967e-29,
+      "D_spin_bubble_grid_upper": 2.0423118106197673e-26,
+      "density_upper_per_Xe_full": 9.357030094258546e-32,
+      "spin_upper_per_Xe_full": 6.306355282053153e-29,
+      "spin_upper_per_Xe_high": 6.78240937389029e-24
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 200.0,
+      "Xe_raw_full": 174.21062146610657,
+      "Xe_raw_high": 0.012708430142355705,
+      "Xe_full_over_high": 13708.272344786556,
+      "D_density_grid_upper": 1.515267029721646e-29,
+      "D_spin_bubble_grid_upper": 1.0212497290503505e-26,
+      "density_upper_per_Xe_full": 8.697902670741851e-32,
+      "spin_upper_per_Xe_full": 5.862155363753403e-29,
+      "spin_upper_per_Xe_high": 8.036002225378295e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 1000.0,
+      "Xe_raw_full": 36.788563374735176,
+      "Xe_raw_high": 0.007562472645441133,
+      "Xe_full_over_high": 4864.621017427724,
+      "D_density_grid_upper": 3.0307435672237515e-30,
+      "D_spin_bubble_grid_upper": 2.0426495819225663e-27,
+      "density_upper_per_Xe_full": 8.238276489223109e-32,
+      "spin_upper_per_Xe_full": 5.552403775911976e-29,
+      "spin_upper_per_Xe_high": 2.7010340105546455e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 100.0,
+      "Xe_raw_full": 333.74892523564705,
+      "Xe_raw_high": 0.003507511671269834,
+      "Xe_full_over_high": 95152.62000962038,
+      "D_density_grid_upper": 3.321712090892778e-29,
+      "D_spin_bubble_grid_upper": 2.1346442732213568e-26,
+      "density_upper_per_Xe_full": 9.952727453871041e-32,
+      "spin_upper_per_Xe_full": 6.395958493991158e-29,
+      "spin_upper_per_Xe_high": 6.085922081760445e-24
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 200.0,
+      "Xe_raw_full": 178.78023129853065,
+      "Xe_raw_high": 0.013957078424437455,
+      "Xe_full_over_high": 12809.28757880333,
+      "D_density_grid_upper": 1.6609959565647333e-29,
+      "D_spin_bubble_grid_upper": 1.0674160472364697e-26,
+      "density_upper_per_Xe_full": 9.290713769080937e-32,
+      "spin_upper_per_Xe_full": 5.9705485303578e-29,
+      "spin_upper_per_Xe_high": 7.647847312855464e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 1000.0,
+      "Xe_raw_full": 37.63515434049767,
+      "Xe_raw_high": 0.007915985995693478,
+      "Xe_full_over_high": 4754.3230067577515,
+      "D_density_grid_upper": 3.322215789235672e-30,
+      "D_spin_bubble_grid_upper": 2.1349823568662517e-27,
+      "density_upper_per_Xe_full": 8.82742703584656e-32,
+      "spin_upper_per_Xe_full": 5.67284071044418e-29,
+      "spin_upper_per_Xe_high": 2.6970517103336756e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 100.0,
+      "Xe_raw_full": 312.43594372118156,
+      "Xe_raw_high": 0.002252794521558353,
+      "Xe_full_over_high": 138688.1673988875,
+      "D_density_grid_upper": 2.655920182342842e-29,
+      "D_spin_bubble_grid_upper": 1.935658884908693e-26,
+      "density_upper_per_Xe_full": 8.500687055113577e-32,
+      "spin_upper_per_Xe_full": 6.195378360935574e-29,
+      "spin_upper_per_Xe_high": 8.592256712208782e-24
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 200.0,
+      "Xe_raw_full": 168.93012952708398,
+      "Xe_raw_high": 0.011278815945717944,
+      "Xe_full_over_high": 14977.647506626712,
+      "D_density_grid_upper": 1.3280803212302318e-29,
+      "D_spin_bubble_grid_upper": 9.679232047704127e-27,
+      "density_upper_per_Xe_full": 7.861713744896557e-32,
+      "spin_upper_per_Xe_full": 5.729725108718567e-29,
+      "spin_upper_per_Xe_high": 8.58178029882551e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 1000.0,
+      "Xe_raw_full": 35.8082262594187,
+      "Xe_raw_high": 0.007166104048498626,
+      "Xe_full_over_high": 4996.888967432856,
+      "D_density_grid_upper": 2.6563530274343214e-30,
+      "D_spin_bubble_grid_upper": 1.9359964355681128e-27,
+      "density_upper_per_Xe_full": 7.41827592405702e-32,
+      "spin_upper_per_Xe_full": 5.406568930676604e-29,
+      "spin_upper_per_Xe_high": 2.7016024641363176e-25
+    }
+  ],
+  "scope": "Common shifted SHM, same mu=1e-6 GeV^-1 and rho=.3 GeV/cm3. Approximate Xe charge+Helm magnetic; two distinct finite-grid diamond approximations. D<=2N per component only, no full material sum, detector fit or exclusion."
+}

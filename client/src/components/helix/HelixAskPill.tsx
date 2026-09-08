@@ -271,6 +271,7 @@ import {
   inspectReasoningSteering,
   resolveReasoningSteeringConversationId,
 } from "@/lib/agent-access/reasoningTaskBinding";
+import { observeReasoningBindingStatus } from "@/lib/agent-access/observeReasoningBindingStatus";
 import {
   createHelixAskComposerTextareaSizingController,
   type HelixAskComposerTextareaSizingController,
@@ -7637,11 +7638,10 @@ export function HelixAskPill({
 
   useEffect(() => {
     if (composerDestination !== "bound_agent") return;
-    let cancelled = false;
-    void inspectLatestReasoningBinding().then((binding) => {
-      if (!cancelled) setBoundAgentState(binding.status === "active" ? "active" : "unavailable");
-    }).catch(() => {
-      if (!cancelled) setBoundAgentState("unavailable");
+    const stopBindingStatus = observeReasoningBindingStatus((active) => {
+      setBoundAgentState((current) => active
+        ? current === "awaiting_agent_pickup" ? current : "active"
+        : "unavailable");
     });
     const onFinalizedVoice = (event: Event) => {
       const voiceEvent = event as CustomEvent<HelixVoiceSteeringFinalizedDetail>;
@@ -7656,7 +7656,7 @@ export function HelixAskPill({
     };
     window.addEventListener(HELIX_VOICE_STEERING_FINALIZED_EVENT, onFinalizedVoice);
     return () => {
-      cancelled = true;
+      stopBindingStatus();
       window.removeEventListener(HELIX_VOICE_STEERING_FINALIZED_EVENT, onFinalizedVoice);
     };
   }, [composerDestination, dispatchBoundAgentSteering]);
@@ -23365,6 +23365,8 @@ export function HelixAskPill({
     destination: (
       <HelixAskComposerDestinationStrip
         model={composerDestinationModel}
+        onOpenConnectionSetup={() => openPanelById("agent-access")}
+        externalBindingUnavailable={boundAgentState === "unavailable"}
         onDestinationChange={(kind) => {
           composerDestinationChosenByOperatorRef.current = true;
           setComposerDestination(kind);

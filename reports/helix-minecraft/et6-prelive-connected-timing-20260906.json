@@ -1,0 +1,23 @@
+{
+  "scope": "Single connected fixture timing sample, not live capacity or benchmark distribution",
+  "source": "measured process intervals with simulated environment ticks",
+  "server_ms": {
+    "root_admission": 28.9058,
+    "root_lease": 15.9296,
+    "successor_admission": 71.0918,
+    "successor_lease": 30.3068,
+    "poll_received_to_lease_complete": 106.3912
+  },
+  "native_ms": { "checkpoint_to_acceptance": 430, "checkpoint_to_activation": 437, "acceptance_to_activation": 8 },
+  "clock_handling": "Server process.hrtime and JVM monotonic origins remain separate; split native durations use ceiling rounding",
+  "simulated_ticks": { "accepted": 0, "stop": 1, "committed": 2 },
+  "live_window_budget_ms": null,
+  "live_acceptance": false,
+  "verification": "Two connected tests pass; intervals finite, ordered and nonnegative; exact run/child identity checked",
+  "limits": [
+    "Test driver freezes game ticks during HTTP, so success does not establish live deadline fit",
+    "Proxy HTTP-client setup affects this diagnostic sample",
+    "Provider proposal latency and snapshot-to-disk latency absent",
+    "No performance quantiles or production latency claim"
+  ]
+}

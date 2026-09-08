@@ -1,0 +1,44 @@
+{
+  "status": "conditional_neutral_cell_partial_upper_envelope",
+  "q_ceiling_eV": 0.7141704424363171,
+  "assumed_electronic_rms_radius_m": 1e-10,
+  "radius_scaling": "upper envelope proportional to assumed rms radius^4",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "conditional_partial_D_upper": 1.3067574199829438e-29,
+      "analytic_absolute_amplitude_upper": 1.3067584884809938e-29
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "conditional_partial_D_upper": 1.306763730769111e-37,
+      "analytic_absolute_amplitude_upper": 1.3067847448376382e-37
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "conditional_partial_D_upper": 1.358583766765443e-45,
+      "analytic_absolute_amplitude_upper": 1.5819595426992796e-45
+    }
+  ],
+  "assumptions": [
+    "Born elastic density coupling to identical neutral spherically symmetric carbon cells",
+    "point nuclei and nonnegative normalized electron clouds with stated rms radius",
+    "isotropic incident directions, fixed separated branches during hold",
+    "maximal N\u00b2 positional coherence, no sphere form-factor suppression used"
+  ],
+  "limitations": [
+    "0.1 nm is an explicit radius hypothesis, not an authenticated diamond charge density",
+    "only q <= hbar/R; not all low-q scattering or total decoherence",
+    "surface charge, permanent multipoles, crystal bonding and induced response not included",
+    "no population supply, full branch history or physical viability claim"
+  ]
+}

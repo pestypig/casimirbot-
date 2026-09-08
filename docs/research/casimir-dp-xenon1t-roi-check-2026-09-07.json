@@ -1,0 +1,90 @@
+{
+  "status": "fixed_ROI_nominal_comparison_not_new_confidence_limit",
+  "input_sha256": "4ba762421059ae9c63b2bd4b28ea972babde7230509d202eab1e20c7d9ae1f2d",
+  "roi_pe": [
+    165.3,
+    271.7
+  ],
+  "source_url": "https://github.com/XENON1T/s2only_data_release/blob/5a364bc8709f2561e5a013ddea6993a5a7c8e313/example_analysis.ipynb",
+  "notebook_sha256": "232a8bb9ffd1d3250e82c6998a4f818b4a3ea4258a9e4bc4be9986cced40e326",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "variants": [
+        {
+          "energy_floor_eV": 186.0,
+          "roi_expected": 0.45565762812016203,
+          "quoted_limit_to_prediction_range": [
+            53.98790337712223,
+            54.42682942083867
+          ]
+        },
+        {
+          "energy_floor_eV": 50.0,
+          "roi_expected": 14.91479774301663,
+          "quoted_limit_to_prediction_range": [
+            1.6493686621743264,
+            1.662778163492817
+          ]
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "variants": [
+        {
+          "energy_floor_eV": 186.0,
+          "roi_expected": 0.11450523223319227,
+          "quoted_limit_to_prediction_range": [
+            214.83734428747843,
+            216.5839893629864
+          ]
+        },
+        {
+          "energy_floor_eV": 50.0,
+          "roi_expected": 0.5387153608357478,
+          "quoted_limit_to_prediction_range": [
+            45.66418889900644,
+            46.03544246729104
+          ]
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "variants": [
+        {
+          "energy_floor_eV": 186.0,
+          "roi_expected": 7.353393217571723e-09,
+          "quoted_limit_to_prediction_range": [
+            3345394333.2196164,
+            3372592661.131971
+          ]
+        },
+        {
+          "energy_floor_eV": 50.0,
+          "roi_expected": 1.760718841011184e-08,
+          "quoted_limit_to_prediction_range": [
+            1397156628.7024097,
+            1408515625.6837301
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "24.6-24.8 is the released range for reference models, not a recomputed model-specific limit",
+    "50 eV variant is below the published energy cutoff",
+    "ratios are nominal fixed-shape rate ratios, not allowed coupling or coherence enhancements",
+    "same covered atomic response and unattenuated incident flux assumptions; not full-model compatibility"
+  ]
+}

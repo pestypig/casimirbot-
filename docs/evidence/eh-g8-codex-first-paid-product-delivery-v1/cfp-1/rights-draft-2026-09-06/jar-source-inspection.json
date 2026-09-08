@@ -1,0 +1,40 @@
+{
+  "schema": "casimirbot.cfp1.jar_rights_inspection.v1",
+  "captured_utc": "2026-09-07T03:05:06.4121856Z",
+  "records": [
+    {
+      "path": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+      "sha256": "6bbe4f870149246c9c00c551d158bca751a2fda2bbe3a6d7855716b6785bbe63",
+      "entries": 149,
+      "licenseEntries": [],
+      "embeddedJars": [
+        "META-INF/jars/HelixMinecraftConnectorCore-0.2.0.jar"
+      ],
+      "baritoneEntries": [
+        "com/casimirbot/helixplayer/fabric/BaritoneFacade$PathState.class",
+        "com/casimirbot/helixplayer/fabric/BaritoneFacade$SettingBinding.class",
+        "com/casimirbot/helixplayer/fabric/BaritoneFacade$Status.class",
+        "com/casimirbot/helixplayer/fabric/BaritoneFacade.class"
+      ]
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/build/libs/HelixFabricSensor-0.3.0.jar",
+      "sha256": "d8c6372de823ed78fc35f82c1fff0153f8ed258a88f67bb4696fe1e4a0ab215a",
+      "entries": 67,
+      "licenseEntries": [],
+      "embeddedJars": [
+        "META-INF/jars/HelixMinecraftConnectorCore-0.2.0.jar"
+      ],
+      "baritoneEntries": []
+    },
+    {
+      "path": "minecraft/helix-minecraft-connector-core/build/libs/HelixMinecraftConnectorCore-0.2.0.jar",
+      "sha256": "936ca2f58446961d997c4ea4120dc8f00929d8c598d4e5b467cd04c1141a0e33",
+      "entries": 63,
+      "licenseEntries": [],
+      "embeddedJars": [],
+      "baritoneEntries": []
+    }
+  ],
+  "scope": "Local build JAR metadata only. No release shipment, execution, signature, title or licensing clearance inferred. Own reflection bridge class names do not establish copied upstream implementation."
+}

@@ -1,0 +1,97 @@
+{
+  "checks": {
+    "union_area_independent_quadrature": true,
+    "coincident_and_disjoint_limits": true,
+    "required_support_recovers_comparator": true,
+    "elastic_threshold_recovery": true
+  },
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "DP_comparator_exponent": 0.029511464722144533,
+  "rows": [
+    {
+      "mass_GeV": 100.0,
+      "speed_km_s": 776.0,
+      "flux_cm2_s": 232799.99999999997,
+      "D_compact_support_upper": 0.00043431261012175483,
+      "comparator_over_ceiling": 67.9498223960647,
+      "minimum_effective_support_radius_m": 2.7623848472588827e-06,
+      "support_radius_over_sphere_radius": 9.997688124285789,
+      "required_flux_enhancement_at_fixed_R": 67.9498223960647,
+      "kR": 362442524.2113648
+    },
+    {
+      "mass_GeV": 200.0,
+      "speed_km_s": 776.0,
+      "flux_cm2_s": 116399.99999999999,
+      "D_compact_support_upper": 0.00021715630506087742,
+      "comparator_over_ceiling": 135.8996447921294,
+      "minimum_effective_support_radius_m": 3.938752049792897e-06,
+      "support_radius_over_sphere_radius": 14.255223935142851,
+      "required_flux_enhancement_at_fixed_R": 135.8996447921294,
+      "kR": 724885048.4227296
+    },
+    {
+      "mass_GeV": 1000.0,
+      "speed_km_s": 776.0,
+      "flux_cm2_s": 23279.999999999996,
+      "D_compact_support_upper": 4.343126101217549e-05,
+      "comparator_over_ceiling": 679.4982239606469,
+      "minimum_effective_support_radius_m": 8.904244139806407e-06,
+      "support_radius_over_sphere_radius": 32.22644954073663,
+      "required_flux_enhancement_at_fixed_R": 679.4982239606469,
+      "kR": 3624425242.113648
+    },
+    {
+      "mass_GeV": 100.0,
+      "speed_km_s": 809.1,
+      "flux_cm2_s": 242730.00000000003,
+      "D_compact_support_upper": 0.0004528380577957628,
+      "comparator_over_ceiling": 65.17001876077887,
+      "minimum_effective_support_radius_m": 2.703694210262468e-06,
+      "support_radius_over_sphere_radius": 9.785273592296129,
+      "required_flux_enhancement_at_fixed_R": 65.17001876077887,
+      "kR": 377902379.30337024
+    },
+    {
+      "mass_GeV": 200.0,
+      "speed_km_s": 809.1,
+      "flux_cm2_s": 121365.00000000001,
+      "D_compact_support_upper": 0.0002264190288978814,
+      "comparator_over_ceiling": 130.34003752155775,
+      "minimum_effective_support_radius_m": 3.8557332855842026e-06,
+      "support_radius_over_sphere_radius": 13.95476047370816,
+      "required_flux_enhancement_at_fixed_R": 130.34003752155775,
+      "kR": 755804758.6067405
+    },
+    {
+      "mass_GeV": 1000.0,
+      "speed_km_s": 809.1,
+      "flux_cm2_s": 24272.999999999996,
+      "D_compact_support_upper": 4.528380577957627e-05,
+      "comparator_over_ceiling": 651.700187607789,
+      "minimum_effective_support_radius_m": 8.718577645743038e-06,
+      "support_radius_over_sphere_radius": 31.5544810043406,
+      "required_flux_enhancement_at_fixed_R": 651.700187607789,
+      "kR": 3779023793.033702
+    }
+  ],
+  "elastic_kinematics": [
+    {
+      "speed_km_s": 776.0,
+      "Xe_mass_GeV_assumed": 122.0,
+      "recoil_keV": 248,
+      "minimum_elastic_DM_mass_GeV": 77.83104701140932,
+      "compact_ceiling_at_minimum_mass": 0.0005580197450743387,
+      "mass_ceiling_for_DP_comparator_GeV": 1.4716741924227825
+    },
+    {
+      "speed_km_s": 809.1,
+      "Xe_mass_GeV_assumed": 122.0,
+      "recoil_keV": 248,
+      "minimum_elastic_DM_mass_GeV": 72.74836824782979,
+      "compact_ceiling_at_minimum_mass": 0.0006224717731854717,
+      "mass_ceiling_for_DP_comparator_GeV": 1.5344479240841151
+    }
+  ],
+  "scope": "Independent dilute particle flux; normalized branch-conditioned environmental output; exactly unchanged output outside union of impact disks of radius B. Max transverse separation and mono-speed or speed-ceiling flux. No general hard cutoff follows from mediator mass. No collective field, resonant long-range or enhanced local density exclusion."
+}

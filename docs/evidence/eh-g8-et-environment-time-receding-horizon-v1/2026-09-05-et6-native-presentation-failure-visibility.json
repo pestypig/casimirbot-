@@ -1,0 +1,18 @@
+{
+  "classification": "presentation",
+  "observed": "Native presentation acceptance did not advance the EXE from Add CasimirBot to Codex App after refreshed same-task presence.",
+  "source_findings": [
+    "AgentConnectionSetup silently returned after 21 native readiness probes at 250ms intervals, and swallowed rejected probes.",
+    "scheduleNativeMcpTunnelTransition consumes execution results locally; the inspected transition_accepted receipt alone does not prove current transport readiness or continued pending state."
+  ],
+  "repair": "Show a sanitized independent native-presentation error on exhausted or rejected inspection. Cancel superseded retries and ignore old generations. Preserve human-only consent and server readiness admission.",
+  "tests": {
+    "initial_regression_run": "25 passed, 1 failed: a concurrent readiness refresh erased the immediate native error",
+    "after_separate_error_state": "26 AgentConnectionSetup tests passed",
+    "native_baseline": "14 transition executor/broker tests passed in preceding diagnosis"
+  },
+  "deployed_to_exe": false,
+  "native_transition_root_cause_proven": false,
+  "exact_binding_completed": false,
+  "et6_complete": false
+}

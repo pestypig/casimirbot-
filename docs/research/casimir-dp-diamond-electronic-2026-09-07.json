@@ -1,0 +1,71 @@
+{
+  "status": "covered_bulk_electronic_hold_exponent_not_total_coherence",
+  "rows": [
+    {
+      "response": "withLFE",
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "covered_D": 7.10886433581736e-21,
+      "refinement_relative": 0.0016157685585270753
+    },
+    {
+      "response": "withLFE",
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "covered_D": 7.193255488306178e-25,
+      "refinement_relative": 0.0033742475496061353
+    },
+    {
+      "response": "withLFE",
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "covered_D": 7.741127455709168e-33,
+      "refinement_relative": 0.003393146481250331
+    },
+    {
+      "response": "noLFE",
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "covered_D": 9.899965811048156e-21,
+      "refinement_relative": 0.0017308764862880022
+    },
+    {
+      "response": "noLFE",
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "covered_D": 9.250592481731328e-25,
+      "refinement_relative": 0.003538681651236719
+    },
+    {
+      "response": "noLFE",
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "covered_D": 9.937195854615366e-33,
+      "refinement_relative": 0.0035664473465858437
+    }
+  ],
+  "formula": "D=2 n c M t/(pi alpha_EM v hbarc rho) integral dq q^3 A(q)^2 [1-sinc(qd/hbar)] integral dOmega ELF",
+  "assumptions": [
+    "bulk isotropic zero-temperature electronic response",
+    "fixed separated branches during hold",
+    "same incoming density and speed and fixed products"
+  ],
+  "limitations": [
+    "only 5.5-50 eV and q within tabulated 0-30.614 keV domain",
+    "local-field comparison is not a total uncertainty bound",
+    "no subgap phonons, finite-surface response, preparation or recombination history",
+    "not a captured-population or measurability prediction"
+  ]
+}

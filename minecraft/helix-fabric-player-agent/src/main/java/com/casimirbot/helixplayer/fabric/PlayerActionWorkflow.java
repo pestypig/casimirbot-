@@ -266,6 +266,7 @@ public final class PlayerActionWorkflow {
     }
 
     public record WorkflowEvent(
+        String actionRequestId,
         String workflowId,
         long sequence,
         String eventType,
@@ -423,6 +424,10 @@ public final class PlayerActionWorkflow {
             String controlEngine
         ) {}
 
+        default boolean enterWorkflowStabilization(String actionKind, String admittedNodeId) { return false; }
+        default boolean queueTemporalSequenceSuccessor(String predecessorSequenceId, String checkpointId,
+            Map<String, Object> arguments, long boundaryTick, long receivedTick, long stopTick, long sourceOriginTick) { return false; }
+
         default WorkflowStep runWorkflowStep(
             String actionKind,
             Map<String, Object> arguments,
@@ -437,6 +442,11 @@ public final class PlayerActionWorkflow {
 
         default boolean evaluateFluidWorldCondition(Map<String, Object> condition) {
             return false;
+        }
+
+        /** Read-only item-count sensor. Unavailable is not an empty inventory. */
+        default InventoryCountObservation inventoryCountObservation() {
+            return InventoryCountObservation.unavailable();
         }
 
         default Map<String, Object> compactFluidState() {

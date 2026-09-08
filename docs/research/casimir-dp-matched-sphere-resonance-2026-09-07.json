@@ -1,0 +1,21 @@
+{
+  "status": "conditional_uniform_sphere_no_resonance_at_matched_coupling",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "nuclear_input_sha256": "75467d7a0cea4ec4ce570a0e2446ee34c23e4ae81b8fc677a8c9ff8b8c0431e7",
+  "W_GeV_minus2": -2.9308572868188522e-08,
+  "potential_well_depth_GeV": 3.95541251172807e-26,
+  "z": 0.003938302011128286,
+  "scattering_length_over_R": -5.170106319421625e-06,
+  "numerical_absolute_error": 1.3613005308502762e-16,
+  "first_threshold_z": 1.5707963267948966,
+  "W_multiplier_to_first_threshold": 159082.24808168114,
+  "threshold_W_magnitude_GeV_minus2": 0.0046624736599371955,
+  "formal_alpha_multiplier": 398.85116031131355,
+  "formal_perturbative_xenon_rate_multiplier": 25307161654.721542,
+  "caveats": [
+    "Uniform static density and short-range local carbon kernel only",
+    "No electronic, lattice excitation or surface response",
+    "Threshold extrapolation is not an admitted model or event forecast",
+    "Original virtual-kernel matching limitations remain"
+  ]
+}

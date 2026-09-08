@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "change": "Internal checkpoint evidence reader resolves the action and latest bounded-age player-embodiment workflow event, verifies the stored event hash and typed identity/running state, then applies source checkpoint content validation.",
+  "verification": {
+    "tests": 5,
+    "result": "PASS",
+    "test_file": "server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts",
+    "new_fixture": "resolves only fresh exact workflow checkpoint events with intact hashes",
+    "scope": "Mocked SQL rows; hash, requested event ID, workflow/environment identity and mapped settlement checks",
+    "limitations": ["SQL freshness/order/locking not tested against PostgreSQL", "No atomic frontier association or retention", "No production admission caller", "No action-event-ref join yet", "Not deployed"]
+  },
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

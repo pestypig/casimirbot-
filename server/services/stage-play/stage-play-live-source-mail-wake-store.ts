@@ -398,13 +398,13 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
           producedRefs: [queuedSameSource.wakeRequestId],
           sourceIds,
           jobId: input.jobId ?? null,
-          evidenceRefs: [
+          evidenceRefs: uniqueStrings([
             deckPresetId,
             ...packetIds,
             ...appendMailIds,
             ...sourceIds,
             ...(input.evidenceRefs ?? []),
-          ],
+          ]),
         }),
         nextRetryAt: queuedSameSource.status === "deferred_for_pressure" ? queuedSameSource.nextRetryAt : null,
         updatedAt: now,
@@ -477,7 +477,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
       producedRefs: [wakeRequestId],
       sourceIds,
       jobId: input.jobId ?? null,
-      evidenceRefs: [
+      evidenceRefs: uniqueStrings([
         deckPresetId,
         ...packetIds,
         ...boundedMailIds,
@@ -485,7 +485,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
         ...supersededWakeIds,
         ...supersededEvidenceRefs,
         ...(input.evidenceRefs ?? []),
-      ],
+      ]),
     }),
     queuedAt: now,
     updatedAt: now,

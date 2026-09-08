@@ -1,0 +1,16 @@
+{
+  "et6_complete": false,
+  "classification": "tool admission",
+  "repair": "Action request can retain the validated temporal source plan; ordinary enqueue rejects it without internal temporal admission. Internal enqueue checks the retained plan hash and retention checks exact source-plan content. Temporal content participates in idempotency hashing while absent metadata preserves the ordinary projection.",
+  "verification": {
+    "focused_tests": "14 passed, then broker 5-test rerun passed with ordinary-path rejection assertion",
+    "initial_failure": "New test plan had unreachable terminal node; repaired the fixture with a reachable branch",
+    "casimir": { "run_id": "2656", "verdict": "PASS", "integrity_ok": true,
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "scope": "repo-convergence; not native temporal execution or live acceptance" }
+  },
+  "limitations": ["Native temporal_plan_v1 still unadvertised", "Native delivered-plan decoding and extension lifecycle incomplete", "No live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

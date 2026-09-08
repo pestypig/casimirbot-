@@ -1,0 +1,22 @@
+{
+  "schema": "et6.checkpoint_result_validation.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "production_entry": "environmentActionWorkflowMeasurementsValid: execute_sequence success validation",
+  "red": {"passed": 30, "failed": 8, "reason": "Checkpoint settlement telemetry was ignored, allowing malformed supplied records to coexist with a successful result."},
+  "repair": "When settlement telemetry is supplied, validate admitted checkpoint/node identity, unique coverage, matching satisfied condition at the same tick, monotonic ordering, safe integer times and local tick/elapsed consistency. Legacy absence remains absent and is not timing evidence.",
+  "green": {
+    "command": "npx vitest run server/services/environment-connectors/actions/__tests__/action-result-canonicalization.test.ts server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks --maxWorkers=1",
+    "passed": 59,
+    "failed": 0,
+    "exit_code": 0
+  },
+  "discipline_quick_exit_code": 0,
+  "limitations": [
+    "This validates telemetry supplied with successful sequence results, not arbitrary progress or failed-result measurements.",
+    "No temporal extension is admitted or dispatched by this change.",
+    "No packaged or live runtime update was performed.",
+    "No current external-principal, steering, live capacity or final revocation acceptance is inferred from unit tests."
+  ],
+  "et6_complete": false
+}

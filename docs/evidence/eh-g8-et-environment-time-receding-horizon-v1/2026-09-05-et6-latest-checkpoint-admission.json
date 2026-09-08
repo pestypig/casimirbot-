@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 production rolling integration prerequisite; tool admission",
+  "finding": "Cumulative checkpoint evidence previously allowed an older explicit source checkpoint to anchor a successor.",
+  "repair": "Require the last mapped source checkpoint in native settlement order, rejecting duplicate source settlements and regressing or invalid clocks. Generated postconditions do not replace source checkpoints.",
+  "verification": {
+    "focused_compiler_and_preflight_tests": { "passed": 16, "failed": 0 },
+    "cases": ["serial and reactive compiler artifacts", "older checkpoint rejected", "latest checkpoint accepted", "same-tick order preserved", "regressing tick or elapsed time rejected", "generated checkpoint excluded"],
+    "discipline_quick": "PASS; scanner reported no sensitive files and skipped its battery",
+    "typescript": "FAIL: focused project exits 2 with errors in its wider dependency graph; no temporal-plan diagnostics observed. Not a clean project build."
+  },
+  "limitations": [
+    "Content validation fixtures are not live database concurrency or resident delivery evidence.",
+    "No server restart, migration deployment, native rebuild, EXE rebuild or Minecraft action occurred.",
+    "Resident successor delivery, sustained rolling execution and original ET6 live acceptance remain incomplete."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

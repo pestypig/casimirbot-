@@ -16,6 +16,49 @@ import org.junit.jupiter.api.Test;
 
 final class ConcurrentReactiveSchedulerTest {
     @Test
+    void resourceWaitingDoesNotExtendTheStartDeadline() {
+        FakeRuntime runtime = new FakeRuntime();
+        runtime.runningCallsBeforeSuccess.put("lane:owner", 5);
+        ConcurrentReactiveScheduler scheduler = new ConcurrentReactiveScheduler(runtime);
+        Map<String, Object> waiting = new LinkedHashMap<>(actionNode("node:waiting", lookAction(), 20));
+        waiting.put("latest_start_tick", 0);
+        scheduler.begin(program("all_required", List.of(
+            lane("lane:owner", "camera", 200, true, List.of("camera"),
+                actionNode("node:owner", lookAction(), 20), terminal("node:owner:done", "succeeded"),
+                terminal("node:owner:failed", "failed")),
+            lane("lane:waiting", "camera", 100, true, List.of("camera"), waiting,
+                terminal("node:waiting:done", "succeeded"), terminal("node:waiting:failed", "failed"))
+        ), List.of(), List.of()));
+        scheduler.step(0);
+        scheduler.step(1);
+        assertFalse(runtime.actionsByLane.containsKey("lane:waiting"));
+        assertTrue(runtime.actionsByLane.containsKey("lane:owner"));
+    }
+
+    @Test
+    void lateActionNeverCallsRuntimeAndOnTimeActionMayContinue() {
+        for (long start : List.of(2L, 3L)) {
+            FakeRuntime runtime = new FakeRuntime();
+            runtime.runningCallsBeforeSuccess.put("lane:camera", 1);
+            ConcurrentReactiveScheduler scheduler = new ConcurrentReactiveScheduler(runtime);
+            Map<String, Object> action = new LinkedHashMap<>(actionNode("node:camera", lookAction(), 20));
+            action.put("latest_start_tick", 2);
+            scheduler.begin(program("all_required", List.of(lane("lane:camera", "camera", 100, true,
+                List.of("camera"), action, terminal("node:camera:done", "succeeded"),
+                terminal("node:camera:failed", "failed"))), List.of(), List.of()));
+            WorkflowStep result = scheduler.step(start);
+            if (start == 3L) {
+                assertEquals(WorkflowStepStatus.FAILED, result.status());
+                assertTrue(runtime.actionCalls.isEmpty());
+            } else {
+                assertEquals(WorkflowStepStatus.RUNNING, result.status());
+                assertEquals(WorkflowStepStatus.SUCCEEDED, scheduler.step(3).status());
+                assertEquals(2, runtime.actionCalls.size());
+            }
+        }
+    }
+
+    @Test
     void interactionLocksOnlyTheHandSelectedByTheReasoningLayer() {
         Map<String, Object> offHand = Map.of(
             "action_kind", "interact",
@@ -830,6 +873,14 @@ final class ConcurrentReactiveSchedulerTest {
             (Map<String, String>) terminal.measurements().get("node_outcomes");
         assertEquals("succeeded", outcomes.get("node:action"));
         assertEquals(List.of("lane:conditions#0@0"), runtime.actionCalls);
+        java.util.List<?> settlements = (java.util.List<?>) terminal.measurements().get("checkpoint_settlements");
+        assertEquals(1, settlements.size());
+        Map<?, ?> settlement = (Map<?, ?>) settlements.get(0);
+        assertEquals("checkpoint:tick-two", settlement.get("checkpoint_id"));
+        assertEquals("lane:conditions", settlement.get("lane_id"));
+        assertEquals(2L, settlement.get("tick_index"));
+        assertTrue(((Number) settlement.get("monotonic_elapsed_ns")).longValue() >= 0);
+        assertEquals(settlements, scheduler.step(3).measurements().get("checkpoint_settlements"));
     }
 
     @Test

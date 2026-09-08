@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 internal serial resident handoff mechanism",
+  "implementation": [
+    "Single bounded immutable successor slot with predecessor sequence and latest native checkpoint checks; identical queued delivery is idempotent and competing delivery is rejected.",
+    "Successful predecessor terminal at the exact supplied resident boundary enters successor tick zero in the same call without global release.",
+    "Completed sequence measurements remain separately sequence-qualified, preserving prior effects and reused local node identities. History is bounded to 31 handoffs.",
+    "Early/late boundary, settled engine and non-advancing native ticks fail closed. Stabilization clears pending successor work."
+  ],
+  "verification": {
+    "new_cases": ["three handoffs with no global release and four total entry pulses", "immutable delivery and duplicate/fork rejection", "completed plan evidence retained", "early and late boundaries reject without successor effect", "parent manual takeover, emergency stop and disconnect prevent queued handoff"],
+    "initial_fixture_failure": "Disconnect fixture changed grounded rather than connected; corrected to an explicitly disconnected PlayerSnapshot.",
+    "casimir": { "run_id": "2666", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": [
+    "Only internal serial engine callers/tests use this API. Runtime still rejects temporal delivery and advertises no temporal execution feature.",
+    "Caller must still verify source/compiler/task/authority identity, map source clocks to resident boundaries, enforce committed windows and outer deadlines, and process revocation before stepping.",
+    "Controller temporal-window continuation, production delivery transport, reactive handoff, retained evidence admission and reconnect remain unfinished.",
+    "Per-plan historical effects are retained separately; this is not yet northbound cumulative action evidence acceptance.",
+    "No EXE build, game deployment or live Minecraft action ran; three deterministic handoffs do not satisfy the ET6 live-cycle requirement."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

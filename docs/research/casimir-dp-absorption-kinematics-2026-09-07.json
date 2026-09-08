@@ -1,0 +1,57 @@
+{
+  "scope": "Free stationary isolated nuclei, incident chi at rest, massless outgoing neutrino; coherent channel only, no rate/solid response",
+  "full_model_admitted": false,
+  "mchi_GeV": 0.247,
+  "checks": {
+    "energy_conservation": true,
+    "momentum_mass_shell": true,
+    "inverse_mass_solution": true
+  },
+  "rows": [
+    {
+      "A": 12,
+      "Z": 6,
+      "nuclear_mass_GeV": 11.17486323534,
+      "recoil_keV": 2670.711369193869,
+      "outgoing_massless_neutrino_GeV": 0.24432928863080614,
+      "momentum_mass_shell_relative": -1.1102230246251565e-16,
+      "mass_for_248keV_GeV": 0.07469794068989337
+    },
+    {
+      "A": 13,
+      "Z": 6,
+      "nuclear_mass_GeV": 12.109482346842297,
+      "recoil_keV": 2468.704210773662,
+      "outgoing_massless_neutrino_GeV": 0.24453129578922633,
+      "momentum_mass_shell_relative": 0.0,
+      "mass_for_248keV_GeV": 0.07774874030635952
+    },
+    {
+      "A": 128,
+      "Z": 54,
+      "nuclear_mass_GeV": 119.11379086189363,
+      "recoil_keV": 255.5654983494138,
+      "outgoing_massless_neutrino_GeV": 0.2467444345016506,
+      "momentum_mass_shell_relative": 0.0,
+      "mass_for_248keV_GeV": 0.24331280981725684
+    },
+    {
+      "A": 131,
+      "Z": 54,
+      "nuclear_mass_GeV": 121.90971983538435,
+      "recoil_keV": 249.71610273349822,
+      "outgoing_massless_neutrino_GeV": 0.2467502838972665,
+      "momentum_mass_shell_relative": 0.0,
+      "mass_for_248keV_GeV": 0.24614896084064136
+    },
+    {
+      "A": 136,
+      "Z": 54,
+      "nuclear_mass_GeV": 126.569174824876,
+      "recoil_keV": 240.54108272958493,
+      "outgoing_massless_neutrino_GeV": 0.2467594589172704,
+      "momentum_mass_shell_relative": 0.0,
+      "mass_for_248keV_GeV": 0.2508041258822831
+    }
+  ]
+}

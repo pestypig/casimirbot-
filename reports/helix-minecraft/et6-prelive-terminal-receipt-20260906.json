@@ -1,0 +1,15 @@
+{
+  "repair": "Terminal result acknowledgement requires local request/result persistence, including read-only exact replay",
+  "focused_tests": { "passed": 45, "failed": 0 },
+  "regression": { "passed": 150, "failed": 0, "skipped": 1, "passed_files": 24 },
+  "skipped_test": "Opt-in native-temporal-publication, previously run explicitly",
+  "targeted_typecheck": "passed",
+  "static_discipline": "passed; classification is evidence normalization/persistence",
+  "server_build": "passed with four existing unrelated duplicate key/case warnings",
+  "limits": [
+    "Handler replay barrier test and disk-fault test are separate fixtures",
+    "No integrated terminal HTTP disk-fault round trip yet",
+    "No updated EXE or live-session change",
+    "Full correlated loop and timing qualification remain incomplete"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "et6.temporal_perception_bridge.v1",
+  "date": "2026-09-05",
+  "classification": "source admission and evidence re-entry prerequisite",
+  "implementation": "resolveTemporalPerceptionContext invokes the current goal preflight, resolves an observation-plane epoch from active connector/source records, and requests exact-player persisted perception with a five-second maximum age. It preserves action and observation producer labels separately.",
+  "verification": {
+    "wiring_tests_passed": 5,
+    "failed": 0,
+    "cases": ["current", "goal_denied", "source_absent", "evidence_absent", "wrong_snapshot"],
+    "dependencies_mocked": true
+  },
+  "not_proven": ["Database query integration", "Atomic currentness at dispatch", "Frontier persistence", "Resident extension delivery", "Live capacity"],
+  "exposure": "Internal function only; no MCP registration or action dispatch",
+  "et6_complete": false
+}

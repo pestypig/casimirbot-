@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-06",
+  "scope": "Generated diagnostic build space assessment",
+  "disk_free_gib_before": 0.46,
+  "recycled_builds": [
+    "apps/desktop/release-et6-receipt-durability-20260906",
+    "apps/desktop/release-et6-sql-compat-20260906"
+  ],
+  "combined_size_gib_approx": 1.146,
+  "preflight": "Both exact targets had zero tracked files, running executables and reparse points; resolved under canonical apps/desktop",
+  "result": "Moved to Windows Recycle Bin under prior user authorization; original paths absent",
+  "disk_free_gib_after": 0.5,
+  "preserved": ["newest timing-closure diagnostic package", "installed harness", "source", "evidence reports", "Minecraft"],
+  "limits": ["Recycling does not free the retained bytes until those items are permanently removed", "No permanent deletion performed", "New packaging not attempted"]
+}

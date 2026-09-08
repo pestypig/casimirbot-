@@ -1,0 +1,117 @@
+{
+  "checks": {
+    "free_spin_half_amplitude_normalization": true,
+    "spin_bubble_trace_factor": true,
+    "positive_rates": true,
+    "quadrature_agreement_one_percent": true
+  },
+  "rows": [
+    {
+      "mass_GeV": 100.0,
+      "spin_integral_eV3": 16168.913938893449,
+      "spin_to_prior_density_rate": 147.92373213147687,
+      "quadrature_relative_difference": 0.001313913924219312,
+      "D_spin_grid_upper": 6.349394374492798e-26,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_spin_grid_upper_per_raw_Xe_count": 8.427996004342953e-29
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_spin_grid_upper_per_raw_Xe_count": 5.160467785155035e-25
+        }
+      ]
+    },
+    {
+      "mass_GeV": 200.0,
+      "spin_integral_eV3": 16169.062748104105,
+      "spin_to_prior_density_rate": 147.91972081859825,
+      "quadrature_relative_difference": 0.0013118408925545388,
+      "D_spin_grid_upper": 3.1747264052992806e-26,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_spin_grid_upper_per_raw_Xe_count": 8.336990305797194e-29
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_spin_grid_upper_per_raw_Xe_count": 4.402407640519875e-25
+        }
+      ]
+    },
+    {
+      "mass_GeV": 1000.0,
+      "spin_integral_eV3": 16169.466284391929,
+      "spin_to_prior_density_rate": 147.9191144382405,
+      "quadrature_relative_difference": 0.0013245312806344778,
+      "D_spin_grid_upper": 6.34961127585142e-27,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_spin_grid_upper_per_raw_Xe_count": 8.265735291106536e-29
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_spin_grid_upper_per_raw_Xe_count": 3.9395272091889946e-25
+        }
+      ]
+    }
+  ],
+  "archive_blob": "775bab519afc75d424ae1fc499b09b54b42384a3",
+  "archive_sha256": "7131d55f9671cfd36283ae3c62d63725267c612127162ccac4f70637910b976d",
+  "upstream_commit": "6d22f936bf49a15db73a24d1274dcc63c37780dd",
+  "sources": [
+    {
+      "name": "__main__.py",
+      "sha256": "985b70ad0c31064759895375f341f6c6cc1a6d0f359119bffb46566d3b53f35a"
+    },
+    {
+      "name": "binning.py",
+      "sha256": "a35ad08cdb27870cab85ec9bb698b79cadf085a813044da1c718be23647ded49"
+    },
+    {
+      "name": "diamond_nolfe.h5",
+      "sha256": "7131d55f9671cfd36283ae3c62d63725267c612127162ccac4f70637910b976d"
+    },
+    {
+      "name": "dielectric_functions.py",
+      "sha256": "f33df5b57d33f7b4303cbda23c723737111a3b37df040d1722ef42fa827def7f"
+    },
+    {
+      "name": "epsilon_routines.py",
+      "sha256": "008678b1e628ddb44706f1cbe0af4141b281f6da756cb48b608d73e097ebb1ee"
+    },
+    {
+      "name": "epsilon_utils.py",
+      "sha256": "62ba037ec91e2f3441cc18f7ac6fffbeaf0d839d9c306b7ffa08c858f04f4182"
+    },
+    {
+      "name": "LICENSE",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "name": "routines.py",
+      "sha256": "8345f8ea6c4cef535f0344fe001dcde0fda2bda06c4597263632e2631a39a927"
+    }
+  ],
+  "scope": "Spin-degenerate independent KS bubble, no spin-orbit/exchange vertex/defects, angular-averaged no-LFE Im(epsilon), finite 5.5..150 eV and tabulated q. Not an exact spin susceptibility or complete magnetic-dipole prediction."
+}

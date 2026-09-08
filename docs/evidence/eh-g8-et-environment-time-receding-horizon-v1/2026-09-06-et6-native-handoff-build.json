@@ -1,0 +1,15 @@
+{
+  "schema": "et6_companion_build_evidence.v1",
+  "artifact": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.11.jar",
+  "sha256": "25b2bcc35f41c684c4c6f90b041d163e9bf6fed648524903f8a3431a042d9795",
+  "remap_jar_build": "passed",
+  "java_major": 21,
+  "installed_companion_changed": false,
+  "live_restart_attempted": false,
+  "live_readiness_rejection": "action_adapter_admission_inactive",
+  "rejection_observed_at": "2026-09-06T08:22:00Z",
+  "timestamp_precision": "approximate minute; tool result did not include an observation timestamp",
+  "note": "The finite source/adapter admission must be renewed through the supported consent workflow before action authority or live restart. No expired authority was reused.",
+  "live_rolling_extensions_proven": 0,
+  "release_maturity_promoted": false
+}

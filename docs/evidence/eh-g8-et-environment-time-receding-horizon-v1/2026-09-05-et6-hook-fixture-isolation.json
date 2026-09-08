@@ -1,0 +1,14 @@
+{
+  "scope": "ET6 continuation-hook failure diagnosis",
+  "classification": "test-only",
+  "findings": [
+    "Connected-source fixtures omitted source admission; source_unknown was truthful.",
+    "Ledger reset clears memory, not persisted history. Reused thread IDs included old failed-run callout records."
+  ],
+  "repair": "Supply matching admission records for connected-source fixtures, use unique test thread IDs, and explicitly test that unadmitted sources remain source_unknown.",
+  "verification": "4 hook tests passed; no production trust gates or assertions weakened; no persisted data deleted.",
+  "limitations": ["Separate tool-route timeout remains unresolved. No live or packaged qualification."],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -517,7 +517,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       expiresAfterMs: input.sourceKind === "minecraft_world_event" ? 120_000 : undefined,
       now: createdAt,
     });
-    wakeRequestId = wake.wakeRequestId;
+    wakeRequestId = wake?.wakeRequestId ?? null;
   }
   notifyStagePlayLiveSourceMailEnqueued({ mail, jobState, wakeRequestId });
   return mail;

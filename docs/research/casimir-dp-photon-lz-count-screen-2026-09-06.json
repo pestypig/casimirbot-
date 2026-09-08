@@ -1,0 +1,378 @@
+{
+  "checks": {
+    "Poisson_inversion": true,
+    "all_sample_count_sum": true,
+    "coupling_recovers_upper_count": true,
+    "lower_floor_weakens_bound": true
+  },
+  "observed_disjoint_counts": {
+    "science": 1710,
+    "prompt_veto": 66,
+    "delayed_veto": 55
+  },
+  "one_sided_total_mean_90_upper": 1887.0624687873465,
+  "rows": [
+    {
+      "halo": "central",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 322.91425830846674,
+      "mu_GeV_inverse_upper": 3.822253896333368e-06,
+      "raw_Xe_200_to_270_upper": 0.04133500994919528,
+      "D_density_grid_upper_at_count_ceiling": 4.340890789508589e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.9698957181862273e-25
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 322.91425830846674,
+      "mu_GeV_inverse_upper": 3.418727815785938e-06,
+      "raw_Xe_200_to_270_upper": 0.03306800795935622,
+      "D_density_grid_upper_at_count_ceiling": 3.4727126316068718e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.3759165745489825e-25
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 173.76735568959563,
+      "mu_GeV_inverse_upper": 5.210495759416769e-06,
+      "raw_Xe_200_to_270_upper": 0.34122551456653527,
+      "D_density_grid_upper_at_count_ceiling": 4.0337206138748527e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.7597537739801295e-25
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 173.76735568959563,
+      "mu_GeV_inverse_upper": 4.660409085812114e-06,
+      "raw_Xe_200_to_270_upper": 0.2729804116532282,
+      "D_density_grid_upper_at_count_ceiling": 3.226976491099882e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.2078030191841033e-25
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 36.70378598229624,
+      "mu_GeV_inverse_upper": 1.1337249674207826e-05,
+      "raw_Xe_200_to_270_upper": 0.9688859784068523,
+      "D_density_grid_upper_at_count_ceiling": 3.8196491718549264e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.613302837822931e-25
+    },
+    {
+      "halo": "central",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 36.70378598229624,
+      "mu_GeV_inverse_upper": 1.0140344379766418e-05,
+      "raw_Xe_200_to_270_upper": 0.7751087827254819,
+      "D_density_grid_upper_at_count_ceiling": 3.055719337483941e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.090642270258345e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 310.0529053155183,
+      "mu_GeV_inverse_upper": 3.900724160749227e-06,
+      "raw_Xe_200_to_270_upper": 0.02834042747977612,
+      "D_density_grid_upper_at_count_ceiling": 3.766633350903802e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.894357632302757e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 310.0529053155183,
+      "mu_GeV_inverse_upper": 3.4889137539644355e-06,
+      "raw_Xe_200_to_270_upper": 0.0226723419838209,
+      "D_density_grid_upper_at_count_ceiling": 3.013306680723041e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.315486105842206e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 167.76746724626574,
+      "mu_GeV_inverse_upper": 5.302849100284466e-06,
+      "raw_Xe_200_to_270_upper": 0.29480954292758776,
+      "D_density_grid_upper_at_count_ceiling": 3.480903841951333e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.6748116099235803e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 167.76746724626574,
+      "mu_GeV_inverse_upper": 4.743012425063866e-06,
+      "raw_Xe_200_to_270_upper": 0.23584763434207018,
+      "D_density_grid_upper_at_count_ceiling": 2.784723073561066e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.139849287938864e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 35.56924539783418,
+      "mu_GeV_inverse_upper": 1.1516640680786115e-05,
+      "raw_Xe_200_to_270_upper": 0.9426133154443593,
+      "D_density_grid_upper_at_count_ceiling": 3.283882524194849e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.5234264249723333e-25
+    },
+    {
+      "halo": "v0_220",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 35.56924539783418,
+      "mu_GeV_inverse_upper": 1.0300796573870884e-05,
+      "raw_Xe_200_to_270_upper": 0.7540906523554876,
+      "D_density_grid_upper_at_count_ceiling": 2.627106019355879e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.0187411399778667e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 321.7778770378232,
+      "mu_GeV_inverse_upper": 3.828997227569451e-06,
+      "raw_Xe_200_to_270_upper": 0.038355959251364445,
+      "D_density_grid_upper_at_count_ceiling": 4.256356250875917e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.963503740788304e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 321.7778770378232,
+      "mu_GeV_inverse_upper": 3.4247592346014094e-06,
+      "raw_Xe_200_to_270_upper": 0.030684767401091557,
+      "D_density_grid_upper_at_count_ceiling": 3.4050850007007337e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.370802992630643e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 173.22984645184573,
+      "mu_GeV_inverse_upper": 5.218573237066265e-06,
+      "raw_Xe_200_to_270_upper": 0.3376265061429272,
+      "D_density_grid_upper_at_count_ceiling": 3.9534824637175544e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.752639216292142e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 173.22984645184573,
+      "mu_GeV_inverse_upper": 4.667633801456517e-06,
+      "raw_Xe_200_to_270_upper": 0.27010120491434175,
+      "D_density_grid_upper_at_count_ceiling": 3.1627859709740433e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.2021113730337135e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 36.601154958161544,
+      "mu_GeV_inverse_upper": 1.1353133585873862e-05,
+      "raw_Xe_200_to_270_upper": 0.9677544649881342,
+      "D_density_grid_upper_at_count_ceiling": 3.742557205317029e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.605790493804546e-25
+    },
+    {
+      "halo": "vesc_528",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 36.601154958161544,
+      "mu_GeV_inverse_upper": 1.0154551382259962e-05,
+      "raw_Xe_200_to_270_upper": 0.7742035719905074,
+      "D_density_grid_upper_at_count_ceiling": 2.9940457642536233e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.0846323950436364e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 323.84978628249445,
+      "mu_GeV_inverse_upper": 3.81672909476223e-06,
+      "raw_Xe_200_to_270_upper": 0.04386526127128627,
+      "D_density_grid_upper_at_count_ceiling": 4.414325078207303e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.9751215923451863e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 323.84978628249445,
+      "mu_GeV_inverse_upper": 3.413786283035833e-06,
+      "raw_Xe_200_to_270_upper": 0.035092209017029016,
+      "D_density_grid_upper_at_count_ceiling": 3.5314600625658427e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.38009727387615e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 174.21062101387645,
+      "mu_GeV_inverse_upper": 5.203862687561797e-06,
+      "raw_Xe_200_to_270_upper": 0.34414666309201486,
+      "D_density_grid_upper_at_count_ceiling": 4.103371432432409e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.765563350463946e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 174.21062101387645,
+      "mu_GeV_inverse_upper": 4.654476285985171e-06,
+      "raw_Xe_200_to_270_upper": 0.27531733047361184,
+      "D_density_grid_upper_at_count_ceiling": 3.2826971459459274e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.2124506803711565e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 36.78856299315974,
+      "mu_GeV_inverse_upper": 1.1324179137869828e-05,
+      "raw_Xe_200_to_270_upper": 0.969789055303435,
+      "D_density_grid_upper_at_count_ceiling": 3.886535632888146e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.619433221438238e-25
+    },
+    {
+      "halo": "vesc_560",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 36.78856299315974,
+      "mu_GeV_inverse_upper": 1.0128653736664759e-05,
+      "raw_Xe_200_to_270_upper": 0.7758312442427481,
+      "D_density_grid_upper_at_count_ceiling": 3.1092285063105173e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.0955465771505905e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 333.7489251872128,
+      "mu_GeV_inverse_upper": 3.7597001094916934e-06,
+      "raw_Xe_200_to_270_upper": 0.049579887260866,
+      "D_density_grid_upper_at_count_ceiling": 4.69535461074877e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 3.017393306920978e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 333.7489251872128,
+      "mu_GeV_inverse_upper": 3.3627780079347315e-06,
+      "raw_Xe_200_to_270_upper": 0.0396639098086928,
+      "D_density_grid_upper_at_count_ceiling": 3.7562836885990162e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.4139146455367825e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 178.7802307902235,
+      "mu_GeV_inverse_upper": 5.136927024203682e-06,
+      "raw_Xe_200_to_270_upper": 0.36829965416564703,
+      "D_density_grid_upper_at_count_ceiling": 4.383039327931454e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.8166995204363403e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 178.7802307902235,
+      "mu_GeV_inverse_upper": 4.594607208630056e-06,
+      "raw_Xe_200_to_270_upper": 0.29463972333251764,
+      "D_density_grid_upper_at_count_ceiling": 3.506431462345163e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.2533596163490723e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 37.63515393757828,
+      "mu_GeV_inverse_upper": 1.1196087773898905e-05,
+      "raw_Xe_200_to_270_upper": 0.9922876960125842,
+      "D_density_grid_upper_at_count_ceiling": 4.164476608410796e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.6762512276738026e-25
+    },
+    {
+      "halo": "summer_speed",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 37.63515393757828,
+      "mu_GeV_inverse_upper": 1.0014085337796899e-05,
+      "raw_Xe_200_to_270_upper": 0.7938301568100673,
+      "D_density_grid_upper_at_count_ceiling": 3.331581286728637e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.141000982139042e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 312.43594370977166,
+      "mu_GeV_inverse_upper": 3.885819716250154e-06,
+      "raw_Xe_200_to_270_upper": 0.03401628459457525,
+      "D_density_grid_upper_at_count_ceiling": 4.0103318752992698e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.922766496321434e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 100.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 312.43594370977166,
+      "mu_GeV_inverse_upper": 3.475582813537716e-06,
+      "raw_Xe_200_to_270_upper": 0.027213027675660206,
+      "D_density_grid_upper_at_count_ceiling": 3.208265500239416e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.3382131970571473e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 168.930129139135,
+      "mu_GeV_inverse_upper": 5.284569159201082e-06,
+      "raw_Xe_200_to_270_upper": 0.3149797844231017,
+      "D_density_grid_upper_at_count_ceiling": 3.7088862456034555e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.7030873084904806e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 200.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 168.930129139135,
+      "mu_GeV_inverse_upper": 4.726662348709011e-06,
+      "raw_Xe_200_to_270_upper": 0.2519838275384814,
+      "D_density_grid_upper_at_count_ceiling": 2.9671089964827647e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.162469846792385e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.4,
+      "raw_Xe_5p4_to_269p9": 35.808225901724676,
+      "mu_GeV_inverse_upper": 1.1478145893964652e-05,
+      "raw_Xe_200_to_270_upper": 0.9441186806112819,
+      "D_density_grid_upper_at_count_ceiling": 3.499687554808125e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.550633353976568e-25
+    },
+    {
+      "halo": "winter_speed",
+      "mass_GeV": 1000.0,
+      "assumed_efficiency_floor": 0.5,
+      "raw_Xe_5p4_to_269p9": 35.808225901724676,
+      "mu_GeV_inverse_upper": 1.0266365789826024e-05,
+      "raw_Xe_200_to_270_upper": 0.7552949444890256,
+      "D_density_grid_upper_at_count_ceiling": 2.7997500438465e-28,
+      "D_spin_bubble_grid_upper_at_count_ceiling": 2.0405066831812547e-25
+    }
+  ],
+  "source": "https://arxiv.org/html/2609.02823v1 Tables I, S1, S2 and Fig S2",
+  "scope": "Count-only conservative screen conditional on spectrum, exposure, Poisson counts, nonnegative background and pointwise acceptance floor applying to sample union. Floor .5 nominal motivated by source crossings; .4 arbitrary stress test, neither a profiled efficiency uncertainty. No high reconstructed-energy bin or official likelihood reproduced."
+}

@@ -1,0 +1,19 @@
+{
+  "scope": "ET6 expired run read-only readiness projection",
+  "classification": "presentation",
+  "observed_defect": "A waiting run inspected after budget.expires_at still recommended continue and reported readiness for its first continuation.",
+  "repair": "Project operation none with reason run_expired and an explicit expired summary at or after the deadline. Preserve stored lifecycle, completion status, version, budget and terminal authority. Use the service clock consistently.",
+  "verification": {
+    "service_tests": { "passed": 21, "failed": 0 },
+    "deadline_cases": ["one millisecond before", "exact deadline", "after deadline"],
+    "executor_called_by_inspection": false,
+    "initial_test_failure": "Restart fixture mixed frozen July creation time with real current time; corrected restart clock to match fixture creation time.",
+    "discipline_quick": "passed; zero sensitive files classified, not behavioral coverage",
+    "targeted_diff_check": "passed"
+  },
+  "deployment": "source only; not packaged or verified in live EXE",
+  "live_mutation_dispatched_this_turn": false,
+  "rolling_capacity_acceptance": "not proven",
+  "external_binding_acceptance": "not proven by this repair",
+  "authority_change": false
+}

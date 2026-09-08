@@ -1,0 +1,28 @@
+{
+  "schema": "et6.successor_sql_repair_package.v1",
+  "classification": "tool admission and evidence retention",
+  "failure_reproduction": "The packaged pg-mem parser rejects LIMIT 2 FOR UPDATE OF a even for an empty successor queue. The native temporal workflow polls this path after its initial checkpoint.",
+  "repair": "Use plain FOR UPDATE, retaining row locks including the joined admission. Authority, goal, resident, exact predecessor/hash, deadline, cancellation and binding checks remain unchanged.",
+  "verification": {
+    "focused_tests_passed": 26,
+    "test_files": [
+      "server/services/environment-connectors/actions/__tests__/temporal-successor-query.test.ts",
+      "server/services/environment-connectors/actions/__tests__/temporal-ordinary-queue.test.ts",
+      "server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts",
+      "server/routes/__tests__/environment-temporal-delivery.test.ts"
+    ],
+    "discipline_quick": "passed static checks; reports other existing dirty UI changes separately",
+    "package_command": "npm --prefix apps/desktop run pack:dir -- --config.directories.output=release-et6-successor-sql-20260906",
+    "package_exit_code": 0,
+    "service_sha256": "df15fca5526b17cc608f978a841e25a0896c3381d3c2b6ad6772189397f78e79",
+    "packaged_service_matches_staging": true,
+    "runtime_files_checked": 645,
+    "runtime_mismatches": 0,
+    "contains_temporal_persistence_and_order_repair": true
+  },
+  "package_path": "apps/desktop/release-et6-successor-sql-20260906/win-unpacked/CasimirBot.exe",
+  "deployed": false,
+  "limitations": ["Real PostgreSQL concurrency was not tested", "Live retry on repaired package remains required", "SQL reproduction does not substitute for a successful live successor poll"],
+  "live_rolling_extensions_proven": 0,
+  "goal_complete": false
+}

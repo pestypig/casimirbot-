@@ -1,0 +1,91 @@
+{
+  "checks": {
+    "massless_square_solid_angle": true,
+    "matching_force_invariant": true,
+    "positive_plate_curvature": true,
+    "two_routes_to_invariant": true
+  },
+  "aN_squared_phi_squared_invariant_GeV_inverse_squared": 2.6501476399009192e-17,
+  "alpha_vacuum_fixed": 1.4709028174801422e-13,
+  "CchiN_fixed": 1.801770531435972e-10,
+  "rows": [
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "plate_thickness_um_assumed": 0.1,
+      "Yukawa_geometric_difference": 0.014368097549429137,
+      "outward_curvature_s_inverse_squared": 1982965554169.8347,
+      "required_confinement_threshold_Hz": 224118.50496471277,
+      "uncompensated_10percent_growth_s": 3.1499442803774576e-07
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "plate_thickness_um_assumed": 1.0,
+      "Yukawa_geometric_difference": 0.14304880365614814,
+      "outward_curvature_s_inverse_squared": 19742408432257.33,
+      "required_confinement_threshold_Hz": 707164.0881554263,
+      "uncompensated_10percent_growth_s": 9.98298435490098e-08
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "plate_thickness_um_assumed": 10.0,
+      "Yukawa_geometric_difference": 1.343453870022576,
+      "outward_curvature_s_inverse_squared": 185412351127639.12,
+      "required_confinement_threshold_Hz": 2167152.4449240495,
+      "uncompensated_10percent_growth_s": 3.257550268297278e-08
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "plate_thickness_um_assumed": 0.1,
+      "Yukawa_geometric_difference": 0.014368097549429137,
+      "outward_curvature_s_inverse_squared": 5880518539951.924,
+      "required_confinement_threshold_Hz": 385947.24344741757,
+      "uncompensated_10percent_growth_s": 1.8291639979973731e-07
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "plate_thickness_um_assumed": 1.0,
+      "Yukawa_geometric_difference": 0.14304880365614814,
+      "outward_curvature_s_inverse_squared": 58546452592211.39,
+      "required_confinement_threshold_Hz": 1217784.4508268768,
+      "uncompensated_10percent_growth_s": 5.7970916147023866e-08
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "plate_thickness_um_assumed": 10.0,
+      "Yukawa_geometric_difference": 1.343453870022576,
+      "outward_curvature_s_inverse_squared": 549843524033688.44,
+      "required_confinement_threshold_Hz": 3731983.27545715,
+      "uncompensated_10percent_growth_s": 1.891650499837428e-08
+    }
+  ],
+  "coupling_family": [
+    {
+      "aN_scale": 1.0,
+      "aN": 1.7905526447794945e-07,
+      "kappa_GeV": 3522.836981864859,
+      "a_chi_GeV_inverse": 0.012488516992222733,
+      "phi_vacuum_squared_GeV2": 0.0008266009124973271,
+      "lambda_eff_at_mu_1meV": 1.2097736463643615e-21,
+      "aN_squared_phi_squared": 2.6501476399009195e-17
+    },
+    {
+      "aN_scale": 0.1,
+      "aN": 1.7905526447794945e-08,
+      "kappa_GeV": 352.283698186486,
+      "a_chi_GeV_inverse": 0.0012488516992222737,
+      "phi_vacuum_squared_GeV2": 0.08266009124973268,
+      "lambda_eff_at_mu_1meV": 1.2097736463643619e-23,
+      "aN_squared_phi_squared": 2.650147639900919e-17
+    },
+    {
+      "aN_scale": 0.01,
+      "aN": 1.7905526447794944e-09,
+      "kappa_GeV": 35.228369818648595,
+      "a_chi_GeV_inverse": 0.00012488516992222734,
+      "phi_vacuum_squared_GeV2": 8.26600912497327,
+      "lambda_eff_at_mu_1meV": 1.2097736463643617e-25,
+      "aN_squared_phi_squared": 2.650147639900919e-17
+    }
+  ],
+  "scope": "Linear weak-source response of isolated square plates in vacuum, mu=.001eV. Heuristic Yukawa endpoint; not full nonlinear chamber+plate solution or general model bound. Same C and vacuum light product; plate thickness/density unverified."
+}

@@ -1,0 +1,165 @@
+{
+  "status": "conditional_analytic_one_collision_bound_not_LZ_exclusion",
+  "incident_speed_range_kms": [
+    601.1213517952707,
+    776
+  ],
+  "minimum_post_low_collision_speed_kms": 585.9793307015506,
+  "low_keV": [
+    5.4,
+    10
+  ],
+  "high_keV": [
+    200,
+    269.9
+  ],
+  "coupling_multiplier": 495016.03748727636,
+  "initial_low_to_high_cross_section_ratio": 70190.30472997054,
+  "sin_deflection_upper": 0.25740523652394137,
+  "rows": [
+    {
+      "column_g_cm2": 100,
+      "incident_cosine_min": 0.9,
+      "post_collision_cosine_min": 0.7574728506032387,
+      "total_path_optical_depth_upper": 0.19801052128941063,
+      "no_other_collision_factor_lower": 0.8203612218345887,
+      "exactly_one_low_to_exactly_one_high_ratio_lower": 57581.40414922074
+    },
+    {
+      "column_g_cm2": 100,
+      "incident_cosine_min": 1.0,
+      "post_collision_cosine_min": 0.9663035466198258,
+      "total_path_optical_depth_upper": 0.15521788627930286,
+      "no_other_collision_factor_lower": 0.8562285966944883,
+      "exactly_one_low_to_exactly_one_high_ratio_lower": 60098.946120501176
+    },
+    {
+      "column_g_cm2": 300,
+      "incident_cosine_min": 0.9,
+      "post_collision_cosine_min": 0.7574728506032387,
+      "total_path_optical_depth_upper": 0.5940315638682319,
+      "no_other_collision_factor_lower": 0.5520969777156509,
+      "exactly_one_low_to_exactly_one_high_ratio_lower": 38751.85510635729
+    },
+    {
+      "column_g_cm2": 300,
+      "incident_cosine_min": 1.0,
+      "post_collision_cosine_min": 0.9663035466198258,
+      "total_path_optical_depth_upper": 0.46565365883790855,
+      "no_other_collision_factor_lower": 0.6277246532891037,
+      "exactly_one_low_to_exactly_one_high_ratio_lower": 44060.18470087729
+    },
+    {
+      "column_g_cm2": 600,
+      "incident_cosine_min": 0.9,
+      "post_collision_cosine_min": 0.7574728506032387,
+      "total_path_optical_depth_upper": 1.1880631277364637,
+      "no_other_collision_factor_lower": 0.30481107280275593,
+      "exactly_one_low_to_exactly_one_high_ratio_lower": 21394.782085094674
+    },
+    {
+      "column_g_cm2": 600,
+      "incident_cosine_min": 1.0,
+      "post_collision_cosine_min": 0.9663035466198258,
+      "total_path_optical_depth_upper": 0.9313073176758171,
+      "no_other_collision_factor_lower": 0.39403824034692536,
+      "exactly_one_low_to_exactly_one_high_ratio_lower": 27657.664165212063
+    }
+  ],
+  "checks": [
+    {
+      "speed_kms": 601.1213617952707,
+      "raw_ratio": 138480928948891.52
+    },
+    {
+      "speed_kms": 610.3255006481512,
+      "raw_ratio": 299959.62300203316
+    },
+    {
+      "speed_kms": 619.5296395010316,
+      "raw_ratio": 153973.72644880923
+    },
+    {
+      "speed_kms": 628.7337783539122,
+      "raw_ratio": 112122.18877979144
+    },
+    {
+      "speed_kms": 637.9379172067927,
+      "raw_ratio": 93223.73821389122
+    },
+    {
+      "speed_kms": 647.1420560596731,
+      "raw_ratio": 83113.07480199795
+    },
+    {
+      "speed_kms": 656.3461949125536,
+      "raw_ratio": 77298.51877472307
+    },
+    {
+      "speed_kms": 665.5503337654341,
+      "raw_ratio": 73888.26960576676
+    },
+    {
+      "speed_kms": 674.7544726183146,
+      "raw_ratio": 71927.89814191546
+    },
+    {
+      "speed_kms": 683.9586114711951,
+      "raw_ratio": 70867.30757457328
+    },
+    {
+      "speed_kms": 693.1627503240755,
+      "raw_ratio": 70355.08314347237
+    },
+    {
+      "speed_kms": 702.3668891769561,
+      "raw_ratio": 70190.30472997055
+    },
+    {
+      "speed_kms": 711.5710280298365,
+      "raw_ratio": 70190.30472997052
+    },
+    {
+      "speed_kms": 720.775166882717,
+      "raw_ratio": 70190.30472997052
+    },
+    {
+      "speed_kms": 729.9793057355976,
+      "raw_ratio": 70190.30472997054
+    },
+    {
+      "speed_kms": 739.1834445884781,
+      "raw_ratio": 70190.30472997052
+    },
+    {
+      "speed_kms": 748.3875834413585,
+      "raw_ratio": 70190.30472997054
+    },
+    {
+      "speed_kms": 757.5917222942389,
+      "raw_ratio": 70190.30472997054
+    },
+    {
+      "speed_kms": 766.7958611471195,
+      "raw_ratio": 70190.30472997052
+    },
+    {
+      "speed_kms": 776.0,
+      "raw_ratio": 70190.30472997054
+    }
+  ],
+  "assumptions": [
+    "infinite transverse homogeneous xenon slab with stated finite mass column",
+    "elastic stationary nuclei with same charge Helm/Born kernel",
+    "exactly one physical nuclear collision; no other channels",
+    "incoming speed and direction restricted as recorded",
+    "no prior detector collisions or unresolved multiple scatters"
+  ],
+  "limitations": [
+    "not a bound for arbitrary geometry or accepted LZ event classes",
+    "no efficiencies or pulse response",
+    "point total cross section upper-bounds Helm total only within the stipulated kernel",
+    "does not establish Born validity or allowed couplings",
+    "does not fix incident subset abundance"
+  ]
+}

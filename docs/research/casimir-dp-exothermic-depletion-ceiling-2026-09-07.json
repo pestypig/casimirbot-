@@ -1,0 +1,154 @@
+{
+  "scope": "Fixed electron/baryon coefficient ratio, constant lifetime, no replenishment, no extra decay channels, initial fraction<=1; approximate published electron-pair lifetime scale. Reference present sigma*f=1e-45cm2 is a chosen benchmark, not a fitted signal.",
+  "elapsed_s": 4.35e+17,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "initial_excited_fraction": 1.0,
+      "critical_abs_Ce_over_Cb_times_sqrtF": 1.687311782771136e-05,
+      "cases": [
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 1e-05,
+          "max_present_strength_over_reference": 2.8470210522783077,
+          "solutions": [
+            {
+              "sigma_over_reference": 1.1620079728732031,
+              "present_fraction": 0.8605792932103392,
+              "lifetime_over_elapsed": 6.660027962211705
+            },
+            {
+              "sigma_over_reference": 24.870798724767397,
+              "present_fraction": 0.04020779594039164,
+              "lifetime_over_elapsed": 0.3111683576105516
+            }
+          ]
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 3e-05,
+          "max_present_strength_over_reference": 0.3163356724753676,
+          "solutions": []
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 0.0001,
+          "max_present_strength_over_reference": 0.028470210522783083,
+          "solutions": []
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 10.0,
+      "initial_excited_fraction": 0.5,
+      "critical_abs_Ce_over_Cb_times_sqrtF": 1.1931096035734329e-05,
+      "cases": [
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 1e-05,
+          "max_present_strength_over_reference": 1.4235105261391539,
+          "solutions": [
+            {
+              "sigma_over_reference": 2.9147228960772593,
+              "present_fraction": 0.34308578745027074,
+              "lifetime_over_elapsed": 2.655142827492764
+            },
+            {
+              "sigma_over_reference": 16.178825783660752,
+              "present_fraction": 0.06180918277826539,
+              "lifetime_over_elapsed": 0.47834161113621826
+            }
+          ]
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 3e-05,
+          "max_present_strength_over_reference": 0.1581678362376838,
+          "solutions": []
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 0.0001,
+          "max_present_strength_over_reference": 0.014235105261391542,
+          "solutions": []
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 15.0,
+      "initial_excited_fraction": 1.0,
+      "critical_abs_Ce_over_Cb_times_sqrtF": 4.2378575304405656e-05,
+      "cases": [
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 1e-05,
+          "max_present_strength_over_reference": 17.95943644831181,
+          "solutions": [
+            {
+              "sigma_over_reference": 1.0211371708885735,
+              "present_fraction": 0.9793003609199924,
+              "lifetime_over_elapsed": 47.8082780047365
+            },
+            {
+              "sigma_over_reference": 274.03191999045754,
+              "present_fraction": 0.0036492099169863953,
+              "lifetime_over_elapsed": 0.17815008466353494
+            }
+          ]
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 3e-05,
+          "max_present_strength_over_reference": 1.9954929387013125,
+          "solutions": [
+            {
+              "sigma_over_reference": 1.2619316862597443,
+              "present_fraction": 0.7924359225529181,
+              "lifetime_over_elapsed": 4.2984198377388445
+            },
+            {
+              "sigma_over_reference": 14.508653267492559,
+              "present_fraction": 0.06892438474910385,
+              "lifetime_over_elapsed": 0.3738673806647229
+            }
+          ]
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 0.0001,
+          "max_present_strength_over_reference": 0.1795943644831181,
+          "solutions": []
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 15.0,
+      "initial_excited_fraction": 0.5,
+      "critical_abs_Ce_over_Cb_times_sqrtF": 2.996617797477e-05,
+      "cases": [
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 1e-05,
+          "max_present_strength_over_reference": 8.979718224155905,
+          "solutions": [
+            {
+              "sigma_over_reference": 2.0873695092013045,
+              "present_fraction": 0.47907186321919226,
+              "lifetime_over_elapsed": 23.387718145548035
+            },
+            {
+              "sigma_over_reference": 232.08183160785833,
+              "present_fraction": 0.004308825008282724,
+              "lifetime_over_elapsed": 0.2103517083116558
+            }
+          ]
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 3e-05,
+          "max_present_strength_over_reference": 0.9977464693506563,
+          "solutions": []
+        },
+        {
+          "abs_Ce_over_Cb_times_sqrtF": 0.0001,
+          "max_present_strength_over_reference": 0.08979718224155905,
+          "solutions": []
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "Lambert_roots": true,
+    "population_ODE": true
+  },
+  "full_model_admitted": false
+}

@@ -1,0 +1,26 @@
+{
+  "scope": "Native unit regression after checkpoint-to-activation instrumentation",
+  "command": "gradle --no-daemon --max-workers=1 test -x runGameTest",
+  "tests": 284,
+  "failures": 0,
+  "errors": 0,
+  "skipped_unit_tests": 0,
+  "game_tests": "explicitly excluded",
+  "memory_before_run_kib": {
+    "free_physical": 5528612,
+    "free_virtual": 11805928,
+    "total_virtual": 31826768
+  },
+  "controller_coverage_inspected": [
+    "temporalControllerCarriesThreeAcceptedWindowsAcrossTheNativeBoundary separates queue acceptance from running handoff and preserves three deterministic extensions",
+    "reservedWindowCannotOutrunDeadlineLateTickOrManualTakeover rejects reserved work on deadline, late tick and manual takeover without another jump pulse"
+  ],
+  "limitations": [
+    "Controller fixtures use a simulated bridge and clock, not a live player",
+    "Telemetry unit checks do not constitute full HTTP-to-runtime callback integration",
+    "No measured full-path capacity trace or remaining-window qualification",
+    "No EXE or connector deployment performed"
+  ],
+  "live_acceptance": false,
+  "execution_authority": false
+}

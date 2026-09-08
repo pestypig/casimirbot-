@@ -1,0 +1,17 @@
+{
+  "schema": "et6.monotonic_clock_measurement.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization; additive adapter clock measurement",
+  "change": "Native clock snapshots now include a runtime-unique monotonic origin and elapsed milliseconds. Shared schema preserves optional legacy absence and validates new measurements. No controller or authority behavior is changed.",
+  "verification": {
+    "shared_clock_tests": {"passed": 7, "failed": 0},
+    "native_clock_tests": {"passed": 3, "failed": 0},
+    "native_finite_sequence_tests": {"passed": 13, "failed": 0},
+    "game_tests": {"passed": 5, "failed": 0},
+    "native_build_exit_code": 0,
+    "casimir_adapter_attempt": {"exit_code": 1, "http_status": 401, "reason": "broker_unauthorized", "verdict": null, "certificate_hash": null, "integrity_status": "not_verified"}
+  },
+  "rollout_constraint": "Updated native snapshots require the updated server schema; older strict schemas reject the additive field. Neither running EXE nor installed mod was replaced.",
+  "not_proven": ["Authenticated Casimir verification", "Cross-process clock alignment", "Production rolling dispatch", "Live three-cycle capacity and latency"],
+  "et6_complete": false
+}

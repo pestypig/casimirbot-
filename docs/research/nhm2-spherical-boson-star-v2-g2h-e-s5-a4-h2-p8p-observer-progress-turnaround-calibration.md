@@ -711,6 +711,25 @@ action exists. Separate authorization is required, and neither a build
 correction nor P=1024 calibration is eligible before recovery classification.
 P8Q remains `P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
 
+R40 was then authorized and consumed exactly once. Its protected original VM
+remained stopped; the snapshot, read-only clone and helper were created as
+frozen. The rescue procedure completed and authenticated a 12,122-byte archive
+SHA-256 `73029fde...d0922` containing the exact R39 fixture evidence. The final
+SCP failed only because Windows PSCP could not create the long repository path,
+and cleanup stopped the helper. The immutable
+[R40 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r40-long-local-path-result.md)
+preserves the remote receipt and resource identities. R40 may not be retried.
+
+The separately frozen
+[R41 short-path retrieval](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r41-short-path-retrieval-proposal.md)
+restarts only the existing stopped helper, copies only that existing archive to
+`C:\NHM2-R41\r40.tgz`, verifies it twice, and stops the helper. Proposal
+SHA-256 is `abcd3bcf...392a211`; its independent audit passes 27/27 at auditor
+SHA-256 `6e77e943...f640cc5`. No resource, mount, rescue, Docker, build, fixture or
+numerical action is part of R41. No R41 cloud action occurred; separate
+authorization is required. P8Q remains
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED`.
+
 The frozen
 [R17 standalone Cloud Shell preflight](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r17-standalone-cloudshell-preflight.md)
 is SHA-256 `9d9f6f588cb4cfe89f2fd635eedbf1bfa0a78e64bbca4dc382d3549ab3c10c75`

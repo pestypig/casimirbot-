@@ -1,0 +1,31 @@
+{
+  "schema": "et6.latest_start_deadline.v1",
+  "date": "2026-09-05",
+  "defect": "Both compatibility compilers omitted the shared action latest_start_unit.",
+  "repair": "Optional latest_start_tick is retained in both native action-node formats. Fluid checks before child controller start. Reactive checks before first runtime effect on every resource-waiting tick. The deadline is inclusive and does not terminate already-started work.",
+  "verification": {
+    "compiler_tests_passed": 3,
+    "FluidSequenceEngineTest_passed": 14,
+    "ConcurrentReactiveSchedulerTest_passed": 23,
+    "native_failures": 0,
+    "native_errors": 0,
+    "native_compile": "passed",
+    "game_tests": "explicitly excluded",
+    "casimir": {
+      "run_id": "2654",
+      "pack": "repo-convergence",
+      "verdict": "PASS",
+      "first_fail": null,
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+      "integrity_ok": true,
+      "status": "GREEN",
+      "trace": "artifacts/et6-latest-start-deadline-training-trace.jsonl"
+    }
+  },
+  "limits": [
+    "Not deployed. Before deployment, production admission must reject deadline-bearing work for older native clients that ignore this optional field.",
+    "Repository certificate verification is not live execution or physical viability evidence.",
+    "No rolling extension, packaged capacity measurement, or Minecraft action was performed."
+  ],
+  "et6_complete": false
+}

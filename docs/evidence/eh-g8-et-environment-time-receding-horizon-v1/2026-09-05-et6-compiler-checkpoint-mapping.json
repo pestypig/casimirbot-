@@ -1,0 +1,16 @@
+{
+  "et6_complete": false,
+  "change": "Compiler artifacts include source_checkpoint_bindings in hashed content. Explicit source checkpoint/node IDs map to native IDs in both existing engines; generated action postconditions are excluded.",
+  "verification": {
+    "tests": 18,
+    "files": 3,
+    "result": "PASS",
+    "scope": "Compiler mapping, existing preflight/retention, and broker transaction regression tests",
+    "new_fixture": "hash-binds only explicit source checkpoints, not generated postconditions"
+  },
+  "remaining": ["Validate measured checkpoint against retained mapping", "Persist checkpoint/frontier association with successor", "Resident successor handoff", "Packaged live ET6 qualification"],
+  "deployed": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

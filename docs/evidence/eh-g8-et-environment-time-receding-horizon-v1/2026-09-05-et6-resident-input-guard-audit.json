@@ -1,0 +1,9 @@
+{
+  "schema": "et6.resident_input_guard_audit.v1",
+  "date": "2026-09-05",
+  "sources": ["minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/NativeFabricControlBridge.java:manualInputReason", "minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/PlayerActionController.java:tick", "server/services/environment-connectors/catalog/index.ts:minecraftPerceptionSnapshotOutputSchema"],
+  "finding": "Native input guards distinguish chat/expected/workflow-automated screens from unexpected screens and raw operator inputs. Existing perception UI-state fields do not establish those ownership facts.",
+  "consequence": "Do not synthesize screen-open blocking or screen-closed permission in the frontier publisher. Obtain an exact resident guard/resource observation for full availability projection; preserve native preemption as authority.",
+  "code_changed": false,
+  "et6_complete": false
+}

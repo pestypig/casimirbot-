@@ -343,6 +343,7 @@ const connect = async (principalValue: HelixAgentApiPrincipal = principal()) => 
     environmentMonitorService: monitorStore,
     environmentMonitorSemanticSource: semanticSource,
     environmentProbeExecutor: executeProbe,
+    mcpEvidenceObservationStore: { put: vi.fn(async () => undefined), get: vi.fn() } as never,
   });
   const client = new Client({ name: "monitor-test", version: "1.0.0" }, { capabilities: {} });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

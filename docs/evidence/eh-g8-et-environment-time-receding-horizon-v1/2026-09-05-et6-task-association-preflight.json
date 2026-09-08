@@ -1,0 +1,13 @@
+{
+  "schema": "et6.task_association_preflight.v1",
+  "date": "2026-09-05",
+  "implementation": "Service-owned binding store verifies active owner/session, MCP principal, continuation hash, conversation, mission/run, binding epoch, service identity, polling transport and fresh continuation-capable presence. Projection remains non-authoritative.",
+  "verification": {
+    "command": "npx vitest run server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "tests_passed": 6,
+    "exit_code": 0,
+    "negative_cases": ["wrong profile", "wrong MCP client", "wrong session", "wrong continuation", "wrong epoch", "wrong Helix conversation", "missing mission", "missing or wrong run", "expired presence", "lost continuation capability", "revoked binding"]
+  },
+  "limits": "Internal preflight has no temporal admission caller yet. Call-time association verification is not atomic dispatch currentness and does not independently authenticate a provider task beyond the supplied authenticated MCP principal. No live claim, authority grant, or Minecraft action occurred.",
+  "et6_complete": false
+}

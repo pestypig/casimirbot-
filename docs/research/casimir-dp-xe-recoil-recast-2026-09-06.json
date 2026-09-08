@@ -1,0 +1,181 @@
+{
+  "evidence_class": "raw_isotope_Helm_SHM_recoil_level_benchmark_not_detector_fit",
+  "inputs_sha256": "38b1d6f96b634ad4f46bf1c9b9d121f62725ed21b5129e5249d49d8b2e237f19",
+  "isotopes_columns": [
+    "A",
+    "atomic_mass_u",
+    "amount_fraction"
+  ],
+  "isotopes": [
+    [
+      124,
+      123.905892,
+      0.000952
+    ],
+    [
+      126,
+      125.9042983,
+      0.00089
+    ],
+    [
+      128,
+      127.903531,
+      0.019102
+    ],
+    [
+      129,
+      128.9047808611,
+      0.264006
+    ],
+    [
+      130,
+      129.903509349,
+      0.04071
+    ],
+    [
+      131,
+      130.90508406,
+      0.212324
+    ],
+    [
+      132,
+      131.9041550856,
+      0.269086
+    ],
+    [
+      134,
+      133.90539466,
+      0.104357
+    ],
+    [
+      136,
+      135.907214484,
+      0.088573
+    ]
+  ],
+  "source_isotopes": "https://physics.nist.gov/cgi-bin/Compositions/stand_alone.pl?ele=Xe",
+  "assumptions": {
+    "rho_GeV_cm3": 0.3,
+    "v0_kms": 238,
+    "vesc_kms": 544,
+    "earth_mean_kms": 250.2,
+    "earth_harmonic_kms": 14.9,
+    "annual_uniform_phase_samples": 32,
+    "efficiency": 1,
+    "energy_band_keV": [
+      5.4,
+      270
+    ],
+    "exposure_tonne_year": 2.84,
+    "sin2thetaW": 0.23122,
+    "Helm": "c=1.23*A^(1/3)-.60 fm; a=.52 fm; s=.9 fm",
+    "nuclear_mass": "atomic mass minus electron rest masses; electronic binding ignored"
+  },
+  "rows": [
+    {
+      "representation": "3M2D",
+      "mass_GeV": 1440.0,
+      "source_delta_keV": 372.0,
+      "source_delta_raw_count_full": 5.2096901981918,
+      "raw_one_count_delta_lower_current_keV": 373.5033507078455,
+      "raw_one_count_delta_full_current_keV": 380.38780826624486,
+      "normalization_only_delta_shift_keV": 6.884457558399333,
+      "summer_to_winter_rate_ratio": 20252.71453682983,
+      "summer_to_winter_ratio_is_infinite": false,
+      "winter_rate_per_2p84_tonne_year": 0.00019346980752128634,
+      "summer_rate_per_2p84_tonne_year": 3.918288783224025
+    },
+    {
+      "representation": "5M4D",
+      "mass_GeV": 7580.0,
+      "source_delta_keV": 377.3,
+      "source_delta_raw_count_full": 4.0222631430370885,
+      "raw_one_count_delta_lower_current_keV": 377.34396523529074,
+      "raw_one_count_delta_full_current_keV": 387.1278475176199,
+      "normalization_only_delta_shift_keV": 9.78388228232916,
+      "summer_to_winter_rate_ratio": 204.8073760308608,
+      "summer_to_winter_ratio_is_infinite": false,
+      "winter_rate_per_2p84_tonne_year": 0.01530405672974489,
+      "summer_rate_per_2p84_tonne_year": 3.1343837014464877
+    },
+    {
+      "representation": "7M6D",
+      "mass_GeV": 22230.0,
+      "source_delta_keV": 370.8,
+      "source_delta_raw_count_full": 3.7337561669067068,
+      "raw_one_count_delta_lower_current_keV": 370.1365628109797,
+      "raw_one_count_delta_full_current_keV": 382.0293606649001,
+      "normalization_only_delta_shift_keV": 11.8927978539204,
+      "summer_to_winter_rate_ratio": 46.92033256620334,
+      "summer_to_winter_ratio_is_infinite": false,
+      "winter_rate_per_2p84_tonne_year": 0.058164512105355455,
+      "summer_rate_per_2p84_tonne_year": 2.729098251534238
+    },
+    {
+      "representation": "9M8D",
+      "mass_GeV": 49080.0,
+      "source_delta_keV": 363.5,
+      "source_delta_raw_count_full": 3.6417440022205176,
+      "raw_one_count_delta_lower_current_keV": 362.44832080129396,
+      "raw_one_count_delta_full_current_keV": 376.2267079770294,
+      "normalization_only_delta_shift_keV": 13.778387175735418,
+      "summer_to_winter_rate_ratio": 21.14657920525551,
+      "summer_to_winter_ratio_is_infinite": false,
+      "winter_rate_per_2p84_tonne_year": 0.1161482175108253,
+      "summer_rate_per_2p84_tonne_year": 2.456137481141912
+    },
+    {
+      "representation": "11M10D",
+      "mass_GeV": 83810.0,
+      "source_delta_keV": 357.5,
+      "source_delta_raw_count_full": 3.621257881895719,
+      "raw_one_count_delta_lower_current_keV": 356.25799374938384,
+      "raw_one_count_delta_full_current_keV": 371.5386277733363,
+      "normalization_only_delta_shift_keV": 15.280634023952473,
+      "summer_to_winter_rate_ratio": 13.664304739705155,
+      "summer_to_winter_ratio_is_infinite": false,
+      "winter_rate_per_2p84_tonne_year": 0.16721664859542681,
+      "summer_rate_per_2p84_tonne_year": 2.284899243960102
+    },
+    {
+      "representation": "13M12D",
+      "mass_GeV": 131140.0,
+      "source_delta_keV": 351.8,
+      "source_delta_raw_count_full": 3.621838126058683,
+      "raw_one_count_delta_lower_current_keV": 350.4375794414599,
+      "raw_one_count_delta_full_current_keV": 367.151972626557,
+      "normalization_only_delta_shift_keV": 16.714393185097094,
+      "summer_to_winter_rate_ratio": 9.96552635075173,
+      "summer_to_winter_ratio_is_infinite": false,
+      "winter_rate_per_2p84_tonne_year": 0.21581927013753002,
+      "summer_rate_per_2p84_tonne_year": 2.1507526235555616
+    }
+  ],
+  "first_mass_sensitivity_raw_one_count_delta_keV": {
+    "v0_220": 377.38717808172737,
+    "escape_528": 368.9377435906999,
+    "escape_560": 391.70451357100137,
+    "no_seasonal_average": 374.6545364880236,
+    "radius_minus2pct": 382.69102084570767,
+    "radius_plus2pct": 377.99731285939566
+  },
+  "refined_count_at_first_mass_root": 1.000000505656226,
+  "checks": {
+    "isotope_amount_fractions_sum_one": true,
+    "speed_distribution_normalized": true,
+    "eta_matches_independent_speed_integral": true,
+    "eta_closes_above_speed_cap": true,
+    "full_lower_current_rate_ratio_four": true,
+    "one_count_roots_replay": true,
+    "grid_phase_refinement_stable": true,
+    "increased_normalization_increases_selected_splitting": true,
+    "physical_velocity_energy_units_match_flux_times_cross_section": true
+  },
+  "limitations": [
+    "unit efficiency; not the published digitized response",
+    "Helm is a phenomenological weak-density approximation, not isotope density matrices",
+    "one raw count is a normalization contour, not a fitted signal or confidence interval",
+    "mass fixed; no thermal trajectory intersection recomputed",
+    "sensitivity variations are diagnostics, not probabilistic uncertainties"
+  ]
+}

@@ -1,4 +1,5 @@
-import crypto from "node:crypto";
+import { sha256 } from "@noble/hashes/sha2";
+import { bytesToHex } from "@noble/hashes/utils";
 import { z } from "zod";
 
 export const HELIX_ENVIRONMENT_TEMPORAL_PLAN_SCHEMA =
@@ -103,17 +104,17 @@ export const canonicalEnvironmentTimeValue = (value: unknown): unknown => {
 };
 
 export const helixEnvironmentTimeSha256 = (value: unknown): string =>
-  `sha256:${crypto
-    .createHash("sha256")
-    .update(JSON.stringify(canonicalEnvironmentTimeValue(value)), "utf8")
-    .digest("hex")}`;
+  `sha256:${bytesToHex(sha256(new TextEncoder().encode(JSON.stringify(canonicalEnvironmentTimeValue(value)))))}`;
+
+/** Exact v1 hash bytes for cross-language transport; never re-sort at receiver. */
+export const serializeHelixEnvironmentPlanHashContent = (plan: HelixEnvironmentTemporalPlan): string => {
+  const { plan_hash, ...content } = plan;
+  return JSON.stringify(canonicalEnvironmentTimeValue(content));
+};
 
 const boundedRecordSchema = (maxBytes: number) =>
   z.record(z.string(), z.unknown()).superRefine((value, context) => {
-    const bytes = Buffer.byteLength(
-      JSON.stringify(canonicalEnvironmentTimeValue(value)),
-      "utf8",
-    );
+    const bytes = new TextEncoder().encode(JSON.stringify(canonicalEnvironmentTimeValue(value))).byteLength;
     if (bytes > maxBytes) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -795,7 +796,8 @@ export const reduceHelixEnvironmentTemporalPlanEvents = (
   let previousHash: string | null = null;
   let previousEnvironmentSequence = -1;
   let previousMonotonicMs = -1;
-  let state: (typeof HELIX_ENVIRONMENT_PLAN_STATES)[number] | "none" = "none";
+  type ReductionState = (typeof HELIX_ENVIRONMENT_PLAN_STATES)[number] | "none";
+  let state: ReductionState = "none";
   let latestCheckpointId: string | null = null;
   let observationRevision = first.identity.observation_revision;
   let affordanceRevision = first.identity.affordance_revision;
@@ -806,7 +808,7 @@ export const reduceHelixEnvironmentTemporalPlanEvents = (
     Partial<
       Record<
         z.infer<typeof temporalPlanEventPayloadSchema>["kind"],
-        typeof state
+        ReductionState
       >
     >
   > = {
@@ -869,7 +871,7 @@ export const reduceHelixEnvironmentTemporalPlanEvents = (
         "Environment and monotonic event clocks cannot regress.",
       );
     }
-    const next = transitions[state][event.payload.kind];
+    const next: ReductionState | undefined = transitions[state][event.payload.kind];
     if (!next) {
       throw new HelixEnvironmentPlanReductionError(
         "environment_plan_transition_invalid",
@@ -1385,7 +1387,7 @@ export const helixEnvironmentCapacitySampleSchema = z
   .object({
     schema: z.literal(HELIX_ENVIRONMENT_CAPACITY_SAMPLE_SCHEMA),
     sample_id: identifierSchema,
-    course: z.enum(["controlled_n0", "unknown_world"]),
+    course: z.enum(["controlled_n0", "unknown_world"]).nullable(),
     rolling_cycle_index: z.number().int().positive(),
     identity: helixEnvironmentTimeIdentitySchema,
     exact_reasoning_binding_ref: identifierSchema,
@@ -1396,7 +1398,7 @@ export const helixEnvironmentCapacitySampleSchema = z
     stalled_ticks: z.number().int().nonnegative(),
     missed_ticks: z.number().int().nonnegative(),
     queue_depth_peak: z.number().int().nonnegative(),
-    lead_time_ticks: z.number().int().nonnegative(),
+    lead_time_ticks: z.number().int().nonnegative().nullable(),
     latencies_ms: z
       .object({
         event_to_evidence: nullableMillisecondsSchema,
@@ -1409,8 +1411,8 @@ export const helixEnvironmentCapacitySampleSchema = z
     elapsed_ms: z.number().int().positive(),
     replans: z.number().int().nonnegative(),
     unnecessary_replans: z.number().int().nonnegative(),
-    observation_input_bytes: z.number().int().nonnegative(),
-    observation_output_bytes: z.number().int().nonnegative(),
+    observation_input_bytes: z.number().int().nonnegative().nullable(),
+    observation_output_bytes: z.number().int().nonnegative().nullable(),
     observation_tokens: z.number().int().nonnegative().nullable(),
     raw_event_count: z.number().int().nonnegative(),
     emitted_observation_count: z.number().int().nonnegative(),
@@ -1440,11 +1442,13 @@ export const helixEnvironmentCapacitySampleSchema = z
         message: "Active control ticks cannot exceed scheduler ticks.",
       });
     }
-    if (sample.stalled_ticks + sample.missed_ticks > sample.scheduler_ticks) {
+    // Scheduler ticks count observed invocations. Missed ticks count nominal
+    // intervals with no invocation, so they are not a subset of that count.
+    if (sample.stalled_ticks > sample.scheduler_ticks) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["stalled_ticks"],
-        message: "Stalled and missed ticks cannot exceed scheduler ticks.",
+        message: "Stalled ticks cannot exceed observed scheduler ticks.",
       });
     }
     if (sample.unnecessary_replans > sample.replans) {
@@ -1499,11 +1503,11 @@ export const helixEnvironmentCapacityReportSchema = z
     stalled_tick_count: z.number().int().nonnegative(),
     missed_tick_count: z.number().int().nonnegative(),
     queue_depth_peak: z.number().int().nonnegative(),
-    lead_time_ticks_p50: z.number().finite().nonnegative(),
+    lead_time_ticks_p50: z.number().finite().nonnegative().nullable(),
     replans_per_minute: z.number().finite().nonnegative(),
     unnecessary_replans_per_minute: z.number().finite().nonnegative(),
-    observation_input_bytes: z.number().int().nonnegative(),
-    observation_output_bytes: z.number().int().nonnegative(),
+    observation_input_bytes: z.number().int().nonnegative().nullable(),
+    observation_output_bytes: z.number().int().nonnegative().nullable(),
     observation_tokens: z.number().int().nonnegative().nullable(),
     observation_coalescing_ratio: z.number().finite().min(0).max(1).nullable(),
     performed_effect_count: z.number().int().nonnegative(),
@@ -1589,6 +1593,18 @@ export const buildHelixEnvironmentCapacityReport = (input: {
     );
   }
 
+  const identity = samples[0].identity;
+  if (samples.some((sample) =>
+    sample.identity.environment_id !== identity.environment_id ||
+    sample.identity.subject_id !== identity.subject_id ||
+    sample.identity.goal_id !== identity.goal_id
+  )) {
+    throw new Error("Capacity samples must preserve one environment, subject, and goal.");
+  }
+  if (new Set(samples.map((sample) => sample.sample_id)).size !== samples.length) {
+    throw new Error("Capacity reports require unique sample identities.");
+  }
+
   const totalSchedulerTicks = samples.reduce(
     (sum, sample) => sum + sample.scheduler_ticks,
     0,
@@ -1619,6 +1635,23 @@ export const buildHelixEnvironmentCapacityReport = (input: {
   )
     ? samples.reduce((sum, sample) => sum + (sample.observation_tokens ?? 0), 0)
     : null;
+  const totalObservationInputBytes = samples.every(
+    (sample) => sample.observation_input_bytes !== null,
+  )
+    ? samples.reduce(
+        (sum, sample) => sum + (sample.observation_input_bytes ?? 0),
+        0,
+      )
+    : null;
+  const totalObservationOutputBytes = samples.every(
+    (sample) => sample.observation_output_bytes !== null,
+  )
+    ? samples.reduce(
+        (sum, sample) => sum + (sample.observation_output_bytes ?? 0),
+        0,
+      )
+    : null;
+  const leadTimeTicks = samples.map((sample) => sample.lead_time_ticks);
 
   const latencyValues = {
     resident_computation: samples.map(
@@ -1650,6 +1683,14 @@ export const buildHelixEnvironmentCapacityReport = (input: {
     .map(([name]) => `latency:${name}`);
   if (totalObservationTokens === null)
     missingMeasurements.push("observation:tokens");
+  if (totalObservationInputBytes === null)
+    missingMeasurements.push("observation:input_bytes");
+  if (totalObservationOutputBytes === null)
+    missingMeasurements.push("observation:output_bytes");
+  if (leadTimeTicks.some((value) => value === null))
+    missingMeasurements.push("planning:lead_time_ticks");
+  if (samples.some((sample) => sample.course === null))
+    missingMeasurements.push("course:classification");
   if (totalRawEvents === 0)
     missingMeasurements.push("observation:coalescing");
   if (totalRoundTrips === 0)
@@ -1658,7 +1699,16 @@ export const buildHelixEnvironmentCapacityReport = (input: {
   const rollingCycleCount = new Set(
     samples.map((sample) => sample.rolling_cycle_index),
   ).size;
-  const coursesObserved = [...new Set(samples.map((sample) => sample.course))];
+  const coursesObserved = [
+    ...new Set(
+      samples
+        .map((sample) => sample.course)
+        .filter(
+          (course): course is "controlled_n0" | "unknown_world" =>
+            course !== null,
+        ),
+    ),
+  ];
   const exitCriteria = {
     at_least_three_rolling_cycles: rollingCycleCount >= 3,
     controlled_and_unknown_world_observed:
@@ -1717,11 +1767,10 @@ export const buildHelixEnvironmentCapacityReport = (input: {
     queue_depth_peak: Math.max(
       ...samples.map((sample) => sample.queue_depth_peak),
     ),
-    lead_time_ticks_p50:
-      percentile(
-        samples.map((sample) => sample.lead_time_ticks),
-        0.5,
-      ) ?? 0,
+    lead_time_ticks_p50: percentile(
+      leadTimeTicks.filter((value): value is number => value !== null),
+      0.5,
+    ),
     replans_per_minute:
       (samples.reduce((sum, sample) => sum + sample.replans, 0) * 60_000) /
       totalElapsedMs,
@@ -1729,14 +1778,8 @@ export const buildHelixEnvironmentCapacityReport = (input: {
       (samples.reduce((sum, sample) => sum + sample.unnecessary_replans, 0) *
         60_000) /
       totalElapsedMs,
-    observation_input_bytes: samples.reduce(
-      (sum, sample) => sum + sample.observation_input_bytes,
-      0,
-    ),
-    observation_output_bytes: samples.reduce(
-      (sum, sample) => sum + sample.observation_output_bytes,
-      0,
-    ),
+    observation_input_bytes: totalObservationInputBytes,
+    observation_output_bytes: totalObservationOutputBytes,
     observation_tokens: totalObservationTokens,
     observation_coalescing_ratio:
       totalRawEvents === 0

@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-09-07T04:43:16.500Z",
+  "run_id": "run_cc12b167-8120-4f5b-bea0-f5bc880ee038",
+  "run_version": 2,
+  "lifecycle_status": "failed",
+  "completion_status": "failed",
+  "reason": "The bounded agent run expired.",
+  "expires_at": "2026-09-07T04:40:20.140Z",
+  "steps_used": 0,
+  "confirmation_method": "Supported run continuation with status-only instruction; no environment action requested",
+  "current_mcp_budget_extension_available": false,
+  "focused_verification": {
+    "file": "server/services/environment-connectors/temporal-plans/__tests__/temporal-plan-preflight.test.ts",
+    "passed": 9,
+    "failed": 0,
+    "live_capacity_proof": false
+  },
+  "remaining": ["Fresh bounded run association approved by user", "Authenticated automated Helix prompt submission", "Measured live three rolling extensions", "Fresh evidence re-entry", "Manual interruption", "Final revoke and stale rejection"],
+  "et6_complete": false,
+  "nav1_unlocked": false
+}

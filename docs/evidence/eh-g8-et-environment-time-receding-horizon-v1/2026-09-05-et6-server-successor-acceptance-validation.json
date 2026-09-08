@@ -1,0 +1,26 @@
+{
+  "scope": "ET6 production rolling integration prerequisite: server validation of native successor acceptance",
+  "classification": "evidence normalization",
+  "implemented": [
+    "Validate acceptance before recording a workflow event, including when acceptance is the only rolling field supplied.",
+    "Require a delivered retained successor with the current predecessor hash and exact resident checkpoint association.",
+    "Check measured native acceptance tick, monotonic origin and elapsed time, stop watermark, committed boundary, positive lead and queue depth.",
+    "Reject acceptance claims carrying execution_started or terminal_eligible authority."
+  ],
+  "focused_test": {
+    "file": "server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts",
+    "result": "PASS",
+    "tests": 9,
+    "positive": "Matching retained successor/checkpoint/clock acknowledgement accepted.",
+    "negative": "Altered predecessor, successor, checkpoint, timing, boundary, lead, queue depth, execution/terminal flags and clock rejected."
+  },
+  "limitations": [
+    "Database query responses are mocked; this does not prove PostgreSQL concurrency or live native delivery.",
+    "Accepted queue lease lifetime, production route mounting, public admission wiring and packaged qualification remain incomplete.",
+    "No live Minecraft execution, continuous movement capacity or latency is established by this fixture."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "et6_session_preparation_evidence.v1",
+  "previous_run": "run_2089d71c-4213-4e69-ad51-e34cb3e3bbcf",
+  "previous_run_disposition": "run_expired; recommended operation none",
+  "new_run": "run_9afe174f-2104-40de-b16e-798ad069509c",
+  "new_run_expires_at": "2026-09-06T09:33:39.079Z",
+  "room_binding": "agent_room_binding:28939e25-09a5-4fdc-a3dc-0d87af437d07",
+  "same_codex_continuation": "codex-continuation:et6-minecraft-capacity-20260903-main",
+  "companion_readiness": "ready, zero active workflows, controls not asserted",
+  "human_presentation_request": "workstation_present_request:4cf44866-64c7-4c80-adf3-082714028cd1",
+  "presentation_accepted": true,
+  "visible_ui_verified": false,
+  "human_run_association_completed": false,
+  "provider_task_created": false,
+  "live_rolling_extensions_proven": 0,
+  "release_maturity_promoted": false
+}

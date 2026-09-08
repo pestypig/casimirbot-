@@ -1,0 +1,193 @@
+{
+  "checks": {
+    "vacuum_finite_domain_Green": true,
+    "collocation_residual": true,
+    "positive_sample_Green_functions": true,
+    "tolerance_refinement": true
+  },
+  "max_vacuum_relative_error": 2.6145250409115306e-09,
+  "max_refinement_absolute_change": 1.5343282200319663e-13,
+  "rows": [
+    {
+      "cavity_radius_um": 50.0,
+      "wall_thickness_um": 100.0,
+      "central_field_fraction": 0.7509952737433329,
+      "h_prime_at_origin": -1.304427264548295,
+      "max_relative_residual": 9.968008531915247e-09,
+      "samples": [
+        {
+          "radius_from_source_um": 1.0,
+          "field_fraction_at_scatterer": 0.7509938722018282,
+          "radial_Green_numerator_h": 0.9933983800031468,
+          "G_over_vacuum_Yukawa": 1.0005434940807283,
+          "center_to_scatterer_potential_over_vacuum": 0.5642993754085831
+        },
+        {
+          "radius_from_source_um": 10.0,
+          "field_fraction_at_scatterer": 0.7508551072659211,
+          "radial_Green_numerator_h": 0.9347641292935027,
+          "G_over_vacuum_Yukawa": 1.0042163493544274,
+          "center_to_scatterer_potential_over_vacuum": 0.5662661883125865
+        },
+        {
+          "radius_from_source_um": 100.0,
+          "field_fraction_at_scatterer": 0.7753818853637326,
+          "radial_Green_numerator_h": 0.45530407172440684,
+          "G_over_vacuum_Yukawa": 0.9322964433626438,
+          "center_to_scatterer_potential_over_vacuum": 0.5428837997095856
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 50.0,
+      "wall_thickness_um": 1000.0,
+      "central_field_fraction": 0.013613271579551047,
+      "h_prime_at_origin": -0.7034229123771765,
+      "max_relative_residual": 9.929195900595033e-09,
+      "samples": [
+        {
+          "radius_from_source_um": 1.0,
+          "field_fraction_at_scatterer": 0.013613213321323266,
+          "radial_Green_numerator_h": 0.9964224235684389,
+          "G_over_vacuum_Yukawa": 1.0035892883722994,
+          "center_to_scatterer_potential_over_vacuum": 0.00018598553826277555
+        },
+        {
+          "radius_from_source_um": 10.0,
+          "field_fraction_at_scatterer": 0.013607446496926483,
+          "radial_Green_numerator_h": 0.9630845624100899,
+          "G_over_vacuum_Yukawa": 1.0346409677851436,
+          "center_to_scatterer_potential_over_vacuum": 0.00019165882213325575
+        },
+        {
+          "radius_from_source_um": 100.0,
+          "field_fraction_at_scatterer": 0.013722713716627222,
+          "radial_Green_numerator_h": 0.5876415018555912,
+          "G_over_vacuum_Yukawa": 1.2032751652699132,
+          "center_to_scatterer_potential_over_vacuum": 0.0002247850713524672
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 100.0,
+      "central_field_fraction": 0.7739038816692316,
+      "h_prime_at_origin": -0.9176928179076137,
+      "max_relative_residual": 9.951683925420091e-09,
+      "samples": [
+        {
+          "radius_from_source_um": 1.0,
+          "field_fraction_at_scatterer": 0.7739025530930627,
+          "radial_Green_numerator_h": 0.9953595954919691,
+          "G_over_vacuum_Yukawa": 1.0025188158019347,
+          "center_to_scatterer_potential_over_vacuum": 0.6004347746236931
+        },
+        {
+          "radius_from_source_um": 10.0,
+          "field_fraction_at_scatterer": 0.773771010591379,
+          "radial_Green_numerator_h": 0.9545011259150333,
+          "G_over_vacuum_Yukawa": 1.0254197888889272,
+          "center_to_scatterer_potential_over_vacuum": 0.6140463781600484
+        },
+        {
+          "radius_from_source_um": 100.0,
+          "field_fraction_at_scatterer": 0.7604840708994992,
+          "radial_Green_numerator_h": 0.6219769728800663,
+          "G_over_vacuum_Yukawa": 1.2735816692202562,
+          "center_to_scatterer_potential_over_vacuum": 0.7495557607511913
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000.0,
+      "central_field_fraction": 0.014079027805983297,
+      "h_prime_at_origin": 0.4229293201766096,
+      "max_relative_residual": 9.942554444158692e-09,
+      "samples": [
+        {
+          "radius_from_source_um": 1.0,
+          "field_fraction_at_scatterer": 0.014078967555312457,
+          "radial_Green_numerator_h": 1.0021304494548042,
+          "G_over_vacuum_Yukawa": 1.0093383697877827,
+          "center_to_scatterer_potential_over_vacuum": 0.00020006921031404093
+        },
+        {
+          "radius_from_source_um": 10.0,
+          "field_fraction_at_scatterer": 0.014073003504642247,
+          "radial_Green_numerator_h": 1.0201406949591634,
+          "G_over_vacuum_Yukawa": 1.0959363249144527,
+          "center_to_scatterer_potential_over_vacuum": 0.00021714247537786988
+        },
+        {
+          "radius_from_source_um": 100.0,
+          "field_fraction_at_scatterer": 0.0134842055327729,
+          "radial_Green_numerator_h": 1.0796648880527853,
+          "G_over_vacuum_Yukawa": 2.21075935328865,
+          "center_to_scatterer_potential_over_vacuum": 0.0004197005142978112
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 100.0,
+      "central_field_fraction": 0.9961262518834397,
+      "h_prime_at_origin": -1.4051653038451704,
+      "max_relative_residual": 9.991207519214863e-09,
+      "samples": [
+        {
+          "radius_from_source_um": 1.0,
+          "field_fraction_at_scatterer": 0.9961262189121475,
+          "radial_Green_numerator_h": 0.9929043244957418,
+          "G_over_vacuum_Yukawa": 1.0000458850312277,
+          "center_to_scatterer_potential_over_vacuum": 0.9923130070719417
+        },
+        {
+          "radius_from_source_um": 10.0,
+          "field_fraction_at_scatterer": 0.9961229541176715,
+          "radial_Green_numerator_h": 0.9312692095422596,
+          "G_over_vacuum_Yukawa": 1.0004617598875287,
+          "center_to_scatterer_potential_over_vacuum": 0.9927224125170921
+        },
+        {
+          "radius_from_source_um": 100.0,
+          "field_fraction_at_scatterer": 0.9957880902483875,
+          "radial_Green_numerator_h": 0.4908328946145558,
+          "G_over_vacuum_Yukawa": 1.0050464960733443,
+          "center_to_scatterer_potential_over_vacuum": 0.9969364321799684
+        }
+      ]
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000.0,
+      "central_field_fraction": 0.9871457623568801,
+      "h_prime_at_origin": -1.384000477972364,
+      "max_relative_residual": 9.976606567128502e-09,
+      "samples": [
+        {
+          "radius_from_source_um": 1.0,
+          "field_fraction_at_scatterer": 0.9871456544227439,
+          "radial_Green_numerator_h": 0.9930108985181635,
+          "G_over_vacuum_Yukawa": 1.0001532255976293,
+          "center_to_scatterer_potential_over_vacuum": 0.9746059612949185
+        },
+        {
+          "radius_from_source_um": 10.0,
+          "field_fraction_at_scatterer": 0.9871349669158166,
+          "radial_Green_numerator_h": 0.9322756201442893,
+          "G_over_vacuum_Yukawa": 1.0015429459846952,
+          "center_to_scatterer_potential_over_vacuum": 0.9759496171617192
+        },
+        {
+          "radius_from_source_um": 100.0,
+          "field_fraction_at_scatterer": 0.9860395351158777,
+          "radial_Green_numerator_h": 0.4966622885808054,
+          "G_over_vacuum_Yukawa": 1.0169829657849172,
+          "center_to_scatterer_potential_over_vacuum": 0.9898953688278068
+        }
+      ]
+    }
+  ],
+  "scope": "Static l=0 source at center only, phi fluctuations fixed zero at far boundary. Nuclear point-source potential diagnostic outside sphere, frozen nonlinear backgrounds. Not off-center branch difference, dynamic propagator, full scattering amplitude or decoherence rate."
+}

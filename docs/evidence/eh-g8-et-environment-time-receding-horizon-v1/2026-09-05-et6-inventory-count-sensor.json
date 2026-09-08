@@ -1,0 +1,13 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "evidence normalization",
+  "change": "Extracted native inventory item-count sensing from compactFluidState into a read-only ControlBridge observation. The native compact state reuses this sensor. Immutable observations distinguish unavailable from observed-empty and compute signed item-count changes without action attribution.",
+  "checks": [
+    { "check": "Offline single-worker Gradle test InventoryCountObservationTest and FluidSequenceEngineTest; runGameTest excluded", "exit_code": 0, "passed": 38, "compile_java": "executed", "compile_test_java": "executed", "test": "executed" }
+  ],
+  "casimir": { "run_id": "2687", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" },
+  "limitations": ["Not yet wired to temporal discrepancy detection or stopping", "Item-count differences do not identify cause, slot moves, durability changes or transient between-sample changes", "No live sensor capture or Minecraft action", "No native feature advertisement or packaged deployment", "Existing keyed-server gate does not verify new native behavior", "ET6 remains incomplete"]
+}

@@ -1,0 +1,69 @@
+{
+  "status": "published_parameter_transcription_only",
+  "source": "https://arxiv.org/html/2609.02823v1",
+  "source_location": "Supplement section .4, equation 5 and Table S5",
+  "NEST_version": "2.4.5",
+  "analysis_parameters": {
+    "alpha": 11.2,
+    "beta": 1.1,
+    "gamma": 0.052,
+    "delta": -0.0533,
+    "epsilon": 10.8,
+    "zeta": 0.53,
+    "eta": 1.4,
+    "theta": 0.31,
+    "iota": 2.5,
+    "p": 0.5,
+    "f1": 1.39,
+    "f2": 1.74,
+    "a": 0.023,
+    "b": 0.0289,
+    "E0_keV": 74.7
+  },
+  "energy_exponent": [
+    {
+      "E_keV": 10,
+      "p": 0.5
+    },
+    {
+      "E_keV": 74.7,
+      "p": 0.5
+    },
+    {
+      "E_keV": 100,
+      "p": 0.5126223420514895
+    },
+    {
+      "E_keV": 150,
+      "p": 0.5265805495732175
+    },
+    {
+      "E_keV": 200,
+      "p": 0.535204902155063
+    },
+    {
+      "E_keV": 220,
+      "p": 0.5379154769416461
+    },
+    {
+      "E_keV": 248,
+      "p": 0.5412425304337487
+    },
+    {
+      "E_keV": 269.9,
+      "p": 0.5435460084678786
+    }
+  ],
+  "caveats": [
+    "not electron/photon yields by itself",
+    "not an energy resolution kernel",
+    "no parameter covariance supplied by this transcription",
+    "no accepted counts"
+  ],
+  "retrieval": {
+    "hepdata_record": 182472,
+    "json_request_status": "HTTP 403 on 2026-09-07",
+    "parameters_available_in_paper": true,
+    "hepdata_tables_downloaded": false
+  }
+}

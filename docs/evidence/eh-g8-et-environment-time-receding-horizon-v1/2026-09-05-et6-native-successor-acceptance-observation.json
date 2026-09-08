@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-05",
+  "classification": "evidence normalization; adapter observation",
+  "scope": "Immediate native queue acceptance, separate from handoff start",
+  "implementation": "The existing controller emits a nonterminal progress observation after accepting one successor, retaining the root action identity and recording predecessor, checkpoint, accepted client tick/monotonic time, committed tick, lead ticks and queue depth. execution_started and terminal_eligible are false.",
+  "verification": {
+    "native_tests": ["PlayerActionRuntimeLifecycleTest", "FluidSequenceEngineTest"],
+    "gradle_exit_code": 0,
+    "positive": "Three fixture handoffs each report acceptance with two ticks of lead and depth one, followed by their distinct native start observations.",
+    "negative": "Duplicate queue attempts emit no extra acceptance; no acceptance releases controls or changes root action identity."
+  },
+  "limitations": [
+    "Server validation of the new acceptance fields remains required before treating them as validated delivery evidence.",
+    "No HTTP-loss recovery fixture, live Minecraft latency measurement, route mount or packaged build.",
+    "Controller-fixture ticks are not ET6 capacity acceptance."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

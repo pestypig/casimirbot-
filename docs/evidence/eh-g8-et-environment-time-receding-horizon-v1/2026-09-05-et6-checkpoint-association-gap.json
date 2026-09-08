@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "inspection": {
+    "native": "FluidSequenceEngine checkpoint settlements retain checkpoint_id, node_id, tick_index, scheduler_ticks_elapsed and workflow-relative monotonic_elapsed_ns",
+    "transport": "PlayerActionRuntime embeds workflow measurements with clock and action_event_ref in the measured player-embodiment event",
+    "persistence": "event-stream-store persists exact event_payload and environmentConnectorSha256(event), with environment, epoch, subject and workflow columns",
+    "ledger": "EnvironmentTimePlanLedger.checkpoint requires source-plan checkpoint identity plus observation_revision and affordance_revision"
+  },
+  "gap": "No production persisted association joins measured native checkpoint to source-plan identity and server-owned perception/frontier revisions.",
+  "next_implementation": "Retain event/hash, exact action/plan/compiler checkpoint mapping, and authenticated frontier association atomically with successor admission; never infer revisions from caller data or local tick.",
+  "runtime_execution": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

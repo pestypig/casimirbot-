@@ -1,0 +1,256 @@
+{
+  "scope": "Leading nonrelativistic scalar elastic Xe, Helm isoscalar nucleon proxy, total halo density .3 GeV/cm3, 2.84 tonne-year exposure. No efficiency, resolution, backgrounds, fit or exclusion. Formal sphere-target angles retain invalid Born-sphere labels; elastic nuclei are a different calculation.",
+  "bins_keV": [
+    [
+      5.4,
+      10.0
+    ],
+    [
+      10.0,
+      30.0
+    ],
+    [
+      30.0,
+      100.0
+    ],
+    [
+      100.0,
+      200.0
+    ],
+    [
+      200.0,
+      269.9
+    ]
+  ],
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-10,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.037678996964503e-12,
+        3.372578086154072e-13,
+        5.015518697641805e-15,
+        3.469675074953211e-23,
+        0.0
+      ],
+      "Xe_raw_window": 1.3799523243122487e-12,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-10,
+      "angle_role": "formal_sphere_target",
+      "theta": 0.0005918173764338211,
+      "Xe_raw_bins": [
+        4.038273593111228,
+        1.312486141269321,
+        0.01951859560778542,
+        1.3502727985096811e-10,
+        0.0
+      ],
+      "Xe_raw_window": 5.370278330123361,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-09,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.0376789969645013e-12,
+        3.3725780861540714e-13,
+        5.0155186976418046e-15,
+        3.469675074953211e-23,
+        0.0
+      ],
+      "Xe_raw_window": 1.3799523243122471e-12,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-09,
+      "angle_role": "formal_sphere_target",
+      "theta": 0.0018802369112853573,
+      "Xe_raw_bins": [
+        40.76088625828765,
+        13.24776469110922,
+        0.19701370824592898,
+        1.3629169665869383e-09,
+        0.0
+      ],
+      "Xe_raw_window": 54.20566465900571,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-08,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.037678996964379e-12,
+        3.3725780861538634e-13,
+        5.015518697641686e-15,
+        3.4696750749531845e-23,
+        0.0
+      ],
+      "Xe_raw_window": 1.3799523243121037e-12,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-08,
+      "angle_role": "formal_sphere_target",
+      "theta": 0.06367689780753338,
+      "Xe_raw_bins": [
+        46498.088746872716,
+        15112.4225906563,
+        224.74390846955558,
+        1.5547511323824524e-06,
+        0.0
+      ],
+      "Xe_raw_window": 61835.25524755332,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-06,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.0376789957266168e-12,
+        3.3725780840593536e-13,
+        5.0155186964562366e-15,
+        3.469675074672962e-23,
+        0.0
+      ],
+      "Xe_raw_window": 1.3799523228637052e-12,
+      "Xe_raw_high": 0.0,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-10,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.6232754591319072e-13,
+        7.195316773472535e-14,
+        3.1109518594512406e-15,
+        2.4367181777480997e-18,
+        2.775257276832694e-20
+      ],
+      "Xe_raw_window": 2.3739412997811784e-13,
+      "Xe_raw_high": 2.775257276832694e-20,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-10,
+      "angle_role": "formal_sphere_target",
+      "theta": 0.001707955512907257,
+      "Xe_raw_bins": [
+        5.2613977318863485,
+        2.3321626122776187,
+        0.10083288677374332,
+        7.897946969829903e-05,
+        8.99522767968002e-07
+      ],
+      "Xe_raw_window": 7.694473109930176,
+      "Xe_raw_high": 8.99522767968002e-07,
+      "sphere_target_valid": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-09,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.6232754591319052e-13,
+        7.195316773472532e-14,
+        3.1109518594512394e-15,
+        2.4367181777480997e-18,
+        2.775257276832694e-20
+      ],
+      "Xe_raw_window": 2.373941299781176e-13,
+      "Xe_raw_high": 2.775257276832694e-20,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-09,
+      "angle_role": "formal_sphere_target",
+      "theta": 0.005426354653096825,
+      "Xe_raw_bins": [
+        53.10666292518458,
+        23.54001351890591,
+        1.0177710187567635,
+        0.0007971904594586922,
+        9.079460414576702e-06
+      ],
+      "Xe_raw_window": 77.66525373276713,
+      "Xe_raw_high": 9.079460414576702e-06,
+      "sphere_target_valid": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-08,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.6232754591317153e-13,
+        7.195316773472107e-14,
+        3.1109518594511704e-15,
+        2.436718177748084e-18,
+        2.7752572768326834e-20
+      ],
+      "Xe_raw_window": 2.3739412997809427e-13,
+      "Xe_raw_high": 2.7752572768326834e-20,
+      "sphere_target_valid": null
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-08,
+      "angle_role": "formal_sphere_target",
+      "theta": 0.18764555072067546,
+      "Xe_raw_bins": [
+        60581.56611458404,
+        26853.33264759878,
+        1161.024980032898,
+        0.9093971239287748,
+        0.010357418468665301
+      ],
+      "Xe_raw_window": 88596.84349675811,
+      "Xe_raw_high": 0.010357418468665301,
+      "sphere_target_valid": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-06,
+      "angle_role": "reference",
+      "theta": 3e-10,
+      "Xe_raw_bins": [
+        1.623275457211603e-13,
+        7.195316769188078e-14,
+        3.110951858748955e-15,
+        2.4367181775963538e-18,
+        2.7752572767251533e-20
+      ],
+      "Xe_raw_window": 2.373941297425404e-13,
+      "Xe_raw_high": 2.7752572767251533e-20,
+      "sphere_target_valid": null
+    }
+  ],
+  "checks": {
+    "contact_normalization_max_relative_error": 9.086065233532281e-13,
+    "nonnegative_bins": true
+  },
+  "full_model_admitted": false
+}

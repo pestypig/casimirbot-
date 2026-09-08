@@ -1,0 +1,33 @@
+{
+  "scope": "Concurrent Java native runtime and loopback HTTP fixture calling real broker lease/event handlers and event store",
+  "passed": true,
+  "server_tests": 2,
+  "selected_native_tests": 1,
+  "verification": [
+    "Native checkpoint is published while broker fixture is running",
+    "Real broker returns the admitted child over HTTP",
+    "Native preflight accepts and controller activates the compiled successor",
+    "Native acceptance and activation evidence returns to real broker validation",
+    "Child becomes running with exactly one lease attempt and one delivery poll",
+    "Generated paired projections pass real event storage checks",
+    "Repeat run with endpoint included in Gradle inputs passes without cached execution"
+  ],
+  "fixture_corrections": [
+    "Used PowerShell environment-path invocation to avoid Windows batch quoting failure",
+    "Added explicit ok acknowledgement required by native HTTP client",
+    "Refresh synthetic heartbeat at delivery after Gradle startup"
+  ],
+  "limits": [
+    "Initial admission/retention and authority/binding observations remain fixtures",
+    "Checkpoint association is fixture-bound to newly published native evidence",
+    "HTTP wrapper is not production routing/authentication middleware",
+    "Movement bridge and environment ticks are simulated",
+    "Positive transport run only; simultaneous uncertain-response and disk-failure injection remain open",
+    "No live Minecraft, installed EXE, keyed server or user binding changed"
+  ],
+  "reproduce": {
+    "prerequisite": "Generate server-compiled-handoff.json and native publication fixtures as documented above",
+    "environment": ["HELIX_NATIVE_PUBLICATION_INTEGRATION=1", "HELIX_NATIVE_BROKER_ROUNDTRIP=1", "HELIX_NATIVE_GRADLE_PATH=<absolute local gradle.bat>", "JAVA_HOME=<local JDK21>"],
+    "command": "npx vitest run server/services/environment-connectors/events/__tests__/native-temporal-publication.test.ts --pool=forks --maxWorkers=1 --minWorkers=1"
+  }
+}

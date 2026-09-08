@@ -1,0 +1,27 @@
+{
+  "scope": "Tree physical amplitude g ubar_1 i gamma5 u_2. Single real-scalar final state, spin-averaged parent. Coupling is a vertex, not a Lagrangian coefficient with unresolved Majorana factors. Cosmological age is a no-replenishment reference, not a derived population model.",
+  "reference_age_s": 4.3549488e+17,
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "gap_GeV": 0.0010062516621719803,
+      "physical_pseudoscalar_vertex": 5.031258310859901e-07,
+      "scalar_mass_GeV": 1e-09,
+      "lifetime_seconds": 102.63130705602404,
+      "age_over_lifetime": 4243294687480434.0,
+      "g_for_lifetime_equal_reference_age": 7.723693268642197e-15,
+      "leading_width_relative_error": 6.28918363558828e-05
+    },
+    {
+      "mchi_GeV": 100.0,
+      "gap_GeV": 0.0005513006648687921,
+      "physical_pseudoscalar_vertex": 2.756503324343961e-07,
+      "scalar_mass_GeV": 1e-09,
+      "lifetime_seconds": 12993.585927197877,
+      "age_over_lifetime": 33516142690712.66,
+      "g_for_lifetime_equal_reference_age": 4.7613653291827906e-14,
+      "leading_width_relative_error": 1.3782569809883682e-05
+    }
+  ],
+  "full_model_admitted": false
+}

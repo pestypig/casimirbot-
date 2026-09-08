@@ -1,0 +1,15 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "adapter execution",
+  "repair": "Expose a package-local synchronized measurement snapshot from the existing controller to its serial owner. Aggregate cumulative child measurements using per-child high-water counts each tick. Cancel a running child on observed overrun before continuing the graph; settlement and cancellation cannot duplicate the counted effects.",
+  "checks": [
+    { "check": "Offline one-worker Gradle test: FluidSequenceEngineTest, PlayerActionControllerTest, ResidentEffectMeasurementsTest, ResidentMutationBudgetTest; runGameTest excluded", "exit_code": 0, "passed": 83, "failures": 0, "errors": 0 },
+    { "case": "Running and settled child each report two items against budget one", "result": "Typed sequence failure, controls released, count two preserved, next node never executed" },
+    { "case": "Running child reports cumulative count one on repeated ticks and at settlement", "result": "Count stays one, valid sequence succeeds without false overrun" }
+  ],
+  "casimir": { "run_id": "2686", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" },
+  "limitations": ["Requires effects to be reported by native child measurements; incidental pickups outside those measurements remain unproven", "Detection follows the observed effect and cannot undo it", "No native feature advertisement, deployment, packaged HTTP handoff or live action", "Keyed-server Casimir result is not new native execution proof", "ET6 remains incomplete with no maturity advancement"]
+}

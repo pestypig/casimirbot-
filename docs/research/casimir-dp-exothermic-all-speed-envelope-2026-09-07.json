@@ -1,0 +1,23 @@
+{
+  "status": "conditional_uniform_sphere_all_speed_envelope",
+  "source_sha256": "19067cb95c34ee24a57e1b6e97e94f936cf08dcc27b6927fb8604528dcca63cf",
+  "Xmax": 335446160.8519054,
+  "Xstar": 4.360589678839442,
+  "maximum_J_over_X": 8.485090945279548,
+  "maximum_ratio_to_prior_envelope": 2.5294941291713254e-08,
+  "rows": [
+    {
+      "excited_fraction": 0.5,
+      "D_any_speed_distribution_upper": 6.831963550014072e-34
+    },
+    {
+      "excited_fraction": 0.0062,
+      "D_any_speed_distribution_upper": 8.831432591056175e-30
+    },
+    {
+      "excited_fraction": 1e-06,
+      "D_any_speed_distribution_upper": 3.4159783590252617e-22
+    }
+  ],
+  "scope": "Any normalized speed/direction distribution below 798 km/s, fixed total density; inherited single-nucleus coefficient and uniform rigid additive model only"
+}

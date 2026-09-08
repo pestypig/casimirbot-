@@ -1,0 +1,24 @@
+{
+  "scope": "ET6 scoped temporal TypeScript integration",
+  "classification": "evidence normalization",
+  "repairs": [
+    "Stored policy parser accepts unknown input at its existing parsing boundary.",
+    "Foreground memory recovery signature matches the nonoptional host reader output.",
+    "Causal evidence references omit absent deck IDs.",
+    "Mailbox preserves null when no wake was created."
+  ],
+  "verification": {
+    "typecheck": "npx tsc -p tsconfig.et6-temporal.json --noEmit --pretty false: PASS",
+    "memory_and_mailbox": "127 tests passed",
+    "account_tests": "3 failed on test/hook timeouts while restoring existing local pg-mem snapshot; restore reported 32086ms",
+    "discipline_full": "Exited successfully but classifier skipped battery; targeted tests run explicitly"
+  },
+  "limitations": [
+    "Account tests need temporary database isolation before rerun.",
+    "Scoped temporal typecheck is not full MCP/server/EXE build verification.",
+    "Public temporal execution admission, full asynchronous delivery and packaged live journey remain incomplete."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

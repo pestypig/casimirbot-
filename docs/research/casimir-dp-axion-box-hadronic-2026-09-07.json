@@ -1,0 +1,115 @@
+{
+  "scope": "Leading zero-transfer scalar up-box projection with published sigma-term sensitivity range; twist total not admitted without scale matching",
+  "checks": {
+    "missing_and_mismatched_twist_scale_rejected": true,
+    "scalar_sigma_normalization": true,
+    "isospin_symmetric_target_recovers_A": true,
+    "all_scalar_coefficients_positive": true
+  },
+  "rows": [
+    {
+      "sigma_up_proton_GeV": 0.012,
+      "sigma_up_neutron_GeV": 0.01,
+      "C_scalar_p_Lagrangian_GeV_m2": 5.492648053543873e-16,
+      "C_scalar_n_Lagrangian_GeV_m2": 4.577206711286561e-16,
+      "neutron_over_proton": 0.8333333333333334,
+      "free_proton_sigma_cm2": 3.2815662272983466e-59,
+      "Xe131_zero_q_amplitude_GeV_m2": 6.490479116604344e-14,
+      "C12_zero_q_amplitude_GeV_m2": 6.04191285889826e-15,
+      "lambdaP_equal_proton_tree": 7.61649146579899e-08
+    },
+    {
+      "sigma_up_proton_GeV": 0.012,
+      "sigma_up_neutron_GeV": 0.015,
+      "C_scalar_p_Lagrangian_GeV_m2": 5.492648053543873e-16,
+      "C_scalar_n_Lagrangian_GeV_m2": 6.865810066929841e-16,
+      "neutron_over_proton": 1.25,
+      "free_proton_sigma_cm2": 3.2815662272983466e-59,
+      "Xe131_zero_q_amplitude_GeV_m2": 8.252703700449668e-14,
+      "C12_zero_q_amplitude_GeV_m2": 7.415074872284229e-15,
+      "lambdaP_equal_proton_tree": 7.61649146579899e-08
+    },
+    {
+      "sigma_up_proton_GeV": 0.012,
+      "sigma_up_neutron_GeV": 0.02,
+      "C_scalar_p_Lagrangian_GeV_m2": 5.492648053543873e-16,
+      "C_scalar_n_Lagrangian_GeV_m2": 9.154413422573122e-16,
+      "neutron_over_proton": 1.6666666666666667,
+      "free_proton_sigma_cm2": 3.2815662272983466e-59,
+      "Xe131_zero_q_amplitude_GeV_m2": 1.0014928284294995e-13,
+      "C12_zero_q_amplitude_GeV_m2": 8.788236885670198e-15,
+      "lambdaP_equal_proton_tree": 7.61649146579899e-08
+    },
+    {
+      "sigma_up_proton_GeV": 0.017,
+      "sigma_up_neutron_GeV": 0.01,
+      "C_scalar_p_Lagrangian_GeV_m2": 7.781251409187154e-16,
+      "C_scalar_n_Lagrangian_GeV_m2": 4.577206711286561e-16,
+      "neutron_over_proton": 0.5882352941176471,
+      "free_proton_sigma_cm2": 6.585921108952932e-59,
+      "Xe131_zero_q_amplitude_GeV_m2": 7.726324928651715e-14,
+      "C12_zero_q_amplitude_GeV_m2": 7.415074872284229e-15,
+      "lambdaP_equal_proton_tree": 1.079002957654857e-07
+    },
+    {
+      "sigma_up_proton_GeV": 0.017,
+      "sigma_up_neutron_GeV": 0.015,
+      "C_scalar_p_Lagrangian_GeV_m2": 7.781251409187154e-16,
+      "C_scalar_n_Lagrangian_GeV_m2": 6.865810066929841e-16,
+      "neutron_over_proton": 0.8823529411764705,
+      "free_proton_sigma_cm2": 6.585921108952932e-59,
+      "Xe131_zero_q_amplitude_GeV_m2": 9.488549512497041e-14,
+      "C12_zero_q_amplitude_GeV_m2": 8.788236885670198e-15,
+      "lambdaP_equal_proton_tree": 1.079002957654857e-07
+    },
+    {
+      "sigma_up_proton_GeV": 0.017,
+      "sigma_up_neutron_GeV": 0.02,
+      "C_scalar_p_Lagrangian_GeV_m2": 7.781251409187154e-16,
+      "C_scalar_n_Lagrangian_GeV_m2": 9.154413422573122e-16,
+      "neutron_over_proton": 1.1764705882352942,
+      "free_proton_sigma_cm2": 6.585921108952932e-59,
+      "Xe131_zero_q_amplitude_GeV_m2": 1.1250774096342368e-13,
+      "C12_zero_q_amplitude_GeV_m2": 1.0161398899056166e-14,
+      "lambdaP_equal_proton_tree": 1.079002957654857e-07
+    },
+    {
+      "sigma_up_proton_GeV": 0.022,
+      "sigma_up_neutron_GeV": 0.01,
+      "C_scalar_p_Lagrangian_GeV_m2": 1.0069854764830434e-15,
+      "C_scalar_n_Lagrangian_GeV_m2": 4.577206711286561e-16,
+      "neutron_over_proton": 0.45454545454545453,
+      "free_proton_sigma_cm2": 1.1029708708419442e-58,
+      "Xe131_zero_q_amplitude_GeV_m2": 8.962170740699086e-14,
+      "C12_zero_q_amplitude_GeV_m2": 8.788236885670198e-15,
+      "lambdaP_equal_proton_tree": 1.396356768729815e-07
+    },
+    {
+      "sigma_up_proton_GeV": 0.022,
+      "sigma_up_neutron_GeV": 0.015,
+      "C_scalar_p_Lagrangian_GeV_m2": 1.0069854764830434e-15,
+      "C_scalar_n_Lagrangian_GeV_m2": 6.865810066929841e-16,
+      "neutron_over_proton": 0.6818181818181818,
+      "free_proton_sigma_cm2": 1.1029708708419442e-58,
+      "Xe131_zero_q_amplitude_GeV_m2": 1.0724395324544412e-13,
+      "C12_zero_q_amplitude_GeV_m2": 1.0161398899056164e-14,
+      "lambdaP_equal_proton_tree": 1.396356768729815e-07
+    },
+    {
+      "sigma_up_proton_GeV": 0.022,
+      "sigma_up_neutron_GeV": 0.02,
+      "C_scalar_p_Lagrangian_GeV_m2": 1.0069854764830434e-15,
+      "C_scalar_n_Lagrangian_GeV_m2": 9.154413422573122e-16,
+      "neutron_over_proton": 0.9090909090909091,
+      "free_proton_sigma_cm2": 1.1029708708419442e-58,
+      "Xe131_zero_q_amplitude_GeV_m2": 1.2486619908389738e-13,
+      "C12_zero_q_amplitude_GeV_m2": 1.1534560912442132e-14,
+      "lambdaP_equal_proton_tree": 1.396356768729815e-07
+    }
+  ],
+  "twist_coefficient_per_unit_momentum_fraction_GeV_m2": 1.649942178525733e-16,
+  "twist_prediction_admitted": false,
+  "source_sigma_terms": "https://arxiv.org/html/1707.06998v2",
+  "source_moment_scale": "https://arxiv.org/html/1810.01039v2",
+  "full_model_admitted": false
+}

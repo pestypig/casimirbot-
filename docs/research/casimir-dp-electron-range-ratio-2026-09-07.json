@@ -1,0 +1,67 @@
+{
+  "status": "conditional_single_yukawa_electron_ratio_scan_not_exclusion",
+  "diamond_sha256": "ce6ca37fdac03fd7520c6028557bf3fb92025d30fb4dedf3cef926c60b50940b",
+  "xenon_sha256": "8214003256c7b40d67a51b59bff6d240ed83323fb9ad384ebafbf668223c6774",
+  "rows": [
+    {
+      "mediator_eV": 1.0,
+      "response": "withLFE",
+      "ROI_events_per_Wref_squared": 0.0006749524835195642,
+      "D_at_reference_24_8": 4.0008228792481166e-19
+    },
+    {
+      "mediator_eV": 1.0,
+      "response": "noLFE",
+      "ROI_events_per_Wref_squared": 0.0006749524835195642,
+      "D_at_reference_24_8": 5.571589321092259e-19
+    },
+    {
+      "mediator_eV": 1000.0,
+      "response": "withLFE",
+      "ROI_events_per_Wref_squared": 0.002699207180334922,
+      "D_at_reference_24_8": 3.869096318541095e-19
+    },
+    {
+      "mediator_eV": 1000.0,
+      "response": "noLFE",
+      "ROI_events_per_Wref_squared": 0.002699207180334922,
+      "D_at_reference_24_8": 5.388191331523881e-19
+    },
+    {
+      "mediator_eV": 10000.0,
+      "response": "withLFE",
+      "ROI_events_per_Wref_squared": 6.7355836740813135,
+      "D_at_reference_24_8": 7.969241451418837e-20
+    },
+    {
+      "mediator_eV": 10000.0,
+      "response": "noLFE",
+      "ROI_events_per_Wref_squared": 6.7355836740813135,
+      "D_at_reference_24_8": 1.0797232879352649e-19
+    },
+    {
+      "mediator_eV": 100000.0,
+      "response": "withLFE",
+      "ROI_events_per_Wref_squared": 16960.899372037646,
+      "D_at_reference_24_8": 1.5579276845673915e-22
+    },
+    {
+      "mediator_eV": 100000.0,
+      "response": "noLFE",
+      "ROI_events_per_Wref_squared": 16960.899372037646,
+      "D_at_reference_24_8": 2.0035092655204236e-22
+    },
+    {
+      "mediator_eV": 1000000.0,
+      "response": "withLFE",
+      "ROI_events_per_Wref_squared": 99806.67861223678,
+      "D_at_reference_24_8": 2.73897699330038e-23
+    },
+    {
+      "mediator_eV": 1000000.0,
+      "response": "noLFE",
+      "ROI_events_per_Wref_squared": 99806.67861223678,
+      "D_at_reference_24_8": 3.5160580485070417e-23
+    }
+  ]
+}

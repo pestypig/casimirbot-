@@ -1,0 +1,78 @@
+{
+  "scope": "Quadratic two-Weyl mass sector with M(phi)=(1+phi/500GeV)M0. Not a complete dilaton EFT or composite transition theorem. Nonuniversal addition is a labeled diagnostic, not an admitted model.",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "asymmetry_GeV": 0.0,
+      "universal_diagonal_yukawa": [
+        0.07999999999999999,
+        0.08000201250332434
+      ],
+      "universal_offdiagonal_numerical_residue": 3.1356265961426084e-18,
+      "mass_alignment_error": 1.3877787807814457e-17,
+      "diagnostic_nonuniversal_transition": 5.031258310839396e-07,
+      "analytic_nonuniversal_transition": 5.031258310859901e-07
+    },
+    {
+      "mchi_GeV": 40.0,
+      "asymmetry_GeV": 0.0002515629155429951,
+      "universal_diagonal_yukawa": [
+        0.08,
+        0.08000201250332435
+      ],
+      "universal_offdiagonal_numerical_residue": 3.051017522950151e-18,
+      "mass_alignment_error": 3.051017522950151e-18,
+      "diagnostic_nonuniversal_transition": 5.031258310772356e-07,
+      "analytic_nonuniversal_transition": 5.031258310760406e-07
+    },
+    {
+      "mchi_GeV": 40.0,
+      "asymmetry_GeV": 4.000050312583109,
+      "universal_diagonal_yukawa": [
+        0.07999999999999997,
+        0.08000201250332432
+      ],
+      "universal_offdiagonal_numerical_residue": 3.2893164814106564e-18,
+      "mass_alignment_error": 2.7755575615628914e-17,
+      "diagnostic_nonuniversal_transition": 5.006038812105252e-07,
+      "analytic_nonuniversal_transition": 5.006038812143876e-07
+    },
+    {
+      "mchi_GeV": 100.0,
+      "asymmetry_GeV": 0.0,
+      "universal_diagonal_yukawa": [
+        0.19999999999999996,
+        0.20000110260132972
+      ],
+      "universal_offdiagonal_numerical_residue": 2.1179252613791292e-17,
+      "mass_alignment_error": 5.551115123125783e-17,
+      "diagnostic_nonuniversal_transition": 2.7565033242028356e-07,
+      "analytic_nonuniversal_transition": 2.756503324343961e-07
+    },
+    {
+      "mchi_GeV": 100.0,
+      "asymmetry_GeV": 0.00013782516621719802,
+      "universal_diagonal_yukawa": [
+        0.2,
+        0.20000110260132975
+      ],
+      "universal_offdiagonal_numerical_residue": 1.4578929207139684e-17,
+      "mass_alignment_error": 2.7755575615628914e-17,
+      "diagnostic_nonuniversal_transition": 2.7565033243301065e-07,
+      "analytic_nonuniversal_transition": 2.7565033243413424e-07
+    },
+    {
+      "mchi_GeV": 100.0,
+      "asymmetry_GeV": 10.000027565033244,
+      "universal_diagonal_yukawa": [
+        0.20000000000000004,
+        0.20000110260132978
+      ],
+      "universal_offdiagonal_numerical_residue": 1.819659339634064e-17,
+      "mass_alignment_error": 2.7755575615628914e-17,
+      "diagnostic_nonuniversal_transition": 2.7426861779090065e-07,
+      "analytic_nonuniversal_transition": 2.7426861780648754e-07
+    }
+  ],
+  "full_model_admitted": false
+}

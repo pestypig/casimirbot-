@@ -1,0 +1,24 @@
+{
+  "schema": "et6.combined_temporal_regression.v1",
+  "date": "2026-09-05",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__ --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "test_files_passed": 5,
+    "tests_passed": 42,
+    "tests_failed": 0,
+    "docs_audit": "passed"
+  },
+  "source_inspection": {
+    "scope": "server, client, apps and minecraft source; generated build/release directories excluded",
+    "publisher_callers": "Only its test invokes publishTemporalPerceptionFrontier in the inspected source.",
+    "ledger_construction": "Only tests instantiate EnvironmentTimePlanLedger in the inspected source.",
+    "manual_input_pending_callers": "Only native tests call ManualInputLatch.pending in the inspected source."
+  },
+  "limits": [
+    "Passing components do not prove executable production temporal admission or resident rolling continuation.",
+    "No packaged rebuild, deployment, Minecraft action, live rolling cycle, or interruption test was performed in this check.",
+    "Next implementation remains production integration in the existing repair packet, not another binding or reconnect loop."
+  ],
+  "et6_complete": false
+}

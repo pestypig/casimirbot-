@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 internal temporal controller and serial native bridge integration",
+  "implementation": [
+    "Exact active-action guarded controller API queues an already-admitted serial successor through ControlBridge and NativeFabricControlBridge.",
+    "Only successful engine queue acceptance reserves continued predecessor work through its committed boundary; no successor preserves the prior stop behavior.",
+    "At the exact boundary, validate predecessor clock/deadline before switching temporal windows. Native execution remains addressed from the original resident origin.",
+    "Existing manual/disconnect/duration checks run before handoff; engine independently verifies terminal boundary and prevents predecessor overrun."
+  ],
+  "verification": {
+    "native_sequence_controller_window_tests": "PASS",
+    "positive": "Three accepted controller windows reach native handoff with four total entry pulses, no intermediate global release, and final settlement.",
+    "negative": "Wrong action rejected; deadline expiry, late tick and manual takeover prevent successor effect.",
+    "casimir": { "run_id": "2669", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": [
+    "Runtime transport does not call this API yet. Temporal delivery remains rejected and the capability is not advertised.",
+    "Runtime must supply authenticated source/compiler/task/authority association, checkpoint mapping and source clocks; this internal API does not establish them.",
+    "Reactive handoff, northbound evidence admission, reconnect, packaged deployment and original ET6 live qualification remain incomplete.",
+    "No Minecraft action or EXE rebuild occurred."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

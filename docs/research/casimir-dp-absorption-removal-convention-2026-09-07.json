@@ -1,0 +1,17 @@
+{
+  "scope": "Assumes table E is intrinsic separation plus excitation and residual mass MA-M+E. Only a conditional kinematic audit on normalized legacy proton weights. Not a neutron spectral function, off-shell current model, or rate.",
+  "checks": {
+    "spectator_energy_conservation": true,
+    "removal_identity": true,
+    "recoil_nonnegative": true,
+    "support_cannot_grow": true
+  },
+  "m_GeV": 0.247,
+  "M_GeV": 0.939,
+  "MA_GeV": 11.17486323534,
+  "weighted_mean_residual_recoil_MeV": 2.3288629828518537,
+  "largest_tabulated_recoil_MeV": 30.43327344143326,
+  "open_weight_without_recoil": 0.955391334939177,
+  "open_weight_with_recoil": 0.9529022839581287,
+  "mean_NR_recoil_error_MeV": 0.0008444920030965774
+}

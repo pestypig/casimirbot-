@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-05",
+  "classification": "tool admission; adapter transport",
+  "scope": "Dependency-injected, currently unmounted successor delivery router",
+  "implementation": "POST boundary authenticates action.poll, accepts only four bounded resident/predecessor/checkpoint fields, uses the injected server binding store, applies no-store and rate/body limits, and returns a non-replaying non-answer delivery envelope.",
+  "verification": {
+    "focused_command": "npx vitest run server/routes/__tests__/environment-temporal-delivery.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "tests_passed": 6,
+    "exit_code": 0,
+    "negative": "Authentication failure, empty checkpoint, missing hash, injected binding store, and injected profile are rejected before leasing.",
+    "casimir": { "run_id": "2673", "verdict": "PASS", "firstFail": null, "deltas": [],
+      "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true,
+      "trace": "artifacts/et6-temporal-delivery-route-training-trace.jsonl" }
+  },
+  "limitations": [
+    "The factory is not mounted by production route registration until native handoff integration exists.",
+    "Authentication and lease behavior are mocked in HTTP boundary tests.",
+    "The existing keyed server's Casimir gate is not proof of deploying or executing this route.",
+    "No native client or EXE build, server restart, or live Minecraft action performed."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

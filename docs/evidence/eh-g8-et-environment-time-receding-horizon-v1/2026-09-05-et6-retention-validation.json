@@ -1,0 +1,27 @@
+{
+  "et6_complete": false,
+  "scope": "Internal temporal source-plan retention validation; not connected to production enqueue or exposed as a tool",
+  "classification": "tool admission",
+  "implemented": [
+    "Source-plan schema/hash and compilation hash/association checks",
+    "Exact action identity, run, authority revision, environment, source, subject and compiled arguments checks",
+    "Exact preflight binding epoch and continuation digest checks",
+    "Identical retained replay returns without insertion; conflicting replay rejects",
+    "No retrospective temporal attachment to an already dispatched action"
+  ],
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-plan-preflight.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed_tests": 9,
+    "retention_test_basis": "Additional assertions in valid joined-preflight fixture; mocked database, real compiler and hashes"
+  },
+  "unproven": [
+    "Transaction rollback and concurrent SQL behavior",
+    "Current authority and task revalidation inside production admission",
+    "Resident extension checkpoint and watermark enforcement",
+    "All packaged ET6 live capacity requirements"
+  ],
+  "live_actions_performed": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

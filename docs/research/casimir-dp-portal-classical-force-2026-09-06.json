@@ -1,0 +1,80 @@
+{
+  "checks": {
+    "origin_profile_curvature": true,
+    "all_curvatures_destabilizing": true,
+    "force_acceleration_units": true,
+    "ten_percent_free_growth_inversion": true
+  },
+  "max_origin_curvature_relative_error": 1.1614063744058711e-07,
+  "fractional_mass_coupling_coefficient": 1.9068718261762463e-07,
+  "lambda_illustrative": 1e-24,
+  "rows": [
+    {
+      "cavity_radius_um": 50.0,
+      "wall_thickness_um": 100.0,
+      "outward_curvature_s_inverse_squared": 3.607743765832132e+16,
+      "minimum_harmonic_confinement_frequency_Hz": 30229987.95204758,
+      "initial_acceleration_at_half_separation_m_s2": 4509679707.290165,
+      "initial_force_N": 1.3946208253489723e-06,
+      "free_hold_10percent_growth_time_s": 2.3352996500037532e-09,
+      "lambda_min_for_diagnostic_10percent_free_hold": 1.1460268398050928e-08,
+      "light_vertex_product_scale_at_that_lambda": 8.725799128492243e-17
+    },
+    {
+      "cavity_radius_um": 50.0,
+      "wall_thickness_um": 1000.0,
+      "outward_curvature_s_inverse_squared": 27183992318997.86,
+      "minimum_harmonic_confinement_frequency_Hz": 829806.3445595426,
+      "initial_acceleration_at_half_separation_m_s2": 3397999.0398747325,
+      "initial_force_N": 1.0508329932754136e-09,
+      "free_hold_10percent_growth_time_s": 8.507536818305054e-08,
+      "lambda_min_for_diagnostic_10percent_free_hold": 8.635198848009486e-12,
+      "light_vertex_product_scale_at_that_lambda": 1.1580509234370575e-13
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 100.0,
+      "outward_curvature_s_inverse_squared": 3.52424387237715e+16,
+      "minimum_harmonic_confinement_frequency_Hz": 29878109.068074774,
+      "initial_acceleration_at_half_separation_m_s2": 4405304840.471437,
+      "initial_force_N": 1.3623428427966612e-06,
+      "free_hold_10percent_growth_time_s": 2.362802817380013e-09,
+      "lambda_min_for_diagnostic_10percent_free_hold": 1.1195024729898673e-08,
+      "light_vertex_product_scale_at_that_lambda": 8.93253944611028e-17
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000.0,
+      "outward_curvature_s_inverse_squared": 29075550915202.38,
+      "minimum_harmonic_confinement_frequency_Hz": 858191.3006115482,
+      "initial_acceleration_at_half_separation_m_s2": 3634443.8644002974,
+      "initial_force_N": 1.1239536798280028e-09,
+      "free_hold_10percent_growth_time_s": 8.226147274358005e-08,
+      "lambda_min_for_diagnostic_10percent_free_hold": 9.236066609418929e-12,
+      "light_vertex_product_scale_at_that_lambda": 1.0827119836708423e-13
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 100.0,
+      "outward_curvature_s_inverse_squared": 1125684972980174.6,
+      "minimum_harmonic_confinement_frequency_Hz": 5339843.955368553,
+      "initial_acceleration_at_half_separation_m_s2": 140710621.62252182,
+      "initial_force_N": 4.35148338684315e-08,
+      "free_hold_10percent_growth_time_s": 1.3220626084599111e-08,
+      "lambda_min_for_diagnostic_10percent_free_hold": 3.5758226635116787e-10,
+      "light_vertex_product_scale_at_that_lambda": 2.7965592651005186e-15
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000.0,
+      "outward_curvature_s_inverse_squared": 3651802937437014.0,
+      "minimum_harmonic_confinement_frequency_Hz": 9617756.963680308,
+      "initial_acceleration_at_half_separation_m_s2": 456475367.1796267,
+      "initial_force_N": 1.4116524778875277e-07,
+      "free_hold_10percent_growth_time_s": 7.340181349001385e-09,
+      "lambda_min_for_diagnostic_10percent_free_hold": 1.1600225657978805e-09,
+      "light_vertex_product_scale_at_that_lambda": 8.620521957796445e-16
+    }
+  ],
+  "scope": "Weak-self-screened sphere in hypothetical shell backgrounds, classical force at center, leading nonrelativistic mass coupling. No authenticated trap stiffness; free-hold ten percent is an explicit diagnostic, not a frozen acceptance rule. No irreversible decoherence inferred from deterministic force."
+}

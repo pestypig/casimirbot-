@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "classification": "tool admission: catalog presentation",
+  "finding": "Restricted catalog OAuth augmentation omitted both temporal tools. Registration-level _meta existed, but the top-level securitySchemes declaration was absent.",
+  "repair": "Add frontier scope mapping and conditional exact-binding submit scope mapping to the restricted augmentation. No execution authority or admission conditions changed.",
+  "regression": {
+    "raw_transport_test_before_repair": "FAIL: restricted frontier top-level securitySchemes undefined versus expected OAuth schemes",
+    "focused_after_repair": "PASS: raw transport metadata for both tools on both surfaces, plus shadow parity and denial",
+    "related_suite_first_run": "27 passed; one exact catalog-list expectation required the intentionally added frontier entry",
+    "related_suite_final": "28 passed, zero failed, exit 0",
+    "test_files": ["server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts", "server/mcp/__tests__/helix-mcp-environment-durable-goal.test.ts"]
+  },
+  "limits": [
+    "Source only; not yet rebuilt into the running EXE.",
+    "The raw SDK test proves metadata repair, not delivery into the hosted task catalog.",
+    "No additional user reconnect requested during diagnosis.",
+    "No temporal movement or ET6 acceptance claimed."
+  ]
+}

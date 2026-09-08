@@ -1,0 +1,13 @@
+{
+  "schema": "et6.resident_clock_read.v1",
+  "date": "2026-09-05",
+  "implementation": "Temporal action catalog resolution now reads the latest heartbeat for its resolved authority and manifest, checks producer epoch, active/non-stopped state, bounded receipt age, same-resident sample age and clock schema with explicit monotonic origin. Missing or rejected observations are null. No extrapolation or clock substitution occurs.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/resident-clock-observation.test.ts server/services/environment-connectors/temporal-plans/__tests__/temporal-perception-context.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "tests_passed": 20,
+    "exit_code": 0,
+    "clock_cases": ["valid", "legacy null", "wrong epoch", "paused", "emergency stop", "stale receipt", "future receipt", "stale resident sample", "future resident sample", "missing monotonic", "malformed JSON"]
+  },
+  "limits": "Clock-reader tests mock SQL results. Migration 084 is required before this source runs. Receipt freshness is not cross-machine synchronization, dispatch currentness, or rolling acceptance. No live service/client was restarted or mutated.",
+  "et6_complete": false
+}

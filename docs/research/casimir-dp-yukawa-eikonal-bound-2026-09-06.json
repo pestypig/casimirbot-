@@ -1,0 +1,118 @@
+{
+  "evidence_class": "conditional_full_phase_eikonal_upper_bound_not_exact_scattering",
+  "parent_sha256": "ad4c2b1971e7e06a0d6b4658db81407ef2e85e7ddf10515a76ac2630a03a3526",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "rows": [
+    {
+      "mediator_eV": 0.001,
+      "alpha": 2.405322235956698e-13,
+      "sigma_el_upper_cm2": 0.044858838222305776,
+      "D_upper": 522.1568769076391,
+      "visibility_loss_upper": 1.0,
+      "sigma_upper_over_geometric": 18703761.362234794,
+      "surface_phase": 231.45080701926085,
+      "max_potential_over_kinetic": 1.4311011244507542e-08,
+      "kR": 3624425242.113648,
+      "tail_upper_integral": 1.2412590127353774e-61,
+      "q_cutoff_applied": false,
+      "Born_comparator_exponent": 0.029511464722144533,
+      "bound_below_comparator": false
+    },
+    {
+      "mediator_eV": 0.01,
+      "alpha": 2.997236885777704e-13,
+      "sigma_el_upper_cm2": 0.0005064081524083509,
+      "D_upper": 5.894590894033203,
+      "visibility_loss_upper": 0.9972456970856369,
+      "sigma_upper_over_geometric": 211145.39764933678,
+      "surface_phase": 189.11368830041255,
+      "max_potential_over_kinetic": 1.768364574257798e-08,
+      "kR": 3624425242.113648,
+      "tail_upper_integral": 1.2412590127353942e-61,
+      "q_cutoff_applied": false,
+      "Born_comparator_exponent": 0.029511464722144533,
+      "bound_below_comparator": false
+    },
+    {
+      "mediator_eV": 0.1,
+      "alpha": 4.4526241949428574e-13,
+      "sigma_el_upper_cm2": 6.2117672615117435e-06,
+      "D_upper": 0.07230497092399668,
+      "visibility_loss_upper": 0.06975284578722937,
+      "sigma_upper_over_geometric": 2589.9781871588216,
+      "surface_phase": 134.62268562965116,
+      "max_potential_over_kinetic": 2.4166612150301208e-08,
+      "kR": 3624425242.113648,
+      "tail_upper_integral": 1.2412590127353796e-61,
+      "q_cutoff_applied": false,
+      "Born_comparator_exponent": 0.029511464722144533,
+      "bound_below_comparator": false
+    },
+    {
+      "mediator_eV": 1.0,
+      "alpha": 1.414620611205511e-12,
+      "sigma_el_upper_cm2": 1.1093069620480899e-07,
+      "D_upper": 0.0012912333038239765,
+      "visibility_loss_upper": 0.00129040002079438,
+      "sigma_upper_over_geometric": 46.25222925478307,
+      "surface_phase": 60.0109127667552,
+      "max_potential_over_kinetic": 3.5083050715471995e-08,
+      "kR": 3624425242.113648,
+      "tail_upper_integral": 1.241259012735376e-61,
+      "q_cutoff_applied": false,
+      "Born_comparator_exponent": 0.029511464722144533,
+      "bound_below_comparator": true
+    },
+    {
+      "mediator_eV": 10.0,
+      "alpha": 4.777885340667339e-11,
+      "sigma_el_upper_cm2": 1.335599916743013e-08,
+      "D_upper": 0.0001554638303088867,
+      "visibility_loss_upper": 0.0001554517464338295,
+      "sigma_upper_over_geometric": 5.568744779877169,
+      "surface_phase": 16.218652900446845,
+      "max_potential_over_kinetic": 2.902461699402333e-08,
+      "kR": 3624425242.113648,
+      "tail_upper_integral": 1.2412590127353864e-61,
+      "q_cutoff_applied": false,
+      "Born_comparator_exponent": 0.029511464722144533,
+      "bound_below_comparator": true
+    }
+  ],
+  "checks": {
+    "tail_extension_stable": true,
+    "ten_eV_bound_below_comparator": true,
+    "all_potentials_small_against_kinetic": true,
+    "all_kR_large": true,
+    "sphere_charge_small_a_limit": true,
+    "exponential_envelope_valid_sample": true
+  },
+  "assumptions": [
+    "uniform rigid real Yukawa sphere",
+    "same isotropic monochromatic population as parent",
+    "straight-line eikonal elastic approximation",
+    "interior bounded by unitarity, exterior exact eikonal phase",
+    "no absorption, lattice excitation, transport, or detector likelihood"
+  ],
+  "limitations": [
+    "small potential and large kR checks are not a certified error estimate",
+    "loose upper bound is not a predicted decoherence rate",
+    "long-range cases with high bounds remain undecided"
+  ],
+  "new_lead_kinematics": [
+    {
+      "mchi_GeV": 1000.0,
+      "splitting_keV": 297.0,
+      "mean_Xe_vmin_248keV_kms": 700.3031737808362,
+      "carbon_max_splitting_at_776kms_keV": 37.03273733723676,
+      "free_carbon_upscatter_open_at_776kms": false
+    },
+    {
+      "mchi_GeV": 1100.0,
+      "splitting_keV": 377.0,
+      "mean_Xe_vmin_248keV_kms": 794.3245468651097,
+      "carbon_max_splitting_at_776kms_keV": 37.069990535507216,
+      "free_carbon_upscatter_open_at_776kms": false
+    }
+  ]
+}

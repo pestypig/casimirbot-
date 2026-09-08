@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-06",
+  "package": "apps/desktop/release-et6-prelive-final-20260906/win-unpacked/CasimirBot.exe",
+  "command": "apps/desktop/scripts/smoke-packaged-launch.ps1 -ExecutablePath apps/desktop/release-et6-prelive-final-20260906/win-unpacked/CasimirBot.exe -TimeoutSeconds 55",
+  "exit_code": 1,
+  "result": "NOT_RUN_MEMORY_GUARD",
+  "reason": "Packaged launch requires at least 4 GiB physical headroom.",
+  "last_preflight_free_physical_gib": 3.96,
+  "last_disk_free_gib": 1.49,
+  "app_launched": false,
+  "guard_bypassed": false,
+  "documentation_audit": { "ok": true, "failures": [], "capability_rows": 40 },
+  "work_packet_diff_check_exit": 0,
+  "goal_complete": false,
+  "next": "Retry guarded isolated startup when host memory permits; final requirement audit remains"
+}

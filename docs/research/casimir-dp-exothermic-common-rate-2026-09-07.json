@@ -1,0 +1,64 @@
+{
+  "scope": "Off-diagonal isoscalar vector nucleon contact, sigma_p=mu_p^2 C^2/pi. Conditional present excited fraction1, no cosmological survival derivation. Xe Helm; carbon F=1 upper within coherent independent-nucleus approximation.",
+  "operator": "C (chi_bar gamma_mu chi_star + h.c.) (p_bar gamma^mu p + n_bar gamma^mu n)",
+  "rho_GeV_cm3": 0.3,
+  "halo_km_s": [
+    238.0,
+    544.0,
+    250.2
+  ],
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "delta_GeV": -0.003281006648687921,
+      "sigma_p_reference_cm2": 1e-45,
+      "f_excited": 1.0,
+      "C_nucleon_GeV_minus2": 3.3113752172604254e-09,
+      "Xe_raw_window": 3.837067819266151,
+      "Xe_raw_high": 3.8370240817752412,
+      "C_independent_F1_events_upper": 6.722382761044852e-25,
+      "D_independent_upper": 1.3444765522089703e-24,
+      "speed_vs_recoil_relative_error": 3.3413261046888465e-10
+    },
+    {
+      "mchi_GeV": 15.0,
+      "delta_GeV": -0.002270004432458614,
+      "sigma_p_reference_cm2": 1e-45,
+      "f_excited": 1.0,
+      "C_nucleon_GeV_minus2": 3.2166932634145995e-09,
+      "Xe_raw_window": 4.1486945222405165,
+      "Xe_raw_high": 4.101117624886414,
+      "C_independent_F1_events_upper": 4.705064615015659e-25,
+      "D_independent_upper": 9.410129230031318e-25,
+      "speed_vs_recoil_relative_error": 2.5057671493300404e-09
+    },
+    {
+      "mchi_GeV": 40.0,
+      "delta_GeV": -0.0010062516621719803,
+      "sigma_p_reference_cm2": 1e-45,
+      "f_excited": 1.0,
+      "C_nucleon_GeV_minus2": 3.0983408211073184e-09,
+      "Xe_raw_window": 5.929095009295347,
+      "Xe_raw_high": 3.2821021046903973,
+      "C_independent_F1_events_upper": 1.7407282051179906e-25,
+      "D_independent_upper": 3.4814564102359813e-25,
+      "speed_vs_recoil_relative_error": 3.927339564668841e-09
+    },
+    {
+      "mchi_GeV": 100.0,
+      "delta_GeV": -0.0005513006648687921,
+      "sigma_p_reference_cm2": 1e-45,
+      "f_excited": 1.0,
+      "C_nucleon_GeV_minus2": 3.055733941876697e-09,
+      "Xe_raw_window": 5.970891838999778,
+      "Xe_raw_high": 1.5390801682458264,
+      "C_independent_F1_events_upper": 6.21315478563855e-26,
+      "D_independent_upper": 1.24263095712771e-25,
+      "speed_vs_recoil_relative_error": 5.105349476508536e-11
+    }
+  ],
+  "checks": {
+    "speed_vs_recoil_integrals": true
+  },
+  "model_admitted": false
+}

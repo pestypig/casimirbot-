@@ -827,6 +827,7 @@ app.use(
 app.use("/api/account", createAgentConnectionsRouter({
   coordinationStore: localSupervisorCoordinationStore,
   reasoningBindingStore: reasoningTaskBindingStore,
+  preparationBindingStore: reasoningTaskBindingStore,
 }));
 app.use("/api/account", createOperatorActivityRouter({ activityStore: operatorActivityStore }));
 app.use("/api/account", createHelixAgentAccountBindingsRouter());
@@ -1517,7 +1518,7 @@ app.use((req, res, next) => {
       log("app ready (fast boot)");
     } else {
       const { registerRoutes } = await import("./routes");
-      await registerRoutes(app, server);
+      await registerRoutes(app, server, { reasoningTaskBindingStore });
 
       if (process.env.ENABLE_LATTICE_WATCHER === "1") {
         const debounceMs = Number(process.env.LATTICE_WATCHER_DEBOUNCE_MS);

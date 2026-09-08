@@ -1,0 +1,10 @@
+{
+  "schema": "et6.frontier_boundary_regressions.v1",
+  "date": "2026-09-05",
+  "scope": "Deterministic frontier storage and delta boundary fixtures",
+  "new_assertions": ["available-to-blocked material delta", "expired baseline resets comparison", "monotonic origin change resets comparison", "corrupt predecessor rejected", "corrupt replay rejected"],
+  "verification": {"goal_store_passed": 21, "perception_bridge_passed": 6, "frontier_store_passed": 1, "failed": 0},
+  "implementation_repair_required_for_these_cases": false,
+  "limits": "No live capacity, concurrent PostgreSQL behavior, retention cleanup or production dispatch is proven.",
+  "et6_complete": false
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "et6.temporal_local_persistence_repair.v1",
+  "classification": "evidence normalization and retention",
+  "defect": "Local snapshot table and JSON-column allowlists omitted temporal frontier and plan-admission records.",
+  "repair": "Retain both tables after durable goal and action parents, and serialize their frontier/source/compilation/checkpoint JSON columns explicitly during restore.",
+  "verification": {
+    "command": "npx vitest run server/__tests__/local-pg-mem-persistence.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed": 9,
+    "failed": 0,
+    "coverage": [
+      "Temporal frontier JSON round trip",
+      "Source plan, compiler artifact, checkpoint JSON and exact binding/continuation fields round trip",
+      "Action and goal foreign-key parents restored before temporal admissions",
+      "Canceled action remains canceled after restore"
+    ],
+    "diff_check": "passed"
+  },
+  "limitations": [
+    "Fixture validates persistence, not source-plan admission or physical execution",
+    "Multiple predecessor/successor restore-order qualification remains separate",
+    "Not deployed to the running EXE",
+    "Not established as cause of unresolved live root submission"
+  ],
+  "live_rolling_extensions_proven": 0,
+  "goal_complete": false
+}

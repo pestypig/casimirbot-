@@ -1,0 +1,23 @@
+{
+  "scope": "Zero-transfer leading light-quark-momentum Dirac box subset; partonic coefficients only, no hadronic matching or full UV amplitude",
+  "checks": {
+    "integration_order_I1": true,
+    "integration_order_I2": true,
+    "forward_Dirac_operator_decomposition": true,
+    "positive_combined_parameter_integrals": true
+  },
+  "I1_GeV_m4": 1.5544358471567017e-06,
+  "I2_GeV_m6": 4.845164289475607e-12,
+  "A1_GeV_m4": 1.1428374053877338e-16,
+  "A2_GeV_m6": -1.4248860756499012e-21,
+  "C_u_scalar_GeV_m3": 4.577206711286561e-14,
+  "C_u_twist1_GeV_m4": 2.2856748107754677e-16,
+  "C_u_twist2_GeV_m5": -5.699544302599605e-19,
+  "twist_combination_GeV_m3": 2.342835894250242e-16,
+  "max_forward_relative_error": 1.3322676295501878e-15,
+  "integration_relative_errors": [
+    1.389555137620846e-12,
+    6.005418384802397e-12
+  ],
+  "full_model_admitted": false
+}

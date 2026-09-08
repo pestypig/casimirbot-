@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-05",
+  "classification": "adapter execution",
+  "scope": "Declared serial graph mutation reservations across resident handoffs",
+  "implementation": [
+    "Freeze the original scope and reserve declared action counts across accepted successors; do not reset reservations when loading the successor graph.",
+    "Reject successor reservations exceeding original world or inventory limits, expanding block IDs, or expanding bounded regions.",
+    "Exact already-queued replay returns before reservation; rejected reservations do not consume budget. Cancellation does not refund uncertain reservations."
+  ],
+  "verification": {
+    "native_tests": ["ResidentMutationBudgetTest", "FluidSequenceEngineTest"],
+    "gradle_exit_code": 0,
+    "positive": "Successive reservations fit until the original declared ceiling is exhausted; a rejected oversized request leaves room for a smaller one.",
+    "negative": "Over-budget counts, unbounded region expansion, and negative/fractional declarations are rejected."
+  },
+  "limitations": [
+    "Reservations mirror declared counts, not proven physical maxima. Crafting output batches and incidental pickup need effect-time verification.",
+    "No live GameTest, production advertisement, deployment, or packaged EXE build.",
+    "This is not acceptance of the complete ET6 capacity or mutation-safety lifecycle."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

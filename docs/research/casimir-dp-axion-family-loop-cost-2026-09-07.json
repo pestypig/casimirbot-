@@ -1,0 +1,73 @@
+{
+  "scope": "yu=0; one-loop potential curvature at mu=M and heavy-only zero-momentum gluon threshold. Neither pole mass nor full nucleon scattering amplitude.",
+  "operator_convention": "L=(alpha_s/pi) G^2 (Kaa a^2 + Kh h)",
+  "sources": {
+    "casimir-dp-axion-coupling-flow-scan-2026-09-07.json": "e139d99d6bf85d828c2d42b02b5afa624816a77731c95c107c8f70af02d24555",
+    "casimir-dp-axion-kaon-mass-tradeoff-2026-09-07.py": "fdaaf1d2e3b811ca565de12cda2a8f6b0f6c190921c74404eeb998bf745d1f80",
+    "casimir-dp-axion-heavy-gluon-threshold-2026-09-07.py": "54ee5f7f3fe1bd32170135cbbe8e0f14db11ef957287b5ef23245f611c0c25eb"
+  },
+  "rows": [
+    {
+      "yL": 0.05,
+      "yR": 0.012798181988641555,
+      "conditional_epsilon": 5.656745893635541e-05,
+      "curvature_GeV2": 49.78629933167925,
+      "Kaa_GeV_minus2": 1.706117262865359e-12,
+      "Kh_GeV_minus1": 6.411336889709827e-09,
+      "curvature_derivative_relative_error": 3.2242380858012844e-17,
+      "gluon_derivative_relative_error": 1.5901193372211161e-16,
+      "curvature_ratio_reference": 16.0000007318775,
+      "Kaa_ratio_reference": 16.00454599688967,
+      "Kh_ratio_reference": 0.06251775780035027,
+      "epsilon_curvature_product_GeV2": 0.002816284443037865
+    },
+    {
+      "yL": 0.1,
+      "yR": 0.006399272805786438,
+      "conditional_epsilon": 0.0002262351483835758,
+      "curvature_GeV2": 12.446574799426985,
+      "Kaa_GeV_minus2": 4.2650507958177487e-13,
+      "Kh_GeV_minus1": 2.5643890345767424e-08,
+      "curvature_derivative_relative_error": 8.968068069803593e-17,
+      "gluon_derivative_relative_error": 1.558112483478854e-16,
+      "curvature_ratio_reference": 4.000000172205665,
+      "Kaa_ratio_reference": 4.000909147715653,
+      "Kh_ratio_reference": 0.25005682173222815,
+      "epsilon_curvature_product_GeV2": 0.002815852696615639
+    },
+    {
+      "yL": 0.15,
+      "yR": 0.004266383875611691,
+      "conditional_epsilon": 0.0005088990062498073,
+      "curvature_GeV2": 5.531810957465295,
+      "Kaa_GeV_minus2": 1.8953986317520222e-13,
+      "Kh_GeV_minus1": 5.769328955689242e-08,
+      "curvature_derivative_relative_error": 7.934595645071938e-17,
+      "gluon_derivative_relative_error": 1.0115058679975105e-17,
+      "curvature_ratio_reference": 1.777777833584309,
+      "Kaa_ratio_reference": 1.7780134604212678,
+      "Kh_ratio_reference": 0.5625745714614167,
+      "epsilon_curvature_product_GeV2": 0.002815133099015883
+    },
+    {
+      "yL": 0.2,
+      "yR": 0.0032,
+      "conditional_epsilon": 0.0009043855957206955,
+      "curvature_GeV2": 3.111643565896084,
+      "Kaa_GeV_minus2": 1.0660204064500963e-13,
+      "Kh_GeV_minus1": 1.0255225259652396e-07,
+      "curvature_derivative_relative_error": 1.667279098474426e-16,
+      "gluon_derivative_relative_error": 8.897507108505932e-17,
+      "curvature_ratio_reference": 1.0,
+      "Kaa_ratio_reference": 1.0,
+      "Kh_ratio_reference": 1.0,
+      "epsilon_curvature_product_GeV2": 0.0028141256200133993
+    }
+  ],
+  "checks": {
+    "independent_potential_derivative": true,
+    "independent_heavy_log_derivative": true
+  },
+  "naturalness_exclusion": false,
+  "full_model_admitted": false
+}

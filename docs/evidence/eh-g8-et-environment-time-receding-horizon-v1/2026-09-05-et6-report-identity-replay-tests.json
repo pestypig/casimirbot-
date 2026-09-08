@@ -1,0 +1,26 @@
+{
+  "scope": "Synthetic capacity-report identity and replay regression",
+  "classification": "evidence normalization",
+  "reproduced_failures": [
+    "Mixed environment accepted under the same reasoning binding",
+    "Mixed subject accepted under the same reasoning binding",
+    "Mixed goal accepted under the same reasoning binding",
+    "Repeated sample ID accepted with a different cycle label"
+  ],
+  "initial_tests": { "passed": 9, "failed": 4 },
+  "repair": "Require one environment/subject/goal and unique sample IDs before aggregation. Preserve revision and producer-epoch variation for separately verified reconnect evidence.",
+  "final_tests": { "shared": 27, "reporter": 15, "passed": 42, "failed": 0 },
+  "additional_checks": [
+    "Epoch/revision variation does not imply a changed subject or goal",
+    "Repeated effect refs across samples still fail acceptance"
+  ],
+  "limitations": [
+    "Supplied identity strings are not authenticated by this pure reporter",
+    "Unique sample IDs do not prove real resident rolling extensions",
+    "Freshness, actual extension receipts and cross-clock evidence joins still require capture-side verification"
+  ],
+  "exe_changed": false,
+  "live_permissions_changed": false,
+  "live_execution": false,
+  "et6_qualified": false
+}

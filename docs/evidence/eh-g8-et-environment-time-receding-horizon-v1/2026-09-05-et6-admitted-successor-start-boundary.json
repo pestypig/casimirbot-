@@ -1,0 +1,20 @@
+{
+  "schema": "et6.admitted_successor_start_boundary.v1",
+  "date": "2026-09-05",
+  "scope": "Deterministic temporal ledger; not production dispatch or native execution authorization.",
+  "repair": "Starting a linked extension checks its predecessor chain and rejects stopping or unsuccessfully settled ancestors before appending execution_started.",
+  "verified_cases": {
+    "rejected_without_successor_history_change": ["direct predecessor canceling", "direct predecessor stabilizing", "direct predecessor settled canceled"],
+    "accepted": ["direct predecessor running", "direct predecessor settled succeeded"]
+  },
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks --maxWorkers=1",
+    "ledger_tests_passed": 27,
+    "compiler_tests_passed": 3,
+    "failed": 0,
+    "exit_code": 0
+  },
+  "not_proven": ["Transitive ancestor-stop regression fixture", "Production authority revalidation at dispatch", "Resident same-tick cancellation race", "Continuous native rolling extension", "Packaged three-cycle capacity and latency qualification"],
+  "runtime_changed": false,
+  "et6_complete": false
+}

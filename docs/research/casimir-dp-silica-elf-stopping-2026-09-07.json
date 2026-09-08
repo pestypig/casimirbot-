@@ -1,0 +1,134 @@
+{
+  "status": "covered_model_response_contribution_not_total_stopping",
+  "source_url": "https://github.com/tongylin/DarkELF/blob/352149fb53b614adbac6ee242045c56be25aad29/data/SiO2/SiO2_mermin.dat",
+  "source_sha256": "8b9ea234e91cfeb29550a5f830a1a183dc3dd4f68553bccdcb71a49af3d6e053",
+  "source_shape": [
+    24900,
+    4
+  ],
+  "missing_cell_policy": "one eps2 NaN at omega=8.1 eV, q=37.2895 eV backward-filled from next source row as in upstream loader; outside kinematic support",
+  "q_range_eV": [
+    37.2895,
+    37289.5
+  ],
+  "omega_range_eV": [
+    0.1,
+    99.3
+  ],
+  "rho_g_cm3": 2.65,
+  "gap_eV": 9.2,
+  "speed_km_s": 776,
+  "formula": "2/(pi alpha_EM v^2 hbarc rho) integral dq q^3 [sum alpha_i/(q^2+m_i^2)]^2 integral dOmega Omega ELF",
+  "normalization_relative_error": 3.3306690738754696e-16,
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "results": [
+        {
+          "channel": "gap_restricted_electronic",
+          "omega_floor_eV": 9.2,
+          "loss_eV_per_g_cm2": 6.660958409948608e-12,
+          "loss_eV_at_7e9": 0.04662670886964026,
+          "refinement_relative": 2.131657041548607e-05,
+          "quadrature_values": [
+            6.6608536395682835e-12,
+            6.661100401764367e-12,
+            6.660958409948608e-12
+          ]
+        },
+        {
+          "channel": "table_floor_sensitivity_only",
+          "omega_floor_eV": 0.1,
+          "loss_eV_per_g_cm2": 8.637384183443879e-12,
+          "loss_eV_at_7e9": 0.060461689284107153,
+          "refinement_relative": 5.380638570362528e-05,
+          "quadrature_values": [
+            8.639114320320672e-12,
+            8.636919462024015e-12,
+            8.637384183443879e-12
+          ]
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "results": [
+        {
+          "channel": "gap_restricted_electronic",
+          "omega_floor_eV": 9.2,
+          "loss_eV_per_g_cm2": 8.359058731937966e-16,
+          "loss_eV_at_7e9": 5.8513411123565766e-06,
+          "refinement_relative": 0.00018597340117709749,
+          "quadrature_values": [
+            8.363028055216643e-16,
+            8.360613583682051e-16,
+            8.359058731937966e-16
+          ]
+        },
+        {
+          "channel": "table_floor_sensitivity_only",
+          "omega_floor_eV": 0.1,
+          "loss_eV_per_g_cm2": 8.663408665225681e-16,
+          "loss_eV_at_7e9": 6.064386065657977e-06,
+          "refinement_relative": 0.00022433682314426662,
+          "quadrature_values": [
+            8.669509851210906e-16,
+            8.66146557955379e-16,
+            8.663408665225681e-16
+          ]
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "results": [
+        {
+          "channel": "gap_restricted_electronic",
+          "omega_floor_eV": 9.2,
+          "loss_eV_per_g_cm2": 9.406516946276992e-24,
+          "loss_eV_at_7e9": 6.584561862393894e-14,
+          "refinement_relative": 0.0001931565010320213,
+          "quadrature_values": [
+            9.410988946239717e-24,
+            9.408334227196857e-24,
+            9.406516946276992e-24
+          ]
+        },
+        {
+          "channel": "table_floor_sensitivity_only",
+          "omega_floor_eV": 0.1,
+          "loss_eV_per_g_cm2": 9.729034367120216e-24,
+          "loss_eV_at_7e9": 6.81032405698415e-14,
+          "refinement_relative": 0.0002207014166240029,
+          "quadrature_values": [
+            9.73605574160031e-24,
+            9.7268876292411e-24,
+            9.729034367120216e-24
+          ]
+        }
+      ]
+    }
+  ],
+  "assumptions": [
+    "isotropic zero-temperature electronic linear response",
+    "interpolate real and imaginary dielectric function before forming ELF",
+    "same fixed mediator products; constant initial speed and chosen path column",
+    "gap restriction is a channel selection, not a repair or validation of the source model"
+  ],
+  "limitations": [
+    "Mermin model table is not a complete measured silica response",
+    "no response extrapolated beyond the tabulated momentum/energy domain",
+    "below-gap table-floor result is sensitivity only; not a validated electronic channel",
+    "missing electronic response, phonons, real geology and trajectory evolution",
+    "no total stopping upper bound, capture efficiency, local density or R4 coherence prediction"
+  ]
+}

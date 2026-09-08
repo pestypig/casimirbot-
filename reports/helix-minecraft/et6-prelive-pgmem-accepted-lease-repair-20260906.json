@@ -1,0 +1,11 @@
+{
+  "scope": "Production accepted-successor lease SQL compatibility with packaged pg-mem",
+  "defect": "LEAST timestamp builtin is absent from production pg-mem; test-only registration masked failure",
+  "before": { "focused_failures": 7, "connected_acceptance_error": "action_event_invalid" },
+  "repair": "Equivalent CASE picks earlier deadline, preserving status and expiry predicates",
+  "after": { "focused_passed": 8, "connected_passed": 2, "targeted_typecheck": "PASS", "quick_discipline": "PASS" },
+  "classification": "evidence normalization / acceptance-lease persistence",
+  "guards_preserved": ["child remains leased", "earlier deadline wins", "equal deadlines preserved", "expired lease rejected", "expired root or child rejected", "canceled/running child not renewed"],
+  "test_only_builtin_removed": true,
+  "limits": ["Diagnostic EXE refresh required after this repair", "No live Minecraft or packaged runtime acceptance of this source fix yet", "PostgreSQL execution not run; CASE equivalence exercised on packaged backend family"]
+}

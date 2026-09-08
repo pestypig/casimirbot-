@@ -1,0 +1,127 @@
+{
+  "status": "conditional_visible_decay_benchmark_screen",
+  "darkcast_commit": "5a2a53a8984827be06e2939e6c3705f79d180048",
+  "source_sha256": "bcf7c4486b3b5eb4ccd0b06168b35acd45a2239cdb5b136a13ab4662df253d54",
+  "limits": {
+    "E137_Andreas2012mt": {
+      "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e",
+      "bracket": [
+        [
+          0.0093937,
+          2.8374e-08,
+          4.3469e-05
+        ],
+        [
+          0.010197,
+          2.8804e-08,
+          4.0106e-05
+        ]
+      ],
+      "log_interpolated": [
+        2.87011803941002e-08,
+        4.0881193063836935e-05
+      ],
+      "linear_interpolated": [
+        2.8698547491597163e-08,
+        4.093073671106684e-05
+      ]
+    },
+    "E137_Bjorken2009mm": {
+      "sha256": "25ddea4d994cc1fca1ba4b8cd308aae51405eb1cbdf57c98c6653d7b5c667140",
+      "bracket": [
+        [
+          0.00998,
+          8.456e-08,
+          4.0107e-05
+        ],
+        [
+          0.010116,
+          8.4381e-08,
+          3.9097e-05
+        ]
+      ],
+      "log_interpolated": [
+        8.453350012755447e-08,
+        3.995598232171477e-05
+      ],
+      "linear_interpolated": [
+        8.453367647058824e-08,
+        3.995847058823529e-05
+      ]
+    },
+    "E141_Riordan1987aw": {
+      "sha256": "cc2178b3c1ff9ca2439b9a765863c9221e1428e1423adad5aec9f289afb9aa31",
+      "bracket": [
+        [
+          0.0097001,
+          2.3621e-05,
+          0.00050001
+        ],
+        [
+          0.010286,
+          2.5059e-05,
+          0.00046005
+        ]
+      ],
+      "log_interpolated": [
+        2.435697699490657e-05,
+        0.0004788482343042372
+      ],
+      "linear_interpolated": [
+        2.4357057689025432e-05,
+        0.00047955599078341007
+      ]
+    }
+  },
+  "points": [
+    {
+      "alpha_D": 0.001,
+      "epsilon": 0.00010355265146615672,
+      "v_D_GeV": 0.044603102903819275,
+      "y": 0.15853309190424045,
+      "alpha_y": 0.002,
+      "scalar_mass_ceiling_GeV": 0.22360679774997894,
+      "excluded_by": [
+        "E141_Riordan1987aw"
+      ]
+    },
+    {
+      "alpha_D": 0.01,
+      "epsilon": 3.274622363826297e-05,
+      "v_D_GeV": 0.014104739588693908,
+      "y": 0.5013256549262001,
+      "alpha_y": 0.019999999999999997,
+      "scalar_mass_ceiling_GeV": 0.07071067811865475,
+      "excluded_by": [
+        "E137_Andreas2012mt",
+        "E137_Bjorken2009mm",
+        "E141_Riordan1987aw"
+      ]
+    },
+    {
+      "alpha_D": 0.1,
+      "epsilon": 1.0355265146615672e-05,
+      "v_D_GeV": 0.004460310290381928,
+      "y": 1.5853309190424043,
+      "alpha_y": 0.2,
+      "scalar_mass_ceiling_GeV": 0.022360679774997897,
+      "excluded_by": [
+        "E137_Andreas2012mt",
+        "E137_Bjorken2009mm"
+      ]
+    },
+    {
+      "alpha_D": 0.5,
+      "epsilon": 4.631015358573394e-06,
+      "v_D_GeV": 0.001994711402007164,
+      "y": 3.544907701811031,
+      "alpha_y": 0.9999999999999994,
+      "scalar_mass_ceiling_GeV": 0.01,
+      "excluded_by": [
+        "E137_Andreas2012mt",
+        "E137_Bjorken2009mm"
+      ]
+    }
+  ],
+  "assumption": "BR(Aprime->e+e-) approximately one; no open additional dark decay channels"
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "et6.heartbeat_client_thread.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "defect": "The projection worker constructed heartbeat state by reading mutable controller and bridge state off the client thread.",
+  "repair": "publishHeartbeat obtains the heartbeat through the existing runOnClient handoff before performing HTTP on the worker. heartbeat rejects off-client-thread invocation. No wire schema or execution authority was changed.",
+  "verification": {
+    "native_compile": "passed with Java 21",
+    "PlayerActionRuntimeLifecycleTest": {"passed": 12, "failures": 0, "errors": 0},
+    "ManualInputLatchTest": {"passed": 7, "failures": 0, "errors": 0},
+    "gradle_exit_code": 0,
+    "game_tests": "explicitly excluded",
+    "discipline_quick": "exit 0; classifier found zero sensitive files and skipped its battery"
+  },
+  "limits": [
+    "Existing regression tests and compilation do not exercise a live client-thread heartbeat race.",
+    "The heartbeat remains an observation, not a dispatch authorization or a guarantee of current state at receipt.",
+    "This does not supply resident resource telemetry, temporal admission, rolling extension delivery, or clock alignment.",
+    "No running client, packaged EXE, or server was replaced."
+  ],
+  "et6_complete": false
+}

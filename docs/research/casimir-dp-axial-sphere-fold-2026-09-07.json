@@ -1,0 +1,106 @@
+{
+  "scope": "Conditional Born rigid-spin-zero sphere, orientation-averaged branch separation, qR 1e-8..80 only. Same raw Xe reference count at each mediator mass. Total elastic density .3 GeV/cm3 and excited fraction1 assumed; no survival/production closure, no full solid response or Born-validity claim. Pure baryon target charges at this order; kinetic-mixing charge corrections omitted.",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1.0,
+      "xenon_propagator_factor_at_qref": 0.9814907596507237,
+      "D_rigid_qR_80_upper": 2.900355087456706e-47,
+      "D_rigid_qR_80_lower": 2.9003550874554004e-47,
+      "velocity_bracket_fraction": 4.502722130054923e-13,
+      "cutoff_40_over_80": 0.9988539870117163,
+      "real_vector_decay_open": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 0.01,
+      "xenon_propagator_factor_at_qref": 0.6710125205273255,
+      "D_rigid_qR_80_upper": 6.307087112598899e-42,
+      "D_rigid_qR_80_lower": 6.30708711259606e-42,
+      "velocity_bracket_fraction": 4.502722130054923e-13,
+      "cutoff_40_over_80": 0.9988539870117498,
+      "real_vector_decay_open": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 0.001,
+      "xenon_propagator_factor_at_qref": 0.6704663699655737,
+      "D_rigid_qR_80_upper": 6.281095639073295e-38,
+      "D_rigid_qR_80_lower": 6.281095639070467e-38,
+      "velocity_bracket_fraction": 4.502722130054923e-13,
+      "cutoff_40_over_80": 0.9988539870151009,
+      "real_vector_decay_open": true
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-06,
+      "xenon_propagator_factor_at_qref": 0.6704608440940377,
+      "D_rigid_qR_80_upper": 6.280711176769317e-26,
+      "D_rigid_qR_80_lower": 6.280711176766488e-26,
+      "velocity_bracket_fraction": 4.502722130054923e-13,
+      "cutoff_40_over_80": 0.9988573627575722,
+      "real_vector_decay_open": true
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-09,
+      "xenon_propagator_factor_at_qref": 0.6704608440885116,
+      "D_rigid_qR_80_upper": 6.463276195951554e-15,
+      "D_rigid_qR_80_lower": 6.463276195948644e-15,
+      "velocity_bracket_fraction": 4.502722130054923e-13,
+      "cutoff_40_over_80": 0.9999999923919035,
+      "real_vector_decay_open": true
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1.0,
+      "xenon_propagator_factor_at_qref": 0.9921846849380691,
+      "D_rigid_qR_80_upper": 5.361297188617863e-49,
+      "D_rigid_qR_80_lower": 5.361297188617477e-49,
+      "velocity_bracket_fraction": 7.204355413071382e-14,
+      "cutoff_40_over_80": 0.9988539870117163,
+      "real_vector_decay_open": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 0.01,
+      "xenon_propagator_factor_at_qref": 0.8889012080128543,
+      "D_rigid_qR_80_upper": 8.896741481160999e-44,
+      "D_rigid_qR_80_lower": 8.896741481160358e-44,
+      "velocity_bracket_fraction": 7.204355413071382e-14,
+      "cutoff_40_over_80": 0.9988539870117498,
+      "real_vector_decay_open": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 0.001,
+      "xenon_propagator_factor_at_qref": 0.8888234134419865,
+      "D_rigid_qR_80_upper": 8.853641510066366e-40,
+      "D_rigid_qR_80_lower": 8.853641510065728e-40,
+      "velocity_bracket_fraction": 7.204355413071382e-14,
+      "cutoff_40_over_80": 0.9988539870151009,
+      "real_vector_decay_open": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-06,
+      "xenon_propagator_factor_at_qref": 0.888822630238554,
+      "D_rigid_qR_80_upper": 8.853034418941055e-28,
+      "D_rigid_qR_80_lower": 8.853034418940417e-28,
+      "velocity_bracket_fraction": 7.204355413071382e-14,
+      "cutoff_40_over_80": 0.9988573627575722,
+      "real_vector_decay_open": true
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-09,
+      "xenon_propagator_factor_at_qref": 0.8888226302377709,
+      "D_rigid_qR_80_upper": 9.110370626992123e-17,
+      "D_rigid_qR_80_lower": 9.110370626991466e-17,
+      "velocity_bracket_fraction": 7.204355413071382e-14,
+      "cutoff_40_over_80": 0.9999999923919035,
+      "real_vector_decay_open": true
+    }
+  ],
+  "full_model_admitted": false
+}

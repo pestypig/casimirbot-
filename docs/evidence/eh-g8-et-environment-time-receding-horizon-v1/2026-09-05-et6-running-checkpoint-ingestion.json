@@ -1,0 +1,17 @@
+{
+  "schema": "et6.running_checkpoint_ingestion.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "production_entry": "submitEnvironmentActionWorkflowEvent",
+  "change": "Validate supplied sequence checkpoint settlements against the persisted admitted request before inserting a new workflow event, after existing lifecycle and connector-manifest checks. Partial progress does not require future checkpoints; successful completion requires all required checkpoints. Preserve valid tick-ceiling failure evidence.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/actions/__tests__/action-result-canonicalization.test.ts --pool=forks --maxWorkers=1",
+    "passed": 43,
+    "failed": 0,
+    "exit_code": 0,
+    "persistence_boundary": "Tests invoke the production ingestion function with a mocked database transaction. Valid progress reaches INSERT; a forged checkpoint fails as action_event_invalid before INSERT. This is not live database acceptance."
+  },
+  "remaining": ["Durable temporal-plan admission and linkage", "Resident extension delivery and watermark enforcement", "Packaged original ET6 acceptance journey"],
+  "live_execution_performed": false,
+  "et6_complete": false
+}

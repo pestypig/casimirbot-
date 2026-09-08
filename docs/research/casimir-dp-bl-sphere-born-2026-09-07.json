@@ -1,0 +1,54 @@
+{
+  "status": "formal_Born_prediction_requires_phase_resummation_where_large",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-11,
+        1.0
+      ],
+      "formal_Born_covered_D": 0.597808116393256,
+      "grid_refinement_relative": 5.551115123125783e-16,
+      "signed_central_eikonal_phase": 308.44149472521366,
+      "central_potential_eV": 0.08431587827081087,
+      "central_potential_over_incident_energy": 2.516849965645738e-07,
+      "small_phase_Born_diagnostic": false
+    },
+    {
+      "masses_GeV": [
+        1e-09,
+        1.0
+      ],
+      "formal_Born_covered_D": 0.02683638300882481,
+      "grid_refinement_relative": 0.0,
+      "signed_central_eikonal_phase": 40.55358924167074,
+      "central_potential_eV": 0.035441818768533334,
+      "central_potential_over_incident_energy": 1.057947117190691e-07,
+      "small_phase_Born_diagnostic": false
+    },
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "formal_Born_covered_D": 2.6087620469724343e-13,
+      "grid_refinement_relative": 7.994046535841903e-10,
+      "signed_central_eikonal_phase": 9.392505821103023e-05,
+      "central_potential_eV": 8.681500818793349e-08,
+      "central_potential_over_incident_energy": 2.591449616091789e-13,
+      "small_phase_Born_diagnostic": true
+    }
+  ],
+  "sphere_BL_charge": 93117510038.1345,
+  "kR": 362442524.2113648,
+  "input_sha256": "ddc698c716a2aa274096819bfdf2694b2d60148ae45313690509bc641bd90d56",
+  "assumptions": [
+    "uniform sphere of neutral C12 B-L charge",
+    "fixed isotropic mono-speed source and constant branch separation",
+    "coherent continuum q<=qBZ and summed two-mediator potential"
+  ],
+  "limitations": [
+    "large central phase invalidates using first-order Born result as physical signal",
+    "small potential/energy motivates but does not validate an eikonal calculation",
+    "no external constraints, environment response, transport or completed microscopic model"
+  ]
+}

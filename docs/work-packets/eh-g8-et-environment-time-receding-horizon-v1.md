@@ -12,6 +12,14 @@ Required evidence: schema and adversarial fixtures; exact clock/epoch/authority 
 Explicit non-goals: no arbitrary macro/code language, private model loop, adapter-authored strategy, implicit authority, raw tick dump, unbounded future queue, provider-task creation, Codex UI automation, Minecraft authority transfer, or receipt/steering/scheduler terminal authority.
 Downstream gate unlocked: measured G8 action-reaction fidelity and a reusable temporal-control substrate for later adapters.
 
+## Current execution approach
+
+Repeated ET6 live acceptance attempts are deferred while the prerequisite build
+stages in `docs/work-packets/eh-g8-et6-continuous-session-build-v1.md` are carried
+out. Their current stage ledger is solely in
+`docs/helix-environment-harness-work-program-v1.md`. This changes the engineering
+order, not this packet's original acceptance criteria, evidence or NAV1 gate.
+
 ## Classification
 
 This packet spans `intent arbitration`, `source admission`, `tool admission`,
@@ -1264,6 +1272,117 @@ consent interruption, expired-auth recovery, queued-versus-awake truthfulness,
 alias-to-exact-binding correlation, reconnect, revoke and zero authority
 broadening.
 
+ET6 sustained-delivery retry and packaged repair (2026-09-04): an admitted
+stationary native-Fabric sequence remained deterministic for 1,500 scheduler
+ticks over 75 seconds with zero missed or stalled ticks, no player motion, no
+interaction or mutation, and released controls. It then settled
+`connector_offline`, not because the connector or credential expired, but
+because the action client reached the route-local 600-request-per-minute
+per-authority limiter while delivering its bounded polling, heartbeat and
+workflow-evidence lanes. Both the critical event batch and terminal workflow
+event received HTTP 429. This is valid negative capacity evidence and is not a
+passing sustained-run report.
+
+The earlier generic-limiter exclusion was therefore necessary but
+insufficient. Current source now keeps both dedicated connector ceilings at
+3,600 requests per 60 seconds while retaining the bearer-, authority- and
+shared-IP boundaries. Focused connector routing, local lifecycle, action-result
+canonicalization and execution-lease tests pass 49/49. Client, server and
+desktop-host builds passed; the staged runtime and packaged renderer contain
+the same 635-file tree with SHA-256
+`0ff3160f8d2f0d85d31cbb7d418e1a6ae089679fd9fd9c8173513ff5f187980b`.
+The repaired canonical unpacked EXE has SHA-256
+`3d2fb70c94c599bd4006823d95eded2a45cf86d63ff6d5b775135317cff0d5a5`;
+the preceding unpacked build remains in a timestamped rollback directory.
+
+After the later zero-control effect-truth deployment, the same packaged route
+again completed an 80,136 ms / 1,603-scheduler-tick stationary run with zero
+missed or stalled ticks, no player motion or side effects, and released
+controls. It measured 16 ms dispatch-to-client accept, 51 ms
+dispatch-to-first-tick, 116 ms resident computation, queue depth 1, 1,700 ticks
+of accepted runway and 97 ticks remaining at completion. Fresh pre/post
+perception retained the same position and semantic fingerprint, and no HTTP
+429 occurred. This independently re-proves the repaired connector ceiling on
+the currently deployed Fabric jar; it does not supply the still-missing exact
+post-restart reasoning binding or complete capacity capture.
+
+After normal EXE replacement, the new packaged service registered the same
+declared Codex continuation and restored the full MCP scope through the trusted
+device transition without a reconnect. A private local source rotation was
+redeemed by the exact `combat-c0-server` profile, which returned to `Done` on
+`127.0.0.1:25566` under Java 21; Device Check then reported the intended source
+online, fresh and probe-ready with no blockers. The live retry is not complete:
+the Codex-side catalog was loaded before the EXE replacement and still validates
+the old lifecycle schema that requires Player Embodiment before joining the
+player. The packaged service already supports the finite trusted-device
+workstation bootstrap with `action_authority_id=null`, grants no Minecraft
+action authority through that path, and still requires exact Player Embodiment
+for a client restart. One catalog refresh is required to exercise that repair,
+then a fresh subject, new finite authority, a >75-second action, evidence
+re-entry, steering-caused stop, revoke and stale rejection must still be proven.
+The detailed checkpoint is
+`docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-action-connector-rate-limit-repair.json`.
+
+Exact-binding presentation repair (2026-09-04): the first divergence after a
+successful MCP claim was browser state synchronization. The server correctly
+kept the consumed binding `active`; only an unconsumed `pending_claim` expires
+at the show-once claim deadline. Agent Access instead used that deadline to
+project the local binding as `expired` without asking the server, leaving the
+operator-facing state inconsistent with successful steering pickup and
+acknowledgement. The client now inspects the exact authoritative binding at the
+deadline and clears the show-once handle only after that inspection settles.
+An initial implementation cleared the handle first and canceled its own async
+reconciliation; the focused regression exposed that race, and the corrected
+ordering passes all 23 Agent Connection Setup tests. The repaired 635-file
+renderer tree was packaged into the canonical unpacked EXE and relaunched, with
+the immediately preceding renderer retained in a rollback directory. The new
+service accepted the same exact continuation presence with
+`continuation_ready` observability. The restart necessarily invalidated the
+prior service-instance binding, so a fresh human consent claim and live UI
+confirmation remain required; this checkpoint does not claim that rebind or
+the final stale steering-read rejection.
+
+Capacity null-measurement repair (2026-09-04): the live checkpoint truthfully
+left continuation lead time, observation byte totals and controlled-versus-
+unknown course classification unavailable, but the strict sample/report
+contracts required concrete values for those fields. That made a placeholder
+zero indistinguishable from a measured zero and forced an unmeasured run into a
+course category, either of which could allow an incomplete capture to satisfy
+`required_measurements_complete`. The sample and report schemas now preserve
+unavailable lead-time, observation-byte and course measurements as `null`;
+aggregation excludes null from `courses_observed` and emits explicit
+`planning:lead_time_ticks`, `observation:input_bytes`, and
+`observation:output_bytes` gaps plus `course:classification`, then fails the
+ET6 exit. Measured zero and a genuinely measured course remain valid. The
+focused capacity suites pass 32 tests, and the
+production server build passes with the four previously recorded unrelated
+duplicate-key/case warnings. This repair does not close ET6: the remaining live
+run must still record the measurements, produce a canonical capture, and obtain
+`exit_satisfied=true`. Evidence is in
+`docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-capacity-null-measurement-repair.json`.
+
+Zero-control effect-truth repair (2026-09-04): an unattended admitted
+602-tick stationary sequence requested zero forward/strafe, no jump/use and a
+zero yaw/pitch delta. Its fresh post-state retained exactly the same position
+and semantic fingerprint, yet the Fabric result claimed player motion and a
+side effect. The first divergence was `FluidSequenceEngine`: the presence of a
+`look_delta` object marked motion even when both deltas were zero. The engine
+now counts only a nonzero look delta (or actual locomotion semantics) as
+motion. The focused 13-test engine suite and all five required Fabric game
+tests pass, and the full remapped-jar build succeeds. The prior installed jar
+was retained as a timestamped rollback, the repaired remapped jar was deployed,
+and Minecraft relaunched through the governed local lifecycle. A fresh
+42-scheduler-tick zero-control sequence then completed with zero missed or
+stalled ticks, `player_motion_performed=false`,
+`side_effects_performed=false`, and released controls. Fresh pre/post
+perception retained exactly `(6.07, 65, 2.38)` and semantic fingerprint
+`sha256:22e30d47bc5f09ba2978f403376866c15b6d06e33aa74076acc93cd855e79069`.
+This closes the effect-reporting defect through the packaged path; it does not
+stand in for a genuine local keypress or close the separate ET6 capacity-report
+gate.
+Evidence is in
+`docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-zero-control-effect-truth-repair.json`.
+
 ### ET7 — Cross-environment conformance
 
 Map a second adapter with a different native clock. Prefer an existing governed
@@ -1282,6 +1401,33 @@ checkpoints, receipts, interruption and final answer.
 Exit: measured capacity artifact, no secrets/hidden reasoning, zero duplicate
 effects, visible user interruption, final release/revocation and identical
 terminal text/API/voice.
+
+## Session-duration and recovery follow-up
+
+User-requested recovery requirement (2026-09-07), current maturity: specified.
+This setup prerequisite does not replace or satisfy ET6 capacity evidence.
+When issuing an exact-task claim, expose an operator-selected, server-bounded
+binding-session duration separately from the short single-use claim lifetime.
+The current store's `expires_at` expires pending claims only; it must not be
+relabeled as an enforced active-session deadline.
+
+Implementation must add an explicit server-enforced session deadline with
+consistent rejection at dispatch, pickup, acknowledgement and binding status.
+Show the selected duration, authoritative deadline and estimated countdown;
+warn before expiry and provide a dismissible expiry notice. In-place renewal
+must preserve the selected exact task/chat/run identities while revalidating
+them and obtaining any required operator consent. It must not silently renew
+Minecraft action authority, restore revoked authority, downgrade to chat-only,
+or require an application restart. Presence expiry, claim expiry, binding
+session expiry, source pairing expiry and action permission expiry must remain
+distinct in both UI and recovery instructions.
+
+Required tests include expiry boundary equality, server/client clock mismatch,
+pending versus claimed state, stale epochs, revoke-before-renew, lost presence,
+missing run verification, and rejection of stale queued steering. Confirm
+recovery from the packaged UI without MCP-only configuration shortcuts before
+claiming this workflow usable. Session-duration selection and unified recovery
+are not implemented merely by the existing local panel countdowns.
 
 ## Stop/fail criteria
 

@@ -1,0 +1,58 @@
+{
+  "schema": "et6_live_debug_evidence.v1",
+  "recorded_at": "2026-09-06T19:41:59.284Z",
+  "goal_revision": 41,
+  "qualification": "Direct MCP scheduler mechanics; no natural EXE prompt acceptance",
+  "root_action_id": "et6-root-1938-action",
+  "root_admitted": true,
+  "successor_context": {
+    "available": true,
+    "previous_plan_id": "plan:et6-root-1938",
+    "previous_plan_hash": "sha256:b1f9780627f0f9038fd2e7757170166e6fbe9f052eb85cba4454efc7f4a042da",
+    "checkpoint": {
+      "event_id": "environment_event:f1bf7a3c-3efe-415d-9446-925c2ab69ff4",
+      "checkpoint_id": "checkpoint:et6-root-1938"
+    },
+    "workflow_id": "et6-root-1938-workflow",
+    "observed_at": "2026-09-06T19:38:24.364903700Z",
+    "predecessor_clocks": {
+      "environment": {
+        "kind": "tick",
+        "sequence": 2340,
+        "resolution_unit": "minecraft_tick",
+        "nominal_units_per_second": 20
+      },
+      "monotonic": {
+        "origin_id": "minecraft_monotonic_clock:f3ee3564-ca6f-4248-9da0-ff79fe79f9ee",
+        "elapsed_ms": 116913
+      },
+      "audit_at": "2026-09-06T19:38:18.355814200Z"
+    },
+    "predecessor_watermarks": {
+      "decision_unit": 100,
+      "stop_unit": 200,
+      "committed_through_unit": 220,
+      "stabilization_node_id": "settled"
+    },
+    "revalidation_required": true,
+    "execution_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "successor_probe_at": "2026-09-06T19:38:23.142Z",
+  "successor_submit_created_at": "2026-09-06T19:38:25.567Z",
+  "successor_result": {
+    "schema": "helix.agent_api.error.v1",
+    "error": "internal_error",
+    "message": "The Helix agent tool could not complete the request.",
+    "request_id": null,
+    "retryable": true,
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "persisted_state_read_at": "2026-09-06T19:39:00Z",
+  "persisted_state_note": "Read-only persisted snapshot inspection: root action status canceled, root admission present, no matching successor action or temporal admission. Timestamp approximate; exact native terminal cause not retrieved.",
+  "rolling_extensions_proven": 0,
+  "diagnostic_change": "35 checkpoint/retention guards now throw existing TemporalPlanError closed codes instead of generic Error; admission predicates unchanged.",
+  "diagnostic_deployed": false,
+  "tests": "14 temporal-plan files, 181 tests passed"
+}

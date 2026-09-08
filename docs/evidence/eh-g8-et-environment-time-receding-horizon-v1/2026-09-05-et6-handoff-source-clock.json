@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 internal serial successor clock addressing",
+  "finding": "The initial handoff implementation reset successor local tick to zero, shifting a plan whose source clock precedes its committed start boundary.",
+  "repair": "Retain an explicit successor source-origin offset in resident coordinates and execute at resident tick minus that origin. Queue replay includes this mapping. Reject negative/future origins and already exhausted successor horizons.",
+  "verification": {
+    "native_sequence_and_controller_tests": "PASS",
+    "new_case": "Successor origin 0, boundary 2, earliest input tick 2 produces its entry pulse at the handoff and records checkpoint tick 2; changed-origin retry rejected.",
+    "casimir": { "run_id": "2668", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": ["Authenticated source-to-resident clock mapping remains the runtime caller's responsibility; no production caller is enabled.", "Temporal controller-window continuation, transport, evidence admission and live EXE qualification remain incomplete."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

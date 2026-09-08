@@ -1,0 +1,101 @@
+{
+  "scope": "Tree potential -muH^2|H|^2-muS^2|S|^2+lambdaH|H|^4+lambdaS|S|^4+lambdaHS|H|^2|S|^2. Unscreened nucleon-only force proxy with fN=.3; no material composition, loop stability or exclusion claim. Angle values are diagnostic inputs, not allowed benchmark determinations.",
+  "vevEW_GeV": 246.2,
+  "vevDark_GeV": 500.0,
+  "rows": [
+    {
+      "ms_GeV": 1e-09,
+      "theta_rad": 1e-12,
+      "lambda_H": 0.128888429885684,
+      "lambda_S": 2.03125e-24,
+      "lambda_HS": 1.269293257514216e-13,
+      "determinant_over_diagonal_product": 0.9846153846153847,
+      "nucleon_scalar_coupling": 1.1441917140536149e-15,
+      "nucleon_Yukawa_strength_relative_to_gravity": 17614223.161639884,
+      "range_m": 1.973269804e-07
+    },
+    {
+      "ms_GeV": 1e-09,
+      "theta_rad": 3e-10,
+      "lambda_H": 0.128888429885684,
+      "lambda_S": 2.8145e-21,
+      "lambda_HS": 3.8078797725426485e-11,
+      "determinant_over_diagonal_product": 0.0007106057914372002,
+      "nucleon_scalar_coupling": 3.432575142160845e-13,
+      "nucleon_Yukawa_strength_relative_to_gravity": 1585280084547.5894,
+      "range_m": 1.973269804e-07
+    },
+    {
+      "ms_GeV": 1e-09,
+      "theta_rad": 1e-08,
+      "lambda_H": 0.128888429885684,
+      "lambda_S": 3.1250019999999997e-18,
+      "lambda_HS": 1.269293257514216e-09,
+      "determinant_over_diagonal_product": 6.399995904002623e-07,
+      "nucleon_scalar_coupling": 1.1441917140536149e-11,
+      "nucleon_Yukawa_strength_relative_to_gravity": 1761422316163988.2,
+      "range_m": 1.973269804e-07
+    },
+    {
+      "ms_GeV": 1e-09,
+      "theta_rad": 0.0001,
+      "lambda_H": 0.12888842859679972,
+      "lambda_S": 3.1249999895833534e-10,
+      "lambda_HS": 1.269293249052261e-05,
+      "determinant_over_diagonal_product": 6.400000085333293e-15,
+      "nucleon_scalar_coupling": 1.1441917121466287e-07,
+      "nucleon_Yukawa_strength_relative_to_gravity": 1.7614223102925805e+23,
+      "range_m": 1.973269804e-07
+    },
+    {
+      "ms_GeV": 1e-06,
+      "theta_rad": 1e-12,
+      "lambda_H": 0.128888429885684,
+      "lambda_S": 2.00000003125e-18,
+      "lambda_HS": 1.269293257514216e-13,
+      "determinant_over_diagonal_product": 0.9999999843750003,
+      "nucleon_scalar_coupling": 1.1441917140536149e-15,
+      "nucleon_Yukawa_strength_relative_to_gravity": 17614223.161639884,
+      "range_m": 1.973269804e-10
+    },
+    {
+      "ms_GeV": 1e-06,
+      "theta_rad": 3e-10,
+      "lambda_H": 0.128888429885684,
+      "lambda_S": 2.0028125e-18,
+      "lambda_HS": 3.807879772542648e-11,
+      "determinant_over_diagonal_product": 0.9985957247620534,
+      "nucleon_scalar_coupling": 3.432575142160845e-13,
+      "nucleon_Yukawa_strength_relative_to_gravity": 1585280084547.5894,
+      "range_m": 1.973269804e-10
+    },
+    {
+      "ms_GeV": 1e-06,
+      "theta_rad": 1e-08,
+      "lambda_H": 0.128888429885684,
+      "lambda_S": 5.125e-18,
+      "lambda_HS": 1.2692932575142159e-09,
+      "determinant_over_diagonal_product": 0.39024390243902446,
+      "nucleon_scalar_coupling": 1.1441917140536149e-11,
+      "nucleon_Yukawa_strength_relative_to_gravity": 1761422316163988.2,
+      "range_m": 1.973269804e-10
+    },
+    {
+      "ms_GeV": 1e-06,
+      "theta_rad": 0.0001,
+      "lambda_H": 0.12888842859679972,
+      "lambda_S": 3.125000009583333e-10,
+      "lambda_HS": 1.269293249052261e-05,
+      "determinant_over_diagonal_product": 6.400000044373334e-09,
+      "nucleon_scalar_coupling": 1.1441917121466287e-07,
+      "nucleon_Yukawa_strength_relative_to_gravity": 1.7614223102925805e+23,
+      "range_m": 1.973269804e-10
+    }
+  ],
+  "checks": {
+    "high_precision_eigenvalues": true,
+    "determinant_identity": true,
+    "positive_quartic_determinant": true
+  },
+  "full_model_admitted": false
+}

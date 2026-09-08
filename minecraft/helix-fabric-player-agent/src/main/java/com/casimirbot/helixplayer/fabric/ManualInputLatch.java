@@ -65,6 +65,11 @@ public final class ManualInputLatch {
         return REASON.getAndSet(null);
     }
 
+    /** Advisory observation only; never consumes or resets takeover input. */
+    static boolean pending() {
+        return ARMED.get() && REASON.get() != null;
+    }
+
     static long detectedNanos() {
         return DETECTED_NANOS.get();
     }

@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-06",
+  "scope": "Connected native evidence-fence split required by correlated timing audit",
+  "checks": {
+    "connected_persistent_tests": 2,
+    "correlated_budget_tests": 18,
+    "targeted_typescript": "passed"
+  },
+  "sample": {
+    "native_checkpoint_to_evidence_fence_observed_ms": 274,
+    "native_evidence_fence_observed_to_acceptance_ms": 135,
+    "enclosing_duration_ms": 408,
+    "server_nested_duration_ms": 111,
+    "rounding": "Native split durations are ceiling-rounded separately; sum differs from enclosing duration by 1 ms",
+    "native_phase_coverage_complete": true,
+    "stage_breakdown_complete": false,
+    "window_ms": null,
+    "fits": false,
+    "reason": "window_unmeasured"
+  },
+  "negative_coverage": "Missing, null, nonfinite, negative and oversized phase measurements reject enclosing-interval verification",
+  "limits": [
+    "Two native phases cover elapsed time, but do not isolate all five conceptual phases",
+    "Scheduling delay is included in fence observation",
+    "Precompiled fixture provider and controlled ticks; no live capacity measurement",
+    "No package refreshed or live session operated"
+  ],
+  "live_acceptance": false
+}

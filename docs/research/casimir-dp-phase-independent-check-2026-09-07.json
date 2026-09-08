@@ -1,0 +1,144 @@
+{
+  "status": "selected_phase_independent_method_check_not_full_spectrum_validation",
+  "speed_kms": 650,
+  "rows": [
+    {
+      "sign": -1,
+      "l": 0,
+      "numerov": 0.1437291027229639,
+      "adaptive": 0.14372925240411405,
+      "absolute_phase_difference": 1.4968115014113437e-07,
+      "adaptive_refinement": 2.877012850177607e-09
+    },
+    {
+      "sign": -1,
+      "l": 1,
+      "numerov": 0.13641021051073654,
+      "adaptive": 0.13641020738339282,
+      "absolute_phase_difference": 3.127343717324038e-09,
+      "adaptive_refinement": 2.8742981328377937e-09
+    },
+    {
+      "sign": -1,
+      "l": 2,
+      "numerov": 0.12085887374929705,
+      "adaptive": 0.12085887058315326,
+      "absolute_phase_difference": 3.166143791588638e-09,
+      "adaptive_refinement": 2.8683846409194302e-09
+    },
+    {
+      "sign": -1,
+      "l": 5,
+      "numerov": 0.07395420910963235,
+      "adaptive": 0.07395420594739921,
+      "absolute_phase_difference": 3.1622331420066985e-09,
+      "adaptive_refinement": 2.8294184772903463e-09
+    },
+    {
+      "sign": -1,
+      "l": 10,
+      "numerov": 0.03733112643583558,
+      "adaptive": 0.03733112338217337,
+      "absolute_phase_difference": 3.053662211982555e-09,
+      "adaptive_refinement": 2.7589144302453406e-09
+    },
+    {
+      "sign": -1,
+      "l": 20,
+      "numerov": 0.012024741698577479,
+      "adaptive": 0.012024738771461152,
+      "absolute_phase_difference": 2.9271163271005207e-09,
+      "adaptive_refinement": 2.637608798039537e-09
+    },
+    {
+      "sign": -1,
+      "l": 40,
+      "numerov": 0.0016392933856708147,
+      "adaptive": 0.0016392906945563723,
+      "absolute_phase_difference": 2.691114442399112e-09,
+      "adaptive_refinement": 2.425470047029421e-09
+    },
+    {
+      "sign": 1,
+      "l": 0,
+      "numerov": -0.1459797780198535,
+      "adaptive": -0.14597992590577658,
+      "absolute_phase_difference": 1.4788592306302917e-07,
+      "adaptive_refinement": 2.87534529519462e-09
+    },
+    {
+      "sign": 1,
+      "l": 1,
+      "numerov": -0.13763853080721944,
+      "adaptive": -0.13763853404429494,
+      "absolute_phase_difference": 3.2370754965427295e-09,
+      "adaptive_refinement": 2.866987536265242e-09
+    },
+    {
+      "sign": 1,
+      "l": 2,
+      "numerov": -0.12075084392628277,
+      "adaptive": -0.12075084715240791,
+      "absolute_phase_difference": 3.2261251448062467e-09,
+      "adaptive_refinement": 2.868068449402017e-09
+    },
+    {
+      "sign": 1,
+      "l": 5,
+      "numerov": -0.07352019526746245,
+      "adaptive": -0.07352019839879098,
+      "absolute_phase_difference": 3.1313285298040228e-09,
+      "adaptive_refinement": 2.8262459039751775e-09
+    },
+    {
+      "sign": 1,
+      "l": 10,
+      "numerov": -0.03718894866765332,
+      "adaptive": -0.037188951743762466,
+      "absolute_phase_difference": 3.0761091451836364e-09,
+      "adaptive_refinement": 2.7697462101627934e-09
+    },
+    {
+      "sign": 1,
+      "l": 20,
+      "numerov": -0.012005230954212909,
+      "adaptive": -0.012005233883586541,
+      "absolute_phase_difference": 2.9293736325541886e-09,
+      "adaptive_refinement": 2.637560392315663e-09
+    },
+    {
+      "sign": 1,
+      "l": 40,
+      "numerov": -0.001638801289915115,
+      "adaptive": -0.001638803986215187,
+      "absolute_phase_difference": 2.696300072102531e-09,
+      "adaptive_refinement": 2.4272308607464765e-09
+    }
+  ],
+  "free_controls": [
+    {
+      "l": 0,
+      "free_phase": -3.192850428490601e-09
+    },
+    {
+      "l": 10,
+      "free_phase": -3.065696141391072e-09
+    },
+    {
+      "l": 40,
+      "free_phase": -2.6948061560005954e-09
+    }
+  ],
+  "checks": [
+    "source hash",
+    "adaptive tolerance refinement",
+    "selected phase comparison modulo pi",
+    "free potential phase"
+  ],
+  "limitations": [
+    "same potential and spherical matching convention",
+    "selected angular momenta and one speed only",
+    "not an independent full angular spectrum integration",
+    "no isotope average or detector response"
+  ]
+}

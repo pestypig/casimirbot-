@@ -1,5 +1,7 @@
 package com.casimirbot.helixplayer.fabric;
 
+import com.casimirbot.helixsensor.HelixJson;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,7 +50,10 @@ final class PlayerActionDeliveryOutbox {
     private final int capacity;
     private final Deque<Delivery> pending = new ArrayDeque<>();
     private Delivery criticalInFlight;
+    private List<Delivery> criticalBatchInFlight;
     private Delivery projectionInFlight;
+    private final java.util.IdentityHashMap<Delivery, Long> ordinals = new java.util.IdentityHashMap<>();
+    private long tailOrdinal;
 
     PlayerActionDeliveryOutbox(int capacity) {
         if (capacity < 3) throw new IllegalArgumentException("Delivery outbox capacity is too small.");
@@ -59,8 +64,22 @@ final class PlayerActionDeliveryOutbox {
         if (deliveries.isEmpty()) return true;
         int usableCapacity = capacity - Math.max(0, reservedTerminalSlots);
         if (pending.size() + deliveries.size() > usableCapacity) return false;
+        var identities = new java.util.IdentityHashMap<Delivery, Boolean>();
+        for (Delivery delivery : deliveries) {
+            if (delivery == null || ordinals.containsKey(delivery) ||
+                identities.put(delivery, Boolean.TRUE) != null) return false;
+        }
         pending.addAll(new ArrayList<>(deliveries));
+        for (Delivery delivery : deliveries) ordinals.put(delivery, ++tailOrdinal);
         return true;
+    }
+
+    synchronized long watermark() { return tailOrdinal; }
+
+    // Both lanes through the required checkpoint must be acknowledged. Later
+    // progress remains retained, but cannot indefinitely move this fence.
+    synchronized boolean hasPendingThrough(long watermark) {
+        return watermark <= 0 || ordinals.values().stream().anyMatch(value -> value <= watermark);
     }
 
     synchronized Delivery peekCritical() {
@@ -71,6 +90,60 @@ final class PlayerActionDeliveryOutbox {
             return criticalInFlight;
         }
         return null;
+    }
+
+    /** Freeze a bounded prefix; later enqueues must not change an uncertain retry. */
+    synchronized List<Delivery> peekCriticalBatch() {
+        return peekCriticalBatch(true);
+    }
+
+    synchronized List<Delivery> peekCriticalBatch(boolean supported) {
+        if (criticalBatchInFlight != null) return criticalBatchInFlight;
+        if (!supported) {
+            Delivery single = peekCritical();
+            return single == null ? List.of() : List.of(single);
+        }
+        if (criticalInFlight != null) return List.of(criticalInFlight);
+        List<Delivery> selected = new ArrayList<>();
+        int bytes = 32;
+        for (Delivery delivery : pending) {
+            if (delivery.stage() == Stage.ENVIRONMENT_EVENT_BATCH) continue;
+            if (!selected.isEmpty()) {
+                Delivery prior = selected.get(selected.size() - 1);
+                if (delivery.stage() != Stage.WORKFLOW_EVENT || prior.stage() != Stage.WORKFLOW_EVENT ||
+                    !java.util.Objects.equals(delivery.payload().get("workflow_id"), prior.payload().get("workflow_id")) ||
+                    !java.util.Objects.equals(delivery.payload().get("action_request_id"), prior.payload().get("action_request_id")) ||
+                    !(delivery.payload().get("sequence") instanceof Number next) ||
+                    !(prior.payload().get("sequence") instanceof Number previous) ||
+                    next.longValue() != previous.longValue() + 1) break;
+            }
+            int size = HelixJson.stringifyIncludingNulls(delivery.payload()).getBytes(java.nio.charset.StandardCharsets.UTF_8).length + 1;
+            if (!selected.isEmpty() && bytes + size > 512 * 1024) break;
+            selected.add(delivery);
+            bytes += size;
+            if (selected.size() == 32 || delivery.stage() != Stage.WORKFLOW_EVENT) break;
+        }
+        if (selected.isEmpty()) return List.of();
+        criticalInFlight = selected.get(0);
+        criticalBatchInFlight = List.copyOf(selected);
+        return criticalBatchInFlight;
+    }
+
+    synchronized boolean acknowledgeCriticalBatch(List<Delivery> expected, Object receivedIds) {
+        if (expected != criticalBatchInFlight || !(receivedIds instanceof List<?> ids) ||
+            ids.size() != expected.size()) return false;
+        for (int i = 0; i < expected.size(); i++) {
+            Object id = expected.get(i).payload().get("event_id");
+            if (!(id instanceof String) || !id.equals(ids.get(i))) return false;
+        }
+        // All identities are checked before removing any member or fence.
+        for (Delivery delivery : expected) {
+            pending.removeIf(candidate -> candidate == delivery);
+            ordinals.remove(delivery);
+        }
+        criticalBatchInFlight = null;
+        criticalInFlight = null;
+        return true;
     }
 
     synchronized Delivery peekProjection() {
@@ -85,6 +158,8 @@ final class PlayerActionDeliveryOutbox {
 
     synchronized boolean acknowledge(Delivery expected) {
         if (expected == null) return false;
+        if (expected.stage() != Stage.ENVIRONMENT_EVENT_BATCH &&
+            criticalBatchInFlight != null && criticalBatchInFlight.size() > 1) return false;
         Delivery selected = expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH
             ? projectionInFlight
             : criticalInFlight;
@@ -93,10 +168,12 @@ final class PlayerActionDeliveryOutbox {
         while (iterator.hasNext()) {
             if (iterator.next() != expected) continue;
             iterator.remove();
+            ordinals.remove(expected);
             if (expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH) {
                 projectionInFlight = null;
             } else {
                 criticalInFlight = null;
+                criticalBatchInFlight = null;
             }
             return true;
         }

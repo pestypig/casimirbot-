@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildHelixAskComposerDestinationModel,
   saveHelixOperatorNote,
@@ -13,6 +13,26 @@ import { HelixAskComposerDestinationStrip } from
 import { buildHelixAskLegacyComposerState } from "../HelixAskLegacyComposerState";
 
 describe("Helix Ask composer destination", () => {
+  afterEach(cleanup);
+  it("offers navigation for an unavailable external destination only after confirmation", () => {
+    const open = vi.fn();
+    const change = vi.fn();
+    render(<HelixAskComposerDestinationStrip model={buildHelixAskComposerDestinationModel({kind: "helix_ask"})} onDestinationChange={change} onOpenConnectionSetup={open} externalBindingUnavailable />);
+    fireEvent.change(screen.getByLabelText("Composer destination"), {target: {value: "bound_agent"}});
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Not now"));
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Set up connection"));
+    fireEvent.click(screen.getByText("Open Agent Access"));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(change).toHaveBeenCalledTimes(1);
+  });
+  it("does not interrupt an available binding with setup", () => {
+    render(<HelixAskComposerDestinationStrip model={buildHelixAskComposerDestinationModel({kind: "bound_agent", boundAgentState: "active"})} onDestinationChange={vi.fn()} onOpenConnectionSetup={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Composer destination"), {target: {value: "bound_agent"}});
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
   it("auto-selects an externally active binding unless the operator chose another destination", () => {
     expect(shouldAutomaticallySelectBoundAgent({
       bindingStatus: "active",

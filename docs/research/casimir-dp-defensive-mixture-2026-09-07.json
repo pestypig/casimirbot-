@@ -1,0 +1,329 @@
+{
+  "status": "bounded_weight_mixture_control_not_validated_physical_model",
+  "source_sha256": "f76b4fb2ea33eeef0165adec20109014d99333c8dd6a43a2a55c3367cadade1d",
+  "sampling": "equal fixed allocations to physical P and biased Q; weight P/(0.5P+0.5Q)",
+  "weight_bound": 2,
+  "lower_capability_keV": 5.4,
+  "rows": [
+    {
+      "factor": 1,
+      "parts": [
+        {
+          "N": 100000,
+          "seed": 9410,
+          "bias": 1,
+          "energy_bias": 1,
+          "scale": 126927.18909930163,
+          "capable": {
+            "mean": 0.65379,
+            "se": 0.0015044962592475732,
+            "ess": 65379.0,
+            "max_share": 1.5295431254684227e-05
+          },
+          "below_old": {
+            "mean": 0.40665,
+            "se": 0.0015533453910251376,
+            "ess": 40665.0,
+            "max_share": 2.4591171769334808e-05
+          },
+          "above_old": {
+            "mean": 0.24714,
+            "se": 0.0013640516157272433,
+            "ess": 24714.0,
+            "max_share": 4.046289552480375e-05
+          },
+          "fast": {
+            "mean": 0.13832,
+            "se": 0.00109173609213809,
+            "ess": 13832.0,
+            "max_share": 7.229612492770387e-05
+          },
+          "total": {
+            "mean": 1.0,
+            "se": 0.0,
+            "ess": 100000.0,
+            "max_share": 1e-05
+          }
+        },
+        {
+          "N": 100000,
+          "seed": 9411,
+          "bias": 1,
+          "energy_bias": 1,
+          "scale": 126927.18909930163,
+          "capable": {
+            "mean": 0.65165,
+            "se": 0.0015066670088160667,
+            "ess": 65165.0,
+            "max_share": 1.5345661014348194e-05
+          },
+          "below_old": {
+            "mean": 0.40346,
+            "se": 0.0015513943251937987,
+            "ess": 40346.0,
+            "max_share": 2.4785604520894264e-05
+          },
+          "above_old": {
+            "mean": 0.24819,
+            "se": 0.0013659926421320805,
+            "ess": 24819.0,
+            "max_share": 4.029171199484266e-05
+          },
+          "fast": {
+            "mean": 0.13911,
+            "se": 0.001094347319163596,
+            "ess": 13911.0,
+            "max_share": 7.188555819135935e-05
+          },
+          "total": {
+            "mean": 1.0,
+            "se": 0.0,
+            "ess": 100000.0,
+            "max_share": 1e-05
+          }
+        }
+      ],
+      "pooled": {
+        "total": {
+          "mean": 1.0,
+          "se": 0.0
+        },
+        "capable": {
+          "mean": 0.65272,
+          "se": 0.001064607259690715
+        },
+        "below_old": {
+          "mean": 0.405055,
+          "se": 0.0010976914703210734
+        },
+        "above_old": {
+          "mean": 0.247665,
+          "se": 0.000965216647795598
+        },
+        "fast": {
+          "mean": 0.138715,
+          "se": 0.000772897753560828
+        }
+      },
+      "normalization_z": 0
+    },
+    {
+      "factor": 3.9,
+      "parts": [
+        {
+          "N": 500000,
+          "seed": 9412,
+          "bias": 0.7,
+          "energy_bias": 0.5,
+          "scale": 495016.03748727636,
+          "capable": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "below_old": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "above_old": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "fast": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "total": {
+            "mean": 1.9495470384679945,
+            "se": 0.0002853892209414528,
+            "ess": 494699.4823257757,
+            "max_share": 2.051758649085254e-06
+          }
+        },
+        {
+          "N": 500000,
+          "seed": 9413,
+          "bias": 0.7,
+          "energy_bias": 0.5,
+          "scale": 495016.03748727636,
+          "capable": {
+            "mean": 2.2161902956216838e-07,
+            "se": 2.6497662707073112e-08,
+            "ess": 69.94216571412498,
+            "max_share": 0.07193888798382428
+          },
+          "below_old": {
+            "mean": 2.2106514113571896e-07,
+            "se": 2.6497640366024438e-08,
+            "ess": 69.59315816197525,
+            "max_share": 0.07211913402922597
+          },
+          "above_old": {
+            "mean": 5.538884264494313e-10,
+            "se": 4.091153038569182e-11,
+            "ess": 183.22925621336756,
+            "max_share": 0.03396766656549559
+          },
+          "fast": {
+            "mean": 2.1109267883792507e-11,
+            "se": 2.6816745891128972e-12,
+            "ess": 61.95569601943828,
+            "max_share": 0.0837343140164896
+          },
+          "total": {
+            "mean": 0.05034487115401313,
+            "se": 0.00033273937372441337,
+            "ess": 21890.723339687578,
+            "max_share": 7.945050096411034e-05
+          }
+        }
+      ],
+      "pooled": {
+        "total": {
+          "mean": 0.9999459548110038,
+          "se": 0.00021918171585244296
+        },
+        "capable": {
+          "mean": 1.1080951478108419e-07,
+          "se": 1.3248831353536556e-08
+        },
+        "below_old": {
+          "mean": 1.1053257056785948e-07,
+          "se": 1.3248820183012219e-08
+        },
+        "above_old": {
+          "mean": 2.7694421322471566e-10,
+          "se": 2.045576519284591e-11
+        },
+        "fast": {
+          "mean": 1.0554633941896253e-11,
+          "se": 1.3408372945564486e-12
+        }
+      },
+      "normalization_z": 0.24657708689804364
+    },
+    {
+      "factor": 3.9,
+      "parts": [
+        {
+          "N": 500000,
+          "seed": 9414,
+          "bias": 0.65,
+          "energy_bias": 0.6,
+          "scale": 495016.03748727636,
+          "capable": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "below_old": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "above_old": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "fast": {
+            "mean": 0.0,
+            "se": 0.0,
+            "ess": 0,
+            "max_share": 0
+          },
+          "total": {
+            "mean": 1.9377946382185824,
+            "se": 0.0003160620200270032,
+            "ess": 493436.5888782942,
+            "max_share": 2.0642022211904515e-06
+          }
+        },
+        {
+          "N": 500000,
+          "seed": 9415,
+          "bias": 0.65,
+          "energy_bias": 0.6,
+          "scale": 495016.03748727636,
+          "capable": {
+            "mean": 2.6939883247262285e-07,
+            "se": 4.094223510359043e-08,
+            "ess": 43.2923924281141,
+            "max_share": 0.13428860980016777
+          },
+          "below_old": {
+            "mean": 2.6867963094269587e-07,
+            "se": 4.094195953554777e-08,
+            "ess": 43.06214910509983,
+            "max_share": 0.13464807349781088
+          },
+          "above_old": {
+            "mean": 7.192015299270396e-10,
+            "se": 1.527665146332973e-10,
+            "ess": 22.16289465938792,
+            "max_share": 0.19765131729143307
+          },
+          "fast": {
+            "mean": 2.3203132775312187e-11,
+            "se": 2.692085128500062e-12,
+            "ess": 74.27660081125883,
+            "max_share": 0.056863090550804324
+          },
+          "total": {
+            "mean": 0.06239185536021201,
+            "se": 0.000367240704799413,
+            "ess": 27288.591768611386,
+            "max_share": 6.4108839104255e-05
+          }
+        }
+      ],
+      "pooled": {
+        "total": {
+          "mean": 1.0000932467893973,
+          "se": 0.0002422606735342735
+        },
+        "capable": {
+          "mean": 1.3469941623631143e-07,
+          "se": 2.0471117551795216e-08
+        },
+        "below_old": {
+          "mean": 1.3433981547134794e-07,
+          "se": 2.0470979767773886e-08
+        },
+        "above_old": {
+          "mean": 3.596007649635198e-10,
+          "se": 7.638325731664865e-11
+        },
+        "fast": {
+          "mean": 1.1601566387656094e-11,
+          "se": 1.346042564250031e-12
+        }
+      },
+      "normalization_z": 0.3849027084623749
+    }
+  ],
+  "checks": [
+    "source hash",
+    "inherited kinematics and termination",
+    "weights bounded by two",
+    "pooled normalization within six sampling standard errors"
+  ],
+  "limitations": [
+    "normalization does not prove rare-exit convergence",
+    "component mean weights need not individually equal one",
+    "sampling errors exclude model uncertainty",
+    "no detector response or accepted counts",
+    "conditional stationary point-nucleus silica slab",
+    "lower-energy histories remain censored"
+  ]
+}

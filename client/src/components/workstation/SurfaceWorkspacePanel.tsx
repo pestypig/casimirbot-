@@ -26,6 +26,7 @@ type InspectResult = {
 };
 
 const ROUTE_TARGETS: ReadonlyArray<{ target: SurfacePanelRouteTarget; label: string }> = [
+  { target: "visual_evidence", label: "Visual Evidence" },
   { target: "hud_lab", label: "HUD Lab" },
   { target: "image_lens", label: "Image Lens" },
   { target: "live_answer", label: "Live Answer" },

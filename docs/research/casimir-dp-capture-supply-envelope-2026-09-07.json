@@ -1,0 +1,37 @@
+{
+  "status": "conditional_supply_envelope_not_local_density_bound",
+  "source_sha256": "c92d809cdf9dbaac381e73a78eaed8191c974f8bd78fd86910d16c17b064ca34",
+  "assumptions": [
+    "constant mono-speed source over Earth age",
+    "geometric capture with Earth-only focusing",
+    "perfect capture",
+    "no evaporation or annihilation",
+    "no additional sources"
+  ],
+  "radius_cm": 637000000.0,
+  "age_s": 1.4317344e+17,
+  "speed_cm_s": 77600000.0,
+  "focusing": 1.0002083111914124,
+  "capture_supply_volume_cm3": 1.4165874091257946e+43,
+  "earth_volume_cm3": 1.0826969324300022e+27,
+  "maximum_average_to_source_density": 1.3083877553309488e+16,
+  "source_density_cm3": 0.003,
+  "maximum_earth_average_density_cm3": 39251632659928.46,
+  "surviving_fast_fraction_for_one_raw_high_count_at_reference_cross_section": 8.896751485920715e-05,
+  "rows": [
+    {
+      "temperature_K": 300.0,
+      "maximum_Veffective_times_survival_cm3": 3665184252664192.5,
+      "uniform_density_maximum_survival": 3.385235648943848e-12,
+      "required_local_density_at_reference_cross_section_cm3": 1.0315737437687167e+21,
+      "required_local_to_maximum_earth_average": 26281040.401711453
+    },
+    {
+      "temperature_K": 5000.0,
+      "maximum_Veffective_times_survival_cm3": 9.062268786391619e+20,
+      "uniform_density_maximum_survival": 8.370088170520891e-07,
+      "required_local_density_at_reference_cross_section_cm3": 4172142683298643.5,
+      "required_local_to_maximum_earth_average": 106.29220749734408
+    }
+  ]
+}

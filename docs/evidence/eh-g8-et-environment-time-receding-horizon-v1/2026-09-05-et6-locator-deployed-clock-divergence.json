@@ -1,0 +1,58 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "previous_turn_classification": "progress",
+  "package": {
+    "path": "apps/desktop/release-et6-probe-locator-20260905/win-unpacked/CasimirBot.exe",
+    "host_build": "PASS exit 0; four unrelated duplicate-key/case warnings",
+    "runtime_stage": "PASS exit 0",
+    "packaging": "PASS exit 0",
+    "runtime_tree": "PASS; verifier evaluated in memory with only module-location and output-root substitutions",
+    "asar_service_equal_to_built": true,
+    "service_sha256": "2f4b3146eff921ab5bdd2ff28509ab0102ec9775937deb06489e46f6b2ab419a",
+    "runtime_manifest_sha256": "6b27fa7e609a7dce2c4092c856ca08f297ed98666af81fd28a1311684419fe4c",
+    "old_exe_closed_normally": true,
+    "host_pid": 28220,
+    "service_pid": 36728,
+    "ready_at": "2026-09-05T19:01:52.264Z",
+    "origin": "http://127.0.0.1:58791"
+  },
+  "transport": {
+    "initial_full_tools": "not found before restoring trusted Full Harness scope",
+    "trusted_device_delegation_applied": true,
+    "transition_request_ref": "desktop_tunnel_request:dcd81d72-eb06-48fb-b96e-7209f2afb165",
+    "full_tools_verified_after_transition": true,
+    "oauth_reconnect_requested": false,
+    "replacement_codex_task_created": false
+  },
+  "live_locator": {
+    "returned_prior_turn_id": "mcp_environment_probe_turn:d3d0c4fb-daf7-4ad2-a810-fc52222c248b",
+    "request_ref": "environment_probe_request:29769602-1b11-49ec-b235-446022b8afd5",
+    "observed_at": "2026-09-05T19:03:31.407Z",
+    "position": {"x": 5.45, "y": 65, "z": 2.55},
+    "success": true
+  },
+  "next_divergence": {
+    "operation": "fresh probe followed immediately by temporal_frontier_publish using returned prior_turn_id",
+    "error": "invalid_request",
+    "path": ["clocks", "monotonic", "elapsed_ms"],
+    "expected": "integer",
+    "received": "float",
+    "cause": "publisher passed fractional performance.now delta into existing integer millisecond schema",
+    "repair": "floor server-publication elapsed milliseconds; preserve origin, separate resident clock and all admission checks",
+    "classification": "evidence normalization",
+    "focused_tests_passed": 3,
+    "clock_repair_deployed": false
+  },
+  "latest_binding": {
+    "id": "reasoning_binding:78dfb3dcac3b4bf0e922ce80320e5c2e",
+    "epoch": 3,
+    "status": "active",
+    "run_id": null,
+    "claim_handle_recorded": false,
+    "limitation": "chat-only; explicit verified environment-run selection still required"
+  },
+  "movement_issued": false,
+  "rolling_cycles_proven": false,
+  "goal_complete": false
+}

@@ -1,0 +1,14 @@
+{
+  "et6_complete": false,
+  "change": "Temporal successor retention invokes the checkpoint evidence reader, requires caller references to match retained association on replay, rejects a frontier audit timestamp predating the event, and stores association JSON in migration 085's new nullable column. Initial plans retain null association.",
+  "verification": {
+    "tests": 19,
+    "files": 3,
+    "result": "PASS",
+    "scope": "Existing preflight/initial retention with new migration, compiler/evidence reader and broker transaction regressions",
+    "limitations": ["New successor branch not directly exercised", "No PostgreSQL transaction isolation proof", "Audit timestamp ordering does not replace native clock/frontier correlation", "No resident handoff", "Migration not deployed"]
+  },
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,40 @@
+{
+  "scope": "Authenticated numerical intake and normalization discrepancy; not admitted to decay prediction",
+  "full_model_admitted": false,
+  "commit": "6a6dcfccf903317ea2104e27bb1dbbc7ad1d9fc7",
+  "checks": {
+    "data_hashes": true,
+    "aligned_finite_monotone_grids": true,
+    "source_formula_reproduced": true,
+    "parser_rejects_executable_expression": true
+  },
+  "samples": 100,
+  "s_nodes": 601,
+  "s_range_GeV2": [
+    0.0,
+    6.0
+  ],
+  "zero_normalization_max_errors": {
+    "c1": 0.007243446447848245,
+    "c2": 0.0809411147955941,
+    "d1": 0.010598852694445824,
+    "d2": 0.11912380171963322
+  },
+  "admission_checks": {
+    "identity_at_zero_to_1e_minus8": false,
+    "code_matches_printed_gammaK0": false
+  },
+  "gammaK0_audit": {
+    "paper_equations": "2407.13587v1 equations 76 and 79",
+    "ratio_to_half_mpi_squared_paper": 1.527632014467108,
+    "ratio_to_half_mpi_squared_code": 2.8857560007288727,
+    "source_function_ratio": 2.8857560007288727
+  },
+  "remaining_admission": [
+    "reconcile canonical channel normalization of numerical matrices with paper and implementation",
+    "reconcile source subtraction function with printed NLO formula",
+    "resolve pion mass convention versus preceding charged-mass slice",
+    "retain independently counted physical final-state symmetry factors",
+    "propagate phase and subtraction uncertainty with correlations stated"
+  ]
+}

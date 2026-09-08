@@ -1,0 +1,650 @@
+{
+  "scope": "Each ratio compares its own conditional local upper estimate with expected raw Xe counts in 2.84 t yr. Not a detector fit, full-model bound, or a common UV coupling scan. Source response prescriptions and target approximations remain distinct.",
+  "checks": {
+    "positive": true,
+    "recover_parent": true,
+    "common_rate_scaling_cancels": true
+  },
+  "summaries": [
+    {
+      "model": "absorption_exclusive_nuclear",
+      "rows": 6,
+      "minimum": {
+        "model": "absorption_exclusive_nuclear",
+        "parameters": {
+          "m_GeV": 0.247,
+          "form": "source_Helm"
+        },
+        "D_upper": 9.812692654095094e-26,
+        "Xe_raw": 5.382134212613603,
+        "ratio_upper": 1.8231973166142918e-26
+      },
+      "maximum": {
+        "model": "absorption_exclusive_nuclear",
+        "parameters": {
+          "m_GeV": 0.247,
+          "form": "KN"
+        },
+        "D_upper": 6.207799247336779e-26,
+        "Xe_raw": 0.22536815969561358,
+        "ratio_upper": 2.7545147707294354e-25
+      }
+    },
+    {
+      "model": "axion_assembled_subset",
+      "rows": 48,
+      "minimum": {
+        "model": "axion_assembled_subset",
+        "parameters": {
+          "lambda_PhiH": 0.01,
+          "halo": "v0_220",
+          "mode": "linear_interference"
+        },
+        "D_upper": 2.46210409851092e-30,
+        "Xe_raw": 0.6901816447620548,
+        "ratio_upper": 3.5673276987245125e-30
+      },
+      "maximum": {
+        "model": "axion_assembled_subset",
+        "parameters": {
+          "lambda_PhiH": 0.1,
+          "halo": "summer_speed",
+          "mode": "squared_subset"
+        },
+        "D_upper": 2.4761170015321488e-28,
+        "Xe_raw": 9.004291466802133,
+        "ratio_upper": 2.749929864733199e-29
+      }
+    }
+  ],
+  "rows": [
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "central",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.5723502575933932e-30,
+      "Xe_raw": 0.6880778509758649,
+      "ratio_upper": 3.738458161304223e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "central",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.57440845320382e-30,
+      "Xe_raw": 0.6881513394829385,
+      "ratio_upper": 3.741049832349629e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "v0_220",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.46210409851092e-30,
+      "Xe_raw": 0.6901816447620548,
+      "ratio_upper": 3.5673276987245125e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "v0_220",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.464091656621614e-30,
+      "Xe_raw": 0.6902570695269727,
+      "ratio_upper": 3.56981734111066e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "vesc_528",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.5608915366977576e-30,
+      "Xe_raw": 0.6884695732141622,
+      "ratio_upper": 3.719687312748012e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "vesc_528",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.5629433980261404e-30,
+      "Xe_raw": 0.6885432054005391,
+      "ratio_upper": 3.7222695364994936e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "vesc_560",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.5820170297627243e-30,
+      "Xe_raw": 0.6877316284313602,
+      "ratio_upper": 3.7543962252427155e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "vesc_560",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.5840804537045633e-30,
+      "Xe_raw": 0.6878050009959933,
+      "ratio_upper": 3.75699573274783e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "summer_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.659871113387532e-30,
+      "Xe_raw": 0.6905731924921894,
+      "ratio_upper": 3.851686023009959e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "summer_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.6619872287061014e-30,
+      "Xe_raw": 0.6906450145841592,
+      "ratio_upper": 3.854349445074757e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "winter_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.4894924560425856e-30,
+      "Xe_raw": 0.6848786836065602,
+      "ratio_upper": 3.634939319373992e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.01,
+        "halo": "winter_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.4914949389276245e-30,
+      "Xe_raw": 0.6849538042917142,
+      "ratio_upper": 3.637464195857689e-30
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "central",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.1797230165466445e-29,
+      "Xe_raw": 1.374501642971214,
+      "ratio_upper": 1.5858278727370674e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "central",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.1815864646848785e-29,
+      "Xe_raw": 1.3751669886503721,
+      "ratio_upper": 1.5864156736528043e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "v0_220",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.1027184013381786e-29,
+      "Xe_raw": 1.3946911688041892,
+      "ratio_upper": 1.5076587909716625e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "v0_220",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.1045178957313456e-29,
+      "Xe_raw": 1.3953740448542713,
+      "ratio_upper": 1.5082105787277525e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "vesc_528",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.1726605148142146e-29,
+      "Xe_raw": 1.3762354103248216,
+      "ratio_upper": 1.5786983088172535e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "vesc_528",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.1745182280232601e-29,
+      "Xe_raw": 1.376902056838727,
+      "ratio_upper": 1.5792831575949604e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "vesc_560",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.1855732938944174e-29,
+      "Xe_raw": 1.3730724531357308,
+      "ratio_upper": 1.5917392333544756e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "vesc_560",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.1874414756567961e-29,
+      "Xe_raw": 1.3737367491024277,
+      "ratio_upper": 1.5923294452783816e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "summer_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.2425758604653885e-29,
+      "Xe_raw": 1.3614317347420428,
+      "ratio_upper": 1.6472187354221622e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "summer_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.2444917479207404e-29,
+      "Xe_raw": 1.3620819931357524,
+      "ratio_upper": 1.6478389401166117e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "winter_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.1193979428717157e-29,
+      "Xe_raw": 1.3865479323770078,
+      "ratio_upper": 1.5285428605690952e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.03,
+        "halo": "winter_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.1212109498498024e-29,
+      "Xe_raw": 1.3872280553685745,
+      "ratio_upper": 1.529100382334911e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "central",
+        "mode": "linear_interference"
+      },
+      "D_upper": 1.1795691039913e-28,
+      "Xe_raw": 4.807880160466569,
+      "ratio_upper": 2.4534078733710197e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "central",
+        "mode": "squared_subset"
+      },
+      "D_upper": 1.1805949598148426e-28,
+      "Xe_raw": 4.811542980443704,
+      "ratio_upper": 2.4536722723112247e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "v0_220",
+        "mode": "linear_interference"
+      },
+      "D_upper": 1.1388665344472551e-28,
+      "Xe_raw": 4.918531533056395,
+      "ratio_upper": 2.315460471876977e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "v0_220",
+        "mode": "squared_subset"
+      },
+      "D_upper": 1.139857182786099e-28,
+      "Xe_raw": 4.922290860149753,
+      "ratio_upper": 2.3157046488541328e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "vesc_528",
+        "mode": "linear_interference"
+      },
+      "D_upper": 1.1759034532015359e-28,
+      "Xe_raw": 4.8163266159904925,
+      "ratio_upper": 2.4414944146384633e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "vesc_528",
+        "mode": "squared_subset"
+      },
+      "D_upper": 1.1769261518615467e-28,
+      "Xe_raw": 4.819996597242804,
+      "ratio_upper": 2.4417572255855678e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "vesc_560",
+        "mode": "linear_interference"
+      },
+      "D_upper": 1.1825968280093365e-28,
+      "Xe_raw": 4.801034146978839,
+      "ratio_upper": 2.4632126991921368e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "vesc_560",
+        "mode": "squared_subset"
+      },
+      "D_upper": 1.1836252897631415e-28,
+      "Xe_raw": 4.804691188143709,
+      "ratio_upper": 2.4634783868813738e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "summer_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 1.212914695897388e-28,
+      "Xe_raw": 4.716955441962582,
+      "ratio_upper": 2.5713931598911416e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "summer_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 1.2139694203423558e-28,
+      "Xe_raw": 4.720535204346961,
+      "ratio_upper": 2.571677506449815e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "winter_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 1.1475073998307232e-28,
+      "Xe_raw": 4.896181708488983,
+      "ratio_upper": 2.343678131555409e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.07,
+        "halo": "winter_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 1.1485054870478735e-28,
+      "Xe_raw": 4.899925879614418,
+      "ratio_upper": 2.3439242047029717e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "central",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.4060857027082986e-28,
+      "Xe_raw": 9.187153973011325,
+      "ratio_upper": 2.6189674297138645e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "central",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.4081965883836415e-28,
+      "Xe_raw": 9.194690890872174,
+      "ratio_upper": 2.619116419426699e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "v0_220",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.3232889485904855e-28,
+      "Xe_raw": 9.41318941832034,
+      "ratio_upper": 2.4681208943578722e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "v0_220",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.325327388437272e-28,
+      "Xe_raw": 9.42092491711402,
+      "ratio_upper": 2.4682580626591032e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "vesc_528",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.3986453368096697e-28,
+      "Xe_raw": 9.204162461345243,
+      "ratio_upper": 2.606044109807133e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "vesc_528",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.400749726044557e-28,
+      "Xe_raw": 9.211714114831404,
+      "ratio_upper": 2.606192176740709e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "vesc_560",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.4122290855240364e-28,
+      "Xe_raw": 9.173398801722762,
+      "ratio_upper": 2.6295914280659206e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "vesc_560",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.4143453333767296e-28,
+      "Xe_raw": 9.180923828627009,
+      "ratio_upper": 2.6297411659691233e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "summer_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.473946713396894e-28,
+      "Xe_raw": 8.99692545503496,
+      "ratio_upper": 2.749769046949696e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "summer_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.4761170015321488e-28,
+      "Xe_raw": 9.004291466802133,
+      "ratio_upper": 2.749929864733199e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "winter_speed",
+        "mode": "linear_interference"
+      },
+      "D_upper": 2.340823761358484e-28,
+      "Xe_raw": 9.3727190925927,
+      "ratio_upper": 2.4974863091847565e-29
+    },
+    {
+      "model": "axion_assembled_subset",
+      "parameters": {
+        "lambda_PhiH": 0.1,
+        "halo": "winter_speed",
+        "mode": "squared_subset"
+      },
+      "D_upper": 2.342877508055705e-28,
+      "Xe_raw": 9.380423405227582,
+      "ratio_upper": 2.497624474765234e-29
+    },
+    {
+      "model": "absorption_exclusive_nuclear",
+      "parameters": {
+        "m_GeV": 0.247,
+        "form": "source_Helm"
+      },
+      "D_upper": 9.812692654095094e-26,
+      "Xe_raw": 5.382134212613603,
+      "ratio_upper": 1.8231973166142918e-26
+    },
+    {
+      "model": "absorption_exclusive_nuclear",
+      "parameters": {
+        "m_GeV": 0.247,
+        "form": "Helm"
+      },
+      "D_upper": 8.568413316768096e-26,
+      "Xe_raw": 4.090633188726606,
+      "ratio_upper": 2.0946423014368102e-26
+    },
+    {
+      "model": "absorption_exclusive_nuclear",
+      "parameters": {
+        "m_GeV": 0.247,
+        "form": "KN"
+      },
+      "D_upper": 6.207799247336779e-26,
+      "Xe_raw": 0.22536815969561358,
+      "ratio_upper": 2.7545147707294354e-25
+    },
+    {
+      "model": "absorption_exclusive_nuclear",
+      "parameters": {
+        "m_GeV": 0.2475,
+        "form": "source_Helm"
+      },
+      "D_upper": 9.654802001321608e-26,
+      "Xe_raw": 5.025710636967714,
+      "ratio_upper": 1.9210819521330175e-26
+    },
+    {
+      "model": "absorption_exclusive_nuclear",
+      "parameters": {
+        "m_GeV": 0.2475,
+        "form": "Helm"
+      },
+      "D_upper": 8.42240886672067e-26,
+      "Xe_raw": 3.782841157198757,
+      "ratio_upper": 2.2264770094014663e-26
+    },
+    {
+      "model": "absorption_exclusive_nuclear",
+      "parameters": {
+        "m_GeV": 0.2475,
+        "form": "KN"
+      },
+      "D_upper": 6.09031464399063e-26,
+      "Xe_raw": 0.2904555579331367,
+      "ratio_upper": 2.0968146339938965e-25
+    }
+  ]
+}

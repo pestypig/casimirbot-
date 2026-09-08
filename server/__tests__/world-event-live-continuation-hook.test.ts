@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import { HELIX_ROOM_SOURCE_ADMISSION_SCHEMA, type HelixRoomSourceAdmission } from "@shared/helix-room-source-ingress";
 import {
   __resetHelixThreadLedgerStore,
   getHelixThreadLedgerEvents,
@@ -64,6 +66,15 @@ const sourceDisconnectedEvent = (): HelixWorldEvent => ({
   meta: { server_id: "server:paper" },
 });
 
+const admittedSource = (event: HelixWorldEvent): HelixRoomSourceAdmission => ({
+  schema: HELIX_ROOM_SOURCE_ADMISSION_SCHEMA, transport: "room_source_ingress",
+  binding_id: "binding:continuation-fixture", request_id: "request:continuation-fixture",
+  room_id: event.room_id, world_id: event.world_id, source_id: event.source_id!,
+  domain_adapter: "minecraft.paper_plugin.v1", evidence_refs: event.evidence_refs ?? [],
+  content_role: "source_admission_not_assistant_answer", reentry_required: true, model_invoked: false,
+  answer_authority: false, assistant_answer: false, terminal_eligible: false, raw_content_included: false,
+});
+
 describe("world-event ingest live continuation hook", () => {
   beforeEach(() => {
     __resetHelixThreadLedgerStore();
@@ -74,7 +85,7 @@ describe("world-event ingest live continuation hook", () => {
   });
 
   it("appends live continuation tick and side receipts as non-terminal tool observations", async () => {
-    const threadId = "thread:continuation-hook";
+    const threadId = `thread:continuation-hook:${randomUUID()}`;
     createSituationThreadBinding({
       room_id: "room:minecraft:continuation",
       source_id: "source:minecraft-server",
@@ -92,7 +103,7 @@ describe("world-event ingest live continuation hook", () => {
       now: "2026-06-02T02:29:59.000Z",
     });
 
-    const result = await ingestWorldEvent(riskEvent());
+    const result = await ingestWorldEvent(riskEvent(), { sourceAdmission: admittedSource(riskEvent()) });
     const completed = getHelixThreadLedgerEvents({ threadId }).filter(
       (event) => event.event_type === "item_completed",
     );
@@ -137,8 +148,19 @@ describe("world-event ingest live continuation hook", () => {
     });
   });
 
+  it("keeps a source without admission unknown rather than enabling voice", async () => {
+    const threadId = `thread:continuation-unadmitted:${randomUUID()}`;
+    createSituationThreadBinding({ room_id: "room:minecraft:continuation", source_id: "source:minecraft-server",
+      world_id: "minecraft:minehut", thread_id: threadId, mode: "standby_receipts", append_policy: "salient_only" });
+    upsertLiveContinuationJob({ thread_id: threadId, room_id: "room:minecraft:continuation",
+      source_ids: ["source:minecraft-server"], objective: "Observe risk.", voice_policy: "automatic_when_policy_allows" });
+    const result = await ingestWorldEvent(riskEvent());
+    expect(result.live_continuation_callout_candidate).toMatchObject({ blocked_reason: "source_unknown",
+      terminal_eligible: false, assistant_answer: false });
+  });
+
   it("updates route context for location samples without appending callout candidates", async () => {
-    const threadId = "thread:continuation-location";
+    const threadId = `thread:continuation-location:${randomUUID()}`;
     createSituationThreadBinding({
       room_id: "room:minecraft:continuation",
       source_id: "source:minecraft-server",
@@ -156,7 +178,7 @@ describe("world-event ingest live continuation hook", () => {
       now: "2026-06-02T02:30:59.000Z",
     });
 
-    const result = await ingestWorldEvent(locationEvent());
+    const result = await ingestWorldEvent(locationEvent(), { sourceAdmission: admittedSource(locationEvent()) });
     const completed = getHelixThreadLedgerEvents({ threadId }).filter(
       (event) => event.event_type === "item_completed",
     );
@@ -175,7 +197,7 @@ describe("world-event ingest live continuation hook", () => {
   });
 
   it("turns source disconnects into source-health receipts and ask-user direction", async () => {
-    const threadId = "thread:continuation-source-health";
+    const threadId = `thread:continuation-source-health:${randomUUID()}`;
     createSituationThreadBinding({
       room_id: "room:minecraft:continuation",
       source_id: "source:minecraft-server",

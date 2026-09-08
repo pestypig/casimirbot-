@@ -1,0 +1,174 @@
+{
+  "scope": "Linearized library finite VddLL response only, mt configured to162.6; all active non-SM coefficients rotated with Uq=Vdagger, other flavor rotations identity. Tree VLL qq term included once for reported partial total. Other LEFT chiralities and complete input/UV matching not established.",
+  "active_count": 31,
+  "generated_count": 25,
+  "rows": [
+    {
+      "operator": "phil3",
+      "max_coefficient_GeV_minus2": 3.105147165526161e-11,
+      "VLL_real": -2.919219422674479e-20,
+      "VLL_imag": 3.344346155166452e-20
+    },
+    {
+      "operator": "ll",
+      "max_coefficient_GeV_minus2": 1.416287106076301e-13,
+      "VLL_real": -6.667536214717866e-23,
+      "VLL_imag": 7.626933704802085e-23
+    },
+    {
+      "operator": "phiD",
+      "max_coefficient_GeV_minus2": 1.2911204826504059e-11,
+      "VLL_real": 5.058954572778547e-26,
+      "VLL_imag": 3.2540841190174393e-29
+    },
+    {
+      "operator": "phiBox",
+      "max_coefficient_GeV_minus2": 8.794005516247992e-11,
+      "VLL_real": -6.016708464877184e-32,
+      "VLL_imag": 8.262964117413664e-32
+    },
+    {
+      "operator": "phiu",
+      "max_coefficient_GeV_minus2": 4.202422165256576e-12,
+      "VLL_real": 3.603722406669009e-36,
+      "VLL_imag": -1.526982769362653e-36
+    },
+    {
+      "operator": "uphi",
+      "max_coefficient_GeV_minus2": 5.601170910966119e-11,
+      "VLL_real": 4.7138634108710534e-46,
+      "VLL_imag": 1.8647783198318793e-48
+    },
+    {
+      "operator": "phi",
+      "max_coefficient_GeV_minus2": 3.1286254313317384e-11,
+      "VLL_real": 3.494994789892085e-46,
+      "VLL_imag": -1.5215923179060944e-49
+    },
+    {
+      "operator": "phil1",
+      "max_coefficient_GeV_minus2": 3.151810933017336e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "phie",
+      "max_coefficient_GeV_minus2": 6.303689490149011e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "phid",
+      "max_coefficient_GeV_minus2": 2.1012275186567474e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "ee",
+      "max_coefficient_GeV_minus2": 9.087853095309262e-15,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "le",
+      "max_coefficient_GeV_minus2": 9.270280075984133e-15,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "dd",
+      "max_coefficient_GeV_minus2": 1.69700362636272e-15,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "uu",
+      "max_coefficient_GeV_minus2": 1.098099138896835e-13,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "ud8",
+      "max_coefficient_GeV_minus2": 5.437201560905333e-14,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "ud1",
+      "max_coefficient_GeV_minus2": 4.9697679136161753e-14,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "qd1",
+      "max_coefficient_GeV_minus2": 1.1291164714805255e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "qd8",
+      "max_coefficient_GeV_minus2": 2.813001190767069e-13,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "lq1",
+      "max_coefficient_GeV_minus2": 1.5424988469467625e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "lq3",
+      "max_coefficient_GeV_minus2": 5.346781075587412e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "ld",
+      "max_coefficient_GeV_minus2": 3.0888172717428518e-15,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "lu",
+      "max_coefficient_GeV_minus2": 7.31562956535485e-14,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "qe",
+      "max_coefficient_GeV_minus2": 3.395386263045824e-12,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "ed",
+      "max_coefficient_GeV_minus2": 6.1065367987248945e-15,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    },
+    {
+      "operator": "eu",
+      "max_coefficient_GeV_minus2": 1.4759358267655405e-13,
+      "VLL_real": -0.0,
+      "VLL_imag": -0.0
+    }
+  ],
+  "generated_total": {
+    "real": -2.9258819094512815e-20,
+    "imag": 3.3519730920790755e-20
+  },
+  "all_finite": {
+    "real": -3.4408585476322682e-15,
+    "imag": 1.4935609119316624e-15
+  },
+  "tree_plus_all_VLL_imag_GeV_minus2": 2.7745442092905028e-15,
+  "previous_partial_VLL_imag_GeV_minus2": 2.7745106895407824e-15,
+  "checks": {
+    "qq_rotation": true,
+    "generated_linearity": true,
+    "generated_amplification": true,
+    "all_amplification": true
+  },
+  "full_model_admitted": false
+}

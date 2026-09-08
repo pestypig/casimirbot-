@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as roomDatabase from "../../../helix-ask/realtime-room/room-store/database";
 import {
   HELIX_ENVIRONMENT_ACTION_REQUEST_SCHEMA,
   HELIX_ENVIRONMENT_ACTION_RESULT_SCHEMA,
@@ -9,12 +10,36 @@ import {
 import {
   canonicalizeEnvironmentActionResult,
   environmentActionWorkflowMeasurementsValid,
+  environmentActionSequenceCheckpointMeasurementsValid,
   readRecordedWorkflowEvidence,
+  submitEnvironmentActionWorkflowEvent,
+  submitEnvironmentActionResult,
 } from "../action-broker";
+import { environmentConnectorSha256 } from "../../catalog";
 import { minecraftPlayerCapabilityForActionKind } from "@shared/helix-minecraft-player-capabilities";
+import { helixMinecraftFluidSequenceArgumentsSchema } from "@shared/helix-minecraft-fluid-sequence";
 
 const startedAt = "2026-08-05T12:00:00.000Z";
 const completedAt = "2026-08-05T12:00:05.000Z";
+
+it("requires persistence even for an exact terminal-result retry with no SQL writes", async () => {
+  const query = vi.fn(async (sql: string) => ({ rows: sql.includes("FROM helix_environment_action_requests")
+    ? [{ ...request, status: "succeeded" }]
+    : [{ result_payload: result, submitted_result_hash: environmentConnectorSha256(result),
+      result_hash: environmentConnectorSha256(result), received_at: completedAt,
+      provenance_valid: true, eligible_for_current_turn_reentry: false }] }));
+  const transaction = vi.spyOn(roomDatabase, "withSharedRealtimeRoomTransaction")
+    .mockImplementation(async callback => callback({ query } as never));
+  try {
+    const receipt = await submitEnvironmentActionResult({ claim: { authorityId: request.action_authority_id } as never, result });
+    expect(receipt).toMatchObject({ replayed: true, observation: { terminal_eligible: false, eligible_for_current_turn_reentry: false } });
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      requireLocalSnapshot: true,
+      snapshotTables: ["helix_environment_action_results", "helix_environment_action_requests"],
+    });
+    expect(query.mock.calls.every(([sql]) => sql.trim().startsWith("SELECT"))).toBe(true);
+  } finally { transaction.mockRestore(); }
+});
 
 const request = helixEnvironmentActionRequestSchema.parse({
   schema: HELIX_ENVIRONMENT_ACTION_REQUEST_SCHEMA,
@@ -121,6 +146,121 @@ const result = helixEnvironmentActionResultSchema.parse({
 });
 
 describe("environment action result canonicalization", () => {
+  const checkpointSequenceRequest = {
+    ...request,
+    action_kind: "execute_sequence",
+    arguments: {
+      action_kind: "execute_sequence",
+      sequence_schema: "helix.minecraft.player_sequence.v1",
+      sequence_id: "sequence:checkpoint",
+      ruleset: "survival_tas",
+      execution_plane: "player_embodiment",
+      scheduler_engine: "native_fabric",
+      optimization: { primary: "minimize_world_ticks", record_wall_clock: true, stop_on_first_verified_success: true },
+      start_node_id: "node:checkpoint",
+      max_total_ticks: 40,
+      required_checkpoint_ids: ["checkpoint:grounded"],
+      mutation_scope: { world_mutation_allowed: false, max_block_mutations: 0, max_inventory_transfers: 0, allowed_block_ids: [], allowed_regions: [], combat_allowed: false },
+      nodes: [
+        { node_id: "node:checkpoint", node_kind: "checkpoint", earliest_tick: 0, checkpoint_id: "checkpoint:grounded", condition: { condition_kind: "player_grounded", expected: true }, wait_up_to_ticks: 10, on_satisfied: "node:success", on_timeout: "node:failed" },
+        { node_id: "node:success", node_kind: "terminal", terminal_outcome: "succeeded", reason_code: "complete" },
+        { node_id: "node:failed", node_kind: "terminal", terminal_outcome: "failed", reason_code: "failed" },
+      ],
+    },
+  };
+  const checkpointSettlement = { checkpoint_id: "checkpoint:grounded", node_id: "node:checkpoint", tick_index: 3, scheduler_ticks_elapsed: 4, monotonic_elapsed_ns: 150_000_000 };
+  const checkpointMeasurements = {
+    sequence_completed: true, sequence_id: "sequence:checkpoint", ruleset: "survival_tas", executed_node_count: 2,
+    required_checkpoints_satisfied: 1, satisfied_checkpoint_ids: ["checkpoint:grounded"], scheduler_ticks_elapsed: 4,
+    condition_observation_count: 1,
+    condition_observations: [{ node_id: "node:checkpoint", tick_index: 3, condition_kind: "player_grounded", satisfied: true }],
+    checkpoint_settlements: [checkpointSettlement],
+  };
+  const validCheckpointMeasurements = (measurements: Record<string, unknown>) => environmentActionWorkflowMeasurementsValid({
+    request: checkpointSequenceRequest,
+    result: { ...result, action_kind: "execute_sequence", duration_ticks: 4 },
+    measurements,
+  });
+
+  it("validates measured checkpoint timing against the admitted sequence", () => {
+    expect(validCheckpointMeasurements(checkpointMeasurements)).toBe(true);
+  });
+
+  it("retains legacy finite-result compatibility without inventing timing", () => {
+    const { checkpoint_settlements: omitted, ...legacy } = checkpointMeasurements;
+    expect(omitted).toHaveLength(1);
+    expect(validCheckpointMeasurements(legacy)).toBe(true);
+    expect(legacy).not.toHaveProperty("checkpoint_settlements");
+  });
+
+  it("validates partial checkpoint evidence without demanding future checkpoints", () => {
+    const sequence = helixMinecraftFluidSequenceArgumentsSchema.parse(checkpointSequenceRequest.arguments);
+    const partial = { ...checkpointMeasurements, required_checkpoints_satisfied: 0, satisfied_checkpoint_ids: [], checkpoint_settlements: [], condition_observations: [] };
+    expect(environmentActionSequenceCheckpointMeasurementsValid({ sequence, measurements: partial, require_complete: false })).toBe(true);
+    expect(environmentActionSequenceCheckpointMeasurementsValid({ sequence, measurements: partial, require_complete: true })).toBe(false);
+    expect(environmentActionSequenceCheckpointMeasurementsValid({ sequence, measurements: { ...checkpointMeasurements, checkpoint_settlements: [{ ...checkpointSettlement, node_id: "node:forged" }] }, require_complete: false })).toBe(false);
+  });
+
+  it("retains checkpoint timing when a sequence hits its terminal tick ceiling", () => {
+    const sequence = helixMinecraftFluidSequenceArgumentsSchema.parse(checkpointSequenceRequest.arguments);
+    const exhausted = { ...checkpointMeasurements, scheduler_ticks_elapsed: sequence.max_total_ticks + 1 };
+    expect(environmentActionSequenceCheckpointMeasurementsValid({ sequence, measurements: exhausted, require_complete: false })).toBe(true);
+    expect(environmentActionSequenceCheckpointMeasurementsValid({ sequence, measurements: exhausted, require_complete: true })).toBe(false);
+  });
+
+  it.each([true, false])("checks checkpoint evidence before production event persistence (valid=%s)", async (valid) => {
+    const statements: string[] = [];
+    const query = vi.fn(async (sql: string) => {
+      statements.push(sql);
+      if (sql.includes("FROM helix_environment_action_requests")) return { rows: [{ ...checkpointSequenceRequest, status: "running", connector_manifest_id: "manifest:test", request_payload: checkpointSequenceRequest }] };
+      if (sql.includes("FROM helix_environment_action_connector_manifests")) return { rows: [{ manifest_id: "manifest:test", producer_epoch_ref: "epoch:test" }] };
+      return { rows: [] };
+    });
+    const transaction = vi.spyOn(roomDatabase, "withSharedRealtimeRoomTransaction")
+      .mockImplementation(async (callback) => callback({ query } as never));
+    try {
+      const event = {
+        schema: "helix.environment_action.workflow_event.v1", event_id: "event:checkpoint",
+        action_request_id: request.action_request_id, workflow_id: request.workflow_id, sequence: 0,
+        event_type: "workflow.progress", workflow_state: "running", progress_fraction: 0.5,
+        summary: "Checkpoint observed.", control_engine: "native_fabric",
+        measurements: { ...checkpointMeasurements, checkpoint_settlements: [{ ...checkpointSettlement, checkpoint_id: valid ? checkpointSettlement.checkpoint_id : "checkpoint:forged" }] },
+        evidence_refs: [], manual_override_detected: false, controls_released: false, created_at: completedAt,
+        content_role: "environment_action_event_not_assistant_answer", answer_authority: false,
+        assistant_answer: false, terminal_eligible: false, raw_content_included: false,
+      };
+      const pending = submitEnvironmentActionWorkflowEvent({ claim: { authorityId: request.action_authority_id } as never, event });
+      expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+        requireLocalSnapshot: true,
+        snapshotTables: ["helix_environment_action_workflow_events", "helix_environment_action_requests"],
+      });
+      if (valid) await expect(pending).resolves.toMatchObject({ replayed: false });
+      else await expect(pending).rejects.toMatchObject({ code: "action_event_invalid" });
+      expect(statements.some((sql) => sql.includes("INSERT INTO helix_environment_action_workflow_events"))).toBe(valid);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
+  it.each([
+    { checkpoint_id: "checkpoint:forged" },
+    { node_id: "node:success" },
+    { tick_index: 4 },
+    { tick_index: -1 },
+    { scheduler_ticks_elapsed: 5 },
+    { monotonic_elapsed_ns: -1 },
+    { monotonic_elapsed_ns: Number.MAX_SAFE_INTEGER + 1 },
+  ])("rejects malformed checkpoint settlement %j", (patch) => {
+    expect(validCheckpointMeasurements({ ...checkpointMeasurements, checkpoint_settlements: [{ ...checkpointSettlement, ...patch }] })).toBe(false);
+  });
+
+  it("rejects duplicate, missing and unsupported settlement evidence", () => {
+    for (const settlements of [[], [checkpointSettlement, checkpointSettlement], null]) {
+      expect(validCheckpointMeasurements({ ...checkpointMeasurements, checkpoint_settlements: settlements })).toBe(false);
+    }
+    expect(validCheckpointMeasurements({ ...checkpointMeasurements, condition_observations: [{ ...checkpointMeasurements.condition_observations[0], satisfied: false }] })).toBe(false);
+  });
+
   it("admits only bounded typed manual-override causes", () => {
     const canceled = helixEnvironmentActionResultSchema.parse({
       ...result,

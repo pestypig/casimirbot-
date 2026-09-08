@@ -35,9 +35,10 @@ export type VisualSequenceInspectorProps = {
   hudElement?: HTMLElement | null;
   hudReceipt?: HudSurfaceRenderReceipt | null;
   hudIdentity?: CaptureIdentity;
+  onArtifact?: (result: VisualSequenceIngestResponse) => void;
 };
 
-export default function VisualSequenceInspector({ hudElement = null, hudReceipt = null, hudIdentity }: VisualSequenceInspectorProps) {
+export default function VisualSequenceInspector({ hudElement = null, hudReceipt = null, hudIdentity, onArtifact }: VisualSequenceInspectorProps) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,9 @@ export default function VisualSequenceInspector({ hudElement = null, hudReceipt 
     setBusy(true);
     setError(null);
     try {
-      setResult(await postClip(file));
+      const next = await postClip(file);
+      setResult(next);
+      onArtifact?.({ ok: true, ...next });
     } catch (caught) {
       setResult(null);
       setError(caught instanceof Error ? caught.message : "Visual-sequence extraction failed.");
@@ -154,7 +157,7 @@ export default function VisualSequenceInspector({ hudElement = null, hudReceipt 
           </div>
         </div>
       ) : null}
-      {hudIdentity ? <BoundedCaptureControls hudElement={hudElement} hudReceipt={hudReceipt} hudIdentity={hudIdentity} onArtifact={(captured) => setResult({ manifest: captured.manifest, receipt: captured.receipt })} /> : null}
+      {hudIdentity ? <BoundedCaptureControls hudElement={hudElement} hudReceipt={hudReceipt} hudIdentity={hudIdentity} onArtifact={(captured) => { setResult({ manifest: captured.manifest, receipt: captured.receipt }); onArtifact?.(captured); }} /> : null}
     </article>
   );
 }

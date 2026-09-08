@@ -1,0 +1,9 @@
+{
+  "schema": "et6.catalog_perception_join.v1",
+  "date": "2026-09-05",
+  "classification": "source and tool admission preflight",
+  "implementation": "Temporal perception context now resolves the fresh action catalog through the existing broker and compares authority, policy, environment, room/source/world, player binding/native identity and action producer epoch against the goal. Truncated catalogs fail closed.",
+  "verification": {"perception_tests_passed": 9, "catalog_tests_passed": 2, "failed": 0, "new_cases": ["action epoch changed", "wrong native player", "catalog truncated"]},
+  "limits": "The action resolver boundary is mocked in these tests. This is not atomic dispatch validation or independent provider-task authentication. No external tool exposure, published frontier or native extension occurs.",
+  "et6_complete": false
+}

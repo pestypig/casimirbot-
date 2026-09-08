@@ -1,0 +1,980 @@
+{
+  "schema": "casimirbot.cfp0.inspection_manifest.v1",
+  "captured_utc": "2026-09-07T02:42:34.085Z",
+  "head": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+  "files": [
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true,
+      "bytes": 99328,
+      "sha256": "7d9ff697ca07c857353d2fa919284bd6051edb8d7c4432bebb8b8b4f53817d78",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "present": true,
+      "bytes": 31188,
+      "sha256": "9255253774dae1690aff57d75f6eaf5e4391f81dc2569007f889618cb5820be0",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/helix-ask-codex-parity-work-program-v1.md",
+      "present": true,
+      "bytes": 21759,
+      "sha256": "23c18ea41cb0b0e13954931714492188201988c25126323a3881f619c3c97e29",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "present": true,
+      "bytes": 21559,
+      "sha256": "90824c15fc12d8b27d5be5d233f7e91f0974a1a334ab1321bbc67f5248ced41b",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "present": true,
+      "bytes": 5854,
+      "sha256": "57450cbb6345c9e571625519a3389d1d7c80e8ea3236da908349afcb5210d1b0",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "present": true,
+      "bytes": 97538,
+      "sha256": "3bf96c0872c6e2ad388eebb544ab2b57fd0cf3411727c3aaa0cc0c91c2a5690a",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+      "present": true,
+      "bytes": 14067,
+      "sha256": "a5c329dbb0d7bb37ea06b088d802945eb615bafdbb602f551349fac3e1df5ac3",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+      "present": true,
+      "bytes": 9547,
+      "sha256": "5cd66666ede87badae5a1bb198d2199fdc4e0d83e51db02f92cc0737846917b6",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "present": true,
+      "bytes": 31369,
+      "sha256": "c77b876666a01f1f7adfde2c8e021eefb2706657b93c1efec46dd79b71a30f6a",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
+      "present": true,
+      "bytes": 13080,
+      "sha256": "afe3d5e45c3af288f90f9c90e4f9e4e7245dc5431d86edfb61f3b39879681431",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+      "present": true,
+      "bytes": 13071,
+      "sha256": "1bffac9de118b306e9d951ce6df63f7752b9e7ca4ad0acb026eab1b4575b7ead",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-public-ui-agent-affordance-manifest-v1.md",
+      "present": true,
+      "bytes": 11523,
+      "sha256": "12ed95e263a13f5a133d5a50e793e3734c747ea9f9db68861768cf6c263a6d3c",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "present": true,
+      "bytes": 64502,
+      "sha256": "3944b7375cc78fbe809d5a923ed9aaf3090c731bef6d6f8e44982f6d74dc4d9c",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+      "present": true,
+      "bytes": 12704,
+      "sha256": "8d3753a32e01e4e91567b9d22a1f9b55afd97e2988d969343915c98304bc3804",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+      "present": true,
+      "bytes": 25822,
+      "sha256": "2420da8258f9cade455f273840f2624935711fd0a1410ca8a6613d79c8290a02",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md",
+      "present": true,
+      "bytes": 22423,
+      "sha256": "efe65f1730979bfa8bbd57275740038c87e5530421543f7343fbbd5ab5486d96",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+      "present": true,
+      "bytes": 73536,
+      "sha256": "0baf58d8cfa5ddd870cae934d1b48cd7f9297dc795f72ab4e08f68e952a597ff",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-shared-live-room-mcp-configuration-v1.md",
+      "present": true,
+      "bytes": 12294,
+      "sha256": "5930c66478627f736290485ec392594a7cb0bb6a58600ab758566fea3bc60df5",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+      "present": true,
+      "bytes": 13581,
+      "sha256": "cb37a6d980703c3afe2e95f45ae4ff4101bf9e03862b9c5a8798bb97eeaac7bf",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+      "present": true,
+      "bytes": 32818,
+      "sha256": "fdc0d94332a639d5a9d0d940e1e259b053c07bd9c529dd12271da66eb592acc4",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+      "present": true,
+      "bytes": 17700,
+      "sha256": "3d9b87516c0513124b51f7b82bd2694e98b9e429cda86dd5f118284a3d35d2cd",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+      "present": true,
+      "bytes": 200754,
+      "sha256": "5a365fce6fa1ee790ae7957d8e64cb39d0b91b1a8e61b9ec08e0db1be39cc54b",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "present": true,
+      "bytes": 73787,
+      "sha256": "7f511d37f65529c797290fa5cdb1b5c27b2469c2b9132ce055d118b8f0db8cfd",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md",
+      "present": true,
+      "bytes": 9837,
+      "sha256": "f3da4177c12636b3f17ff30546168a9bc10841f3c6bf4b558a9f57d11de5cce0",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-local-supervisor-mcp-coordination-v1.md",
+      "present": true,
+      "bytes": 40614,
+      "sha256": "b349218dda482b1321f2da10337b443f8d619dccf4c7b9f76c64dfc183e9450b",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+      "present": true,
+      "bytes": 8177,
+      "sha256": "3f2891311986cd0fba512f291d4ec795dc8132ac477eae0c9197831f8c5e6453",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+      "present": true,
+      "bytes": 26128,
+      "sha256": "8f10e124813a7a0e236f0d4b9f67697b8b7480e897e056a69a22e24a02f82926",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md",
+      "present": true,
+      "bytes": 18125,
+      "sha256": "6c3f81407c9bf7262d89e6bd35437a3fa8cbce7507a6f485fc69441f7d5a84d3",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "present": true,
+      "bytes": 32429,
+      "sha256": "4d5aa53be806e5c5585ee9d36615b68644cf9611f854e149ade27a02bce89615",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+      "present": true,
+      "bytes": 92354,
+      "sha256": "4004aa6ef6a96eef6b2f13947ac60cf7201e3b82cc909d3a05f2ac4720187e50",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+      "present": true,
+      "bytes": 26576,
+      "sha256": "816aadb9b5f5153abe6f01b70605e1f3affef716da29853e95c5bd614fe0bb0f",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+      "present": true,
+      "bytes": 7705,
+      "sha256": "97de6b91ac6126a6c38ec5307c2088aabe663def17fac63a2581a06c13e9b63d",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "present": true,
+      "bytes": 32354,
+      "sha256": "7f24ef31926470ba6ab6c628d189acc12f859ed4346eb69bed9dcdef33d112e5",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md",
+      "present": true,
+      "bytes": 8433,
+      "sha256": "1db2cafed127ae3548d462e9a4d4fb0f3d448bcd4c8b5b6ef983436ab8fae1c9",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-6-play-minecraft-with-helix-v1.md",
+      "present": true,
+      "bytes": 27791,
+      "sha256": "452b584578ee227ec76836c2dc61a39325573735c7c43a51619c52fa47a33c92",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+      "present": true,
+      "bytes": 9860,
+      "sha256": "1bb13d7a130a1857769b1f8ce2293d362a63793fe3eb60ae0bd419ccbb1172fe",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md",
+      "present": true,
+      "bytes": 17313,
+      "sha256": "eacaf9a0d7c0047e05b1e762a2a11035da49af47fc6000fbb37a0fd77c39d846",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "present": true,
+      "bytes": 14847,
+      "sha256": "0a4d08294cc5353aafd5488409690dd44c1a5c7e50dffe04af79757451f68baf",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md",
+      "present": true,
+      "bytes": 14275,
+      "sha256": "18c9d750fc6f52342f24cae6e10b4d33f9cb1f37f9b790238b98d344d48c175f",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+      "present": true,
+      "bytes": 19171,
+      "sha256": "009e69c4820d8856c906dd308c932c224a6caa5ee0357e67e1f23becb640980b",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "present": true,
+      "bytes": 21915,
+      "sha256": "55e40cf9004b214c43d8d52148322a840c0fc85302f8a45c67ec69f39b810416",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md",
+      "present": true,
+      "bytes": 45718,
+      "sha256": "0548477030031243c4de3669448c2ec4e8b8a4292e253fd03cbf0474f83a4649",
+      "changed_since_traversal": false
+    },
+    {
+      "path": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+      "present": true,
+      "bytes": 159332,
+      "sha256": "1656cfb295d861c2d682fecd26deb11d0456c715914e52b832577170754ceb3d",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md",
+      "present": true,
+      "bytes": 9121,
+      "sha256": "35e793d7ee51e3804b01a183f430da937389321175a9ade085c5d9ec56ab3bd9",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json",
+      "present": true,
+      "bytes": 2695,
+      "sha256": "458c7e38081b92f39123c3308a2a3244d53937a7bb9e8fa536f070cec165f269",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "shared/helix-account-session.ts",
+      "present": true,
+      "bytes": 14678,
+      "sha256": "b11ed6a8e419af3a8b55f15586e45fd0f1839ddffb261524bcbcf2174694dee4",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/routes/agi.workstation-tool-gateway.ts",
+      "present": true,
+      "bytes": 15141,
+      "sha256": "ced84d86d8db5e99cee468fc7e7050d2f64bd5cb64d414e20538703a33f27471",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/account-policy.ts",
+      "present": true,
+      "bytes": 19733,
+      "sha256": "3a94b4862f62adff8e9f001a6cdccad0c376b0c6b402412c44058db6f12f531a",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/mcp/helix-mcp-server.ts",
+      "present": true,
+      "bytes": 422185,
+      "sha256": "c66463c5a196b476ad9418cea8747542f2a80617aaf5ccc80d7a118048303053",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "shared/helix-billing-entitlement.ts",
+      "present": true,
+      "bytes": 6929,
+      "sha256": "4d6c41e756d6f433fedacec5f25504c426e25cf2e8cfce9126c5b6f98cf55185",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/helix-account/billing-entitlement-store.ts",
+      "present": true,
+      "bytes": 23040,
+      "sha256": "82ecd2751826e9f0f5fb4ce457d9e0608ab8ec205ba0f6ec955c7cca3886e9db",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+      "present": true,
+      "bytes": 6020,
+      "sha256": "6eca6e15fd8a8a580f7f1d3540323fedc9f9bd16805d87d9c6cfde88cc3359ae",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+      "present": true,
+      "bytes": 1637,
+      "sha256": "fe52cb5ad5dc0be403dc6a2219201bcbfb9dfdc1bbe9dfff9913997060e2583e",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+      "present": true,
+      "bytes": 3030,
+      "sha256": "2ec5b470ea2229b551270a05691dc489c0987d02ad332a13eb6f2ed91402f6da",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+      "present": true,
+      "bytes": 3805,
+      "sha256": "ee6a7bff09e3f12c7fd0f0a9b9165400542335e76f025d4ca8466ceba6983917",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+      "present": true,
+      "bytes": 4810,
+      "sha256": "db9573c1468745d20bddb355d48f3aee0f2333d963ce43f2794755570489b549",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1/2026-09-03-deterministic-checkpoint.json",
+      "present": true,
+      "bytes": 6068,
+      "sha256": "9ff53bb376d32435978f6f688272b25bd7e5d39e51a9351b70f2c264a4e3860d",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json",
+      "present": true,
+      "bytes": 13342,
+      "sha256": "17292d7beb5d46d0994158bf1e5b296ed1c49525c8e2f1fc04dfdde709538d24",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+      "present": true,
+      "bytes": 5360,
+      "sha256": "17986a121b3041d861bd00057ebfb760fc3e7e497d9e2ffae856825cbaac98a7",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json",
+      "present": true,
+      "bytes": 5152,
+      "sha256": "9d627ca4c625a0295069208f299f8082bcaaed1755aa47e4ae912915a3024f58",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json",
+      "present": true,
+      "bytes": 4139,
+      "sha256": "18b205357ed4d6d0e40bfe9f722cf17158bed079b4ae83cc3ad9b73effbfcd6e",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json",
+      "present": true,
+      "bytes": 2714,
+      "sha256": "57d5b2761138a290cbcea8bf2ec384f6a9cd979862b14ede96e2ca62b5a7ecb1",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-native-node-a-preflight.json",
+      "present": true,
+      "bytes": 3544,
+      "sha256": "ae4ca36a0fd4820b1fb8b8230eb07c44278fb5888cb554fc93e7bf73b278e818",
+      "changed_since_traversal": null
+    },
+    {
+      "path": ".github/workflows/desktop-release.yml",
+      "present": true,
+      "bytes": 13134,
+      "sha256": "c60ac703e524fab98df6a9943a9464094fd6f0ecd6db20b6a77332f7e8adacd5",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/electron-builder.config.cjs",
+      "present": true,
+      "bytes": 1507,
+      "sha256": "91623f7b399c56edfa468cdfeb00e15ca173ae53c6a5fbc2c42b4f2f29b19336",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/scripts/release-signing-config.cjs",
+      "present": true,
+      "bytes": 3984,
+      "sha256": "76f528ddee89d8bd4b43eeb7db574f6f7cc164f9deb229f1da89528aef1d22c4",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/scripts/site-release-metadata-lib.mjs",
+      "present": true,
+      "bytes": 6355,
+      "sha256": "4cfb6365c09265ac003e11a0dc579fe69f447364abb4bdffaa924d2dff10701b",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/scripts/provider-neutral-runtime-guard-lib.mjs",
+      "present": true,
+      "bytes": 2228,
+      "sha256": "2543a824149c931288a76a8c2c4eb69383e8ee05f1a7f921e0c67ca23acf7794",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/scripts/stage-runtime.mjs",
+      "present": true,
+      "bytes": 8502,
+      "sha256": "76514293548def2f9ca2b9932c15a0f2c73158c051d0e4820359adff0f102ee8",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/src/updater.ts",
+      "present": true,
+      "bytes": 3859,
+      "sha256": "85de35a52a5525357d0d4d9f43363f66d328a64c175b65a65c3f05a0dd9e6c53",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/release-slice.v1.json",
+      "present": true,
+      "bytes": 14279,
+      "sha256": "9340a9f6f4adf5b94d41bcab1c7db96c21efe9e9439ebda72c59254f098f0cd0",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-05-et6-terminal-resident-effect-consistency.json",
+      "present": true,
+      "bytes": 1475,
+      "sha256": "bdd77bd75de0d16cae45a679fb61984dde5891c84fa128a2b17383a1cf3a1857",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "client/src/components/agent-access/AgentConnectionSetup.tsx",
+      "present": true,
+      "bytes": 62959,
+      "sha256": "9dd8d299620633118dea061f5ff26b0791997c263a784d5b4de15ff856f23aa4",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "client/src/components/agent-access/agentHarnessOnboarding.ts",
+      "present": true,
+      "bytes": 5141,
+      "sha256": "1fea230874eb9594ed581a2d21b217ed28d75f4433097361f3ed8acf653caf0b",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "client/src/components/agent-access/agentConnectionSetupState.ts",
+      "present": true,
+      "bytes": 4018,
+      "sha256": "be01c82cc7f34b992bf224196c9821d37501be4942e478b01329fe5e946f304f",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/routes/agent-connections.ts",
+      "present": true,
+      "bytes": 20218,
+      "sha256": "817dccc05b56227d97f5061e5f74784c7968844775be4dac2c9b26db78e28594",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/local-supervisor/reasoning-task-binding-store.ts",
+      "present": true,
+      "bytes": 17589,
+      "sha256": "92e9a9c3b4d086d746d8d68bede33aee8b5d2674872d5eb79b3d5ea309213e98",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/src/mcp-tunnel-recovery-supervisor.ts",
+      "present": true,
+      "bytes": 5552,
+      "sha256": "8f910ff0727ea4a1436c5aaf563f6de00ef328264d23a138cb5f57d66e84f123",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/environment-action.ts",
+      "present": true,
+      "bytes": 39582,
+      "sha256": "4bc451e2d3749782aae9694ea696ce60cc8f492e7d7626cc8af8cf870a95a64c",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/environment-action-control.ts",
+      "present": true,
+      "bytes": 13901,
+      "sha256": "6df9af579837e0357dc7663447f6554f1d3d627f8544cecf1e2d9ec2096dba94",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/environment-connectors/actions/action-broker.ts",
+      "present": true,
+      "bytes": 182271,
+      "sha256": "c257d725553f8e7215e4cccaaee898cb75908a764900b3f3ed552a9ba9334dc0",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/environment-connectors/actions/authority-store.ts",
+      "present": true,
+      "bytes": 41667,
+      "sha256": "164b4a9fcaca097f8b3fbde4bb4e6619c4e4df8328715e8713f6ef57782b6cef",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/environment-connectors/goals/durable-goal-store.ts",
+      "present": true,
+      "bytes": 49532,
+      "sha256": "3b25f6aeb7008a307dfeefa88d83fe2ef7d202f029f91d786042cf7deb59953d",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/src/provider-credential-key.ts",
+      "present": true,
+      "bytes": 5233,
+      "sha256": "c1f6e4b4bd698ecc148a18d040a5cadd32b75b775536bd8adf1aa1d6e505262f",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/src/main.ts",
+      "present": true,
+      "bytes": 58228,
+      "sha256": "8d46cb740777fcf7460bc986111b582d1955c34c3382046f3852721750dc66bf",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/routes/stripe-sandbox-webhook.ts",
+      "present": true,
+      "bytes": 8755,
+      "sha256": "f70d2171f663907e08362ce22af824ad930b526ea1c1e4454122b3930f64e3ff",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/routes/installed-account-services.ts",
+      "present": true,
+      "bytes": 5766,
+      "sha256": "08fea72223a3bd8df3569b40f0454869ca3d1cb86068c3f08e94f7e16246cf45",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/routes/__tests__/stripe-sandbox-acceptance.test.ts",
+      "present": true,
+      "bytes": 8138,
+      "sha256": "329b06bc0e69aee598e4ab975589e80f113f2995a43c393fa895b0400fe6c274",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/helix-account/__tests__/billing-entitlement-store.test.ts",
+      "present": true,
+      "bytes": 11345,
+      "sha256": "9e40450c09e8f61f84b5d9462cbd651d2cfc5472c32b2ec3cebc01a1ee1caf91",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/__tests__/account-policy.test.ts",
+      "present": true,
+      "bytes": 7172,
+      "sha256": "b353cb5638f64748c4a9743ba1f06f7bc9756892bb16d83acac3ff36a9ddf610",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/routes/__tests__/agent-connections.test.ts",
+      "present": true,
+      "bytes": 19236,
+      "sha256": "5d153706ff2941887c3bad33bbd6bb31665298f1082cacf5c86a3c87a60f85e6",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts",
+      "present": true,
+      "bytes": 13525,
+      "sha256": "995d4db09919b85539c7e97820687a80d7b6af262d4d8773fd1b31dee8138011",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/mcp/__tests__/helix-mcp-minecraft-local-lifecycle.test.ts",
+      "present": true,
+      "bytes": 18020,
+      "sha256": "54ca40749c278fe75d80992b4fb67a2ff6fd562a7dc89285a9f7f8eded7be905",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "client/src/components/agent-access/__tests__/agentHarnessOnboarding.spec.ts",
+      "present": true,
+      "bytes": 3033,
+      "sha256": "1d0f9795d357875e8dd46ecd7c43379b4876981195ee5ef6b0b4b888f70a416b",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx",
+      "present": true,
+      "bytes": 50075,
+      "sha256": "2535fd46032baa3d688b19d47df88fd11f49d670da914bcca2561767ebdf35b8",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-mcp-tunnel-recovery-supervisor.spec.ts",
+      "present": true,
+      "bytes": 5893,
+      "sha256": "19c9e39180d0d4ff69639266a09052f187799c33e64d41781e955365c18cad6a",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-provider-credential-key.spec.ts",
+      "present": true,
+      "bytes": 6233,
+      "sha256": "518d22f0410ea2713001c131178196488afc7a03aa7e69bb0bf4de49ce1cdf23",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-provider-credential-broker.spec.ts",
+      "present": true,
+      "bytes": 7605,
+      "sha256": "7469e16e6c4927c34fad19cf8f43d8dc6931e8d58afd68f6966c05f2df6e1d80",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-provider-neutral-runtime-guard.spec.ts",
+      "present": true,
+      "bytes": 2119,
+      "sha256": "2e829cee98b091868f20551038629cc7742467d33dfc7b1ab884556ff9e710e5",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts",
+      "present": true,
+      "bytes": 43922,
+      "sha256": "da816f45d1c5d02b3ac4abace71f93a5264da34dd965d9375387857150f80e70",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/environment-connectors/actions/__tests__/execution-lease-claim.test.ts",
+      "present": true,
+      "bytes": 2113,
+      "sha256": "35fd822e74558784e1cbfaf7d2b9405997191e02dd01bf980586bb50964f3012",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "server/services/environment-connectors/temporal-plans/__tests__/temporal-resident-effects.test.ts",
+      "present": true,
+      "bytes": 4524,
+      "sha256": "59528af2adbe44a58d7ae6222bd11c5ed8c8ea333299104a853137ef6d045b93",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-release-signing.spec.ts",
+      "present": true,
+      "bytes": 6645,
+      "sha256": "7e9e79098bfd8f02be6fc03397bc024c3b69e6abe124f23d67c96ad16df90c7e",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-site-release-metadata.spec.ts",
+      "present": true,
+      "bytes": 6145,
+      "sha256": "9214e5fe49f40beef0a628ce7956dec72a89be6219f09ea75df1002fcb559ad1",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "tests/desktop-release-slice.spec.ts",
+      "present": true,
+      "bytes": 8127,
+      "sha256": "45d6b48125b9987d4b7a28f1ef32c5a129c5621630d95c0480c0065c20f7c1ae",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "shared/__tests__/desktop-update.spec.ts",
+      "present": true,
+      "bytes": 953,
+      "sha256": "7a3e705abbf69037f6ba8e58edb4cf5b379a0832e2bba6d85f88457a9e0f0b9b",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "docs/BUSINESS_MODEL.md",
+      "present": true,
+      "bytes": 7487,
+      "sha256": "7b6ec8bf676c4c31e3e1e9d2072e05e47a9103107305e012c2127abe444042ea",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "package.json",
+      "present": true,
+      "bytes": 74352,
+      "sha256": "7a85515b909c8769d98c29ef81535c1c8fa6219ed903719eb004bc0ebe9fa291",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "package-lock.json",
+      "present": true,
+      "bytes": 805697,
+      "sha256": "2c755f40f32cbf527964c668e760292d8fbeeb60cd4973dc1d1fa2e07840c888",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "sdk/package.json",
+      "present": true,
+      "bytes": 758,
+      "sha256": "03ef1214b00c052bb863714982d1cb594d10ef4fd2af92c98caa44cd2928049b",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "cli/package.json",
+      "present": true,
+      "bytes": 779,
+      "sha256": "c63e16629daa39ba162d6092946c6b7273ad79859c3dcd32805c45c42d803f9f",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "present": true,
+      "bytes": 1762,
+      "sha256": "5c0533e803ce91e67d2644badd7e92a203570dca1182f7a8ee0c729bf068c939",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "apps/desktop/package-lock.json",
+      "present": true,
+      "bytes": 159647,
+      "sha256": "35d137eeb3dd27eda1f6fc6aa9bf48ef9f712bee053cb984a3bdcc9519218306",
+      "changed_since_traversal": null
+    },
+    {
+      "path": "packages/create-casimir-verifier/LICENSE",
+      "present": true,
+      "bytes": 1067,
+      "sha256": "d2ad01b7f9a41b728135d18d838648f1dfa6f6784cd99707ae8b50fce26f6957",
+      "changed_since_traversal": null
+    }
+  ],
+  "relevant_working_tree_status": [
+    " M apps/desktop/src/main.ts",
+    " M client/src/components/agent-access/AgentConnectionSetup.tsx",
+    " M client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx",
+    " M docs/BUSINESS_MODEL.md",
+    " M docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+    " M docs/helix-environment-harness-work-program-v1.md",
+    " M docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+    " M docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+    " M package-lock.json",
+    " M package.json",
+    " M server/mcp/__tests__/helix-mcp-minecraft-local-lifecycle.test.ts",
+    " M server/mcp/helix-mcp-server.ts",
+    " M server/routes/__tests__/agent-connections.test.ts",
+    " M server/routes/agent-connections.ts",
+    " M server/services/environment-connectors/actions/action-broker.ts",
+    " M server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts",
+    " M server/services/environment-connectors/goals/durable-goal-store.ts",
+    " M server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts",
+    " M server/services/local-supervisor/reasoning-task-binding-store.ts",
+    " M shared/helix-account-session.ts",
+    "?? docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md",
+    "?? docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-05-et6-terminal-resident-effect-consistency.json",
+    "?? docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+    "?? docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+    "?? docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+    "?? server/services/environment-connectors/temporal-plans/__tests__/temporal-resident-effects.test.ts"
+  ],
+  "groups": [
+    {
+      "id": "E00",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+        "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+        "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md"
+      ],
+      "finding": "Planning contract and bounded baseline; no executable acceptance."
+    },
+    {
+      "id": "E01",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json"
+      ],
+      "finding": "Sandbox fixture with live_accepted false. Agent verified four named source hashes match current inspected files; no test rerun, hosted transaction or software-capability grant."
+    },
+    {
+      "id": "E02",
+      "kind": "source-inspected",
+      "paths": [
+        "shared/helix-account-session.ts",
+        "server/routes/agi.workstation-tool-gateway.ts",
+        "server/services/helix-ask/workstation-tool-gateway/account-policy.ts",
+        "server/mcp/helix-mcp-server.ts",
+        "shared/helix-billing-entitlement.ts",
+        "server/services/helix-account/billing-entitlement-store.ts"
+      ],
+      "finding": "User rooms/gateway features locked; Minecraft local lifecycle requires trusted developer. Billing schema sandbox-only. No software-entitlement admission integration found in these inspected boundaries; not an exhaustive absence proof."
+    },
+    {
+      "id": "E03",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+        "docs/evidence/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1/2026-09-03-deterministic-checkpoint.json"
+      ],
+      "finding": "Historical connection/recovery and production OAuth metadata results; signed current release pending. Independent client proves bounded discovery/Device Check, not continuation. Disposable onboarding did not prove signed-in time-to-ready."
+    },
+    {
+      "id": "E04",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json"
+      ],
+      "finding": "Recorded unpacked EXE/ASAR identities, 350ms step (~1.255 blocks), post-observation and stale denial; earlier reasoning evidence composed; native impersonation rejected. No useful paid ordinary-user full journey."
+    },
+    {
+      "id": "E05",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+        "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json"
+      ],
+      "finding": "Shared deterministic schemas/compiler/fixtures only. ET6 capacity and NAV runtime/live conformance excluded."
+    },
+    {
+      "id": "E06",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+        "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+        "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md"
+      ],
+      "finding": "Inline later perception scene/checkpoints inspected; raw screenshots not opened. Full benchmark/Nether not accepted; canonical Invalid-session-only wording requires reconciliation."
+    },
+    {
+      "id": "E07",
+      "kind": "result-inspected",
+      "paths": [
+        "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json",
+        "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json"
+      ],
+      "finding": "Narrow monitor/look/cursor trace; direct three-stone record lacks observation re-entry. Not unknown-world Nether or closed-task wake."
+    },
+    {
+      "id": "E08",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-native-node-a-preflight.json"
+      ],
+      "finding": "One node ready but coordination-only/stale unbound connector and no isolated second node. Federation/NFO scope dependencies require contract reconciliation."
+    },
+    {
+      "id": "E09",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+        "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md"
+      ],
+      "finding": "Inline private replay and REC2C limits inspected; underlying raw traces/screenshots not independently revalidated. Broader public gameplay claims remain excluded."
+    },
+    {
+      "id": "E10",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+        "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+        "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+        "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+        "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+        "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+        "docs/helix-ask-codex-parity-work-program-v1.md"
+      ],
+      "finding": "Canonical G5-G7 closed regression scope retained. Separate Helix parity G1 remains active. No fresh financial or parity run."
+    },
+    {
+      "id": "E11",
+      "kind": "source-inspected",
+      "paths": [
+        ".github/workflows/desktop-release.yml",
+        "apps/desktop/electron-builder.config.cjs",
+        "apps/desktop/scripts/release-signing-config.cjs",
+        "apps/desktop/scripts/site-release-metadata-lib.mjs",
+        "apps/desktop/scripts/provider-neutral-runtime-guard-lib.mjs",
+        "apps/desktop/scripts/stage-runtime.mjs",
+        "apps/desktop/src/updater.ts",
+        "apps/desktop/release-slice.v1.json"
+      ],
+      "finding": "Fail-closed signing configuration and release workflow; download/updater source-repo coupling; bundled runtime guard. Local artifact hashes captured separately; no signature/network/update run."
+    },
+    {
+      "id": "E12",
+      "kind": "result-inspected",
+      "paths": [
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-05-et6-terminal-resident-effect-consistency.json"
+      ],
+      "finding": "61-test effect-consistency record; explicitly no production transport/package/live capacity, et6_complete false. Supplemental current ET6 repair packet inspected separately; later startup success is diagnostic only."
+    },
+    {
+      "id": "E13",
+      "kind": "source-inspected",
+      "paths": [
+        "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md"
+      ],
+      "finding": "Optional display/provider stages only; no provider execution in audit; raw output images not evaluated."
+    }
+  ],
+  "tests_status": "Located and selectively source-inspected; none rerun in this audit."
+}

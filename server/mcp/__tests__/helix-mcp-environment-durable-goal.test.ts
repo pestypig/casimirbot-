@@ -1,4 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import * as frontierPublisher from "../../services/environment-connectors/temporal-plans/temporal-frontier-publisher";
+import * as temporalAdmission from "../../services/environment-connectors/temporal-plans/temporal-plan-admission";
+import { buildHelixEnvironmentTemporalPlan } from "@shared/helix-environment-time";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
 import { buildHelixSharedRealtimeRoomsExperimentPolicy } from "@shared/helix-account-session";
@@ -129,15 +132,21 @@ const projection: HelixEnvironmentDurableGoalProjection = {
   raw_content_included: false,
 };
 
-const connect = async (scopes: readonly string[]) => {
+const connect = async (scopes: readonly string[], exactTask = false) => {
   const goalStore = {
     create: vi.fn(async () => projection),
     inspect: vi.fn(async () => projection),
     append: vi.fn(async () => ({ ...projection, revision: 2 })),
   } satisfies HelixEnvironmentDurableGoalMcpStore;
   const inspectRoom = vi.fn(async () => ({ room: { self_participant_id: PARTICIPANT_ID } }));
+  const authenticateClient = vi.fn();
+  const verifyTaskAssociation = vi.fn();
   const server = createHelixMcpServer({
-    principal: principal(scopes),
+    principal: { ...principal(scopes), mcpClientRef: "mcp_client:test" },
+    ...(exactTask ? {
+      localSupervisorCoordinationStore: { serviceInstanceRef: "service:test", authenticateClient } as never,
+      reasoningTaskBindingStore: { verifyTaskAssociation } as never,
+    } : {}),
     service: {} as HelixAgentApiService,
     roomControlService: { inspectRoom } as unknown as SharedLiveRoomControlService,
     roomBindingStore: {} as Pick<SharedLiveRoomBindingStore, "bindRunToRoom" | "claimPendingChatBinding" | "revokeRunRoomBindingForOwner" | "revokeClaimedRunChatBindingForOwner">,
@@ -148,10 +157,118 @@ const connect = async (scopes: readonly string[]) => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   await client.connect(clientTransport);
-  return { client, goalStore, inspectRoom, close: async () => { await client.close(); await server.close(); } };
+  return { client, goalStore, inspectRoom, authenticateClient, verifyTaskAssociation, close: async () => { await client.close(); await server.close(); } };
 };
 
+const temporalArgs = () => ({
+  client_continuation_ref: "continuation:test", reasoning_binding_id: "binding:test", binding_epoch: 1,
+  helix_conversation_id: "chat:test", mission_id: "mission:test", goal_id: "goal:test", expected_revision: 1,
+  frontier_id: "frontier:test", probe_request_id: "probe:test", prior_turn_id: "turn:prior",
+  request: {
+    schema: "helix.environment_action.request.v1",
+    ...Object.fromEntries(["action_request_id", "workflow_id", "action_authority_id", "environment_binding_id",
+      "source_id", "world_id", "subject_binding_id", "subject_native_id", "run_id", "turn_id",
+      "provider_execution_id", "tool_call_id", "catalog_snapshot_id", "capability_id"].map(key => [key, `test:${key}`])),
+    room_id: ROOM_ID, capability_version: 1, action_kind: "execute_sequence", effect_class: "player_motion",
+    workflow_mode: "long_running", requested_control_engine: "native_fabric", preconditions: [],
+    postconditions: [{ condition_id: "post:test", condition_kind: "stopped", required: true, parameters: {} }],
+    idempotency_key: "idempotency:test", confirmation_state: "not_required", approval_ref: null,
+    created_at: "2026-09-05T12:00:00Z", deadline_at: "2026-09-05T12:01:00Z",
+    constraints: { max_duration_ms: 60000, max_distance_blocks: 10, max_block_mutations: 0, max_inventory_transfers: 0,
+      manual_override_policy: "cancel", require_postcondition_verification: true, world_mutation_allowed: false,
+      combat_allowed: false, host_access_allowed: false, automatic_replay_allowed: false },
+    answer_authority: false, assistant_answer: false, terminal_eligible: false, raw_content_included: false,
+  },
+  mutation_scope: { max_block_mutations: 0, max_inventory_transfers: 0, world_mutation_allowed: false,
+    allowed_block_ids: [], allowed_regions: [], combat_allowed: false },
+  plan: buildHelixEnvironmentTemporalPlan({
+    plan_id: "plan:test", previous_plan_id: null, previous_plan_hash: null,
+    identity: { environment_id: "env:test", source_id: "source:test", subject_id: "subject:test", producer_epoch: "epoch:test",
+      authority_id: "authority:test", authority_revision: 1, goal_id: "goal:test", goal_revision: 1, observation_revision: 1, affordance_revision: 1 },
+    clocks: { environment: { kind: "tick", sequence: 10, resolution_unit: "minecraft_tick", nominal_units_per_second: 20 },
+      monotonic: { origin_id: "origin:test", elapsed_ms: 100 }, audit_at: "2026-09-05T12:00:00Z" },
+    adapter_id: "minecraft.fabric_client", adapter_version: "1", compiler_version: "compiler:1", resident_executor_version: "native:1",
+    start_node_id: "walk", maximum_total_units: 80, monotonic_deadline_elapsed_ms: 1000,
+    watermarks: { decision_unit: 40, stop_unit: 60, committed_through_unit: 80, stabilization_node_id: "success" },
+    lanes: [{ lane_id: "move", priority: 1, resource_keys: ["locomotion"] }], effect_ceiling: {},
+    nodes: [{ kind: "action", node_id: "walk", lane_id: "move", capability_id: "com.casimirbot.minecraft.player.walk", capability_version: "1",
+      arguments: { action_kind: "walk", direction: "forward", duration_ms: 100, sprint: false }, required_resources: ["locomotion"],
+      timing: { earliest_start_unit: 0, latest_start_unit: 10, maximum_duration_units: 20 }, preconditions: [],
+      completion_conditions: [{ kind: "adapter_condition", condition_id: "minecraft.player_grounded", arguments: { expected: true } }],
+      abort_guards: [], effect_budget: {}, on_success_node_id: "success", on_failure_node_id: "failure", on_timeout_node_id: "failure" },
+      { kind: "terminal", node_id: "success", outcome: "succeeded", reason_code: "done" },
+      { kind: "terminal", node_id: "failure", outcome: "failed", reason_code: "failed" }],
+  }),
+});
+
 describe("Helix MCP durable environment goal", () => {
+  it("submits serial plans with authenticated exact-task identity and refuses a rejected binding", async () => {
+    const admit = vi.spyOn(temporalAdmission, "admitTemporalPlan").mockResolvedValue({ action_request_id: "admitted:test" } as never);
+    const connection = await connect([HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE], true);
+    try {
+      expect((await connection.client.listTools()).tools.map(tool => tool.name)).toContain("helix_environment_temporal_plan_submit");
+      const result = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit", arguments: temporalArgs() });
+      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      expect(connection.authenticateClient).toHaveBeenCalledOnce();
+      expect(admit).toHaveBeenCalledOnce();
+      expect(admit.mock.calls[0][0]).toMatchObject({ preflight: {
+        context: { profileId: "profile:durable-goal-mcp", participantId: PARTICIPANT_ID },
+        binding: { profileRef: "profile:durable-goal-mcp", authenticatedMcpClientRef: "mcp_client:test",
+          clientSessionRef: expect.stringMatching(/^supervisor_client:/), clientContinuationRef: "continuation:test",
+          helixConversationId: "chat:test", missionId: "mission:test", runId: "test:run_id" },
+        compilation: { target: "serial" } }, request: { participant_id: PARTICIPANT_ID } });
+      admit.mockClear();
+      for (const key of ["participant_id", "arguments", "temporal_compilation_hash"]) {
+        const args = temporalArgs();
+        const rejected = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit",
+          arguments: { ...args, request: { ...args.request, [key]: "injected" } } });
+        expect(rejected.isError).toBe(true);
+        expect(admit).not.toHaveBeenCalled();
+      }
+      connection.verifyTaskAssociation.mockImplementation(() => { throw new Error("revoked"); });
+      const rejected = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit", arguments: temporalArgs() });
+      expect(rejected.isError).toBe(true);
+      expect(admit).not.toHaveBeenCalled();
+    } finally { admit.mockRestore(); await connection.close(); }
+  });
+  it("requires exact-task stores and rejects submission without action scope", async () => {
+    for (const [scopes, exactTask] of [
+      [[HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE], false],
+      [[HELIX_SHARED_LIVE_ROOM_READ_SCOPE], true],
+    ] as const) {
+      const connection = await connect(scopes, exactTask);
+      try {
+        if (!exactTask) expect((await connection.client.listTools()).tools.map(tool => tool.name)).not.toContain("helix_environment_temporal_plan_submit");
+        else {
+          const result = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit", arguments: temporalArgs() });
+          expect(result.isError).toBe(true);
+          expect(result.structuredContent).toMatchObject({ error: "insufficient_scope" });
+          expect(connection.verifyTaskAssociation).not.toHaveBeenCalled();
+        }
+      }
+      finally { await connection.close(); }
+    }
+  });
+  it("publishes frontier using authenticated owner and room participant, rejecting identity injection", async () => {
+    const publish = vi.spyOn(frontierPublisher, "publishTemporalPerceptionFrontier").mockResolvedValue({ frontier_id: "frontier:test" } as never);
+    const connection = await connect([HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE]);
+    const args = { room_id: ROOM_ID, goal_id: "goal:test", expected_revision: 1, run_id: "run:test",
+      turn_id: "turn:current", prior_turn_id: "turn:prior", probe_request_id: "probe:test" };
+    try {
+      expect((await connection.client.listTools()).tools.map(tool => tool.name)).toContain("helix_environment_temporal_frontier_publish");
+      const result = await connection.client.callTool({ name: "helix_environment_temporal_frontier_publish", arguments: args });
+      expect(result.isError).not.toBe(true);
+      expect(publish).toHaveBeenCalledWith({ profileId: "profile:durable-goal-mcp", participantId: PARTICIPANT_ID,
+        roomId: ROOM_ID, goalId: "goal:test", expectedRevision: 1, runId: "run:test", turnId: "turn:current",
+        priorTurnId: "turn:prior", probeRequestId: "probe:test" });
+      publish.mockClear();
+      const denied = await connection.client.callTool({ name: "helix_environment_temporal_frontier_publish",
+        arguments: { ...args, profileId: "someone-else" } });
+      expect(denied.isError).toBe(true);
+      expect(publish).not.toHaveBeenCalled();
+    } finally { publish.mockRestore(); await connection.close(); }
+  });
+
   it("creates, inspects, and appends through current room identity as nonterminal re-entry context", async () => {
     const connection = await connect([HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE]);
     try {

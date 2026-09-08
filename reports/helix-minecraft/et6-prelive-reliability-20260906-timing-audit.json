@@ -1,0 +1,29 @@
+{
+  "scope": "Source-derived timing audit; not measured live capacity",
+  "observed_configuration": {
+    "native_poll_interval_ticks": 20,
+    "nominal_tick_rate_hz": 20,
+    "http_request_timeout_ms": 12000,
+    "http_connect_timeout_ms": 5000,
+    "checkpoint_event_freshness_ms": 5000,
+    "outbox_capacity_entries": 768
+  },
+  "interpretation": [
+    "Twenty ticks is nominally one second, not a wall-clock scheduling guarantee.",
+    "Connection timeout is part of request execution, not an additional measured latency to sum blindly.",
+    "Checkpoint freshness is not the remaining successor execution window.",
+    "A timeout bounds waiting for transport failure, not successful delivery.",
+    "A dedicated single-flight successor lane removes its queue wait from control polling, but control HTTP latency remains independent and unmeasured."
+  ],
+  "conservative_serial_budget": {
+    "required_stages": ["checkpoint_to_verified_evidence", "evidence_to_provider_proposal", "proposal_to_admission_and_snapshot", "admission_to_native_delivery", "native_validation_and_scheduler_pickup", "explicit_safety_margin"],
+    "condition": "The complete nonoverlapping stage budget must fit strictly within the remaining mapped native latest-start/committed window. Native deadline checks remain mandatory regardless of estimates.",
+    "complete_budget_ms": null,
+    "remaining_native_window_ms": null,
+    "feasibility": "unproven"
+  },
+  "existing_measurement_coverage": ["dispatch receipt to first tick", "resident computation", "successor HTTP count/total/max", "reconciliation HTTP count/total/max", "manual or safety release when observed"],
+  "remaining_evidence": ["Correlated full-stage trace under one exact run/plan/checkpoint identity", "Clock-domain mapping for cross-process marks", "Snapshot duration included in admission latency", "Positive runway margin and over-budget rejection fixtures", "No live latency percentile inferred from deterministic tests"],
+  "execution_authority": false,
+  "live_acceptance": false
+}

@@ -1,0 +1,36 @@
+{
+  "scope": "Leading dimension-six yL^2 yt^2 electroweak overlap at fixed tree inputs and up alignment. No two-loop QCD, charm matching, scalar-A subset, or global fit.",
+  "rows": [
+    {
+      "M_GeV": 2000.0,
+      "EFT_imag_H_LL_GeV_minus2": 3.0625879536459975e-15,
+      "full_imag_H_LL_GeV_minus2": 3.057592503794215e-15,
+      "full_over_EFT": 0.9983688795465171
+    },
+    {
+      "M_GeV": 5000.0,
+      "EFT_imag_H_LL_GeV_minus2": 6.142986838537577e-16,
+      "full_imag_H_LL_GeV_minus2": 6.14105217910235e-16,
+      "full_over_EFT": 0.9996850620901399
+    },
+    {
+      "M_GeV": 20000.0,
+      "EFT_imag_H_LL_GeV_minus2": 5.0145877614365493e-17,
+      "full_imag_H_LL_GeV_minus2": 5.014472585133199e-17,
+      "full_over_EFT": 0.9999770317503991
+    },
+    {
+      "M_GeV": 200000.0,
+      "EFT_imag_H_LL_GeV_minus2": 6.966587569227101e-19,
+      "full_imag_H_LL_GeV_minus2": 6.966585756963269e-19,
+      "full_over_EFT": 0.999999739863482
+    }
+  ],
+  "checks": {
+    "high_and_EW_scales_cancel": true,
+    "finite_identity": true,
+    "flavor_sum_vanishes": true,
+    "full_theory_converges": true
+  },
+  "full_QCD_matching_completed": false
+}

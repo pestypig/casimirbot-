@@ -1,0 +1,181 @@
+{
+  "upstream_commit": "6d22f936bf49a15db73a24d1274dcc63c37780dd",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "dataset_git_blob": "640fbe133a393318e97b9b3856cc869cf309f142",
+  "sources": [
+    {
+      "name": "diamond_comp.h5",
+      "bytes": 24062232,
+      "sha256": "77ed914ab0f330028c62e4c1a5f2005a2a3d38b683ca431a8fb8f37157c29021"
+    },
+    {
+      "name": "dielectric_functions__README.md",
+      "bytes": 1932,
+      "sha256": "2a518636d1df2b8516ac66a3ff837114b6bba772ee91d5250e0bc7b02e8de117"
+    },
+    {
+      "name": "LICENSE",
+      "bytes": 7048,
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "name": "qcdark2__dark_matter_rates.py",
+      "bytes": 18257,
+      "sha256": "076a24b0e28b405fe94c5735b48098c42d1892c891dfeb31fd50538f42425491"
+    }
+  ],
+  "checks": {
+    "published_blob_hash": true,
+    "shape_matches_axes": true,
+    "finite_data": true,
+    "increasing_axes": true,
+    "ELF_passivity_with_roundoff_tolerance": true,
+    "lower_root_energy_equation": true
+  },
+  "q_grid_ame": [
+    0.01,
+    20.009999999999998
+  ],
+  "q_grid_eV": [
+    37.28939427819144,
+    74616.07795066106
+  ],
+  "energy_grid_eV": [
+    0.0,
+    150.0
+  ],
+  "epsilon_shape": [
+    1001,
+    1501
+  ],
+  "hdf5_attributes": {
+    "M_cell": 22356000000.0,
+    "V_cell": 76.56775926434172,
+    "dE": 0.1
+  },
+  "ELF_min": -1.3928038091000775e-18,
+  "negative_ELF_cells_roundoff": 17741,
+  "kinematics": [
+    {
+      "speed_km_s": 776.0,
+      "mass_GeV": 100.0,
+      "omega_eV": 5.5,
+      "qminus_eV": 2124.826400316628,
+      "qplus_eV": 517689350.9211317,
+      "qminus_R_over_hbar": 2975.2371059603183,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 776.0,
+      "mass_GeV": 100.0,
+      "omega_eV": 30.0,
+      "qminus_eV": 11590.174096398938,
+      "qplus_eV": 517679885.57343566,
+      "qminus_R_over_hbar": 16228.862758391795,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 776.0,
+      "mass_GeV": 100.0,
+      "omega_eV": 150.0,
+      "qminus_eV": 57956.061304115305,
+      "qplus_eV": 517633519.68622786,
+      "qminus_R_over_hbar": 81151.58211589424,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 776.0,
+      "mass_GeV": 1000.0,
+      "omega_eV": 5.5,
+      "qminus_eV": 2124.81855123656,
+      "qplus_eV": 5176912632.656769,
+      "qminus_R_over_hbar": 2975.2261154745715,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 776.0,
+      "mass_GeV": 1000.0,
+      "omega_eV": 30.0,
+      "qminus_eV": 11589.940560656072,
+      "qplus_eV": 5176903167.534759,
+      "qminus_R_over_hbar": 16228.535755579876,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 776.0,
+      "mass_GeV": 1000.0,
+      "omega_eV": 150.0,
+      "qminus_eV": 57950.22175997888,
+      "qplus_eV": 5176856807.25356,
+      "qminus_R_over_hbar": 81143.40543454558,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 809.1,
+      "mass_GeV": 100.0,
+      "omega_eV": 5.5,
+      "qminus_eV": 2037.8998198539944,
+      "qplus_eV": 539771380.9498298,
+      "qminus_R_over_hbar": 2853.520250574799,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 809.1,
+      "mass_GeV": 100.0,
+      "omega_eV": 30.0,
+      "qminus_eV": 11116.004152882566,
+      "qplus_eV": 539762302.8454968,
+      "qminus_R_over_hbar": 15564.917689622509,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 809.1,
+      "mass_GeV": 100.0,
+      "omega_eV": 150.0,
+      "qminus_eV": 55584.600130390674,
+      "qplus_eV": 539717834.2495192,
+      "qminus_R_over_hbar": 77831.00059527761,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 809.1,
+      "mass_GeV": 1000.0,
+      "omega_eV": 5.5,
+      "qminus_eV": 2037.8928952171007,
+      "qplus_eV": 5397732150.603601,
+      "qminus_R_over_hbar": 2853.510554518392,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 809.1,
+      "mass_GeV": 1000.0,
+      "omega_eV": 30.0,
+      "qminus_eV": 11115.798123004748,
+      "qplus_eV": 5397723072.698374,
+      "qminus_R_over_hbar": 15564.629201237138,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    },
+    {
+      "speed_km_s": 809.1,
+      "mass_GeV": 1000.0,
+      "omega_eV": 150.0,
+      "qminus_eV": 55579.44844976775,
+      "qplus_eV": 5397678609.048047,
+      "qminus_R_over_hbar": 77823.78707828389,
+      "grid_has_kinematic_overlap": true,
+      "grid_covers_whole_kinematic_q_interval": false
+    }
+  ],
+  "status": "Authenticated density-response input only. No spin-density response, photon-dipole rate or completeness claim."
+}

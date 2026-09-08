@@ -1,0 +1,33 @@
+{
+  "scope": "Coupled gaugeless top-Yukawa beta evolution on imposed QCD-only SM trajectory, current/pure-heavy/mixed hard subset boundary. Only current finite EW matching included; other generated operators not yet fully matched.",
+  "restricted": {
+    "keys_count": 4,
+    "rtol": 1e-07,
+    "function_evaluations": 38,
+    "H_imag_GeV_minus2": 2.7179586852249803e-15,
+    "current11_real_GeV_minus2": 2.2110033976607363e-09,
+    "qu1_max_GeV_minus2": 0.0
+  },
+  "coupled": {
+    "keys_count": 64,
+    "rtol": 1e-07,
+    "function_evaluations": 38,
+    "H_imag_GeV_minus2": 2.707712777840167e-15,
+    "current11_real_GeV_minus2": 2.2129014349207784e-09,
+    "qu1_max_GeV_minus2": 5.380918968348674e-11
+  },
+  "tight": {
+    "keys_count": 64,
+    "rtol": 1e-09,
+    "function_evaluations": 50,
+    "H_imag_GeV_minus2": 2.707712777849716e-15,
+    "current11_real_GeV_minus2": 2.212901434919186e-09,
+    "qu1_max_GeV_minus2": 5.3809189683847386e-11
+  },
+  "coupled_over_restricted": 0.996230293182707,
+  "checks": {
+    "tolerance_stability": true,
+    "additional_operator_generated": true
+  },
+  "full_model_admitted": false
+}

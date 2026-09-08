@@ -1,0 +1,21 @@
+{
+  "schema": "et6.goal_admission_context.v1",
+  "date": "2026-09-05",
+  "classification": "tool admission prerequisite",
+  "implementation": "EnvironmentDurableGoalStore.resolveTemporalAdmissionContext reads the authenticated steering grant and canonical goal history, checks revision/state/recovery/room/run, and freshly resolves the existing action identity. Historical inspect behavior remains unchanged.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts --pool=forks --maxWorkers=1",
+    "passed": 18,
+    "failed": 0,
+    "new_cases": ["current", "wrong_revision", "wrong_room", "wrong_run", "removed_steering_grant", "changed_epoch", "identity_unavailable"],
+    "history_unchanged_verified": true
+  },
+  "limits": [
+    "Internal preflight has no production callers yet and grants no execution authority.",
+    "Goal/run binding is not independent external-provider authentication.",
+    "Production dispatch must revalidate current identity and revision atomically.",
+    "Active/recovery state guards still need dedicated negative fixtures.",
+    "Persisted affordance frontier and resident extension integration remain incomplete."
+  ],
+  "et6_complete": false
+}

@@ -1,0 +1,13 @@
+# Xenon detector response intake
+
+Exploratory source audit, 2026-09-07. The planned XENONnT electron-response comparison cannot use the supplied nuclear response. This is a correction to the previous next-step assumption, not an experimental conclusion.
+
+The [XENONnT release](https://github.com/XENONnT/s2_only_data_release) at commit `dd00e04597a23c07324d41bc9773c0c59ed01337` supplies 21 nuclear-recoil response CSVs, three science runs times seven charge-yield settings. Its 2100 orthonormal-basis files are nuclear-recoil templates. Electron limit curves and an ER energy array exist, but no ER response matrix is present in this inspected checkout. Notebook prose refers to ER or NR response generally; its executed template-construction code loops only over NR. Published electron limits cannot be applied directly to our different spectrum and source law.
+
+The [XENON1T release](https://github.com/XENON1T/s2only_data_release) at commit `5a364bc8709f2561e5a013ddea6993a5a7c8e313` supplies the required ER matrix: 41 energies from 0.05 to 10 keV by 199 S2 bins. All entries are finite and nonnegative; row sums range from 1.20e-6 to 0.06305. These are selected-event fractions, not distributions normalized to one. The release states that all event selections are already included. Do not apply another generic efficiency.
+
+Use the search exposure 356770 kg day, separately from training data and the earlier 2.84 tonne-year diagnostic. The supplied energy endpoints and energy-bin edges have different meanings; integrate the theoretical spectrum over defined cells or interpolate the monoenergetic response with convergence checks. The 50 eV response endpoint does not authorize discarding the published analysis's 186 eV energy cutoff. Audit results both with that cutoff and, if useful, as an explicitly extended response sensitivity study. Preserve the distinction between underlying energy and measured S2 region of interest.
+
+The released produced-electron matrix is another route if a custom liquid response is supplied. For the first comparison, use the documented ER response, keep the frozen mediator products, and report a conditional covered detector prediction before statistical interpretation. Observed events and backgrounds are available; the collaboration explicitly describes its older background model as incomplete. Do not replace its inference procedure with an unexplained observed-count ratio.
+
+The sibling Python/JSON audit records pinned revisions, matrix dimensions, positivity and normalization checks, and local file hashes. No source notebooks or pickles were executed. No detector-folded result yet. Research-only changes; no Casimir server verification applies.

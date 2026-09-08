@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-06",
+  "scope": "Current-source regression and staging refresh",
+  "verification": {
+    "native_tests": 305, "native_failures": 0, "native_errors": 0, "native_skips": 0,
+    "native_test_build": "passed; runGameTest excluded",
+    "server_tests": 106, "server_files": 11, "server_failures": 0,
+    "host_service_build": "passed with four existing unrelated bundler warnings",
+    "runtime_staging": "passed; six allowlisted roots; dependency closure staged_verified"
+  },
+  "resources": { "initial_free_physical_gib": 5.45, "initial_commit_percent": 64.4, "disk_free_gib_before_staging": 1.18 },
+  "limits": [
+    "New diagnostic packaging not attempted pending exact disk-space assessment",
+    "Installed app and Minecraft untouched",
+    "Previous diagnostic package predates current staged source",
+    "Final requirement audit remains; no pre-live completion or live ET6 claim"
+  ]
+}

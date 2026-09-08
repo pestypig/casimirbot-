@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-06",
+  "scope": "Connected production frontier publisher and storage through admission to native pickup",
+  "tests_passed": 2,
+  "production_boundaries": ["frontier publisher", "frontier schema/hash builder", "revision allocation and storage", "response-ready diagnostics", "admission/retention", "one-shot lease with snapshot", "native acceptance"],
+  "fixture_boundaries": ["authority/perception context resolution", "successor context resolution", "provider plan generation", "native world ticks"],
+  "negative_attempts": [
+    "temporal_retention_frontier_stale: fixture reused the predecessor affordance revision; corrected the fixture to advance revision and regenerated hashes",
+    "retained source-plan mismatch: old native serialized fixture still contained the previous hash; regenerated native evidence before retry"
+  ],
+  "result": "Connected response-ready record correlates with admission and native pickup; both tests pass after fixture repair",
+  "limits": ["Five-stage attribution remains incomplete", "No live capacity or provider-latency claim", "Fault variants need rerunning with this expanded fixture", "Diagnostic package refresh remains"]
+}

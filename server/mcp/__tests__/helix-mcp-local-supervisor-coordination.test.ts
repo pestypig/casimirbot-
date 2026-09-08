@@ -1,12 +1,13 @@
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { z } from "zod";
 import { ToolListChangedNotificationSchema } from
   "@modelcontextprotocol/sdk/types.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
 import { HELIX_AGENT_RUN_READ_SCOPE } from
   "@shared/contracts/helix-agent-api.v1";
-import { HELIX_ENVIRONMENT_ACTION_READ_SCOPE } from
+import { HELIX_ENVIRONMENT_ACTION_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE } from
   "@shared/helix-environment-action";
 import {
   HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE,
@@ -338,6 +339,112 @@ describe("Helix MCP local-supervisor coordination", () => {
     expect(JSON.stringify(observations)).not.toContain("Private objective");
   });
 
+  it("publishes temporal OAuth metadata in both raw transport catalogs", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore("service_instance:78787878787878787878787878787878");
+    const reasoningTaskBindingStore = new HelixReasoningTaskBindingStore(store);
+    const identity = principal("profile:temporal-catalog", "oauth_client:temporal-catalog");
+    const rawCatalogSchema = z.object({ tools: z.array(z.object({
+      name: z.string(), securitySchemes: z.unknown().optional(),
+      _meta: z.object({ securitySchemes: z.unknown().optional() }).passthrough().optional(),
+    }).passthrough()) }).passthrough();
+    for (const surface of ["local_supervisor_coordination", undefined]) {
+      const client = await connect(store, identity, { surface, reasoningTaskBindingStore });
+      const catalog = await client.request({ method: "tools/list" }, rawCatalogSchema);
+      for (const name of ["helix_environment_temporal_frontier_publish", "helix_environment_temporal_plan_submit", "helix_environment_session_ready_up"]) {
+        const tool = catalog.tools.find(candidate => candidate.name === name);
+        expect(tool, `${surface}: ${name}`).toBeDefined();
+        expect(tool?.securitySchemes, `${surface}: ${name}`).toEqual(tool?._meta?.securitySchemes);
+        expect(tool?.securitySchemes).toEqual(expect.arrayContaining([expect.objectContaining({ type: "oauth2" })]));
+      }
+    }
+  });
+
+  it("routes Ready up through the authenticated exact task and participant", async () => {
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    try {
+      const store = new HelixLocalSupervisorCoordinationStore("service_instance:78787878787878787878787878787878");
+      const reasoning = new HelixReasoningTaskBindingStore(store);
+      const identity = principal("profile:ready-up-success", "oauth_client:ready-up-success");
+      identity.scopes.add(HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE);
+      const execute = vi.fn().mockResolvedValue({ schema: "helix.environment_session_ready_up.v1",
+        readiness: { ready: false }, repairs: [], execution_authority: false, answer_authority: false });
+      const automatic = vi.fn().mockResolvedValue({ readiness: { ready: false } });
+      const client = await connect(store, identity, { reasoningTaskBindingStore: reasoning,
+        environmentSessionReadyUp: execute, environmentSessionAutoPrepare: automatic, roomControlService: {
+          inspectRoom: async () => ({ room: { self_participant_id: "participant:verified" } }),
+        } });
+      const presenceResult = await client.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
+        client_continuation_ref: "task:ready-up", declared_objective_summary: "Prepare my environment",
+        lifecycle_state: "active", resource_claims: [], heartbeat_ttl_seconds: 60,
+        thread_observability_bridge: { supported_levels: ["tool_activity_only", "checkpoint_publish", "continuation_ready"],
+          requested_level: "continuation_ready", checkpoint_publication: {
+            freshness_window_seconds: 120, retention: "current_session", revocation: "independent" } },
+      } });
+      expect(presenceResult.isError, JSON.stringify(presenceResult)).not.toBe(true);
+      const presence = (presenceResult.structuredContent as any).presence;
+      const claim = reasoning.issueClaim({ profileRef: identity.accountProfileId, clientSessionRef: presence.client_session_ref,
+        helixConversationId: "chat:ready-up", missionId: null, runId: "run:ready-up" });
+      const claimed = await client.callTool({ name: "helix_reasoning_task_binding_claim", arguments: {
+        client_continuation_ref: "task:ready-up", claim_handle: claim.claim_handle,
+      } });
+      expect(claimed.isError).not.toBe(true);
+      const binding = (claimed.structuredContent as any).binding;
+      const args = { client_continuation_ref: "task:ready-up", reasoning_binding_id: binding.reasoning_binding_id,
+        binding_epoch: binding.binding_epoch, helix_conversation_id: "chat:ready-up", mission_id: null,
+        room_id: "room:ready-up", run_id: "run:ready-up", goal_id: "goal:a", expected_revision: 1,
+        turn_id: "turn:a", probe_request_id: "probe:a", prior_turn_id: "turn:prior",
+        environment_binding_id: "environment:a", source_id: "source:a", world_id: "world:a",
+        subject_binding_id: "subject:a", action_authority_id: "authority:a" };
+      const result = await client.callTool({ name: "helix_environment_session_ready_up", arguments: args });
+      expect(result.isError).not.toBe(true);
+      expect(execute).toHaveBeenCalledOnce();
+      expect(execute.mock.calls[0][0]).toMatchObject({
+        context: { profileId: identity.accountProfileId, participantId: "participant:verified", runId: "run:ready-up" },
+        binding: { helixConversationId: "chat:ready-up", clientContinuationRef: "task:ready-up" },
+      });
+      const automaticArgs = { client_continuation_ref: args.client_continuation_ref,
+        reasoning_binding_id: args.reasoning_binding_id, binding_epoch: args.binding_epoch,
+        helix_conversation_id: args.helix_conversation_id, mission_id: null,
+        run_id: args.run_id, request_id: "ready:automatic" };
+      const catalogue = await client.listTools();
+      const readySchema = catalogue.tools.find(tool => tool.name === "helix_environment_session_ready_up")!.inputSchema;
+      expect(readySchema.properties).toHaveProperty("request_id");
+      expect(readySchema.properties).toHaveProperty("client_continuation_ref");
+      const prepared = await client.callTool({ name: "helix_environment_session_ready_up", arguments: automaticArgs });
+      expect(prepared.isError, JSON.stringify(prepared)).not.toBe(true);
+      expect(automatic).toHaveBeenCalledOnce();
+      expect(automatic.mock.calls[0][0]).toMatchObject({ requestId: "ready:automatic", runId: args.run_id });
+      expect(automatic.mock.calls[0][0].sessionId).toBe(identity.accountContext.session_id);
+      expect(automatic.mock.calls[0][4].target.clientContinuationRef).toBe(args.client_continuation_ref);
+      const wrongTask = await client.callTool({ name: "helix_environment_session_ready_up",
+        arguments: { ...automaticArgs, client_continuation_ref: "task:foreign" } });
+      expect(wrongTask.isError).toBe(true);
+      expect(automatic).toHaveBeenCalledOnce();
+      const rejected = await client.callTool({ name: "helix_environment_session_ready_up",
+        arguments: { ...args, helix_conversation_id: "chat:other" } });
+      expect(rejected.isError).toBe(true);
+      expect(execute).toHaveBeenCalledOnce();
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("does not ready up a session with read-only scopes", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore("service_instance:78787878787878787878787878787878");
+    const executor = vi.fn();
+    const client = await connect(store, principal("profile:ready-up", "oauth_client:ready-up"), {
+      reasoningTaskBindingStore: new HelixReasoningTaskBindingStore(store), environmentSessionReadyUp: executor,
+    });
+    const result = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+      client_continuation_ref: "task:a", reasoning_binding_id: "binding:a", binding_epoch: 1,
+      helix_conversation_id: "chat:a", mission_id: null, room_id: "room:a", run_id: "run:a",
+      goal_id: "goal:a", expected_revision: 1, turn_id: "turn:a", probe_request_id: "probe:a", prior_turn_id: "turn:prior",
+      environment_binding_id: "environment:a", source_id: "source:a", world_id: "world:a",
+      subject_binding_id: "subject:a", action_authority_id: "authority:a",
+    } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).toContain("insufficient_scope");
+    expect(executor).not.toHaveBeenCalled();
+  });
+
   it("pre-advertises exact room and environment schemas while denying every shadow call", async () => {
     const store = new HelixLocalSupervisorCoordinationStore(
       "service_instance:78787878787878787878787878787878",
@@ -352,6 +459,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       fullClient.listTools(),
     ]);
     const transitionShadowToolNames = [
+      "helix_environment_temporal_frontier_publish",
       "helix_room_list",
       "helix_room_inspect",
       "helix_room_floor_inspect",
@@ -404,6 +512,18 @@ describe("Helix MCP local-supervisor coordination", () => {
     });
     expect(denied.isError).toBe(true);
     expect(JSON.stringify(denied)).toContain("full_mcp_transition_required");
+    const deniedFrontier = await shadowClient.callTool({
+      name: "helix_environment_temporal_frontier_publish",
+      arguments: {
+        room_id: "shared_realtime_room:shadow-fixture",
+        goal_id: "goal:shadow", expected_revision: 1, run_id: null,
+        turn_id: "turn:shadow", probe_request_id: "probe:shadow", prior_turn_id: "turn:prior",
+      },
+    });
+    expect(deniedFrontier.isError).toBe(true);
+    expect(JSON.parse((deniedFrontier.content[0] as { text: string }).text)).toMatchObject({
+      error: "full_mcp_transition_required", mutation_executed: false,
+    });
     const deniedEnvironmentMutation = await shadowClient.callTool({
       name: "helix_minecraft_player_action",
       arguments: {
@@ -1171,6 +1291,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_environment_source_pair_local",
       "helix_environment_subject_list",
       "helix_environment_subject_select",
+      "helix_environment_temporal_frontier_publish",
       "helix_evidence_observation_get",
       "helix_local_supervisor_coordination_read",
       "helix_local_supervisor_presence_disconnect",

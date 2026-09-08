@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-05",
+  "classification": "adapter execution",
+  "first_divergence": "Crafting used QUICK_MOVE on the result slot while claiming one result; that operation can repeatedly craft from available ingredients.",
+  "repair": "Require an empty cursor and a player slot with matching stack components and enough capacity. Reject a displayed batch exceeding remaining requested output, then use PICKUP for one result and deposit it into the prechecked slot.",
+  "verification": {
+    "native_tests": ["CraftResultBudgetTest", "ResidentMutationBudgetTest", "FluidSequenceEngineTest"],
+    "gradle_exit_code": 0,
+    "negative": "Oversized batch, insufficient destination capacity, occupied cursor, invalid counts and integer overflow are rejected by the pre-click budget predicate."
+  },
+  "limitations": [
+    "No actual server-menu reconciliation or live crafting GameTest was run.",
+    "Incidental item pickup and complete effect-time mutation accounting remain unverified.",
+    "No deployment or packaged EXE build; ET6 live qualification remains incomplete."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

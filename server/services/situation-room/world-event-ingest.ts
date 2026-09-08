@@ -1327,7 +1327,7 @@ export const ingestWorldEvent = async (
       actorLabel: environmentStateSnapshot.actor_label ?? event.actor_label ?? null,
       limit: 1,
     });
-    const routeStateSnapshot = navigationQuery.navigation_state
+    const routeStateSnapshot: HelixEnvironmentStateSnapshot = navigationQuery.navigation_state
       ? {
           ...environmentStateSnapshot,
           route_state: {

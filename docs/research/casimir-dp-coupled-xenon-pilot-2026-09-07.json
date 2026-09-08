@@ -1,0 +1,76 @@
+{
+  "status": "coupled_planar_true_recoil_pilot_not_LZ_selection",
+  "rows": [
+    {
+      "rock_run": 2,
+      "xe_seed": 9702,
+      "simulated_Xe_entries": 10465,
+      "outputs": {
+        "at_least_one_5p4_200": {
+          "mean": 238151310.48638618,
+          "se": 65757384.76473413,
+          "sampling_status": "nonzero_sample",
+          "ess": 13.114878401371994,
+          "max_share": 0.16982522183835005
+        },
+        "exactly_one_above_5p4": {
+          "mean": 237854669.04157528,
+          "se": 65757296.7080162,
+          "sampling_status": "nonzero_sample",
+          "ess": 13.082266249571122,
+          "max_share": 0.17003702007369456
+        },
+        "at_least_one_200_269p9": {
+          "mean": 0.0,
+          "se": null,
+          "sampling_status": "no_sampled_event_not_zero_rate",
+          "ess": 0,
+          "max_share": 0
+        }
+      },
+      "energy_balance_max_error_keV": 1.4210854715202004e-13
+    },
+    {
+      "rock_run": 3,
+      "xe_seed": 9703,
+      "simulated_Xe_entries": 7425,
+      "outputs": {
+        "at_least_one_5p4_200": {
+          "mean": 172367390.03458545,
+          "se": 43923218.35750182,
+          "sampling_status": "nonzero_sample",
+          "ess": 15.397824608998436,
+          "max_share": 0.12194692085678627
+        },
+        "exactly_one_above_5p4": {
+          "mean": 151054521.23010924,
+          "se": 38567760.58964452,
+          "sampling_status": "nonzero_sample",
+          "ess": 15.337562304454142,
+          "max_share": 0.13266053930256405
+        },
+        "at_least_one_200_269p9": {
+          "mean": 0.0,
+          "se": null,
+          "sampling_status": "no_sampled_event_not_zero_rate",
+          "ess": 0,
+          "max_share": 0
+        }
+      },
+      "energy_balance_max_error_keV": 1.4210854715202004e-13
+    }
+  ],
+  "source_sha256": "6e1638c04be0ed0067f4c2f51671db0bfd58e28e0a6d0ab900620e00aa20c958",
+  "rock_archive_sha256": "397233927c4c3f60e9b5b20337c1251f06f4766cbb04cba269a05ff5f8d804da",
+  "incident_crossings_for_exposure": 6.950029824e+16,
+  "normalization_relative_error": 2.220446049250313e-16,
+  "archive": "casimir-dp-coupled-xenon-pilot-2026-09-07.npz",
+  "archive_sha256": "e7095bddb3e858cb6bbb4b4ca7774853291fcc30a119fac08f42ccde4cc3fb76",
+  "limitations": [
+    "Recoil threshold predicates are not detected-event selection",
+    "Rare high recoils may be unsampled",
+    "One Xe realization per importance-weighted entry; empirical errors do not guarantee tail coverage",
+    "Uniform infinite slab geometry and Born kernel",
+    "Missing pulse reconstruction and captured population"
+  ]
+}

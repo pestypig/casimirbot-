@@ -1,0 +1,54 @@
+{
+  "scope": "Physical g12 ubar i gamma5 u, scalar target gA=gN*mA/.939GeV. 1eV mediator. Leading nonrelativistic kinematics and Helm mass-charge proxy. Prescribed halo and .3GeV/cm3 total density. No detector acceptance, source, transport, external fit or force exclusion. Coupling caps are declared diagnostics, not measured bounds or rigorous perturbativity criteria.",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "unit_coupling_raw_Xe_window": 1927402740790207.8,
+      "unit_coupling_raw_Xe_high": 979105562813379.2,
+      "survival_optimized_g12_squared_times_fraction": 2.1946009086882132e-29,
+      "assumed_caps": [
+        {
+          "assumed_gN_cap": 1.0,
+          "max_raw_Xe_window": 4.2298798063463426e-14,
+          "max_raw_Xe_high": 2.1487459578519265e-14
+        },
+        {
+          "assumed_gN_cap": 3.5449077018110318,
+          "max_raw_Xe_window": 5.315423730074194e-13,
+          "max_raw_Xe_high": 2.70019380624735e-13
+        },
+        {
+          "assumed_gN_cap": 12.566370614359172,
+          "max_raw_Xe_window": 6.679558456447178e-12,
+          "max_raw_Xe_high": 3.3931636099901346e-12
+        }
+      ],
+      "gN_for_one_raw_window_event_at_survival_optimum": 4862235.462931796
+    },
+    {
+      "mchi_GeV": 100.0,
+      "unit_coupling_raw_Xe_window": 365088396034568.0,
+      "unit_coupling_raw_Xe_high": 76185696443864.61,
+      "survival_optimized_g12_squared_times_fraction": 8.340047584689032e-28,
+      "assumed_caps": [
+        {
+          "assumed_gN_cap": 1.0,
+          "max_raw_Xe_window": 3.0448545955460917e-13,
+          "max_raw_Xe_high": 6.353923336145048e-14
+        },
+        {
+          "assumed_gN_cap": 3.5449077018110318,
+          "max_raw_Xe_window": 3.826277131446688e-12,
+          "max_raw_Xe_high": 7.984575549722412e-13
+        },
+        {
+          "assumed_gN_cap": 12.566370614359172,
+          "max_raw_Xe_window": 4.808241650700618e-11,
+          "max_raw_Xe_high": 1.0033713555616247e-11
+        }
+      ],
+      "gN_for_one_raw_window_event_at_survival_optimum": 1812244.2102763036
+    }
+  ],
+  "full_model_admitted": false
+}

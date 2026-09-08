@@ -131,15 +131,60 @@ export function createVisualSequenceRouter(
     });
   });
 
+  router.get("/", async (request: DeveloperRequest, response: Response) => {
+    try {
+      const manifests = await dependencies.service.listManifests(request.visualSequenceDeveloper!.profileId);
+      const reasoningGrants = dependencies.service.listReasoningGrants(request.visualSequenceDeveloper!.profileId);
+      response.setHeader("Cache-Control", "private, no-store");
+      return response.json({
+        ok: true,
+        schema: HELIX_VISUAL_SEQUENCE_MANIFEST_SCHEMA,
+        sequences: manifests,
+        reasoning_grants: reasoningGrants,
+        assistant_answer: false,
+        terminal_eligible: false,
+      });
+    } catch (error) {
+      return routeError(response, error);
+    }
+  });
+
+  router.post("/:sequenceId/reasoning-grants", boundary.enforceSameOrigin, async (request: DeveloperRequest, response: Response) => {
+    try {
+      const requestedDurationMs = Number(request.body?.duration_ms);
+      const grant = await dependencies.service.issueReasoningGrant(
+        request.visualSequenceDeveloper!.profileId,
+        request.params.sequenceId,
+        Number.isFinite(requestedDurationMs)
+          ? requestedDurationMs
+          : VISUAL_SEQUENCE_LIMITS.reasoningGrantDefaultDurationMs,
+      );
+      response.setHeader("Cache-Control", "private, no-store");
+      return response.status(201).json({ ok: true, grant });
+    } catch (error) {
+      return routeError(response, error);
+    }
+  });
+
+  router.post("/reasoning-grants/:grantId/revoke", boundary.enforceSameOrigin, async (request: DeveloperRequest, response: Response) => {
+    try {
+      const grant = dependencies.service.revokeReasoningGrant(
+        request.visualSequenceDeveloper!.profileId,
+        request.params.grantId,
+      );
+      response.setHeader("Cache-Control", "private, no-store");
+      return response.json({ ok: true, grant });
+    } catch (error) {
+      return routeError(response, error);
+    }
+  });
+
   router.get("/:sequenceId", async (request: DeveloperRequest, response: Response) => {
     try {
-      const [manifest, receipt] = await Promise.all([
-        dependencies.service.getManifest(request.params.sequenceId),
-        dependencies.service.getReceipt(request.params.sequenceId),
-      ]);
-      if (manifest.owner_profile_id !== request.visualSequenceDeveloper!.profileId) {
-        return errorResponse(response, 404, "sequence_not_found", "The visual sequence is unavailable or expired.");
-      }
+      const { manifest, receipt } = await dependencies.service.getOwnedSequence(
+        request.visualSequenceDeveloper!.profileId,
+        request.params.sequenceId,
+      );
       response.setHeader("Cache-Control", "private, no-store");
       return response.json({ ok: true, manifest, receipt });
     } catch (error) {
@@ -149,15 +194,15 @@ export function createVisualSequenceRouter(
 
   router.get("/:sequenceId/artifacts/:artifactPath(*)", async (request: DeveloperRequest, response: Response) => {
     try {
-      const manifest = await dependencies.service.getManifest(request.params.sequenceId);
-      if (manifest.owner_profile_id !== request.visualSequenceDeveloper!.profileId) {
-        return errorResponse(response, 404, "sequence_not_found", "The visual sequence is unavailable or expired.");
-      }
       const artifactPath = request.params.artifactPath ?? "";
-      const artifact = await dependencies.service.resolveArtifact(request.params.sequenceId, artifactPath);
+      const artifact = await dependencies.service.readOwnedArtifact(
+        request.visualSequenceDeveloper!.profileId,
+        request.params.sequenceId,
+        artifactPath,
+      );
       response.setHeader("Cache-Control", "private, no-store");
       response.type(artifact.mimeType);
-      return response.sendFile(artifact.path);
+      return response.send(artifact.bytes);
     } catch (error) {
       return routeError(response, error);
     }

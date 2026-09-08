@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-06",
+  "scope": "Full native regression and JAR rebuild after acceptance identity repair",
+  "command": "gradle --no-daemon --max-workers=1 test build -x runGameTest",
+  "compiled_handoff_enabled": true,
+  "exit_code": 0,
+  "xml_results": { "suites": 41, "tests": 303, "failures": 0, "errors": 0, "skipped": 0 },
+  "artifact": {
+    "path": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+    "sha256": "6bbe4f870149246c9c00c551d158bca751a2fda2bbe3a6d7855716b6785bbe63"
+  },
+  "limits": [
+    "No game test task or live Minecraft action executed",
+    "Built artifact not installed into the player's instance",
+    "Five-stage timing attribution remains incomplete",
+    "Frontier draft clock is captured before store.publish completes and is not a completed public-availability timestamp"
+  ]
+}

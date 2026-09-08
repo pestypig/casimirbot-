@@ -1,0 +1,34 @@
+{
+  "schema": "casimirbot.et6.frontier_store_diagnostics.v1",
+  "recorded_date": "2026-09-05",
+  "classification": "evidence normalization",
+  "change": "Eight existing frontier-store refusal codes now use TemporalPlanError instead of plain Error; guard conditions are unchanged.",
+  "codes": [
+    "temporal_frontier_time_invalid",
+    "temporal_frontier_forbidden",
+    "temporal_frontier_integrity_invalid",
+    "temporal_frontier_goal_stale",
+    "temporal_frontier_retention_invalid",
+    "temporal_frontier_replay_conflict",
+    "temporal_frontier_revision_overflow",
+    "temporal_frontier_observation_regressed"
+  ],
+  "verification": {
+    "temporal_test_files": 13,
+    "temporal_tests_passed": 132,
+    "temporal_tests_failed": 0,
+    "real_pg_mem_store_refusals_checked": true,
+    "all_added_codes_redaction_checked": true,
+    "server_build_exit_code": 0,
+    "server_bundle_sha256": "6eb1816f76fba5db8f4594fbadb70d0aab95eac112ed7d070161727c8fb46e2f",
+    "build_warnings": "Four existing duplicate-key/case warnings in unrelated demonstration, halobank and starsim files; preserved.",
+    "changed_temporal_files_diff_check": "PASS",
+    "docs_audit": "PASS"
+  },
+  "live_deployed": false,
+  "actual_prior_live_exception_identified": false,
+  "freshness_or_authority_relaxed": false,
+  "movement_dispatched_this_turn": false,
+  "rolling_cycles_proven": 0,
+  "goal_complete": false
+}

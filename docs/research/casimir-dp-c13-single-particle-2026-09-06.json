@@ -1,0 +1,52 @@
+{
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "checks": {
+    "independent_realspace_Fourier": true,
+    "zero_q_spin_projection": true,
+    "angular_momentum_projection": true,
+    "transverse_node": true,
+    "point_limit_integral": true
+  },
+  "coefficient_per_nucleon_GeV_minus2": 1.6497719025367554e-05,
+  "mchi_GeV": 1000.0,
+  "speed_km_s": 776,
+  "density_GeV_cm3": 0.3,
+  "qmax_GeV": 0.06193970016108539,
+  "C13_count_assuming_natural_fraction": 165911125.84181765,
+  "rows": [
+    {
+      "oscillator_b_fm_assumed": 1.4,
+      "sigma_C13_cm2": 5.4142651445260165e-42,
+      "independent_free_nucleus_expected_count": 5.228029325774341e-30,
+      "conditional_D_upper_2N": 1.0456058651548682e-29
+    },
+    {
+      "oscillator_b_fm_assumed": 1.6,
+      "sigma_C13_cm2": 5.050628522516455e-42,
+      "independent_free_nucleus_expected_count": 4.876900802688696e-30,
+      "conditional_D_upper_2N": 9.753801605377392e-30
+    },
+    {
+      "oscillator_b_fm_assumed": 1.8,
+      "sigma_C13_cm2": 4.663066248666198e-42,
+      "independent_free_nucleus_expected_count": 4.502669604332726e-30,
+      "conditional_D_upper_2N": 9.005339208665451e-30
+    },
+    {
+      "oscillator_b_fm_assumed": 2.0,
+      "sigma_C13_cm2": 4.259191103675313e-42,
+      "independent_free_nucleus_expected_count": 4.1126866527038295e-30,
+      "conditional_D_upper_2N": 8.225373305407659e-30
+    }
+  ],
+  "scope": "Conditional nuclear-elastic free-carbon impulse channel, unpolarized independent nuclei. No solid response or experimental bound.",
+  "excluded_from_claim": [
+    "configuration mixing",
+    "two-body currents",
+    "core polarization",
+    "solid spin dynamics",
+    "coherent correlated spin states",
+    "postselected survival",
+    "LZ coefficient inference"
+  ]
+}

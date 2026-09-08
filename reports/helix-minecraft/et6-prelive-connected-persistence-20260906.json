@@ -1,0 +1,23 @@
+{
+  "scope": "Simultaneous native/broker integration through real local DB client, snapshot writer and transaction wrapper",
+  "positive": { "server_tests": 2, "selected_native_tests": 1, "passed": true },
+  "snapshot_failure": { "server_tests": 2, "selected_native_tests": 1, "passed": true },
+  "verified": [
+    "Normal run saves both real admissions and action rows with native workflow and projection events",
+    "Failed snapshot rename after lease commit prevents executable HTTP acknowledgement",
+    "In-memory child is leased while prior saved child is absent or admitted",
+    "Native receives 503 and makes status-only reconciliation",
+    "No second delivery lease or successor activation",
+    "Required snapshot after recovery saves leased state",
+    "Temporary snapshot and DB handles cleaned up; targeted TypeScript passes"
+  ],
+  "fixture_correction": "Deferred admission need not already exist on disk; initial overly strict assertion corrected. Initial assertion failure also delayed response and caused synthetic heartbeat expiry; passing rerun has no unhandled errors.",
+  "limits": [
+    "Bounded schema rather than full migrations",
+    "Synthetic authority/catalog observations intercepted inside real transaction",
+    "No restart/reopen in this fixture; separate restart tests retain their own scope",
+    "Explicit post-fault snapshot flush is diagnostic recovery, not a new automatic runtime feature",
+    "No live Minecraft or power-loss durability claim"
+  ],
+  "reproduction": "Connected fixture recipe plus HELIX_NATIVE_BROKER_PERSISTENCE=1 for success, or HELIX_NATIVE_BROKER_SNAPSHOT_FAILURE=1 for failure"
+}

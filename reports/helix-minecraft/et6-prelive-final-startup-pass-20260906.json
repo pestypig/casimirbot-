@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-06",
+  "package": "apps/desktop/release-et6-prelive-final-20260906/win-unpacked/CasimirBot.exe",
+  "package_identity_evidence": "et6-prelive-final-package-bytes-20260906.json",
+  "command": "apps/desktop/scripts/smoke-packaged-launch.ps1 -ExecutablePath apps/desktop/release-et6-prelive-final-20260906/win-unpacked/CasimirBot.exe -TimeoutSeconds 55",
+  "exit_code": 0,
+  "result": {
+    "Verdict": "PASS",
+    "Processes": 5,
+    "LoopbackListeners": 4,
+    "FriendsCoordinationBroker": "NOT_CONFIGURED",
+    "IsolatedUserDataFiles": 164,
+    "FullReadinessReceipt": "PASS",
+    "ServiceListenerReceipt": "PASS",
+    "ProviderCredentialKeyVault": "PASS",
+    "ProtocolRegistrationPreserved": "PASS",
+    "MinFreePhysicalGiB": 3.39,
+    "MaxCommitPercent": 58.3
+  },
+  "cleanup": "Script completed its finally block for owned processes and disposable user data",
+  "installed_app_changed": false,
+  "live_capacity_proven": false
+}

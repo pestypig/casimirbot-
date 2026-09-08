@@ -1,0 +1,19 @@
+{
+  "source": "https://arxiv.org/html/2303.00778v2",
+  "role": "Corrected weak-coupling stellar reference, not a global large-mixing exclusion or independent stellar recast",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "D_at_sintheta_2e_minus10": 3.3390863887101016e-16,
+      "formal_target_sintheta_over_reference": 9401179.017107487
+    },
+    {
+      "mchi_GeV": 100.0,
+      "D_at_sintheta_2e_minus10": 4.0091421726882544e-17,
+      "formal_target_sintheta_over_reference": 27131640.11503403
+    }
+  ],
+  "nonrel_equal_coupling_heavy_light_emission_suppression": 2.961480183653362e-07,
+  "Higgs_proxy_dipole_squared_relative_to_electron_only": 0.48999999999999994,
+  "model_admitted": false
+}

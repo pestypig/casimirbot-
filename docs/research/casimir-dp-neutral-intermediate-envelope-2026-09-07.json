@@ -1,0 +1,91 @@
+{
+  "status": "conditional_elastic_charge_envelope_not_total_response",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "envelopes": [
+        {
+          "model": "spherical_intermediate",
+          "q_interval_eV": [
+            0.7141704424363171,
+            3472.823879
+          ],
+          "conditional_D_upper": 4.5299540991845294e-08
+        },
+        {
+          "model": "arbitrary_neutral_all_below_qBZ",
+          "q_interval_eV": [
+            0.0,
+            3472.823879
+          ],
+          "conditional_D_upper": 1.332483626072468e-06
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "envelopes": [
+        {
+          "model": "spherical_intermediate",
+          "q_interval_eV": [
+            0.7141704424363171,
+            3472.823879
+          ],
+          "conditional_D_upper": 3.370592945343992e-14
+        },
+        {
+          "model": "arbitrary_neutral_all_below_qBZ",
+          "q_interval_eV": [
+            0.0,
+            3472.823879
+          ],
+          "conditional_D_upper": 5.877528536347702e-13
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "envelopes": [
+        {
+          "model": "spherical_intermediate",
+          "q_interval_eV": [
+            0.7141704424363171,
+            3472.823879
+          ],
+          "conditional_D_upper": 3.510595755679295e-22
+        },
+        {
+          "model": "arbitrary_neutral_all_below_qBZ",
+          "q_interval_eV": [
+            0.0,
+            3472.823879
+          ],
+          "conditional_D_upper": 6.120431117689461e-21
+        }
+      ]
+    }
+  ],
+  "assumed_electron_rms_radius_m": 1e-10,
+  "input_script_sha256": "55e7e6da7c808c2f9cbddbd964a0da12f14d8b03d7c647609c8daf7c649a863a",
+  "assumptions": [
+    "fixed incoming population and mediator products",
+    "point nuclei and positive electron density partitioned into neutral cells",
+    "each cell rms electron distance from nucleus <=0.1 nm",
+    "Born elastic channel and maximal N\u00b2 positional coherence"
+  ],
+  "limitations": [
+    "arbitrary-neutral result permits anisotropy and nonzero cell dipoles but requires local neutrality",
+    "not validated charge partition for bonded diamond, charged surface or ionic cells",
+    "does not bound inelastic excitations or q above the chosen endpoint",
+    "no captured population or full apparatus signal prediction"
+  ]
+}

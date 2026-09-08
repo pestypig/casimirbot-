@@ -1,0 +1,23 @@
+{
+  "scope": "ET6 changed-affordance evidence reference repair",
+  "classification": "evidence normalization",
+  "defect": "Continuation collector read nonexistent drift_id; canonical producer emits drift_event_id already prefixed minecraft_route_drift:.",
+  "repair": "Carry drift_event_id unchanged into continuation evidence references.",
+  "verification": {
+    "runner": "11 tests passed including canonical reference and nonterminal flags",
+    "broader_check": "6 passed, 3 failed across hook, job-store and tool-route suites",
+    "failures": [
+      "Hook expected confirm_speak_required but received source_unknown.",
+      "Location hook expected no callout candidate but received a candidate reference.",
+      "Tool-route lifecycle test exceeded 20000ms timeout."
+    ],
+    "discipline_full": "Command exited successfully but classifier skipped its battery; targeted suites run explicitly."
+  },
+  "limitations": [
+    "Broader failures are unresolved, not attributed to this patch without baseline evidence.",
+    "Runner fixture does not prove live Codex pickup, physical replanning or packaged acceptance."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

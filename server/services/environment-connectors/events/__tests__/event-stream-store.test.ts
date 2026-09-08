@@ -5,7 +5,8 @@ import {
   type HelixEnvironmentEvent,
 } from "@shared/helix-environment-event-stream";
 import { newDb } from "pg-mem";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as roomDatabase from "../../../helix-ask/realtime-room/room-store/database";
 import { migration046 } from "../../../../db/migrations/046_environment_action_plane";
 import { migration047 } from "../../../../db/migrations/047_environment_action_result_replay_identity";
 import { migration048 } from "../../../../db/migrations/048_environment_event_ledger_identity";
@@ -299,11 +300,16 @@ describe("environment event stream and digest reducer", () => {
       const unsubscribe = subscribeEnvironmentSituationDigestRecorded((value) =>
         published.push(value),
       );
-      const recorded = await recordEnvironmentActionEventBatch({
-        claim,
-        batch,
-        withTransaction,
-      });
+      const transaction = vi.spyOn(roomDatabase, "withSharedRealtimeRoomTransaction")
+        .mockImplementation(async handler => handler(client));
+      let recorded: Awaited<ReturnType<typeof recordEnvironmentActionEventBatch>>;
+      try {
+        recorded = await recordEnvironmentActionEventBatch({ claim, batch });
+        expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+          requireLocalSnapshot: true,
+          snapshotTables: ["helix_environment_event_batches", "helix_environment_events", "helix_environment_situation_digests"],
+        });
+      } finally { transaction.mockRestore(); }
       const replayed = await recordEnvironmentActionEventBatch({
         claim,
         batch,

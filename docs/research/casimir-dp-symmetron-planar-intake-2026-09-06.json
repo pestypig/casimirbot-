@@ -1,0 +1,37 @@
+{
+  "checks": {
+    "nonlinear_BVP_converged": true,
+    "profile_matches_analytic": true,
+    "wall_and_far_boundary_conditions": true,
+    "local_vertex_suppression_not_enhancement": true
+  },
+  "max_profile_error": 1.7535972673954348e-12,
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "rows": [
+    {
+      "mu_eV": 0.001,
+      "illustrative_z_m": 1e-05,
+      "far_vacuum_fluctuation_range_m": 0.00013953124595190492,
+      "background_phi_over_far_vev": 0.03581893723311461,
+      "two_local_vertices_product_over_far_value": 0.0012829962645098043,
+      "squared_vertex_product_over_far_value": 1.6460794147461118e-06
+    },
+    {
+      "mu_eV": 0.01,
+      "illustrative_z_m": 1e-05,
+      "far_vacuum_fluctuation_range_m": 1.3953124595190493e-05,
+      "background_phi_over_far_vev": 0.3437533832338719,
+      "two_local_vertices_product_over_far_value": 0.1181663884847332,
+      "squared_vertex_product_over_far_value": 0.013963295367524886
+    },
+    {
+      "mu_eV": 0.1,
+      "illustrative_z_m": 1e-05,
+      "far_vacuum_fluctuation_range_m": 1.3953124595190493e-06,
+      "background_phi_over_far_vev": 0.9984576958514654,
+      "two_local_vertices_product_over_far_value": 0.9969177704050174,
+      "squared_vertex_product_over_far_value": 0.9938450409493109
+    }
+  ],
+  "scope": "Infinite perfectly screened plane and empty half-space; same broken vacuum at infinity; no sphere backreaction, finite geometry, gas or DM density. Vertex ratios are not scattering-rate ratios: inhomogeneous propagator and environmental state uncomputed. z=10um is illustrative, not an authenticated branch coordinate."
+}

@@ -368,6 +368,40 @@ const dependencies = (
 });
 
 describe("environment probe workstation gateway", () => {
+  it.each(["exact", "room", "source", "connector", "subject", "revoked-before-dispatch"])(
+    "constrains first-party setup probes to the exact environment (%s)", async scenario => {
+      const connector = await dependencies().materializeConnector!({} as never);
+      const dispatchProbe = vi.fn(async (_input: Parameters<EnvironmentProbeGatewayDependencies["dispatchProbe"]>[0]) =>
+        ({ requestId: observation.probe_request_ref, replayed: false }));
+      const materializeConnector = vi.fn(async () => connector);
+      const expected = { roomId: ROOM_ID, environmentBindingId: connector.environmentBindingId,
+        sourceId: SOURCE_ID, worldId: sourceCandidate.worldId,
+        subjectBindingId: "subject:setup", subjectNativeId: "player:setup" };
+      if (scenario === "room") expected.roomId = "room:other";
+      if (scenario === "source") expected.sourceId = "source:other";
+      if (scenario === "connector") expected.environmentBindingId = "environment:other";
+      if (scenario === "subject") expected.subjectBindingId = "subject:other";
+      const result = await executeEnvironmentProbeGatewayCapability({
+        turnId: TURN_ID, toolCallId: TOOL_CALL_ID, policy: null,
+        accountContext: firstPartyAccountContext(), conversationThreadId: `helix-ask:room:${ROOM_ID}`,
+        arguments: { target: "current_actor" }, expectedEnvironmentIdentity: expected,
+        assertCurrentTarget: () => {
+          if (scenario === "revoked-before-dispatch") throw new Error("revoked");
+        },
+        dependencies: dependencies({ listActiveConnectors: async () => [connector],
+          resolveSubject: async () => ({ subjectBindingId: "subject:setup", subjectNativeId: "player:setup" }) as never,
+          materializeConnector, dispatchProbe }),
+      });
+      expect(result.ok).toBe(scenario === "exact");
+      expect(materializeConnector).not.toHaveBeenCalled();
+      expect(dispatchProbe).toHaveBeenCalledTimes(scenario === "exact" ? 1 : 0);
+      if (scenario === "exact") {
+        expect(dispatchProbe.mock.calls[0][0]).toMatchObject({ executionAuthorityKind: "first_party_shared_room",
+          resolvedSubject: { subjectBindingId: "subject:setup", subjectNativeId: "player:setup" } });
+      }
+    },
+  );
+
   it("refreshes exact authenticated in-game presence before a delayed probe", async () => {
     let currentPresence: SharedRealtimeRoomMembership["presence"] = "away";
     const refreshPresence = vi.fn(async () => {

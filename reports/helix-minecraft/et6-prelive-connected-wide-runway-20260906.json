@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-06",
+  "scope": "Connected positive advancing-clock fixture",
+  "mode": "HELIX_NATIVE_BROKER_WIDE_RUNWAY=1 with persistence and roundtrip enabled",
+  "result": { "passed": 2, "failed": 0, "exit_code": 0 },
+  "negative_attempts": [
+    "Broker rejected acceptance versus stale tick-zero observation clock; fixture observation now uses the same advancing elapsed source",
+    "Test compilation rejected the reflection helper's checked exception; fixture catch corrected before successful rerun"
+  ],
+  "verified": ["Production frontier publication/storage, admission, lease and native acceptance remain correlated", "Acceptance satisfies the predeclared 20-tick nominal window", "Wide and narrow fixture artifacts remain separate"],
+  "limits": ["Acceptance clock starts before polling, not the earlier checkpoint", "Post-acceptance activation is scripted", "No live capacity or complete checkpoint-window claim", "Complete checkpoint-budget verification and package refresh remain"]
+}

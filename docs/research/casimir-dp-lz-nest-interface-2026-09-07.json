@@ -1,0 +1,181 @@
+{
+  "status": "exploratory_source_interface_mapping",
+  "paper": "https://arxiv.org/html/2609.02823v1",
+  "nest_tag": "v2.4.5beta",
+  "nest_commit": "19bc9bc063c62961d2f190beec2db16a9e279aa1",
+  "nest_cpp_sha256": "29ba21cbd1b37be5c30a232db906ed2e433833e11574beec865072b16f9c5173",
+  "parameter_receipt_sha256": "f4e146d15d843250c82d790cdd69c6a6309955d5de86f790e417ec572480bcab",
+  "zero_based_parameter_order": [
+    "alpha",
+    "beta",
+    "gamma",
+    "delta",
+    "epsilon",
+    "zeta",
+    "eta",
+    "theta",
+    "iota",
+    "p",
+    "f1",
+    "f2"
+  ],
+  "rows": [
+    {
+      "energy_keV": 10,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 1.0
+    },
+    {
+      "energy_keV": 74.7,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 1.0
+    },
+    {
+      "energy_keV": 100,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5126223420514895,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 0.9423085242154203
+    },
+    {
+      "energy_keV": 150,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5265805495732175,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 0.8736866594849741
+    },
+    {
+      "energy_keV": 200,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.535204902155063,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 0.8283013375743636
+    },
+    {
+      "energy_keV": 220,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5379154769416461,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 0.8135734872498005
+    },
+    {
+      "energy_keV": 248,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5412425304337487,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 0.7952125905064735
+    },
+    {
+      "energy_keV": 269.9,
+      "NRYieldsParam": [
+        11.2,
+        1.1,
+        0.052,
+        -0.0533,
+        10.8,
+        0.53,
+        1.4,
+        0.31,
+        2.5,
+        0.5435460084678786,
+        1.39,
+        1.74
+      ],
+      "conditional_Qy_ratio_to_constant_p": 0.7823278936779795
+    }
+  ],
+  "checks": [
+    "input hash",
+    "12 entries",
+    "below-break invariance",
+    "continuity at break",
+    "positive conditional ratio"
+  ],
+  "limitations": [
+    "NEST not executed by this script",
+    "external per-energy mapping inferred from paper and source; not authenticated LZ wrapper",
+    "ratio holds all other NR settings fixed; not an S1/S2 or energy-response kernel",
+    "no accepted event counts or parameter exclusion"
+  ]
+}

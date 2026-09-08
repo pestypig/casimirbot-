@@ -1,0 +1,17 @@
+{
+  "scope": "ET6 internal temporal preflight to broker composition",
+  "classification": "tool admission",
+  "implementation": "admitTemporalPlan freezes input, rejects request/run/participant/graph-kind mismatches, uses server compilation output and invokes the existing broker with exact binding retention and task revalidation callback.",
+  "verification": {
+    "focused_tests": "5 passed",
+    "coverage": "Compiler output and task identity forwarding, callback revocation, context mismatch and failed preflight."
+  },
+  "limitations": [
+    "Preflight and broker are mocked in the composition test; no full transaction or live execution is proven.",
+    "Helper is internal and has no public MCP caller yet. Existing broker feature gate remains unchanged.",
+    "No server restart, packaged build or Minecraft action occurred."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,92 @@
+{
+  "status": "scalar_and_vector_s_wave_only_not_halo_constraint",
+  "alpha_h": 0.0001111111111111111,
+  "rows": [
+    {
+      "scalar_included": false,
+      "relative_speed_km_s": 0,
+      "quantity": "scattering_length_GeV_inverse",
+      "coarse": 5.3308396536069225,
+      "fine": 5.330833686375224,
+      "absolute_refinement": 5.967231698100761e-06
+    },
+    {
+      "scalar_included": false,
+      "relative_speed_km_s": 30,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": -0.02667156157821915,
+      "fine": -0.02667153172622916,
+      "absolute_refinement": 2.985198999105876e-08
+    },
+    {
+      "scalar_included": false,
+      "relative_speed_km_s": 200,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": -0.17749652655412618,
+      "fine": -0.1774963289989535,
+      "absolute_refinement": 1.9755517266517586e-07
+    },
+    {
+      "scalar_included": false,
+      "relative_speed_km_s": 1000,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": -0.853020867190251,
+      "fine": -0.8530200136180053,
+      "absolute_refinement": 8.535722457736483e-07
+    },
+    {
+      "scalar_included": false,
+      "relative_speed_km_s": 3000,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": 1.036657355431844,
+      "fine": 1.0366587123840727,
+      "absolute_refinement": 1.3569522288037206e-06
+    },
+    {
+      "scalar_included": true,
+      "relative_speed_km_s": 0,
+      "quantity": "scattering_length_GeV_inverse",
+      "coarse": 5.28755169159395,
+      "fine": 5.2875457394097705,
+      "absolute_refinement": 5.952184179314202e-06
+    },
+    {
+      "scalar_included": true,
+      "relative_speed_km_s": 30,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": -0.02645504090105444,
+      "fine": -0.026455011124390637,
+      "absolute_refinement": 2.9776663801328596e-08
+    },
+    {
+      "scalar_included": true,
+      "relative_speed_km_s": 200,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": -0.17607251992629624,
+      "fine": -0.17607232287568442,
+      "absolute_refinement": 1.9705061182762051e-07
+    },
+    {
+      "scalar_included": true,
+      "relative_speed_km_s": 1000,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": -0.847435029764414,
+      "fine": -0.8474341780498218,
+      "absolute_refinement": 8.517145921871361e-07
+    },
+    {
+      "scalar_included": true,
+      "relative_speed_km_s": 3000,
+      "quantity": "s_wave_phase_mod_pi_radians",
+      "coarse": 1.044173483193541,
+      "fine": 1.0441748416177514,
+      "absolute_refinement": 1.3584242104514033e-06
+    }
+  ],
+  "omissions": [
+    "higher partial waves",
+    "halo velocity integration",
+    "complete observational constraints",
+    "coherence prediction"
+  ]
+}

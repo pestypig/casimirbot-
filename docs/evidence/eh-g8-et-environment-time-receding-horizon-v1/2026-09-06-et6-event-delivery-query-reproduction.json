@@ -1,0 +1,25 @@
+{
+  "scope": "Second temporal attempt and isolated persistence failure reproduction",
+  "action_request_id": "et6-action-delivery-2",
+  "recorded_outcome": "connector_offline",
+  "started_at": "2026-09-06T07:26:55.355180200Z",
+  "completed_at": "2026-09-06T07:26:55.485674Z",
+  "duration_ticks": 2,
+  "player_motion_performed": true,
+  "controls_released": true,
+  "automatic_replay_performed": false,
+  "client_log_error": "action_delivery_workflow_event_http_503_action_connector_unavailable",
+  "before_position": {"x": 5.45, "y": 65, "z": 2.55},
+  "after_position": {"x": 5.04, "y": 65, "z": 2.44},
+  "after_evidence_ref": "environment_probe_evidence:7485afd51d723700237ac6216789c8511c868f64",
+  "reproduction": {
+    "environment": "isolated pg-mem, two empty minimal tables; no live database write",
+    "source": "server/services/environment-connectors/actions/action-broker.ts validatedTemporalEvidence update",
+    "result": "Unknown alias helix_environment_action_requests",
+    "query_shape": "UPDATE helix_environment_action_requests a SET ... FROM helix_environment_temporal_plan_admissions p ...",
+    "limitation": "Reproduces the source query incompatibility; no exact live server exception stack captured"
+  },
+  "rolling_cycles_proven": 0,
+  "repair_deployed": false,
+  "credentials_included": false
+}

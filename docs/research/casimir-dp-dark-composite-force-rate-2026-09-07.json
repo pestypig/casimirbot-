@@ -1,0 +1,76 @@
+{
+  "status": "conditional Born scale screen; not an accepted event count or allowed point",
+  "N": 10000.0,
+  "mean_constituent_mass_GeV": 10.0,
+  "mass_GeV": 100000.0,
+  "radius_m": 8.158881029298554e-16,
+  "rho_GeV_cm3": 0.3,
+  "speed_kms": 776.0,
+  "flux_cm2_s": 232.8,
+  "assumptions": [
+    "uniform mean xenon nucleus, not isotope Helm response",
+    "isotropic monochromatic incident shell",
+    "rigid uniform sphere, qR up to 80",
+    "one unscreened isoscalar scalar; external conservative ordinary-force ceilings",
+    "screening-scale endpoint is marginal, not controlled unscreened point",
+    "self-interaction, formation, transport and detector response not yet admitted"
+  ],
+  "rows": [
+    {
+      "mediator_eV": 0.001,
+      "constituent_g": 0.01,
+      "screening_scale_ratio": 0.21544346900318834,
+      "ordinary_g": 2.7046337308871357e-19,
+      "nugget_nucleon_alpha": 2.1522791376188133e-18,
+      "D_quadratic_interval": 2.3628786862147043e-14,
+      "visibility_loss_quadratic": 2.3628786862146765e-14,
+      "raw_Xe_5p4to269p9": 2.093908628502424e-12,
+      "raw_Xe_200to269p9": 1.8378108238625948e-17,
+      "point_nugget_central_phase": 0.002269286832360015,
+      "local_cutoff40to80_relative": 2.508742574847134e-10,
+      "comparator_over_quadratic": 1248962331173.3135
+    },
+    {
+      "mediator_eV": 0.001,
+      "constituent_g": 0.046415888336127795,
+      "screening_scale_ratio": 0.9999999999999999,
+      "ordinary_g": 2.7046337308871357e-19,
+      "nugget_nucleon_alpha": 9.989994811989227e-18,
+      "D_quadratic_interval": 5.090667809917923e-13,
+      "visibility_loss_quadratic": 5.090667809916627e-13,
+      "raw_Xe_5p4to269p9": 4.511189387002708e-11,
+      "raw_Xe_200to269p9": 3.959443392645652e-16,
+      "point_nugget_central_phase": 0.01053309642134676,
+      "local_cutoff40to80_relative": 2.508742574847134e-10,
+      "comparator_over_quadratic": 57971696099.770355
+    },
+    {
+      "mediator_eV": 0.01,
+      "constituent_g": 0.01,
+      "screening_scale_ratio": 0.21544346900318834,
+      "ordinary_g": 8.5528028261222455e-16,
+      "nugget_nucleon_alpha": 6.806104235338439e-15,
+      "D_quadratic_interval": 1.521758792862371e-07,
+      "visibility_loss_quadratic": 1.5217586770748858e-07,
+      "raw_Xe_5p4to269p9": 2.093908628502424e-05,
+      "raw_Xe_200to269p9": 1.837810823862595e-10,
+      "point_nugget_central_phase": 4.921129632183306,
+      "local_cutoff40to80_relative": 2.6797560801804865e-10,
+      "comparator_over_quadratic": 193929.97668595414
+    },
+    {
+      "mediator_eV": 0.01,
+      "constituent_g": 0.046415888336127795,
+      "screening_scale_ratio": 0.9999999999999999,
+      "ordinary_g": 8.5528028261222455e-16,
+      "nugget_nucleon_alpha": 3.159113741915154e-14,
+      "D_quadratic_interval": 3.2785299332037365e-06,
+      "visibility_loss_quadratic": 3.278524558830348e-06,
+      "raw_Xe_5p4to269p9": 0.00045111893870027075,
+      "raw_Xe_200to269p9": 3.959443392645651e-09,
+      "point_nugget_central_phase": 22.841860349502998,
+      "local_cutoff40to80_relative": 2.6797560801804865e-10,
+      "comparator_over_quadratic": 9001.432142883112
+    }
+  ]
+}

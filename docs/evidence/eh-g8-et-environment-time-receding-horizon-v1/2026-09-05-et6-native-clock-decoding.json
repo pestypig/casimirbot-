@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "scope": "Internal native source-plan clock decoder, not runtime admission",
+  "implemented": "Decode explicit client-tick/monotonic origin and producer epoch, preserve delivery delay as execution offset, reject world-clock substitution, future/malformed/expired clocks",
+  "verification": {
+    "filters": ["TemporalPlanClockBindingTest", "TemporalPlanWindowTest"],
+    "tests": 7,
+    "result": "BUILD SUCCESSFUL",
+    "game_tests": "not run"
+  },
+  "limitations": ["No runtime caller", "Full source-plan/task/hash admission and execution offset application remain required", "Receiver still rejects temporal metadata", "No live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

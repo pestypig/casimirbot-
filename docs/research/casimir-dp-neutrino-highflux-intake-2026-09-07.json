@@ -1,0 +1,61 @@
+{
+  "scope": "Authenticated atmospheric spline evaluation; off-horizon production flux only, no Earth transport, astrophysical component, or splice to DUNE",
+  "full_model_admitted": false,
+  "checks": {
+    "byte_identities": true,
+    "upstream_agreement_within_20ppm": true,
+    "angular_refinement": true,
+    "horizon_extent_guard": true
+  },
+  "strict_1e_minus10_parity": false,
+  "regression_points": 512,
+  "max_relative_regression_error": 1.33233908279351e-05,
+  "cosine_lower_extent": 0.0174524064372836,
+  "omitted_solid_angle_fraction": 0.0174524064372836,
+  "native_extents": [
+    -1.0500000000651724,
+    10.749999999852994,
+    0.0174524064372836,
+    1.0
+  ],
+  "angular_refinement_relative": 4.861000491018785e-12,
+  "units": "cm^-2 s^-1 GeV^-1 integrated over both hemispheres excluding |cos(theta)| < stated extent",
+  "rows": [
+    {
+      "E_GeV": 1000.0,
+      "total_off_horizon": 5.311629094935388e-10,
+      "conventional_off_horizon": 5.291013808722335e-10,
+      "prompt_off_horizon": 2.046362941836075e-12
+    },
+    {
+      "E_GeV": 10000.0,
+      "total_off_horizon": 2.442414598994366e-13,
+      "conventional_off_horizon": 2.3847126327694803e-13,
+      "prompt_off_horizon": 5.717863324562978e-15
+    },
+    {
+      "E_GeV": 100000.0,
+      "total_off_horizon": 5.602921905727404e-17,
+      "conventional_off_horizon": 4.6969518049919235e-17,
+      "prompt_off_horizon": 8.988021556908091e-18
+    },
+    {
+      "E_GeV": 1000000.0,
+      "total_off_horizon": 8.756913824790819e-21,
+      "conventional_off_horizon": 3.600315844232369e-21,
+      "prompt_off_horizon": 5.132499915965428e-21
+    },
+    {
+      "E_GeV": 10000000.0,
+      "total_off_horizon": 3.1135776637311128e-24,
+      "conventional_off_horizon": 3.5749130212605343e-25,
+      "prompt_off_horizon": 2.7546358797764516e-24
+    },
+    {
+      "E_GeV": 100000000.0,
+      "total_off_horizon": 1.5331829082378644e-27,
+      "conventional_off_horizon": 2.137587563649178e-28,
+      "prompt_off_horizon": 1.3189869407392388e-27
+    }
+  ]
+}

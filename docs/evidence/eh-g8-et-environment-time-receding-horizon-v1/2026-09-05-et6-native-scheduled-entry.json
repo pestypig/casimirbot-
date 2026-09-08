@@ -1,0 +1,17 @@
+{
+  "et6_complete": false,
+  "scope": "Native finite-graph scheduled input handoff",
+  "defect": "nodeEnteredAt was recorded before earliest_tick, causing scheduled waiting to consume node duration and skip the input segment",
+  "repair": "Record node entry only after its earliest tick, preserving full duration and checkpoint wait budget",
+  "verification": {
+    "filters": ["FluidSequenceEngineTest", "PlayerActionControllerTest"],
+    "tests": 57,
+    "final_result": "BUILD SUCCESSFUL",
+    "negative_attempt": "New scheduled-entry fixture failed before repair; changed-safety handoff fixture passed",
+    "game_tests": "not run"
+  },
+  "limitations": ["Not cross-plan extension acceptance", "Not live or packaged ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

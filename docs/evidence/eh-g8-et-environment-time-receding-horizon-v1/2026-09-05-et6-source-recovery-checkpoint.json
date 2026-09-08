@@ -1,0 +1,29 @@
+{
+  "et6_complete": false,
+  "service_instance_ref": "service_instance:a75cd5b59ac01ff0b907962910d0cb80",
+  "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+  "room_source_binding_id": "room_source_binding:5eaf90ee-96be-49da-88e7-02d978d35f44",
+  "initial_blockers": ["adapter_admission_inactive", "credential_inactive", "credential_expired", "contact_stale"],
+  "source_pairing_id": "connector_pairing:2c0e9ce2-b854-4903-befc-aba029bd3df5",
+  "source_recovery": "Opaque local MCP handoff; subsequent Device Check online, fresh, probe-ready with no blockers",
+  "credential_ttl_ms": 3600000,
+  "lifecycle_launch": {
+    "authority_basis_requested": "trusted_device_workstation_lifecycle_bootstrap",
+    "restart_client": false,
+    "outcome": "internal_error",
+    "replayed": false,
+    "success_receipt_proven": false
+  },
+  "subsequent_directory": {
+    "observed_at": "2026-09-05T07:26:30.515162500Z",
+    "connection_status": "active",
+    "freshness": "fresh",
+    "subject_label": "DatDamPig",
+    "presence": "online"
+  },
+  "interpretation": "Fresh online player evidence supersedes the earlier empty directory for readiness only; it does not erase the launch error or prove a successful lifecycle receipt.",
+  "player_motion_requested": false,
+  "world_authority_granted": false,
+  "pairing_material_included": false,
+  "credential_included": false
+}

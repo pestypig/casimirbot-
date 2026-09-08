@@ -130,6 +130,7 @@ const actionNodeSchema = z
     node_id: identifierSchema,
     node_kind: z.literal("action"),
     earliest_tick: tickSchema,
+    latest_start_tick: tickSchema.optional(),
     timeout_ticks: z.number().int().positive().max(36_000),
     action: embeddedActionSchema,
     on_success: identifierSchema,
@@ -536,10 +537,12 @@ export const helixMinecraftReactiveProgramArgumentsSchema = z
           (conditionKind) =>
             conditions.some(
               (condition) =>
+                (condition.condition_kind === "on_fire_is" || condition.condition_kind === "in_lava_is") &&
                 condition.condition_kind === conditionKind && condition.expected,
             ) &&
             conditions.some(
               (condition) =>
+                (condition.condition_kind === "on_fire_is" || condition.condition_kind === "in_lava_is") &&
                 condition.condition_kind === conditionKind && !condition.expected,
             ),
         );

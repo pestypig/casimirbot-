@@ -1,0 +1,13 @@
+{
+  "schema": "et6_companion_launch_evidence.v1",
+  "source_diagnostic_launch": {"status": "connected", "client_process_id": 32132, "counts_as_mcp_launch_acceptance": false},
+  "subsequent_packaged_mcp_check": {"status": "connected", "client_process_id": 32132, "launcher_action": "reused_client", "connection_action": "already_connected", "mod_loaded": true, "server_address": "127.0.0.1:25566", "profile_id": "helix-combat-c0-isolated"},
+  "installed_jar_sha256": "25b2bcc35f41c684c4c6f90b041d163e9bf6fed648524903f8a3431a042d9795",
+  "memory_used_percent_at_mcp_check": 92.8,
+  "mcp_error_projection_source_patch": "Known MinecraftLocalLifecycleError codes retained, stderr/messages not disclosed, blind retry not advised",
+  "mcp_lifecycle_tests_passed": 12,
+  "error_projection_patch_deployed": false,
+  "earlier_launch_failure_root_cause": "unknown; later successful launch does not establish its cause",
+  "live_rolling_extensions_proven": 0,
+  "release_maturity_promoted": false
+}

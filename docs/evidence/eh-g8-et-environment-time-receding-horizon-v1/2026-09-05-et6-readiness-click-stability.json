@@ -1,0 +1,19 @@
+{
+  "classification": "presentation",
+  "defect": "The focus-refresh repair sets remote to loading, removing the binding controls while a readiness read is pending. This can interfere with a user's return-to-window click. The actual user click failure is not fully attributed by this code finding alone.",
+  "repair": "Retain the loaded projection and mounted consent control during refresh, with a separate refreshing flag. Current presence and identity are still enforced by the server claim endpoint. Errors still clear the loaded projection.",
+  "verification": {
+    "focused_tests_passed": 24,
+    "regression": "Deferred readiness read retains identical bind DOM node; duplicate focus while pending starts no extra read; later unavailable evidence disables binding",
+    "client_build": "passed in 55.67 seconds with bundler warnings",
+    "package": "apps/desktop/release-et6-readiness-click-20260905/win-unpacked",
+    "runtime_files_matching_staging": 645,
+    "asar_host_preload_service_match": true,
+    "previous_exe_closed_normally": true,
+    "candidate_launched_pid": 31120
+  },
+  "live_click_success_verified": false,
+  "binding_created": false,
+  "environment_authority_changed": false,
+  "et6_complete": false
+}

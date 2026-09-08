@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-06",
+  "scope": "Follow-up source and result inspection against the six numbered prerequisite requirements",
+  "requirements_source": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md:1209",
+  "observations": [
+    {
+      "requirement": 1,
+      "source": "server/services/environment-connectors/actions/__tests__/temporal-admission-publication.test.ts",
+      "inspected_assertions": ["No staged request visible as admitted before retention", "pg-mem rollback does not erase concurrent observations", "Post-write acknowledgement loss preserves admitted metadata", "Publication CAS preserves cancellation", "Failed overlapping publication cannot compensate successful sibling"]
+    },
+    {
+      "requirement": 2,
+      "source": "server/services/environment-connectors/events/__tests__/native-temporal-publication.test.ts",
+      "inspected_assertions": ["Uncertain outcome reconciles once", "Child remains leased with attempt_count one", "Native child identity correlates to admission and delivery"]
+    },
+    {
+      "requirement": 3,
+      "source": "minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/PlayerActionDeliveryOutboxTest.java",
+      "inspected_assertions": ["768-entry saturation retains three terminal slots", "Critical terminal/result can drain while projection backlog remains", "Checkpoint fence remains pending until its required projection acknowledgement", "Clearing checkpoint fence retains later backlog"],
+      "limit": "In-memory bounded queue; not durable storage or a substitute for connected HTTP fault coverage"
+    },
+    {
+      "requirement": 4,
+      "source": "server/db/__tests__/temporal-process-restart.test.ts",
+      "inspected_assertions": ["Write, replacement and verification occur in separate child process lifetimes", "Saved action ends connector_offline"],
+      "limit": "Not a power-loss test"
+    },
+    {
+      "requirement": 5,
+      "source": "server/services/environment-connectors/events/__tests__/native-temporal-publication.test.ts",
+      "inspected_assertions": ["Connected budget uses fixture checkpoint window", "One-ms budget rejects", "Server phase sum is contiguous", "Clock envelope remains within native roundtrip", "Corrupted timing enclosure is rejected"],
+      "limit": "Simulated provider/world; no live capacity inference"
+    },
+    {
+      "requirement": 6,
+      "native_xml_results": { "tests": 305, "failures": 0, "errors": 0, "skipped": 0 },
+      "current_package_startup": "INCOMPLETE: unchanged four-GiB guard refused launch again",
+      "startup_attempt_exit_code": 1,
+      "latest_free_physical_gib": 3.14
+    }
+  ],
+  "goal_complete": false,
+  "live_movement_resumed": false,
+  "next": "Current-package isolated startup when host headroom permits, then final complete invariant audit"
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "et6_native_root_execution_evidence.v1",
+  "run_id": "run_fc627da2-df6f-43dc-8b24-f251b8a03247",
+  "binding_id": "reasoning_binding:1300fd9879358618f7f61698f81871c4",
+  "binding_epoch": 3,
+  "action_request_id": "et6-action-rolling-root-1524",
+  "outcome": "succeeded",
+  "settlement_source": "exact action result in packaged service persisted database",
+  "post_observation_ref": "environment_probe_evidence:7010296597db4c4b4345342187d9d730a9961a1c",
+  "before": {
+    "x": 2.96,
+    "y": 65,
+    "z": 1.88
+  },
+  "after": {
+    "x": -1.27,
+    "y": 65,
+    "z": 1.06
+  },
+  "controls_released": true,
+  "active_control_ticks": 21,
+  "wall_clock_elapsed_ms": 962,
+  "queue_depth_at_lease": 1,
+  "dispatch_to_first_tick_ms": 53,
+  "missed_ticks": 0,
+  "stalled_ticks": 0,
+  "automatic_replay_performed": false,
+  "live_rolling_extensions_proven": 0,
+  "limitation": "Root completed before any successor was submitted. Declared 200-tick runway did not imply 200 ticks of executable movement.",
+  "steering_note": "Latest repeated typed prompt acknowledged after this action; action was prepared from previously acknowledged identical intent, not causally attributed to the newly retrieved event.",
+  "first_submission_rejection": "durable_goal_evidence_identity_mismatch",
+  "retry_call_timings_ms": {
+    "probe": 3891,
+    "frontier": 1530,
+    "plan": 774,
+    "submit": 1548
+  },
+  "voice_proven": false
+}

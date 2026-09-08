@@ -1,0 +1,66 @@
+{
+  "status": "BL_nuclear_shape_diagnostic_not_UV_complete_or_allowed",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-11,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -401.8920562548233
+      ],
+      "effective_alpha_products": [
+        8.531719830643956e-13,
+        -3.428830426127552e-10
+      ],
+      "raw_low_high_minimum": 131.87349894145254,
+      "normalization_strength": 4.106350142430266e-08
+    },
+    {
+      "masses_GeV": [
+        1e-09,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -401.89205625482197
+      ],
+      "effective_alpha_products": [
+        8.531719830643985e-13,
+        -3.4288304261275523e-10
+      ],
+      "raw_low_high_minimum": 131.87349894145245,
+      "normalization_strength": 4.1063501424302936e-08
+    },
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -401.8920560243253
+      ],
+      "effective_alpha_products": [
+        8.531719835783538e-13,
+        -3.4288304262265653e-10
+      ],
+      "raw_low_high_minimum": 131.8734988874404,
+      "normalization_strength": 4.106350147377668e-08
+    }
+  ],
+  "nuclear_amplitude": "A F_Helm(q) sum_i alpha_i/(q^2+m_i^2)",
+  "neutral_atom_amplitude": "[A F_nuclear(q)-Z F_electron(q)] sum_i alpha_i/(q^2+m_i^2)",
+  "assumptions": [
+    "high-q nuclear impulse treatment with common Helm proton/neutron profile",
+    "one raw unattenuated 200-269.9 keV event at fixed fast source",
+    "real signed products optimized for minimum raw 5.4-200/high ratio"
+  ],
+  "limitations": [
+    "full B-L neutral atom has A-Z low-q charge, but nucleus alone has A, not A-Z",
+    "individual dark/SM couplings, anomalies, mediator mixing and external bounds unresolved",
+    "no macroscopic Born validity, finite-size coherence, transport or detector likelihood",
+    "neutral electrical cancellation bounds do not transfer unchanged to this new operator"
+  ]
+}

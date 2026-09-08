@@ -1,0 +1,9 @@
+{
+  "schema": "et6.frontier_retention_cleanup.v1",
+  "date": "2026-09-05",
+  "implementation": "Internal goal-scoped cleanup removes at most 64 expired older frontiers per call, requires a steering grant, and preserves the latest row as the revision high-water mark.",
+  "verification": {"sql_tests_passed": 1, "failed": 0, "assertions": ["wrong profile rejected", "unexpired rows retained", "five expired older rows removed", "repeat removes zero", "next revision remains seven"]},
+  "live_data_deleted": false,
+  "limits": "Only isolated test records were deleted. No maintenance scheduler or production caller is connected. Before execution can retain frontier references, its retention/pinning contract must be integrated; this maintenance method is not yet exposed.",
+  "et6_complete": false
+}

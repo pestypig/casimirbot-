@@ -1,0 +1,179 @@
+{
+  "operator": "Cb Jdark (Jbaryon + r Jem): Cp=Cb(1+r), Cn=Cb, Ce=-Cb*r; isotope amplitude Cb(A+r Z)",
+  "scope": "Momentum-independent real coherent vector charges; archived Xe Helm and carbon independent-nucleus F=1 bound. Fixed raw Xe truth-energy window, not detector likelihood or experimental exclusion. Generalized eigenvalue permits all real mixing ratios without survival/UV constraints and therefore is a permissive target-response ceiling within these approximations.",
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "xenon_response_matrix": [
+        [
+          3.837067819266151,
+          1.580923155765823
+        ],
+        [
+          1.580923155765823,
+          0.6515168316199972
+        ]
+      ],
+      "carbon_response_matrix": [
+        [
+          6.722382758887399e-25,
+          3.3577673406373376e-25
+        ],
+        [
+          3.3577673406373376e-25,
+          1.6773033447157326e-25
+        ]
+      ],
+      "benchmark_mixing": [
+        {
+          "mixing_ratio": -0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 0.998838927485256,
+          "xenon_factor": 0.9995215409465693,
+          "carbon_factor": 0.9994199708358007,
+          "carbon_factor_at_fixed_raw_xenon": 0.9998983812688295
+        },
+        {
+          "mixing_ratio": 0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 1.0011617469510279,
+          "xenon_factor": 1.0004785735696737,
+          "carbon_factor": 1.0005801974429591,
+          "carbon_factor_at_fixed_raw_xenon": 1.0001015752620497
+        }
+      ],
+      "max_carbon_over_xenon_enhancement": 190.4330539821712,
+      "extremizing_Cmix_over_Cb": -2.4298291909760756,
+      "generalized_eigen_residual": 4.029986791980099e-14,
+      "max_D_at_same_raw_xenon": 2.5603277584457426e-22
+    },
+    {
+      "mchi_GeV": 15.0,
+      "xenon_response_matrix": [
+        [
+          4.1486945222405165,
+          1.708728262814752
+        ],
+        [
+          1.708728262814752,
+          0.7039470007407724
+        ]
+      ],
+      "carbon_response_matrix": [
+        [
+          4.705064611298789e-25,
+          2.350106788955488e-25
+        ],
+        [
+          2.350106788955488e-25,
+          1.1739339252344027e-25
+        ]
+      ],
+      "benchmark_mixing": [
+        {
+          "mixing_ratio": -0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 0.998838927485256,
+          "xenon_factor": 0.9995217058665194,
+          "carbon_factor": 0.9994199779914513,
+          "carbon_factor_at_fixed_raw_xenon": 0.999898223445803
+        },
+        {
+          "mixing_ratio": 0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 1.0011617469510279,
+          "xenon_factor": 1.0004784085712624,
+          "carbon_factor": 1.000580190283312,
+          "carbon_factor_at_fixed_raw_xenon": 1.0001017330420903
+        }
+      ],
+      "max_carbon_over_xenon_enhancement": 187.8718008142559,
+      "extremizing_Cmix_over_Cb": -2.430709746874337,
+      "generalized_eigen_residual": 2.0081471891631017e-14,
+      "max_D_at_same_raw_xenon": 1.767897924340851e-22
+    },
+    {
+      "mchi_GeV": 40.0,
+      "xenon_response_matrix": [
+        [
+          5.929095009295347,
+          2.4398285189123703
+        ],
+        [
+          2.4398285189123703,
+          1.0042456855506723
+        ]
+      ],
+      "carbon_response_matrix": [
+        [
+          1.740728211839005e-25,
+          8.694437481547179e-26
+        ],
+        [
+          8.694437481547179e-26,
+          4.342970935705353e-26
+        ]
+      ],
+      "benchmark_mixing": [
+        {
+          "mixing_ratio": -0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 0.998838927485256,
+          "xenon_factor": 0.999522135851402,
+          "carbon_factor": 0.999419993327173,
+          "carbon_factor_at_fixed_raw_xenon": 0.9998978086421848
+        },
+        {
+          "mixing_ratio": 0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 1.0011617469510279,
+          "xenon_factor": 1.0004779783818372,
+          "carbon_factor": 1.0005801749390248,
+          "carbon_factor_at_fixed_raw_xenon": 1.0001021477327796
+        }
+      ],
+      "max_carbon_over_xenon_enhancement": 182.24441696782384,
+      "extremizing_Cmix_over_Cb": -2.432997495385248,
+      "generalized_eigen_residual": 7.771121816641531e-14,
+      "max_D_at_same_raw_xenon": 6.344759936823494e-23
+    },
+    {
+      "mchi_GeV": 100.0,
+      "xenon_response_matrix": [
+        [
+          5.970891838999778,
+          2.4554428565917026
+        ],
+        [
+          2.4554428565917026,
+          1.0100270096210189
+        ]
+      ],
+      "carbon_response_matrix": [
+        [
+          6.213154785324547e-26,
+          3.10324374012647e-26
+        ],
+        [
+          3.10324374012647e-26,
+          1.550083261200556e-26
+        ]
+      ],
+      "benchmark_mixing": [
+        {
+          "mixing_ratio": -0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 0.998838927485256,
+          "xenon_factor": 0.999522444098864,
+          "carbon_factor": 0.999420002415582,
+          "carbon_factor_at_fixed_raw_xenon": 0.9998975093717136
+        },
+        {
+          "mixing_ratio": 0.0005807048664429298,
+          "proton_cross_section_over_baryon_reference": 1.0011617469510279,
+          "xenon_factor": 1.0004776699877551,
+          "carbon_factor": 1.0005801658455398,
+          "carbon_factor_at_fixed_raw_xenon": 1.0001024469219646
+        }
+      ],
+      "max_carbon_over_xenon_enhancement": 179.08357427225906,
+      "extremizing_Cmix_over_Cb": -2.434629599547729,
+      "generalized_eigen_residual": 3.793107691135447e-14,
+      "max_D_at_same_raw_xenon": 2.2253479330378862e-23
+    }
+  ],
+  "full_model_admitted": false
+}

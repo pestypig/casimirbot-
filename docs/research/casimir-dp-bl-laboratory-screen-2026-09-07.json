@@ -1,0 +1,20 @@
+{
+  "status": "conservative_unscreened_vector_perturbative_candidate_rejection",
+  "mediator_eV": 0.01,
+  "range_m": 1.973269804e-05,
+  "visual_abs_yukawa_ceiling": 1000.0,
+  "neutron_fraction_screen": 0.5,
+  "SM_coupling_ceiling": 1.710560467181885e-17,
+  "required_dark_coupling": 626769.7367423704,
+  "required_dark_alpha": 31261238025.81589,
+  "perturbative_SM_floor": 3.024415933734367e-12,
+  "floor_over_ceiling": 176808.4783765074,
+  "source": "https://arxiv.org/pdf/2002.11761",
+  "source_sha256": "ffcddf6d2c1a758f07112a3125ae8583254a3089b1022ac2cf459a052652504c",
+  "limitations": [
+    "visual conservative envelope, not digitized fit",
+    "platinum-dominated composition approximation, not layered torque recast",
+    "unscreened linear vector force and dark alpha <= 1 criterion",
+    "does not constrain the 1 eV row at its different range"
+  ]
+}

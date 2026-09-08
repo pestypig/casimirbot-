@@ -1,0 +1,77 @@
+{
+  "checks": {
+    "heavy_block_positive": true,
+    "Gaussian_elimination_energy": true,
+    "portal_contact_quartic_identity": true,
+    "light_contact_ratio_identity": true,
+    "small_kinetic_correction_at_examples": true
+  },
+  "inputs": {
+    "mS_GeV": 1000.0,
+    "mh_diagonal_GeV": 125.0,
+    "v_GeV": 246.2,
+    "b_GeV": 100.0,
+    "kappa_GeV": 1000.0,
+    "ychi": -0.1,
+    "fN_assumed": 0.3,
+    "mN_GeV": 0.939,
+    "mchi_GeV": 1000.0,
+    "mu_GeV": 1e-12
+  },
+  "heavy_eigenmasses_GeV": [
+    122.51375010646152,
+    1000.3076431952579
+  ],
+  "a_chi_GeV_inverse": 0.00010403588939226502,
+  "a_N_GeV_inverse": 1.875642242675267e-06,
+  "C_chiN_GeV_inverse_squared": 1.8756422426752668e-10,
+  "M_chi_equivalent_GeV": 3100.3334633551917,
+  "M_N_equivalent_GeV": 707.5510723615647,
+  "rows": [
+    {
+      "lambda_effective": 1.0,
+      "lambda_tree_threshold_shift": 0.5201794469613251,
+      "bare_lambda_decimal": "1.5201794469613251",
+      "threshold_shift_over_effective": 0.5201794469613251,
+      "phi_vacuum_GeV": 1e-12,
+      "light_vertex_product": 1.95134108898424e-34,
+      "light_alpha_product": 1.552827899850819e-35,
+      "zero_q_light_over_contact_amplitude": 0.5201794469613252,
+      "induced_kinetic_correction": 3.769561619607791e-30
+    },
+    {
+      "lambda_effective": 1e-06,
+      "lambda_tree_threshold_shift": 0.5201794469613251,
+      "bare_lambda_decimal": "0.5201804469613251",
+      "threshold_shift_over_effective": 520179.4469613251,
+      "phi_vacuum_GeV": 1e-09,
+      "light_vertex_product": 1.95134108898424e-28,
+      "light_alpha_product": 1.552827899850819e-29,
+      "zero_q_light_over_contact_amplitude": 520179.44696132524,
+      "induced_kinetic_correction": 3.769561619607792e-24
+    },
+    {
+      "lambda_effective": 1e-12,
+      "lambda_tree_threshold_shift": 0.5201794469613251,
+      "bare_lambda_decimal": "0.5201794469623251",
+      "threshold_shift_over_effective": 520179446961.32513,
+      "phi_vacuum_GeV": 1e-06,
+      "light_vertex_product": 1.9513410889842398e-22,
+      "light_alpha_product": 1.5528278998508188e-23,
+      "zero_q_light_over_contact_amplitude": 520179446961.3252,
+      "induced_kinetic_correction": 3.7695616196077906e-18
+    },
+    {
+      "lambda_effective": 1e-24,
+      "lambda_tree_threshold_shift": 0.5201794469613251,
+      "bare_lambda_decimal": "0.520179446961325100000001",
+      "threshold_shift_over_effective": 5.201794469613252e+23,
+      "phi_vacuum_GeV": 1.0,
+      "light_vertex_product": 1.95134108898424e-10,
+      "light_alpha_product": 1.5528278998508188e-11,
+      "zero_q_light_over_contact_amplitude": 5.201794469613252e+23,
+      "induced_kinetic_correction": 3.7695616196077907e-06
+    }
+  ],
+  "scope": "Tree-level scalar portal demonstration. m_h diagonal is not a matched physical Higgs mass. Nucleon form factor benchmark, no full QCD/species matching, running, loops, finite-density solution or experimental admission. Tiny effective quartic is specified with explicit cancellation, not numerically recovered in binary float."
+}

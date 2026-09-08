@@ -1,0 +1,87 @@
+{
+  "status": "conditional_nonrelativistic_zero_temperature_fsum_envelope",
+  "initial_energy_keV": 335.00558007707184,
+  "qmax_GeV": 0.5176914757475319,
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "initial_stopping_upper_GeV_per_column": 3.727579056394323e-15,
+      "absolute_amplitude_stopping_upper_GeV_per_column": 4.0789848942266865e-15,
+      "columns": [
+        {
+          "path_column_g_cm2": 400000.0,
+          "initial_speed_upper_loss_keV": 0.0014910316225577294,
+          "half_energy_loss_probability_upper": 1.948139439725521e-05
+        },
+        {
+          "path_column_g_cm2": 7000000000.0,
+          "initial_speed_upper_loss_keV": 26.093053394760265,
+          "half_energy_loss_probability_upper": 0.3409244019519661
+        }
+      ],
+      "fraction_of_formal_moment_from_q_above_electron_mass": 0.9971675016836854,
+      "log_quadrature_relative_error": 1.7763568394002505e-15
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "initial_stopping_upper_GeV_per_column": 3.719104063486472e-15,
+      "absolute_amplitude_stopping_upper_GeV_per_column": 4.070511870996667e-15,
+      "columns": [
+        {
+          "path_column_g_cm2": 400000.0,
+          "initial_speed_upper_loss_keV": 0.0014876416253945886,
+          "half_energy_loss_probability_upper": 1.9440926900669293e-05
+        },
+        {
+          "path_column_g_cm2": 7000000000.0,
+          "initial_speed_upper_loss_keV": 26.033728444405302,
+          "half_energy_loss_probability_upper": 0.3402162207617126
+        }
+      ],
+      "fraction_of_formal_moment_from_q_above_electron_mass": 0.9994217671428253,
+      "log_quadrature_relative_error": 2.220446049250313e-15
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "initial_stopping_upper_GeV_per_column": 3.723230635732278e-15,
+      "absolute_amplitude_stopping_upper_GeV_per_column": 4.095568360294117e-15,
+      "columns": [
+        {
+          "path_column_g_cm2": 400000.0,
+          "initial_speed_upper_loss_keV": 0.001489292254292911,
+          "half_energy_loss_probability_upper": 1.9560597692023565e-05
+        },
+        {
+          "path_column_g_cm2": 7000000000.0,
+          "initial_speed_upper_loss_keV": 26.062614450125945,
+          "half_energy_loss_probability_upper": 0.3423104596104124
+        }
+      ],
+      "fraction_of_formal_moment_from_q_above_electron_mass": 0.9999999991270477,
+      "log_quadrature_relative_error": 1.5543122344752192e-15
+    }
+  ],
+  "assumptions": [
+    "Born coupling to total nonrelativistic charge density",
+    "isotropic target in ground state",
+    "coordinate-dependent target interactions and standard kinetic terms",
+    "all 30 electrons per silica formula included",
+    "fixed integrated path-column budget"
+  ],
+  "limitations": [
+    "upper bound not realized stopping rate",
+    "no material static response supplied",
+    "large-q nonrelativistic target validity must be assessed",
+    "finite-temperature positive-frequency response not bounded by zero-temperature identity alone",
+    "no Earth capture or local-density prediction"
+  ]
+}

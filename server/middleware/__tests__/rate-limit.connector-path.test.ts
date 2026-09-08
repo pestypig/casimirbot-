@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isDedicatedEnvironmentConnectorApiPath } from "../rate-limit";
+import {
+  DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS,
+  isDedicatedEnvironmentConnectorApiPath,
+} from "../rate-limit";
 
 describe("dedicated environment connector rate-limit routing", () => {
   it("recognizes the mounted and absolute player-action connector paths", () => {
@@ -19,5 +22,13 @@ describe("dedicated environment connector rate-limit routing", () => {
     expect(isDedicatedEnvironmentConnectorApiPath("/agi/ask")).toBe(false);
     expect(isDedicatedEnvironmentConnectorApiPath("/environment-command/v1/commands")).toBe(false);
     expect(isDedicatedEnvironmentConnectorApiPath("/environment-action/browser/control")).toBe(false);
+  });
+
+  it("keeps the authenticated connector allowance above its measured active cadence", () => {
+    expect(DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS).toEqual({
+      windowMs: 60_000,
+      perIp: 3_600,
+      perAuthority: 3_600,
+    });
   });
 });

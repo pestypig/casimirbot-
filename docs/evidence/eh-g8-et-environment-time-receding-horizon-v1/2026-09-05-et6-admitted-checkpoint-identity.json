@@ -1,0 +1,13 @@
+{
+  "schema": "et6.admitted_checkpoint_identity.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "defect": "The temporal ledger accepted checkpoint IDs absent from the admitted graph and allowed a settled finite-graph checkpoint to be settled again with replacement evidence.",
+  "repair": "Require an admitted checkpoint node and no prior settlement of that checkpoint before appending a checkpoint fact. Rejections leave the event chain unchanged.",
+  "red": {"passed": 17, "failed": 2},
+  "green": {"ledger_tests": 19, "compiler_tests": 3, "result_validation_tests": 43, "total_passed": 65, "failed": 0},
+  "integration_constraint": "Compiler-inserted native postcondition checkpoints are not automatically source-plan checkpoints. The future bridge must map them explicitly and must not invent admitted source checkpoint IDs.",
+  "runtime_restarted": false,
+  "production_extension_dispatch_implemented": false,
+  "et6_complete": false
+}

@@ -1,0 +1,314 @@
+{
+  "status": "threshold_cut_sensitivity_not_liquid_model",
+  "results": [
+    {
+      "model": "original",
+      "rows": [
+        {
+          "masses_GeV": [
+            1e-06,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 1770613.5551938473,
+              "refinement_relative": 0.00010734968693915103
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 24644.08033237236,
+              "refinement_relative": 0.00021527738161308818
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 78.75693128953628,
+              "refinement_relative": 1.0812132282822517e-06
+            }
+          ]
+        },
+        {
+          "masses_GeV": [
+            0.0001,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 398.4541488029556,
+              "refinement_relative": 4.2748549131665925e-05
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 277.39305459237863,
+              "refinement_relative": 0.000171955735043694
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 21.39423395570952,
+              "refinement_relative": 1.89233685388146e-07
+            }
+          ]
+        },
+        {
+          "masses_GeV": [
+            0.01,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 7.814917709928788e-06,
+              "refinement_relative": 3.233257741952489e-05
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 6.1984641398885525e-06,
+              "refinement_relative": 6.98751419891952e-05
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 1.8526913199203812e-06,
+              "refinement_relative": 2.590425701165522e-06
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "cut_12p1_eV",
+      "rows": [
+        {
+          "masses_GeV": [
+            1e-06,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 1724257.1122779993,
+              "refinement_relative": 0.005190482160773668
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 24644.08033237236,
+              "refinement_relative": 0.00021527738161308818
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 78.75693128953628,
+              "refinement_relative": 1.0812132282822517e-06
+            }
+          ]
+        },
+        {
+          "masses_GeV": [
+            0.0001,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 397.7645889374996,
+              "refinement_relative": 0.0003868527052527382
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 277.39305459237863,
+              "refinement_relative": 0.000171955735043694
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 21.39423395570952,
+              "refinement_relative": 1.89233685388146e-07
+            }
+          ]
+        },
+        {
+          "masses_GeV": [
+            0.01,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 7.80761065180944e-06,
+              "refinement_relative": 0.00021818521525884815
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 6.1984641398885525e-06,
+              "refinement_relative": 6.98751419891952e-05
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 1.8526913199203812e-06,
+              "refinement_relative": 2.590425701165522e-06
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model": "cut_first_nonzero_node",
+      "rows": [
+        {
+          "masses_GeV": [
+            1e-06,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 1703745.123661666,
+              "refinement_relative": 0.006804992302525514
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 24644.08033237236,
+              "refinement_relative": 0.00021527738161308818
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 78.75693128953628,
+              "refinement_relative": 1.0812132282822517e-06
+            }
+          ]
+        },
+        {
+          "masses_GeV": [
+            0.0001,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 397.44985340112817,
+              "refinement_relative": 0.0004047439030487876
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 277.39305459237863,
+              "refinement_relative": 0.000171955735043694
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 21.39423395570952,
+              "refinement_relative": 1.89233685388146e-07
+            }
+          ]
+        },
+        {
+          "masses_GeV": [
+            0.01,
+            1.0
+          ],
+          "bands": [
+            {
+              "energy_eV": [
+                5.0000131158,
+                9999.9990202
+              ],
+              "raw_counts": 7.804274694539403e-06,
+              "refinement_relative": 0.00020917106621998194
+            },
+            {
+              "energy_eV": [
+                40,
+                700
+              ],
+              "raw_counts": 6.1984641398885525e-06,
+              "refinement_relative": 6.98751419891952e-05
+            },
+            {
+              "energy_eV": [
+                186,
+                1000
+              ],
+              "raw_counts": 1.8526913199203812e-06,
+              "refinement_relative": 2.590425701165522e-06
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "total K is not shell resolved; cuts audit only first ionization onset",
+    "same integral implementation, not an independent solver",
+    "40-700 eV is an energy band diagnostic, not detector acceptance",
+    "no liquid correction, multipole convergence or complete excluded-region calculation"
+  ]
+}

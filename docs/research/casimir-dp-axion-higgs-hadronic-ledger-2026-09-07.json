@@ -1,0 +1,39 @@
+{
+  "scope": "Published 2017 one-body input sensitivity, fixed box sigma/PDF inputs, not joint confidence interval",
+  "full_model_admitted": false,
+  "LO_legacy_light_sum": 0.09999999999999996,
+  "LO_legacy_heavy_sum": 0.19999999999999998,
+  "erroneous_duplicate_heavy_scalar_rate_factor": 2.777777777777778,
+  "checks": {
+    "LO_light_plus_heavy": true,
+    "three_heavy_flavors": true,
+    "baseline_recovered": true,
+    "monotone_sensitivity": true
+  },
+  "rows": [
+    {
+      "fn_onebody": 0.289,
+      "Xe_total_full": 1.318910891909455,
+      "Xe_total_high": 0.03724227444356895,
+      "D_free_nuclei_upper": 2.024028305976902e-29
+    },
+    {
+      "fn_onebody": 0.3,
+      "Xe_total_full": 1.374501642971214,
+      "Xe_total_high": 0.037285671523368154,
+      "D_free_nuclei_upper": 2.1797230165466445e-29
+    },
+    {
+      "fn_onebody": 0.307,
+      "Xe_total_full": 1.4109586772378018,
+      "Xe_total_high": 0.03731413181208745,
+      "D_free_nuclei_upper": 2.281829343546161e-29
+    },
+    {
+      "fn_onebody": 0.325,
+      "Xe_total_full": 1.508566414540247,
+      "Xe_total_high": 0.037390329573118206,
+      "D_free_nuclei_upper": 2.5552023087548143e-29
+    }
+  ]
+}

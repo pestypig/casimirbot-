@@ -1,0 +1,21 @@
+{
+  "scope": "Diagnostic packaged renderer update; not live ET6 acceptance",
+  "package": "apps/desktop/release-et6-run-association-20260907/win-unpacked",
+  "renderer_build_passed": true,
+  "runtime_staging": "6 allowlisted runtime roots; dependency closure staged_verified",
+  "directory_packaging_passed": true,
+  "exe_sha256": "677261bf50d7d455ce9b8eb7e109d3fd3c1ba766c281140906b0a30fdcfca626",
+  "service_sha256": "46941951e5dfad3c372c30a172a0baafa283cc90433fa1ace0a082381772d88f",
+  "service_matches_previously_live_tested_artifact": true,
+  "renderer_asset": "resources/runtime/dist/public/assets/AgentConnectionSetup-CiFwOkHr.js",
+  "renderer_asset_sha256": "34ba680ff07f60826612792b73c667c35042445edf4b0d62e96b940b844cfdf3",
+  "renderer_matches_build_and_contains_repair": true,
+  "identity_note": "The executable hash is unchanged because renderer resources are external. EXE hash alone does not identify this UI revision.",
+  "new_package_launched": false,
+  "visual_acceptance": false,
+  "existing_running_package_preserved": true,
+  "rollback_build_preserved": true,
+  "release_signing_verified": false,
+  "et6_complete": false,
+  "nav1_unlocked": false
+}

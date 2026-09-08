@@ -1,0 +1,15 @@
+{
+  "scope": "Selected isolated client preparation; no live acceptance",
+  "profile_id": "helix-combat-c0-isolated",
+  "profile_version": "fabric-loader-0.18.4-1.21.8",
+  "game_directory": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0",
+  "companion_version": "0.4.12",
+  "previous_sha256": "810d7f029aacaf8f83779389720d72690bdc981ea76405129ce32f89ff92c12d",
+  "installed_verified_sha256": "6bbe4f870149246c9c00c551d158bca751a2fda2bbe3a6d7855716b6785bbe63",
+  "backup_filename": "HelixFabricPlayerAgent-0.4.12.jar.pre-et6-prelive-810d7f02.bak",
+  "backup_preserved": true,
+  "preflight": { "minecraft_titled_javaw_window_found": false, "port_25565_listener_found": false },
+  "runtime_mod_load_verified": false,
+  "movement_submitted": false,
+  "next": "Resolve exact server profile and start the supported session, then verify connector freshness and runtime companion identity"
+}

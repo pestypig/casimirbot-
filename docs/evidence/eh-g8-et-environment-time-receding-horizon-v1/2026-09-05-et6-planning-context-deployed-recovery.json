@@ -1,0 +1,49 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "package": {
+    "path": "apps/desktop/release-et6-planning-context-20260905/win-unpacked/CasimirBot.exe",
+    "host_build_and_stage": "PASS exit 0",
+    "packaging_exit_code": null,
+    "packaging_note": "Handle missing on subsequent poll; no electron-builder process remained. Artifacts verified independently; no packaging exit code claimed.",
+    "runtime_tree": "PASS using original verifier with module-location/output-path substitutions in memory",
+    "service_sha256": "1e5f59bede36fb5a2f7fb222ffb496d6095b1402e2e068e79df541cd027ee658",
+    "runtime_manifest_sha256": "02d024a5ca99fbd98ef96d0f8046d6558f905d0523e6056f58dd5d4e3bd76348",
+    "service_equal_to_built": true,
+    "marker_check_note": "Initial literal check failed on esbuild context2 rename; corrected expression check passed with exact byte equality.",
+    "host_pid": 21308,
+    "service_pid": 35612,
+    "ready_at": "2026-09-05T19:20:01.353Z",
+    "origin": "http://127.0.0.1:59583"
+  },
+  "recovery": {
+    "prior_authority": "expired at 19:16 UTC",
+    "prior_fabric_process": "PID 7800 absent; console handle 61642 missing; no listener on 25566. Exit cause and normal shutdown unproven.",
+    "fabric_restarted": "same existing loopback world, Java 21, PID 1868, console session 56978; ready 19:22:49 UTC",
+    "client_reused": "PID 31760, autojoin through trusted Workstation Lifecycle; no duplicate client",
+    "source_pairing": "opaque read-only rotation redeemed after server restart; command lane disabled",
+    "subject_binding_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+    "authority_id": "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85",
+    "authority_policy_version": 2,
+    "authority_expires_at": "2026-09-05T19:55:00Z",
+    "allowed_actions": ["look", "navigate", "sequence.execute", "walk"],
+    "manual_override": "cancel",
+    "goal_id": "environment_durable_goal:896355ef-445f-4edd-8465-e02596d619b8",
+    "goal_revision": 5,
+    "goal_status": "active",
+    "sequence": ["recovery_required", "authority_rebound from admitted fresh observation", "checkpoint_verified", "goal_resumed"],
+    "observed_position": {"x": 5.45, "y": 65, "z": 2.55},
+    "scope": "setup recovery only; no interrupted mutation or duplicate-effect test"
+  },
+  "live_planning_context": {
+    "frontier_id": "environment_frontier:a4d39e6b-3c53-41ce-9c3e-fc9f702d2070",
+    "catalog_snapshot_id": "environment_catalog:b6f2deb1-0f48-498c-b715-1184dfa2ffa7",
+    "resident_clock_returned": true,
+    "clock_extrapolated": false,
+    "execution_authority": false,
+    "limits": "Resident and world clocks remain distinct; this historical frontier must not be reused for action admission."
+  },
+  "next": "User explicitly includes verified run in binding claim; fresh perception and temporal admission after exact binding verification.",
+  "movement_issued": false,
+  "goal_complete": false
+}

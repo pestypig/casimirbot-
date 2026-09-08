@@ -1,0 +1,8 @@
+{
+  "schema": "et6.nonconsuming_input_latch.v1",
+  "date": "2026-09-05",
+  "implementation": "Package-local pending observation reads the manual-input latch without consuming, clearing, or changing its timestamp. Existing controller consume behavior is unchanged.",
+  "verification": {"ManualInputLatchTest_passed": 7, "failed": 0, "native_build_exit_code": 0, "game_tests": "explicitly excluded for this latch-only run"},
+  "limits": "No guard telemetry publisher uses this method yet. Advisory pending state is not complete physical-key state, current authority, or a dispatch permission. No live client update or interruption acceptance was performed.",
+  "et6_complete": false
+}

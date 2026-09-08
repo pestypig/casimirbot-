@@ -1,0 +1,98 @@
+{
+  "evidence_class": "exploratory_diagnostic_calculations_not_measured_or_certified",
+  "sources_sha256": {
+    "docs/research/casimir-dp-quantum-foam-study.md": "2ad1aba2d0911e8aa1386c233037594e4bf234f4c2299d1aac2dd6fa7f1756c6",
+    "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11"
+  },
+  "constants": {
+    "G_SI": 6.6743e-11,
+    "hbar_J_s": 1.054571817e-34,
+    "c_m_s": 299792458.0,
+    "eV_J": 1.602176634e-19,
+    "atomic_mass_kg": 1.66053906892e-27,
+    "year_s": 31557600.0
+  },
+  "inputs": {
+    "leading_design": {
+      "candidate_id": "stage4_2m_candidate_002",
+      "material": "diamond",
+      "radius_m": 2.76302362398029e-07,
+      "mass_kg": 3.0925052683774525e-16,
+      "branch_separation_m": 2.5e-07,
+      "hold_time_s": 0.25,
+      "gap_m": 1e-05,
+      "plate_size_m": 8e-05,
+      "temperature_K": 4,
+      "pressure_Pa": 1e-15
+    },
+    "R0_m": 1e-07,
+    "ER_keV": 248,
+    "xenon_mean_u": 131.293,
+    "carbon_u": 12,
+    "mchi_GeV": 1000,
+    "lab_speed_km_s": 776,
+    "density_GeV_c2_cm3": 0.3,
+    "exposure_kg_s": 89623584000.0,
+    "stored_dp_exponent": 0.029511464722144533
+  },
+  "results": {
+    "q_MeV_c": 246.292779143691,
+    "hbar_over_q_m": 8.011886545129805e-16,
+    "dp_qscale_eV_c": 1.9732698033839644,
+    "q_over_dp_scale": 124814548.27987687,
+    "negative_log_gaussian_factor": 1.5578671462309714e+16,
+    "xe_recoil_at_dp_scale_eV": 1.5919200850983942e-11,
+    "sphere_qR_over_hbar": 344865545.51372826,
+    "sphere_coherent_scale_eV_c": 0.7141704422133601,
+    "dp_EG_J": 1.2448785938321962e-35,
+    "dp_EG_fourier_J": 1.2448785938321957e-35,
+    "dp_rate_per_s": 0.11804588115900658,
+    "dp_exponent": 0.029511470289751644,
+    "stored_exponent_relative_difference": 1.8865912498888804e-07,
+    "dp_visibility_loss": 0.029080259153429842,
+    "ideal_uniform_sphere_EG_fourier_J": 3.576374707186842e-36,
+    "ideal_uniform_sphere_EG_realspace_J": 3.576374707186843e-36,
+    "ideal_uniform_sphere_to_effective_particle_EG_ratio": 0.28728702741826734,
+    "ideal_uniform_sphere_visibility_loss": 0.008442423462132968,
+    "dp_object_heating_W": 3.0701345211116004e-40,
+    "dp_isolated_xe_total_kick_rate_per_s": 1.6972115026582783e-19,
+    "dp_isolated_xe_mean_energy_in_1us_eV": 1.3509125398708692e-36,
+    "vmin_elastic_km_s": {
+      "100": 671.0541093386422,
+      "200": 486.46231522079654,
+      "1000": 338.7888799265201
+    },
+    "delta_max_keV": {
+      "xenon_mean": 365.06086669272395,
+      "carbon12": 37.03273738829232
+    },
+    "xe_248_keV_delta300_vmin_km_s": 703.9548328736381,
+    "gravity_Emax_keV": 1301.1184320657633,
+    "gravity_sigma_cm2": 6.559863901477346e-87,
+    "gravity_expected_events": 6.277828426281148e-47,
+    "gravity_optimal_stream_speed_km_s": 586.7995530720846,
+    "gravity_optimal_stream_events": 6.838010215562948e-47,
+    "same_accepted_rate_per_kg_toy_counts": 8.626371347684144e-28,
+    "r0_numerical_screen_ratio": 204.08163265306123
+  },
+  "limitations": [
+    "No LZ likelihood, coupling fit, or detection claim.",
+    "Mean Xe mass; no isotope or detector response folding.",
+    "Gaussian hard-kick test assumes same smearing for nuclear degree of freedom.",
+    "Gravity benchmark is elastic Newtonian Born scattering, not all gravity models.",
+    "Mass exposure comparison is not a response or decoherence transfer.",
+    "XENONnT ratio is not an exact constituent/noise recast.",
+    "Ideal uniform sphere is a separate density representation, not a candidate update or measurement."
+  ],
+  "checks": {
+    "dp_analytic_fourier_relative_agreement_1e_9": true,
+    "stored_dp_exponent_agreement_1e_6": true,
+    "ideal_sphere_fourier_realspace_agreement_1e_9": true,
+    "q_si_and_natural_units_agree_1e_12": true,
+    "gravity_cross_section_zero_below_threshold": true,
+    "gravity_speed_optimum_within_benchmark_cap": true,
+    "carbon_endothermic_200_keV_channel_closed": true,
+    "xenon_endothermic_300_keV_channel_open": true,
+    "specific_xenon_248_keV_delta300_channel_open": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "et6.heartbeat_clock_retention.v1",
+  "date": "2026-09-05",
+  "defect": "Heartbeat validation accepted the resident clock, but the durable INSERT discarded it.",
+  "repair": "Migration 084 adds nullable clock_snapshot. The existing authenticated heartbeat ingestion stores the schema-validated clock; absent legacy clocks remain SQL null. No new wire contract or inferred clock mapping was added.",
+  "verification": {
+    "tests_passed": 4,
+    "exit_code": 0,
+    "scope": "Actual heartbeat-ingestion function with mocked database verifies inserted clock/null and invalid-clock rejection before DB access; isolated migration fixture verifies legacy null and repeated migration.",
+    "initial_test_failure": "JSON property-order string equality failed despite equivalent parsed content; assertion corrected to compare parsed values."
+  },
+  "limits": "No live migration or server restart occurred. Reader/currentness integration and cross-clock alignment are not complete. A stored heartbeat is an observation, not a dispatch permission or live capacity result.",
+  "et6_complete": false
+}

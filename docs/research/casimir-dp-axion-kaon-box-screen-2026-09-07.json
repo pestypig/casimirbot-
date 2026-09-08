@@ -1,0 +1,62 @@
+{
+  "scope": "Dimensionless W/charged-Goldstone Inami-Lim kaon mixing kernel, aligned up-singlet and mu=0. CKM angles and masses are diagnostic references, not a new fit. No hadronic matrix element, full QCD evolution or epsilon_K likelihood.",
+  "checks": {
+    "GIM_sum_includes_heavy_row": true,
+    "expanded_new_terms_equal_full_sum": true,
+    "equal_mass_limit": true,
+    "symmetric_loop_function": true,
+    "no_new_phase_needed": true,
+    "real_CKM_has_no_CP_phase": true
+  },
+  "LO_SM_kernel": {
+    "real": 1.2553990356689341e-05,
+    "imag": -3.208319439686422e-07
+  },
+  "rows": [
+    {
+      "yL": 0.1,
+      "heavy_mass_GeV": 2000.075766614855,
+      "lambda_T_real": 1.65722130812987e-05,
+      "lambda_T_imag": 0.0,
+      "Re_box_new": -5.045444116327425e-08,
+      "Im_box_new": 3.431649907722443e-08,
+      "Re_new_over_Re_LO_SM": -0.004018996329433201,
+      "Im_new_over_Im_LO_SM": -0.10696097979750573,
+      "Im_new_with_paper_QCD_approximation": 1.9784468769349148e-08
+    },
+    {
+      "yL": 0.2,
+      "heavy_mass_GeV": 2000.3030492402895,
+      "lambda_T_real": 6.627378915918939e-05,
+      "lambda_T_imag": 0.0,
+      "Re_box_new": 3.3272916008930465e-07,
+      "Im_box_new": 1.3723915855521026e-07,
+      "Re_new_over_Re_LO_SM": 0.026503856593454472,
+      "Im_new_over_Im_LO_SM": -0.4277602686864119,
+      "Im_new_with_paper_QCD_approximation": 7.912240221961592e-08
+    },
+    {
+      "yL": 0.4,
+      "heavy_mass_GeV": 2001.2119216115018,
+      "lambda_T_real": 0.0002648544195626226,
+      "lambda_T_imag": 0.0,
+      "Re_box_new": 9.873602203987974e-06,
+      "Im_box_new": 5.4852767791673e-07,
+      "Re_new_over_Re_LO_SM": 0.7864911413387271,
+      "Im_new_over_Im_LO_SM": -1.7097040622935682,
+      "Im_new_with_paper_QCD_approximation": 3.162423013006688e-07
+    },
+    {
+      "yL": 0.6,
+      "heavy_mass_GeV": 2002.725792314065,
+      "lambda_T_real": 0.0005950218628552371,
+      "lambda_T_imag": 0.0,
+      "Re_box_new": 5.4170373544770865e-05,
+      "Im_box_new": 1.2325822622987833e-06,
+      "Re_new_over_Re_LO_SM": 4.314992445083917,
+      "Im_new_over_Im_LO_SM": -3.8418314805312987,
+      "Im_new_with_paper_QCD_approximation": 7.106198345449191e-07
+    }
+  ],
+  "full_model_admitted": false
+}

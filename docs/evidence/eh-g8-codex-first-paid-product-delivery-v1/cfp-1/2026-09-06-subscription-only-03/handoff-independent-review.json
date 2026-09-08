@@ -1,0 +1,37 @@
+{
+  "captured_utc": "2026-09-07T03:50:04.152Z",
+  "reviewer": "/root/cfp1_subscription_review",
+  "scope": "Complete prepared CFP-1 specification and seven candidate CFP-2/CFP-3 handoffs against parent exit requirements",
+  "verdict": "prepared_specification_accepted",
+  "findings": [
+    {
+      "issue": "Missing uninstall and declared data-handling acceptance",
+      "resolution": "DIST06A-F added; LICENSE and RECOVERY responsibility and bounded acceptance references linked",
+      "rechecked": true
+    },
+    {
+      "issue": "Final output hashes required before implementation dispatch",
+      "resolution": "Pre-dispatch specification/source-baseline freeze separated from post-build per-run artifact identity; applies to all children",
+      "rechecked": true
+    }
+  ],
+  "requirements": {
+    "product_scope": "Prepared; owner benefit/interval/trial selections pending",
+    "public_account_policy": "Prepared; final selected capability freeze pending",
+    "claims_and_g8_reconciliation": "Prepared; all12 requirements and C01-C08 retained",
+    "acceptance": "Prepared; exact hardware/client/resource baseline and threshold freeze pending",
+    "subscription_lifecycle": "Prepared; device/offline/refund/service commitments pending",
+    "rights_inventory": "Prepared; ownership/licensed provenance and Minecraft commercial classification incomplete",
+    "distribution": "Prepared; target feed and customer commitments pending; artifact notices/SBOM fulfillment belongs to later implementation",
+    "dependent_handoffs": "Seven prepared non-dispatchable candidates independently accepted within specification review scope"
+  },
+  "remaining_agent_fixable_documentation_findings": [],
+  "validation": "handoff-review-validation.json",
+  "stage_decision": "CFP-1 remains open in canonical work program; no implementation admission",
+  "completion_requires": [
+    "Owner offer and lifecycle selections",
+    "Applicable rights/distribution resolution",
+    "Final specification and acceptance freeze"
+  ],
+  "no_runtime_or_production_changes": true
+}

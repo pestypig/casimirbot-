@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -24,9 +23,12 @@ import org.slf4j.Logger;
 
 final class PlayerActionRuntime implements AutoCloseable {
     private static final String PROTOCOL_VERSION = "helix.environment_action.v1";
-    static final String ADAPTER_VERSION = "0.4.9";
+    static final String ADAPTER_VERSION = "0.4.11";
     private static final int POLL_INTERVAL_TICKS = 20;
-    private static final int HEARTBEAT_INTERVAL_TICKS = 100;
+    // Nominally one second at 20 Hz. This is a publication opportunity, not
+    // a freshness guarantee: transport remains single-flight and admission
+    // must still reject an older/unmapped resident sample.
+    private static final int HEARTBEAT_INTERVAL_TICKS = 20;
     private static final int LOCAL_STATUS_INTERVAL_TICKS = 5;
     private static final int MAX_PENDING_DELIVERIES = 768;
     private static final int RESERVED_TERMINAL_DELIVERIES = 3;
@@ -40,6 +42,44 @@ final class PlayerActionRuntime implements AutoCloseable {
         List<String> progressEventRefs,
         EnvironmentCapacityTelemetry capacityTelemetry
     ) {}
+
+    // Owned on the Minecraft client thread. Keep root action identity unchanged.
+    private static final class TemporalDeliveryState {
+        Map<String, Object> currentWire;
+        Map<String, Object> queuedWire;
+        // Diagnostic context only, scoped to the synchronous queue callback.
+        String acceptingSuccessorActionRequestId;
+        Map<String, Object> measurements = Map.of();
+        final TemporalResponseSlot<TemporalReceived> received = new TemporalResponseSlot<>();
+        long interruptionRevision;
+        String checkpointEvidenceKey;
+        long checkpointDeliveryWatermark;
+        TemporalPoll uncertainPoll;
+        String queuedCheckpoint;
+        TemporalDeliveryState(Map<String, Object> wire) { currentWire = wire; }
+    }
+    private TemporalDeliveryState temporalDeliveryState;
+    private record TemporalPoll(ActiveEnvelope envelope, Map<String, Object> wire, long interruptionRevision, String checkpoint, Map<String, Object> body) {}
+    private record TemporalReceived(TemporalPoll poll, Map<String, Object> wire) {}
+
+    // Client-thread-owned, memory-only transport retention. Never survives a
+    // resident replacement or authorizes execution/replay on its own.
+    static final class TemporalResponseSlot<T> {
+        private T value;
+        boolean offer(T response) {
+            if (value != null || response == null) return false;
+            value = response;
+            return true;
+        }
+        boolean pending() { return value != null; }
+        T take(boolean current, boolean evidencePending) {
+            if (!current) { value = null; return null; }
+            if (evidencePending) return null;
+            T response = value;
+            value = null;
+            return response;
+        }
+    }
 
     private record LocalDiagnosticEnvelope(
         String actionRequestId,
@@ -55,10 +95,13 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     private final PlayerActionConfig config;
     private final Minecraft minecraft;
+    private final java.util.concurrent.Executor clientExecutor;
     private final Logger logger;
     private final NativeFabricControlBridge bridge;
+    private final java.util.function.Supplier<PlayerActionWorkflow.PlayerSnapshot> evidenceSnapshot;
     private final PlayerActionController controller;
     private final ExecutorService network;
+    private final TemporalDeliveryLane temporalDeliveryLane = new TemporalDeliveryLane();
     private final ExecutorService criticalDeliveryNetwork;
     private final ExecutorService projectionDeliveryNetwork;
     private final PlayerActionHttpClient http;
@@ -67,13 +110,16 @@ final class PlayerActionRuntime implements AutoCloseable {
     private volatile String producerEpochRef = id("environment_action_epoch");
     private volatile String manifestId = id("environment_action_manifest");
     private final String executionClockId = id("minecraft_client_tick_clock");
+    private final EnvironmentMonotonicClock monotonicClock = new EnvironmentMonotonicClock();
     private final AtomicBoolean cyclePending = new AtomicBoolean(false);
+    private final AtomicBoolean temporalPollDeferred = new AtomicBoolean(false);
     private final AtomicBoolean manifestPending = new AtomicBoolean(false);
     private final AtomicBoolean heartbeatPublishPending = new AtomicBoolean(false);
     private final AtomicBoolean criticalDeliveryFlushPending = new AtomicBoolean(false);
     private final AtomicBoolean projectionDeliveryFlushPending = new AtomicBoolean(false);
     private volatile boolean manifestReady;
     private volatile boolean heartbeatReady;
+    private volatile boolean workflowEventBatchSupported;
     private volatile Instant lastHeartbeatAcceptedAt;
     private volatile boolean emergencyStopLatched;
     private volatile boolean eventStreamResyncRequired;
@@ -99,17 +145,24 @@ final class PlayerActionRuntime implements AutoCloseable {
         Logger logger,
         Consumer<String> localDiagnosticMessage
     ) {
+        this(config, minecraft, logger, localDiagnosticMessage, minecraft::execute,
+            minecraft.gameDirectory.toPath().resolve("config").resolve("helix-fabric-player-agent.runtime-status.json"));
+    }
+
+    PlayerActionRuntime(PlayerActionConfig config, Minecraft minecraft, Logger logger,
+        Consumer<String> localDiagnosticMessage, java.util.concurrent.Executor clientExecutor,
+        java.nio.file.Path statusPath) {
         this.config = config;
         this.minecraft = minecraft;
+        this.clientExecutor = java.util.Objects.requireNonNull(clientExecutor);
         this.logger = logger;
         this.localDiagnosticMessage = localDiagnosticMessage;
         this.localStatusWriter = new PlayerActionLocalStatusWriter(
-            minecraft.gameDirectory.toPath()
-                .resolve("config")
-                .resolve("helix-fabric-player-agent.runtime-status.json"),
+            statusPath,
             logger
         );
         this.bridge = new NativeFabricControlBridge(minecraft);
+        this.evidenceSnapshot = bridge::snapshot;
         this.controller = new PlayerActionController(bridge, this::onWorkflowEvent);
         this.network = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "helix-player-action-network");
@@ -201,15 +254,14 @@ final class PlayerActionRuntime implements AutoCloseable {
                 }
             });
         }
-        if (ticks % HEARTBEAT_INTERVAL_TICKS == 0) {
-            if (manifestReady) scheduleHeartbeatPublish();
-        }
+        if (heartbeatPublicationDue(ticks, manifestReady)) scheduleHeartbeatPublish();
         if (eventStreamResyncRequired) return;
         if (
             actionPollingReady(manifestReady, heartbeatReady) &&
-            ticks % POLL_INTERVAL_TICKS == 0 &&
+            actionPollDue(ticks, activeEnvelope != null && temporalPollDeferred.get(), temporalEvidencePending()) &&
             cyclePending.compareAndSet(false, true)
         ) {
+            temporalPollDeferred.set(false);
             network.execute(() -> {
                 try {
                     pollControlsThenActions();
@@ -569,8 +621,14 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     private void publishHeartbeat() {
         try {
-            PlayerActionHttpClient.Response response = http.post("/heartbeat", heartbeat());
+            // Read resident state on its owning thread; only transport the
+            // resulting snapshot here. Never sample the mutable bridge from
+            // the projection worker or move network I/O onto the client tick.
+            Map<String, Object> snapshot = runOnClient(this::heartbeat);
+            PlayerActionHttpClient.Response response = http.post("/heartbeat", snapshot);
             heartbeatReady = response.ok();
+            workflowEventBatchSupported = response.ok() &&
+                Boolean.TRUE.equals(response.body().get("workflow_event_batch_supported"));
             if (response.ok()) lastHeartbeatAcceptedAt = Instant.now();
             if (!response.ok()) {
                 recordTransportError(response.error());
@@ -594,6 +652,10 @@ final class PlayerActionRuntime implements AutoCloseable {
             recordTransportError("heartbeat_unreachable");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
+    }
+
+    static boolean heartbeatPublicationDue(long tick, boolean manifestReady) {
+        return manifestReady && tick > 0 && tick % HEARTBEAT_INTERVAL_TICKS == 0;
     }
 
     private void scheduleHeartbeatPublish() {
@@ -666,12 +728,25 @@ final class PlayerActionRuntime implements AutoCloseable {
                 }
             }
             scheduleDeliveryFlush();
+            if (activeEnvelope != null && !deliveryOutbox.isEmpty()) temporalPollDeferred.set(true);
             if (
                 emergencyStopLatched ||
-                activeEnvelope != null ||
-                localDiagnosticEnvelope != null ||
-                !deliveryOutbox.isEmpty()
+                localDiagnosticEnvelope != null
             ) return;
+            if (activeEnvelope != null) {
+                // Keep control polling independent of a slow/uncertain successor
+                // response. The delivery lane stays single-flight and applies
+                // responses only through the existing client-thread guards.
+                temporalDeliveryLane.submit(() -> {
+                    try { pollTemporalSuccessor(); }
+                    catch (Exception error) {
+                        recordTransportError("temporal_successor_transport_unreachable");
+                        if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                    }
+                });
+                return;
+            }
+            if (!deliveryOutbox.isEmpty()) return;
             PlayerActionHttpClient.Response actions = http.get("/requests/pending?limit=1");
             if (!actions.ok()) {
                 recordTransportError(actions.error());
@@ -721,6 +796,22 @@ final class PlayerActionRuntime implements AutoCloseable {
         long queueDepthAtLease,
         long oldestPendingAgeMs
     ) {
+        TemporalPlanDeliveryPreflight.SerialInitial temporal = null;
+        if (hasTemporalMetadata(wire)) {
+            // Source/compiled identity and serial stabilization must bind before
+            // an envelope or controller is created. Never use finite fallback.
+            try {
+                if (!bridge.inventoryCountObservation().available())
+                    throw new IllegalStateException("temporal_inventory_observation_unavailable");
+                Map<String, Object> clock = monotonicClock.snapshot();
+                temporal = TemporalPlanDeliveryPreflight.initialSerial(wire, config, producerEpochRef,
+                    textRequired(clock, "origin_id"), ticks, number(clock, "elapsed_ms").doubleValue());
+            } catch (RuntimeException invalidTemporalDelivery) {
+                submitWithoutExecution(wire, "capability_unavailable",
+                    "Temporal delivery failed source, compilation, paired identity, clock or inventory-sensor validation; no execution started.");
+                return;
+            }
+        }
         String requestedEngine = text(wire, "requested_control_engine");
         String resolvedEngine = "baritone".equals(requestedEngine)
             ? "baritone"
@@ -764,14 +855,182 @@ final class PlayerActionRuntime implements AutoCloseable {
                 )
             );
             activeEnvelope = envelope;
+            temporalDeliveryState = temporal == null ? null : new TemporalDeliveryState(envelope.wire());
             if (!controller.start(request)) {
                 activeEnvelope = null;
+                temporalDeliveryState = null;
                 submitWithoutExecution(wire, "duplicate_request", "Another player workflow is already active.");
+            } else if (temporal != null && !controller.attachTemporalWindow(request.actionRequestId(), temporal.clock().window(),
+                () -> {
+                    Map<String, Object> clock = monotonicClock.snapshot();
+                    return new PlayerActionController.TemporalClockSample(textRequired(clock, "origin_id"), ticks,
+                        number(clock, "elapsed_ms").doubleValue());
+                }, temporal.stabilizationNode())) {
+                controller.cancel(request.workflowId(), "The admitted temporal window could not attach before execution.");
             }
         } catch (RuntimeException error) {
             activeEnvelope = null;
+            temporalDeliveryState = null;
             submitWithoutExecution(wire, "capability_unavailable", "The admitted player request could not be interpreted by this connector version.");
         }
+    }
+
+    static boolean hasTemporalMetadata(Map<String, Object> wire) {
+        // Orphaned and null metadata must also enter strict temporal preflight.
+        return wire.containsKey("temporal_plan") || wire.containsKey("temporal_plan_canonical_json") ||
+            wire.containsKey("temporal_compilation_canonical_json") || wire.containsKey("temporal_compilation_hash");
+    }
+
+    private boolean temporalEvidencePending() {
+        TemporalDeliveryState state = temporalDeliveryState;
+        return state == null || deliveryOutbox.hasPendingThrough(state.checkpointDeliveryWatermark);
+    }
+
+    private void pollTemporalSuccessor() throws Exception {
+        TemporalPoll uncertain = runOnClient(() -> temporalDeliveryState == null ? null : temporalDeliveryState.uncertainPoll);
+        if (uncertain != null) {
+            // A lost response may have consumed the one-shot lease. Inspect
+            // only: neither absence nor a recorded status authorizes replay.
+            PlayerActionHttpClient.Response status;
+            long started = System.nanoTime();
+            try {
+                status = http.post("/requests/temporal-successor/status", uncertain.body());
+            } finally {
+                uncertain.envelope().capacityTelemetry().recordTemporalRequest(true, System.nanoTime() - started);
+            }
+            recordTransportError("temporal_successor_delivery_" + reconciliationStatus(status));
+            return;
+        }
+        TemporalPoll poll = runOnClient(() -> {
+            applyReceivedTemporalSuccessor();
+            ActiveEnvelope envelope = activeEnvelope;
+            TemporalDeliveryState state = temporalDeliveryState;
+            if (envelope != null && state != null && !deliveryOutbox.isEmpty()) temporalPollDeferred.set(true);
+            if (envelope == null || state == null || state.queuedWire != null || state.received.pending() ||
+                !temporalDeliveryReady(controller.state(), eventStreamResyncRequired, emergencyStopLatched, temporalEvidencePending())) return null;
+            List<Object> settlements = HelixJson.asList(state.measurements.get("checkpoint_settlements"));
+            if (settlements.isEmpty()) return null;
+            String checkpoint = text(HelixJson.asObject(settlements.get(settlements.size() - 1)), "checkpoint_id");
+            Map<String, Object> plan = object(state.currentWire.get("temporal_plan"));
+            boolean explicitCheckpoint = HelixJson.asList(plan.get("nodes")).stream().anyMatch(value -> {
+                Map<String, Object> node = HelixJson.asObject(value);
+                return "checkpoint".equals(node.get("kind")) && checkpoint.equals(node.get("checkpoint_id"));
+            });
+            if (!explicitCheckpoint) return null;
+            // Client-thread observation after BOTH evidence lanes clear the
+            // fixed fence. Includes scheduling delay; not the HTTP receipt time.
+            envelope.capacityTelemetry().recordCheckpointEvidenceReady(
+                HelixJson.stringify(List.of(text(plan, "plan_id"), checkpoint)), System.nanoTime());
+            TemporalPoll prepared = new TemporalPoll(envelope, state.currentWire, state.interruptionRevision, checkpoint, Map.of(
+                "resident_action_request_id", textRequired(envelope.wire(), "action_request_id"),
+                "predecessor_plan_id", textRequired(plan, "plan_id"), "predecessor_plan_hash", textRequired(plan, "plan_hash"),
+                "checkpoint_id", checkpoint));
+            // Arm before crossing the network boundary. A later client-thread
+            // timeout must not lose the record that a one-shot lease may exist.
+            state.uncertainPoll = prepared;
+            return prepared;
+        });
+        if (poll == null) return;
+        PlayerActionHttpClient.Response response;
+        long responseReceived;
+        long pollStarted = System.nanoTime();
+        try {
+            try {
+                response = http.post("/requests/temporal-successor", poll.body());
+                responseReceived = System.nanoTime();
+            } finally {
+                poll.envelope().capacityTelemetry().recordTemporalRequest(false, System.nanoTime() - pollStarted);
+            }
+        } catch (java.io.IOException | InterruptedException failure) {
+            retainUncertainTemporalPoll(poll);
+            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+            return;
+        }
+        if (temporalResponseUncertain(response)) { retainUncertainTemporalPoll(poll); return; }
+        if (!(response.body().get("action_request") instanceof Map<?, ?>)) {
+            // Only an explicit empty response permits another delivery poll.
+            runOnClient(() -> {
+                TemporalDeliveryState state = temporalDeliveryState;
+                if (state != null && state.uncertainPoll == poll) state.uncertainPoll = null;
+                return false;
+            });
+            return;
+        }
+        Map<String, Object> successor = HelixJson.asObject(response.body().get("action_request"));
+        poll.envelope().capacityTelemetry().recordTemporalDeliveryResponse(
+            HelixJson.stringify(List.of(text(poll.body(), "predecessor_plan_id"), poll.checkpoint())),
+            pollStarted, responseReceived);
+        runOnClient(() -> {
+            TemporalDeliveryState state = temporalDeliveryState;
+            if (activeEnvelope != poll.envelope() || state == null || state.currentWire != poll.wire() ||
+                state.interruptionRevision != poll.interruptionRevision() ||
+                state.queuedWire != null ||
+                !temporalDeliveryReady(controller.state(), eventStreamResyncRequired, emergencyStopLatched, false)) return false;
+            if (!state.received.offer(new TemporalReceived(poll, successor))) return false;
+            // The exact response is now retained on the client thread. Until
+            // this handoff succeeds, subsequent attempts remain status-only.
+            if (state.uncertainPoll == poll) state.uncertainPoll = null;
+            return applyReceivedTemporalSuccessor();
+        });
+    }
+
+    private void retainUncertainTemporalPoll(TemporalPoll poll) throws Exception {
+        runOnClient(() -> {
+            TemporalDeliveryState state = temporalDeliveryState;
+            if (activeEnvelope == poll.envelope() && state != null && state.currentWire == poll.wire()) {
+                state.uncertainPoll = poll;
+            }
+            return false;
+        });
+        recordTransportError("temporal_successor_delivery_unresolved");
+    }
+
+    static String reconciliationStatus(PlayerActionHttpClient.Response response) {
+        if (!response.ok()) return "unresolved";
+        String status = text(object(response.body().get("delivery_state")), "recorded_status");
+        return switch (status) {
+            case "queued", "admitted", "leased", "running", "succeeded", "failed", "canceled",
+                 "timed_out", "emergency_stopped", "connector_offline", "authority_stale" -> "recorded_" + status;
+            default -> "unresolved";
+        };
+    }
+
+    static boolean temporalResponseUncertain(PlayerActionHttpClient.Response response) {
+        if (!response.ok() || !response.body().containsKey("action_request")) return true;
+        Object action = response.body().get("action_request");
+        // Only the explicit null variant proves an empty delivery response.
+        // A missing/malformed payload may follow a consumed one-shot lease.
+        return action != null && !(action instanceof Map<?, ?>);
+    }
+
+    private boolean applyReceivedTemporalSuccessor() {
+            TemporalDeliveryState state = temporalDeliveryState;
+            if (state == null) return false;
+            TemporalReceived received = state.received.take(activeEnvelope != null && state.queuedWire == null &&
+                temporalDeliveryReady(controller.state(), eventStreamResyncRequired, emergencyStopLatched, false), temporalEvidencePending());
+            if (received == null) return false;
+            TemporalPoll poll = received.poll();
+            Map<String, Object> successor = received.wire();
+            if (activeEnvelope != poll.envelope() || state.currentWire != poll.wire() ||
+                state.interruptionRevision != poll.interruptionRevision()) return false;
+            try {
+                Map<String, Object> clock = monotonicClock.snapshot();
+                var prepared = TemporalPlanDeliveryPreflight.successorSerial(successor, state.currentWire, config,
+                    producerEpochRef, textRequired(clock, "origin_id"), ticks, number(clock, "elapsed_ms").doubleValue());
+                state.acceptingSuccessorActionRequestId = textRequired(successor, "action_request_id");
+                if (!controller.queueTemporalSuccessor(textRequired(poll.envelope().wire(), "action_request_id"),
+                    textRequired(object(state.currentWire.get("temporal_plan")), "plan_id"), poll.checkpoint(),
+                    object(successor.get("arguments")), prepared.clock().window(), prepared.stabilizationNode())) throw new IllegalArgumentException();
+                state.queuedWire = successor;
+                state.queuedCheckpoint = poll.checkpoint();
+                return true;
+            } catch (RuntimeException invalid) {
+                controller.cancel(textRequired(poll.envelope().wire(), "workflow_id"),
+                    "Temporal successor delivery was incompatible or late; it was not executed.");
+                return false;
+            } finally {
+                state.acceptingSuccessorActionRequestId = null;
+            }
     }
 
     private Map<String, Object> applyControl(Map<String, Object> control) {
@@ -813,12 +1072,19 @@ final class PlayerActionRuntime implements AutoCloseable {
         return result;
     }
 
+    static boolean eventMatchesEnvelope(WorkflowEvent event, Map<String, Object> wire) {
+        return event.actionRequestId() != null && !event.actionRequestId().isBlank() &&
+            event.actionRequestId().equals(wire.get("action_request_id")) &&
+            event.workflowId() != null && !event.workflowId().isBlank() &&
+            event.workflowId().equals(wire.get("workflow_id"));
+    }
+
     private void onWorkflowEvent(WorkflowEvent event) {
         ActiveEnvelope currentEnvelope = activeEnvelope;
         if (
             residentCallbackInProgress &&
             currentEnvelope != null &&
-            event.workflowId().equals(text(currentEnvelope.wire(), "workflow_id"))
+            eventMatchesEnvelope(event, currentEnvelope.wire())
         ) {
             deferredWorkflowEvents.add(event);
             return;
@@ -826,13 +1092,59 @@ final class PlayerActionRuntime implements AutoCloseable {
         LocalDiagnosticEnvelope diagnostic = localDiagnosticEnvelope;
         if (
             diagnostic != null &&
+            diagnostic.actionRequestId().equals(event.actionRequestId()) &&
             event.workflowId().equals(diagnostic.workflowId())
         ) {
             onLocalDiagnosticEvent(diagnostic, event);
             return;
         }
         ActiveEnvelope envelope = activeEnvelope;
-        if (envelope == null || !event.workflowId().equals(text(envelope.wire(), "workflow_id"))) return;
+        if (envelope == null || !eventMatchesEnvelope(event, envelope.wire())) return;
+        TemporalDeliveryState temporalState = temporalDeliveryState;
+        if (temporalState != null) {
+            if (event.state() != State.RUNNING || event.manualOverrideDetected()) {
+                envelope.capacityTelemetry().interruptTemporalTiming();
+                temporalState.interruptionRevision++;
+                temporalState.received.take(false, false);
+            }
+            if (temporalState.queuedWire != null && java.util.Objects.equals(event.measurements().get("sequence_id"),
+                object(temporalState.queuedWire.get("temporal_plan")).get("plan_id"))) {
+                if (event.state() == State.RUNNING && !event.manualOverrideDetected()) {
+                    Map<String, Object> previous = object(temporalState.currentWire.get("temporal_plan"));
+                    Map<String, Object> next = object(temporalState.queuedWire.get("temporal_plan"));
+                    envelope.capacityTelemetry().recordTemporalActivation(
+                        HelixJson.stringify(List.of(text(previous, "plan_id"), temporalState.queuedCheckpoint)), System.nanoTime(), Map.of(
+                            "run_id", text(envelope.wire(), "run_id"),
+                            "resident_action_request_id", event.actionRequestId(),
+                            "producer_epoch_ref", producerEpochRef,
+                            "predecessor_plan_id", text(previous, "plan_id"),
+                            "predecessor_plan_hash", text(previous, "plan_hash"),
+                            "checkpoint_id", temporalState.queuedCheckpoint,
+                            "successor_action_request_id", text(temporalState.queuedWire, "action_request_id"),
+                            "successor_plan_id", text(next, "plan_id")));
+                }
+                temporalState.currentWire = temporalState.queuedWire;
+                temporalState.queuedWire = null;
+            }
+            temporalState.measurements = event.measurements();
+            Map<String, Object> acceptance = object(event.measurements().get("temporal_successor_acceptance"));
+            if (event.state() == State.RUNNING && !event.manualOverrideDetected() && !acceptance.isEmpty()) {
+                Map<String, Object> timingIdentity = new LinkedHashMap<>(acceptance);
+                timingIdentity.put("run_id", text(envelope.wire(), "run_id"));
+                timingIdentity.put("resident_action_request_id", event.actionRequestId());
+                timingIdentity.put("producer_epoch_ref", producerEpochRef);
+                timingIdentity.put("successor_action_request_id", temporalState.acceptingSuccessorActionRequestId);
+                envelope.capacityTelemetry().recordTemporalAcceptance(HelixJson.stringify(List.of(
+                    text(acceptance, "predecessor_sequence_id"), text(acceptance, "checkpoint_id"))),
+                    System.nanoTime(), timingIdentity);
+            }
+            List<Object> checkpoints = HelixJson.asList(event.measurements().get("checkpoint_settlements"));
+            if (event.state() == State.RUNNING && !event.manualOverrideDetected() && !checkpoints.isEmpty()) {
+                String checkpoint = text(HelixJson.asObject(checkpoints.get(checkpoints.size() - 1)), "checkpoint_id");
+                envelope.capacityTelemetry().recordCheckpoint(
+                    HelixJson.stringify(List.of(text(event.measurements(), "sequence_id"), checkpoint)), System.nanoTime());
+            }
+        }
         String eventId = id("environment_action_event");
         long environmentEventSequence = ++latestEventSequence;
         manualInputDetected = manualInputDetected || event.manualOverrideDetected();
@@ -848,7 +1160,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         Map<String, Object> payload = baseNonAnswer();
         payload.put("schema", "helix.environment_action.workflow_event.v1");
         payload.put("event_id", eventId);
-        payload.put("action_request_id", text(envelope.wire(), "action_request_id"));
+        payload.put("action_request_id", event.actionRequestId());
         payload.put("workflow_id", event.workflowId());
         payload.put("sequence", event.sequence());
         payload.put("event_type", event.eventType());
@@ -889,7 +1201,7 @@ final class PlayerActionRuntime implements AutoCloseable {
                 capacityMeasurements
             )
             : null;
-        if (terminal) activeEnvelope = null;
+        if (terminal) { activeEnvelope = null; temporalDeliveryState = null; }
         List<PlayerActionDeliveryOutbox.Delivery> deliveries = new ArrayList<>();
         deliveries.add(new PlayerActionDeliveryOutbox.Delivery(
             PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
@@ -913,6 +1225,15 @@ final class PlayerActionRuntime implements AutoCloseable {
                 "The bounded evidence outbox filled; controls were released rather than losing workflow provenance."
             ));
             return;
+        }
+        if (temporalState != null) {
+            String key = HelixJson.stringify(List.of(
+                text(event.measurements(), "sequence_id"),
+                HelixJson.asList(event.measurements().get("checkpoint_settlements"))));
+            if (!key.equals(temporalState.checkpointEvidenceKey)) {
+                temporalState.checkpointEvidenceKey = key;
+                temporalState.checkpointDeliveryWatermark = deliveryOutbox.watermark();
+            }
         }
         logger.debug(
             "Helix player-action delivery queued: stage={} pending={}",
@@ -1025,14 +1346,18 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     private boolean flushDeliveryLane(boolean projectionLane) {
         while (true) {
+            List<PlayerActionDeliveryOutbox.Delivery> criticalBatch = projectionLane
+                ? List.of() : deliveryOutbox.peekCriticalBatch(workflowEventBatchSupported);
             PlayerActionDeliveryOutbox.Delivery delivery = projectionLane
                 ? deliveryOutbox.peekProjection()
-                : deliveryOutbox.peekCritical();
+                : criticalBatch.isEmpty() ? null : criticalBatch.get(0);
             if (delivery == null) break;
+            boolean batched = criticalBatch.size() > 1;
             try {
                 PlayerActionHttpClient.Response receipt = http.post(
-                    delivery.stage().endpointSuffix(),
-                    delivery.payload()
+                    batched ? "/requests/events" : delivery.stage().endpointSuffix(),
+                    batched ? Map.of("events", criticalBatch.stream().map(PlayerActionDeliveryOutbox.Delivery::payload).toList())
+                        : delivery.payload()
                 );
                 if (!receipt.ok()) {
                     String transportError = PlayerActionDeliveryOutbox.transportErrorCode(
@@ -1051,7 +1376,14 @@ final class PlayerActionRuntime implements AutoCloseable {
                     }
                     return false;
                 }
-                boolean acknowledged = deliveryOutbox.acknowledge(delivery);
+                boolean acknowledged = batched
+                    ? "helix.environment_action.events_receipt.v1".equals(receipt.body().get("schema")) &&
+                        deliveryOutbox.acknowledgeCriticalBatch(criticalBatch, receipt.body().get("event_ids"))
+                    : deliveryOutbox.acknowledge(delivery);
+                if (!acknowledged) {
+                    recordTransportError("action_delivery_workflow_receipt_mismatch");
+                    return false;
+                }
                 if (
                     acknowledged &&
                     delivery.stage() == PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH
@@ -1085,7 +1417,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         long sequence
     ) {
         String observedAt = Instant.now().toString();
-        PlayerActionWorkflow.PlayerSnapshot snapshot = bridge.snapshot();
+        PlayerActionWorkflow.PlayerSnapshot snapshot = evidenceSnapshot.get();
         Map<String, Object> actor = new LinkedHashMap<>();
         actor.put("connected", snapshot.connected());
         actor.put("position", Map.of(
@@ -1363,6 +1695,9 @@ final class PlayerActionRuntime implements AutoCloseable {
                         longNumber(startedClock, "tick_index")
                 )
         );
+        // Retain per-plan evidence unchanged; only the settled result's effect
+        // projection combines history, so a quiet final plan cannot erase it.
+        if ("execute_sequence".equals(actionKind)) measurements = ResidentEffectMeasurements.resultView(measurements);
         boolean programKind = "execute_sequence".equals(actionKind) ||
             "execute_reactive_program".equals(actionKind);
         boolean motionKind = List.of(
@@ -1519,6 +1854,9 @@ final class PlayerActionRuntime implements AutoCloseable {
     }
 
     private Map<String, Object> heartbeat() {
+        if (!minecraft.isSameThread()) {
+            throw new IllegalStateException("heartbeat_snapshot_requires_client_thread");
+        }
         String workflow = controller.activeWorkflowId();
         boolean running = workflow != null && controller.state() == State.RUNNING;
         Map<String, Object> heartbeat = baseNonAnswer();
@@ -1682,7 +2020,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         );
     }
 
-    private static Map<String, Object> capability(
+    static Map<String, Object> capability(
         String capabilityId,
         String actionKind,
         String effectClass,
@@ -1690,7 +2028,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         List<String> controlEngines,
         boolean mutationScopeRequired
     ) {
-        return Map.of(
+        Map<String, Object> result = new LinkedHashMap<>(Map.of(
             "capability_id", capabilityId,
             "capability_version", 1,
             "action_kind", actionKind,
@@ -1699,19 +2037,17 @@ final class PlayerActionRuntime implements AutoCloseable {
             "control_engines", controlEngines,
             "requires_world_mutation_scope", mutationScopeRequired,
             "requires_confirmation", true
-        );
+        ));
+        if ("execute_sequence".equals(actionKind)) {
+            result.put("execution_features", List.of("latest_start_tick_v1", "temporal_plan_v1"));
+        } else if ("execute_reactive_program".equals(actionKind)) {
+            result.put("execution_features", List.of("latest_start_tick_v1"));
+        }
+        return Map.copyOf(result);
     }
 
     private <T> T runOnClient(java.util.concurrent.Callable<T> callable) throws Exception {
-        CompletableFuture<T> future = new CompletableFuture<>();
-        minecraft.execute(() -> {
-            try {
-                future.complete(callable.call());
-            } catch (Throwable error) {
-                future.completeExceptionally(error);
-            }
-        });
-        return future.get();
+        return ClientThreadCall.await(clientExecutor, callable, 12_000);
     }
 
     private Map<String, Object> captureClockSnapshot(long clientTick) {
@@ -1725,6 +2061,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         clock.put("tick_rate_hz", 20);
         clock.put("tick_index", Math.max(0L, clientTick));
         clock.put("world_tick_index", worldTick);
+        clock.put("monotonic", monotonicClock.snapshot());
         clock.put(
             "synchronization",
             worldTick == null ? "client_local" : "server_synchronized"
@@ -1781,6 +2118,17 @@ final class PlayerActionRuntime implements AutoCloseable {
             activeWorkflowId != null &&
             transportError != null &&
             !transportError.isBlank();
+    }
+
+    static boolean temporalDeliveryReady(State state, boolean resyncRequired, boolean emergencyStopped, boolean evidencePending) {
+        return state == State.RUNNING && !resyncRequired && !emergencyStopped && !evidencePending;
+    }
+
+    // A periodic poll can coincide with progress publication on every cycle.
+    // Retain that opportunity until acknowledged evidence drains; do not poll
+    // through backpressure, add another network worker, or replay a response.
+    static boolean actionPollDue(long tick, boolean deferred, boolean evidencePending) {
+        return tick > 0 && (tick % POLL_INTERVAL_TICKS == 0 || (deferred && !evidencePending));
     }
 
     static boolean eventStreamResyncRequiresWorkflowStop(
@@ -1921,6 +2269,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         bridge.releaseAll();
         publishLocalStatus();
         network.shutdownNow();
+        temporalDeliveryLane.close();
         criticalDeliveryNetwork.shutdownNow();
         projectionDeliveryNetwork.shutdownNow();
         if (http != null) http.close();

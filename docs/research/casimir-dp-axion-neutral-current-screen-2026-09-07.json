@@ -1,0 +1,116 @@
+{
+  "scope": "Leading tree aligned-up-singlet delta C1u=D/2, delta C1d=0. No RG, oblique, vertex, hadronic or atomic re-extraction. Separate Gaussian diagnostics; no combined fit.",
+  "checks": {
+    "proton_neutron_assembly": true,
+    "fixed_sign_for_positive_mixing": true,
+    "Cs_to_proton_shift_ratio": true
+  },
+  "datasets": {
+    "proton_PVES_2018": {
+      "Z": 1,
+      "N": 0,
+      "measurement": 0.0719,
+      "error": 0.0045,
+      "SM": 0.0708,
+      "SM_error": 0.0003,
+      "source": "https://arxiv.org/pdf/1905.08283"
+    },
+    "Cs_values_reported_2602p22466v1": {
+      "Z": 55,
+      "N": 78,
+      "measurement": -72.41,
+      "error": 0.42,
+      "SM": -73.26,
+      "SM_error": 0.01,
+      "source": "https://arxiv.org/html/2602.22466v1"
+    }
+  },
+  "rows": [
+    {
+      "yL": 0.1,
+      "dataset": "proton_PVES_2018",
+      "delta_C1u": 3.7881154818767634e-05,
+      "delta_weak_charge": -0.00015152461927507054,
+      "conditional_prediction": 0.07064847538072493,
+      "gaussian_pull": -0.27750059773440394,
+      "absolute_signal_over_quoted_measurement_error": 0.03367213761668234
+    },
+    {
+      "yL": 0.1,
+      "dataset": "Cs_values_reported_2602p22466v1",
+      "delta_C1u": 3.7881154818767634e-05,
+      "delta_weak_charge": -0.014243314211856631,
+      "conditional_prediction": -73.27424331421186,
+      "gaussian_pull": -2.057139169974979,
+      "absolute_signal_over_quoted_measurement_error": 0.03391265288537293,
+      "alternative_proposed_SM_shift": 0.58608,
+      "alternative_central_value_only": -72.68816331421186,
+      "alternative_pull_using_original_error_for_sensitivity_only": -0.6621059600988861
+    },
+    {
+      "yL": 0.2,
+      "dataset": "proton_PVES_2018",
+      "delta_C1u": 0.00015149018753558515,
+      "delta_weak_charge": -0.0006059607501423406,
+      "conditional_prediction": 0.07019403924985766,
+      "gaussian_pull": -0.3782627369728794,
+      "absolute_signal_over_quoted_measurement_error": 0.1346579444760757
+    },
+    {
+      "yL": 0.2,
+      "dataset": "Cs_values_reported_2602p22466v1",
+      "delta_C1u": 0.00015149018753558515,
+      "delta_weak_charge": -0.05696031051338002,
+      "conditional_prediction": -73.31696031051338,
+      "gaussian_pull": -2.1588174877247353,
+      "absolute_signal_over_quoted_measurement_error": 0.1356197869366191,
+      "alternative_proposed_SM_shift": 0.58608,
+      "alternative_central_value_only": -72.73088031051338,
+      "alternative_pull_using_original_error_for_sensitivity_only": -0.7637842778486429
+    },
+    {
+      "yL": 0.4,
+      "dataset": "proton_PVES_2018",
+      "delta_C1u": 0.0006054104676706402,
+      "delta_weak_charge": -0.0024216418706825608,
+      "conditional_prediction": 0.06837835812931745,
+      "gaussian_pull": -0.7808537755229871,
+      "absolute_signal_over_quoted_measurement_error": 0.5381426379294579
+    },
+    {
+      "yL": 0.4,
+      "dataset": "Cs_values_reported_2602p22466v1",
+      "delta_C1u": 0.0006054104676706402,
+      "delta_weak_charge": -0.2276343358441607,
+      "conditional_prediction": -73.48763433584416,
+      "gaussian_pull": -2.5650690803395273,
+      "absolute_signal_over_quoted_measurement_error": 0.5419865139146683,
+      "alternative_proposed_SM_shift": 0.58608,
+      "alternative_central_value_only": -72.90155433584417,
+      "alternative_pull_using_original_error_for_sensitivity_only": -1.1700358704634348
+    },
+    {
+      "yL": 0.6,
+      "dataset": "proton_PVES_2018",
+      "delta_C1u": 0.0013601149826396259,
+      "delta_weak_charge": -0.0054404599305585034,
+      "conditional_prediction": 0.0653595400694415,
+      "gaussian_pull": -1.4502164098371428,
+      "absolute_signal_over_quoted_measurement_error": 1.2089910956796674
+    },
+    {
+      "yL": 0.6,
+      "dataset": "Cs_values_reported_2602p22466v1",
+      "delta_C1u": 0.0013601149826396259,
+      "delta_weak_charge": -0.5114032334724993,
+      "conditional_prediction": -73.7714032334725,
+      "gaussian_pull": -3.2405178861705726,
+      "absolute_signal_over_quoted_measurement_error": 1.2176267463630936,
+      "alternative_proposed_SM_shift": 0.58608,
+      "alternative_central_value_only": -73.1853232334725,
+      "alternative_pull_using_original_error_for_sensitivity_only": -1.8454846762944799
+    }
+  ],
+  "alternative_theory_correction_independently_validated": false,
+  "full_model_admitted": false
+}

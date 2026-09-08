@@ -1,0 +1,37 @@
+{
+  "scope": "Isolated packaged startup and bundled-service access boundary",
+  "exe": "apps/desktop/release-et6-prelive-reliability-20260906/win-unpacked/CasimirBot.exe",
+  "exe_sha256": "155e9d4058fa8bf6dfaed7a8c4e7a59f0625585840fedc60e44c0d274617f9b4",
+  "packaged_launch": {
+    "passed": true,
+    "processes": 5,
+    "loopback_listeners": 4,
+    "full_readiness_receipt": true,
+    "service_listener_receipt": true,
+    "provider_credential_key_vault_created": true,
+    "protocol_registration_preserved": true,
+    "isolated_user_data_files": 80,
+    "minimum_free_physical_gib": 3.16,
+    "maximum_commit_percent": 66.6,
+    "friends_coordination": "not_configured"
+  },
+  "service_boundary": {
+    "passed": true,
+    "missing_session_status": 401,
+    "wrong_session_status": 401,
+    "valid_test_session_status": 200,
+    "release_status": "closed",
+    "local_state": "isolated",
+    "device_check": "policy_closed",
+    "provider_runtime_required": false
+  },
+  "cleanup": "Both scripts completed successfully after cleaning their own test processes and temporary profiles",
+  "installed_user_profile_used": false,
+  "minecraft_launched": false,
+  "live_acceptance": false,
+  "limits": [
+    "Unsigned verification build, not release-signing acceptance",
+    "No real OAuth/exact-task binding or environment admission established",
+    "No full successor evidence publication or measured Minecraft capacity"
+  ]
+}

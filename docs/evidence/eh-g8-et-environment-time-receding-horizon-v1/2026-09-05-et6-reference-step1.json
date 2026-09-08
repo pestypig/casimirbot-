@@ -1,0 +1,315 @@
+{
+  "et6_complete": false,
+  "classification": "direct_mcp_reference_measurement",
+  "reasoning_binding_id": "reasoning_binding:682844c34203856dec59b416501137db",
+  "authority_id": "environment_action_authority:6c4a021e-73b1-44a7-a022-a2a261d57088",
+  "pre_observation": {
+    "schema": "helix.environment_connector.probe_observation.v1",
+    "probe_request_ref": "environment_probe_request:cadd1acc-2b28-4fd4-a981-257497ea5f6a",
+    "probe_attempt_ref": "environment_probe_attempt:a6716908-1feb-4ab8-b43e-e3e6e4c1691a",
+    "capability_id": "com.casimirbot.minecraft.actor.status.read",
+    "capability_version": 1,
+    "outcome": "succeeded",
+    "summary": "Actor status read-only probe completed.",
+    "result": {
+      "result_summary": "Actor status read-only probe completed.",
+      "health": 20,
+      "max_health": 20,
+      "saturation": 19,
+      "yaw": 74.13,
+      "pitch": 4.65,
+      "food_level": 20,
+      "actor_label": "DatDamPig",
+      "game_mode": "survival",
+      "world": "minecraft:overworld",
+      "position": {
+        "x": 6.07,
+        "y": 65,
+        "z": 2.38
+      },
+      "status_flags": [],
+      "active_effects": []
+    },
+    "evidence_ref": "environment_probe_evidence:c9d95e42ff2e783d5a5a9a2a6e2e16ba6b211e86",
+    "observation_revision": 1788593390813,
+    "observed_at": "2026-09-05T07:29:50.813Z",
+    "freshness_age_ms": 185,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "late_result_disposition": null,
+    "content_role": "environment_probe_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "action": {
+    "action_kind": "execute_sequence",
+    "sequence_schema": "helix.minecraft.player_sequence.v1",
+    "sequence_id": "sequence:et6_20260905_reference_step1",
+    "ruleset": "survival_tas",
+    "execution_plane": "player_embodiment",
+    "scheduler_engine": "native_fabric",
+    "optimization": {
+      "primary": "minimize_world_ticks",
+      "record_wall_clock": true,
+      "stop_on_first_verified_success": true
+    },
+    "start_node_id": "grounded_before",
+    "max_total_ticks": 40,
+    "required_checkpoint_ids": [
+      "grounded_after"
+    ],
+    "mutation_scope": {
+      "world_mutation_allowed": false,
+      "max_block_mutations": 0,
+      "max_inventory_transfers": 0,
+      "allowed_block_ids": [],
+      "allowed_regions": [],
+      "combat_allowed": false
+    },
+    "nodes": [
+      {
+        "node_id": "grounded_before",
+        "node_kind": "branch",
+        "earliest_tick": 0,
+        "condition": {
+          "condition_kind": "player_grounded",
+          "expected": true
+        },
+        "on_true": "step",
+        "on_false": "failed"
+      },
+      {
+        "node_id": "step",
+        "node_kind": "input_segment",
+        "earliest_tick": 0,
+        "duration_ticks": 3,
+        "controls": {
+          "forward": 1,
+          "strafe": 0,
+          "sprint": false,
+          "sneak": false,
+          "jump": "idle",
+          "use": "idle"
+        },
+        "on_complete": "checkpoint",
+        "on_failure": "failed"
+      },
+      {
+        "node_id": "checkpoint",
+        "node_kind": "checkpoint",
+        "earliest_tick": 0,
+        "checkpoint_id": "grounded_after",
+        "condition": {
+          "condition_kind": "player_grounded",
+          "expected": true
+        },
+        "wait_up_to_ticks": 5,
+        "on_satisfied": "done",
+        "on_timeout": "failed"
+      },
+      {
+        "node_id": "done",
+        "node_kind": "terminal",
+        "terminal_outcome": "succeeded",
+        "reason_code": "bounded_step_grounded"
+      },
+      {
+        "node_id": "failed",
+        "node_kind": "terminal",
+        "terminal_outcome": "failed",
+        "reason_code": "grounding_or_step_failed"
+      }
+    ]
+  },
+  "result_observation": {
+    "schema": "helix.environment_action.observation.v1",
+    "action_request_ref": "environment_action_request:5a66bfc6-cc31-49a4-a4c0-76c49633d8e3",
+    "workflow_ref": "environment_action_workflow:ac5afe1f-6113-4662-8926-ecf58747cb2d",
+    "action_execution_ref": "environment_action_execution:f24215b9-be80-4f7c-b013-dfabcd8b0e5f",
+    "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+    "capability_version": 1,
+    "action_kind": "execute_sequence",
+    "outcome": "succeeded",
+    "summary": "The Fabric client completed the admitted sequence and every required checkpoint.",
+    "result": {
+      "control_engine": "native_fabric",
+      "started_clock": {
+        "schema": "helix.environment_clock_snapshot.v1",
+        "clock_id": "minecraft_client_tick_clock:6530fa22-f8fe-4e50-9697-6de4bfbc5976",
+        "clock_kind": "minecraft_game_tick",
+        "tick_rate_hz": 20,
+        "tick_index": 2140,
+        "world_tick_index": 6773969,
+        "synchronization": "server_synchronized",
+        "observed_at": "2026-09-05T07:30:15.665284100Z"
+      },
+      "completed_clock": {
+        "schema": "helix.environment_clock_snapshot.v1",
+        "clock_id": "minecraft_client_tick_clock:6530fa22-f8fe-4e50-9697-6de4bfbc5976",
+        "clock_kind": "minecraft_game_tick",
+        "tick_rate_hz": 20,
+        "tick_index": 2144,
+        "world_tick_index": 6773973,
+        "synchronization": "server_synchronized",
+        "observed_at": "2026-09-05T07:30:15.866839100Z"
+      },
+      "duration_ticks": 4,
+      "postconditions": [
+        {
+          "condition_id": "environment_action_condition:f67e6119-806e-4d89-82dd-7e584ee18951",
+          "condition_kind": "minecraft.player.sequence_checkpoints_satisfied",
+          "required": true,
+          "status": "satisfied",
+          "summary": "The native Fabric executor completed its action-specific postcondition check.",
+          "evidence_refs": [
+            "environment_action_event:be2c8475-c75b-43f2-a9b3-d4753d2bdeef",
+            "environment_action_event:ff014664-d653-4aeb-a197-ff2792ebbe42",
+            "environment_action_event:3d56447e-f525-4efa-9898-59e8e23cddf0"
+          ],
+          "checked_at": "2026-09-05T07:30:15.900692700Z"
+        }
+      ],
+      "verified_terminal_measurements": {
+        "active_control_ticks": 5,
+        "answer_authority": false,
+        "condition_observation_count": 2,
+        "condition_observations": [
+          {
+            "condition_kind": "player_grounded",
+            "node_id": "grounded_before",
+            "satisfied": true,
+            "tick_index": 0
+          },
+          {
+            "condition_kind": "player_grounded",
+            "node_id": "checkpoint",
+            "satisfied": true,
+            "tick_index": 4
+          }
+        ],
+        "deviation_count": 0,
+        "dispatch_to_client_accept_ms": 5,
+        "dispatch_to_first_tick_ms": 8,
+        "executed_node_count": 4,
+        "executed_node_ids": [
+          "grounded_before",
+          "step",
+          "checkpoint",
+          "done"
+        ],
+        "inventory_mutation_performed": false,
+        "inventory_mutations_performed": 0,
+        "manual_or_safety_to_release_ms": null,
+        "measurement_authority": false,
+        "missed_ticks": 0,
+        "node_outcomes": {
+          "checkpoint": "succeeded",
+          "done": "succeeded",
+          "grounded_before": "succeeded",
+          "step": "succeeded"
+        },
+        "oldest_pending_age_ms": 897,
+        "planned_runway_ticks_at_accept": 40,
+        "player_interaction_performed": false,
+        "player_motion_performed": true,
+        "queue_depth_at_lease": 1,
+        "required_checkpoints_satisfied": 1,
+        "resident_computation_ms": 7,
+        "retry_count": 0,
+        "ruleset": "survival_tas",
+        "runway_ticks_remaining": 35,
+        "satisfied_checkpoint_ids": [
+          "grounded_after"
+        ],
+        "scheduler_ticks": 5,
+        "scheduler_ticks_elapsed": 5,
+        "sequence_completed": true,
+        "sequence_id": "sequence:et6_20260905_reference_step1",
+        "stalled_ticks": 0,
+        "terminal_eligible": false,
+        "terminal_reason_code": "bounded_step_grounded",
+        "wall_clock_elapsed_ms": 201,
+        "world_mutations_performed": 0
+      },
+      "side_effects_performed": true,
+      "player_motion_performed": true,
+      "player_interaction_performed": false,
+      "inventory_mutation_performed": false,
+      "world_mutation_performed": false,
+      "manual_override_detected": false,
+      "manual_override_reason": null,
+      "controls_released": true,
+      "host_access_performed": false,
+      "automatic_replay_performed": false,
+      "model_invoked": false
+    },
+    "progress_observation_refs": [
+      "environment_action_event:be2c8475-c75b-43f2-a9b3-d4753d2bdeef",
+      "environment_action_event:ff014664-d653-4aeb-a197-ff2792ebbe42",
+      "environment_action_event:3d56447e-f525-4efa-9898-59e8e23cddf0"
+    ],
+    "postcondition_evidence_refs": [
+      "environment_action_event:be2c8475-c75b-43f2-a9b3-d4753d2bdeef",
+      "environment_action_event:ff014664-d653-4aeb-a197-ff2792ebbe42",
+      "environment_action_event:3d56447e-f525-4efa-9898-59e8e23cddf0"
+    ],
+    "evidence_ref": "environment_action_evidence:e83a8120193f127f62e46615d446aec5570f9d1a5",
+    "observed_at": "2026-09-05T07:30:15.939Z",
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "content_role": "environment_action_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "post_observation": {
+    "schema": "helix.environment_connector.probe_observation.v1",
+    "probe_request_ref": "environment_probe_request:0b04a4a1-3f1f-4bb9-8048-590b6b42b43d",
+    "probe_attempt_ref": "environment_probe_attempt:8d5ba335-784b-4f5d-b539-ae86afd1770f",
+    "capability_id": "com.casimirbot.minecraft.actor.status.read",
+    "capability_version": 1,
+    "outcome": "succeeded",
+    "summary": "Actor status read-only probe completed.",
+    "result": {
+      "result_summary": "Actor status read-only probe completed.",
+      "health": 20,
+      "max_health": 20,
+      "saturation": 19,
+      "yaw": 74.13,
+      "pitch": 4.65,
+      "food_level": 20,
+      "actor_label": "DatDamPig",
+      "game_mode": "survival",
+      "world": "minecraft:overworld",
+      "position": {
+        "x": 5.45,
+        "y": 65,
+        "z": 2.55
+      },
+      "status_flags": [],
+      "active_effects": []
+    },
+    "evidence_ref": "environment_probe_evidence:37c5bfb750218ba2d76f62e86af018214279e83d",
+    "observation_revision": 1788593436625,
+    "observed_at": "2026-09-05T07:30:36.625Z",
+    "freshness_age_ms": 52,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "late_result_disposition": null,
+    "content_role": "environment_probe_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "helix_chat_steering_proven": false,
+  "rolling_capacity_proven": false,
+  "credentials_included": false,
+  "hidden_reasoning_included": false
+}

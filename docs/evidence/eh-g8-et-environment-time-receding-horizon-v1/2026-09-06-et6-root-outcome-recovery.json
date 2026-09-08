@@ -1,0 +1,39 @@
+{
+  "schema": "et6.root_outcome_recovery.v1",
+  "attempted_workflow_id": "et6-temporal-workflow-1728",
+  "attempted_action_request_id": "et6-action-1728-root",
+  "attempted_plan_id": "plan:et6-live-1728-root",
+  "original_submission_outcome": "unresolved: original tool output unavailable",
+  "workflow_lookup": {
+    "observed_at": "2026-09-06T17:31:52.606Z",
+    "outcome": "forbidden",
+    "summary": "The exact active player workflow was not found for this room participant."
+  },
+  "fresh_perception": {
+    "observed_at": "2026-09-06T17:33:04.282Z",
+    "evidence_ref": "environment_probe_evidence:ac0bbd9acccc5e769991d6d165916587e1356f75",
+    "outcome": "succeeded",
+    "position": { "x": -1.19, "y": 65, "z": -1.08 },
+    "position_matches_prior_focus_post_observation": true,
+    "client_screen_state": "unobserved",
+    "manual_input_attribution": "unobserved"
+  },
+  "persisted_action_records": {
+    "snapshot_saved_at": "2026-09-06T17:34:44.891Z",
+    "exact_attempt_matches": 0,
+    "latest_request_created_at": "2026-09-06T17:24:50.249Z",
+    "latest_request_id": "environment_action_request:68661252-b244-488d-888c-5aaeda53a38f",
+    "limitation": "Persisted snapshot absence is not authoritative proof of no unpersisted effect. An initial substring search matched an unrelated September 4 condition UUID and was discarded; exact IDs were used for this result."
+  },
+  "goal_inspection": { "outcome": "transport_error", "http_status": 504 },
+  "separate_source_finding": {
+    "location": "server/db/client.ts localPersistenceTables",
+    "finding": "Temporal frontier and admission tables are absent from the configured local snapshot table list and from the inspected snapshot.",
+    "recovery_impact": "requires targeted restart-persistence verification",
+    "proven_cause_of_submission_failure": false
+  },
+  "new_motion_dispatched": false,
+  "automatic_replay_performed": false,
+  "rolling_extensions_proven": 0,
+  "goal_complete": false
+}

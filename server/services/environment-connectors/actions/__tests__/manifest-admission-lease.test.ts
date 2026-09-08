@@ -17,7 +17,9 @@ describe("environment action manifest admission lease", () => {
     effect_class: "continuous_control",
     workflow_modes: ["long_running"],
     control_engines: ["native_fabric"],
-  } as const;
+    requires_world_mutation_scope: false,
+    requires_confirmation: false,
+  } satisfies Parameters<typeof resolveEnvironmentActionManifestCapabilityIntersection>[0]["manifestCapabilities"][number];
   const trustedRegisteredCapability = {
     ...trustedCapability,
     allowed_control_engines: ["native_fabric"],
@@ -31,7 +33,9 @@ describe("environment action manifest admission lease", () => {
       effect_class: "player_motion",
       workflow_modes: ["single_action"],
       control_engines: ["native_fabric"],
-    } as const;
+      requires_world_mutation_scope: false,
+      requires_confirmation: false,
+    } satisfies Parameters<typeof resolveEnvironmentActionManifestCapabilityIntersection>[0]["manifestCapabilities"][number];
 
     expect(resolveEnvironmentActionManifestCapabilityIntersection({
       manifestCapabilities: [trustedCapability, look],

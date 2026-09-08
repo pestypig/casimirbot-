@@ -1,0 +1,33 @@
+{
+  "status": "conditional independent-azimuth common-beam covariance, not exact contrast",
+  "particle_mass_GeV": 1000.0,
+  "target_mass_GeV": 173476823106.9536,
+  "speed_kms": 776,
+  "relative_momentum_GeV": 2.5884573638166044,
+  "rows": [
+    {
+      "label": "old_toy_x1e-4",
+      "q_eV": 7.893079216000001e-05,
+      "qparallel_eV": 1.203432986398328e-18,
+      "pair_dot_over_single_q2": 2.324614272618154e-28,
+      "fractional_variance_enhancement_at_10000_hits": 2.324381811190892e-24,
+      "formal_hits_for_order_one_variance_enhancement": 4.3017889538883606e+27
+    },
+    {
+      "label": "inverse_separation",
+      "q_eV": 0.7893079216000001,
+      "qparallel_eV": 1.2034329863983276e-10,
+      "pair_dot_over_single_q2": 2.3246142726181533e-20,
+      "fractional_variance_enhancement_at_10000_hits": 2.3243818111908914e-16,
+      "formal_hits_for_order_one_variance_enhancement": 4.301788953888362e+19
+    },
+    {
+      "label": "soft_interval_top",
+      "q_eV": 57.13363539490537,
+      "qparallel_eV": 6.305400929271902e-07,
+      "pair_dot_over_single_q2": 1.2179843132464763e-16,
+      "fractional_variance_enhancement_at_10000_hits": 1.2178625148151516e-12,
+      "formal_hits_for_order_one_variance_enhancement": 8210286365138398.0
+    }
+  ]
+}

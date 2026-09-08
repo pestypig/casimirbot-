@@ -1,0 +1,141 @@
+{
+  "evidence_class": "conditional_local_channel_audit_not_full_model_admission",
+  "source_refs": [
+    "https://arxiv.org/html/2609.02608v2",
+    "https://arxiv.org/html/2609.04144v1"
+  ],
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "pseudo_Dirac": {
+    "sigma_N_cm2": 6.5e-43,
+    "c_N_GeV_minus2": 7.714823170984095e-08,
+    "Lambda_GeV": 6235.878420606759,
+    "all_excited_population_free_carbon_downscatter_count_upper": 3.521354573931612e-24,
+    "downscatter_decoherence_exponent_upper": 7.042709147863224e-24,
+    "mixing_degeneracy": [
+      {
+        "asymmetry": 0.0,
+        "physical_masses_GeV": [
+          1000.0,
+          1000.000297
+        ],
+        "diagonal_Weyl_charge_magnitude": 2.2371143170757382e-17,
+        "offdiagonal_charge_magnitude": 0.9999999999999998
+      },
+      {
+        "asymmetry": 0.5,
+        "physical_masses_GeV": [
+          1000.0000000000002,
+          1000.0002969999999
+        ],
+        "diagonal_Weyl_charge_magnitude": 7.424998873344064e-08,
+        "offdiagonal_charge_magnitude": 0.9999999999999973
+      },
+      {
+        "asymmetry": 1.0,
+        "physical_masses_GeV": [
+          1000.0000000000001,
+          1000.0002969999999
+        ],
+        "diagonal_Weyl_charge_magnitude": 1.48499977995098e-07,
+        "offdiagonal_charge_magnitude": 0.9999999999999888
+      }
+    ]
+  },
+  "electroweak_rows": [
+    {
+      "representation": "3M2D",
+      "y_source": 0.00595,
+      "mchi_GeV": 1440.0,
+      "delta_source_keV": 372.0,
+      "delta_replayed_from_rounded_y_keV": 372.6130368750086,
+      "sigma_loop_source_cm2": 1.26e-47,
+      "inclusive_contact_D_upper": 8.308473075511391e-15,
+      "rigid_uniform_soft_D": 7.266965771290314e-35,
+      "rigid_uniform_all_q_D_upper": 7.309858183926693e-35,
+      "carbon_max_endothermic_splitting_keV": 37.158247583679525
+    },
+    {
+      "representation": "5M4D",
+      "y_source": 0.0137,
+      "mchi_GeV": 7580.0,
+      "delta_source_keV": 377.3,
+      "delta_replayed_from_rounded_y_keV": 375.2827311385799,
+      "sigma_loop_source_cm2": 1.12e-46,
+      "inclusive_contact_D_upper": 3.88343926154004e-13,
+      "rigid_uniform_soft_D": 1.2258433846754074e-34,
+      "rigid_uniform_all_q_D_upper": 1.2330787813922598e-34,
+      "carbon_max_endothermic_splitting_keV": 37.391546804225754
+    },
+    {
+      "representation": "7M6D",
+      "y_source": 0.0233,
+      "mchi_GeV": 22230.0,
+      "delta_source_keV": 370.8,
+      "delta_replayed_from_rounded_y_keV": 370.1340492069004,
+      "sigma_loop_source_cm2": 4.45e-46,
+      "inclusive_contact_D_upper": 4.524366888663894e-12,
+      "rigid_uniform_soft_D": 1.6604881167422013e-34,
+      "rigid_uniform_all_q_D_upper": 1.6702889529815144e-34,
+      "carbon_max_endothermic_splitting_keV": 37.427866769242485
+    },
+    {
+      "representation": "9M8D",
+      "y_source": 0.0343,
+      "mchi_GeV": 49080.0,
+      "delta_source_keV": 363.5,
+      "delta_replayed_from_rounded_y_keV": 363.3041401575805,
+      "sigma_loop_source_cm2": 1.22e-45,
+      "inclusive_contact_D_upper": 2.7384363023133594e-11,
+      "rigid_uniform_soft_D": 2.0618184297029127e-34,
+      "rigid_uniform_all_q_D_upper": 2.0739880710155903e-34,
+      "carbon_max_endothermic_splitting_keV": 37.43816014447715
+    },
+    {
+      "representation": "11M10D",
+      "y_source": 0.0445,
+      "mchi_GeV": 83810.0,
+      "delta_source_keV": 357.5,
+      "delta_replayed_from_rounded_y_keV": 358.10537778195044,
+      "sigma_loop_source_cm2": 2.6e-45,
+      "inclusive_contact_D_upper": 9.965533582773304e-11,
+      "rigid_uniform_soft_D": 2.57315387376647e-34,
+      "rigid_uniform_all_q_D_upper": 2.5883416125289834e-34,
+      "carbon_max_endothermic_splitting_keV": 37.44169297108733
+    },
+    {
+      "representation": "13M12D",
+      "y_source": 0.0552,
+      "mchi_GeV": 131140.0,
+      "delta_source_keV": 351.8,
+      "delta_replayed_from_rounded_y_keV": 352.15157747124164,
+      "sigma_loop_source_cm2": 5.02e-45,
+      "inclusive_contact_D_upper": 3.010694925208159e-10,
+      "rigid_uniform_soft_D": 3.175069775585211e-34,
+      "rigid_uniform_all_q_D_upper": 3.193810252319218e-34,
+      "carbon_max_endothermic_splitting_keV": 37.44349509770605
+    }
+  ],
+  "checks": {
+    "fixed_mass_eigenvalues": true,
+    "equal_Majorana_terms_zero_diagonal_charge": true,
+    "unequal_terms_nonzero_diagonal_charge": true,
+    "effective_scale_replays_cross_section": true,
+    "all_tree_upscatter_closed_on_free_carbon": true,
+    "rigid_channel_below_inclusive_envelope": true,
+    "rounded_y_splitting_consistent_one_percent": true
+  },
+  "assumptions": [
+    "density .3 GeV/cm3, speed support <=776 km/s for inclusive bounds",
+    "contact scalar SI elastic amplitude with equal proton/neutron amplitudes",
+    "Born single-collision treatment and nucleon amplitude additivity",
+    "cold target for inclusive q<=2*mchi*v; no exothermic internal energy release in elastic bound",
+    "uniform sphere, isotropic 776 km/s shell and constant separation for rigid-channel integral",
+    "published loop cross sections used as conditional inputs, not independently authenticated Wilson coefficients"
+  ],
+  "open": [
+    "factor-four neutral-current normalization comparison",
+    "loop nucleon matching and isospin",
+    "mediator completion, excited-state history, collider/cosmological constraints",
+    "actual detector likelihood and solid dynamics"
+  ]
+}

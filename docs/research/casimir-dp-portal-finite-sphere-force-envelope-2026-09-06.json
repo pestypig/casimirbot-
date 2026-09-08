@@ -1,0 +1,187 @@
+{
+  "checks": {
+    "momentum_grid_refinement": true,
+    "omitted_tails_small": true,
+    "exact_azimuthal_branch_factor": true,
+    "zero_separation_zero": true
+  },
+  "quadrature_relative_change": 1.2634338020234281e-13,
+  "momentum_integral_um_squared": 0.09532912771048221,
+  "omitted_tail_upper_um_squared": 1.43157922778959e-14,
+  "D_finite_sphere_vacuum_quadratic_envelope": 0.015616981170748853,
+  "alpha_reference": 1.4709028174801422e-13,
+  "speed_km_s": 776.0,
+  "sphere_radius_um": 0.27630236239802897,
+  "separation_um": 0.25,
+  "rows": [
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.928387513428969e-18,
+      "conditional_vacuum_D_upper_at_force_ceiling": 6.18993686931989e-12
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 10000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.928387513428968e-16,
+      "conditional_vacuum_D_upper_at_force_ceiling": 6.189936869319886e-08
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 100000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.9283875134289684e-14,
+      "conditional_vacuum_D_upper_at_force_ceiling": 0.0006189936869319886
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.9283875134289686e-12,
+      "conditional_vacuum_D_upper_at_force_ceiling": 6.1899368693198875
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.94132885980758e-19,
+      "conditional_vacuum_D_upper_at_force_ceiling": 6.244767811026833e-14
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 10000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.9413288598075805e-17,
+      "conditional_vacuum_D_upper_at_force_ceiling": 6.244767811026835e-10
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 100000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.9413288598075805e-15,
+      "conditional_vacuum_D_upper_at_force_ceiling": 6.244767811026834e-06
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000000.0,
+      "alpha_ceiling_from_linear_plate_force": 2.9413288598075803e-13,
+      "conditional_vacuum_D_upper_at_force_ceiling": 0.062447678110268336
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000.0,
+      "alpha_ceiling_from_linear_plate_force": 3.1318795824951234e-20,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.080097494344945e-16
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 10000.0,
+      "alpha_ceiling_from_linear_plate_force": 3.131879582495124e-18,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.080097494344947e-12
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 100000.0,
+      "alpha_ceiling_from_linear_plate_force": 3.131879582495124e-16,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.080097494344947e-08
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000000.0,
+      "alpha_ceiling_from_linear_plate_force": 3.131879582495124e-14,
+      "conditional_vacuum_D_upper_at_force_ceiling": 0.0007080097494344947
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.874795103423266e-19,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.038584244318585e-13
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 10000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.874795103423268e-17,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.038584244318586e-09
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 100000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.874795103423268e-15,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.038584244318586e-05
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 0.1,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.874795103423267e-13,
+      "conditional_vacuum_D_upper_at_force_ceiling": 0.7038584244318585
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.91843452725812e-20,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.100932570407744e-15
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 10000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.918434527258118e-18,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.100932570407741e-11
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 100000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.918434527258118e-16,
+      "conditional_vacuum_D_upper_at_force_ceiling": 7.100932570407739e-07
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 1.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000000.0,
+      "alpha_ceiling_from_linear_plate_force": 9.918434527258119e-14,
+      "conditional_vacuum_D_upper_at_force_ceiling": 0.007100932570407743
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000.0,
+      "alpha_ceiling_from_linear_plate_force": 1.0560989289809142e-20,
+      "conditional_vacuum_D_upper_at_force_ceiling": 8.05078690203367e-17
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 10000.0,
+      "alpha_ceiling_from_linear_plate_force": 1.0560989289809142e-18,
+      "conditional_vacuum_D_upper_at_force_ceiling": 8.050786902033673e-13
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 100000.0,
+      "alpha_ceiling_from_linear_plate_force": 1.0560989289809143e-16,
+      "conditional_vacuum_D_upper_at_force_ceiling": 8.050786902033673e-09
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 10.0,
+      "allowed_scalar_curvature_frequency_Hz_assumed": 1000000.0,
+      "alpha_ceiling_from_linear_plate_force": 1.0560989289809143e-14,
+      "conditional_vacuum_D_upper_at_force_ceiling": 8.050786902033671e-05
+    }
+  ],
+  "scope": "Homogeneous-vacuum finite-sphere static Yukawa eikonal model, mono-speed transverse incidence, 1-cos phase <= phase^2/2. Includes finite radius/separation and all impact parameters in this model. Force translation uses separate weak-source plate approximation; no full chamber, halo, transport or accepted-shot prediction."
+}

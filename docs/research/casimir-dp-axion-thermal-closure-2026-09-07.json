@@ -1,0 +1,206 @@
+{
+  "scope": "Any orientation, canonical equilibrium at 4K, Born constant scalar density envelope; not full UV or driven-apparatus bound",
+  "full_model_admitted": false,
+  "kBT_GeV": 3.4469333048e-13,
+  "checks": {
+    "thermal_tail_independent_integral": true,
+    "Gibbs_pair_detailed_balance": true,
+    "thermal_bound_contains_nonnegative": true,
+    "tail_positive": true
+  },
+  "max_tail_relative_error": 5.551115123125783e-16,
+  "rows": [
+    {
+      "halo": "central",
+      "lambda_PhiH": 0.01,
+      "D_nonnegative_upper": 3.743160706089837e-16,
+      "D_thermal_total_upper": 2.014387670883253e-15,
+      "negative_bound_over_nonnegative_bound": 4.381515326355071,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "central",
+      "lambda_PhiH": 0.03,
+      "D_nonnegative_upper": 3.3694328902195245e-15,
+      "D_thermal_total_upper": 1.8132654739841236e-14,
+      "negative_bound_over_nonnegative_bound": 4.381515326355071,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "central",
+      "lambda_PhiH": 0.07,
+      "D_nonnegative_upper": 1.8350675271542408e-14,
+      "D_thermal_total_upper": 9.875444022277047e-14,
+      "negative_bound_over_nonnegative_bound": 4.381515326355071,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "central",
+      "lambda_PhiH": 0.1,
+      "D_nonnegative_upper": 3.7459469578802556e-14,
+      "D_thermal_total_upper": 2.015887096554575e-13,
+      "negative_bound_over_nonnegative_bound": 4.381515326355071,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "v0_220",
+      "lambda_PhiH": 0.01,
+      "D_nonnegative_upper": 3.9977352640417354e-16,
+      "D_thermal_total_upper": 2.293719914725287e-15,
+      "negative_bound_over_nonnegative_bound": 4.737548294797094,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "v0_220",
+      "lambda_PhiH": 0.03,
+      "D_nonnegative_upper": 3.5985899999264876e-15,
+      "D_thermal_total_upper": 2.0647083917752094e-14,
+      "negative_bound_over_nonnegative_bound": 4.737548294797094,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "v0_220",
+      "lambda_PhiH": 0.07,
+      "D_nonnegative_upper": 1.959871547397651e-14,
+      "D_thermal_total_upper": 1.1244857654792734e-13,
+      "negative_bound_over_nonnegative_bound": 4.737548294797094,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "v0_220",
+      "lambda_PhiH": 0.1,
+      "D_nonnegative_upper": 4.0007110104527655e-14,
+      "D_thermal_total_upper": 2.295427263599922e-13,
+      "negative_bound_over_nonnegative_bound": 4.737548294797094,
+      "thermal_tail_over_q0_squared": 1.227876052470826e-10
+    },
+    {
+      "halo": "vesc_528",
+      "lambda_PhiH": 0.01,
+      "D_nonnegative_upper": 3.7497483101728793e-16,
+      "D_thermal_total_upper": 1.956233013195387e-15,
+      "negative_bound_over_nonnegative_bound": 4.216971517496853,
+      "thermal_tail_over_q0_squared": 1.2788860255289147e-10
+    },
+    {
+      "halo": "vesc_528",
+      "lambda_PhiH": 0.03,
+      "D_nonnegative_upper": 3.3753627691662213e-15,
+      "D_thermal_total_upper": 1.7609171427959485e-14,
+      "negative_bound_over_nonnegative_bound": 4.216971517496853,
+      "thermal_tail_over_q0_squared": 1.2788860255289147e-10
+    },
+    {
+      "halo": "vesc_528",
+      "lambda_PhiH": 0.07,
+      "D_nonnegative_upper": 1.838297070121731e-14,
+      "D_thermal_total_upper": 9.590343455522988e-14,
+      "negative_bound_over_nonnegative_bound": 4.216971517496853,
+      "thermal_tail_over_q0_squared": 1.2788860255289147e-10
+    },
+    {
+      "halo": "vesc_528",
+      "lambda_PhiH": 0.1,
+      "D_nonnegative_upper": 3.7525394654994026e-14,
+      "D_thermal_total_upper": 1.9576891509793248e-13,
+      "negative_bound_over_nonnegative_bound": 4.216971517496853,
+      "thermal_tail_over_q0_squared": 1.2788860255289147e-10
+    },
+    {
+      "halo": "vesc_560",
+      "lambda_PhiH": 0.01,
+      "D_nonnegative_upper": 3.7380808118091536e-16,
+      "D_thermal_total_upper": 2.0750552363406686e-15,
+      "negative_bound_over_nonnegative_bound": 4.551124603259673,
+      "thermal_tail_over_q0_squared": 1.1798582050204374e-10
+    },
+    {
+      "halo": "vesc_560",
+      "lambda_PhiH": 0.03,
+      "D_nonnegative_upper": 3.364860187038406e-15,
+      "D_thermal_total_upper": 1.867875817079784e-14,
+      "negative_bound_over_nonnegative_bound": 4.551124603259673,
+      "thermal_tail_over_q0_squared": 1.1798582050204374e-10
+    },
+    {
+      "halo": "vesc_560",
+      "lambda_PhiH": 0.07,
+      "D_nonnegative_upper": 1.8325771320662893e-14,
+      "D_thermal_total_upper": 1.0172864005184229e-13,
+      "negative_bound_over_nonnegative_bound": 4.551124603259673,
+      "thermal_tail_over_q0_squared": 1.1798582050204374e-10
+    },
+    {
+      "halo": "vesc_560",
+      "lambda_PhiH": 0.1,
+      "D_nonnegative_upper": 3.740863282339389e-14,
+      "D_thermal_total_upper": 2.076599820402492e-13,
+      "negative_bound_over_nonnegative_bound": 4.551124603259673,
+      "thermal_tail_over_q0_squared": 1.1798582050204374e-10
+    },
+    {
+      "halo": "summer_speed",
+      "lambda_PhiH": 0.01,
+      "D_nonnegative_upper": 4.1705585459070176e-16,
+      "D_thermal_total_upper": 2.2124672615482412e-15,
+      "negative_bound_over_nonnegative_bound": 4.304966318527178,
+      "thermal_tail_over_q0_squared": 1.1830685035195597e-10
+    },
+    {
+      "halo": "summer_speed",
+      "lambda_PhiH": 0.03,
+      "D_nonnegative_upper": 3.75415811357044e-15,
+      "D_thermal_total_upper": 1.9915682346916713e-14,
+      "negative_bound_over_nonnegative_bound": 4.304966318527178,
+      "thermal_tail_over_q0_squared": 1.1830685035195597e-10
+    },
+    {
+      "halo": "summer_speed",
+      "lambda_PhiH": 0.07,
+      "D_nonnegative_upper": 2.044597376019232e-14,
+      "D_thermal_total_upper": 1.0846520214731075e-13,
+      "negative_bound_over_nonnegative_bound": 4.304966318527178,
+      "thermal_tail_over_q0_squared": 1.1830685035195597e-10
+    },
+    {
+      "halo": "summer_speed",
+      "lambda_PhiH": 0.1,
+      "D_nonnegative_upper": 4.1736629347185026e-14,
+      "D_thermal_total_upper": 2.2141141293566952e-13,
+      "negative_bound_over_nonnegative_bound": 4.304966318527178,
+      "thermal_tail_over_q0_squared": 1.1830685035195597e-10
+    },
+    {
+      "halo": "winter_speed",
+      "lambda_PhiH": 0.01,
+      "D_nonnegative_upper": 3.3504007695626747e-16,
+      "D_thermal_total_upper": 1.82874810584023e-15,
+      "negative_bound_over_nonnegative_bound": 4.458296578886396,
+      "thermal_tail_over_q0_squared": 1.2752782190859356e-10
+    },
+    {
+      "halo": "winter_speed",
+      "lambda_PhiH": 0.03,
+      "D_nonnegative_upper": 3.015887223333751e-15,
+      "D_thermal_total_upper": 1.6461606913429806e-14,
+      "negative_bound_over_nonnegative_bound": 4.458296578886396,
+      "thermal_tail_over_q0_squared": 1.2752782190859356e-10
+    },
+    {
+      "halo": "winter_speed",
+      "lambda_PhiH": 0.07,
+      "D_nonnegative_upper": 1.6425187529817706e-14,
+      "D_thermal_total_upper": 8.965354490157149e-14,
+      "negative_bound_over_nonnegative_bound": 4.458296578886396,
+      "thermal_tail_over_q0_squared": 1.2752782190859356e-10
+    },
+    {
+      "halo": "winter_speed",
+      "lambda_PhiH": 0.1,
+      "D_nonnegative_upper": 3.352894667334049e-14,
+      "D_thermal_total_upper": 1.8301093492075882e-13,
+      "negative_bound_over_nonnegative_bound": 4.458296578886396,
+      "thermal_tail_over_q0_squared": 1.2752782190859356e-10
+    }
+  ]
+}

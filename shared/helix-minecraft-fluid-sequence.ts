@@ -349,6 +349,7 @@ const workflowActionNodeSchema = z
     node_id: identifierSchema,
     node_kind: z.literal("workflow_action"),
     earliest_tick: tickSchema,
+    latest_start_tick: tickSchema.optional(),
     timeout_ticks: z.number().int().positive().max(36_000),
     action: helixMinecraftPlayerActionArgumentsSchema,
     on_success: nextNodeSchema,

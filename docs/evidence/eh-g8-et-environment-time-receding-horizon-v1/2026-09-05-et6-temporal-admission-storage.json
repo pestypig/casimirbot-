@@ -1,0 +1,19 @@
+{
+  "schema": "et6.temporal_admission_storage.v1",
+  "date": "2026-09-05",
+  "implementation": "Registered migration 083 retains source plan and compilation payload/hash, exact action, frontier, goal revision, binding epoch and continuation, plus paired predecessor ID/hash.",
+  "verification": {
+    "command": "npx vitest run server/db/migrations/__tests__/083_environment_temporal_plan_admissions.spec.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "tests_passed": 1,
+    "assertions_cover": ["duplicate action rejected", "unknown action rejected", "incomplete predecessor rejected", "unknown predecessor rejected", "wrong predecessor hash rejected", "referenced frontier deletion rejected", "referenced action deletion rejected"]
+  },
+  "limits": [
+    "The isolated pg-mem fixture is not a production concurrency test.",
+    "Migration is not applied to the running service and has no admission writer yet.",
+    "Storage does not authenticate caller-supplied identity or validate source-plan semantics; atomic broker integration must do both.",
+    "Frontier maintenance must skip pinned rows before production retention is enabled.",
+    "No live temporal action or capacity measurement was performed."
+  ],
+  "et6_complete": false
+}

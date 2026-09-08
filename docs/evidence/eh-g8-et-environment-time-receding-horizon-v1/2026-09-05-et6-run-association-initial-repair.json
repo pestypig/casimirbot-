@@ -1,0 +1,32 @@
+{
+  "schema": "casimirbot.et6.repair_evidence.v1",
+  "recorded_at": "2026-09-05T18:24:30Z",
+  "stage": "exact_run_association_initial_source_repair",
+  "classification": ["tool admission", "presentation"],
+  "finding": "Browser chat-only claims omit run identity; temporal admission correctly requires an exact non-null run. A later advisory presence run declaration must not upgrade the binding.",
+  "changes": [
+    "Readiness projects an optional server-verified run after current database owner, run/version, lifecycle, expiry, room-binding/version and participant checks.",
+    "Browser explicitly selects the run preview and carries its verification reference in the claim.",
+    "Run claim validation precedes replacement; mismatched, absent or stale selection is rejected.",
+    "Chat-only use remains available and displayed separately from environment-run association."
+  ],
+  "tests": {
+    "agent_connections_route": 11,
+    "reasoning_task_binding_store": 7,
+    "reasoning_run_association_mock_database": 3,
+    "agent_connection_setup_existing_ui_regressions": 26,
+    "reasoning_task_binding_client_transport": 3,
+    "unique_tests_passed": 50,
+    "pool": "forks, one worker"
+  },
+  "not_proven": [
+    "Live database query behavior and concurrent association changes",
+    "New run-selection UI interactions under stale preview refresh",
+    "Packaged EXE deployment of this repair",
+    "Independent external OAuth provider-task principal identity",
+    "Three rolling Minecraft cycles and remaining full ET6 lifecycle acceptance"
+  ],
+  "minecraft_effects_issued_for_this_repair": false,
+  "goal_complete": false,
+  "maturity_promoted": false
+}

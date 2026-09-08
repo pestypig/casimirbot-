@@ -32,6 +32,7 @@ import {
   signInSharedRealtimeRoomTestAgent,
 } from "./route-harness";
 import { readSharedRealtimeRoomMembership } from "../room-store";
+import { ensureOwnRoomEnvironmentSubject, refreshOwnRoomEnvironmentSubjectEpoch } from "../../../environment-connectors/subjects/subject-binding-store";
 
 const SAME_ORIGIN_HEADERS = {
   Host: "casimirbot.test",
@@ -305,6 +306,30 @@ describe("Shared Realtime room environment subjects", () => {
     expect(configuredAuthority.body.member_grant.subject_binding_id).toBe(
       ownerBound.body.binding.subject_binding_id,
     );
+
+    // Ready up must not implement verification by replacing a healthy binding.
+    const ensureInput = { roomId, profileId: owner.profileId,
+      environmentBindingId: connector.environmentBindingId, subjectRef: aliceRef };
+    const bindingsBeforeEnsure = await db.query(
+      "SELECT * FROM helix_room_environment_subject_bindings WHERE room_id=$1 ORDER BY subject_binding_id", [roomId]);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const retained = await ensureOwnRoomEnvironmentSubject(ensureInput);
+      expect(retained.subject_binding_id).toBe(ownerBound.body.binding.subject_binding_id);
+      expect(retained.verified_at).toBe(ownerBound.body.binding.verified_at);
+      expect(retained.expires_at).toBe(ownerBound.body.binding.expires_at);
+    }
+    await expect(ensureOwnRoomEnvironmentSubject({ ...ensureInput, subjectRef: bobRef }))
+      .rejects.toMatchObject({ code: "subject_binding_stale" });
+    expect((await db.query(
+      "SELECT * FROM helix_room_environment_subject_bindings WHERE room_id=$1 ORDER BY subject_binding_id", [roomId])).rows)
+      .toEqual(bindingsBeforeEnsure.rows);
+    await db.query("UPDATE helix_room_environment_subject_bindings SET expires_at=$2 WHERE subject_binding_id=$1",
+      [ownerBound.body.binding.subject_binding_id, new Date(Date.now() - 1_000).toISOString()]);
+    await expect(ensureOwnRoomEnvironmentSubject(ensureInput)).rejects.toMatchObject({ code: "subject_binding_stale" });
+    await db.query("UPDATE helix_room_environment_subject_bindings SET expires_at=NULL WHERE subject_binding_id=$1",
+      [ownerBound.body.binding.subject_binding_id]);
+    const retainedAuthority = await owner.agent.get(commandAuthorityPath).set(SAME_ORIGIN_HEADERS).expect(200);
+    expect(retainedAuthority.body.member_grant.subject_binding_id).toBe(ownerBound.body.binding.subject_binding_id);
 
     const ownerRebound = await owner.agent
       .put(
@@ -604,6 +629,25 @@ describe("Shared Realtime room environment subjects", () => {
       producerEpochRef: restartedProducerEpochRef,
     })).rejects.toMatchObject({ code: "producer_epoch_mismatch" });
 
+    await expect(ensureOwnRoomEnvironmentSubject(ensureInput)).rejects.toMatchObject({ code: "subject_binding_stale" });
+    const refreshInput = { ...ensureInput, subjectBindingId: ownerRebound.body.binding.subject_binding_id,
+      expectedProducerEpochRef: producerEpochRef };
+    await expect(refreshOwnRoomEnvironmentSubjectEpoch({ ...refreshInput, subjectBindingId: "binding:wrong" }))
+      .rejects.toMatchObject({ code: "subject_binding_stale" });
+    await expect(refreshOwnRoomEnvironmentSubjectEpoch({ ...refreshInput, expectedProducerEpochRef: "epoch:wrong" }))
+      .rejects.toMatchObject({ code: "subject_binding_stale" });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const refreshed = await refreshOwnRoomEnvironmentSubjectEpoch(refreshInput);
+      expect(refreshed).toMatchObject({
+        subject_binding_id: ownerRebound.body.binding.subject_binding_id,
+        producer_epoch_ref: restartedProducerEpochRef,
+        verified_at: ownerRebound.body.binding.verified_at,
+        expires_at: ownerRebound.body.binding.expires_at,
+      });
+    }
+    const refreshedEvents = await db.query(
+      "SELECT * FROM helix_shared_realtime_room_events WHERE room_id=$1 AND event_type='environment_subject_epoch_refreshed'", [roomId]);
+    expect(refreshedEvents.rows).toHaveLength(1);
     const renewedOwner = await owner.agent
       .put(
         `/api/agi/realtime/rooms/${encodeURIComponent(roomId)}/environments/${encodeURIComponent(connector.environmentBindingId)}/me`,
@@ -639,5 +683,6 @@ describe("Shared Realtime room environment subjects", () => {
       .set(SAME_ORIGIN_HEADERS)
       .expect(200);
     expect(authorityAfterRevoke.body.member_grant.subject_binding_id).toBeNull();
+    await expect(ensureOwnRoomEnvironmentSubject(ensureInput)).rejects.toMatchObject({ code: "subject_binding_stale" });
   });
 });

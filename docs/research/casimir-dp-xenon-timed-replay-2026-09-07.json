@@ -1,0 +1,48 @@
+{
+  "status": "exact_replay_with_dimensionless_collision_times",
+  "checks": [
+    {
+      "run": 0,
+      "exact_collision_replay": true,
+      "recoils": 483
+    },
+    {
+      "run": 1,
+      "exact_collision_replay": true,
+      "recoils": 85404
+    },
+    {
+      "run": 2,
+      "exact_collision_replay": true,
+      "recoils": 67601
+    },
+    {
+      "run": 3,
+      "exact_collision_replay": true,
+      "recoils": 12773
+    },
+    {
+      "run": 4,
+      "exact_collision_replay": true,
+      "recoils": 1208
+    }
+  ],
+  "source_sha256": "6e1638c04be0ed0067f4c2f51671db0bfd58e28e0a6d0ab900620e00aa20c958",
+  "input_archive_sha256": "0ecfb1c762fc42c629b1ee6b39a872075f86db06f4b1964100654458526fdf37",
+  "archive": "casimir-dp-xenon-timed-replay-2026-09-07.npz",
+  "archive_sha256": "e4e0756bccc2eb4ca825bd7cf070268014334013391dcc700678d2a40cdd9e5d",
+  "recoil_columns": [
+    "history_id",
+    "normalized_depth",
+    "energy_keV",
+    "isotope_A",
+    "flight_time_c_over_slab_thickness"
+  ],
+  "conversion": "physical flight time = final column * slab thickness in cm / 29979245800",
+  "limitations": [
+    "No physical slab thickness or liquid density authenticated",
+    "No light propagation or electron drift added",
+    "No pulse widths, areas or selection response",
+    "Same conditional collision kernel and energy floor"
+  ]
+}

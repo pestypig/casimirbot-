@@ -1,0 +1,18 @@
+{
+  "et6_complete": false,
+  "classification": "evidence normalization",
+  "defect": "Successful stabilization could be reported as original sequence/workflow success.",
+  "repair": "Sequence stabilization success retains sequence_completed=false and reports stabilization_completed=true. Controller-owned temporalStabilizing state maps local successful stabilization to workflow cancellation, not original workflow success.",
+  "verification": {
+    "filters": ["*FluidSequenceEngineTest", "*PlayerActionControllerTest"],
+    "result": "BUILD SUCCESSFUL",
+    "exit_code": 0,
+    "fixture": "successfulStabilizationIsNotOriginalWorkflowSuccess",
+    "assertions": ["controller CANCELED", "sequence_completed false", "stabilization_completed true", "controls released", "one original input entry pulse"]
+  },
+  "deployed": false,
+  "live_acceptance": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

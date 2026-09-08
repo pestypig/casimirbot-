@@ -1,0 +1,231 @@
+{
+  "checks": {
+    "positive_spectral_moments": true,
+    "grid_partial_fsum_no_overshoot": true,
+    "closed_form_log_quadrature_agree": true,
+    "ceiling_exceeds_prior_grid": true
+  },
+  "all_electron_plasma_energy_eV": 38.18767735171828,
+  "grid_partial_fsum_fraction_max": 0.6995194065524298,
+  "grid_partial_fsum_fraction_min": 1.7829341321136456e-07,
+  "threshold_eV": 5.5,
+  "rows": [
+    {
+      "mass_GeV": 100.0,
+      "q_cap_eV": 74616.07795066106,
+      "formal_all_q_NR_extension": false,
+      "integral_ceiling_eV3": 7717004.684553979,
+      "ceiling_over_prior_grid_integral": 70600.17377354151,
+      "D_density_threshold_ceiling": 3.0304018140747734e-23,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 4.022464643742661e-26
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 2.4629578846813185e-22
+        }
+      ]
+    },
+    {
+      "mass_GeV": 100.0,
+      "q_cap_eV": 100000.0,
+      "formal_all_q_NR_extension": false,
+      "integral_ceiling_eV3": 13897680.488220973,
+      "ceiling_over_prior_grid_integral": 127145.0125566779,
+      "D_density_threshold_ceiling": 5.457500401319321e-23,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 7.244122645900938e-26
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 4.435581308607684e-22
+        }
+      ]
+    },
+    {
+      "mass_GeV": 100.0,
+      "q_cap_eV": 517689350.9211317,
+      "formal_all_q_NR_extension": true,
+      "integral_ceiling_eV3": 373930263271715.94,
+      "ceiling_over_prior_grid_integral": 3420957048141.9355,
+      "D_density_threshold_ceiling": 1.4683921994036718e-15,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 1.949099844718827e-18
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 1.1934351835880267e-14
+        }
+      ]
+    },
+    {
+      "mass_GeV": 200.0,
+      "q_cap_eV": 74616.07795066106,
+      "formal_all_q_NR_extension": false,
+      "integral_ceiling_eV3": 7717036.542581729,
+      "ceiling_over_prior_grid_integral": 70597.90098590941,
+      "D_density_threshold_ceiling": 1.5152071622250556e-23,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 3.9790097822788366e-26
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 2.1011447086638606e-22
+        }
+      ]
+    },
+    {
+      "mass_GeV": 200.0,
+      "q_cap_eV": 100000.0,
+      "formal_all_q_NR_extension": false,
+      "integral_ceiling_eV3": 13897737.7296216,
+      "ceiling_over_prior_grid_integral": 127140.91824628317,
+      "D_density_threshold_ceiling": 2.7287614397641705e-23,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 7.165864003957367e-26
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 3.783985981129396e-22
+        }
+      ]
+    },
+    {
+      "mass_GeV": 200.0,
+      "q_cap_eV": 1035380826.6730243,
+      "formal_all_q_NR_extension": true,
+      "integral_ceiling_eV3": 1495733331813362.2,
+      "ceiling_over_prior_grid_integral": 13683443518508.621,
+      "D_density_threshold_ceiling": 2.9368085075623444e-15,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 7.71220600825975e-18
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 4.072485802510412e-14
+        }
+      ]
+    },
+    {
+      "mass_GeV": 1000.0,
+      "q_cap_eV": 74616.07795066106,
+      "formal_all_q_NR_extension": false,
+      "integral_ceiling_eV3": 7717062.029004002,
+      "ceiling_over_prior_grid_integral": 70596.0828464148,
+      "D_density_threshold_ceiling": 3.0304243327504092e-24,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 3.944916352518644e-26
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 1.8801842499654147e-22
+        }
+      ]
+    },
+    {
+      "mass_GeV": 1000.0,
+      "q_cap_eV": 100000.0,
+      "formal_all_q_NR_extension": false,
+      "integral_ceiling_eV3": 13897783.522742176,
+      "ceiling_over_prior_grid_integral": 127137.64296121306,
+      "D_density_threshold_ceiling": 5.457540862095583e-24,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 7.104464532819856e-26
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 3.386054639794207e-22
+        }
+      ]
+    },
+    {
+      "mass_GeV": 1000.0,
+      "q_cap_eV": 5176912632.656769,
+      "formal_all_q_NR_extension": true,
+      "integral_ceiling_eV3": 3.739357886505587e+16,
+      "ceiling_over_prior_grid_integral": 342078394803590.75,
+      "D_density_threshold_ceiling": 1.46841389709436e-14,
+      "ratios": [
+        {
+          "window_keV": [
+            5.4,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 1.9115375798397376e-16
+        },
+        {
+          "window_keV": [
+            200.0,
+            270.0
+          ],
+          "D_ceiling_per_raw_Xe_count": 9.110567955482894e-13
+        }
+      ]
+    }
+  ],
+  "scope": "Positive longitudinal density response, omega>=5.5 eV, all-electron nonrelativistic f-sum and prior dipole kernel. Formal all-q extension is not a relativistically valid physical bound. No below-threshold, spin, transverse-current or mixed response bound."
+}

@@ -1026,6 +1026,21 @@ guest evidence through a derivative read-only clone and bounded helper. No R40
 cloud action occurred. A build correction or P=1024 calibration remains
 ineligible until the recovered fixture evidence is classified; P8Q remains
 stopped.
+R40 was then authorized and consumed once. The read-only stopped-disk rescue
+succeeded and created an authenticated 12,122-byte evidence archive at
+`73029fde...d0922`; only the final PSCP into the long local repository path
+failed. The helper is `TERMINATED`, the original VM was not restarted, and the
+snapshot/clone/evidence remain preserved. The immutable
+[R40 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r40-long-local-path-result.md)
+does not authorize a retry.
+The separately frozen
+[P8P-R41 short-path retrieval](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r41-short-path-retrieval-proposal.md)
+is the sole successor. It reuses only the stopped helper and existing archive,
+performs one short-path SCP and no rescue/build/numerical action, then stops the
+helper. Proposal SHA-256 is `abcd3bcf...392a211`; its independent audit passes
+27/27 at auditor SHA-256 `6e77e943...f640cc5`. No R41 cloud action occurred.
+Local fixture classification and any build correction remain blocked on that
+retrieval; P8Q remains stopped.
 R28 was then authorized and executed exactly once. The immutable
 [R28 result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r28-terminal-spaced-hostkey-result.md)
 is SHA-256 `0eecabbb...a41fb9` and independently audits 16/16. The one restart
@@ -1511,6 +1526,15 @@ separate work packet naming its exact semantics, inputs, tests and verification
 gate. Apparatus evidence, architecture selection, experimental execution,
 BMR-I eligibility, G3 and every physical/propulsion/transport authority remain
 false until their own predecessor receipts close.
+
+The September 5 planning addendum in the staged plan,
+[observable sidecar and downstream RB1/RB3 validation](./nhm2-spherical-boson-star-v2-g2h-e-s5-staged-delivery-plan.md#observable-sidecar-and-downstream-rb1rb3-validation),
+may receive documentation and candidate-neutral inventory in this parallel
+lane. Exact-member reporting, family-atlas computation and nonlinear evolution
+remain separately scoped downstream work; they do not alter frozen C15/Q06
+acceptance, authorize candidate evaluation, add an active gate or silently
+reorder BMR-I. The control's fixed-background quantum duties remain distinct
+from G3's required converged joint geometry/state witness.
 
 ## Current position
 

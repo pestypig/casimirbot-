@@ -1,0 +1,369 @@
+{
+  "status": "optimistic_two_mediator_Born_shape_screen_not_shared_prediction",
+  "speed_kms": 776,
+  "low_keV": [
+    5.4,
+    200
+  ],
+  "high_keV": [
+    200,
+    269.9
+  ],
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        0.03
+      ],
+      "relative_products": [
+        1.0,
+        -1.4662124370494016
+      ],
+      "minimum_low_high_ratio": 9598.766488779413,
+      "pure_mediator_ratios": [
+        120222.77823326744,
+        62835.62151804393
+      ],
+      "amplitude_node_q_GeV": 0.04393689142133479,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            61132.5459473463,
+            43163.95547782677
+          ],
+          [
+            43163.95547782677,
+            30884.093063688706
+          ]
+        ],
+        "high": [
+          [
+            0.5084938715085359,
+            0.49992759163948575
+          ],
+          [
+            0.49992759163948575,
+            0.4915061284914641
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        1e-06,
+        0.1
+      ],
+      "relative_products": [
+        1.0,
+        -5.438574563698703
+      ],
+      "minimum_low_high_ratio": 1750.1763915292956,
+      "pure_mediator_ratios": [
+        120222.77823326744,
+        7424.478568675518
+      ],
+      "amplitude_node_q_GeV": 0.04746551965152516,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            70475.22245734106,
+            13631.69753682556
+          ],
+          [
+            13631.69753682556,
+            3072.2103342655137
+          ]
+        ],
+        "high": [
+          [
+            0.586205239082052,
+            0.49248946049194653
+          ],
+          [
+            0.49248946049194653,
+            0.41379476091794787
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -402.0220526347782
+      ],
+      "minimum_low_high_ratio": 131.05038092496864,
+      "pure_mediator_ratios": [
+        120222.77823326744,
+        426.3563812640533
+      ],
+      "amplitude_node_q_GeV": 0.04993624385329552,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            119921.03576437748,
+            304.5149136634296
+          ],
+          [
+            304.5149136634296,
+            1.070095276454097
+          ]
+        ],
+        "high": [
+          [
+            0.9974901389460117,
+            0.0499456998774933
+          ],
+          [
+            0.0499456998774933,
+            0.002509861053988447
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        0.03
+      ],
+      "relative_products": [
+        1.0,
+        -1.4662043781707295
+      ],
+      "minimum_low_high_ratio": 9598.711423299013,
+      "pure_mediator_ratios": [
+        120221.6636489809,
+        62835.62151804393
+      ],
+      "amplitude_node_q_GeV": 0.04393691330931471,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            61131.96774735466,
+            43163.7642050431
+          ],
+          [
+            43163.7642050431,
+            30884.099043345523
+          ]
+        ],
+        "high": [
+          [
+            0.5084937763450496,
+            0.49992759326213293
+          ],
+          [
+            0.49992759326213293,
+            0.4915062236549505
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        0.1
+      ],
+      "relative_products": [
+        1.0,
+        -5.438544073650479
+      ],
+      "minimum_low_high_ratio": 1750.1679061013529,
+      "pure_mediator_ratios": [
+        120221.6636489809,
+        7424.478568675518
+      ],
+      "amplitude_node_q_GeV": 0.0474655536212315,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            70474.55797835498,
+            13631.643741928912
+          ],
+          [
+            13631.643741928912,
+            3072.2110200005477
+          ]
+        ],
+        "high": [
+          [
+            0.5862051467206791,
+            0.4924894767120193
+          ],
+          [
+            0.4924894767120193,
+            0.4137948532793208
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -402.0197459931579
+      ],
+      "minimum_low_high_ratio": 131.0498441209097,
+      "pure_mediator_ratios": [
+        120221.6636489809,
+        426.3563812640533
+      ],
+      "amplitude_node_q_GeV": 0.049936287101102456,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            119919.92386293942,
+            304.51383328042965
+          ],
+          [
+            304.51383328042965,
+            1.0700956828850943
+          ]
+        ],
+        "high": [
+          [
+            0.9974901379927458,
+            0.04994570937278275
+          ],
+          [
+            0.04994570937278275,
+            0.002509862007254342
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        0.03
+      ],
+      "relative_products": [
+        1.0,
+        -1.3904134903502385
+      ],
+      "minimum_low_high_ratio": 9077.089179225033,
+      "pure_mediator_ratios": [
+        109916.61058101863,
+        62835.62151804393
+      ],
+      "amplitude_node_q_GeV": 0.04414872048518188,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            55787.40919965412,
+            41347.505052414046
+          ],
+          [
+            41347.505052414046,
+            30943.83999919988
+          ]
+        ],
+        "high": [
+          [
+            0.5075430265249462,
+            0.499942896946196
+          ],
+          [
+            0.499942896946196,
+            0.49245697347505385
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        0.1
+      ],
+      "relative_products": [
+        1.0,
+        -5.1521206777845245
+      ],
+      "minimum_low_high_ratio": 1669.3174467732285,
+      "pure_mediator_ratios": [
+        109916.61058101863,
+        7424.478568675518
+      ],
+      "amplitude_node_q_GeV": 0.04779459972913743,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            64332.22676299067,
+            13119.308298890362
+          ],
+          [
+            13119.308298890362,
+            3079.064018934301
+          ]
+        ],
+        "high": [
+          [
+            0.5852821190803724,
+            0.49265067963745257
+          ],
+          [
+            0.49265067963745257,
+            0.41471788091962764
+          ]
+        ]
+      }
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -380.3701147125923
+      ],
+      "minimum_low_high_ratio": 125.91518686678263,
+      "pure_mediator_ratios": [
+        109916.61058101863,
+        426.3563812640533
+      ],
+      "amplitude_node_q_GeV": 0.05035558242724743,
+      "matrices_normalized_to_high_trace": {
+        "low": [
+          [
+            109639.68628195752,
+            294.2154235277712
+          ],
+          [
+            294.2154235277712,
+            1.074163781139869
+          ]
+        ],
+        "high": [
+          [
+            0.9974805964485505,
+            0.050040659631140474
+          ],
+          [
+            0.050040659631140474,
+            0.0025194035514496315
+          ]
+        ]
+      }
+    }
+  ],
+  "amplitude": "Z*[c1/(q^2+m1^2)+c2/(q^2+m2^2)]*F_Helm(q)",
+  "checks": [
+    "source hash",
+    "generalized-eigenvalue recovery",
+    "positive-semidefinite residual within tolerance"
+  ],
+  "limitations": [
+    "real coefficient products freely optimized; no UV or external constraints",
+    "Born validity not established at any physical normalization",
+    "no detector or overburden convolution",
+    "no diamond neutral/solid response or measurable coherence claim",
+    "finite mass grid, not all mediator masses"
+  ]
+}

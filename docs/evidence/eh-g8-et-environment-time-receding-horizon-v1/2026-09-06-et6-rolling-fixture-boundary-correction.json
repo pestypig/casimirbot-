@@ -1,0 +1,21 @@
+{
+  "evidence_lane": "automated_contract_verification",
+  "classification": "test_only_evidence_correction",
+  "finding": "The compiler-derived native fixture supplied a two-tick resident handoff while its source plan declared a 200-tick committed boundary. It did not test production-declared timing.",
+  "repair": "The source fixture now declares decision=0, stop=1, committed=2. Source and compilation hashes were regenerated with the production builder/compiler. Native handoff and final settlement ticks derive from the source watermarks instead of independent constants.",
+  "source_plan_hash": "sha256:809ceae04bf506ab22ac2e40bcb9cc895e5a696c782e94f15056689bdfab8d9a",
+  "compilation_hash": "sha256:79c0cfb92898f61faadf3019e4524f9e1eba1067611712ae04cb082307fd7893",
+  "checks": {
+    "production_compiler_fixture_equality_tests": {"passed": 11, "failed": 0},
+    "FluidSequenceEngineTest": {"passed": 41, "failed": 0, "errors": 0, "timestamp": "2026-09-06T16:41:47.261Z"},
+    "gradle_required_game_tests": {"passed": 5, "failed": 0}
+  },
+  "limitations": [
+    "Native movement bridge remains simulated.",
+    "This does not measure live MCP delivery latency or prove three packaged rolling extensions.",
+    "No movement was dispatched by this diagnostic.",
+    "The next live orchestration must resolve the latest measured predecessor checkpoint event, fresh perception and an executable route before submitting a successor."
+  ],
+  "live_rolling_extensions_proven": 0,
+  "et6_complete": false
+}

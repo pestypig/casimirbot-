@@ -9,6 +9,25 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 final class ManualInputLatchTest {
+    @Test
+    void observingPendingInputDoesNotConsumeOrResetTakeover() {
+        ManualInputLatch.disarm();
+        assertFalse(ManualInputLatch.pending());
+        ManualInputLatch.arm();
+        assertFalse(ManualInputLatch.pending());
+        ManualInputLatch.recordKeyboardAction(ManualInputLatch.KeyboardAction.LEFT);
+        long detected = ManualInputLatch.detectedNanos();
+        assertTrue(ManualInputLatch.pending());
+        assertTrue(ManualInputLatch.pending());
+        assertEquals(detected, ManualInputLatch.detectedNanos());
+        assertEquals("left_key_pressed", ManualInputLatch.consume());
+        assertFalse(ManualInputLatch.pending());
+        ManualInputLatch.recordMousePress(0);
+        assertTrue(ManualInputLatch.pending());
+        ManualInputLatch.disarm();
+        assertFalse(ManualInputLatch.pending());
+    }
+
     @AfterEach
     void resetLatch() {
         ManualInputLatch.disarm();

@@ -1,0 +1,47 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "previous_turn_classification": "progress",
+  "package": {
+    "path": "apps/desktop/release-et6-frontier-clock-20260905/win-unpacked/CasimirBot.exe",
+    "host_build": "PASS exit 0; four unrelated duplicate warnings",
+    "runtime_stage": "PASS exit 0",
+    "packaging": "PASS exit 0",
+    "runtime_tree": "PASS; original verifier with in-memory path substitutions only",
+    "service_sha256": "3d9ccd475cae0a69112c27f0b13779769ca3f846592f6e3c11dd26a85be81cc9",
+    "runtime_manifest_sha256": "693df650238f6cdfa35925025180bf72e6666dac642ec869b6a37c8f83542065",
+    "asar_equal_to_built": true,
+    "artifact_check_note": "Initial literal marker check failed because esbuild renamed performance to performance4; byte equality and corrected bundled expression check passed.",
+    "old_exe_normal_exit_verified": true,
+    "host_pid": 12452,
+    "service_pid": 17796,
+    "origin": "http://127.0.0.1:62574",
+    "ready_at": "2026-09-05T19:09:32.068Z"
+  },
+  "verification": {
+    "publisher_with_real_frontier_builder_tests_passed": 2,
+    "frontier_store_tests_passed": 1,
+    "clock_tests_passed": 7,
+    "scope": "deterministic application clock normalization; not full live ET6 or physical certificate verification"
+  },
+  "live": {
+    "trusted_transport_restored_without_oauth_reconnect": true,
+    "first_probe": "subject_binding_stale at 19:10:50.496Z; fresh roster not yet available",
+    "subsequent_directory": "same DatDamPig and subject binding fresh at 19:11:11.221774600Z; no restart or new pairing",
+    "fresh_probe_then_frontier_publish": "succeeded",
+    "frontier_id": "environment_frontier:92833386-b410-4b7b-9008-3fcb61e79afb",
+    "goal_id": "environment_durable_goal:896355ef-445f-4edd-8465-e02596d619b8",
+    "goal_revision": 1,
+    "affordance_revision": 1,
+    "world_tick": 7564924,
+    "world_tick_expiry": 7564944,
+    "observed_at": "2026-09-05T19:11:31.617Z",
+    "server_publication_elapsed_ms": 147427,
+    "resident_clock_alignment_proven": false,
+    "sequence_capability_state": "conditional",
+    "execution_authority": false,
+    "movement_issued": false
+  },
+  "remaining": ["explicit run-bound claim on current service", "fresh plan and separate admitted authority", "full original ET6 rolling and perturbation lifecycle"],
+  "goal_complete": false
+}

@@ -1,0 +1,70 @@
+{
+  "scope": "yu=0 leading background expansion of messenger fermion potential. Delta V=delta_mA2 A^2/2 + delta_mH2 h^2/2 + delta_lambdaA A^4/4 + delta_lambdaH h^4/4 + delta_kappaA A^2 h^2/4. Additive fixed-field scale coefficients only; field renormalization and other diagrams omitted.",
+  "checks": {
+    "matrix_trace_polynomial": true,
+    "pure_background_second_derivative": true,
+    "isolated_scale_cancellation": true
+  },
+  "additive_scale_coefficients": {
+    "delta_mA2": -6.225173522985234,
+    "delta_mH2": -12158.542037080535,
+    "delta_lambdaA": -1.59364442188422e-11,
+    "delta_lambdaH": -6.079271018540268e-05,
+    "delta_kappaA": 0.0
+  },
+  "rows": [
+    {
+      "mu_GeV": 1000.0,
+      "thresholds": {
+        "delta_mA2": -1.2023747144610197,
+        "delta_mH2": -2348.388114181679,
+        "delta_lambdaA": -1.104630137844131e-11,
+        "delta_lambdaH": -4.2138295663609734e-05,
+        "delta_kappaA": -3.112586761492617e-08
+      },
+      "zero_boundary_plus_loop": {
+        "delta_mA2": 3.112586761492617,
+        "delta_mH2": 6079.2710185402675,
+        "delta_lambdaA": 0.0,
+        "delta_lambdaH": 0.0,
+        "delta_kappaA": -3.112586761492617e-08
+      }
+    },
+    {
+      "mu_GeV": 2000.0,
+      "thresholds": {
+        "delta_mA2": 3.112586761492617,
+        "delta_mH2": 6079.2710185402675,
+        "delta_lambdaA": -0.0,
+        "delta_lambdaH": -0.0,
+        "delta_kappaA": -3.112586761492617e-08
+      },
+      "zero_boundary_plus_loop": {
+        "delta_mA2": 3.112586761492617,
+        "delta_mH2": 6079.2710185402675,
+        "delta_lambdaA": -0.0,
+        "delta_lambdaH": -0.0,
+        "delta_kappaA": -3.112586761492617e-08
+      }
+    },
+    {
+      "mu_GeV": 4000.0,
+      "thresholds": {
+        "delta_mA2": 7.427548237446254,
+        "delta_mH2": 14506.930151262215,
+        "delta_lambdaA": 1.104630137844131e-11,
+        "delta_lambdaH": 4.2138295663609734e-05,
+        "delta_kappaA": -3.112586761492617e-08
+      },
+      "zero_boundary_plus_loop": {
+        "delta_mA2": 3.112586761492617,
+        "delta_mH2": 6079.271018540268,
+        "delta_lambdaA": 0.0,
+        "delta_lambdaH": 0.0,
+        "delta_kappaA": -3.112586761492617e-08
+      }
+    }
+  ],
+  "max_trace_relative_error": 4.1775581313916594e-16,
+  "full_model_admitted": false
+}

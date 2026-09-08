@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "scope": "Success-result effect flags against recorded resident terminal measurements",
+  "change": "Recorded-workflow evidence validation now also requires successful result effect flags to equal recomputed cumulative resident effects. Existing identity, terminal-event, timing, initial graph, and postcondition validation remain in place.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-resident-effects.test.ts server/services/environment-connectors/actions/__tests__/action-result-canonicalization.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "tests_passed": 61,
+    "negative": "Each inconsistent result flag, handoff count mismatch, malformed history, and invalid totals rejected by the consistency predicate."
+  },
+  "limitations": [
+    "Failed-result provenance handling is unchanged.",
+    "Rolling final success still fails closed against the initial graph; full per-plan terminal completion integration remains required.",
+    "No production transport, packaged EXE build, live Minecraft action, or capacity qualification performed.",
+    "Unit predicates and existing canonicalization regressions are not a database-backed rolling result acceptance test."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

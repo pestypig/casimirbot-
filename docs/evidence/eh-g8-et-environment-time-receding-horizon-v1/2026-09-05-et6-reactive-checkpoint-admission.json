@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "defect": "Workflow event admission rejected checkpoint_settlements for every non-serial action, including the new concurrent scheduler evidence.",
+  "repair": "Added concurrent checkpoint validation at workflow-event and final-result validation: exact lane/node/checkpoint, matching satisfied condition observation, bounded ordered timing and complete unique satisfied-checkpoint coverage. Legacy absence remains compatible but is not extension evidence.",
+  "verification": {
+    "tests": 10,
+    "files": 2,
+    "result": "PASS",
+    "scope": "Validator fixtures and broker admission transaction regressions",
+    "limitations": ["No live concurrent workflow event submission", "No exact action-event association join yet", "No resident successor admission", "Not deployed"]
+  },
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-06",
+  "scope": "Production successor-delivery diagnostic after configured persistence barrier",
+  "classification": "evidence normalization; authority and one-shot lease semantics unchanged",
+  "production_changes": [
+    "Admission diagnostics include checkpoint and explicit process-local receipt/return marks",
+    "Successor lease diagnostic measures poll receipt, lease SQL completion and transaction return including configured snapshot wait",
+    "Delivery diagnostic emitted only for a non-null lease after transaction wrapper resolves",
+    "Diagnostic sink errors cannot replace the completed lease result"
+  ],
+  "verification": {
+    "connected_persistent_positive": "2 tests passed",
+    "connected_snapshot_rename_failure": "2 tests passed",
+    "targeted_typescript": "passed",
+    "positive": "Exactly one correlated delivery diagnostic; same admission clock; ordered marks; exact action/run/binding epoch/producer epoch/checkpoint",
+    "negative": "Zero completed-delivery diagnostics on snapshot failure; no executable payload, one lease, status-only reconciliation and no native successor activation"
+  },
+  "limits": [
+    "Persistence-barrier completion is configured behavior, not proof of physical power-loss durability",
+    "Lease SQL to return includes COMMIT and snapshot wait, not isolated disk I/O",
+    "Native pickup remains separately evidenced; this diagnostic does not prove it",
+    "Provider proposal is precompiled fixture output; simulated ticks remain distinct from live capacity",
+    "Full end-to-end budget and refreshed packaging remain outstanding"
+  ],
+  "live_acceptance": false
+}

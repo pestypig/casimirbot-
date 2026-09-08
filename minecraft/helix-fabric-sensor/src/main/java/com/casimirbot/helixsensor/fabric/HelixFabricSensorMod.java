@@ -3,6 +3,7 @@ package com.casimirbot.helixsensor.fabric;
 import com.casimirbot.helixsensor.HelixSensorConfig;
 import com.casimirbot.helixsensor.pairing.ConnectorPairingClient;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import net.fabricmc.api.ModInitializer;
@@ -16,6 +17,7 @@ public final class HelixFabricSensorMod implements ModInitializer {
     private static final Logger LOGGER = Logger.getLogger(MOD_ID);
 
     private final AtomicBoolean connectorOperation = new AtomicBoolean(false);
+    private final AtomicBoolean pairingInboxPollPending = new AtomicBoolean(false);
     private volatile FabricConnectorRuntime runtime;
     private volatile MinecraftServer server;
     private long pairingInboxPollTick;
@@ -65,27 +67,60 @@ public final class HelixFabricSensorMod implements ModInitializer {
 
     private void pollLocalPairingInbox(MinecraftServer activeServer) {
         pairingInboxPollTick++;
-        if (pairingInboxPollTick % 20L != 0L || connectorOperation.get()) return;
-        try {
-            FabricServerPairingInbox.PollResult result =
-                FabricServerPairingInbox.consumeDefault(System.currentTimeMillis());
-            if (result.code() != null) {
-                pairAsync(
-                    activeServer.createCommandSourceStack(),
-                    result.code(),
-                    result.pairingEndpoint() != null
-                        ? result.pairingEndpoint()
-                        : FabricSensorConfigLoader.loadPairingEndpoint(LOGGER)
-                );
-            } else if (!result.failureCode().isBlank()) {
-                LOGGER.warning(
-                    "The local Helix server pairing inbox was rejected: " +
-                    result.failureCode()
-                );
-            }
-        } catch (java.io.IOException error) {
+        if (
+            pairingInboxPollTick % 20L != 0L ||
+            connectorOperation.get() ||
+            !pairingInboxPollPending.compareAndSet(false, true)
+        ) return;
+        // Windows filesystem metadata calls can occasionally stall for many
+        // seconds under host pressure. Never make that I/O part of the server
+        // tick; keep at most one poll outstanding and re-enter Minecraft only
+        // to apply the bounded result.
+        CompletableFuture
+            .supplyAsync(() -> {
+                try {
+                    return FabricServerPairingInbox.consumeDefault(
+                        System.currentTimeMillis()
+                    );
+                } catch (java.io.IOException error) {
+                    throw new CompletionException(error);
+                }
+            })
+            .whenComplete((result, error) -> {
+                if (server != activeServer) {
+                    pairingInboxPollPending.set(false);
+                    return;
+                }
+                activeServer.execute(() -> {
+                    pairingInboxPollPending.set(false);
+                    if (server != activeServer) return;
+                    if (error != null) {
+                        LOGGER.warning(
+                            "The local Helix server pairing inbox could not be consumed."
+                        );
+                        return;
+                    }
+                    applyLocalPairingInboxResult(activeServer, result);
+                });
+            });
+    }
+
+    private void applyLocalPairingInboxResult(
+        MinecraftServer activeServer,
+        FabricServerPairingInbox.PollResult result
+    ) {
+        if (result.code() != null) {
+            pairAsync(
+                activeServer.createCommandSourceStack(),
+                result.code(),
+                result.pairingEndpoint() != null
+                    ? result.pairingEndpoint()
+                    : FabricSensorConfigLoader.loadPairingEndpoint(LOGGER)
+            );
+        } else if (!result.failureCode().isBlank()) {
             LOGGER.warning(
-                "The local Helix server pairing inbox could not be consumed."
+                "The local Helix server pairing inbox was rejected: " +
+                result.failureCode()
             );
         }
     }

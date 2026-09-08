@@ -1,0 +1,30 @@
+{
+  "parameters": {
+    "mchi_GeV": 100,
+    "gap_GeV": 0.0005513006648687921,
+    "vev_GeV": 500,
+    "gchi": 0.1,
+    "mV_GeV": 100,
+    "gB": 0.00030557339418766966,
+    "ms_GeV": 1e-09,
+    "sin_theta": 2e-10,
+    "prescribed_present_excited_fraction": 1,
+    "halo_density_GeV_cm3": 0.3
+  },
+  "predictions": {
+    "Xe_vector_raw_full": 5.970839104166514,
+    "Xe_vector_raw_high": 1.5390637461486754,
+    "Xe_scalar_raw_full": 1.0550850221249671e-13,
+    "D_scalar_rigid_interval": 4.009142172688255e-17,
+    "D_exothermic_independent_carbon_upper": 1.24263095712771e-25,
+    "vector_contact_full_relative_change": -8.831986022417304e-06
+  },
+  "source_hashes": {
+    "casimir-dp-dark-scalar-selection-2026-09-07.json": "726aba59faf256ce62130a0ecc80753765e5e69122d8415ee0198aef7ea21fcb",
+    "casimir-dp-dark-scalar-sphere-2026-09-07.json": "f09759040f9a9b2e3b87fef034cb7e7ccc292e9974561b9a79e1d0f1080740d3",
+    "casimir-dp-dark-scalar-xenon-companion-2026-09-07.json": "ad108d4c81faadf114e786cb68c0babe833eeaf150550f5633734e9582e8f9ab",
+    "casimir-dp-exothermic-common-rate-2026-09-07.json": "891d68ea311d5221a501c07bccefbb11dbcb4ce0e12e5208be158b4774307513"
+  },
+  "scope": "Single explicit conditional tree benchmark. Scalar reference from corrected stellar intake, not an allowed-model claim. Present excited fraction prescribed, not demonstrated; detector and full solid response missing. Scalar interval and independent-nuclear quantities are not a certified complete total.",
+  "full_model_admitted": false
+}

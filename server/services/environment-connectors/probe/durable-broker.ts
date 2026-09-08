@@ -936,7 +936,9 @@ export const leaseDurableEnvironmentProbesForClaim = async (input: {
                       ...(Number.isInteger(args.vertical_radius)
                         ? { vertical_radius: Number(args.vertical_radius) }
                         : {}),
-                      ...(typeof args.purpose === "string"
+                      ...(args.purpose === "general" || args.purpose === "structure_planning" ||
+                        args.purpose === "build_planning" || args.purpose === "structure_verification" ||
+                        args.purpose === "fire_safety" || args.purpose === "landing_safety" || args.purpose === "movement_safety"
                         ? { purpose: args.purpose }
                         : {}),
                       ...(Number.isInteger(args.requested_length)
@@ -945,10 +947,11 @@ export const leaseDurableEnvironmentProbesForClaim = async (input: {
                       ...(Number.isInteger(args.requested_height)
                         ? { requested_height: Number(args.requested_height) }
                         : {}),
-                      ...(typeof args.orientation === "string"
+                      ...(args.orientation === "north_south" || args.orientation === "east_west"
                         ? { orientation: args.orientation }
                         : {}),
-                      ...(typeof args.relative_side === "string"
+                      ...(args.relative_side === "north" || args.relative_side === "south" ||
+                        args.relative_side === "east" || args.relative_side === "west"
                         ? { relative_side: args.relative_side }
                         : {}),
                       ...(args.verification_from &&
@@ -2729,6 +2732,16 @@ export const readDurableEnvironmentProbeContinuationEvidence = async (input: {
   expectedPriorTurnId: string;
   expectedRoomId: string;
   expectedCapabilityId: string;
+  // Internal temporal callers resolve these values from current server state.
+  // This constrains persisted evidence; it does not grant current authority.
+  expectedEnvironmentIdentity?: {
+    environmentBindingId: string;
+    sourceId: string;
+    worldId: string;
+    subjectBindingId: string;
+    subjectNativeId: string;
+    observationProducerEpochRef: string;
+  };
   maxAgeMs?: number;
   now?: Date;
 }): Promise<DurableEnvironmentProbeContinuationEvidence | null> => {
@@ -2773,6 +2786,15 @@ export const readDurableEnvironmentProbeContinuationEvidence = async (input: {
   ) {
     return null;
   }
+  const exact = input.expectedEnvironmentIdentity;
+  if (exact && (
+    Object.values(exact).some((value) => !value.trim()) ||
+    row.environment_binding_id !== exact.environmentBindingId ||
+    row.source_id !== exact.sourceId || row.world_id !== exact.worldId ||
+    row.resolved_subject_binding_id !== exact.subjectBindingId ||
+    row.resolved_subject_native_id !== exact.subjectNativeId ||
+    row.producer_epoch_ref !== exact.observationProducerEpochRef
+  )) return null;
   const parsedObservation = helixEnvironmentProbeObservationSchema.safeParse(
     parseJson(row.normalized_observation),
   );

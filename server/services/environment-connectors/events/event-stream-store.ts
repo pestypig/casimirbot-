@@ -358,7 +358,10 @@ export const recordEnvironmentActionEventBatch = async (input: {
     );
   }
 
-  const transact = input.withTransaction ?? withSharedRealtimeRoomTransaction;
+  const transact = input.withTransaction ?? ((run) => withSharedRealtimeRoomTransaction(run, {
+    requireLocalSnapshot: true,
+    snapshotTables: ["helix_environment_event_batches", "helix_environment_events", "helix_environment_situation_digests"],
+  }));
   const recorded = await transact(async (db) => {
     const manifest = await latestActionManifestIdentity(db, input.claim);
     const identityValid =

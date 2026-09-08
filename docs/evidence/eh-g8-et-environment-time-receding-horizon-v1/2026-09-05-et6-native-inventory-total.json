@@ -1,0 +1,14 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "evidence normalization",
+  "first_divergence": "FluidSequenceEngine ignored inventory_mutations_performed when aggregating settled child effects, although NativeFabricWorkflowEngine reports placement and consumption through that counter.",
+  "repair": "Prefer the explicit native inventory total; use legacy descriptive counters only when it is absent, count consumption aliases once, reject invalid explicit totals and detect integer overflow. Wire this aggregation into serial child settlement.",
+  "checks": [
+    { "check": "Offline one-worker Gradle test: ResidentEffectMeasurementsTest and FluidSequenceEngineTest, runGameTest excluded", "exit_code": 0, "passed": 37, "failures": 0, "errors": 0, "compile_java": "executed", "compile_test_java": "executed", "test": "executed" }
+  ],
+  "casimir": { "run_id": "2684", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" },
+  "limitations": ["Focused counter fixtures and serial regressions, not actual placement or consumption in Minecraft", "No incidental-pickup accounting or complete budget-overrun stopping proof", "No native temporal feature advertisement, deployment or live action", "Existing keyed-server Casimir verification does not prove the new native behavior", "ET6 remains incomplete without maturity promotion"]
+}

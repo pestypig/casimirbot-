@@ -1,0 +1,11 @@
+{
+  "files": {
+    "h2_p8p_charter_v2_retrieval.mjs": {"bytes":9473,"sha256":"7d6f6e6b755c71b4ea45a0e880ec0a2d2797945dad4e6279edc482751eff3bdb"},
+    "h2_p8p_charter_v2_process.mjs": {"bytes":3581,"sha256":"cb8f8d93a7c28e0b2d220b4112391c2170d2f9f298458c21af69eae1f797f919"},
+    "h2_p8p_charter_v2_plink_args.mjs": {"bytes":492,"sha256":"bac5e9579179dbd8187e10001419317085044b532297335f739cb910f1695cab"},
+    "h2_p8p_charter_v2_transfer_args.mjs": {"bytes":634,"sha256":"04a0532a158265babffb99202bb0844d177661064bba3ac6094a955aa0bdeb84"},
+    "h2_p8p_charter_v2_capped_sink.mjs": {"bytes":1300,"sha256":"58d8b42bc7f52d897b90bb289798832a8b9478e2225894805d0f016e358184c6"},
+    "h2_p8p_r43_resource_guard.mjs": {"bytes":1831,"sha256":"4a4304229d2b862e855e07be9c3fcbb59724494f5633a4634d2cf42f26f00bd9"},
+    "h2_p8p_r42_local_io.mjs": {"bytes":1776,"sha256":"3a659215cdf6ea78aa8f3388a2f21bbe03c36b8c451d6657fc41d4b39908084e"}
+  }
+}

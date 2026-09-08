@@ -1,0 +1,15 @@
+{
+  "scope": "Offline retained-evidence report rehearsal",
+  "input": "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json",
+  "input_schema": "helix.environment_time.et6_live_capacity_checkpoint.v1",
+  "command": "npm run helix:environment-time:capacity-report -- --input docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json",
+  "exit_code": 1,
+  "result": "Expected strict rejection; lifecycle checkpoint is not a canonical capacity capture.",
+  "missing_capture_fields": ["report_id", "samples", "evidence_refs"],
+  "required_schema": "environment.capacity_capture.v1",
+  "source_evidence_modified": false,
+  "samples_fabricated": false,
+  "historical_cycle_labels_promoted_to_resident_extensions": false,
+  "live_acceptance": false,
+  "next_requirement": "Collect exact accepted resident extension and event/observation records for a new authorized live run, then assemble canonical samples without substituting finite action counts or lease-time queue samples for rolling metrics."
+}

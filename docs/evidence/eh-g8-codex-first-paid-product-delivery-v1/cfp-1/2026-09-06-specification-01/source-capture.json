@@ -1,0 +1,71 @@
+{
+  "captured_utc": "2026-09-07T03:02:41.703Z",
+  "head": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+  "scope": "Planning-only input snapshot in shared dirty worktree. Not executable or signing acceptance.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "11b89b21799ecebcc562c7481685ad91c29b0758f60c3a8daca0f365c0ccc7f4"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "ca41bec72b81ce70d729da8078c230597ed41ec5fb99c3b0b01e6a55021a01ee"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "sha256": "90824c15fc12d8b27d5be5d233f7e91f0974a1a334ab1321bbc67f5248ced41b"
+    },
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "2122576d71a038815f613f4793e7f8e8835575261ffd4bd20405ef3e806cd18c"
+    },
+    {
+      "path": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "sha256": "9255253774dae1690aff57d75f6eaf5e4391f81dc2569007f889618cb5820be0"
+    },
+    {
+      "path": "docs/architecture/helix-environment-agent-reasoning-v1.md",
+      "sha256": "18101ee295c72845ae9a0c900ecd4ffb4097871d2e01517ada7d624f7c8d36a6"
+    },
+    {
+      "path": "docs/architecture/helix-minecraft-dual-plane-adapter-v1.md",
+      "sha256": "0af2d50ab6b8e984be85745d0e669a1377fd3a195754e8aab4eedfa1e84d3fa1"
+    },
+    {
+      "path": "docs/BUSINESS_MODEL.md",
+      "sha256": "7b6ec8bf676c4c31e3e1e9d2072e05e47a9103107305e012c2127abe444042ea"
+    },
+    {
+      "path": "docs/helix-ask-codex-loop-discipline.md",
+      "sha256": "f3288e64c6b5dd5d0578c080b69513a14ef3086184757265eef172f2c20e5352"
+    },
+    {
+      "path": "docs/helix-ask-turn-solver-spine.md",
+      "sha256": "8c4cd832a7424788ac0cf7cdb2669990d046aa7228289ac08d8eb19dbe6b01ad"
+    },
+    {
+      "path": "docs/helix-ask-api-parity-matrix.md",
+      "sha256": "d341a015a6f62b87af693c1eed6377a20da513fe1b2981dffbadc5764298285e"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "sha256": "3944b7375cc78fbe809d5a923ed9aaf3090c731bef6d6f8e44982f6d74dc4d9c"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "sha256": "c77b876666a01f1f7adfde2c8e021eefb2706657b93c1efec46dd79b71a30f6a"
+    },
+    {
+      "path": "minecraft/helix-fabric-player-agent/build.gradle.kts",
+      "sha256": "db31f0322a705e2385889819e299974ed1398f8924ba45042f95dd26a545be8e"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/build.gradle.kts",
+      "sha256": "c3d6ca9123088fdfd8ef901d8937e4e2f2ff31d9c337a6547646d9ead1f5b512"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "sha256": "5c0533e803ce91e67d2644badd7e92a203570dca1182f7a8ee0c729bf068c939"
+    }
+  ]
+}

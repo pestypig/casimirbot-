@@ -1,0 +1,24 @@
+{
+  "files": {
+    "h2_p8p_r42_cloud_adapter.mjs": {
+      "bytes": 5349,
+      "sha256": "4f3a27a436114716da914819421de067c4ea1c280c205cc42727e075fcc17058"
+    },
+    "h2_p8p_r42_retrieval_flow.mjs": {
+      "bytes": 3019,
+      "sha256": "4035191174d02ec169541c5e2cf8216b4e436efc13ff4b5dfa0cbdef604a60ff"
+    },
+    "h2_p8p_r42_bounded_process.mjs": {
+      "bytes": 2612,
+      "sha256": "c2577638f2f8b0acdb725ccbc7b1c991446b7c338dabd4d8d6afbcf47c8d44e6"
+    },
+    "h2_p8p_r42_execute.mjs": {
+      "bytes": 1281,
+      "sha256": "7b5803fa2e7cfdc67972018387e35b4b7e0794300680ec9c3ae6b6c7d7511443"
+    },
+    "h2_p8p_r42_local_io.mjs": {
+      "bytes": 1776,
+      "sha256": "3a659215cdf6ea78aa8f3388a2f21bbe03c36b8c451d6657fc41d4b39908084e"
+    }
+  }
+}

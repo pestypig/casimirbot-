@@ -1,0 +1,18 @@
+{
+  "status": "conditional_independent_spin_bubble_component_bound",
+  "source_sha256": {
+    "casimir-dp-electron-box-spin-operator-2026-09-07.json": "b586754caaf1abfa206ad16ce0b772acaa524c28794cc6d8afdc1a177835f689",
+    "casimir-dp-diamond-spin-bubble-2026-09-06.json": "1e994ade837b985038378f762526ea3d6b55e68ce1161b38abd296e76a6279a7",
+    "casimir-dp-diamond-density-rate-2026-09-06.json": "39d3554dfbf1e498cda44feada20d83d3fc72a6548ba2b56284dd6eb4b00e4c7"
+  },
+  "relative_rate_factor": 2.6094346439805378e-17,
+  "D_covered_spin_bound": 1.6568329649096644e-42,
+  "inherited_quadrature_difference": 0.001313913924219312,
+  "limitations": [
+    "spin-degenerate independent orbitals; not interacting susceptibility",
+    "constant leading spin coefficient; full matching unresolved",
+    "5.5-150 eV and archived momentum grid only",
+    "D <= twice scatter count; not postselected visibility",
+    "not combined with different-grid density as a full model"
+  ]
+}

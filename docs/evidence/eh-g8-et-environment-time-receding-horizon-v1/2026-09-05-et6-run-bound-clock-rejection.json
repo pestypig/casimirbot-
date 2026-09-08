@@ -1,0 +1,69 @@
+{
+  "schema": "casimirbot.et6.run_bound_clock_rejection.v1",
+  "recorded_at": "2026-09-05T20:06:17.511Z",
+  "binding_id": "reasoning_binding:c46c347a870fd3d0167829f0679174c2",
+  "binding_epoch": 5,
+  "run_id": "run_c7929dcb-70ca-4dcf-89f4-f21e0bbb0958",
+  "claim_succeeded": true,
+  "identity_basis": "native desktop authenticated MCP client and client-declared exact continuation",
+  "attempts": [
+    {
+      "turn_id": "et6-ready-admission-2005",
+      "error": {
+        "schema": "helix.environment_temporal_plan_error.v1",
+        "error": "temporal_frontier_resident_clock_unmapped",
+        "message": "Temporal admission was rejected; revalidate the named prerequisite before proposing fresh work.",
+        "retryable": false,
+        "credential_included": false,
+        "raw_content_included": false,
+        "reentry_required": true,
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "error_code": "INVALID_ARGUMENT"
+      }
+    },
+    {
+      "turn_id": "et6-motion-2005",
+      "error": {
+        "schema": "helix.environment_temporal_plan_error.v1",
+        "error": "temporal_frontier_resident_clock_unmapped",
+        "message": "Temporal admission was rejected; revalidate the named prerequisite before proposing fresh work.",
+        "retryable": false,
+        "credential_included": false,
+        "raw_content_included": false,
+        "reentry_required": true,
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "error_code": "INVALID_ARGUMENT"
+      }
+    }
+  ],
+  "movement_dispatched": false,
+  "observed_actor": {
+    "air": 300,
+    "food_level": 20,
+    "freezing": false,
+    "health": 20,
+    "max_health": 20,
+    "on_fire": false,
+    "on_ground": true,
+    "pitch": -1.65,
+    "position": {
+      "x": 5.45,
+      "y": 65,
+      "z": 2.55
+    },
+    "velocity": {
+      "x": 0,
+      "y": -0.08,
+      "z": 0
+    },
+    "yaw": 95.58
+  },
+  "goal_complete": false,
+  "next": "Improve bounded current resident-clock delivery; do not repeatedly resample to select a fortunate heartbeat phase or request another binding."
+}

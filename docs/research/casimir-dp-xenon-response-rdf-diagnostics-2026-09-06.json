@@ -1,0 +1,53 @@
+{
+  "evidence_class": "diagnostic_historical_efficiency_weighting_not_response_fit_or_updated_Xe_RDF",
+  "assumptions": [
+    "additive atomic emission",
+    "white nondissipative DP noise",
+    "published clamped orbital approximation",
+    "E_reconstructed_equals_E_photon",
+    "one selected event at most per source photon",
+    "no efficiency extrapolation"
+  ],
+  "R0_m": 1e-07,
+  "efficiency_rows": 787,
+  "table_band_keV": [
+    0.1,
+    29.876654717758587
+  ],
+  "integration_band_keV": [
+    1.0,
+    29.876654717758587
+  ],
+  "raw_photons_per_tonne_year_in_table_band_above_1keV": 1.2579307970244781e-05,
+  "historical_efficiency_weighted_per_tonne_year": 1.013629772477791e-05,
+  "weighted_to_raw_ratio": 0.8057913637820465,
+  "quadrature_relative_change": 8.005462995488957e-14,
+  "full_1to140keV_raw_photons_per_tonne_year": 3.352137807542951e-05,
+  "full_1to140keV_atomic_triangle_upper_per_tonne_year": 0.00028542490757141705,
+  "triangle_upper_to_clamped_ratio": 8.514712817866748,
+  "hydrogenic_pair_norm": 1.0,
+  "hydrogenic_pair_mean_au": 2.187499999999733,
+  "xe_same_shell_ordered_pairs": 310,
+  "xe_cross_shell_ordered_pairs": 2552,
+  "xe_total_ordered_pairs": 2862,
+  "source_sha256": {
+    "docs/research/casimir-dp-xenon-constituent-radiation-diagnostics-2026-09-06.json": "bdafe3ea13308f66a860e39d424671b7f8c8687702c6cfffc9b4d05238c3212a",
+    "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+    "docs/research/casimir-dp-xenon-response-inputs-2026-09-06/efficiency.txt": "a8fae34fe73e7512b8137eb34e174f3a36d530186fce2e9cb8edd9cf9f60f578",
+    "docs/research/casimir-dp-xenon-response-inputs-2026-09-06/provenance.json": "124be87e16d275777ac46401662b5f4480e0c37a61ddbf7aef52e10068fe8efa"
+  },
+  "checks": {
+    "archive_matches_publisher_md5": true,
+    "efficiency_abscissae_strictly_increasing": true,
+    "efficiency_is_probability": true,
+    "interpolation_recovers_knots": true,
+    "weighted_between_zero_and_emitted": true,
+    "piecewise_quadrature_converged": true,
+    "source_model_replays_parent": true,
+    "hydrogenic_pair_unit_normalization": true,
+    "hydrogenic_pair_mean_35_over_16": true,
+    "xe_ordered_pair_count": true,
+    "formal_neutral_charge_cancellation": true,
+    "frozen_config_hash_unchanged": true
+  }
+}

@@ -467,6 +467,7 @@ const restoreReadOnlyMcpTunnel = async (
 const scheduleNativeMcpTunnelTransition = (input: {
   controller: DesktopMcpTunnelController;
   request: DesktopMcpTunnelTransitionBrokerRequest;
+  onOutcome: (outcome: string) => void;
 }): void => {
   const generation = ++mcpTransitionGeneration;
   // A stable scope router changes only the loopback upstream. No remote MCP
@@ -484,6 +485,13 @@ const scheduleNativeMcpTunnelTransition = (input: {
         accountSessionId: input.request.accountSessionId,
         targetScope: input.request.targetScope,
       });
+      // Only typed outcome fields: never log account IDs, credentials or raw errors.
+      const observed = input.controller.getState();
+      input.onOutcome(JSON.stringify({
+        execution,
+        observed: { scope: observed.scope, status: observed.status,
+          ready: observed.ready, failureCode: observed.failureCode },
+      }));
       if (
         execution.requestedScopeReady &&
         input.request.targetScope === "full_helix_agent"
@@ -676,7 +684,11 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
             account.accountType !== "developer"
           ) throw new Error("native_transition_developer_revalidation_failed");
         }
-        scheduleNativeMcpTunnelTransition({ controller, request });
+        scheduleNativeMcpTunnelTransition({ controller, request,
+          onOutcome: (outcome) => appendStartupJournal(
+            startupJournal, "host", `native tunnel transition outcome ${outcome}`, secret,
+          ),
+        });
         const stableScopeRouting = controller.supportsStableScopeRouting();
         return {
           nativeReceiptRef:

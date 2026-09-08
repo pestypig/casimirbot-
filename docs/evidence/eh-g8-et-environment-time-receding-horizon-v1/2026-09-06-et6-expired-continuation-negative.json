@@ -1,0 +1,22 @@
+{
+  "scope": "Expired durable-run refusal, not post-revocation temporal action rejection",
+  "run_id": "run_f567eefd-623e-4e53-add9-e197f6a3365a",
+  "operation": "helix_run_continue",
+  "idempotency_key": "et6-expired-run-negative-20260906-0712",
+  "expected_version": 1,
+  "instruction": "Walk across the open platform, choosing a clear route and adjusting if something gets in the way. Stop when I take control.",
+  "result": {
+    "updated_at": "2026-09-06T07:11:54.679Z",
+    "version": 2,
+    "lifecycle_status": "failed",
+    "completion_status": "failed",
+    "terminal_authority_status": "blocked",
+    "summary": "The bounded agent run expired.",
+    "steps_used": 0,
+    "latest_result": null,
+    "provider_terminal_candidate_ref": null,
+    "recommended_next_action": "none / run_failed"
+  },
+  "interpretation": "The expired run was terminalized without a solver step. This is not a successful natural objective, live motion, three rolling cycles, or stale-action rejection after explicit revocation.",
+  "credentials_included": false
+}

@@ -1,0 +1,16 @@
+{
+  "scope": "ET6 account regression test isolation",
+  "classification": "test-only",
+  "defect": "Password tests switch NODE_ENV to development, enabling persisted pg-mem and restoring repository data within short test/hook deadlines.",
+  "repair": "Explicitly use in-memory pg-mem, reset the test database before each case and close it before restoring environment settings. No timeout increase or production account change.",
+  "verification": {
+    "suite": "account-session-local-password.test.ts",
+    "result": "3 passed",
+    "test_execution_ms": 2336,
+    "runtime_evidence": "Each case reported an in-memory pg-mem instance, not a persisted snapshot."
+  },
+  "limitations": ["This resolves account-test uncertainty only; it does not prove packaged authentication or ET6 live execution."],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

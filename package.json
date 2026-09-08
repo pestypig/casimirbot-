@@ -548,6 +548,7 @@
     "helix:ask:runtime-authority-audit:strict": "tsx scripts/helix-ask-runtime-authority-audit.ts --strict"
   },
   "dependencies": {
+    "@noble/hashes": "1.8.0",
     "@aws-sdk/client-s3": "^3.674.0",
     "@dnd-kit/core": "^6.3.1",
     "@ffmpeg/ffmpeg": "^0.12.10",

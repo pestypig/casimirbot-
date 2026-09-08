@@ -1,0 +1,26 @@
+{
+  "scope": "Boundary differential audit, gaugeless and top-only Yukawa. Generated operators have not yet been evolved or matched to observables.",
+  "wilson_version": "2.5.2",
+  "beta_source_sha256": "0f69bd9b689c9925ff17ae8cc224e0159d053d6620e2bb50ed437bc9a5dc93dc",
+  "source_real": -1.865251405551724e-15,
+  "source_imag": 8.477427451996454e-16,
+  "source_over_expected_real": 1.0000000000000002,
+  "VLL_over_expected_real": 1.0,
+  "generated_beta_max_abs_GeV_minus2_per_log_mu": {
+    "phiBox": 2.3985591576983744e-30,
+    "phiD": 2.3985591576983744e-30,
+    "uphi": 1.32189058627986e-29,
+    "phiq1": 7.868775277641365e-11,
+    "phiq3": 7.868775277641365e-11,
+    "phiu": 2.005201655118404e-31,
+    "qq1": 6.5464733633571825e-12,
+    "qq3": 6.5464733633571825e-12,
+    "qu1": 2.6229250925471214e-11
+  },
+  "checks": {
+    "mixed_source": true,
+    "VLL_projection": true,
+    "QCD_top_yukawa": true
+  },
+  "full_coupled_evolution_completed": false
+}

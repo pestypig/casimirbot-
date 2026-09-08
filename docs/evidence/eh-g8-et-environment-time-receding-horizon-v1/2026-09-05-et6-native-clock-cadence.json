@@ -1,0 +1,54 @@
+{
+  "schema": "casimirbot.et6.native_clock_cadence.v1",
+  "recorded_date": "2026-09-05",
+  "classification": "evidence normalization and delivery cadence",
+  "native_version": "0.4.11",
+  "heartbeat_interval_client_ticks_before": 100,
+  "heartbeat_interval_client_ticks_after": 20,
+  "nominal_tick_rate_hz": 20,
+  "freshness_policy_changed": false,
+  "preserved": [
+    "single-flight heartbeat scheduling",
+    "shared ordered projection executor",
+    "client-thread snapshot sampling",
+    "acknowledged event cursor ordering",
+    "independent critical workflow delivery",
+    "fail-closed temporal admission and manual cancellation"
+  ],
+  "verification": {
+    "java": "21",
+    "gradle": "8.14.3",
+    "workers": 1,
+    "focused_lifecycle_tests": { "tests": 18, "failures": 0, "errors": 0 },
+    "full_native_unit_suite": { "suites": 37, "tests": 269, "failures": 0, "errors": 0, "skipped": 0 },
+    "fabric_gametests": { "required": 5, "passed": 5, "normal_test_server_shutdown": true },
+    "commands": [
+      "GradleWrapperMain -p minecraft/helix-fabric-player-agent --no-daemon --max-workers=1 test --tests com.casimirbot.helixplayer.fabric.PlayerActionRuntimeLifecycleTest",
+      "GradleWrapperMain -p minecraft/helix-fabric-player-agent --no-daemon --max-workers=1 build -x runGameTest",
+      "npm run helix:environment-harness:docs-audit",
+      "git diff --check (four changed source/plan paths)"
+    ],
+    "build_exit_code": 0,
+    "docs_audit": "PASS",
+    "diff_check": "PASS",
+    "jar": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.11.jar",
+    "jar_sha256": "578929484b4078709470d209e22012dc08dfa67cd0e16dafdb4ea3d5652f7508",
+    "warnings": [
+      "GameTest server reported 2595 ms / 51 ticks behind under memory pressure; timing is not capacity evidence",
+      "Existing deprecated Java API and Gradle features warnings"
+    ]
+  },
+  "live_scope": {
+    "exe_service_instance": "service_instance:0e185083b91bae8b834796e852052fe3",
+    "same_task_presence_refresh_succeeded": true,
+    "inspected_authority_active": true,
+    "inspected_active_workflow_count": 0,
+    "inspected_controls_asserted": false,
+    "new_jar_installed": false,
+    "movement_dispatched": false,
+    "rolling_cycles_proven": 0,
+    "external_provider_identity_proven_by_this_change": false,
+    "goal_complete": false
+  },
+  "next": "Deploy the verified native JAR without replacing the healthy EXE, revalidate changed native epoch and goal recovery, then measure fresh probe/frontier alignment without favorable-phase selection. Faster publication alone does not prove coherence or ET6 capacity."
+}

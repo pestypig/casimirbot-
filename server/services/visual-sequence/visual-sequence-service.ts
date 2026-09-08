@@ -8,14 +8,22 @@ import {
   HELIX_VISUAL_SEQUENCE_MANIFEST_SCHEMA,
   HELIX_VISUAL_SEQUENCE_RECEIPT_SCHEMA,
   HELIX_VISUAL_SEQUENCE_CAPTURE_SCHEMA,
+  HELIX_VISUAL_SEQUENCE_REASONING_GRANT_SCHEMA,
   VISUAL_SEQUENCE_LIMITS,
+  VisualSequenceReasoningGrantSchema,
   type VisualSequenceCaptureMetadata,
   type VisualSequenceErrorCode,
   type VisualSequenceFrame,
   type VisualSequenceIngestResponse,
   type VisualSequenceManifest,
+  type VisualSequenceReasoningGrant,
   type VisualSequenceReceipt,
 } from "@shared/helix-visual-sequence";
+
+export type VisualSequenceReasoningOperation =
+  | "inspect_manifest"
+  | "contact_sheet"
+  | "frames";
 
 type ProbeFrame = {
   best_effort_timestamp_time?: string;
@@ -318,6 +326,7 @@ export class VisualSequenceService {
   private readonly retentionMs: number;
   private readonly command: NonNullable<VisualSequenceServiceOptions["runCommand"]>;
   private readonly activeThreads = new Set<string>();
+  private readonly reasoningGrants = new Map<string, VisualSequenceReasoningGrant>();
 
   constructor(options: VisualSequenceServiceOptions = {}) {
     this.rootDir = path.resolve(options.rootDir ?? DEFAULT_ROOT);
@@ -665,6 +674,131 @@ export class VisualSequenceService {
         throw new VisualSequenceServiceError("sequence_not_found", "The visual sequence is unavailable or expired.", 404);
       }
       throw error;
+    }
+  }
+
+  async listManifests(ownerProfileId: string): Promise<VisualSequenceManifest[]> {
+    await fs.mkdir(this.rootDir, { recursive: true });
+    await this.cleanupExpired();
+    const manifests: VisualSequenceManifest[] = [];
+    for (const entry of await fs.readdir(this.rootDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.includes(".staging-")) continue;
+      try {
+        const manifest = await this.getManifest(entry.name);
+        if (manifest.owner_profile_id === ownerProfileId) manifests.push(manifest);
+      } catch (error) {
+        if (!(error instanceof VisualSequenceServiceError) || error.code !== "sequence_not_found") throw error;
+      }
+    }
+    return manifests.sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
+  }
+
+  async getOwnedSequence(ownerProfileId: string, sequenceId: string): Promise<{
+    manifest: VisualSequenceManifest;
+    receipt: VisualSequenceReceipt;
+  }> {
+    const [manifest, receipt] = await Promise.all([
+      this.getManifest(sequenceId),
+      this.getReceipt(sequenceId),
+    ]);
+    if (manifest.owner_profile_id !== ownerProfileId) {
+      throw new VisualSequenceServiceError("sequence_not_found", "The visual sequence is unavailable or expired.", 404);
+    }
+    return { manifest, receipt };
+  }
+
+  async readOwnedArtifact(ownerProfileId: string, sequenceId: string, artifactPath: string): Promise<{
+    manifest: VisualSequenceManifest;
+    bytes: Buffer;
+    mimeType: string;
+  }> {
+    const { manifest } = await this.getOwnedSequence(ownerProfileId, sequenceId);
+    const artifact = await this.resolveArtifact(sequenceId, artifactPath);
+    return { manifest, bytes: await fs.readFile(artifact.path), mimeType: artifact.mimeType };
+  }
+
+  async issueReasoningGrant(
+    ownerProfileId: string,
+    sequenceId: string,
+    requestedDurationMs = VISUAL_SEQUENCE_LIMITS.reasoningGrantDefaultDurationMs,
+  ): Promise<VisualSequenceReasoningGrant> {
+    const { manifest } = await this.getOwnedSequence(ownerProfileId, sequenceId);
+    this.expireReasoningGrants();
+    for (const [grantId, grant] of this.reasoningGrants.entries()) {
+      if (grant.owner_profile_id === ownerProfileId && grant.sequence_id === sequenceId && grant.status === "active") {
+        this.reasoningGrants.set(grantId, { ...grant, status: "revoked" });
+      }
+    }
+    const durationMs = Math.min(
+      VISUAL_SEQUENCE_LIMITS.reasoningGrantMaxDurationMs,
+      Math.max(30_000, Math.round(requestedDurationMs)),
+    );
+    const issuedAt = this.now();
+    const artifactExpiryMs = Date.parse(manifest.expires_at);
+    const expiresAt = new Date(Math.min(issuedAt.getTime() + durationMs, artifactExpiryMs));
+    const grant = VisualSequenceReasoningGrantSchema.parse({
+      schema: HELIX_VISUAL_SEQUENCE_REASONING_GRANT_SCHEMA,
+      reasoning_grant_id: `vseg_${randomUUID().replaceAll("-", "")}`,
+      sequence_id: manifest.sequence_id,
+      owner_profile_id: ownerProfileId,
+      permitted_operations: ["inspect_manifest", "contact_sheet", "frames"],
+      issued_at: issuedAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      status: "active",
+      content_role: "visual_sequence_reasoning_grant_not_assistant_answer",
+      assistant_answer: false,
+      terminal_eligible: false,
+      environment_action: false,
+      hud_or_controller_mutated: false,
+    });
+    this.reasoningGrants.set(grant.reasoning_grant_id, grant);
+    return grant;
+  }
+
+  listReasoningGrants(ownerProfileId: string): VisualSequenceReasoningGrant[] {
+    this.expireReasoningGrants();
+    return [...this.reasoningGrants.values()]
+      .filter((grant) => grant.owner_profile_id === ownerProfileId && grant.status === "active")
+      .sort((left, right) => Date.parse(right.issued_at) - Date.parse(left.issued_at));
+  }
+
+  requireReasoningGrant(
+    ownerProfileId: string,
+    sequenceId: string,
+    reasoningGrantId: string,
+    operation: VisualSequenceReasoningOperation,
+  ): VisualSequenceReasoningGrant {
+    this.expireReasoningGrants();
+    const grant = this.reasoningGrants.get(reasoningGrantId);
+    if (!grant || grant.owner_profile_id !== ownerProfileId || grant.sequence_id !== sequenceId) {
+      throw new VisualSequenceServiceError("reasoning_grant_not_found", "The visual-evidence reasoning grant is unavailable.", 404);
+    }
+    if (grant.status !== "active") {
+      throw new VisualSequenceServiceError("reasoning_grant_expired", "The visual-evidence reasoning grant is no longer active.", 410);
+    }
+    if (!grant.permitted_operations.includes(operation)) {
+      throw new VisualSequenceServiceError("reasoning_grant_operation_forbidden", "The visual-evidence reasoning grant does not admit this operation.", 403);
+    }
+    return grant;
+  }
+
+  revokeReasoningGrant(ownerProfileId: string, reasoningGrantId: string): VisualSequenceReasoningGrant {
+    this.expireReasoningGrants();
+    const grant = this.reasoningGrants.get(reasoningGrantId);
+    if (!grant || grant.owner_profile_id !== ownerProfileId) {
+      throw new VisualSequenceServiceError("reasoning_grant_not_found", "The visual-evidence reasoning grant is unavailable.", 404);
+    }
+    const revoked = { ...grant, status: "revoked" as const };
+    this.reasoningGrants.set(reasoningGrantId, revoked);
+    return revoked;
+  }
+
+  private expireReasoningGrants(): void {
+    const nowMs = this.now().getTime();
+    for (const [grantId, grant] of this.reasoningGrants.entries()) {
+      if (grant.status === "active" && Date.parse(grant.expires_at) <= nowMs) {
+        this.reasoningGrants.set(grantId, { ...grant, status: "expired" });
+      }
     }
   }
 

@@ -12,6 +12,25 @@ Downstream gate unlocked: an installed public pilot in which a user can subscrib
 
 # EH-G8 EXE-first subscription and provider-access broker v1
 
+## Base-product reconciliation boundary
+
+The paid external-agent-first base offer is defined in
+`docs/architecture/casimirbot-environment-harness-product-goal-v1.md` and audited
+through `docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md`.
+Current delivery stage and dependency authority remain only in
+`docs/helix-environment-harness-work-program-v1.md`. This packet's managed
+provider credits, provider enrollment, and Realtime Texture Pack acceptance
+describe its provider offering; they are not automatically required purchases
+or runtime dependencies for an external-Codex harness user. CFP-0/CFP-1 must
+record the exact reuse/defer decisions for the base offer. The owner has now
+selected a subscription-only initial CFP offer: credits, managed model/API
+services and provider enrollment are deferred outside that release. Reuse only
+applicable subscription/account foundations; historical credit acceptance is
+not an initial CFP release prerequisite. Existing SPB stage
+ordering, evidence, secret isolation, step-up, and budget requirements remain
+in force for work within this packet; this note neither advances nor cancels
+those stages.
+
 ## Product decision
 
 The installed CasimirBot application is the primary harness product. The web

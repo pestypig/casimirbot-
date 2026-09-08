@@ -1,0 +1,96 @@
+{
+  "scope": "Symmetric dark-scalar pilot w500GeV; conditional total elastic density .3GeV/cm3. Born rigid uniform-sphere response qR1e-8..80, orientation-averaged separation. Inverse-speed moment gives an upper bound for this interval only; not complete solid response. Formal target angles are not physical predictions when phase is large. No stellar recast or all-velocity Born admission.",
+  "reference_theta": 3e-10,
+  "reference_source": "https://arxiv.org/abs/1611.05852",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-10,
+      "K_in_D_equals_K_sin2theta_cos2theta": 84258.85304612906,
+      "D_reference_mixing_upper_in_qR_interval": 7.583296774151616e-15,
+      "cutoff40_over80": 0.9999999991678813,
+      "formal_theta_for_target": 0.0005918173764338211,
+      "formal_target_phase_at_300km_s": 55.07355065726981,
+      "reference_phase_at_300km_s": 2.7917512585754895e-05,
+      "formal_target_alphaNN": 6.169342314970012e+24
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-09,
+      "K_in_D_equals_K_sin2theta_cos2theta": 8347.715971775255,
+      "D_reference_mixing_upper_in_qR_interval": 7.512944374597729e-16,
+      "cutoff40_over80": 0.9999999923919032,
+      "formal_theta_for_target": 0.0018802369112853573,
+      "formal_target_phase_at_300km_s": 42.36139666678265,
+      "reference_phase_at_300km_s": 6.758961530740333e-06,
+      "formal_target_alphaNN": 6.2271328459681e+25
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-08,
+      "K_in_D_equals_K_sin2theta_cos2theta": 7.317726607953674,
+      "D_reference_mixing_upper_in_qR_interval": 6.585953947158307e-19,
+      "cutoff40_over80": 0.9999927397110894,
+      "formal_theta_for_target": 0.06367689780753338,
+      "formal_target_phase_at_300km_s": 32.79164492501837,
+      "reference_phase_at_300km_s": 1.5490918352903635e-07,
+      "formal_target_alphaNN": 7.132474456068787e+28
+    },
+    {
+      "mchi_GeV": 40.0,
+      "scalar_mass_GeV": 1e-06,
+      "K_in_D_equals_K_sin2theta_cos2theta": 8.111922098436068e-08,
+      "D_reference_mixing_upper_in_qR_interval": 7.300729888592461e-27,
+      "cutoff40_over80": 0.9988573627575722,
+      "formal_theta_for_target": null,
+      "formal_target_phase_at_300km_s": null,
+      "reference_phase_at_300km_s": 1.565426179406798e-11,
+      "formal_target_alphaNN": null
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-10,
+      "K_in_D_equals_K_sin2theta_cos2theta": 10116.711035442047,
+      "D_reference_mixing_upper_in_qR_interval": 9.105039931897843e-16,
+      "cutoff40_over80": 0.9999999991678813,
+      "formal_theta_for_target": 0.001707955512907257,
+      "formal_target_phase_at_300km_s": 87.07892945481795,
+      "reference_phase_at_300km_s": 1.529532206365593e-05,
+      "formal_target_alphaNN": 5.1382612392644555e+25
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-09,
+      "K_in_D_equals_K_sin2theta_cos2theta": 1002.2855431720636,
+      "D_reference_mixing_upper_in_qR_interval": 9.020569888548573e-17,
+      "cutoff40_over80": 0.9999999923919032,
+      "formal_theta_for_target": 0.005426354653096825,
+      "formal_target_phase_at_300km_s": 66.97924916644902,
+      "reference_phase_at_300km_s": 3.7030696452980163e-06,
+      "formal_target_alphaNN": 5.186514318173978e+26
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-08,
+      "K_in_D_equals_K_sin2theta_cos2theta": 0.8786177695595145,
+      "D_reference_mixing_upper_in_qR_interval": 7.907559926035631e-20,
+      "cutoff40_over80": 0.9999927397110894,
+      "formal_theta_for_target": 0.18764555072067546,
+      "formal_target_phase_at_300km_s": 51.84814309327971,
+      "reference_phase_at_300km_s": 8.487095135773633e-08,
+      "formal_target_alphaNN": 6.1296651095975816e+29
+    },
+    {
+      "mchi_GeV": 100.0,
+      "scalar_mass_GeV": 1e-06,
+      "K_in_D_equals_K_sin2theta_cos2theta": 9.739744708721092e-09,
+      "D_reference_mixing_upper_in_qR_interval": 8.765770237848984e-28,
+      "cutoff40_over80": 0.9988573627575722,
+      "formal_theta_for_target": null,
+      "formal_target_phase_at_300km_s": null,
+      "reference_phase_at_300km_s": 8.576587010521434e-12,
+      "formal_target_alphaNN": null
+    }
+  ],
+  "full_model_admitted": false
+}

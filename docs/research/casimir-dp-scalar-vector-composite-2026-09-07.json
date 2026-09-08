@@ -1,0 +1,71 @@
+{
+  "source": "https://arxiv.org/html/0907.4110v1",
+  "source_equation": "16",
+  "scope": "Fermi-gas boost-factor composition proxy; not a nuclear scalar form factor, finite-range force recast, certified residual force or complete cancellation no-go.",
+  "rows": [
+    {
+      "isotope": "C12",
+      "mean_gamma_minus_one_proxy": 0.018898815748423097,
+      "difference_from_carbon": 0.0,
+      "ratio_to_inherited_tolerances": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "isotope": "O16",
+      "mean_gamma_minus_one_proxy": 0.018898815748423097,
+      "difference_from_carbon": 0.0,
+      "ratio_to_inherited_tolerances": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "isotope": "Be9",
+      "mean_gamma_minus_one_proxy": 0.019028496715384507,
+      "difference_from_carbon": 0.00012968096696141032,
+      "ratio_to_inherited_tolerances": [
+        1288889590.9202187,
+        200.12959724983233
+      ]
+    },
+    {
+      "isotope": "Al27",
+      "mean_gamma_minus_one_proxy": 0.01891321887008854,
+      "difference_from_carbon": 1.4403121665441249e-05,
+      "ratio_to_inherited_tolerances": [
+        143151566.69728476,
+        22.227555867183234
+      ]
+    },
+    {
+      "isotope": "Ti48",
+      "mean_gamma_minus_one_proxy": 0.018971746633189946,
+      "difference_from_carbon": 7.293088476684889e-05,
+      "ratio_to_inherited_tolerances": [
+        724854698.6896341,
+        112.55027578416099
+      ]
+    },
+    {
+      "isotope": "Xe131",
+      "mean_gamma_minus_one_proxy": 0.019222837916727978,
+      "difference_from_carbon": 0.00032402216830488065,
+      "ratio_to_inherited_tolerances": [
+        3220432494.7687607,
+        500.0458244745334
+      ]
+    },
+    {
+      "isotope": "Xe136",
+      "mean_gamma_minus_one_proxy": 0.01934456355475244,
+      "difference_from_carbon": 0.0004457478063293434,
+      "ratio_to_inherited_tolerances": [
+        4430254656.6018,
+        687.8983943899302
+      ]
+    }
+  ],
+  "model_admitted": false
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "et6.goal_stop_preflight_build.v1",
+  "date": "2026-09-05",
+  "scope": "Internal temporal admission preflight regression and server build",
+  "new_cases": ["goal_paused", "goal_canceled", "recovery_required"],
+  "observed": "All three reject with durable_goal_authority_stale and preserve the complete prior goal projection.",
+  "verification": {
+    "goal_store_tests_passed": 21,
+    "goal_store_tests_failed": 0,
+    "server_build_exit_code": 0,
+    "server_build_existing_warnings": 4
+  },
+  "packaged_binding_read": {
+    "service_instance": "service_instance:a75cd5b59ac01ff0b907962910d0cb80",
+    "binding_id": "reasoning_binding:682844c34203856dec59b416501137db",
+    "read_ok": true,
+    "pending_deliveries": 0,
+    "independent_external_provider_authentication_proven": false
+  },
+  "limits": "Build success is not a typecheck or production temporal execution. No packaged EXE/mod replacement or Minecraft action occurred. The internal preflight remains unconnected to production dispatch.",
+  "et6_complete": false
+}

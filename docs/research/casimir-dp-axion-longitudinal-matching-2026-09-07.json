@@ -1,0 +1,100 @@
+{
+  "maturity": "conditional one-body derivation; not a joint rate prediction",
+  "source": "https://arxiv.org/html/1707.06998v2",
+  "axion_source": "https://arxiv.org/html/2609.04186v1",
+  "matching_scope": "LO pion+eta only; B0 sensitivity inputs, nonpole terms not fixed",
+  "rows": [
+    {
+      "B0_GeV": 2.7,
+      "q_GeV": 0.0,
+      "gbar_p": 178.68499522068342,
+      "gbar_n": -175.40204501978204,
+      "d4p_GeV_m2": 0.013608649236007249,
+      "d4n_GeV_m2": -0.0133586197487066
+    },
+    {
+      "B0_GeV": 2.7,
+      "q_GeV": 0.001,
+      "gbar_p": 178.6752730841623,
+      "gbar_n": -175.39233382082205,
+      "d4p_GeV_m2": 0.013607895190194614,
+      "d4n_GeV_m2": -0.013357866785927023
+    },
+    {
+      "B0_GeV": 2.7,
+      "q_GeV": 0.05,
+      "gbar_p": 157.30959559418258,
+      "gbar_n": -154.0537635177046,
+      "d4p_GeV_m2": 0.011950821746087728,
+      "d4n_GeV_m2": -0.011703475939659235
+    },
+    {
+      "B0_GeV": 2.7,
+      "q_GeV": 0.1,
+      "gbar_p": 115.89428625394712,
+      "gbar_n": -112.7171855087785,
+      "d4p_GeV_m2": 0.008739117664456052,
+      "d4n_GeV_m2": -0.008499545394404525
+    },
+    {
+      "B0_GeV": 2.7,
+      "q_GeV": 0.246,
+      "gbar_p": 42.334335632632715,
+      "gbar_n": -39.602226065320636,
+      "d4p_GeV_m2": 0.0030402021297003604,
+      "d4n_GeV_m2": -0.0028439981453696308
+    },
+    {
+      "B0_GeV": 3.0,
+      "q_GeV": 0.0,
+      "gbar_p": 198.5388835785371,
+      "gbar_n": -194.89116113309117,
+      "d4p_GeV_m2": 0.015120721373341387,
+      "d4n_GeV_m2": -0.014842910831896225
+    },
+    {
+      "B0_GeV": 3.0,
+      "q_GeV": 0.001,
+      "gbar_p": 198.52808120462478,
+      "gbar_n": -194.88037091202446,
+      "d4p_GeV_m2": 0.015119883544660682,
+      "d4n_GeV_m2": -0.014842074206585579
+    },
+    {
+      "B0_GeV": 3.0,
+      "q_GeV": 0.05,
+      "gbar_p": 174.78843954909175,
+      "gbar_n": -171.17084835300508,
+      "d4p_GeV_m2": 0.013278690828986363,
+      "d4n_GeV_m2": -0.013003862155176927
+    },
+    {
+      "B0_GeV": 3.0,
+      "q_GeV": 0.1,
+      "gbar_p": 128.77142917105235,
+      "gbar_n": -125.24131723197611,
+      "d4p_GeV_m2": 0.009710130738284502,
+      "d4n_GeV_m2": -0.009443939327116138
+    },
+    {
+      "B0_GeV": 3.0,
+      "q_GeV": 0.246,
+      "gbar_p": 47.03815070292523,
+      "gbar_n": -44.00247340591182,
+      "d4p_GeV_m2": 0.003378002366333733,
+      "d4n_GeV_m2": -0.0031599979392995903
+    }
+  ],
+  "max_quadrature_error": 1.6653345369377348e-16,
+  "checks": {
+    "Cartesian_C13_longitudinal_matches": true,
+    "free_nucleon_spin_trace_matches": true,
+    "zero_q_C13_projection": true,
+    "longitudinal_not_transverse": true,
+    "scalar_companion_order_reproduced": true
+  },
+  "scalar_companion_C_GeV_m2": 7.21152e-10,
+  "scalar_companion_sigma_cm2": 5.656805595806664e-47,
+  "C13_scope": "closed C12 core plus one p1/2 neutron; oscillator approximation",
+  "joint_prediction_admitted": false
+}

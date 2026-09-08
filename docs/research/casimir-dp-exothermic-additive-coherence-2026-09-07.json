@@ -1,0 +1,27 @@
+{
+  "status": "conditional_additive_effective_amplitude_envelope",
+  "source_sha256": "581f5ed4859079ff5241e5bf79e7fb047e92ac7db1777303bb6363e079c79160",
+  "enhancement_over_independent_ceiling": 392002508235.1936,
+  "rows": [
+    {
+      "excited_fraction": 0.5,
+      "D_rigid_additive_ceiling": 2.7009208960893125e-26,
+      "ratio_to_DP_forecast": 9.15210722855996e-25
+    },
+    {
+      "excited_fraction": 0.0062,
+      "D_rigid_additive_ceiling": 3.4913829169271065e-22,
+      "ratio_to_DP_forecast": 1.1830598548052668e-20
+    },
+    {
+      "excited_fraction": 1e-06,
+      "D_rigid_additive_ceiling": 1.3504590975842087e-14,
+      "ratio_to_DP_forecast": 4.576049038226368e-13
+    }
+  ],
+  "assumptions": [
+    "Transfer the bounded single-nucleus effective amplitude unchanged into a rigid sum",
+    "Use |sum exp(i q r_j)| <= N at every transfer and D <= 2 events",
+    "Not a microscopic solid matching or bound on cross-nucleus virtual vertices; no full-model exclusion"
+  ]
+}

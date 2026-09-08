@@ -1,0 +1,45 @@
+{
+  "evidence_class": "conservative_conditional_force_screen_not_new_experimental_limit",
+  "source_sha256": "5b12bd61a11bf4cf76ee243edac0800b99d183f14c68ab74d1d222b9ceb47828",
+  "gravitational_nucleon_alpha": 5.8211267538885185e-39,
+  "assumptions": [
+    "one unscreened scalar with universal equal-sign nucleon coupling",
+    "alpha_DM=g_DM^2/(4*pi)<=1 adopted as perturbative-domain criterion",
+    "same scalar mediates DM-nucleon and nucleon-nucleon interactions",
+    "nucleon number proportional to mass at screening precision; no cancellations"
+  ],
+  "rows": [
+    {
+      "mediator_eV": 0.001,
+      "range_micrometers": 197.3269804,
+      "DM_nucleon_alpha_product": 2.405322235956698e-13,
+      "minimum_matter_force_relative_to_gravity": 9938926437090.484,
+      "conservative_force_screen_ceiling": 1.0,
+      "minimum_over_screen_ceiling": 9938926437090.484,
+      "maximum_product_at_alpha_DM_one": 7.629630891392138e-20,
+      "quadratic_D_at_screen_ceiling": 2.9692912258394458e-15,
+      "source": "https://arxiv.org/abs/2002.11761"
+    },
+    {
+      "mediator_eV": 0.01,
+      "range_micrometers": 19.73269804,
+      "DM_nucleon_alpha_product": 2.997236885777704e-13,
+      "minimum_matter_force_relative_to_gravity": 15432457201632.81,
+      "conservative_force_screen_ceiling": 10000000.0,
+      "minimum_over_screen_ceiling": 1543245.720163281,
+      "maximum_product_at_alpha_DM_one": 2.4127011323179915e-16,
+      "quadratic_D_at_screen_ceiling": 1.9123038690369195e-08,
+      "source": "https://arxiv.org/abs/2412.13167v2"
+    }
+  ],
+  "checks": {
+    "both_benchmark_points_fail_force_screen": true,
+    "perturbative_product_identity": true,
+    "range_mapping": true
+  },
+  "notes": [
+    "1e7 ceiling at 19.7 micrometers deliberately looser than the second source abstract summary near 1e6",
+    "quadratic D estimates at screen boundary are diagnostics, not new confidence limits",
+    "no automatic exclusion of screened, nonperturbative, multi-mediator or other nonminimal theories"
+  ]
+}

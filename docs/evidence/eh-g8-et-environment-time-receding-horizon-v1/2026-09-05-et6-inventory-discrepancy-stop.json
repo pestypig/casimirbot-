@@ -1,0 +1,16 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "adapter execution",
+  "change": "Resident serial execution samples inventory counts before each tick, preserving a root-run item-count-change lower bound across handoffs. It checks that separate lower bound against the root inventory budget and fails on loss of an available sensor. General failure now cancels an active child before releasing controls. Sensor changes remain unattributed and are not added to overlapping action receipt counters.",
+  "checks": [
+    { "check": "Offline one-worker Gradle test: ResidentInventoryObservationTest, InventoryCountObservationTest, FluidSequenceEngineTest, PlayerActionControllerTest; runGameTest excluded", "exit_code": 0 },
+    { "case": "Inventory gain before movement with zero inventory budget", "result": "Typed failure sequence_observed_inventory_change_budget_exceeded, no node execution, controls released, attribution unestablished" },
+    { "case": "Repeated sensor samples and subsequent inventory loss", "result": "Unchanged samples add nothing; later changes retained separately" },
+    { "case": "Sensor gap", "result": "Gap stays detected; unavailable never interpreted as empty inventory" }
+  ],
+  "casimir": { "run_id": "2688", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" },
+  "limitations": ["Observations are a root-run lower bound, not complete effect accounting or action attribution", "Between-sample changes, inventory-preserving slot moves and durability are not measured", "An initially unavailable bridge remains explicitly unavailable; native sensor availability must be established for qualification", "No live pickup or temporal handoff run", "No native feature advertisement or deployment", "ET6 remains incomplete"]
+}

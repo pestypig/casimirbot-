@@ -5,6 +5,8 @@ import pg from "pg";
 import { newDb } from "pg-mem";
 import type { Pool as PgPool } from "pg";
 import { LocalPersistenceScheduler } from "./local-persistence-scheduler";
+import { StrictSnapshotBarrier } from "./strict-snapshot-barrier";
+import { orderLocalTemporalAdmissions } from "./local-temporal-restore-order";
 import {
   compactLocalEnvironmentPersistenceTables,
   compactLocalEnvironmentSituationDigestRows,
@@ -149,6 +151,11 @@ const localPersistenceTables = [
   "helix_environment_durable_goal_participants",
   "helix_environment_durable_goal_participant_events",
   "helix_environment_durable_goal_events",
+  // Temporal evidence depends on both the durable goal and retained action.
+  // Restore frontiers before admissions; retaining effects without their source
+  // plan/checkpoint association would make restart recovery unverifiable.
+  "helix_environment_temporal_frontiers",
+  "helix_environment_temporal_plan_admissions",
   // Concurrent reasoning is an append-only child ledger of the durable goal.
   // Persist the projection before its events so a keyed restart cannot retain
   // the physical effect while losing the proposals, arbitration, and exact
@@ -223,6 +230,10 @@ const localPersistenceJsonColumns = new Set([
   "helix_environment_durable_goal_events.event_payload",
   "helix_environment_durable_goal_events.payload",
   "helix_environment_durable_goal_events.evidence_refs",
+  "helix_environment_temporal_frontiers.frontier_payload",
+  "helix_environment_temporal_plan_admissions.source_plan",
+  "helix_environment_temporal_plan_admissions.compilation_artifact",
+  "helix_environment_temporal_plan_admissions.checkpoint_association",
   "helix_environment_reasoning_role_events.event_payload",
   "helix_environment_monitor_leases.lease_payload",
   "helix_environment_monitor_events.event_payload",
@@ -417,7 +428,7 @@ const compactLocalRoomSourceRequestRows = (
   );
 };
 
-const writeLocalSnapshotAtomically = async (
+export const writeLocalSnapshotAtomically = async (
   snapshotPath: string,
   snapshot: LocalSnapshot,
 ): Promise<void> => {
@@ -426,10 +437,27 @@ const writeLocalSnapshotAtomically = async (
   const stream = fs.createWriteStream(tempPath, {
     encoding: "utf8",
     flags: "w",
+    // Bound buffering to 1 MiB while avoiding thousands of 16 KiB drain
+    // round trips for a large profile. Keep row-at-a-time serialization,
+    // stream completion and atomic rename as the acknowledgement barrier.
+    highWaterMark: 1024 * 1024,
   });
-  const write = async (chunk: string): Promise<void> => {
+  const emit = async (chunk: string): Promise<void> => {
     if (stream.write(chunk)) return;
     await once(stream, "drain");
+  };
+  // Keep small rows out of thousands of individual stream writes. The buffer
+  // is bounded in UTF-16 units (at most 768 KiB of UTF-8); an oversized row is
+  // emitted directly, retaining the existing one-row allocation bound.
+  const chunkLimit = 256 * 1024;
+  let buffered = "";
+  const write = async (chunk: string): Promise<void> => {
+    if (buffered.length + chunk.length > chunkLimit && buffered) {
+      await emit(buffered);
+      buffered = "";
+    }
+    if (chunk.length >= chunkLimit) await emit(chunk);
+    else buffered += chunk;
   };
 
   try {
@@ -451,6 +479,7 @@ const writeLocalSnapshotAtomically = async (
       await write("]");
     }
     await write("}}");
+    if (buffered) await emit(buffered);
     stream.end();
     await once(stream, "close");
     await fs.promises.rename(tempPath, snapshotPath);
@@ -618,7 +647,7 @@ function createPool(): PgPool {
   return new Pool({ connectionString: dsn });
 }
 
-async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
+async function persistLocalSnapshot(activePool: PgPool, requiredTables?: readonly string[]): Promise<void> {
   if (!localPersistencePath) return;
   const startedAtMs = Date.now();
   const capturedVersions = new Map(localPersistenceMutationVersions);
@@ -677,7 +706,11 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
         const { rows } = await activePool.query(`SELECT * FROM ${table};`);
         tables[table] = rows as Array<Record<string, unknown>>;
       }
-    } catch {
+    } catch (error) {
+      // Delivery cannot be acknowledged from a snapshot that omitted the
+      // very mutation whose durability it promises. Optional legacy tables
+      // retain the existing best-effort behavior outside a strict barrier.
+      if (requiredTables?.includes(table)) throw error;
       tables[table] = [];
     }
   }
@@ -687,7 +720,9 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
     saved_at: savedAt,
     tables: compacted.tables,
   };
+  const collectedAtMs = Date.now();
   await writeLocalSnapshotAtomically(localPersistencePath, snapshot);
+  const writtenAtMs = Date.now();
   localPersistenceSnapshotCache = snapshot;
   for (const [table, version] of capturedVersions) {
     if (localPersistenceMutationVersions.get(table) === version) {
@@ -697,7 +732,7 @@ async function persistLocalSnapshot(activePool: PgPool): Promise<void> {
   const elapsedMs = Date.now() - startedAtMs;
   if (elapsedMs >= 250) {
     console.warn(
-      `[db] local pg-mem snapshot took ${elapsedMs}ms (refreshed ${tablesToRefresh.length}/${localPersistenceTables.length} tables)`,
+      `[db] local pg-mem snapshot took ${elapsedMs}ms (refreshed ${tablesToRefresh.length}/${localPersistenceTables.length} tables; collect_compact_ms=${collectedAtMs - startedAtMs}; serialize_write_rename_ms=${writtenAtMs - collectedAtMs}; strict=${requiredTables !== undefined})`,
     );
   }
   if (deferredLocalPersistenceEnabled()) {
@@ -714,7 +749,10 @@ function scheduleDeferredLocalPersistence(activePool: PgPool): void {
     localPersistenceScheduler = new LocalPersistenceScheduler({
       idleDelayMs: localPersistenceIdleDelayMs(),
       maxDelayMs: localPersistenceMaxDelayMs(),
-      persist: () => persistLocalSnapshot(activePool),
+      // Deferred and strict delivery saves share the same temporary path and
+      // snapshot cache. Join the common writer lane instead of racing a strict
+      // barrier. Deferred persistence retains its best-effort failure policy.
+      persist: () => persistImmediateLocalSnapshot(activePool),
       onError: (err) => {
         console.warn("[db] failed to persist deferred local pg-mem snapshot", err);
       },
@@ -745,10 +783,41 @@ export async function persistLocalDatabaseSnapshotIfEnabled(
 }
 
 export async function flushLocalDatabaseSnapshotIfEnabled(): Promise<void> {
+  await strictSnapshotBarrier.drain();
   if (localPersistenceScheduler) {
     await localPersistenceScheduler.drain();
   }
   if (localPersistenceWrite) await localPersistenceWrite;
+}
+
+/** Delivery barrier: bypass deferred/best-effort acknowledgement. A failed
+ * snapshot rejects the caller; it does not undo an already committed mutation.
+ * PostgreSQL owns its transaction durability. This is not a power-loss claim. */
+export async function requireLocalDatabaseSnapshotIfEnabled(touchedTables?: readonly string[]): Promise<void> {
+  if (!pool || !localPersistencePath || !localPersistenceReady || localPersistenceSuppress) return;
+  if (touchedTables?.length === 0) return;
+  await strictSnapshotBarrier.request(touchedTables);
+}
+
+const strictSnapshotBarrier = new StrictSnapshotBarrier(saveStrictLocalDatabaseSnapshot);
+
+async function saveStrictLocalDatabaseSnapshot(touchedTables?: readonly string[]): Promise<void> {
+  if (!pool || !localPersistencePath || !localPersistenceReady || localPersistenceSuppress) {
+    throw new Error("Strict local snapshot became unavailable before persistence");
+  }
+  markLocalPersistenceTablesDirty(touchedTables);
+  while (localPersistenceWrite) await localPersistenceWrite;
+  // A preceding best-effort writer may have consumed the dirty versions.
+  // Re-read the required tables for this strict caller's own save.
+  markLocalPersistenceTablesDirty(touchedTables);
+  const activePool = pool;
+  const write = persistLocalSnapshot(activePool, touchedTables ?? localPersistenceTables);
+  // Other best-effort callers wait for this writer without inheriting its
+  // failure policy. The delivery caller awaits the original rejecting promise.
+  const settled = write.then(() => undefined, () => undefined);
+  localPersistenceWrite = settled;
+  try { await write; }
+  finally { if (localPersistenceWrite === settled) localPersistenceWrite = null; }
 }
 
 async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
@@ -785,9 +854,11 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
     let restoredRowCount = 0;
     let discardedRowCount = compacted.discardedRowCount;
     for (const table of localPersistenceTables) {
-      const snapshotRows = Array.isArray(snapshot.tables[table])
+      const storedRows = Array.isArray(snapshot.tables[table])
         ? snapshot.tables[table]
         : [];
+      const snapshotRows = table === "helix_environment_temporal_plan_admissions"
+        ? orderLocalTemporalAdmissions(storedRows) : storedRows;
       const rows =
         table === ROOM_SOURCE_REQUEST_TABLE
           ? compactLocalRoomSourceRequestRows(snapshotRows)
@@ -932,6 +1003,7 @@ export async function ensureDatabase(): Promise<void> {
 }
 
 export async function resetDbClient(): Promise<void> {
+  await strictSnapshotBarrier.drain();
   await flushLocalDatabaseSnapshotIfEnabled();
   if (pool && "end" in pool) {
     try {

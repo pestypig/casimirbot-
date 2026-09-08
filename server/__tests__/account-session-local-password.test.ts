@@ -1,6 +1,7 @@
 import express from "express";
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetDbClient } from "../db/client";
 import { accountSessionRouter } from "../routes/account-session";
 import {
   resetAccountSessionStore,
@@ -17,9 +18,17 @@ const createApp = (): express.Express => {
 };
 
 describe("local password account session", () => {
+  beforeEach(async () => {
+    // These tests switch NODE_ENV to development, which otherwise enables the
+    // repository's persisted pg-mem database. Keep all test accounts in memory.
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_PERSIST", "0");
+    await resetDbClient();
+  });
   afterEach(async () => {
-    vi.unstubAllEnvs();
     await resetAccountSessionStore();
+    await resetDbClient();
+    vi.unstubAllEnvs();
   });
 
   it("signs into a local admin profile with a server-side scrypt hash", async () => {

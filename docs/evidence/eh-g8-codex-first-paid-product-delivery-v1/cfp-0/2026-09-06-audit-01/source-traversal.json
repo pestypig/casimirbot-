@@ -1,0 +1,1257 @@
+{
+  "schema": "casimirbot.cfp0.source_traversal.v1",
+  "captured_utc": "2026-09-07T02:33:45.622Z",
+  "head": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+  "scope": "Four named roots; recursively traverse literal docs/work-packets paths and normalized Markdown links resolving under docs/work-packets. Other source/evidence refs are inspection inputs, not recursive roadmap roots.",
+  "roots": [
+    "docs/helix-environment-harness-work-program-v1.md",
+    "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+    "docs/helix-ask-codex-parity-work-program-v1.md",
+    "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+  ],
+  "entry_count": 45,
+  "packet_count": 42,
+  "working_tree_counts": {
+    "tracked": 111,
+    "untracked_entries": 587
+  },
+  "edges": [
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-companion-survival-party-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-public-ui-agent-affordance-manifest-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-shared-live-room-mcp-configuration-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-local-supervisor-mcp-coordination-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-6-play-minecraft-with-helix-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md"
+    },
+    {
+      "from": "docs/helix-environment-harness-work-program-v1.md",
+      "to": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md"
+    },
+    {
+      "from": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "to": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+    },
+    {
+      "from": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "to": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+    },
+    {
+      "from": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "to": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md"
+    },
+    {
+      "from": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "to": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "to": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "to": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "to": "docs/work-packets/https:/github.com/gnembon/fabric-carpet/blob/master/docs/scarpet/api/Entities.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "to": "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+      "to": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "to": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "to": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "to": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "to": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "to": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "to": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+      "to": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+      "to": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+      "to": "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+      "to": "docs/work-packets/https:/github.com/cabaletta/baritone/blob/1.19.4/FEATURES.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "to": "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "to": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "to": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+      "to": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "to": "docs/work-packets/https:/github.com/cabaletta/baritone/blob/1.19.4/FEATURES.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "to": "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "to": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+      "to": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "to": "docs/work-packets/eh-g5-durable-survival-goal-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "to": "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md",
+      "to": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md",
+      "to": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "to": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "to": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md",
+      "to": "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "to": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "to": "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md"
+    },
+    {
+      "from": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "to": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md"
+    }
+  ],
+  "rows": [
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "7d9ff697ca07c857353d2fa919284bd6051edb8d7c4432bebb8b8b4f53817d78",
+      "line_count": 1151,
+      "header": [
+        "# Helix Environment Harness Work Program v1",
+        "Status: canonical program-control document.",
+        "Active program gate: **G8**"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+        "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+        "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+        "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+        "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+        "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+        "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
+        "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+        "docs/work-packets/eh-g8-public-ui-agent-affordance-manifest-v1.md",
+        "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+        "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+        "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+        "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md",
+        "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+        "docs/work-packets/eh-g8-shared-live-room-mcp-configuration-v1.md",
+        "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+        "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+        "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+        "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+        "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+        "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md",
+        "docs/work-packets/eh-g8-local-supervisor-mcp-coordination-v1.md",
+        "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+        "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+        "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md",
+        "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+        "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+        "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+        "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+        "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+        "docs/work-packets/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md",
+        "docs/work-packets/eh-g8-pna3-6-play-minecraft-with-helix-v1.md",
+        "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+        "docs/work-packets/eh-nfo-0-network-field-observer-v1.md"
+      ],
+      "evidence_references": [
+        "docs/audits/helix-environment-harness-g1-closure-audit-2026-08-20.md",
+        "docs/audits/helix-environment-harness-g2-closure-audit-2026-08-20.md",
+        "docs/audits/helix-environment-harness-g3-closure-audit-2026-08-21.md",
+        "docs/audits/helix-environment-harness-g4-closure-audit-2026-08-22.md",
+        "docs/audits/helix-environment-harness-g5-closure-audit-2026-08-23.md",
+        "docs/audits/helix-environment-harness-g6-closure-audit-2026-08-23.md",
+        "docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md",
+        "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md",
+        "artifacts/helix-minecraft-guardian-v0.4/direct-codex/water-bucket-rescue/attempt-4-dynamic-collision-success.json",
+        "docs/audits/helix-environment-harness-g2-a0-b-partial-audit-2026-08-20.md",
+        "artifacts/g3-persistent-viability/g3-keyed-fire-program-live-036.json",
+        "artifacts/helix-environment-g4-live-2026-08-22-deterministic/helix-minecraft-player-ask-5a72c8a7-4dc7-4546-bf88-15c41a66700f.json",
+        "artifacts/g5-durable-survival-goal/owner-natural-progress-report-final.json",
+        "artifacts/g5-durable-survival-goal/second-participant-natural-progress-report-authorized.json",
+        "artifacts/g6-concurrent-environment-reasoning/a1-live-latest.json",
+        "artifacts/g6-concurrent-environment-reasoning/keyed-natural-ask-ask_g6-keyed-natural-1787531751670.json",
+        "artifacts/g7-second-domain-transfer/live-tripath-acceptance-2026-08-24.json",
+        "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json",
+        "docs/evidence/eh-g8-pna1-packaging-ux-readiness-boundary-v1/2026-08-31-deterministic-acceptance.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+        "docs/evidence/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1/2026-09-02-current-service-typed-minecraft-checkpoint.json",
+        "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+        "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json",
+        "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json",
+        "reports/helix-minecraft/nether1-baritone-movement-only-a0.json",
+        "docs/evidence/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1/2026-09-03-deterministic-checkpoint.json",
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json",
+        "docs/audits/helix-environment-harness-g7-progress-audit-2026-08-23.md",
+        "docs/audits/helix-environment-harness-g7-progress-audit-2026-08-24.md"
+      ]
+    },
+    {
+      "path": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "sha256": "9255253774dae1690aff57d75f6eaf5e4391f81dc2569007f889618cb5820be0",
+      "line_count": 515,
+      "header": [
+        "# CasimirBot Environment Harness Product Goal v1",
+        "Status: canonical product goal and staged acceptance map. This document combines"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+        "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+        "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+        "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md"
+      ],
+      "evidence_references": [
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json",
+        "docs/audits/helix-minecraft-fluid-execution-audit-2026-08-12.md"
+      ]
+    },
+    {
+      "path": "docs/helix-ask-codex-parity-work-program-v1.md",
+      "sha256": "23c18ea41cb0b0e13954931714492188201988c25126323a3881f619c3c97e29",
+      "line_count": 411,
+      "header": [
+        "# Helix Ask / Codex Parity Work Program v1",
+        "Status: canonical program-control document.",
+        "Active program gate: **G1**"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/audits/helix-ask-codex-parity-g0-closure-audit-2026-08-26.md",
+        "docs/audits/helix-ask-codex-parity-g1-progress-audit-2026-08-26.md",
+        "docs/audits/helix-ask-codex-parity-g1-runtime-transport-evidence-2026-08-26.md",
+        "docs/audits/helix-ask-codex-parity-g1-deterministic-closure-readiness-2026-08-26.md"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "sha256": "90824c15fc12d8b27d5be5d233f7e91f0974a1a334ab1321bbc67f5248ced41b",
+      "line_count": 254,
+      "header": [
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: Codex-first paid product delivery and existing-plan reconciliation",
+        "Capability or component: Commercial installed CasimirBot harness and staged release acceptance",
+        "Authority owner: The product owner selects the offer, licensing terms, public-source boundary, and release; Development Codex implements bounded packets; reviewers verify evidence; the external agent owns reasoning; CasimirBot and its connectors retain existing identity, consent, effect, and evidence boundaries",
+        "Current maturity: specified",
+        "Target maturity: release-ready for the exact signed Windows capability set accepted through G8",
+        "# EH-G8 Codex-first paid product delivery v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+        "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+        "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+        "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+        "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+        "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+        "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md"
+      ],
+      "evidence_references": [
+        "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "sha256": "57450cbb6345c9e571625519a3389d1d7c80e8ea3236da908349afcb5210d1b0",
+      "line_count": 91,
+      "header": [
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: CFP-0 repository and development-plan audit",
+        "Capability or component: Release dependency, implementation, rights, and distribution inventory for the paid Codex-first harness",
+        "Authority owner: Development audit agents inspect evidence; one coordinator assigns findings; the product owner retains commercial and release decisions; existing work programs retain runtime authority",
+        "Current maturity: specified",
+        "Target maturity: specified with a reviewed complete first-release dependency and gap inventory",
+        "# CFP-0 repository release-gap audit v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md"
+      ],
+      "evidence_references": [
+        "docs/audits/eh-g8-codex-first-paid-product-planning-baseline-2026-09-06.md"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "sha256": "3bf96c0872c6e2ad388eebb544ab2b57fd0cf3411727c3aaa0cc0c91c2a5690a",
+      "line_count": 1731,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation; parallel specification work for post-G3 EH-RCC1 through EH-RCC3",
+        "Workstream: Minecraft server-native companion embodiment, survival interaction fidelity, and multi-companion party evaluation",
+        "Capability or component: Account-independent visible companion actors with finite resident-controller leases, player-semantic survival interactions, canonical inventory and health custody, and a real-client differential benchmark lane",
+        "Authority owner: the user owns each companion and its finite actor/effect leases; Runtime Codex owns semantic plans and completion claims; Helix owns identity, admission, arbitration, provenance, evidence, and terminal eligibility; the Fabric/server arbiter owns only admitted tick-local execution and fail-closed release",
+        "Current maturity: projected",
+        "Target maturity: specified",
+        "# EH-MC server-native companion survival party v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+        "docs/work-packets/https:/github.com/gnembon/fabric-carpet/blob/master/docs/scarpet/api/Entities.md",
+        "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md"
+      ],
+      "evidence_references": [
+        "artifacts/eh-mc-companion-survival-party-v1/A0/c0-presence-lifecycle/attempt-2/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/c0-presence-mcp-contract/attempt-2/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/c0-presence-live/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/B/c0-presence-keyed-helix/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A0/c1-follow-baseline/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/c1-follow-mcp-live/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/B/c1-follow-keyed-helix/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/runtime/current-custody-evidence.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A0/c2-custody-baseline/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/c2-custody-mcp-live/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/B/c2-custody-keyed-helix/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/runtime/current-mining-evidence.json",
+        "artifacts/eh-mc-companion-survival-party-v1/real-client-differential/c3-stone-wood-pick/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/A1/c3-mining-mcp-deterministic/attempt-1/manifest.json",
+        "artifacts/eh-mc-companion-survival-party-v1/B/c3-mining-owner-room-deterministic/attempt-1/manifest.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+      "sha256": "a5c329dbb0d7bb37ea06b088d802945eb615bafdbb602f551349fac3e1df5ac3",
+      "line_count": 235,
+      "header": [
+        "# EH-G7 Robinhood shadow-observation transfer v1",
+        "Program gate: G7 — Second-domain transfer",
+        "Workstream: Provider-neutral environment lifecycle portability into a contrasting, high-consequence domain",
+        "Capability or component: Developer-only Robinhood private-room read observations exposed through the governed workstation/MCP catalog, exact observation re-entry, concurrent shadow-role compatibility, and terminal continuity",
+        "Authority owner: Runtime Codex owns natural-language interpretation, read-capability selection, interpretation, uncertainty, follow-up reasoning, and the terminal candidate; Helix owns developer/account identity, owner-private room binding, consented read capability, connection and producer epoch, freshness, redaction, provenance, role currentness, route authority, and terminal eligibility; the Robinhood adapter owns only execution and normalization of an admitted read call",
+        "Current maturity: integrated accepted",
+        "Target maturity: integrated accepted"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/audits/helix-environment-harness-g7-closure-audit-2026-08-24.md",
+        "artifacts/g7-second-domain-transfer/live-tripath-acceptance-2026-08-24.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+      "sha256": "5cd66666ede87badae5a1bb198d2199fdc4e0d83e51db02f92cc0737846917b6",
+      "line_count": 136,
+      "header": [
+        "# EH-G8 installed profile connection broker v1",
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: Installed-node credential separation and user-owned capability grants",
+        "Capability or component: User-facing profile connections backed by the installed desktop credential broker, with revocable read-only Shared Live Room grants for the Robinhood reference connector",
+        "Authority owner: The signed-in profile owns enrollment, revocation, and room grants; the installed native host owns OS-protected key custody; Helix owns account, room, capability, expiry, revocation, provenance, and consequence policy; the connector alone may resolve provider credentials for one admitted call; Runtime Codex may select and interpret an advertised read but never receives or manages credentials",
+        "Current maturity: deterministically verified",
+        "Target maturity: live accepted"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "sha256": "c77b876666a01f1f7adfde2c8e021eefb2706657b93c1efec46dd79b71a30f6a",
+      "line_count": 440,
+      "header": [
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: EXE-first subscriptions, provider connections, and user-authorized agent capability",
+        "Capability or component: Installed CasimirBot subscription and provider-access broker v1",
+        "Authority owner: The profile owner chooses a plan, provider, device, capability grant, and hard budget; the Casimir billing service owns entitlements, managed credits, and the usage ledger; the installed native host owns OS-protected user-secret custody; Helix owns scopes, leases, limits, provenance, and terminal eligibility; the admitted connector may resolve one credential for one admitted provider operation; Runtime Codex never receives credentials or approves spending",
+        "Current maturity: specified",
+        "Target maturity: integrated accepted on one signed installed Windows node for one Casimir-managed image-provider path and one user-owned provider path",
+        "# EH-G8 EXE-first subscription and provider-access broker v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+        "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+        "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
+      "sha256": "afe3d5e45c3af288f90f9c90e4f9e4e7245dc5431d86edfb61f3b39879681431",
+      "line_count": 192,
+      "header": [
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: EXE-first subscriptions, provider connections, and user-authorized agent capability",
+        "Capability or component: SPB-3 Auth0 MFA, one-purpose step-up receipts, and installed device/session security",
+        "Authority owner: Auth0 owns factor enrollment and the signed authentication ceremony; the Casimir private service validates exact claims and owns receipt/device/session state; the installed native host owns the callback and usable receipt token; the profile owner completes MFA and confirms recovery or revocation; Runtime Codex may inspect sanitized readiness only",
+        "Current maturity: live accepted",
+        "Target maturity: live accepted on one installed Windows node with one passkey or authenticator-app TOTP factor",
+        "# EH-G8 SPB-3 Auth0 MFA and fresh step-up v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+      "sha256": "1bffac9de118b306e9d951ce6df63f7752b9e7ca4ad0acb026eab1b4575b7ead",
+      "line_count": 191,
+      "header": [
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: EXE-first subscriptions, provider connections, and user-authorized agent capability",
+        "Capability or component: SPB-4 Stripe sandbox payment, entitlement, and credit ledger",
+        "Authority owner: Stripe sandbox owns hosted payment instruments and signed payment events; the Casimir billing service owns event admission, immutable integer-minor-unit ledger entries, balances, and entitlement state; the profile owner starts checkout and confirms high-risk changes; the installed native UI receives only sanitized status; Runtime Codex may inspect status but cannot purchase, refund, adjust, raise limits, or arm spend",
+        "Current maturity: deterministically verified",
+        "Target maturity: live accepted with one owner-attended sandbox purchase/cancel/refund trace",
+        "# EH-G8 SPB-4 Stripe sandbox entitlement ledger v1"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/evidence/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1/2026-08-28-deterministic-acceptance.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-public-ui-agent-affordance-manifest-v1.md",
+      "sha256": "12ed95e263a13f5a133d5a50e793e3734c747ea9f9db68861768cf6c263a6d3c",
+      "line_count": 169,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Public-user UI capability discovery and cross-surface parity",
+        "Capability or component: Canonical public UI surface and affordance manifest for workstation panels, Helix Ask, Shared Live Rooms, account/session, mobile launch, and panel-internal controls",
+        "Authority owner: the signed-in user owns interaction and consent; shared account policy owns public reachability; Helix owns capability admission, receipts, and terminal eligibility; each UI component owns only its local projection",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified",
+        "# EH-G8 public UI agent affordance manifest v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "sha256": "3944b7375cc78fbe809d5a923ed9aaf3090c731bef6d6f8e44982f6d74dc4d9c",
+      "line_count": 1193,
+      "header": [
+        "# EH-G8 provider-neutral agent connection and Helix activity v1",
+        "Program gate: G8 — Environment-harness release evaluation",
+        "Workstream: Installed-node northbound reasoning-client convergence",
+        "Capability or component: Provider-neutral external-agent connection profiles and a Helix Ask operator/activity surface over the canonical CasimirBot lifecycle",
+        "Authority owner: The user owns client selection and consent; the external reasoning runtime owns conversation, sampling, generic tool sequencing, retries, compaction, session lifecycle, and completion; CasimirBot owns identity, capability admission, credentials, evidence, effects, leases, cancellation, and terminal eligibility; connectors alone execute admitted environment operations",
+        "Current maturity: specified",
+        "Target maturity: release-ready"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+        "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+        "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+      "sha256": "8d3753a32e01e4e91567b9d22a1f9b55afd97e2988d969343915c98304bc3804",
+      "line_count": 163,
+      "header": [
+        "# EH-G8 PNA1 packaging, UX, and readiness boundary v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: provider-neutral installed-node release boundary",
+        "Capability or component: PNA1 — Stage 1A packaging inventory, UX baseline, sanitized readiness contract, no-agent operation, and release guard",
+        "Authority owner: the installed CasimirBot host owns packaging and local readiness projection; the selected external AI application owns its model session; Helix retains identity, admission, evidence, and effect authority",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md"
+      ],
+      "evidence_references": [
+        "docs/evidence/eh-g8-pna1-packaging-ux-readiness-boundary-v1/2026-08-31-deterministic-acceptance.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+      "sha256": "2420da8258f9cade455f273840f2624935711fd0a1410ca8a6613d79c8290a02",
+      "line_count": 447,
+      "header": [
+        "# EH-G8 PNA2 provider-neutral Agent Connections v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: provider-neutral external-agent onboarding",
+        "Capability or component: PNA2 — versioned client profiles, profile-owned connection readiness, and resumable guided setup",
+        "Authority owner: the signed-in CasimirBot profile owns CasimirBot authorization; the installed node owns connection readiness and catalog evidence; the external AI application owns its MCP settings, OAuth UI, restart, chats, model session, and continuation lifecycle",
+        "Current maturity: deterministically verified",
+        "Target maturity: integrated accepted"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md"
+      ],
+      "evidence_references": [
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-independent-client-live-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-installed-codex-refresh-continuity-checkpoint.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-agent-connections-disconnect-reactivation-acceptance.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-08-31-stage2-completion-audit.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-source-delivery-and-replit-handoff.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-production-oauth-metadata-and-parity-acceptance.json",
+        "docs/evidence/eh-g8-pna2-provider-neutral-agent-connections-v1/2026-09-01-desktop-cloud-signing-infrastructure-acceptance.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md",
+      "sha256": "efe65f1730979bfa8bbd57275740038c87e5530421543f7343fbbd5ab5486d96",
+      "line_count": 411,
+      "header": [
+        "# EH-G8 PNA3 current-source cross-surface live acceptance v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: provider-neutral Codex App to CasimirBot/Helix current-source acceptance",
+        "Capability or component: PNA3-LA — Agent Connections, MCP capability use, Helix chat binding, operator activity, and Helix Ask cross-surface behavior",
+        "Authority owner: Codex App owns its task, model loop, tool sequence, approvals, retries, compaction, and completion; CasimirBot owns profile/OAuth/MCP admission and public lifecycle evidence; Helix owns policy, evidence identity, and terminal eligibility without owning provider-private reasoning",
+        "Current maturity: implemented",
+        "Target maturity: live accepted for the current-source developer surface"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/evidence/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1/2026-09-01-pre-approval-checkpoint.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+      "sha256": "0baf58d8cfa5ddd870cae934d1b48cd7f9297dc795f72ab4e08f68e952a597ff",
+      "line_count": 1229,
+      "header": [
+        "# EH-G8 PNA3.4 exact reasoning binding and voice pickup v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: provider-neutral external-agent correlation and reverse steering",
+        "Capability or component: PNA3.4 — exact principal reasoning-task binding, truthful Helix chat destination, and GPT Live steering pickup",
+        "Authority owner: the user owns provider-task selection and attachment; the external reasoning runtime owns conversation, sampling, tool sequencing, retries, compaction, and completion; CasimirBot owns exact binding identity, steering admission, evidence, effects, cancellation, and truthful delivery state; GPT Realtime is input and presentation only",
+        "Current maturity: live accepted",
+        "Target maturity: live accepted on one current-source developer node"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/evidence/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1/2026-09-01-deterministic-acceptance.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-shared-live-room-mcp-configuration-v1.md",
+      "sha256": "5930c66478627f736290485ec392594a7cb0bb6a58600ab758566fea3bc60df5",
+      "line_count": 166,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Public-user Shared GPT Live Room semantic MCP configuration",
+        "Capability or component: Shared Live Room settings, lifecycle, privacy, runtime, floor, media, visual ingress, and membership controls",
+        "Authority owner: the signed-in participant owns their consent and membership; the room owner owns runtime reservation and room closure; the browser/native host owns WebRTC devices and provider session binding; Helix owns policy, identity, admission, idempotency, receipts, and post-state projection; Codex owns intent interpretation, tool selection, re-entry, follow-up reasoning, and completion",
+        "Current maturity: deterministically verified for authority-reducing own-consent revocation, exact-epoch speaking-floor inspection/release, and signed-delegation own-consent grant/speaking-floor acquire; native signer and trusted installed-client conversation binding remain unverified external acceptance",
+        "Target maturity: deterministically verified semantic MCP parity for every host-independent public room setting, with explicit native-host handoffs for browser-owned effects",
+        "# EH-G8 Shared Live Room MCP configuration v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+      "sha256": "cb37a6d980703c3afe2e95f45ae4ff4101bf9e03862b9c5a8798bb97eeaac7bf",
+      "line_count": 237,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Robinhood shadow observation and provider-neutral resident-controller transfer",
+        "Capability or component: `resident.brokerage.market_observer.v1` deterministic paper observer and generic semantic-monitor projection",
+        "Authority owner: the signed-in profile owns the Robinhood connection and paper account; Helix owns binding, freshness, cursor and evidence admission; Runtime Codex owns interpretation",
+        "Current maturity: live accepted",
+        "Target maturity: integrated accepted",
+        "# EH-G8 Robinhood resident observer v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+      "sha256": "fdc0d94332a639d5a9d0d940e1e259b053c07bd9c529dd12271da66eb592acc4",
+      "line_count": 593,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Brokerage reactive simulation and provider-neutral resident-controller transfer",
+        "Capability or component: `resident.brokerage.simulated_execution.v1` bounded simulated-execution controller and watchdog",
+        "Authority owner: the signed-in developer owns activation and the simulated bankroll; Helix owns identity, leases, freshness, risk admission and interruption; the paper ledger owns simulated effects; Runtime Codex owns intent and strategy interpretation",
+        "Current maturity: deterministically verified",
+        "Target maturity: integrated accepted",
+        "# EH-G8 brokerage reactive simulation controller v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+      "sha256": "3d9b87516c0513124b51f7b82bd2694e98b9e429cda86dd5f118284a3d35d2cd",
+      "line_count": 295,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Robinhood attended tiny-live cash-equity qualification",
+        "Capability or component: `helix:live-equity:tiny-v1` production-gated entry, reconciliation and protective-exit plane",
+        "Authority owner: the signed-in developer owns every financial approval; Helix owns admission, single-use authority, reconciliation and safety locks; the supervisor owns only fail-closed safety transitions",
+        "Current maturity: implemented",
+        "Target maturity: live accepted",
+        "# EH-G8 Robinhood attended tiny-live qualification v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+      "sha256": "5a365fce6fa1ee790ae7957d8e64cb39d0b91b1a8e61b9ec08e0db1be39cc54b",
+      "line_count": 3163,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation; supporting Minecraft integration work after G7",
+        "Workstream: Minecraft Player Embodiment combat perception, bounded reflex control, and reproducible arena evaluation",
+        "Capability or component: Tick-consistent projectile and hostile-state sensing, explicit governed combat actions, resident combat guardian, semantic combat events, and an isolated arena ladder culminating in a legitimate Survival Wither trial",
+        "Authority owner: Runtime Codex owns encounter strategy, target selection, loadout, phase changes, retreat, and completion claims; Helix owns identity, admission, target and effect scope, leases, provenance, evidence, and terminal eligibility; the Fabric companion owns only admitted tick-local sensing, arbitration, execution, verification, and control release; the operator owns consent, manual override, and Emergency Stop",
+        "Current maturity: specified",
+        "Target maturity: integrated accepted",
+        "# EH-MC combat awareness and arena ladder v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md",
+        "docs/work-packets/https:/github.com/cabaletta/baritone/blob/1.19.4/FEATURES.md"
+      ],
+      "evidence_references": [
+        "artifacts/helix-minecraft-combat-c0/a0-exact-zombie-defeated-v1.json",
+        "artifacts/helix-minecraft-combat-c0/topology-correction-2026-08-26-v1.json",
+        "artifacts/helix-minecraft-combat-c0/isolated-client-profile-preparation-v1.json",
+        "artifacts/helix-minecraft-combat-c0/isolated-client-live-launch-2026-08-26-v1.json",
+        "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a0/projectile-shield-a0-public-capture.json",
+        "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-27-c1-a1/bow-skeleton-a1-success-receipt.json",
+        "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/rec2c-staggered-v3-qualified-live-summary.json",
+        "docs/evidence/eh-mc-combat-awareness-arena-ladder-v1/2026-08-31-rec2c-installed-profile-live/rec2c-contact-use-v5-qualified-live-summary.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "sha256": "7f511d37f65529c797290fa5cdb1b5c27b2469c2b9132ce055d118b8f0db8cfd",
+      "line_count": 1322,
+      "header": [
+        "# EH-G8 Shared Room Multi-Host Capability Federation v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Cross-device Shared Live Room capability federation",
+        "Capability or component: One room may consume separately owned, capability-narrowed environment connections from one or more installed CasimirBot nodes without granting ambient device access or merging participant authority",
+        "Authority owner: each signed-in profile owns its installed node, environment connections, local subjects, grants, revocation, and mutation ceilings; the room owner owns room membership and may accept or remove references but never owns member credentials; Helix owns exact node, profile, room, participant, environment, source, world, subject, connector-epoch, capability, lease, provenance, and terminal admission; Runtime Codex owns cross-source interpretation and strategy; each connector executes only its admitted local operation",
+        "Current maturity: deterministically verified through M2.1 two-host read-only federation and bounded advisory fan-out; live same-device dual-EXE rehearsal and live cross-device acceptance remain unperformed",
+        "Target maturity: live accepted for one same-device dual-EXE rehearsal with two isolated profile/node/credential boundaries, followed by a separately evidenced live cross-device acceptance before installed release integration"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md",
+        "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+        "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md"
+      ],
+      "evidence_references": [
+        "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-live-preflight.json",
+        "docs/evidence/eh-g8-shared-room-multi-host-capability-federation-v1/2026-08-29-m3-native-node-a-preflight.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md",
+      "sha256": "f3da4177c12636b3f17ff30546168a9bc10841f3c6bf4b558a9f57d11de5cce0",
+      "line_count": 164,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: M1.1 local installed-node restart coordination",
+        "Capability or component: One-instance supervisor restart proposal, acknowledgement, graceful drain, authorization consumption, service-epoch rotation, and reconnect revalidation",
+        "Authority owner: authenticated clients may propose, acknowledge, or object; the installed-node owner approves or cancels; verified resource claims and execution leases block admission; only the trusted signed desktop bootstrap or approved opaque supervisor may consume an authorization and replace its owned service",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified",
+        "# EH-G8 local supervisor restart coordination v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-local-supervisor-mcp-coordination-v1.md",
+      "sha256": "b349218dda482b1321f2da10337b443f8d619dccf4c7b9f76c64dfc183e9450b",
+      "line_count": 643,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: M1 installed-node multi-client convergence",
+        "Capability or component: Signed supervisor ownership receipt and authenticated local-supervisor MCP coordination",
+        "Authority owner: the signed native or approved opaque launcher owns service/process admission; Helix owns authenticated profile, authenticated MCP client, room, run, connector, and execution authority; Codex owns whether and when to publish or acknowledge advisory coordination",
+        "Current maturity: live accepted",
+        "Target maturity: live accepted",
+        "# EH-G8 local-supervisor MCP coordination v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+      "sha256": "3f2891311986cd0fba512f291d4ec795dc8132ac477eae0c9197831f8c5e6453",
+      "line_count": 133,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation; bounded N0 setup lane that cannot advance N1–N4",
+        "Workstream: Minecraft Player Embodiment deterministic capability course",
+        "Capability or component: EH-MC-NETHER1 N0 controlled-course fixture planner",
+        "Authority owner: a separately admitted World Authority owns setup only; Player Embodiment owns every course postcondition; the server operator owns snapshot restoration",
+        "Current maturity: implemented",
+        "Target maturity: deterministically verified",
+        "# EH-MC-NETHER1 N0 controlled-course fixture v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+      "sha256": "8f10e124813a7a0e236f0d4b9f67697b8b7480e897e056a69a22e24a02f82926",
+      "line_count": 400,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation; supporting N0 work for the reserved post-G7 Minecraft integration objective",
+        "Workstream: Minecraft Player Embodiment perception fidelity and operator-visible Codex steering",
+        "Capability or component: Authenticated external-Codex situation probes, one bounded same-revision perception snapshot, semantic change delivery, and perception benchmark",
+        "Authority owner: Fabric owns game-thread facts and local control release; Helix owns identity, admission, provenance, coverage and delivery; Runtime Codex owns interpretation and strategy; the operator owns consent and Emergency Stop",
+        "Current maturity: specified",
+        "Target maturity: live accepted",
+        "# EH-MC-NETHER1 perception parity v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+      ],
+      "evidence_references": [
+        "artifacts/training-trace.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md",
+      "sha256": "6c3f81407c9bf7262d89e6bd35437a3fa8cbce7507a6f485fc69441f7d5a84d3",
+      "line_count": 295,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Installed-node authenticated MCP observation continuity",
+        "Capability or component: Profile-scoped semantic monitor lease, resumable cursor, bounded wait, and Codex re-entry",
+        "Authority owner: the signed-in profile grants the monitor; Helix owns identity, cursor, freshness, revocation, and evidence; the MCP client owns whether to wait and Runtime Codex owns replanning",
+        "Current maturity: deterministically verified",
+        "Target maturity: live accepted",
+        "# EH-G8 profile semantic MCP monitor v1"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "reports/helix-minecraft/g8-m3-authorization-readiness-20260825.json",
+        "reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "sha256": "4d5aa53be806e5c5585ee9d36615b68644cf9611f854e149ade27a02bce89615",
+      "line_count": 552,
+      "header": [
+        "# EH-MC-NETHER1 responsive action/reaction sensing plan v1",
+        "Program gate: G8 — Environment-harness release evaluation; supporting N0 work for the reserved post-G7 Minecraft integration objective",
+        "Workstream: Minecraft Player Embodiment sensing, continuous-control responsiveness, optional pathing-engine integration, and compact evidence re-entry",
+        "Capability or component: General responsive sensing and consecutive action/reaction substrate for legitimate survival objectives",
+        "Authority owner: Runtime Codex owns semantic strategy and finite-program authorship; Helix owns identity, admission, authority, effect ceilings, provenance, evidence, and terminal eligibility; the Fabric companion owns only admitted tick-sensitive sensing, arbitration, execution, verification, and control release",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+        "docs/work-packets/https:/github.com/cabaletta/baritone/blob/1.19.4/FEATURES.md",
+        "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md",
+        "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md"
+      ],
+      "evidence_references": [
+        "reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json",
+        "reports/helix-minecraft/nether1-baritone-movement-only-a0.json",
+        "reports/helix-minecraft/nether1-keyed-a1-action-reaction-20260824.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+      "sha256": "4004aa6ef6a96eef6b2f13947ac60cf7201e3b82cc909d3a05f2ac4720187e50",
+      "line_count": 1421,
+      "header": [
+        "# EH-G8 Environment Time and Receding-Horizon Action Planning v1",
+        "Program gate: G8 — environment-harness release evaluation.",
+        "Workstream: Operator-visible Codex steering and action-reaction fidelity.",
+        "Capability or component: ET — provider-neutral environment time, temporal action plans, progressive affordance frontiers and resident rolling execution; Minecraft is the capacity reference adapter.",
+        "Authority owner: Runtime Codex owns semantic objectives, plan construction, repair and final synthesis; Helix owns identity, admission, effects, provenance and terminal eligibility; adapters compile and sense; resident executors advance only admitted plans.",
+        "Current maturity: deterministically verified for ET0–ET5; ET6–ET8 remain specified.",
+        "Target maturity: deterministically verified shared contract and Minecraft compatibility compiler, followed by live-accepted Minecraft capacity and cross-environment conformance evidence."
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md"
+      ],
+      "evidence_references": [
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-trusted-device-onramp-repair.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-guided-attention-onramp.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-bound-steering-single-action-checkpoint.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-packaged-transition-checkpoint.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-delivery-renewal-live-checkpoint.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-capacity-reporter-checkpoint.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et6-packaged-trust-cache-repair.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-guidance-satisfied-repair.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-deferred-persistence-live-capacity.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-exact-binding-live-capacity-checkpoint.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-action-connector-rate-limit-repair.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-capacity-null-measurement-repair.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-04-et6-zero-control-effect-truth-repair.json",
+        "docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+      "sha256": "816aadb9b5f5153abe6f01b70605e1f3affef716da29853e95c5bd614fe0bb0f",
+      "line_count": 476,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Provider-neutral spatial navigation with Minecraft as the first capacity reference",
+        "Capability or component: ENV-NAV1 — bounded spatial/topological evidence, goal-directed route planning, receding-horizon trajectory execution and sensor-driven replanning",
+        "Authority owner: Runtime Codex selects the destination, policy and strategy; Helix owns identity, admission, effect bounds, provenance and terminal eligibility; the adapter owns evidence compilation; the admitted local planner/controller may choose only a route and trajectory inside the fixed destination, traversal, cost and safety envelope; the environment arbiter owns physical execution and release",
+        "Current maturity: deterministically verified for NAV0; NAV1–NAV9 remain specified and depend on the open ET6 Minecraft capacity qualification",
+        "Target maturity: deterministically verified provider-neutral contracts and Minecraft planner/controller, followed by live-accepted Minecraft A0/A1/B evidence and a non-shipping Baritone black-box comparison; FiveM remains a contract-only second-environment fixture in this packet",
+        "# EH-G8 environment spatial navigation v1"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+      "sha256": "97de6b91ac6126a6c38ec5307c2088aabe663def17fac63a2581a06c13e9b63d",
+      "line_count": 134,
+      "header": [
+        "Program gate: G8 — installed profile connection broker and environment-harness convergence; this is a bounded N0 Player Embodiment support lane and does not advance the active broker gate",
+        "Workstream: Minecraft Player Embodiment non-shipping navigation comparison",
+        "Capability or component: Baritone v1.15.0 evaluation-only compatibility oracle",
+        "Authority owner: Helix owns admission and effect ceilings; the Fabric companion owns the evaluation lease, public-API call, status observation, and control release; Baritone owns only the locally evaluated path calculation/execution; Codex owns semantic strategy",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified evaluation-only compatibility evidence",
+        "# Baritone v1.15.0 compatibility and license packet"
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "reports/helix-minecraft/nether1-baritone-movement-only-a0.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "sha256": "7f24ef31926470ba6ab6c628d189acc12f859ed4346eb69bed9dcdef33d112e5",
+      "line_count": 552,
+      "header": [
+        "# EH-MC-NETHER1 legitimate durable Nether entry v1",
+        "Program gate: G8 — Environment-harness release evaluation; post-G7 Minecraft integration lane",
+        "Workstream: Minecraft durable objective, fluid Player Embodiment, resident viability, and cross-surface acceptance",
+        "Capability or component: Legitimate survival Nether preparation, portal construction, safe entry, and verified return point",
+        "Authority owner: Runtime Codex owns strategy, milestone selection, retries, recovery, and completion proposals; Helix owns exact identity, capability admission, effect leases, evidence/provenance, durable checkpoint integrity, and terminal eligibility; Fabric owns admitted player effects, resident viability, postcondition measurement, and control release",
+        "Current maturity: specified",
+        "Target maturity: integrated accepted"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+        "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+        "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md",
+      "sha256": "1db2cafed127ae3548d462e9a4d4fb0f3d448bcd4c8b5b6ef983436ab8fae1c9",
+      "line_count": 130,
+      "header": [
+        "# EH-G8 PNA3.5 finite agent onboarding and recovery v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: provider-neutral external-agent onboarding and recovery",
+        "Capability or component: PNA3.5 — one-start Codex/CasimirBot harness onboarding, finite diagnosis, and truthful recovery guidance",
+        "Authority owner: the signed-in developer starts full harness scope for the current desktop session; the native desktop owns tunnel process recovery; Codex owns its MCP catalog and task lifecycle; CasimirBot owns readiness projection, exact binding identity, diagnostics, and fail-closed guidance",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-6-play-minecraft-with-helix-v1.md",
+      "sha256": "452b584578ee227ec76836c2dc61a39325573735c7c43a51619c52fa47a33c92",
+      "line_count": 427,
+      "header": [
+        "# EH-G8 PNA3.6 Play Minecraft with Helix v1",
+        "Program gate: G8 — environment-harness release evaluation.",
+        "Workstream: Provider-neutral agent connection, installed-node convergence, and Minecraft environment operation.",
+        "Capability or component: PNA3.6 — finite one-start Play Minecraft with Helix journey.",
+        "Authority owner: Runtime Codex owns semantic planning and completion; Helix owns exact task/room/player/world/source admission, durable-goal identity, action authorization, evidence provenance, and terminal eligibility; Fabric owns admitted game execution and immediate local release controls.",
+        "Current maturity: installed-node live accepted at the governed action lifecycle boundary; G8 release evaluation remains active.",
+        "Target maturity: deterministically verified, followed by one installed-node live acceptance without a development repair between activation and the final authoritative result."
+      ],
+      "packet_references": [],
+      "evidence_references": [
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-deterministic-checkpoint.json",
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-current-source-action-monitor-revoke-checkpoint.json",
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-start-harness-catalog-checkpoint.json",
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-exe-mcp-control-coverage.json",
+        "docs/evidence/eh-g8-pna3-6-play-minecraft-with-helix-v1/2026-09-03-installed-exe-exploratory-minecraft-acceptance.json"
+      ]
+    },
+    {
+      "path": "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+      "sha256": "1bb13d7a130a1857769b1f8ce2293d362a63793fe3eb60ae0bd419ccbb1172fe",
+      "line_count": 178,
+      "header": [
+        "# EH-G6 concurrent environment reasoning roles v1",
+        "Program gate: G6 — Concurrent reasoning roles",
+        "Workstream: Provider-neutral environment perception, prospective planning, and verification support around the principal Runtime Codex solver",
+        "Capability or component: Revision-bound shadow-role artifacts, append-only invalidation, proposal arbitration, principal-turn evidence re-entry, and differential lifecycle audit",
+        "Authority owner: Runtime Codex remains the principal semantic solver and owns action selection, repair, retry, replanning, and the terminal candidate; Helix owns exact identity, role/capability admission, revision and expiry checks, provenance, one-proposal arbitration, execution leases, evidence re-entry, and terminal eligibility; Fabric owns only execution of the one admitted action or finite program and measured postconditions",
+        "Current maturity: specified",
+        "Target maturity: integrated accepted"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md",
+      "sha256": "eacaf9a0d7c0047e05b1e762a2a11035da49af47fc6000fbb37a0fd77c39d846",
+      "line_count": 346,
+      "header": [
+        "# EH-NFO-0 Network Field Observer v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Parallel post-G7 physical-device observation and installed-node integration",
+        "Capability or component: Network Field Observer contract, evidence-backed site graph, deterministic Block 66 fixture, and reserved developer-only field companion",
+        "Authority owner: the signed-in profile owns the site connection and grants; the field companion owns access to selected local interfaces and device sessions; Helix owns identity, admission, capability scope, freshness, provenance, monitor cursor, revocation, and terminal eligibility; Runtime Codex owns capability selection, interpretation, troubleshooting, uncertainty disclosure, and final synthesis",
+        "Current maturity: projected",
+        "Target maturity: deterministically verified on the Block 66 fixture"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+        "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/https:/github.com/gnembon/fabric-carpet/blob/master/docs/scarpet/api/Entities.md",
+      "missing": true
+    },
+    {
+      "path": "docs/work-packets/https:/github.com/PrismarineJS/mineflayer/blob/master/docs/api.md",
+      "missing": true
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "sha256": "0a4d08294cc5353aafd5488409690dd44c1a5c7e50dffe04af79757451f68baf",
+      "line_count": 248,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Parallel packaged-desktop presentation experiment",
+        "Capability or component: Realtime Texture Pack attended fal FLUX.2 Klein realtime provider adapter",
+        "Authority owner: The authenticated developer user owns provider selection, credential enrollment, billable-session approval, reveal-original, and stop; the server owns credential custody and request/cost ceilings; provider pixels own no evidence or action authority",
+        "Current maturity: specified",
+        "Target maturity: live accepted for one attended 60-second baseline benchmark",
+        "# EH-G8 Realtime Texture Pack fal attended API v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+        "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md",
+      "sha256": "18c9d750fc6f52342f24cae6e10b4d33f9cb1f37f9b790238b98d344d48c175f",
+      "line_count": 276,
+      "header": [
+        "# EH-G8 PNA3 Helix operator activity v1",
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: provider-neutral external-agent activity and operator presentation",
+        "Capability or component: PNA3 — always-on governed lifecycle activity with progressive disclosure",
+        "Authority owner: CasimirBot owns admitted lifecycle identity, evidence, effects, leases, cancellation, and terminal eligibility; the external agent owns reasoning and session continuation; Helix presents authorized public state without becoming a model runtime or terminal writer",
+        "Current maturity: deterministically verified",
+        "Target maturity: deterministically verified"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+        "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/https:/github.com/cabaletta/baritone/blob/1.19.4/FEATURES.md",
+      "missing": true
+    },
+    {
+      "path": "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+      "sha256": "009e69c4820d8856c906dd308c932c224a6caa5ee0357e67e1f23becb640980b",
+      "line_count": 338,
+      "header": [
+        "# EH-G5 durable survival goal v1",
+        "Program gate: G5 — Durable survival goal",
+        "Workstream: Minecraft durable objective persistence and authorized continuation",
+        "Capability or component: Canonical environment-goal event ledger, reducer, checkpoint verification, recovery, and Runtime Codex continuation surface",
+        "Authority owner: Runtime Codex owns milestone strategy, retries, recovery, replanning, and completion proposals; Helix owns exact identity, append-only checkpoint integrity, evidence verification, capability admission, provenance, and terminal eligibility; Fabric owns admitted tick-scale viability and control release",
+        "Current maturity: deterministically verified",
+        "Target maturity: integrated accepted"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "sha256": "55e40cf9004b214c43d8d52148322a840c0fc85302f8a45c67ec69f39b810416",
+      "line_count": 374,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Parallel packaged-desktop presentation experiment",
+        "Capability or component: Realtime Texture Pack non-authoritative generative display",
+        "Authority owner: The signed/native desktop host owns the consented capture and overlay process; the user owns start, pause, reveal-original, and stop; generated pixels own no observation, action, or terminal authority",
+        "Current maturity: deterministically verified through the provider-neutral API boundary",
+        "Target maturity: live accepted only after a separately authorized RTP-5 provider packet; this packet does not claim it",
+        "# EH-G8 Realtime Texture Pack v1"
+      ],
+      "packet_references": [
+        "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md",
+        "docs/work-packets/eh-g8-realtime-texture-pack-v1.md"
+      ],
+      "evidence_references": []
+    },
+    {
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md",
+      "sha256": "0548477030031243c4de3669448c2ec4e8b8a4292e253fd03cbf0474f83a4649",
+      "line_count": 777,
+      "header": [
+        "Program gate: G8 — environment-harness release evaluation",
+        "Workstream: Parallel packaged-desktop presentation experiment",
+        "Capability or component: Realtime Texture Pack dynamic visual-direction compiler",
+        "Authority owner: The authenticated developer user owns capture/source selection, visual-target enablement, base prompt, preset, dynamic-mode enablement, agent prompt-control enablement, provider selection, billing, attended resource reload, reveal-original, and stop; the environment harness owns typed situation identity and freshness; the visual-direction compiler owns only bounded non-authoritative treatment classification and prompt/parameter assembly",
+        "Current maturity: specified",
+        "Target maturity: deterministically verified before one separately approved dynamic-prompt live acceptance run",
+        "# EH-G8 Realtime Texture Pack dynamic visual direction v1"
+      ],
+      "packet_references": [],
+      "evidence_references": []
+    }
+  ]
+}

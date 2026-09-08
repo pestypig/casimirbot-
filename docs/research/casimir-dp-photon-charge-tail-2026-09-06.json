@@ -1,0 +1,259 @@
+{
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "checks": {
+    "tail_integral_two_forms": true,
+    "tail_positive": true,
+    "full_upper_exceeds_partial": true,
+    "positive_xenon_denominator": true
+  },
+  "rows": [
+    {
+      "electron_rms_nm_assumed": 0.05,
+      "mchi_GeV": 100.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 1.0834122117491744e-15,
+      "tail_upper": 2.3081878889613785e-14,
+      "full_rigid_integral_upper": 2.416529110136296e-14,
+      "Xe_charge_shape_integral": 2707.1779693171043,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 4.698396598790104e-32
+    },
+    {
+      "electron_rms_nm_assumed": 0.05,
+      "mchi_GeV": 100.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 1.0834122117491744e-15,
+      "tail_upper": 2.3081878889613785e-14,
+      "full_rigid_integral_upper": 2.416529110136296e-14,
+      "Xe_charge_shape_integral": 0.26067461493403266,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 4.879414808602596e-28
+    },
+    {
+      "electron_rms_nm_assumed": 0.05,
+      "mchi_GeV": 200.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 1.0834122117491744e-15,
+      "tail_upper": 2.3081878889613785e-14,
+      "full_rigid_integral_upper": 2.416529110136296e-14,
+      "Xe_charge_shape_integral": 2737.4459607672356,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 4.6464463392709545e-32
+    },
+    {
+      "electron_rms_nm_assumed": 0.05,
+      "mchi_GeV": 200.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 1.0834122117491744e-15,
+      "tail_upper": 2.3081878889613785e-14,
+      "full_rigid_integral_upper": 2.416529110136296e-14,
+      "Xe_charge_shape_integral": 0.3385912481501668,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 3.756563653918743e-28
+    },
+    {
+      "electron_rms_nm_assumed": 0.05,
+      "mchi_GeV": 1000.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 1.0834122117491744e-15,
+      "tail_upper": 2.3081878889613785e-14,
+      "full_rigid_integral_upper": 2.416529110136296e-14,
+      "Xe_charge_shape_integral": 2761.660353927341,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 4.605706036685795e-32
+    },
+    {
+      "electron_rms_nm_assumed": 0.05,
+      "mchi_GeV": 1000.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 1.0834122117491744e-15,
+      "tail_upper": 2.3081878889613785e-14,
+      "full_rigid_integral_upper": 2.416529110136296e-14,
+      "Xe_charge_shape_integral": 0.40092455472307414,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 3.1725160291428145e-28
+    },
+    {
+      "electron_rms_nm_assumed": 0.1,
+      "mchi_GeV": 100.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 1.733437003012533e-14,
+      "tail_upper": 3.217385387811705e-13,
+      "full_rigid_integral_upper": 3.3907290881129585e-13,
+      "Xe_charge_shape_integral": 2707.1779693171043,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 6.592509044556911e-31
+    },
+    {
+      "electron_rms_nm_assumed": 0.1,
+      "mchi_GeV": 100.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 1.733437003012533e-14,
+      "tail_upper": 3.217385387811705e-13,
+      "full_rigid_integral_upper": 3.3907290881129585e-13,
+      "Xe_charge_shape_integral": 0.26067461493403266,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 6.846502967872295e-27
+    },
+    {
+      "electron_rms_nm_assumed": 0.1,
+      "mchi_GeV": 200.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 1.733437003012533e-14,
+      "tail_upper": 3.217385387811705e-13,
+      "full_rigid_integral_upper": 3.3907290881129585e-13,
+      "Xe_charge_shape_integral": 2737.4459607672356,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 6.519615548117027e-31
+    },
+    {
+      "electron_rms_nm_assumed": 0.1,
+      "mchi_GeV": 200.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 1.733437003012533e-14,
+      "tail_upper": 3.217385387811705e-13,
+      "full_rigid_integral_upper": 3.3907290881129585e-13,
+      "Xe_charge_shape_integral": 0.3385912481501668,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 5.2709853977185354e-27
+    },
+    {
+      "electron_rms_nm_assumed": 0.1,
+      "mchi_GeV": 1000.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 1.733437003012533e-14,
+      "tail_upper": 3.217385387811705e-13,
+      "full_rigid_integral_upper": 3.3907290881129585e-13,
+      "Xe_charge_shape_integral": 2761.660353927341,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 6.462451192655886e-31
+    },
+    {
+      "electron_rms_nm_assumed": 0.1,
+      "mchi_GeV": 1000.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 1.733437003012533e-14,
+      "tail_upper": 3.217385387811705e-13,
+      "full_rigid_integral_upper": 3.3907290881129585e-13,
+      "Xe_charge_shape_integral": 0.40092455472307414,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 4.451484708956161e-27
+    },
+    {
+      "electron_rms_nm_assumed": 0.15,
+      "mchi_GeV": 100.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 8.775334697567233e-14,
+      "tail_upper": 1.487924343637164e-12,
+      "full_rigid_integral_upper": 1.5756776906128364e-12,
+      "Xe_charge_shape_integral": 2707.1779693171043,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 3.0635503918871668e-30
+    },
+    {
+      "electron_rms_nm_assumed": 0.15,
+      "mchi_GeV": 100.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 8.775334697567233e-14,
+      "tail_upper": 1.487924343637164e-12,
+      "full_rigid_integral_upper": 1.5756776906128364e-12,
+      "Xe_charge_shape_integral": 0.26067461493403266,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 3.181581808765125e-26
+    },
+    {
+      "electron_rms_nm_assumed": 0.15,
+      "mchi_GeV": 200.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 8.775334697567233e-14,
+      "tail_upper": 1.487924343637164e-12,
+      "full_rigid_integral_upper": 1.5756776906128364e-12,
+      "Xe_charge_shape_integral": 2737.4459607672356,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 3.029676657611624e-30
+    },
+    {
+      "electron_rms_nm_assumed": 0.15,
+      "mchi_GeV": 200.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 8.775334697567233e-14,
+      "tail_upper": 1.487924343637164e-12,
+      "full_rigid_integral_upper": 1.5756776906128364e-12,
+      "Xe_charge_shape_integral": 0.3385912481501668,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 2.4494360601817683e-26
+    },
+    {
+      "electron_rms_nm_assumed": 0.15,
+      "mchi_GeV": 1000.0,
+      "Xe_window_keV": [
+        5.4,
+        270.0
+      ],
+      "partial_integral": 8.775334697567233e-14,
+      "tail_upper": 1.487924343637164e-12,
+      "full_rigid_integral_upper": 1.5756776906128364e-12,
+      "Xe_charge_shape_integral": 2761.660353927341,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 3.0031122824410587e-30
+    },
+    {
+      "electron_rms_nm_assumed": 0.15,
+      "mchi_GeV": 1000.0,
+      "Xe_window_keV": [
+        200.0,
+        270.0
+      ],
+      "partial_integral": 8.775334697567233e-14,
+      "tail_upper": 1.487924343637164e-12,
+      "full_rigid_integral_upper": 1.5756776906128364e-12,
+      "Xe_charge_shape_integral": 0.40092455472307414,
+      "D_rigid_charge_upper_per_raw_Xe_charge_count": 2.0686126681710085e-26
+    }
+  ],
+  "scope": "Born smooth rigid charge-density model with Gaussian atomic electrons, isotropic mono-speed 776 km/s; Xe Helm charge term only; no full-material or experimental bound.",
+  "ratio_cancels": [
+    "alpha",
+    "magnetic_moment_squared",
+    "common_flux"
+  ],
+  "missing": [
+    "discrete atomic/crystal response",
+    "magnetic channel",
+    "electronic excitations",
+    "surface charge",
+    "Born/transport admission",
+    "detector likelihood"
+  ]
+}

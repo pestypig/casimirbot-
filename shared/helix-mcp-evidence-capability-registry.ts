@@ -10,6 +10,7 @@ import {
   HELIX_ENVIRONMENT_ACTION_READ_SCOPE,
   HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE,
 } from "./helix-environment-action";
+import { HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA } from "./helix-environment-connector";
 import {
   HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_READ_TOOL,
   HELIX_MINECRAFT_COMPANION_PRESENCE_EVIDENCE_SCHEMA,
@@ -44,6 +45,32 @@ import {
  * negatives, and focused parity evidence are all named.
  */
 export const HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTORS = [
+  {
+    schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
+    capability_id: "helix.minecraft.situation.observe_result",
+    capability_version: 1,
+    mcp_tool_name: "helix_minecraft_situation_probe",
+    semantic_family: "environment.minecraft.situation",
+    handler_id: "helix.minecraft.situation.handler",
+    handler_contract_version: HELIX_ENVIRONMENT_PROBE_OBSERVATION_SCHEMA,
+    admission_profiles: [{
+      surface: "full_mcp",
+      account_scope: "developer",
+      required_oauth_scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_READ_SCOPE],
+    }],
+    permission_class: "read_observe",
+    interaction_kind: "observe",
+    effect_class: "read_only",
+    confirmation_policy: "never",
+    observation_schema: HELIX_MCP_EVIDENCE_OBSERVATION_SCHEMA,
+    observation_retention_class: "profile_durable",
+    reentry_required: true,
+    terminal_support_policy: "reusable_while_fresh",
+    claim_ceiling: {
+      class: "bounded_observation",
+      description: "Supports only the exact bounded Minecraft probe observation while fresh; it grants no path-safety, execution, answer, or terminal authority.",
+    },
+  },
   {
     schema: HELIX_MCP_EVIDENCE_CAPABILITY_DESCRIPTOR_SCHEMA,
     capability_id: "helix.minecraft.player_action.observe_result",

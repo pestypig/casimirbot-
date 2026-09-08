@@ -1,0 +1,14 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "adapter execution",
+  "repair": "Serial execution checks settled plan and cumulative resident mutation counts against plan and root ceilings before advancing, and immediately after child settlement. An observed overrun fails and releases controls without following success/failure edges into further work.",
+  "checks": [
+    { "check": "Offline one-worker Gradle test: ResidentMutationBudgetTest, ResidentEffectMeasurementsTest, FluidSequenceEngineTest; runGameTest excluded", "exit_code": 0, "passed": 42 },
+    { "case": "Child collect requests one item but reports two with budget one", "result": "FAILED with sequence_observed_mutation_budget_exceeded; observed count remains two; only collect node executed; controls released; subsequent step remains failed" }
+  ],
+  "casimir": { "run_id": "2685", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" },
+  "limitations": ["Checks use settled child measurements; mid-child incidental effects are not yet covered", "No new live rolling handoff evidence", "No native feature advertisement, EXE deployment or Minecraft action", "Existing keyed-server gate is not proof of new native behavior", "ET6 remains active and incomplete"]
+}

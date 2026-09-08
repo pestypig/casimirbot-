@@ -1,0 +1,46 @@
+{
+  "status": "hypothetical gaps determine tension and amplitude; no microscopic spectrum or rate",
+  "M_GeV": 100000.0,
+  "N": 10000.0,
+  "mean_mass_GeV": 10.0,
+  "R_GeVinv": 4.134701201406797,
+  "l": 2,
+  "rows": [
+    {
+      "gap_keV": 28.0,
+      "epsilon": 0.2958156583642543,
+      "surface_tension_GeV3": 2.3395776634508612e-06,
+      "epsilon_qxe_R": 0.30087495793342584,
+      "normalized_one_mode_family_F2_xe": 0.0012841121630637088,
+      "normalized_elastic_F2_xe": 0.8105399119570861,
+      "vmin_248keV_kms": 336.7323630927689,
+      "necessary_q_min_excitation_GeV": 0.01056936391840846,
+      "max_energy_at_soft_q_eV": 0.0020910077442132316,
+      "soft_excitation_kinematically_forbidden": true
+    },
+    {
+      "gap_keV": 100.0,
+      "epsilon": 0.15653093319013214,
+      "surface_tension_GeV3": 2.984155182973037e-05,
+      "epsilon_qxe_R": 0.15920806288377298,
+      "normalized_one_mode_family_F2_xe": 0.0003595514056578384,
+      "normalized_elastic_F2_xe": 0.8105399119570861,
+      "vmin_248keV_kms": 424.4793971509382,
+      "necessary_q_min_excitation_GeV": 0.037747728280030216,
+      "max_energy_at_soft_q_eV": 0.0020910077442132316,
+      "soft_excitation_kinematically_forbidden": true
+    },
+    {
+      "gap_keV": 248.0,
+      "epsilon": 0.09939724197302557,
+      "surface_tension_GeV3": 0.0001835374803735737,
+      "epsilon_qxe_R": 0.10109722102846741,
+      "normalized_one_mode_family_F2_xe": 0.00014498040550719289,
+      "normalized_elastic_F2_xe": 0.8105399119570861,
+      "vmin_248keV_kms": 604.8483004927307,
+      "necessary_q_min_excitation_GeV": 0.09361436613447495,
+      "max_energy_at_soft_q_eV": 0.0020910077442132316,
+      "soft_excitation_kinematically_forbidden": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "status": "finite_gap_rigid_atom_forward_diagnostic",
+  "rows": [
+    {
+      "gap_eV": 1000000.0,
+      "forward_amplitude_over_constant_gap": 0.9999866660321702,
+      "refinement_relative": 0.0
+    },
+    {
+      "gap_eV": 10000000.0,
+      "forward_amplitude_over_constant_gap": 0.9999949166211537,
+      "refinement_relative": 2.220446049250313e-16
+    }
+  ],
+  "assumptions": [
+    "massless mediator and point nucleus; Gaussian neutral cloud rms 0.1 nm",
+    "mu=100 GeV static-source limit; speed 776 km/s",
+    "second Born; forward amplitude only",
+    "nonrelativistic propagator; no target excitation or material correlations"
+  ]
+}

@@ -28,6 +28,28 @@ afterEach(() => {
 });
 
 describe("Helix Ask shared-room thread scope", () => {
+  it.each([
+    ["room:exact", "ready", true],
+    ["room:other", "ready", false],
+    ["room:exact", "closed", false],
+  ])("gates exact room navigation for %s in %s", async (roomId, status, accepted) => {
+    hookState.controller = {
+      room: { room_id: roomId, status, participants: [],
+        runtime: { state: "idle", transport_owner: "none", realtime_session_ref_hash: null } },
+      selfParticipant: null,
+    } as unknown as HelixSharedLiveRoomController;
+    render(<HelixAskSharedLiveRoomControls realtimeSessionId={null}
+      runtimeActive={false} realtimeModel="gpt-realtime" />);
+    const event = new CustomEvent(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT,
+      { detail: { roomId: "room:exact" }, cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(accepted);
+    if (accepted) {
+      expect(await screen.findByRole("dialog")).toBeTruthy();
+    } else {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+  });
   it("publishes the active room id for typed Ask and clears it when the room closes", async () => {
     const onActiveRoomChange = vi.fn();
     hookState.controller = {

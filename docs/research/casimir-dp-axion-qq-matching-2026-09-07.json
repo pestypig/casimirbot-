@@ -1,0 +1,31 @@
+{
+  "source": "https://arxiv.org/pdf/1811.04961 v2 Eq. 2.24, 2.30, 2.31",
+  "scope": "Author-derived top-projector completion of J contraction in down-doublet basis; selected top/QCD boundary and trajectory only; not full UV/kaon matching.",
+  "J": 0.02266561760973906,
+  "K": 0.05251351027974151,
+  "rows": [
+    {
+      "rtol": 1e-07,
+      "previous_partial_imag": 2.7075722973436998e-15,
+      "J_imag": -4.9927876086135695e-21,
+      "K_imag": -7.059156469604557e-19,
+      "updated_selected_imag": 2.7068613889091305e-15,
+      "qq_fractional_shift": -0.0002625630478146477
+    },
+    {
+      "rtol": 1e-09,
+      "previous_partial_imag": 2.707572297353248e-15,
+      "J_imag": -4.992787609569196e-21,
+      "K_imag": -7.059156469666146e-19,
+      "updated_selected_imag": 2.706861388918672e-15,
+      "qq_fractional_shift": -0.00026256304781634935
+    }
+  ],
+  "checks": {
+    "rephasing_J": true,
+    "rephasing_K": true,
+    "external_leg_log_cancellation": true,
+    "tolerance": true
+  },
+  "full_model_admitted": false
+}

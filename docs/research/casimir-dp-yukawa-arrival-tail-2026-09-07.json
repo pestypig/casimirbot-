@@ -1,0 +1,42 @@
+{
+  "status": "conditional_yukawa_eikonal_support_plus_tail_bound",
+  "C": 436934917.6790526,
+  "split_s": 18.314030045726025,
+  "candidate_sha256": "54fc7fe2ae81ff6062486128741a26c7bfa3931b5baf18e0286934bbd8134884",
+  "rows": [
+    {
+      "mediator_eV": 1.0,
+      "split_radius_m": 3.890154610276019e-06,
+      "D_interior_bound": 0.1106793431853671,
+      "D_tail_bound": 0.005605724596756645,
+      "D_total_bound": 0.11628506778212376
+    },
+    {
+      "mediator_eV": 10.0,
+      "split_radius_m": 6.37687587185828e-07,
+      "D_interior_bound": 0.002974053490937609,
+      "D_tail_bound": 9.102624299557515e-05,
+      "D_total_bound": 0.0030650797339331843
+    },
+    {
+      "mediator_eV": 100.0,
+      "split_radius_m": 3.124408848768089e-07,
+      "D_interior_bound": 0.0007139512641462949,
+      "D_tail_bound": 4.407162132756622e-06,
+      "D_total_bound": 0.0007183584262790514
+    },
+    {
+      "mediator_eV": 300000000.0,
+      "split_radius_m": 2.763023744442031e-07,
+      "D_interior_bound": 0.0005583442948451192,
+      "D_tail_bound": 1.2951480960430655e-12,
+      "D_total_bound": 0.0005583442961402674
+    }
+  ],
+  "assumptions": [
+    "all source charges localized within frozen radius",
+    "absolute charge sum 12 per carbon; no neutrality cancellation credited",
+    "same fixed coupling envelope for illustrative mass variants, not new xenon fits",
+    "straight-line static Yukawa eikonal description"
+  ]
+}

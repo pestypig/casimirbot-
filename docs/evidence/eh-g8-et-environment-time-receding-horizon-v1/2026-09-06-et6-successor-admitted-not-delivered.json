@@ -1,0 +1,43 @@
+{
+  "schema": "et6_live_debug_evidence.v1",
+  "recorded_at": "2026-09-06T19:46:38.887Z",
+  "scope": "Direct MCP qualification, not natural EXE prompt acceptance",
+  "root": "et6-root-1946-action",
+  "successor": "et6-succ-1946-1-action",
+  "root_admitted": true,
+  "successor_admitted": true,
+  "successor_request_workflow_id": "et6-succ-1946-1-workflow",
+  "resident_action_id": "et6-root-1946-action",
+  "root_terminal_state": "canceled",
+  "root_terminal_reason": "temporal_runway_exhausted",
+  "root_terminal_at": "2026-09-06T19:44:54.434001300Z",
+  "successor_last_persisted_status": "admitted",
+  "successor_native_acceptance_observed": false,
+  "rolling_extensions_proven": 0,
+  "diagnosis": "1938 successor reused unique root workflow_id. Correcting per-request workflow identity admitted the successor. Resident delivery remains unproven.",
+  "readiness_at": "2026-09-06T19:46:07.513Z",
+  "active_workflows": 0,
+  "controls_asserted": false,
+  "offline_checkpoint_replay": "Recorded checkpoint envelopes passed at 25.6/26.6/27.6 second cutoffs; query shim does not prove historical transaction ordering.",
+  "post_actor": {
+    "air": 300,
+    "food_level": 20,
+    "freezing": false,
+    "health": 20,
+    "max_health": 20,
+    "on_fire": false,
+    "on_ground": true,
+    "pitch": -6.45,
+    "position": {
+      "x": -2.13,
+      "y": 65,
+      "z": 7.7
+    },
+    "velocity": {
+      "x": 0,
+      "y": -0.08,
+      "z": 0
+    },
+    "yaw": 2.43
+  }
+}

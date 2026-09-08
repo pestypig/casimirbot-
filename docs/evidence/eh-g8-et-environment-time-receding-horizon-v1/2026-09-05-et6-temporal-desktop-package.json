@@ -1,0 +1,38 @@
+{
+  "recorded_date": "2026-09-05",
+  "program_gate": "G8",
+  "workstream": "ET6 production rolling integration qualification prerequisite",
+  "result": "local_package_verified_not_deployed",
+  "package": "apps/desktop/release-et6-temporal-20260905/win-unpacked/CasimirBot.exe",
+  "checks": {
+    "client_build": "PASS; exit 0 in preceding build session",
+    "host_build": "New service and dependency manifest observed after build process exited; original exit output unavailable after context truncation. Subsequent staging verified service hash and dependency closure.",
+    "stage_runtime": "PASS; exit 0; six allowlisted roots; dependency closure staged_verified",
+    "electron_builder": "PASS; exit 0; --dir --publish never; unique output directory",
+    "runtime_tree": "PASS; existing verify-runtime-tree.mjs executed in memory with only output-root and module-location substitutions; repository verifier unchanged",
+    "asar_service": "PASS; extracted dist/service.mjs bytes match runtime manifest SHA256"
+  },
+  "identity": {
+    "server_sha256": "63ce1b10e32d6a3829150a56c41c37d063d8a17f7f2f2e51789ee7163ca7780a",
+    "service_bytes": 62432389,
+    "renderer_files": 635,
+    "renderer_sha256": "44bed21c1960bef11b3b2996904c577f51092a8ca4f9e2bb280c0f10273f564a",
+    "marketplace_sha256": "acce58ed91b7f72b2c8ae1999f1e43506ff85027f2e42f8a99ccdd69952cb820",
+    "tunnel_client_version": "0.0.13",
+    "tunnel_client_sha256": "83f08fb39b1c154747debd31b81b65dd4ee834cacf5a073b6301b2688699bc76",
+    "runtime_manifest_sha256": "08e835792dd526faa95abfcf7f8b72d9dea41732305613134fe977868ae4d1d9"
+  },
+  "preservation": {
+    "running_exe_replaced": false,
+    "keyed_server_restarted": false,
+    "minecraft_restarted": false,
+    "old_build_deleted": false,
+    "published": false
+  },
+  "limits": [
+    "This package has not been launched or exercised against Minecraft.",
+    "Native 0.4.10 qualification JAR remains separately built, not installed by this packaging operation.",
+    "Package identity is not proof of three rolling cycles, exact task steering, observation re-entry, or revocation acceptance.",
+    "No release maturity or ET7/ET8 advancement is claimed."
+  ]
+}

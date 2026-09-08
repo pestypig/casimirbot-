@@ -1,0 +1,35 @@
+{
+  "status": "layered_composition_check_with_visual_force_envelope",
+  "rows": [
+    {
+      "label": "nominal",
+      "charge_factor": 0.36280258397792325,
+      "g_SM_ceiling": 1.4199506451355762e-13,
+      "floor_over_ceiling": 21.29944406233646
+    },
+    {
+      "label": "broad_lower",
+      "charge_factor": 0.1901428992339423,
+      "g_SM_ceiling": 1.961409973747721e-13,
+      "floor_over_ceiling": 15.41960107379051
+    },
+    {
+      "label": "broad_upper",
+      "charge_factor": 0.4403491455509724,
+      "g_SM_ceiling": 1.2888721993327978e-13,
+      "floor_over_ceiling": 23.465599888802064
+    }
+  ],
+  "weights": [
+    0.7183056551608902,
+    0.01391982235252276,
+    0.26777452248658706
+  ],
+  "probe_fraction": 0.5922577527025337,
+  "source_difference_fraction": 0.6125754915362734,
+  "assumptions": [
+    "nominal bulk densities g/cm3, dominant-isotope approximations",
+    "published exponential layer kernel; no exact finite-sphere correction",
+    "visual Yukawa ceiling 1e11 unchanged; no new likelihood fit"
+  ]
+}

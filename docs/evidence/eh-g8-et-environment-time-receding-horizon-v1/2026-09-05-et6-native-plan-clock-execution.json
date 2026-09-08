@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "scope": "Internal temporal controller execution clock",
+  "repair": "When a temporal window is attached, graph execution uses observed native ticks relative to the source plan origin instead of restarting at delivery. Repeated clock samples still check stop/deadline boundaries but do not execute input twice.",
+  "verification": {
+    "filters": ["FluidSequenceEngineTest", "PlayerActionControllerTest", "TemporalPlan*Test"],
+    "result": "BUILD SUCCESSFUL",
+    "cases": ["Latest start is inclusive and late delivery cannot reset it", "Repeated sample does not repeat entry jump pulse"],
+    "game_tests": "not run"
+  },
+  "limitations": ["Runtime receiver remains gated off", "No cross-plan extension or live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

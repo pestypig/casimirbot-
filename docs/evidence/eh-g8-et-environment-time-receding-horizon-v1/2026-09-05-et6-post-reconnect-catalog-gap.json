@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "result": "live_qualification_blocked_at_tool_delivery",
+  "observations": {
+    "user_reported_plugin_connected_after_catalog_deployment": true,
+    "authenticated_presence_call_succeeded": true,
+    "current_service_instance": "service_instance:8134dc194deaa98783b923c2def3ec6e",
+    "verified_running_exe": "apps/desktop/release-et6-catalog-20260905/win-unpacked/CasimirBot.exe",
+    "current_task_tools_missing": ["helix_environment_temporal_frontier_publish", "helix_environment_temporal_plan_submit", "helix_workstation_human_control_present"],
+    "current_task_tools_callable": ["helix_reasoning_task_binding_claim", "helix_reasoning_steering_read", "helix_environment_action_authority_inspect", "helix_minecraft_actor_status"],
+    "last_readiness": { "heartbeat_at": "2026-09-05T17:30:25.472Z", "state": "ready", "active_workflows": 0, "controls_asserted": false }
+  },
+  "interpretation": "Reconnection and service reachability are proven separately from catalog delivery. Current raw-catalog tests and packaged hashes establish the repaired source artifact, but do not prove what the hosted connection fetched or retained. The exact client-side cause remains unverified.",
+  "boundaries": [
+    "Do not ask for repeated reconnects without new evidence.",
+    "Do not impersonate the existing MCP principal through a separate HTTP client.",
+    "Do not substitute finite player actions for continuous temporal-plan qualification.",
+    "Do not restart healthy applications solely because catalog observation is unchanged."
+  ],
+  "remaining": "Obtain a supported refreshed tool catalog for this same task, then revalidate exact binding and finite authority before the original complete ET6 acceptance."
+}

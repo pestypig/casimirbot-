@@ -1,0 +1,31 @@
+{
+  "classification": "evidence normalization",
+  "scope": "Capacity sample validation, no controller or admission change",
+  "reproduction": {
+    "basis": "Existing native EnvironmentCapacityTelemetryTest uses invocations at 1010 and 1160 ms.",
+    "scheduler_ticks": 2,
+    "active_control_ticks": 1,
+    "stalled_ticks": 1,
+    "missed_ticks": 2,
+    "before": "Reporter rejects stalled + missed > scheduler even though missed intervals are unobserved slots, not scheduler invocations."
+  },
+  "repair": "Bound stalled ticks by observed scheduler ticks independently; preserve nonnegative missed intervals without imposing that incorrect subset relation.",
+  "after": {
+    "missed_tick_count": 2,
+    "stalled_tick_count": 1,
+    "continuous_control_ratio": 0.5,
+    "exit_satisfied": false
+  },
+  "verification": {
+    "initial_regression": "1 expected failure, 5 passes",
+    "final_report_tests": 9,
+    "final_shared_tests": 27,
+    "total_passed": 36,
+    "negative_cases": ["stalled ticks exceed observed count", "active ticks exceed observed count", "negative missed ticks"],
+    "native_tests_rerun": false
+  },
+  "live_execution": false,
+  "package_rebuilt": false,
+  "capacity_acceptance": "not established",
+  "remaining_caveat": "Continuous-control ratio remains the fraction of observed scheduler invocations, not wall-clock motion availability; missed intervals are reported separately."
+}

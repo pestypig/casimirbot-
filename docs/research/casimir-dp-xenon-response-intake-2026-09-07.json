@@ -1,0 +1,33 @@
+{
+  "status": "response_intake_not_folded_prediction",
+  "xenonnt_commit": "dd00e04597a23c07324d41bc9773c0c59ed01337",
+  "xenonnt_nr_matrices": 21,
+  "xenonnt_er_matrices": 0,
+  "xenon1t_commit": "5a364bc8709f2561e5a013ddea6993a5a7c8e313",
+  "xenon1t_er_shape": [
+    41,
+    199
+  ],
+  "energy_kev": [
+    0.05,
+    10.0
+  ],
+  "row_acceptance_range": [
+    1.2027732769228197e-06,
+    0.06304826974181123
+  ],
+  "raw_search_exposure_kg_day": 356770,
+  "hashes": {
+    "casimir-xenon1t-s2-fallback\\README.md": "3dcb1a96bc434b8281d7befd4f2757e33885345a5acd9ba3e481fff56078eae0",
+    "casimir-xenon1t-s2-fallback\\s2_response_er.csv": "24bc8d0548ec1e405240177ee5e84c89121592eb44dd96a2608bf573878a334a",
+    "casimir-xenon1t-s2-fallback\\s2_binning_info.csv": "637539acfbb0f568c4a0c185ef2d179bb612f6470fec1e2492067a6b417e2282",
+    "casimir-xenonnt-s2-intake\\README.md": "d16f45c8d59a4c3bc9cf6068a4c65bc85fb14110a079fa9608625647c3d40ab1"
+  },
+  "constraints": [
+    "XENONnT published ER limits are not arbitrary-spectrum ER response matrices",
+    "XENON1T ER matrix includes event selections; do not multiply by a second efficiency",
+    "distinguish matrix 50 eV endpoint from analysis 186 eV cutoff",
+    "use search exposure, not training exposure or the original LZ diagnostic exposure",
+    "no detector inference performed in this intake"
+  ]
+}

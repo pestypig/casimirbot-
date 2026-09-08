@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "verification": {
+    "test_file": "server/services/environment-connectors/temporal-plans/__tests__/temporal-plan-preflight.test.ts",
+    "tests": 9,
+    "result": "PASS",
+    "new_cases": ["successor requires checkpoint references", "verified association serialized into INSERT", "exact replay skips checkpoint reread", "changed event reference rejected on replay"],
+    "fixture_scope": "Controlled query and checkpoint-reader fixtures exercise retention branch; separate reader fixtures validate evidence content",
+    "limitations": ["No PostgreSQL transaction isolation proof", "No live event-to-frontier correlation", "No resident handoff or packaged execution"]
+  },
+  "deployed": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

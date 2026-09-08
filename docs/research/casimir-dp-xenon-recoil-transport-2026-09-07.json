@@ -1,0 +1,127 @@
+{
+  "status": "conditional_energy_updating_Xe_slab",
+  "source_sha256": "6a8a73e52583756565490daf1f2938401f367a38f75228bfb1ba550465ca47d9",
+  "rows": [
+    {
+      "speed_kms": 776,
+      "N": 20000,
+      "seed": 9500,
+      "column_scale": 0.1,
+      "status_counts": [
+        0,
+        20000,
+        0,
+        0
+      ],
+      "zero_recoil_count": 19523,
+      "mean_deposited_keV": 0.022371013110770464,
+      "above_5p4_counts": [
+        19987,
+        13,
+        0
+      ],
+      "energy_balance_max_error_keV": 1.7053025658242404e-13
+    },
+    {
+      "speed_kms": 98.7743,
+      "N": 5000,
+      "seed": 9501,
+      "column_scale": 1,
+      "status_counts": [
+        0,
+        19,
+        34,
+        4947
+      ],
+      "zero_recoil_count": 0,
+      "mean_deposited_keV": 5.415778111220381,
+      "above_5p4_counts": [
+        5000,
+        0,
+        0
+      ],
+      "energy_balance_max_error_keV": 6.217248937900877e-15
+    },
+    {
+      "speed_kms": 150,
+      "N": 5000,
+      "seed": 9502,
+      "column_scale": 1,
+      "status_counts": [
+        0,
+        2873,
+        14,
+        2113
+      ],
+      "zero_recoil_count": 6,
+      "mean_deposited_keV": 7.741547261512609,
+      "above_5p4_counts": [
+        4271,
+        728,
+        1
+      ],
+      "energy_balance_max_error_keV": 1.7763568394002505e-14
+    },
+    {
+      "speed_kms": 250,
+      "N": 5000,
+      "seed": 9503,
+      "column_scale": 1,
+      "status_counts": [
+        0,
+        4969,
+        2,
+        29
+      ],
+      "zero_recoil_count": 529,
+      "mean_deposited_keV": 2.6298984839954445,
+      "above_5p4_counts": [
+        4562,
+        414,
+        24
+      ],
+      "energy_balance_max_error_keV": 3.552713678800501e-14
+    },
+    {
+      "speed_kms": 776,
+      "N": 5000,
+      "seed": 9504,
+      "column_scale": 1,
+      "status_counts": [
+        0,
+        5000,
+        0,
+        0
+      ],
+      "zero_recoil_count": 3935,
+      "mean_deposited_keV": 0.2453200221951833,
+      "above_5p4_counts": [
+        4965,
+        35,
+        0
+      ],
+      "energy_balance_max_error_keV": 1.7053025658242404e-13
+    }
+  ],
+  "archive": "casimir-dp-xenon-recoil-transport-2026-09-07.npz",
+  "archive_sha256": "0ecfb1c762fc42c629b1ee6b39a872075f86db06f4b1964100654458526fdf37",
+  "states": [
+    "active",
+    "far_exit",
+    "entrance_exit",
+    "kinetic_energy_below_0.001_keV"
+  ],
+  "recoil_columns": [
+    "history_id",
+    "normalized_depth",
+    "energy_keV",
+    "isotope_A"
+  ],
+  "limitations": [
+    "Normal incidence diagnostic slab, not LZ geometry",
+    "Fixed Born kernel, no strong-amplitude validation",
+    "Energy floor is not a capture label",
+    "True recoil thresholds are not pulse selection",
+    "No coupled incident spectrum or accepted counts"
+  ]
+}

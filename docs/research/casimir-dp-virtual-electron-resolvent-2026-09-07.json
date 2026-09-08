@@ -1,0 +1,28 @@
+{
+  "status": "instantaneous_positive_energy_projected_toy_not_QFT_matching",
+  "source_sha256": "5dd97935c6c3559c0eb8fd2d15eae38b79af9e1f955a790def87be9b8888be9e",
+  "rows": {
+    "gap": {
+      "W_GeV_minus2": -4.916631337126041e-09,
+      "split_relative": 2.220446049250313e-16,
+      "amplitude_ratio_to_static_gap": 0.9999999999999998
+    },
+    "nr": {
+      "W_GeV_minus2": -2.8851877338650333e-10,
+      "split_relative": 0.0,
+      "amplitude_ratio_to_static_gap": 0.05868220608851945
+    },
+    "positive_energy": {
+      "W_GeV_minus2": -8.400753972503977e-10,
+      "split_relative": 1.3093970352429096e-12,
+      "amplitude_ratio_to_static_gap": 0.17086402043344048
+    }
+  },
+  "omissions": [
+    "retardation and mediator poles",
+    "pair sectors and complete crossed diagrams",
+    "finite external momentum",
+    "bound-electron material response",
+    "matching error budget"
+  ]
+}

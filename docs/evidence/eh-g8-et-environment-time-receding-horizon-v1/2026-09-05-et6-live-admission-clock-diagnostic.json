@@ -1,0 +1,835 @@
+{
+  "schema": "casimirbot.et6.live_admission_diagnostic.v1",
+  "recorded_at": "2026-09-05T19:44:28.987Z",
+  "classification": "tool admission and evidence normalization; no authority-policy change",
+  "binding_id": "reasoning_binding:59da2f7c721d9385f8122d0af256f676",
+  "binding_epoch": 1,
+  "identity_basis": "authenticated native desktop MCP client; client-declared same-task continuation, not independent external provider identity proof",
+  "attempts": [
+    {
+      "action_request_id": "et6-temporal-admission-1937",
+      "result": "connector_input_validation_rejected",
+      "reason": "missing_outer_postconditions",
+      "dispatch_proven": false
+    },
+    {
+      "action_request_id": "et6-temporal-admission-1939",
+      "result": "reasoning_binding_target_inactive",
+      "cause": "supervisor presence expired; same continuation refreshed at 19:40:02.714Z",
+      "dispatch_proven": false
+    },
+    {
+      "action_request_id": "et6-temporal-admission-1940",
+      "result": "internal_error",
+      "exact_live_failure_gate": "unknown; generic projection erased distinction",
+      "dispatch_proven": false
+    }
+  ],
+  "frontier": {
+    "schema": "environment.affordance_frontier.v1",
+    "frontier_id": "environment_frontier:d666cb3f-bcf4-4208-85b9-9cb24b456b1e",
+    "identity": {
+      "environment_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+      "source_id": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+      "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+      "producer_epoch": "environment_action_epoch:ebccd567-c2f5-49ef-9d73-3e7c8cf86f73",
+      "authority_id": "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85",
+      "authority_revision": 2,
+      "goal_id": "environment_durable_goal:896355ef-445f-4edd-8465-e02596d619b8",
+      "goal_revision": 5,
+      "observation_revision": 7588883,
+      "affordance_revision": 4
+    },
+    "clocks": {
+      "environment": {
+        "kind": "tick",
+        "sequence": 7588883,
+        "resolution_unit": "minecraft_world_tick",
+        "nominal_units_per_second": 20
+      },
+      "monotonic": {
+        "origin_id": "frontier_publication_clock:48c11c2e-9ccd-4fe7-8053-7dd7c21289f6",
+        "elapsed_ms": 1253417
+      },
+      "audit_at": "2026-09-05T19:40:28.904Z"
+    },
+    "expires_at_environment_sequence": 7588903,
+    "entries": [
+      {
+        "capability_id": "com.casimirbot.minecraft.player.camera.track",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.collect",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.combat.attack",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.combat.guard",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.consume",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.craft",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.equipment.equip",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.follow",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.guardian.execute",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.hotbar.select",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.interact",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.inventory.transfer",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.jump",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.look",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "conditional",
+        "reason_codes": [
+          "requires_action_specific_preconditions"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.mine",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.navigate",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "conditional",
+        "reason_codes": [
+          "requires_action_specific_preconditions"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.place",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "conditional",
+        "reason_codes": [
+          "requires_action_specific_preconditions"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.viability_guardian.arm",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.viability_guardian.disarm",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "blocked",
+        "reason_codes": [
+          "authority_capability_not_listed"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      },
+      {
+        "capability_id": "com.casimirbot.minecraft.player.walk",
+        "capability_version": "1",
+        "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+        "state": "conditional",
+        "reason_codes": [
+          "requires_action_specific_preconditions"
+        ],
+        "required_authority_ids": [
+          "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85"
+        ],
+        "held_resource_keys": [],
+        "parameter_bounds": {},
+        "missing_observation_kinds": [
+          "action_specific_preconditions",
+          "resident_resource_ownership"
+        ],
+        "evidence_probe_capability_ids": [
+          "com.casimirbot.minecraft.perception_snapshot.read"
+        ]
+      }
+    ],
+    "newly_available_capability_ids": [],
+    "newly_blocked_capability_ids": [
+      "com.casimirbot.minecraft.player.camera.track",
+      "com.casimirbot.minecraft.player.collect",
+      "com.casimirbot.minecraft.player.combat.attack",
+      "com.casimirbot.minecraft.player.combat.guard",
+      "com.casimirbot.minecraft.player.consume",
+      "com.casimirbot.minecraft.player.craft",
+      "com.casimirbot.minecraft.player.equipment.equip",
+      "com.casimirbot.minecraft.player.follow",
+      "com.casimirbot.minecraft.player.guardian.execute",
+      "com.casimirbot.minecraft.player.hotbar.select",
+      "com.casimirbot.minecraft.player.interact",
+      "com.casimirbot.minecraft.player.inventory.transfer",
+      "com.casimirbot.minecraft.player.jump",
+      "com.casimirbot.minecraft.player.mine",
+      "com.casimirbot.minecraft.player.place",
+      "com.casimirbot.minecraft.player.viability_guardian.arm",
+      "com.casimirbot.minecraft.player.viability_guardian.disarm"
+    ],
+    "materially_changed_capability_ids": [],
+    "expired_capability_ids": [],
+    "strategy_recommendation_included": false,
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "planning_context": {
+    "catalog_snapshot_id": "environment_catalog:b6f2deb1-0f48-498c-b715-1184dfa2ffa7",
+    "resident_clock_observation": {
+      "heartbeat_id": "environment_action_heartbeat:04e475b4-59f7-4848-8e44-7eff2f3e69bf",
+      "manifest_id": "environment_action_manifest:7fa5122e-d908-43ad-a0dd-e543b5151a65",
+      "producer_epoch_ref": "environment_action_epoch:ebccd567-c2f5-49ef-9d73-3e7c8cf86f73",
+      "clock": {
+        "schema": "helix.environment_clock_snapshot.v1",
+        "clock_id": "minecraft_client_tick_clock:0056fd5b-c27a-4208-b4ee-672cd7f0843a",
+        "clock_kind": "minecraft_game_tick",
+        "tick_rate_hz": 20,
+        "tick_index": 19501,
+        "world_tick_index": 7588912,
+        "monotonic": {
+          "origin_id": "minecraft_monotonic_clock:a71091af-ad7c-4cca-88de-b5b91c64e553",
+          "elapsed_ms": 975497.375
+        },
+        "synchronization": "server_synchronized",
+        "observed_at": "2026-09-05T19:40:30.284422600Z"
+      },
+      "received_at": "2026-09-05T19:40:30.395Z",
+      "receipt_age_ms": 103,
+      "clock_extrapolated": false,
+      "execution_authority": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "observation_producer_epoch_ref": "adapter_epoch:e274ccc87dd61df591766b43d9268a723564be66",
+    "action_producer_epoch_ref": "environment_action_epoch:ebccd567-c2f5-49ef-9d73-3e7c8cf86f73",
+    "clock_extrapolated": false,
+    "execution_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "clock_findings": {
+    "frontier_expiry_world_tick": 7588903,
+    "resident_world_tick": 7588912,
+    "already_expired_at_projection": true,
+    "preflight_clock_gate_would_reject": true,
+    "not_claimed_as_observed_internal_exception": true
+  },
+  "plan": {
+    "schema": "environment.temporal_action_plan.v1",
+    "plan_id": "et6-platform-temporal-20260905-1940",
+    "previous_plan_id": null,
+    "previous_plan_hash": null,
+    "identity": {
+      "environment_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+      "source_id": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+      "subject_id": "environment_subject_binding:b69ce3ad-fd58-40f2-b49c-4f13cc34e418",
+      "producer_epoch": "environment_action_epoch:ebccd567-c2f5-49ef-9d73-3e7c8cf86f73",
+      "authority_id": "environment_action_authority:b9fb14b3-dd5a-46b7-816c-aaece06aab85",
+      "authority_revision": 2,
+      "goal_id": "environment_durable_goal:896355ef-445f-4edd-8465-e02596d619b8",
+      "goal_revision": 5,
+      "observation_revision": 7588883,
+      "affordance_revision": 4
+    },
+    "clocks": {
+      "environment": {
+        "kind": "tick",
+        "sequence": 19501,
+        "resolution_unit": "minecraft_tick",
+        "nominal_units_per_second": 20
+      },
+      "monotonic": {
+        "origin_id": "minecraft_monotonic_clock:a71091af-ad7c-4cca-88de-b5b91c64e553",
+        "elapsed_ms": 975497
+      },
+      "audit_at": "2026-09-05T19:40:30.284Z"
+    },
+    "adapter_id": "minecraft.fabric_client",
+    "adapter_version": "0.4.10",
+    "compiler_version": "environment.minecraft_temporal_plan_compilation.v1",
+    "resident_executor_version": "0.4.10",
+    "start_node_id": "segment_one",
+    "maximum_total_units": 200,
+    "monotonic_deadline_elapsed_ms": 990497,
+    "watermarks": {
+      "decision_unit": 40,
+      "stop_unit": 180,
+      "committed_through_unit": 200,
+      "stabilization_node_id": "failure"
+    },
+    "lanes": [
+      {
+        "lane_id": "move",
+        "priority": 1,
+        "resource_keys": [
+          "camera",
+          "locomotion"
+        ]
+      }
+    ],
+    "effect_ceiling": {},
+    "nodes": [
+      {
+        "kind": "action",
+        "node_id": "segment_one",
+        "lane_id": "move",
+        "capability_id": "com.casimirbot.minecraft.player.navigate",
+        "capability_version": "1",
+        "arguments": {
+          "action_kind": "navigate_to",
+          "destination": {
+            "x": 3.5,
+            "y": 65,
+            "z": 2.5
+          },
+          "arrival_radius": 0.3,
+          "allow_sprint": false,
+          "allow_dig": false,
+          "allow_place": false,
+          "engine_preference": "native_fabric"
+        },
+        "required_resources": [
+          "camera",
+          "locomotion"
+        ],
+        "timing": {
+          "earliest_start_unit": 0,
+          "latest_start_unit": 140,
+          "maximum_duration_units": 60
+        },
+        "preconditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.player_grounded",
+            "arguments": {
+              "expected": true
+            }
+          },
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.hazard_clear",
+            "arguments": {
+              "hazard_kinds": [
+                "lava",
+                "fire",
+                "magma",
+                "cactus",
+                "powder_snow",
+                "hostile",
+                "void_fall"
+              ],
+              "radius": 3
+            }
+          }
+        ],
+        "completion_conditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.position_within",
+            "arguments": {
+              "position": {
+                "x": 3.5,
+                "y": 65,
+                "z": 2.5
+              },
+              "radius": 0.5
+            }
+          }
+        ],
+        "abort_guards": [],
+        "effect_budget": {},
+        "on_success_node_id": "checkpoint_one",
+        "on_failure_node_id": "failure",
+        "on_timeout_node_id": "failure"
+      },
+      {
+        "kind": "action",
+        "node_id": "segment_two",
+        "lane_id": "move",
+        "capability_id": "com.casimirbot.minecraft.player.navigate",
+        "capability_version": "1",
+        "arguments": {
+          "action_kind": "navigate_to",
+          "destination": {
+            "x": 1.5,
+            "y": 65,
+            "z": 2.5
+          },
+          "arrival_radius": 0.3,
+          "allow_sprint": false,
+          "allow_dig": false,
+          "allow_place": false,
+          "engine_preference": "native_fabric"
+        },
+        "required_resources": [
+          "camera",
+          "locomotion"
+        ],
+        "timing": {
+          "earliest_start_unit": 0,
+          "latest_start_unit": 140,
+          "maximum_duration_units": 60
+        },
+        "preconditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.player_grounded",
+            "arguments": {
+              "expected": true
+            }
+          },
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.hazard_clear",
+            "arguments": {
+              "hazard_kinds": [
+                "lava",
+                "fire",
+                "magma",
+                "cactus",
+                "powder_snow",
+                "hostile",
+                "void_fall"
+              ],
+              "radius": 3
+            }
+          }
+        ],
+        "completion_conditions": [
+          {
+            "kind": "adapter_condition",
+            "condition_id": "minecraft.position_within",
+            "arguments": {
+              "position": {
+                "x": 1.5,
+                "y": 65,
+                "z": 2.5
+              },
+              "radius": 0.5
+            }
+          }
+        ],
+        "abort_guards": [],
+        "effect_budget": {},
+        "on_success_node_id": "success",
+        "on_failure_node_id": "failure",
+        "on_timeout_node_id": "failure"
+      },
+      {
+        "kind": "checkpoint",
+        "node_id": "checkpoint_one",
+        "checkpoint_id": "platform_first_foothold",
+        "required_evidence_kinds": [
+          "position"
+        ],
+        "condition": {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.position_within",
+          "arguments": {
+            "position": {
+              "x": 3.5,
+              "y": 65,
+              "z": 2.5
+            },
+            "radius": 0.5
+          }
+        },
+        "wait_up_to_units": 10,
+        "on_satisfied_node_id": "segment_two",
+        "on_timeout_node_id": "failure"
+      },
+      {
+        "kind": "terminal",
+        "node_id": "success",
+        "outcome": "succeeded",
+        "reason_code": "bounded_segment_observed"
+      },
+      {
+        "kind": "terminal",
+        "node_id": "failure",
+        "outcome": "failed",
+        "reason_code": "stop_on_boundary_or_failed_condition"
+      }
+    ],
+    "automatic_replay": false,
+    "adapter_strategy_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "plan_hash": "sha256:09dc06b842e66d49174eae2d0d6557ec5e06be365be6e758a359b8a4103b5344"
+  },
+  "post_attempt_readiness": {
+    "observed_heartbeat_received_at": "2026-09-05T19:41:25.368Z",
+    "active_workflow_count": 0,
+    "controls_asserted": false,
+    "ready_for_actions": true
+  },
+  "repair": {
+    "typed_preflight_errors": true,
+    "mcp_maps_known_typed_errors_to_409": true,
+    "arbitrary_exception_messages_not_exposed": true,
+    "deployed": false,
+    "changes_freshness_or_authority": false
+  },
+  "verification": {
+    "focused_test_files": 3,
+    "focused_tests_passed": 16,
+    "live_rolling_cycles_proven": 0,
+    "sustained_motion": "unmeasured",
+    "latencies": "unmeasured",
+    "goal_complete": false
+  },
+  "next": "Repair coherent frontier/controller sampling and expose the actual typed live rejection before retrying; preserve all ET6 qualification requirements."
+}

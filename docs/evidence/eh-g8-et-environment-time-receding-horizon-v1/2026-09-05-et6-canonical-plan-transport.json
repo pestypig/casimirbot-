@@ -1,0 +1,17 @@
+{
+  "et6_complete": false,
+  "repair": "Preserve existing v1 hash semantics by transporting exact canonical source-plan bytes. Broker generates them; request schema rejects contradictory bytes. Native integrity helper hashes exact bytes and compares decoded semantic content with the delivered plan.",
+  "verification": {
+    "broker_tests_passed": 5,
+    "native_hash_fixture": "BUILD SUCCESSFUL; v1 counterexample now verifies through exact bytes; byte/content tampering rejects",
+    "casimir_run": "2658",
+    "verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "certificate_scope": "repo-convergence"
+  },
+  "limitations": ["Native integrity helper is not yet called by runtime admission", "Temporal receiver still fails closed", "No live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

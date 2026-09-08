@@ -1,0 +1,28 @@
+{
+  "source": "https://arxiv.org/html/1801.04847v2 Table1",
+  "scope": "Comparison with a published illustrative electron coupling; not a calculation of UV kinetic mixing or decay phase space.",
+  "r_electron_over_baryon": 0.0005807048664429298,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "maximum_phase_space_factor_for_reference_strength": 0.0008442668701477868,
+      "benchmark_r_over_critical_r": 34.41597885894071
+    },
+    {
+      "mchi_GeV": 15.0,
+      "maximum_phase_space_factor_for_reference_strength": 0.005325762234072899,
+      "benchmark_r_over_critical_r": 13.702793505249337
+    }
+  ],
+  "quark_photon_baryon_charge_traces": {
+    "3": "0",
+    "4": "2/3",
+    "5": "1/3",
+    "6": "1"
+  },
+  "checks": {
+    "exact_charge_traces": true
+  },
+  "mixing_predicted": false,
+  "full_model_admitted": false
+}

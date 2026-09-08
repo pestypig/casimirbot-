@@ -1,0 +1,115 @@
+{
+  "status": "initial_path_single_capture_channel_not_total_capture",
+  "rows": [
+    {
+      "A": 107,
+      "Z": 47,
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "capture_recoil_interval_keV": [
+        334.93579466555616,
+        335.0046642790565
+      ],
+      "point_nucleus_capture_sigma_cm2": 1.2402191589798323e-41,
+      "Helm_capture_sigma_cm2": 3.36840985923614e-45,
+      "pure_target_initial_path_capture_optical_depth_upper": 4.886114054710338e-10,
+      "pure_target_Helm_initial_path_capture_optical_depth": 1.327058579612397e-13
+    },
+    {
+      "A": 107,
+      "Z": 47,
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "capture_recoil_interval_keV": [
+        334.93579466555616,
+        335.0046642790565
+      ],
+      "point_nucleus_capture_sigma_cm2": 1.2402193018914872e-41,
+      "Helm_capture_sigma_cm2": 3.3684102473811974e-45,
+      "pure_target_initial_path_capture_optical_depth_upper": 4.886114617741993e-10,
+      "pure_target_Helm_initial_path_capture_optical_depth": 1.3270587325306133e-13
+    },
+    {
+      "A": 107,
+      "Z": 47,
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "capture_recoil_interval_keV": [
+        334.93579466555616,
+        335.0046642790565
+      ],
+      "point_nucleus_capture_sigma_cm2": 1.241635735122958e-41,
+      "Helm_capture_sigma_cm2": 3.372257250336095e-45,
+      "pure_target_initial_path_capture_optical_depth_upper": 4.891694965594014e-10,
+      "pure_target_Helm_initial_path_capture_optical_depth": 1.3285743433055591e-13
+    },
+    {
+      "A": 108,
+      "Z": 48,
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "capture_recoil_interval_keV": [
+        334.93579466555616,
+        335.0025694443479
+      ],
+      "point_nucleus_capture_sigma_cm2": 1.2653597954844247e-41,
+      "Helm_capture_sigma_cm2": 2.755214803952751e-45,
+      "pure_target_initial_path_capture_optical_depth_upper": 4.939002180284512e-10,
+      "pure_target_Helm_initial_path_capture_optical_depth": 1.0754262915920424e-13
+    },
+    {
+      "A": 108,
+      "Z": 48,
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "capture_recoil_interval_keV": [
+        334.93579466555616,
+        335.0025694443479
+      ],
+      "point_nucleus_capture_sigma_cm2": 1.2653599464353428e-41,
+      "Helm_capture_sigma_cm2": 2.75521513263565e-45,
+      "pure_target_initial_path_capture_optical_depth_upper": 4.939002769482079e-10,
+      "pure_target_Helm_initial_path_capture_optical_depth": 1.0754264198848458e-13
+    },
+    {
+      "A": 108,
+      "Z": 48,
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "capture_recoil_interval_keV": [
+        334.93579466555616,
+        335.0025694443479
+      ],
+      "point_nucleus_capture_sigma_cm2": 1.2668561008770773e-41,
+      "Helm_capture_sigma_cm2": 2.7584728828139928e-45,
+      "pure_target_initial_path_capture_optical_depth_upper": 4.944842618413695e-10,
+      "pure_target_Helm_initial_path_capture_optical_depth": 1.0766979977626222e-13
+    }
+  ],
+  "column_g_cm2": 7000000000.0,
+  "local_speed_km_s": 776,
+  "escape_speed_km_s": 11.2,
+  "assumptions": [
+    "fixed products, stationary nuclei and Born elastic scattering",
+    "approximate isotope masses A times u, Z=47/48 diagnostic targets",
+    "pure isotope column, constant initial speed, no prior collisions"
+  ],
+  "limitations": [
+    "point charge result bounds this nuclear form-factor channel, not all atomic transitions",
+    "no abundance or actual Earth profile; pure column is deliberately favorable",
+    "prior slowing changes capture kinematics; not a total transport bound",
+    "no retention, surface density, or common-model validation"
+  ]
+}

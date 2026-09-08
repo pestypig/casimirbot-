@@ -1,0 +1,124 @@
+{
+  "status": "conditional_elastic_path_budget_not_earth_capture",
+  "initial_speed_kms": 776,
+  "initial_kinetic_energy_keV": 335.00558007707184,
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "collision_coefficient_per_column": 1.0155279030921391e-08,
+      "energy_loss_GeV_per_column": 5.353492870343108e-21,
+      "absolute_sum_energy_loss_GeV_per_column": 8.486838144144087e-21,
+      "columns": [
+        {
+          "path_column_g_cm2": 400000.0,
+          "point_collision_mean_at_initial_speed": 0.004062111612368556,
+          "first_order_point_mean_loss_keV": 2.141397148137243e-09,
+          "first_order_fractional_loss": 6.392123819682616e-12,
+          "conditional_probability_bound_to_lose_half_energy_within_path_column": 1.6213390866512194e-10
+        },
+        {
+          "path_column_g_cm2": 7000000000.0,
+          "point_collision_mean_at_initial_speed": 71.08695321644974,
+          "first_order_point_mean_loss_keV": 3.747445009240176e-05,
+          "first_order_fractional_loss": 1.118621668444458e-07,
+          "conditional_probability_bound_to_lose_half_energy_within_path_column": 2.8373434016396337e-06
+        }
+      ],
+      "checks": [
+        {
+          "A": 28,
+          "relative_moment_error": 2.90878432451791e-14
+        },
+        {
+          "A": 16,
+          "relative_moment_error": 8.024692021990631e-13
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "collision_coefficient_per_column": 1.0154420587725264e-12,
+      "energy_loss_GeV_per_column": 3.0291881838080277e-21,
+      "absolute_sum_energy_loss_GeV_per_column": 6.162498683807675e-21,
+      "columns": [
+        {
+          "path_column_g_cm2": 400000.0,
+          "point_collision_mean_at_initial_speed": 4.0617682350901054e-07,
+          "first_order_point_mean_loss_keV": 1.2116752735232111e-09,
+          "first_order_fractional_loss": 3.616880868803592e-12,
+          "conditional_probability_bound_to_lose_half_energy_within_path_column": 1.1772935712681413e-10
+        },
+        {
+          "path_column_g_cm2": 7000000000.0,
+          "point_collision_mean_at_initial_speed": 0.0071080944114076845,
+          "first_order_point_mean_loss_keV": 2.1204317286656193e-05,
+          "first_order_fractional_loss": 6.329541520406286e-08,
+          "conditional_probability_bound_to_lose_half_energy_within_path_column": 2.060263749719247e-06
+        }
+      ],
+      "checks": [
+        {
+          "A": 28,
+          "relative_moment_error": 4.463096558993129e-14
+        },
+        {
+          "A": 16,
+          "relative_moment_error": 1.538991156735392e-12
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "collision_coefficient_per_column": 8.876146317457512e-17,
+      "energy_loss_GeV_per_column": 8.161606173058704e-22,
+      "absolute_sum_energy_loss_GeV_per_column": 3.963429084712327e-21,
+      "columns": [
+        {
+          "path_column_g_cm2": 400000.0,
+          "point_collision_mean_at_initial_speed": 3.550458526983005e-11,
+          "first_order_point_mean_loss_keV": 3.2646424692234817e-10,
+          "first_order_fractional_loss": 9.74503907807271e-13,
+          "conditional_probability_bound_to_lose_half_energy_within_path_column": 7.57179809850426e-11
+        },
+        {
+          "path_column_g_cm2": 7000000000.0,
+          "point_collision_mean_at_initial_speed": 6.213302422220259e-07,
+          "first_order_point_mean_loss_keV": 5.713124321141093e-06,
+          "first_order_fractional_loss": 1.7053818386627242e-08,
+          "conditional_probability_bound_to_lose_half_energy_within_path_column": 1.3250646672382455e-06
+        }
+      ],
+      "checks": [
+        {
+          "A": 28,
+          "relative_moment_error": 1.176836406102666e-13
+        },
+        {
+          "A": 16,
+          "relative_moment_error": 1.1690648449302898e-11
+        }
+      ]
+    }
+  ],
+  "checks": [
+    "normalization receipt hash",
+    "positive moments",
+    "analytic versus log-quadrature moment"
+  ],
+  "limitations": [
+    "chosen silica composition and path budgets, not actual geology",
+    "point nuclear collision means omit screening",
+    "rigid-neutral bound excludes inelastic electronic/material channels",
+    "path column is integrated along trajectory, not vertical depth",
+    "no slow distribution, diffusion or capture rate"
+  ]
+}

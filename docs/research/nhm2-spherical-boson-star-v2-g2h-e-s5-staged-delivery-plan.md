@@ -306,6 +306,15 @@ Purpose: make the primary checkpoint capable of constructing and checking one
 quantum state on the exact classical geometry that passed every eligible
 classical duty.
 
+Scope boundary: the control couples the classical massive complex scalar to
+Einstein's equation. Its separate quantum field is the frozen free real scalar
+on that classical background. Q01-Q06 test that field's state, renormalized
+stress and noise; they do not by themselves iterate the quantum stress back
+into the metric or establish a converged semiclassical fixed point. Such a
+joint geometry/state witness remains a separate G3 obligation in the canonical
+work program. Neither equilibrium nor quantum pair agreement closes it by
+implication.
+
 Required deliverables:
 
 1. Q01 global-hyperbolic/static/complete accepted-background certificate.
@@ -389,6 +398,76 @@ Required decision evidence:
 Only a full authenticated PASS may establish that the boson-star control
 machinery works on this frozen member. It does not establish NHM2 source closure,
 material feasibility, propulsion, transport, or physical viability.
+
+### Observable sidecar and downstream RB1/RB3 validation
+
+Planning addition, September 5, 2026: these deliverables make the benchmark
+interpretable and independently reusable. They change no frozen acceptance
+predicate, C15/Q06 receipt, output ABI, candidate identity or active gate.
+Only documentation and candidate-neutral inventory are eligible now. Every
+producer or execution requires a separately versioned work packet with the
+program's ten-field header, frozen inputs, budgets, failure rules and explicit
+authorization boundary. Missing new observables remain missing, never inferred
+from a plot or inserted into an authenticated v1 result.
+
+1. **Exact-member observable sidecar (BMR-H reporting follow-up).** Prepare a
+   machine-readable table and matching figure for the unchanged `shat(0)=6/5`
+   member, anchored to both lanes' immutable evidence. Include the scalar and
+   metric profiles, asymptotically normalized frequency, ADM/Komar/integrated
+   mass intervals, explicitly defined effective radius, Noether charge,
+   compactness, fundamental radial eigenvalue interval, and constraint/tail
+   errors. Each value needs its units, normalization, extraction definition,
+   uncertainty/enclosure, source hash and lane identity. Distinguish an
+   authenticated interval from a diagnostic estimate and a missing quantity.
+   Freeze a sidecar schema and extraction rules before reading candidate
+   outputs; existing-output extraction must not invoke the candidate solver.
+   New computations require their own later authorization, not a BMR-F retry.
+   Sidecar publication is not a new retroactive BMR-H acceptance test.
+
+   In particular, define any `R99` using the areal radius enclosing 99% of
+   the ADM-consistent cumulative mass, with controlled exterior-tail error;
+   do not substitute a charge radius or proper-volume mass integral. State
+   whether compactness means `G M_ADM/(c^2 R99)` or twice that quantity.
+   Freeze the Noether-current sign and normalization, hypersurface measure,
+   scalar normalization and asymptotic time normalization. SI conversion is
+   conditional on justified scale bindings, not on an assumed particle mass.
+   The existing C09 proper-volume comparator remains diagnostic and is not
+   silently added to the common ADM/Komar/integrated-mass equality.
+
+2. **RB1 equilibrium-family atlas (downstream of BMR-H acceptance).** Schedule
+   the existing [RB1 research benchmark](./nhm2-casimir-cross-system-validation-goal.md)
+   as a separate family study, not a scan to replace the selected member.
+   Preregister sample coordinates, continuation and termination rules,
+   independent replay, observables and error budgets before new results.
+   Deliver mass-frequency, mass-radius and charge relations with the accepted
+   member marked, literature overlays and an explicit convention map for
+   field amplitude, radius and reduced versus unreduced Planck mass. A Kaup
+   maximum comparison must cite the primary reference and convert conventions
+   before comparing numbers. Label observed turning points separately from
+   stability evidence; literature proximity alone is not a C13 certificate.
+
+3. **RB3 nonlinear evolution benchmark (downstream, separately authorized).**
+   Schedule the existing RB3 dynamics study after accepted equilibrium inputs
+   and its own frozen evolution contract exist. Bind initial-data hashes,
+   constraint-consistent perturbation families/amplitudes, gauge and boundary
+   treatment, resolution ladder, extraction surfaces, duration in dynamical
+   units, resource ceilings and first-failure rules. Report convergence,
+   constraint norms, mass/charge balance including boundary flux, radial-mode
+   behavior and preregistered classifications: bounded oscillation over the
+   observed interval, migration, dispersal, collapse, or inconclusive.
+   Collapse needs a defined horizon/trapped-surface diagnostic, not a gauge
+   singularity. A short apparently quiet run proves neither indefinite nor
+   nonspherical stability. This complements, rather than replaces, C13's
+   frozen linear spherical stability certificate. Any later Casimir evolution
+   needs its own material, drive, dissipation and quantum-response model; it
+   cannot inherit the star's evolution equations or stability result.
+
+Stop at convention ambiguity, absent source data, unresolved tail/flux error,
+nonconvergence or lane disagreement; preserve the result without tuning it
+toward a reference curve. These studies earn no P8P/S5 gate credit, authorize
+no selected-member evaluation now, and are not silently added as prerequisites
+to the existing BMR-I sequence. A future transfer claim that relies on family
+or dynamical validation must explicitly name and close the relevant study.
 
 ## BMR-I — NHM2 transfer
 

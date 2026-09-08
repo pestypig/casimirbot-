@@ -1,0 +1,12 @@
+{
+  "scope": "Exact rational two-flavor rotation, symmetric mixed Cqq3 probe, explicit-mt additive library subset; MW=v=1 unit choices. General flavor completion and full matching remain unproven.",
+  "library_normalized": "-t**2*(4*t**4*log(t) - 4*t**4*log(u) - 7*t**4 - 8*t**2*log(t) + 8*t**2*log(u) + 8*t**2 + 16*log(t) - 4*log(u) - 1)/(8*(t - 1)**2*(t + 1)**2)",
+  "selected_normalized": "8 J(x) + 4 K(x,mu)",
+  "remainder": "2 x log(x)/(x-1)",
+  "symbolic_residual": "0",
+  "checks": {
+    "exact_identity": true,
+    "no_Z_mass": true
+  },
+  "qq_full_overlap_established": false
+}

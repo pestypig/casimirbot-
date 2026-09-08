@@ -1,0 +1,22 @@
+{
+  "classification": "evidence normalization",
+  "confirmed_defect": "Temporal MCP submission mapped typed action-broker refusals to retryable internal_error.",
+  "reproduction": {
+    "injected_error": "action_policy_denied",
+    "before": "internal_error, retryable true",
+    "after": "action_policy_denied, retryable false, private message omitted"
+  },
+  "verification": {
+    "red_test": "failed at expected typed-error assertion",
+    "focused_mcp_suite": "4 passed",
+    "discipline_quick": "passed with classification warning; classification recorded here",
+    "diff_check": "existing trailing whitespace at helix-mcp-server.ts import block remains outside this patch"
+  },
+  "running_exe_contains_patch": false,
+  "live_internal_error_cause_identified": false,
+  "admission_policy_changed": false,
+  "freshness_policy_changed": false,
+  "execution_authority": false,
+  "et6_live_acceptance": false,
+  "nav1_unlocked": false
+}

@@ -1,0 +1,391 @@
+{
+  "schema": "casimirbot.cfp1.specification_validation.v1",
+  "captured_utc": "2026-09-07T03:22:07.192Z",
+  "scope": "Prepared specification only; no stage closure, rights clearance, runtime or release evidence.",
+  "docs_audit": {
+    "command": "npm run helix:environment-harness:docs-audit",
+    "exit_code": 0,
+    "ok": true,
+    "active_gate": "G8",
+    "capability_rows": 40,
+    "acceptance_claims": 14
+  },
+  "packet_headers_checked": 9,
+  "local_links": [
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/scope-claims-policy-proposal.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/entitlements-distribution-draft-2026-09-07.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/rights-draft-2026-09-06/rights-component-matrix.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-specification-01/owner-decisions.json",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-specification-01/source-capture.json",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-specification-01/external-source-review.json",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp3-license-enforcement-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp3-software-commerce-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp3-signing-provenance-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp3-distribution-migration-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "target": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-specification-01/bounded-case-matrix.json",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/scope-claims-policy-proposal.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/entitlements-distribution-draft-2026-09-07.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "target": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "target": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "target": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "target": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "target": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "target": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "target": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "target": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "target": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md",
+      "present": true
+    },
+    {
+      "from": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "target": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "present": true
+    },
+    {
+      "from": "docs/audits/eh-g8-cfp1-specification-checkpoint-2026-09-06.md",
+      "target": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "present": true
+    }
+  ],
+  "test_paths_located_not_run": [
+    "server/services/helix-ask/realtime-room/__tests__/room-lifecycle-route.test.ts",
+    "server/services/helix-ask/realtime-room/__tests__/room-participant-route.test.ts",
+    "server/routes/__tests__/helix-shared-live-room-transports.test.ts",
+    "server/mcp/__tests__/helix-mcp-minecraft-local-lifecycle.test.ts",
+    "server/mcp/__tests__/helix-mcp-minecraft-action.test.ts",
+    "server/services/helix-ask/workstation-tool-gateway/__tests__/account-policy.test.ts",
+    "server/services/helix-account/__tests__/billing-entitlement-store.test.ts",
+    "server/routes/__tests__/stripe-sandbox-webhook.test.ts",
+    "server/routes/__tests__/stripe-sandbox-acceptance.test.ts",
+    "server/routes/__tests__/desktop-auth0-step-up.test.ts",
+    "server/routes/__tests__/installed-account-services.test.ts",
+    "tests/desktop-release-signing.spec.ts",
+    "tests/desktop-release-slice.spec.ts",
+    "tests/desktop-site-release-metadata.spec.ts",
+    "server/services/shared-live-room-control/__tests__/binding-store.test.ts"
+  ],
+  "json_files_parsed": 7,
+  "case_matrix": {
+    "normal": 10,
+    "distinct_adverse_lifecycle": 88,
+    "adverse_lifecycle_runs": 176,
+    "value_runs": 12
+  },
+  "diff_check": {
+    "exit_code": 0,
+    "output": "warning: in the working copy of 'docs/BUSINESS_MODEL.md', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'docs/architecture/casimirbot-environment-harness-product-goal-v1.md', LF will be replaced by CRLF the next time Git touches it\nwarning: in the working copy of 'docs/helix-environment-harness-work-program-v1.md', LF will be replaced by CRLF the next time Git touches it"
+  },
+  "files": [
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "696fcf3fc1b56bb9cfb0e059b852a3db2d2cf52cd467d97f40a79be6e8a65c1f"
+    },
+    {
+      "path": "docs/architecture/casimirbot-environment-harness-product-goal-v1.md",
+      "sha256": "6a2104f723d44d4ce7270f6653c741f02ef7e6acfaf784a079501eadeee56bf7"
+    },
+    {
+      "path": "docs/BUSINESS_MODEL.md",
+      "sha256": "6c9ef59c4c64416923e04146b35c77a3891bf0b5e5be1b14bcb3c9dd2f735e79"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "f48624516f1b8c0725d202106215d987082774656df5e9b9d2e01c174cd929ed"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "sha256": "fe6ab824895c70d50e2a32b2dee40b9a645765cb52dfbc97a2bba88d48eb5783"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "sha256": "6336c5bcbcaf5e84fb930cd4918c55c7832cfa5bc356a4a866923e2c83401705"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "sha256": "ae56425224d90f7f076bc66020b92f12d7085c9f9f0be007ddc9ba9e3865c726"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "sha256": "0c8e22d9e6c5d354bec7177d2a61205567784ab302fbd6fd75342c8703b4af3c"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp3-license-enforcement-v1.md",
+      "sha256": "37197ed523f98bbe598084fed7dc1ee4d2bd1a42c0aba424dcc78f625f2161e9"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp3-software-commerce-v1.md",
+      "sha256": "67721b7c44313a5a6c8430e976f7c85917e6503fea5e7942d9ee77ed7542d44e"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp3-signing-provenance-v1.md",
+      "sha256": "370f9d4f33a82f8994239f4f02b96c4ce9d18064b69032ed04c58be9accac459"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp3-distribution-migration-v1.md",
+      "sha256": "3b98ca6d517f4e7e6e50dc407751b8003bd9980a39dc62b0514846a979818ea0"
+    },
+    {
+      "path": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/entitlements-distribution-draft-2026-09-07.md",
+      "sha256": "f4d2168345839eef439a71ac4098812636fc7403482283d28d7a2d34805d6827"
+    },
+    {
+      "path": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md",
+      "sha256": "1e2675b83a5fb2a2fa50273f5ff2ff73d84378daad0444b8dd71e8f99c8925a2"
+    },
+    {
+      "path": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/rights-draft-2026-09-06/rights-component-matrix.md",
+      "sha256": "409c1d4841852a7423c584d6f7846266b40c90645c1dd0d0e839cab7e2713010"
+    },
+    {
+      "path": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/scope-claims-policy-proposal.md",
+      "sha256": "937519ec393c6a6571710003bf64ab394b84c5530ee4fc57c940b903d5485014"
+    },
+    {
+      "path": "docs/audits/eh-g8-cfp1-specification-checkpoint-2026-09-06.md",
+      "sha256": "53ba2582389d2acf66c606a043fbfc634288f02713b94b1ec49ced7cff985e0a"
+    }
+  ],
+  "ok": true,
+  "failures": [],
+  "decision_records": [
+    {
+      "id": "D01",
+      "state": "owner_selected"
+    },
+    {
+      "id": "D02",
+      "state": "awaiting_owner"
+    },
+    {
+      "id": "D03",
+      "state": "awaiting_owner_and_provenance_review"
+    },
+    {
+      "id": "D04",
+      "state": "proposal"
+    },
+    {
+      "id": "D05",
+      "state": "proposal"
+    },
+    {
+      "id": "D06",
+      "state": "proposal"
+    },
+    {
+      "id": "D07",
+      "state": "proposal"
+    },
+    {
+      "id": "D08",
+      "state": "rights_review_required"
+    },
+    {
+      "id": "D09",
+      "state": "retained_existing_contract"
+    },
+    {
+      "id": "D10",
+      "state": "selected_prior_direction"
+    },
+    {
+      "id": "D11",
+      "state": "historical_dependency_not_reverified"
+    },
+    {
+      "id": "D12",
+      "state": "owner_reaffirmed_exclusion"
+    }
+  ],
+  "review": {
+    "independent_critique_received": true,
+    "coordinator_fixes": [
+      "Trusted pre-release eligibility interface separates CFP2 from commercial CFP3.",
+      "Minecraft indirect-product checks explicitly conditional.",
+      "Owner broad scope versus task candidate separated.",
+      "Exactly enumerated adverse cases and explicit readiness PASS clock."
+    ],
+    "final_followup": "queued at checkpoint capture; not claimed accepted"
+  }
+}

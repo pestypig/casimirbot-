@@ -1,0 +1,102 @@
+{
+  "evidence_class": "leading_NR_vector_amplitude_audit_not_recast_or_loop_verification",
+  "inputs_sha256": "38b1d6f96b634ad4f46bf1c9b9d121f62725ed21b5129e5249d49d8b2e237f19",
+  "GF_GeV_minus2": 1.1663787e-05,
+  "nucleon_vector_coefficient_GeV_minus2": 8.247542882015496e-06,
+  "sigma_neutron_at_1100GeV_cm2": 7.429929499971088e-39,
+  "rows": [
+    {
+      "representation": "3M2D",
+      "mchi_GeV": 1440.0,
+      "light_state_M_fraction": 0.0,
+      "light_state_Dplus_fraction": 1.0,
+      "vector_transition_weight": 0.9999998706205069,
+      "axial_transition_weight": 1.2937949321459609e-07,
+      "analytic_vector_weight": 0.9999998706205068,
+      "diagonal_Higgs_mass_derivative": 0.0,
+      "vector_neutron_sigma_cm2": 7.432923739089453e-39,
+      "lower_normalization_sigma_cm2": 1.858231175189371e-39,
+      "fixed_spectrum_leading_SI_rate_ratio": 3.9999994824820266
+    },
+    {
+      "representation": "5M4D",
+      "mchi_GeV": 7580.0,
+      "light_state_M_fraction": 0.0,
+      "light_state_Dplus_fraction": 1.0,
+      "vector_transition_weight": 0.9999999752452035,
+      "axial_transition_weight": 2.4754796342907955e-08,
+      "analytic_vector_weight": 0.9999999752452036,
+      "diagonal_Higgs_mass_derivative": 0.0,
+      "vector_neutron_sigma_cm2": 7.440782558387581e-39,
+      "lower_normalization_sigma_cm2": 1.8601956856456612e-39,
+      "fixed_spectrum_leading_SI_rate_ratio": 3.9999999009808134
+    },
+    {
+      "representation": "7M6D",
+      "mchi_GeV": 22230.0,
+      "light_state_M_fraction": 0.0,
+      "light_state_Dplus_fraction": 1.0,
+      "vector_transition_weight": 0.9999999916748981,
+      "axial_transition_weight": 8.325102182728136e-09,
+      "analytic_vector_weight": 0.9999999916748978,
+      "diagonal_Higgs_mass_derivative": 0.0,
+      "vector_neutron_sigma_cm2": 7.44199831783032e-39,
+      "lower_normalization_sigma_cm2": 1.8604995949464294e-39,
+      "fixed_spectrum_leading_SI_rate_ratio": 3.999999966699591
+    },
+    {
+      "representation": "9M8D",
+      "mchi_GeV": 49080.0,
+      "light_state_M_fraction": 0.0,
+      "light_state_Dplus_fraction": 1.0,
+      "vector_transition_weight": 0.9999999962988575,
+      "axial_transition_weight": 3.7011423947463293e-09,
+      "analytic_vector_weight": 0.9999999962988576,
+      "diagonal_Higgs_mass_derivative": 0.0,
+      "vector_neutron_sigma_cm2": 7.442342498910641e-39,
+      "lower_normalization_sigma_cm2": 1.860585631613953e-39,
+      "fixed_spectrum_leading_SI_rate_ratio": 3.9999999851954295
+    },
+    {
+      "representation": "11M10D",
+      "mchi_GeV": 83810.0,
+      "light_state_M_fraction": 0.0,
+      "light_state_Dplus_fraction": 1.0,
+      "vector_transition_weight": 0.9999999978635881,
+      "axial_transition_weight": 2.136411980979771e-09,
+      "analytic_vector_weight": 0.9999999978635881,
+      "diagonal_Higgs_mass_derivative": 0.0,
+      "vector_neutron_sigma_cm2": 7.442460588264343e-39,
+      "lower_normalization_sigma_cm2": 1.8606151510411267e-39,
+      "fixed_spectrum_leading_SI_rate_ratio": 3.9999999914543514
+    },
+    {
+      "representation": "13M12D",
+      "mchi_GeV": 131140.0,
+      "light_state_M_fraction": 0.0,
+      "light_state_Dplus_fraction": 1.0,
+      "vector_transition_weight": 0.9999999986573451,
+      "axial_transition_weight": 1.3426550881714408e-09,
+      "analytic_vector_weight": 0.9999999986573449,
+      "diagonal_Higgs_mass_derivative": 0.0,
+      "vector_neutron_sigma_cm2": 7.442520819172832e-39,
+      "lower_normalization_sigma_cm2": 1.8606302072913925e-39,
+      "fixed_spectrum_leading_SI_rate_ratio": 3.99999999462938
+    }
+  ],
+  "checks": {
+    "spin_sum_recovers_contact_cross_section": true,
+    "unmixed_vector_cross_section_factor_four": true,
+    "light_state_is_Dplus": true,
+    "transition_weights_sum_one": true,
+    "analytic_mixing_weight_matches": true,
+    "tree_Higgs_diagonal_zero": true,
+    "mixing_cannot_explain_factor_four": true
+  },
+  "scope": [
+    "tree mass matrix and neutral current as printed in arXiv:2609.04144v1",
+    "leading nonrelativistic spin-independent vector transition",
+    "negative signed eigenstate receives Majorana phase; positive-state transition is axial",
+    "no detector refit or changed splitting; no reassignment of source loop values"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "scope": "Leading contact L10 algebra only; no carbon nuclear matching, rate, or exclusion",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "checks": {
+    "spin_half_average_equals_2_q4": true,
+    "longitudinal_spin_component_cancels": true,
+    "zero_momentum_vanishes": true,
+    "q_doubling_scales_probability_by_16": true,
+    "two_unpolarized_spins_scale_as_N": true
+  },
+  "natural_carbon_assumption": {
+    "fraction_C13": 0.0107,
+    "atom_count": 15505712695.496977,
+    "C13_count": 165911125.84181765
+  },
+  "scales": {
+    "q_at_inverse_separation_eV": 0.7893079216,
+    "q_at_Xe_248keV_eV": 246292778.9720162,
+    "q4_ratio_fixed_spin_matrix_element": 1.0548218803621366e-34
+  },
+  "missing": [
+    "sample isotope assay and nuclear spin state",
+    "C13 isoscalar spin form factors",
+    "Xe spin response and detector likelihood",
+    "UV matching and subleading terms",
+    "solid dynamic spin response and selected-path survival"
+  ]
+}

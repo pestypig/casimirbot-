@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 rolling checkpoint history admission",
+  "implementation": "Bound history to 31 completed plans, require handoff count equality and exact retained predecessor ID/hash chain beginning at the resident's original plan. Reject duplicates, nested history and incomplete historical samples. Existing broker checkpoint validators now run against each resolved historical and current graph.",
+  "verification": {
+    "focused_tests": { "passed": 22, "failed": 0 },
+    "cases": ["complete retained chain", "missing predecessor history", "count mismatch", "duplicate plan", "reordered history", "incomplete historical sample"],
+    "typescript": "Project exit 2 persists; no diagnostics observed for the changed resolver, broker or compiler test. Not a clean build."
+  },
+  "limitations": ["No live database or connector event ingestion was exercised.", "Cumulative effect normalization and final rolling action-result verification remain unfinished.", "Production temporal delivery remains disabled; no EXE build or Minecraft qualification occurred."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

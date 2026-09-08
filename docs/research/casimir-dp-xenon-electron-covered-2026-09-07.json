@@ -1,0 +1,115 @@
+{
+  "status": "covered_atomic_raw_counts_not_LZ_accepted_prediction",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "bands": [
+        {
+          "energy_eV": [
+            5.0000131158,
+            9999.9990202
+          ],
+          "raw_counts": 1770613.5551938473,
+          "refinement_relative": 0.00010734968693915103
+        },
+        {
+          "energy_eV": [
+            100,
+            1000
+          ],
+          "raw_counts": 818.612784888225,
+          "refinement_relative": 5.226105568745254e-06
+        },
+        {
+          "energy_eV": [
+            1000,
+            9999.9990202
+          ],
+          "raw_counts": 0.014810884516592647,
+          "refinement_relative": 0.00012332679633719756
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "bands": [
+        {
+          "energy_eV": [
+            5.0000131158,
+            9999.9990202
+          ],
+          "raw_counts": 398.4541488029556,
+          "refinement_relative": 4.2748549131665925e-05
+        },
+        {
+          "energy_eV": [
+            100,
+            1000
+          ],
+          "raw_counts": 71.77721126473753,
+          "refinement_relative": 1.2798585932838336e-05
+        },
+        {
+          "energy_eV": [
+            1000,
+            9999.9990202
+          ],
+          "raw_counts": 0.013724067242842114,
+          "refinement_relative": 0.00012467570565299901
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "bands": [
+        {
+          "energy_eV": [
+            5.0000131158,
+            9999.9990202
+          ],
+          "raw_counts": 7.814917709928788e-06,
+          "refinement_relative": 3.233257741952489e-05
+        },
+        {
+          "energy_eV": [
+            100,
+            1000
+          ],
+          "raw_counts": 3.2922502993698993e-06,
+          "refinement_relative": 2.5911102918163564e-05
+        },
+        {
+          "energy_eV": [
+            1000,
+            9999.9990202
+          ],
+          "raw_counts": 1.813366301394207e-07,
+          "refinement_relative": 0.00010890916078643009
+        }
+      ]
+    }
+  ],
+  "formula": "d sigma/dE = 8 pi hbarc^2/(v^2 EH) integral q dq [sum alpha_i/(q^2+m_i^2)]^2 K(E,q)",
+  "exposure_kg_year": 2840,
+  "xe_atomic_mass_u": 131.293,
+  "assumptions": [
+    "fixed unattenuated mono-speed source shared with nuclear normalization",
+    "atomic vector density response; L=6 source truncation",
+    "linear K interpolation on log axes"
+  ],
+  "limitations": [
+    "not a complete energy/momentum integral",
+    "no transport, liquid response correction, or LZ detector folding",
+    "refinement measures quadrature only, not atomic or interpolation uncertainty",
+    "no allowed parameter point or exclusion"
+  ]
+}

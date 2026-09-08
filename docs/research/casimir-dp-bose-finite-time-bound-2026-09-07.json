@@ -1,0 +1,38 @@
+{
+  "status": "conditional_second_order_stimulated_term_bound",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "contact_coefficient_convention": "H_int=C integral n_target n_chi d3x",
+  "C_reference_GeV_minus2": 1,
+  "target_charge_proxy": 186235020076.269,
+  "density_GeV_cm3": 0.3,
+  "hold_s": 0.25,
+  "rows": [
+    {
+      "mass_GeV": 77.86556301055496,
+      "number_density_cm3": 0.0038527943342467567,
+      "unit_C_GeV_minus2_stimulated_D_upper": 4.384717895519045e-18,
+      "unit_peak_gaussian_D_upper": 4.231737892577459e-28
+    },
+    {
+      "mass_GeV": 100,
+      "number_density_cm3": 0.003,
+      "unit_C_GeV_minus2_stimulated_D_upper": 2.6584745872021384e-18,
+      "unit_peak_gaussian_D_upper": 2.1715670101018382e-28
+    },
+    {
+      "mass_GeV": 1000,
+      "number_density_cm3": 0.0003,
+      "unit_C_GeV_minus2_stimulated_D_upper": 2.6584745872021384e-20,
+      "unit_peak_gaussian_D_upper": 4.678499298442134e-31
+    }
+  ],
+  "pair_identity_max_error": 2.220446049250313e-16,
+  "limitations": [
+    "Stimulated f*f term only; not total decoherence",
+    "Number-diagonal Gaussian boson state, no anomalous or coherent mean field",
+    "Second-order weak contact-density coupling, rigid nonnegative target charge",
+    "Constant separated hold only; not complete preparation/recombination sequence",
+    "Density is a benchmark, not a bound on captured populations",
+    "Unit C is not a xenon fit or an allowed parameter point"
+  ]
+}

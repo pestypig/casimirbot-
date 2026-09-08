@@ -1,0 +1,23 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "previous_turn_classification": "progress",
+  "classification": "evidence normalization",
+  "source_evidence": {
+    "preflight": "Requires current catalog snapshot identity and a plan clock matching the authenticated resident monotonic origin; server-publication origin is not interchangeable.",
+    "previous_public_frontier": "Returned capability frontier and server-publication clock only; omitted the already-resolved catalog snapshot and resident clock observation.",
+    "repair": "Project catalog_snapshot_id and existing resident_clock_observation with separately labeled observation/action epochs. Do not spread internal authority context or extrapolate clocks. Preflight remains unchanged."
+  },
+  "verification": {
+    "publisher_tests": 3,
+    "preflight_tests": 9,
+    "resident_clock_observation_tests": 11,
+    "passed": 23,
+    "covers": ["real frontier builder boundary", "missing clock stays null", "internal context sentinel excluded", "stale clock rejection", "exact identity and clock preflight"]
+  },
+  "deployed": false,
+  "current_package": "apps/desktop/release-et6-frontier-clock-20260905/win-unpacked/CasimirBot.exe",
+  "live_movement_issued": false,
+  "next": "Deploy planning-context projection before requesting another explicit run-bound claim; revalidate finite action authority, goal identity and perception before admission.",
+  "goal_complete": false
+}

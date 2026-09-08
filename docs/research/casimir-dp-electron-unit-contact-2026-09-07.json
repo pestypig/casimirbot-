@@ -1,0 +1,29 @@
+{
+  "status": "conditional_unit_electron_density_contact_response_not_matching",
+  "rows": [
+    {
+      "response": "withLFE",
+      "unit_contact_D": 1.1026775989358773e-19,
+      "contact_W_for_DP_comparator_GeV_minus2": 517334100.9236345,
+      "refinement_relative": 0.0033931484705127524
+    },
+    {
+      "response": "noLFE",
+      "unit_contact_D": 1.4154942159669681e-19,
+      "contact_W_for_DP_comparator_GeV_minus2": 456605704.55201447,
+      "refinement_relative": 0.003566450326495052
+    }
+  ],
+  "formula": "D=2 n c M t/(pi alpha_EM v hbarc rho) integral dq q^3 A(q)^2 [1-sinc(qd/hbar)] integral dOmega ELF",
+  "assumptions": [
+    "bulk isotropic zero-temperature electronic response",
+    "fixed separated branches during hold",
+    "unit momentum-independent electron number-density potential W=1 GeV^-2; not a matched model"
+  ],
+  "limitations": [
+    "only 5.5-50 eV and q within tabulated 0-30.614 keV domain",
+    "local-field comparison is not a total uncertainty bound",
+    "no subgap phonons, finite-surface response, preparation or recombination history",
+    "not a captured-population or measurability prediction"
+  ]
+}

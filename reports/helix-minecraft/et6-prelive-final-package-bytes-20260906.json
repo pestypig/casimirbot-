@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-06",
+  "scope": "Current staged pre-live reliability diagnostic package; not installed or live-qualified",
+  "package": "apps/desktop/release-et6-prelive-final-20260906/win-unpacked/CasimirBot.exe",
+  "packaging_exit": "unavailable: execution handle disappeared; artifact independently checked",
+  "exe_sha256": "1f0651534ea72209ba3739c5b22f30dce680d0d6ac15657a07914e30956546ed",
+  "asar_payloads_matching_staging": {
+    "dist/main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "dist/preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "dist/service.mjs": "23c467247614552e50f1c5fffa3bdc57d11606d37dc8094adf4530c795fd3c9b",
+    "dist/service-dependencies.json": "791d40fd971337fc085634aa96daabf9702855304473c25c8906a35d55b1dfc4"
+  },
+  "runtime_files_byte_matched": 645,
+  "verification_exit_code": 0,
+  "disk_free_gib_before_package": 2.07,
+  "latest_free_physical_gib": 3.51,
+  "smoke_required_free_physical_gib": 4,
+  "current_package_startup_verified": false,
+  "installed_app_changed": false,
+  "live_capacity_proven": false,
+  "goal_complete": false,
+  "next": "Guarded isolated startup of this exact package and final requirement audit; do not reuse the older diagnostic startup result"
+}

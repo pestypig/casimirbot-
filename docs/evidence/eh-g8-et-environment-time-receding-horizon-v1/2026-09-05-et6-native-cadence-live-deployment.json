@@ -1,0 +1,185 @@
+{
+  "schema": "casimirbot.et6.native_cadence_live_deployment.v1",
+  "recorded_at": "2026-09-05T20:33:00Z",
+  "native_version": "0.4.11",
+  "jar_sha256": "578929484b4078709470d209e22012dc08dfa67cd0e16dafdb4ea3d5652f7508",
+  "old_client_pid": 31760,
+  "old_client_normal_close_verified": true,
+  "new_client_pid": 34040,
+  "launch_via": "helix_minecraft_local_lifecycle_launch",
+  "launch_profile": "helix-combat-c0-isolated",
+  "new_version_confirmed_in_client_log": true,
+  "exe_restarted": false,
+  "service_instance": "service_instance:0e185083b91bae8b834796e852052fe3",
+  "reasoning_binding_id": "reasoning_binding:c46c347a870fd3d0167829f0679174c2",
+  "binding_epoch": 5,
+  "steering_read_succeeded": true,
+  "run_id": "run_c7929dcb-70ca-4dcf-89f4-f21e0bbb0958",
+  "identity_basis": "native desktop authenticated MCP client and client-declared continuation; not independent external provider identity",
+  "negative_preflight_evidence": [
+    "action_adapter_admission_inactive before opaque source re-pair",
+    "producer_epoch_mismatch before fresh same-player subject verification",
+    "durable_goal_identity_unavailable before authority reconfiguration and opaque player re-pair"
+  ],
+  "authority_id": "environment_action_authority:e0b7d689-9cdd-42f7-acdd-723c56910a2e",
+  "authority_policy_version": 3,
+  "authority_expiry": "2026-09-05T20:40:00.000Z",
+  "capabilities_not_expanded": true,
+  "goal": {
+    "schema": "helix.environment_durable_goal_projection.v1",
+    "goal_id": "environment_durable_goal:896355ef-445f-4edd-8465-e02596d619b8",
+    "revision": 13,
+    "latest_event_hash": "sha256:0f47b4f96912be98d7cf0c797ced1019403c395d1b76a11a71f2a2ac56616613",
+    "status": "active",
+    "objective": {
+      "objective_text": "Walk across this platform, keep checking the path ahead, and stop if it becomes unsafe.",
+      "goal_kind": "custom_survival",
+      "domain": "minecraft",
+      "game_version": "1.21.8",
+      "mechanics_collection_ref": null,
+      "milestones": [
+        {
+          "milestone_id": "platform_traversal",
+          "description": "Traverse freshly observed supported platform using native rolling checkpoints; stop on unsafe or unknown path conditions.",
+          "dependency_milestone_ids": [],
+          "required_postcondition_ids": [
+            "platform_traversal_observed",
+            "controls_released"
+          ]
+        }
+      ]
+    },
+    "identity": {
+      "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "host_ref": "environment_device:connector_device:legacy:2be81cc493f17699f4036bb8ddb93aaa1cf7f0ad",
+      "connector_installation_id": "connector_installation:legacy:748a2bdf41dda910086ae12c5c298b071fc44bab",
+      "device_id": "connector_device:legacy:2be81cc493f17699f4036bb8ddb93aaa1cf7f0ad",
+      "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+      "room_source_binding_id": "room_source_binding:5eaf90ee-96be-49da-88e7-02d978d35f44",
+      "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+      "goal_owner_participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+      "participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+      "authority_participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+      "subject_binding_id": "environment_subject_binding:8b518026-2b2f-4f72-9d56-c1debe11ba23",
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "source_id": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+      "world_id": "minecraft:minehut:479f4368-ada",
+      "producer_epoch_ref": "environment_action_epoch:dbc3945c-a3ae-4a14-a894-6f2be13b8788",
+      "action_authority_id": "environment_action_authority:e0b7d689-9cdd-42f7-acdd-723c56910a2e",
+      "authority_policy_version": 3,
+      "authority_expires_at": "2026-09-05T20:40:00.000Z",
+      "run_id": "run_c7929dcb-70ca-4dcf-89f4-f21e0bbb0958",
+      "turn_id": "et6-native-cadence-recovery-20260905-2027"
+    },
+    "active_milestone_id": null,
+    "milestones": [
+      {
+        "milestone_id": "platform_traversal",
+        "description": "Traverse freshly observed supported platform using native rolling checkpoints; stop on unsafe or unknown path conditions.",
+        "status": "candidate",
+        "required_postcondition_ids": [
+          "platform_traversal_observed",
+          "controls_released"
+        ],
+        "completed_postcondition_ids": []
+      }
+    ],
+    "recent_attempts": [],
+    "attempt_count": 0,
+    "latest_checkpoint": {
+      "checkpoint_id": "et6-native-cadence-checkpoint-20260905-2031",
+      "event_id": "environment_durable_goal_event:fe7d4c0a-a038-4e76-92c6-757f084ac369",
+      "observation_revision": 1788640251132,
+      "verified_facts": {
+        "position": {
+          "x": 5.45,
+          "y": 65,
+          "z": 2.55
+        },
+        "health": 20,
+        "on_ground": true,
+        "hazard_count": 0,
+        "scope": "Fresh post-native-0.4.11 recovery observation; no traversal performed"
+      },
+      "evidence_refs": [
+        "environment_probe_evidence:c009649dc8168c047267a06265c4800d96a5e982"
+      ]
+    },
+    "recovery": {
+      "required": false,
+      "reason": null,
+      "rebound_event_id": "environment_durable_goal_event:0a8a2e8f-339c-4d17-a016-40a72365fe26"
+    },
+    "consumed_semantic_wake_refs": [],
+    "event_refs": [
+      "environment_durable_goal_event:ac007f06-7a8d-46db-9965-adb5ec2f1404",
+      "environment_durable_goal_event:247f62b5-59b4-4022-b3b6-f24bcdcfd44d",
+      "environment_durable_goal_event:04ba4e60-4654-4fdc-9428-492d1efd6927",
+      "environment_durable_goal_event:123aa6ef-6fc9-4c0c-94a5-218c0764e3e4",
+      "environment_durable_goal_event:b663ccd7-6cd4-4497-adba-a05a3efbcad9",
+      "environment_durable_goal_event:f9ba7a1a-8727-457f-bfa1-7e0c7ace177c",
+      "environment_durable_goal_event:1ed31522-42ad-47f9-a6fd-954326d40b38",
+      "environment_durable_goal_event:d9421333-6fc9-4e71-a63d-27d15ea932b9",
+      "environment_durable_goal_event:b8e9139b-1f7b-40bb-9f47-1df08823486e",
+      "environment_durable_goal_event:6a64e480-3e70-46bd-b81b-d4f5dec3f7ff",
+      "environment_durable_goal_event:0a8a2e8f-339c-4d17-a016-40a72365fe26",
+      "environment_durable_goal_event:fe7d4c0a-a038-4e76-92c6-757f084ac369",
+      "environment_durable_goal_event:ac45706e-d8d3-4374-b396-92e322e23f28"
+    ],
+    "content_role": "environment_durable_goal_projection_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "clock_trials": [
+    {
+      "index": 1,
+      "probe_ok": true,
+      "probe_evidence_ref": "environment_probe_evidence:27ae8336e085c82e67884e04d8b0bb5551540db6",
+      "frontier_ok": true,
+      "error": null,
+      "frontier_id": "environment_frontier:c3b8accb-502d-4377-bb77-50ea5b841516",
+      "probe_world_tick": 7651284,
+      "resident_world_tick": 7651325,
+      "remaining_frontier_ticks": 59,
+      "heartbeat_received_at": "2026-09-05T20:32:31.032Z",
+      "heartbeat_receipt_age_ms": 967,
+      "total_probe_frontier_call_ms": 8076
+    },
+    {
+      "index": 2,
+      "probe_ok": true,
+      "probe_evidence_ref": "environment_probe_evidence:d9a04a2746899e50b2aaeea4475f3fb92713be07",
+      "frontier_ok": true,
+      "error": null,
+      "frontier_id": "environment_frontier:59907ac6-3153-4346-81a0-cb447d420fbd",
+      "probe_world_tick": 7651444,
+      "resident_world_tick": 7651505,
+      "remaining_frontier_ticks": 39,
+      "heartbeat_received_at": "2026-09-05T20:32:40.045Z",
+      "heartbeat_receipt_age_ms": 517,
+      "total_probe_frontier_call_ms": 8463
+    },
+    {
+      "index": 3,
+      "probe_ok": true,
+      "probe_evidence_ref": "environment_probe_evidence:76cac4740445160a6ae7a51b2730cb6b8d6ed94c",
+      "frontier_ok": true,
+      "error": null,
+      "frontier_id": "environment_frontier:b3205ac2-b1ef-4ecc-949f-3a17e710f278",
+      "probe_world_tick": 7651605,
+      "resident_world_tick": 7651645,
+      "remaining_frontier_ticks": 60,
+      "heartbeat_received_at": "2026-09-05T20:32:47.040Z",
+      "heartbeat_receipt_age_ms": 955,
+      "total_probe_frontier_call_ms": 7330
+    }
+  ],
+  "trial_policy": "Exactly three consecutive read-only probe/frontier pairs; no retry or phase-selection filter",
+  "movement_dispatched": false,
+  "rolling_cycles_proven": 0,
+  "goal_complete": false,
+  "next": "Fresh caller-authored temporal admission and native continuous extension qualification; returned frontiers are now historical and must not be reused."
+}

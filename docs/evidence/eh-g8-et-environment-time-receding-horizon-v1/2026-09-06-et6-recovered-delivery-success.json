@@ -1,0 +1,54 @@
+{
+  "schema": "et6_live_diagnostic_evidence.v1",
+  "recorded_at": "2026-09-06T08:03:55.023Z",
+  "scope": "Packaged EXE event-delivery repair and connector epoch recovery; not sustained rolling acceptance",
+  "goal_id": "environment_durable_goal:57b20d9a-36f6-4c2d-800e-5fce76abd493",
+  "binding_id": "reasoning_binding:4e1d77ab5bd2f1eb8a73764080e18e17",
+  "run_id": "run_2089d71c-4213-4e69-ad51-e34cb3e3bbcf",
+  "recovery": {
+    "revision_before": 1,
+    "revision_after": 5,
+    "steps": [
+      "recovery_required",
+      "authority_rebound",
+      "checkpoint_verified",
+      "goal_resumed"
+    ],
+    "new_epoch": "environment_action_epoch:376b0d13-7ce6-43fa-b14b-0bc1a1288c72",
+    "chat_binding_replaced": false
+  },
+  "action_id": "et6-action-query-repair-6",
+  "plan_hash": "sha256:80a40aa43999ee1593caeb87e83d1cb60b595889f5313ecc3af3460f9a8bd4ea",
+  "pre_observation_ref": "environment_probe_evidence:25b88bcf77ff35d08000415c4655910f84124f06",
+  "post_observation_ref": "environment_probe_evidence:35c363d8b2e14ac60fbde769f53bcd573dc91ba5",
+  "position_before": {
+    "x": 5.04,
+    "y": 65,
+    "z": 2.44
+  },
+  "position_after": {
+    "x": 2.96,
+    "y": 65,
+    "z": 1.88
+  },
+  "retained_result": {
+    "snapshot_at": "2026-09-06T08:03:15.500Z",
+    "outcome": "succeeded",
+    "controls_released": true,
+    "world_mutation_performed": false,
+    "automatic_replay_performed": false,
+    "active_control_ticks": 12,
+    "missed_ticks": 0,
+    "stalled_ticks": 0,
+    "dispatch_to_first_tick_ms": 48,
+    "oldest_pending_age_ms": 1715,
+    "queue_depth_at_lease": 1,
+    "wall_clock_elapsed_ms": 502
+  },
+  "limitations": [
+    "Finite diagnostic only; zero rolling extensions proven in this run",
+    "Typed steering is not live microphone evidence",
+    "Declared continuation does not establish independent external provider identity",
+    "Full packaged runtime tree audit still has two extra diagnostic files"
+  ]
+}

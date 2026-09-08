@@ -1,0 +1,9 @@
+{
+  "captured_utc": "2026-09-07T02:52:28.576Z",
+  "source": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+  "line": 216,
+  "extracted": "artifacts/training-trace.json",
+  "actual": "artifacts/training-trace.jsonl",
+  "classification": "extractor extension truncation; example command output target, not acceptance evidence",
+  "action": "No export executed; original scan retained."
+}

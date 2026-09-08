@@ -1,0 +1,92 @@
+{
+  "checks": {
+    "fixed_matter_screening": true,
+    "fixed_heavy_Xe_coefficient": true,
+    "light_product_preserved": true,
+    "declared_yukawa_boundary_solved": true
+  },
+  "declared_diagnostic_domain": "|ychi|^2 <= 4pi and Delta lambda <= 4pi; heuristic perturbative domain, not a theorem or global experimental bound",
+  "rows": [
+    {
+      "b_GeV": 100.0,
+      "kappa_GeV": 99.3773964852485,
+      "y_chi": -0.1,
+      "a_chi_GeV_inverse": 1.0323019541509686e-05,
+      "a_N_GeV_inverse_recovered": 1.7905526447794945e-07,
+      "C_chiN_recovered": 1.8017705314359717e-10,
+      "lambda_threshold_shift": 0.00512937402950788,
+      "lambda_effective_for_same_light_product": 1e-24,
+      "force_curvature_relative_to_original": 1.0,
+      "required_confinement_frequency_Hz": 9617756.963680308,
+      "conditional_Higgs_invisible_signal": 0.107,
+      "passes_conditional_Higgs_screen": true,
+      "y_squared_over_4pi": 0.0007957747154594769,
+      "threshold_over_4pi": 0.0004081826158816863
+    },
+    {
+      "b_GeV": 30.0,
+      "kappa_GeV": 331.0724831505022,
+      "y_chi": -0.3331466660023101,
+      "a_chi_GeV_inverse": 0.00011068075810217265,
+      "a_N_GeV_inverse_recovered": 1.7905526447794942e-07,
+      "C_chiN_recovered": 1.8017705314359717e-10,
+      "lambda_threshold_shift": 0.05499582790603745,
+      "lambda_effective_for_same_light_product": 1.0721742573199292e-23,
+      "force_curvature_relative_to_original": 0.09326842098407209,
+      "required_confinement_frequency_Hz": 2937251.340018925,
+      "conditional_Higgs_invisible_signal": 0.10695385213701836,
+      "passes_conditional_Higgs_screen": true,
+      "y_squared_over_4pi": 0.008832041046253557,
+      "threshold_over_4pi": 0.00437642893033853
+    },
+    {
+      "b_GeV": 10.0,
+      "kappa_GeV": 993.1685250206515,
+      "y_chi": -0.9993907670624846,
+      "a_chi_GeV_inverse": 0.0009929484992104891,
+      "a_N_GeV_inverse_recovered": 1.7905526447794942e-07,
+      "C_chiN_recovered": 1.8017705314359717e-10,
+      "lambda_threshold_shift": 0.4933831834773661,
+      "lambda_effective_for_same_light_product": 9.618779614024404e-23,
+      "force_curvature_relative_to_original": 0.01039632926553361,
+      "required_confinement_frequency_Hz": 980649.5001815098,
+      "conditional_Higgs_invisible_signal": 0.10694979431016947,
+      "passes_conditional_Higgs_screen": true,
+      "y_squared_over_4pi": 0.0794805386488018,
+      "threshold_over_4pi": 0.03926218624441918
+    },
+    {
+      "b_GeV": 3.0,
+      "kappa_GeV": 3310.5431995554736,
+      "y_chi": -3.3312838901418473,
+      "a_chi_GeV_inverse": 0.011028744271308006,
+      "a_N_GeV_inverse_recovered": 1.7905526447794945e-07,
+      "C_chiN_recovered": 1.8017705314359715e-10,
+      "lambda_threshold_shift": 5.480039460920944,
+      "lambda_effective_for_same_light_product": 1.0683641764854307e-21,
+      "force_curvature_relative_to_original": 0.0009360104185537869,
+      "required_confinement_frequency_Hz": 294248.42022492544,
+      "conditional_Higgs_invisible_signal": 0.10694933272344027,
+      "passes_conditional_Higgs_screen": true,
+      "y_squared_over_4pi": 0.8831071991492844,
+      "threshold_over_4pi": 0.4360876842721068
+    },
+    {
+      "b_GeV": 2.8192133233569483,
+      "kappa_GeV": 3522.83698186486,
+      "y_chi": -3.544907701811032,
+      "a_chi_GeV_inverse": 0.012488516992222736,
+      "a_N_GeV_inverse_recovered": 1.7905526447794947e-07,
+      "C_chiN_recovered": 1.801770531435972e-10,
+      "lambda_threshold_shift": 6.205381523244409,
+      "lambda_effective_for_same_light_product": 1.2097736463643618e-21,
+      "force_curvature_relative_to_original": 0.0008266009124973269,
+      "required_confinement_frequency_Hz": 276516.93771053106,
+      "conditional_Higgs_invisible_signal": 0.10694932738710031,
+      "passes_conditional_Higgs_screen": true,
+      "y_squared_over_4pi": 1.0000000000000002,
+      "threshold_over_4pi": 0.49380857159773134
+    }
+  ],
+  "scope": "Fixed b-positive physical-Higgs tree family; CchiN and aN fixed, light vertex product held by lambda rescaling. Same normalized background/operator and tree local scattering potential. Classical force reduces. Coupling boundary is diagnostic; all earlier Higgs, vacuum, loop, transport and apparatus qualifications persist."
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "et6.session_preparation.v1",
+  "observed_at": "2026-09-06T16:16:40Z",
+  "evidence_kind": "live_packaged_mcp_receipts",
+  "service_instance_ref": "service_instance:3ad56414e5be6b9fc048d7b4397c0e19",
+  "continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+  "run_id": "run_cd366442-5f55-4b9d-a9a4-43f2d8428f65",
+  "run_expires_at": "2026-09-06T17:15:49.137Z",
+  "run_room_binding_ref": "agent_room_binding:a49e653f-1889-4959-af5e-936c534c82d5",
+  "run_association_verification_ref": "supervisor_verification:retained_agent_run:82547d7a1308766d968a45a209bfea52",
+  "action_authority_id": "environment_action_authority:b57e15e8-973d-4e1f-b4de-a1ee2a149435",
+  "authority_extension_succeeded": true,
+  "authority_expires_at": "2026-09-06T17:15:49.137Z",
+  "authority_policy_version": 7,
+  "authority_scope_changed": false,
+  "manual_override_policy": "cancel",
+  "prior_claim_rejected": "reasoning_binding_claim_replayed",
+  "prior_claim_ui_expiry": "2026-09-06T16:11:31Z",
+  "prior_claim_run_association": "chat_only",
+  "remaining": [
+    "Operator-approved exact task binding associated with the prepared run",
+    "Fresh perception and canonical durable-goal identity recovery for the new run and expiry",
+    "Original ET6 rolling capacity and lifecycle qualification"
+  ],
+  "movement_dispatched": false,
+  "live_rolling_extensions_proven": 0,
+  "goal_complete": false,
+  "credentials_included": false
+}

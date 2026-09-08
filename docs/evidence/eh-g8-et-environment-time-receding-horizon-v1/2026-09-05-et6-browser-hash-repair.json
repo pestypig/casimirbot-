@@ -1,0 +1,19 @@
+{
+  "et6_complete": false,
+  "defect": "Importing temporal validation from the shared action schema pulled node:crypto into the browser renderer; browser-targeted esbuild failed",
+  "repair": "Use installed @noble/hashes 1.8.0 as an explicit pinned dependency and TextEncoder for UTF-8 hashing/size checks, preserving canonical ordering and digest semantics",
+  "verification": {
+    "temporal_regressions": 62,
+    "browser_tests": 2,
+    "browser_scope": "In-memory esbuild bundle and VM execution without Buffer/process; representative hashes compared with Node crypto including Unicode and numbers",
+    "test_discovery": "Initial browser fixture location was excluded; moved into the discovered temporal test directory and ran explicitly",
+    "casimir_run": "2659",
+    "verdict": "PASS",
+    "integrity_ok": true,
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45"
+  },
+  "limitations": ["Not a full EXE build or rendered UI test", "No live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

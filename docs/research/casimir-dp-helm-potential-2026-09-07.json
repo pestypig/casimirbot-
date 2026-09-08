@@ -1,0 +1,93 @@
+{
+  "status": "extended_charge_zero_energy_diagnostic_not_finite_speed_spectrum",
+  "A": 131,
+  "Z": 54,
+  "lambda_strength": 1.758288315675443,
+  "Helm_R_fm": 5.836451084056975,
+  "Helm_s_fm": 0.9,
+  "rows": [
+    {
+      "grid_N": 12001,
+      "charge_norm": 1.0,
+      "form_factor_checks": [
+        {
+          "q_over_mmed": 1,
+          "error": 7.771561172376096e-16
+        },
+        {
+          "q_over_mmed": 5,
+          "error": 1.1102230246251565e-16
+        },
+        {
+          "q_over_mmed": 10,
+          "error": 0.0
+        },
+        {
+          "q_over_mmed": 20,
+          "error": 2.0816681711721685e-17
+        }
+      ],
+      "results": [
+        {
+          "sign": -1,
+          "dimensionless_scattering_length": 89.48267086312794,
+          "zero_energy_sigma_to_Born": 2589.987669759843
+        },
+        {
+          "sign": 1,
+          "dimensionless_scattering_length": 0.9858857803770036,
+          "zero_energy_sigma_to_Born": 0.3143931139699468
+        }
+      ],
+      "pole_strength": 1.7305026430991433
+    },
+    {
+      "grid_N": 24001,
+      "charge_norm": 1.0000000000000002,
+      "form_factor_checks": [
+        {
+          "q_over_mmed": 1,
+          "error": 6.661338147750939e-16
+        },
+        {
+          "q_over_mmed": 5,
+          "error": 2.220446049250313e-16
+        },
+        {
+          "q_over_mmed": 10,
+          "error": 0.0
+        },
+        {
+          "q_over_mmed": 20,
+          "error": 6.938893903907228e-18
+        }
+      ],
+      "results": [
+        {
+          "sign": -1,
+          "dimensionless_scattering_length": 89.48269016137785,
+          "zero_energy_sigma_to_Born": 2589.988786897591
+        },
+        {
+          "sign": 1,
+          "dimensionless_scattering_length": 0.985885780208946,
+          "zero_energy_sigma_to_Born": 0.3143931138627617
+        }
+      ],
+      "pole_strength": 1.7305026489576882
+    }
+  ],
+  "checks": [
+    "input hash",
+    "unit charge integral",
+    "four momentum-space Helm matches",
+    "potential-grid refinement"
+  ],
+  "limitations": [
+    "Xe131 mass-number approximation",
+    "zero energy only",
+    "no atomic screening or solid response",
+    "no finite-speed total or differential cross section",
+    "not detector response or exclusion"
+  ]
+}

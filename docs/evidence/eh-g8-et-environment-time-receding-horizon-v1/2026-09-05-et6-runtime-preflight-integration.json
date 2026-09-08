@@ -1,0 +1,21 @@
+{
+  "et6_complete": false,
+  "classification": "tool admission",
+  "change": "PlayerActionRuntime.accept now invokes TemporalPlanDeliveryPreflight before creating an envelope or starting a controller. Invalid deliveries are rejected; valid temporal deliveries still fail closed pending stabilization and successor integration. Orphaned temporal transport fields also enter this rejection path.",
+  "verification": {
+    "native_filters": ["*Temporal*Test", "*PlayerActionRuntimeLifecycleTest"],
+    "result": "BUILD SUCCESSFUL",
+    "exit_code": 0,
+    "limitations": "Helper and lifecycle predicate tests plus native compilation; no instantiated runtime HTTP delivery test, GameTest or live execution",
+    "casimir_run": "2661",
+    "verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "deployed": false,
+  "temporal_execution_enabled": false,
+  "remaining": ["Native stabilization and successor handoff", "Production temporal capability exposure", "Packaged live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

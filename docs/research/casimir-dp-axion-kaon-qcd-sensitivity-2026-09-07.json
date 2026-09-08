@@ -1,0 +1,50 @@
+{
+  "scope": "Fixed CKM/mass linear sensitivity in eta. Borrowed SM eta errors do not quantify heavy-scale approximation or full prediction uncertainty.",
+  "rows": [
+    {
+      "yL": 0.05,
+      "epsilon_coefficient_eta_cT": -3.986620537187287e-08,
+      "epsilon_coefficient_eta_tT": 0.00010939755214724413,
+      "charm_term": -1.9773637864448943e-08,
+      "top_term": 6.306768881288624e-05,
+      "central": 6.304791517502179e-05,
+      "charm_over_top": -0.00031353040259830665,
+      "borrowed_error_relative_min": 0.011253178455983207,
+      "borrowed_error_relative_max": 0.011303763735780266,
+      "eta_tT_for_zero_at_fixed_eta_cT": 0.0001807502770979238,
+      "eta_tT_for_dated_same_sign_endpoint": 2.609545934945958
+    },
+    {
+      "yL": 0.09916784176599759,
+      "epsilon_coefficient_eta_cT": -1.5681336584393314e-07,
+      "epsilon_coefficient_eta_tT": 0.00043031705018119453,
+      "charm_term": -7.777942945859084e-08,
+      "top_term": 0.00024807777942945867,
+      "central": 0.00024800000000000007,
+      "charm_over_top": -0.0003135284008002319,
+      "borrowed_error_relative_min": 0.01125317859493551,
+      "borrowed_error_relative_max": 0.011303763551659358,
+      "eta_tT_for_zero_at_fixed_eta_cT": 0.0001807491230613337,
+      "eta_tT_for_dated_same_sign_endpoint": 0.6635478263532488
+    },
+    {
+      "yL": 0.2,
+      "epsilon_coefficient_eta_cT": -6.376825731701184e-07,
+      "epsilon_coefficient_eta_tT": 0.0017499330318052754,
+      "charm_term": -3.162905562923787e-07,
+      "top_term": 0.0010088363928357413,
+      "central": 0.001008520102279449,
+      "charm_over_top": -0.0003135201689178922,
+      "borrowed_error_relative_min": 0.011253179166341293,
+      "borrowed_error_relative_max": 0.011303762794509247,
+      "eta_tT_for_zero_at_fixed_eta_cT": 0.00018074437738116488,
+      "eta_tT_for_dated_same_sign_endpoint": 0.16330593755493325
+    }
+  ],
+  "checks": {
+    "central_reproduces_archive": true,
+    "cancellation_reconstructed": true,
+    "endpoint_reconstructed": true
+  },
+  "full_QCD_matching_completed": false
+}

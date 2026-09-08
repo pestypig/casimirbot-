@@ -1,0 +1,17 @@
+{
+  "artifact": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+  "sha256": "b95fda82962e54f6353c5adc907e15a07ddf1c4e21f32ad68744edae321702a1",
+  "bytes": 540081,
+  "build": "gradle --no-daemon --max-workers=1 remapJar",
+  "build_passed": true,
+  "archive_entries_verified": [
+    "com/casimirbot/helixplayer/fabric/ClientThreadCall.class",
+    "com/casimirbot/helixplayer/fabric/EnvironmentCapacityTelemetry.class",
+    "com/casimirbot/helixplayer/fabric/TemporalDeliveryLane.class",
+    "fabric.mod.json"
+  ],
+  "installed": false,
+  "exe_replaced": false,
+  "live_acceptance": false,
+  "note": "The desktop staging allowlist does not bundle this companion JAR. Later installed verification must identify both service and companion artifacts. Class presence is not runtime behavior proof."
+}

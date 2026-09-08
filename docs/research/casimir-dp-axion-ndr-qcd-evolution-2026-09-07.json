@@ -1,0 +1,107 @@
+{
+  "scope": "NDR gamma0=4, gamma1=-7+4nf/9; two-loop alpha, expanded NLO evolution/RGI factor. Conditional on finite matching convention compatibility; no complete UV or observable claim.",
+  "rows": [
+    {
+      "mu_GeV": 2.0,
+      "ledger": [
+        {
+          "nf": 5,
+          "high_GeV": 162.6,
+          "low_GeV": 4.18,
+          "alpha_high": 0.108,
+          "alpha_low": 0.22116035673764153,
+          "J": 1.6272841839949592
+        },
+        {
+          "nf": 4,
+          "high_GeV": 4.18,
+          "low_GeV": 1.3,
+          "alpha_high": 0.22116035673764153,
+          "alpha_low": 0.36227655622230487,
+          "J": 1.791733333333333
+        },
+        {
+          "nf": 3,
+          "high_GeV": 1.3,
+          "low_GeV": 2.0,
+          "alpha_high": 0.36227655622230487,
+          "alpha_low": 0.2865703011582643,
+          "J": 1.8950617283950617
+        }
+      ],
+      "RGI_over_weak": 0.5763063359709442,
+      "C_RGI_imag_GeV_minus2": 1.5989874072455346e-15,
+      "C_running_imag_GeV_minus2": 2.20393580774922e-15
+    },
+    {
+      "mu_GeV": 3.0,
+      "ledger": [
+        {
+          "nf": 5,
+          "high_GeV": 162.6,
+          "low_GeV": 4.18,
+          "alpha_high": 0.108,
+          "alpha_low": 0.22116035673764153,
+          "J": 1.6272841839949592
+        },
+        {
+          "nf": 4,
+          "high_GeV": 4.18,
+          "low_GeV": 1.3,
+          "alpha_high": 0.22116035673764153,
+          "alpha_low": 0.36227655622230487,
+          "J": 1.791733333333333
+        },
+        {
+          "nf": 3,
+          "high_GeV": 1.3,
+          "low_GeV": 3.0,
+          "alpha_high": 0.36227655622230487,
+          "alpha_low": 0.24058761818786845,
+          "J": 1.8950617283950617
+        }
+      ],
+      "RGI_over_weak": 0.5763063359709444,
+      "C_RGI_imag_GeV_minus2": 1.5989874072455352e-15,
+      "C_running_imag_GeV_minus2": 2.2757556684244907e-15
+    },
+    {
+      "mu_GeV": 4.0,
+      "ledger": [
+        {
+          "nf": 5,
+          "high_GeV": 162.6,
+          "low_GeV": 4.18,
+          "alpha_high": 0.108,
+          "alpha_low": 0.22116035673764153,
+          "J": 1.6272841839949592
+        },
+        {
+          "nf": 4,
+          "high_GeV": 4.18,
+          "low_GeV": 1.3,
+          "alpha_high": 0.22116035673764153,
+          "alpha_low": 0.36227655622230487,
+          "J": 1.791733333333333
+        },
+        {
+          "nf": 3,
+          "high_GeV": 1.3,
+          "low_GeV": 4.0,
+          "alpha_high": 0.36227655622230487,
+          "alpha_low": 0.2163688878678249,
+          "J": 1.8950617283950617
+        }
+      ],
+      "RGI_over_weak": 0.5763063359709442,
+      "C_RGI_imag_GeV_minus2": 1.5989874072455346e-15,
+      "C_running_imag_GeV_minus2": 2.321677760767772e-15
+    }
+  ],
+  "checks": {
+    "NDR_J3": true,
+    "RGI_derivative_through_NLO": true,
+    "hadronic_scale_invariance": true
+  },
+  "full_model_admitted": false
+}

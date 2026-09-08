@@ -1,0 +1,13 @@
+{
+  "status": "necessary_rigid_target_soft_window_not_total_decoherence_bound",
+  "q_soft_eV": 0.7141704424363171,
+  "delta_min_eV": -0.0018485997539508213,
+  "delta_max_eV": 0.0018485997488504272,
+  "particle_mass_eV": 100000000000.0,
+  "assumptions": [
+    "stationary rigid sphere; no internal excitation or radiation",
+    "nonrelativistic two-body scattering; splitting small compared with particle mass",
+    "qR/hbar<=1 defines fully coherent window, not a hard form-factor cutoff",
+    "infinite target mass approximation; 776 km/s speed cap"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-06",
+  "scope": "Connected persistent native/server causal-clock envelope validation",
+  "tests_passed": 2,
+  "positive": "Identity-correlated server completion maps to a nonnegative ordered interval within the measured native HTTP round trip",
+  "negative": "Corrupting server return to exceed the native roundtrip by two ms rejects the enclosure and produces no mapped interval",
+  "limits": [
+    "Native ticks are fixture-controlled and held during HTTP",
+    "Successful pickup does not establish a wall-clock stop-window budget",
+    "The one-ms diagnostic quantization allowance is not a live drift measurement",
+    "Complete timing attribution and packaging remain open; no live ET6 claim"
+  ]
+}

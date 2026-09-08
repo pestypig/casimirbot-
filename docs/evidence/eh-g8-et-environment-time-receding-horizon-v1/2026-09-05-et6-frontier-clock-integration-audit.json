@@ -1,0 +1,21 @@
+{
+  "schema": "et6.frontier_clock_integration_audit.v1",
+  "date": "2026-09-05",
+  "scope": "Current source inspection; no live timing measurement or execution",
+  "sources": [
+    "shared/helix-environment-time.ts:buildHelixEnvironmentAffordanceFrontier",
+    "server/services/environment-connectors/probe/durable-broker.ts:normalizeLegacyResult",
+    "server/services/environment-connectors/probe/durable-broker.ts:readDurableEnvironmentProbeContinuationEvidence",
+    "minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/PlayerActionRuntime.java:captureClockSnapshot"
+  ],
+  "observed": [
+    "Frontier builder requires environment sequence and monotonic origin/elapsed clocks.",
+    "Perception normalization preserves game_tick and snapshot observation_revision.",
+    "Outer broker observation_revision is assigned from Date.getTime().",
+    "Player clock snapshot publishes a clock_id, client tick_index, world_tick_index and audit observed_at but no monotonic elapsed value.",
+    "Prior probe evidence reader checks exact request/turn/room/capability, active binding, provenance and age; its result does not establish a mapping to the current player execution clock."
+  ],
+  "implementation_consequence": "Persist plane-labeled perception identity for the frontier and bind resident delivery separately to the current action clock. Implement explicit clock-domain measurements rather than equating world ticks, client ticks, workflow-relative elapsed time and audit revisions.",
+  "runtime_changed": false,
+  "et6_complete": false
+}

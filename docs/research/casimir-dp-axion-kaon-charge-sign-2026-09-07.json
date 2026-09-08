@@ -1,0 +1,62 @@
+{
+  "scope": "Reference-phase mapping, zero wrong-sign semileptonic amplitudes, equal CP-conjugate right-sign rates unless explicitly varied. No full DeltaS=1 or absorptive matching.",
+  "observed_AL": 0.00332,
+  "observed_error": 6e-05,
+  "rows": [
+    {
+      "yL": 0.09916784176599759,
+      "phase_reference_degrees": 43.5,
+      "signed_epsilon_reference": 0.001912,
+      "q_over_p_magnitude": 0.9972300149394889,
+      "predicted_AL_equal_right_sign_rates": 0.002773821454369939,
+      "required_right_sign_rate_asymmetry": 0.0005461835754822505
+    },
+    {
+      "yL": 0.09916784176599759,
+      "phase_reference_degrees": 45.0,
+      "signed_epsilon_reference": 0.001912,
+      "q_over_p_magnitude": 0.9972996794060784,
+      "predicted_AL_equal_right_sign_rates": 0.0027039664462482466,
+      "required_right_sign_rate_asymmetry": 0.000616039084038476
+    },
+    {
+      "yL": 0.2,
+      "phase_reference_degrees": 43.5,
+      "signed_epsilon_reference": 0.001151479897720551,
+      "q_over_p_magnitude": 0.9983308871687271,
+      "predicted_AL_equal_right_sign_rates": 0.0016705057981510943,
+      "required_right_sign_rate_asymmetry": 0.0016495033501252084
+    },
+    {
+      "yL": 0.2,
+      "phase_reference_degrees": 45.0,
+      "signed_epsilon_reference": 0.001151479897720551,
+      "q_over_p_magnitude": 0.998372887416921,
+      "predicted_AL_equal_right_sign_rates": 0.0016284363290028408,
+      "required_right_sign_rate_asymmetry": 0.0016915728163310016
+    },
+    {
+      "yL": 0.4173600101062603,
+      "phase_reference_degrees": 43.5,
+      "signed_epsilon_reference": -0.0022279999999999865,
+      "q_over_p_magnitude": 1.0032374928048375,
+      "predicted_AL_equal_right_sign_rates": -0.0032322521523827693,
+      "required_right_sign_rate_asymmetry": 0.006552181840413966
+    },
+    {
+      "yL": 0.4173600101062603,
+      "phase_reference_degrees": 45.0,
+      "signed_epsilon_reference": -0.0022279999999999865,
+      "q_over_p_magnitude": 1.0031558317886078,
+      "predicted_AL_equal_right_sign_rates": -0.003150852176187424,
+      "required_right_sign_rate_asymmetry": 0.006470784486415961
+    }
+  ],
+  "checks": {
+    "exact_epsilon_identity": true,
+    "flavor_rephasing_invariance": true,
+    "physical_reflection_reverses_asymmetry": true,
+    "required_decay_asymmetry_reconstructs_measurement": true
+  },
+  "reflected_branch_admitted": false
+}

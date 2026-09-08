@@ -1,0 +1,84 @@
+{
+  "checks": {
+    "inverse_speed_invariance_direct_local_integral": true,
+    "density_enhancement": true,
+    "small_mass_change": true,
+    "negative_potential_accelerates": true
+  },
+  "max_inverse_speed_relative_error": 2.220446049250313e-16,
+  "rows": [
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000,
+      "mass_GeV_at_infinity": 100.0,
+      "mass_well_keV": 5.1604866613259155,
+      "mass_fraction_change": 5.1604866613259154e-08,
+      "minimum_local_speed_km_s": 96.31213954293545,
+      "central_unbound_number_density_over_infinity": 1.069677799722155,
+      "unnormalized_local_inverse_speed_over_infinity": 1.0,
+      "normalized_local_inverse_speed_over_infinity": 0.9348609462211391,
+      "fraction_of_far_inverse_speed_moment_below_boost": 0.07344207421182389
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000,
+      "mass_GeV_at_infinity": 200.0,
+      "mass_well_keV": 5.1604866613259155,
+      "mass_fraction_change": 2.5802433306629577e-08,
+      "minimum_local_speed_km_s": 68.1029669813947,
+      "central_unbound_number_density_over_infinity": 1.036724652527549,
+      "unnormalized_local_inverse_speed_over_infinity": 1.0,
+      "normalized_local_inverse_speed_over_infinity": 0.9645762715895548,
+      "fraction_of_far_inverse_speed_moment_below_boost": 0.037142407056592774
+    },
+    {
+      "cavity_radius_um": 250.0,
+      "wall_thickness_um": 1000,
+      "mass_GeV_at_infinity": 1000.0,
+      "mass_well_keV": 5.1604866613259155,
+      "mass_fraction_change": 5.160486661325915e-09,
+      "minimum_local_speed_km_s": 30.45657272796444,
+      "central_unbound_number_density_over_infinity": 1.0079039029575676,
+      "unnormalized_local_inverse_speed_over_infinity": 1.0,
+      "normalized_local_inverse_speed_over_infinity": 0.9921580788263896,
+      "fraction_of_far_inverse_speed_moment_below_boost": 0.007494368600854023
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000,
+      "mass_GeV_at_infinity": 100.0,
+      "mass_well_keV": 0.13184170276457124,
+      "mass_fraction_change": 1.3184170276457125e-09,
+      "minimum_local_speed_km_s": 15.394376449414157,
+      "central_unbound_number_density_over_infinity": 1.0020814811236871,
+      "unnormalized_local_inverse_speed_over_infinity": 1.0,
+      "normalized_local_inverse_speed_over_infinity": 0.9979228424405637,
+      "fraction_of_far_inverse_speed_moment_below_boost": 0.0019177752699367986
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000,
+      "mass_GeV_at_infinity": 200.0,
+      "mass_well_keV": 0.13184170276457124,
+      "mass_fraction_change": 6.592085138228563e-10,
+      "minimum_local_speed_km_s": 10.885467979519238,
+      "central_unbound_number_density_over_infinity": 1.0010503449993908,
+      "unnormalized_local_inverse_speed_over_infinity": 1.0000000000000002,
+      "normalized_local_inverse_speed_over_infinity": 0.9989507570676766,
+      "fraction_of_far_inverse_speed_moment_below_boost": 0.0009591521000313943
+    },
+    {
+      "cavity_radius_um": 1000.0,
+      "wall_thickness_um": 1000,
+      "mass_GeV_at_infinity": 1000.0,
+      "mass_well_keV": 0.13184170276457124,
+      "mass_fraction_change": 1.3184170276457125e-10,
+      "minimum_local_speed_km_s": 4.86812927382046,
+      "central_unbound_number_density_over_infinity": 1.0002126768058415,
+      "unnormalized_local_inverse_speed_over_infinity": 1.0000000000000002,
+      "normalized_local_inverse_speed_over_infinity": 0.9997873684159648,
+      "fraction_of_far_inverse_speed_moment_below_boost": 0.0001918727047366628
+    }
+  ],
+  "scope": "Leading nonrelativistic constant-inertial-mass Hamiltonian, collisionless unbound population, spherical smooth mass well, exact center, vacuum at infinity, no obstruction or reflection barrier above exterior potential. Not full wall transport, off-center lensing, bound population or eikonal validity proof."
+}

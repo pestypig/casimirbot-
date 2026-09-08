@@ -1,0 +1,44 @@
+{
+  "schema": "casimirbot.et6.admission_diagnostics_package.v1",
+  "recorded_at": "2026-09-05T21:00:05.381Z",
+  "package_path": "apps/desktop/release-et6-admission-diagnostics-20260905/win-unpacked/CasimirBot.exe",
+  "build_host_exit_code": 0,
+  "stage_runtime_exit_code": 0,
+  "package_exit_code": 0,
+  "verification": {
+    "runtime_tree": "PASS; repository verifier evaluated with only the packed-directory target redirected in memory",
+    "renderer_file_count": 635,
+    "renderer_sha256": "4caf3a1ae1aab25fd60ec9dea6e4b7d001eaf51d21a4e0a492c367acc5b1d048",
+    "runtime_manifest_sha256": "d90532d2bc2040e5bff13590dd7160622f4d0c8270a30a8612385419820fb44d",
+    "service_byte_equality": true,
+    "service_sha256": "cf42aff51c340175d3616acf18fbcabab7684857807b23ba0d8ccc3bd0e8839b",
+    "tunnel_version": "0.0.13",
+    "tunnel_sha256": "83f08fb39b1c154747debd31b81b65dd4ee834cacf5a073b6301b2688699bc76"
+  },
+  "deployment": {
+    "old_host_pid": 34596,
+    "old_service_pid": 31696,
+    "normal_exit_verified": true,
+    "new_host_pid": 32460,
+    "new_service_pid": 18612,
+    "origin": "http://127.0.0.1:52707",
+    "ready_at": "2026-09-05T20:59:32.156Z",
+    "unauthenticated_account_request": "rejected: desktop_session_required",
+    "authenticated_mcp_presence_refresh": true,
+    "service_instance": "service_instance:52c7024c54649ac963710a7fd1717906",
+    "client_session": "supervisor_client:f5f0e4e17408a54e728826dbeed263a2",
+    "manual_plugin_reconnect_required": false
+  },
+  "session": {
+    "prior_run_id": "run_c7929dcb-70ca-4dcf-89f4-f21e0bbb0958",
+    "prior_run_expired_at": "2026-09-05T20:55:53.974Z",
+    "run_inspect_status": "waiting",
+    "run_inspect_recommendation": "continue",
+    "recommendation_not_treated_as_authority": true,
+    "current_reasoning_binding_proven": false,
+    "human_run_association_still_required": true
+  },
+  "movement_dispatched": false,
+  "rolling_cycles_proven": 0,
+  "goal_complete": false
+}

@@ -1,0 +1,15 @@
+{
+  "source": "https://arxiv.org/pdf/2204.05962 v2 Eqs. S.3.7-S.3.8; mu=M",
+  "scope": "Only pure-Higgs/messenger quartic current boundary insertion; selected coupled evolution and matching. Partial higher-order sensitivity, not an uncertainty band or full UV completion.",
+  "base_imag_GeV_minus2": 2.706861388918672e-15,
+  "with_current_boundary_imag_GeV_minus2": 2.7046482419853686e-15,
+  "fractional_change": -0.0008176063031389846,
+  "relative_C1_boundary_change": -0.0010765375761998392,
+  "relative_C3_boundary_change": -0.00056993165798815,
+  "checks": {
+    "tolerance": true,
+    "top_alignment": true,
+    "sum_identity": true
+  },
+  "full_model_admitted": false
+}

@@ -1,0 +1,261 @@
+{
+  "status": "conditional_repeated_collision_transport_above_recoil_cut",
+  "branch_sha256": "16e728335769bbfa142a873a44d585de38118fb5a686705517d8866246d7e9f1",
+  "matching_script_sha256": "6eaf46b926f7c93e75b6a5b4751be6995f7fc7076899b82fde11fddaf3ee1c23",
+  "terminal_status_labels": [
+    "unresolved",
+    "far_exit_capable",
+    "entrance_exit",
+    "below_200keV_Xe_capability"
+  ],
+  "speed_cut_kms": 601.1213517952707,
+  "raw_initial_200_220_to_200_269p9_ratio": 0.6744885040452184,
+  "thin_slab_control": {
+    "seed": 111,
+    "N": 100000,
+    "cross_section_scale": 1.0,
+    "status_counts": [
+      0,
+      100000,
+      0,
+      0
+    ],
+    "forward_capable_fraction": 1.0,
+    "forward_capable_standard_error": 0.0,
+    "forward_above_650_fraction": 1.0,
+    "forward_above_650_standard_error": 0.0,
+    "forward_speed_quantiles_kms": [
+      728.1775192745731,
+      776.0,
+      776.0,
+      776.0,
+      776.0
+    ],
+    "forward_cosine_quantiles": [
+      0.9854224158978829,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "forward_collision_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "forward_speed_histogram_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      2,
+      0,
+      0,
+      4,
+      99993
+    ],
+    "forward_speed_histogram_edges_kms": [
+      600,
+      610,
+      620,
+      630,
+      640,
+      650,
+      660,
+      670,
+      680,
+      690,
+      700,
+      710,
+      720,
+      730,
+      740,
+      750,
+      760,
+      770,
+      780
+    ],
+    "uncollided_count": 99983,
+    "subset_raw_200_220_count_lower_estimate": 7581.289700095701
+  },
+  "rows": [
+    {
+      "seed": 20260907,
+      "N": 30000,
+      "cross_section_scale": 126927.18909930163,
+      "status_counts": [
+        0,
+        7412,
+        0,
+        22588
+      ],
+      "forward_capable_fraction": 0.24706666666666666,
+      "forward_capable_standard_error": 0.002490145436775992,
+      "forward_above_650_fraction": 0.13773333333333335,
+      "forward_above_650_standard_error": 0.0019896638093090187,
+      "forward_speed_quantiles_kms": [
+        601.1439958083214,
+        612.3759931143248,
+        656.983865277217,
+        711.9745365826134,
+        768.2488301110185
+      ],
+      "forward_cosine_quantiles": [
+        0.7366686176808946,
+        0.9312898335530978,
+        0.9798001311278666,
+        0.9971590444682744,
+        0.999989823615808
+      ],
+      "forward_collision_quantiles": [
+        7.0,
+        15.0,
+        21.0,
+        28.0,
+        39.0
+      ],
+      "forward_speed_histogram_counts": [
+        562,
+        699,
+        682,
+        655,
+        682,
+        616,
+        624,
+        576,
+        565,
+        477,
+        463,
+        328,
+        228,
+        120,
+        94,
+        37,
+        4,
+        0
+      ],
+      "forward_speed_histogram_edges_kms": [
+        600,
+        610,
+        620,
+        630,
+        640,
+        650,
+        660,
+        670,
+        680,
+        690,
+        700,
+        710,
+        720,
+        730,
+        740,
+        750,
+        760,
+        770,
+        780
+      ],
+      "uncollided_count": 0,
+      "subset_raw_200_220_count_lower_estimate": 132536901.39949276
+    },
+    {
+      "seed": 20260908,
+      "N": 30000,
+      "cross_section_scale": 126927.18909930163,
+      "status_counts": [
+        0,
+        7445,
+        0,
+        22555
+      ],
+      "forward_capable_fraction": 0.24816666666666667,
+      "forward_capable_standard_error": 0.002493858938955331,
+      "forward_above_650_fraction": 0.13726666666666668,
+      "forward_above_650_standard_error": 0.0019868276966803883,
+      "forward_speed_quantiles_kms": [
+        601.1281983609684,
+        612.3319825125783,
+        655.9896000308486,
+        711.9908323591706,
+        764.3536698038031
+      ],
+      "forward_cosine_quantiles": [
+        0.7473203326811834,
+        0.931003895132523,
+        0.9795811284028493,
+        0.9970435005975081,
+        0.9999964556121542
+      ],
+      "forward_collision_quantiles": [
+        6.0,
+        15.0,
+        22.0,
+        28.0,
+        40.0
+      ],
+      "forward_speed_histogram_counts": [
+        584,
+        689,
+        654,
+        723,
+        677,
+        653,
+        619,
+        586,
+        575,
+        463,
+        404,
+        323,
+        235,
+        155,
+        76,
+        24,
+        5,
+        0
+      ],
+      "forward_speed_histogram_edges_kms": [
+        600,
+        610,
+        620,
+        630,
+        640,
+        650,
+        660,
+        670,
+        680,
+        690,
+        700,
+        710,
+        720,
+        730,
+        740,
+        750,
+        760,
+        770,
+        780
+      ],
+      "uncollided_count": 0,
+      "subset_raw_200_220_count_lower_estimate": 132087841.23018178
+    }
+  ],
+  "limitations": [
+    "chosen infinite silica slab",
+    "normal uniform incident flux",
+    "stationary point nuclei and Born law",
+    "stops at loss of high-window capability, not at capture",
+    "no electrons/inelastic material response",
+    "no real detector acceptance",
+    "Monte Carlo errors exclude model uncertainties"
+  ]
+}

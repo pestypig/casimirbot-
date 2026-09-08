@@ -1,0 +1,18 @@
+{
+  "captured_utc": "2026-09-07T03:17:42.291Z",
+  "scope": "Read-only concurrent source refresh; source claims inspected, underlying runs not rerun or independently accepted here.",
+  "files": [
+    {
+      "path": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+      "sha256": "46ce17418183bfff0ac9dd30b2827738165bf83ee459f31351b54a3dec483494"
+    },
+    {
+      "path": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+      "sha256": "8f10e124813a7a0e236f0d4b9f67697b8b7480e897e056a69a22e24a02f82926"
+    }
+  ],
+  "findings": [
+    "Current ET6 top checkpoint says prelive-final package startup unverified under4GiB guard; older timing-closure startup remains history. Six causal server phases with bounded clock intervals do not satisfy live capacity; ET6 and NAV1 remain unadvanced.",
+    "Perception packet contains partial native movement and sensor observations after prior Invalid session. It explicitly leaves P3 and full P4 incomplete."
+  ]
+}

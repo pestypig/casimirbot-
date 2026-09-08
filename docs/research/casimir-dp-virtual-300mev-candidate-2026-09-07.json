@@ -1,0 +1,96 @@
+{
+  "status": "broader_partial_screen_and_conditional_candidate",
+  "source_sha256": "aef9a2af3615f06bf5e0a2720789ecd8509f14d65e5893800fa59d14bce1bad5",
+  "rows": [
+    {
+      "mediator_GeV": 0.1,
+      "limits": [
+        {
+          "name": "BaBar_Lees2014xha",
+          "epsilon_bounds": [
+            0.001005003173047351
+          ],
+          "sha256": "612d1495e215eb73826c83b14618fce3ca303c0b32269e98bed457273e790fda"
+        },
+        {
+          "name": "NuCAL_Tsai2019mtm",
+          "epsilon_bounds": [
+            2.046599999999999e-07,
+            7.5309999999999996e-06
+          ],
+          "sha256": "16cd71b07febf78041ad9d1cb656dfebcec8dc66dcb7ce10acd4b6c426cdfde1"
+        },
+        {
+          "name": "CHARM_Tsai2019mtm",
+          "epsilon_bounds": [
+            2.053600000000001e-07,
+            3.622899999999999e-06
+          ],
+          "sha256": "ba5491069e2f205a38a3990e16103bd2e3e8405372d0e6e8dd0ab10c8a7456d5"
+        },
+        {
+          "name": "A1_Merkel2014avp",
+          "epsilon_bounds": [
+            0.0011108571464031923
+          ],
+          "sha256": "0be3ec142063d04cb86e4267c3ad9fdc36666889fb66f7a946633eadabbd9c3c"
+        }
+      ]
+    },
+    {
+      "mediator_GeV": 0.3,
+      "limits": [
+        {
+          "name": "BaBar_Lees2014xha",
+          "epsilon_bounds": [
+            0.0008440052744153187
+          ],
+          "sha256": "612d1495e215eb73826c83b14618fce3ca303c0b32269e98bed457273e790fda"
+        },
+        {
+          "name": "NA62_Dobrich2023dkm",
+          "epsilon_bounds": [
+            4.052999999999997e-07,
+            2.5521922752202382e-06
+          ],
+          "sha256": "f17cc20d32d4d7fa77e523aba93058bbc8eed3c0821a7f447f9b8d1971c809b6"
+        },
+        {
+          "name": "NuCAL_Tsai2019mtm",
+          "epsilon_bounds": [
+            2.1965999999999986e-07,
+            1.2262e-06
+          ],
+          "sha256": "16cd71b07febf78041ad9d1cb656dfebcec8dc66dcb7ce10acd4b6c426cdfde1"
+        },
+        {
+          "name": "A1_Merkel2014avp",
+          "epsilon_bounds": [
+            0.0028856000000000008
+          ],
+          "sha256": "0be3ec142063d04cb86e4267c3ad9fdc36666889fb66f7a946633eadabbd9c3c"
+        }
+      ]
+    }
+  ],
+  "candidate": {
+    "mediator_GeV": 0.3,
+    "gap_GeV": 0.01,
+    "dark_mass_GeV": 100,
+    "alpha_D": 0.1,
+    "epsilon": 0.00011240451600353182,
+    "effective_alpha": 3.0364520315544227e-06,
+    "scalar_mass_GeV": 0.3,
+    "v_D_GeV": 0.13380930871145783,
+    "y": 0.05284436396808014,
+    "lambda_D": 2.513274122871835,
+    "portal_status": "not fixed; no scalar-mediated rate claimed"
+  },
+  "omissions": [
+    "complete modern laboratory inventory",
+    "self-interactions and cosmology",
+    "full loop matching",
+    "detector-level xenon likelihood",
+    "material coherence response"
+  ]
+}

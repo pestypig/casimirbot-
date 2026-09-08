@@ -1,0 +1,25 @@
+{
+  "scope": "Read-only MCP preflight while native window input is deferred",
+  "run_id": "run_9a38524a-e0f7-4c94-bee8-d214da937161",
+  "run_version": 2,
+  "run_lifecycle": "waiting",
+  "run_completion": "needs_more_evidence",
+  "run_expires_at": "2026-09-08T01:27:28.644Z",
+  "action_authority_status": "expired",
+  "action_authority_expired_at": "2026-09-07T14:00:00.000Z",
+  "active_workflow_count": 0,
+  "controls_asserted": false,
+  "actor_probe": {
+    "evidence_ref": "environment_probe_evidence:257bf8e2bfbaf777bb41357f8c3c779c86d9a181",
+    "observed_at": "2026-09-07T14:17:33.152Z",
+    "outcome": "succeeded",
+    "provenance_valid": true,
+    "freshness_age_ms_at_receipt": 168,
+    "position": { "x": 2.84, "y": 65, "z": 0.06 },
+    "health": 20,
+    "food": 20
+  },
+  "interpretation": "MCP and read-only Minecraft observation are functioning. Expired movement authority is distinct from service failure. No movement, authority renewal, binding claim or UI restart was performed in this preflight.",
+  "native_switch": "Deferred after user-input detection and repeated foreground changes during the preceding attempt; old package remains running.",
+  "et6_complete": false
+}

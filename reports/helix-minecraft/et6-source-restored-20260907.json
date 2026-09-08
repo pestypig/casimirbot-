@@ -1,0 +1,28 @@
+{
+  "observed_at": "2026-09-07T04:25:46.619Z",
+  "scope": "Read-only connector recovery, not live movement proof",
+  "pairing_id": "connector_pairing:3e4c94ee-17ca-4a22-9966-4ce13b833ba7",
+  "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+  "source_pairing_handoff": "server_pairing_inbox_staged",
+  "subsequent_device_check": {
+    "health": "online",
+    "freshness": "fresh",
+    "adapter_admission_status": "active",
+    "credential_status": "active",
+    "credential_expires_at": "2026-09-07T04:55:33.167Z",
+    "probe_ready": true,
+    "blocking_reasons": []
+  },
+  "player_authority": {
+    "status": "expired",
+    "policy_version": 13,
+    "ready_for_actions": false,
+    "active_workflow_count": 0,
+    "controls_asserted": false,
+    "note": "Inactive connector readiness is not independent physical zero-motion proof. Renew finite movement lease only when exact task binding is ready."
+  },
+  "reasoning_binding_restored": false,
+  "movement_submitted": false,
+  "credentials_included": false,
+  "et6_live_acceptance": false
+}

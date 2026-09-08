@@ -1,0 +1,36 @@
+{
+  "status": "invalid_independent_carbon_peak_not_signal_prediction",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "angular_checks": [
+    {
+      "x": 0.01,
+      "absolute_error": 3.292586472566916e-17
+    },
+    {
+      "x": 0.5,
+      "absolute_error": 2.7755575615628914e-17
+    },
+    {
+      "x": 1.9979477996,
+      "absolute_error": 1.1102230246251565e-16
+    },
+    {
+      "x": 5.0,
+      "absolute_error": 1.1102230246251565e-16
+    },
+    {
+      "x": 20.0,
+      "absolute_error": 0.0
+    }
+  ],
+  "peak_x": 1.9979477996040573,
+  "speed_m_s": 0.04703440872161083,
+  "formal_D": 0.08536261114528612,
+  "single_carbon_sigma_cm2": 1.9675311058485566e-09,
+  "overlap_diagnostic": 12731589949.731312,
+  "assumptions": [
+    "isotropic incident directions and elastic s-wave CM scattering",
+    "stationary free-carbon targets; invalid for this slow solid extrapolation",
+    "unitarity saturation and density 0.3 GeV/cm3, not a matched population"
+  ]
+}

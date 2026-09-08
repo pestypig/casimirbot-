@@ -1,0 +1,135 @@
+{
+  "status": "exploratory_lower_energy_transport_not_response_fold",
+  "input_sha256": "f76b4fb2ea33eeef0165adec20109014d99333c8dd6a43a2a55c3367cadade1d",
+  "lower_true_recoil_capability_keV": 5.4,
+  "speed_cut_kms": 98.7743172528805,
+  "old_speed_cut_kms": 601.1213517952707,
+  "rows": [
+    {
+      "N": 100000,
+      "seed": 9310,
+      "bias": 1,
+      "energy_bias": 1,
+      "scale": 126927.18909930163,
+      "capable": {
+        "mean": 0.65083,
+        "se": 0.0015074899124897525,
+        "ess": 65083.0,
+        "max_share": 1.5364995467326338e-05
+      },
+      "below_old": {
+        "mean": 0.40357,
+        "se": 0.0015514627360546603,
+        "ess": 40357.0,
+        "max_share": 2.4778848774685927e-05
+      },
+      "above_old": {
+        "mean": 0.24726,
+        "se": 0.001364273996100257,
+        "ess": 24726.0,
+        "max_share": 4.044325810887325e-05
+      },
+      "fast": {
+        "mean": 0.13684,
+        "se": 0.0010868118308150479,
+        "ess": 13684.0,
+        "max_share": 7.307804735457468e-05
+      },
+      "total": {
+        "mean": 1.0,
+        "se": 0.0,
+        "ess": 100000.0,
+        "max_share": 1e-05
+      },
+      "factor_relative_to_strong_root": 1
+    },
+    {
+      "N": 500000,
+      "seed": 9311,
+      "bias": 0.7,
+      "energy_bias": 0.5,
+      "scale": 495016.03748727636,
+      "capable": {
+        "mean": 1.0031115774741934e-07,
+        "se": 6.527951636935175e-09,
+        "ess": 236.01545839111424,
+        "max_share": 0.03628481831131061
+      },
+      "below_old": {
+        "mean": 9.998768420966845e-08,
+        "se": 6.527903784295792e-09,
+        "ess": 234.49990292631142,
+        "max_share": 0.0364022045538122
+      },
+      "above_old": {
+        "mean": 3.2347353775093037e-10,
+        "se": 2.7461443513118898e-11,
+        "ess": 138.71108256155497,
+        "max_share": 0.05549365000077935
+      },
+      "fast": {
+        "mean": 1.226689932741981e-11,
+        "se": 1.2028269823566082e-12,
+        "ess": 103.98574720898985,
+        "max_share": 0.04358130553053332
+      },
+      "total": {
+        "mean": 0.8610981728764477,
+        "se": 0.1234295786948572,
+        "ess": 48.665976047789535,
+        "max_share": 0.09521110184948989
+      },
+      "factor_relative_to_strong_root": 3.9
+    },
+    {
+      "N": 500000,
+      "seed": 9312,
+      "bias": 0.65,
+      "energy_bias": 0.6,
+      "scale": 495016.03748727636,
+      "capable": {
+        "mean": 8.476109202179371e-08,
+        "se": 4.441794027937081e-09,
+        "ess": 363.88231105891225,
+        "max_share": 0.015334919085432214
+      },
+      "below_old": {
+        "mean": 8.449635101963618e-08,
+        "se": 4.4417529847844874e-09,
+        "ess": 361.62109572794145,
+        "max_share": 0.015382965915830117
+      },
+      "above_old": {
+        "mean": 2.6474100215748966e-10,
+        "se": 2.1309330096271703e-11,
+        "ess": 154.30132186406058,
+        "max_share": 0.044188791183848435
+      },
+      "fast": {
+        "mean": 1.0070409047859367e-11,
+        "se": 1.0476824714297237e-12,
+        "ess": 92.37522137639318,
+        "max_share": 0.03809015884715056
+      },
+      "total": {
+        "mean": 0.760591027801561,
+        "se": 0.04615330573523847,
+        "ess": 271.43247805643733,
+        "max_share": 0.022069093055094927
+      },
+      "factor_relative_to_strong_root": 3.9
+    }
+  ],
+  "checks": [
+    "source hash",
+    "inherited exact collision kinematics and termination",
+    "disjoint exit partition"
+  ],
+  "limitations": [
+    "5.4 keV is a diagnostic stopping choice, not a hard acceptance threshold",
+    "histories below this capability remain censored, not captured",
+    "finite-sample errors and ESS do not bound unseen weight tails",
+    "chosen silica column and stationary point-nucleus Born model, not actual site transport",
+    "no detector response, accepted counts, exclusion or shared measurable prediction"
+  ]
+}

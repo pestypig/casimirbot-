@@ -1,0 +1,44 @@
+{
+  "scope": "Approximate heavy-vector electron-pair lifetime scale, phase-space factor left explicit; no mixing boundary or lifetime prediction assigned.",
+  "source": "https://arxiv.org/html/2609.04673v1 equation5",
+  "age_diagnostic_s": 4.35e+17,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "gap_MeV": 3.2810066486879212,
+      "electron_pair_open": true,
+      "tau_scale_s": 336646743.23670864,
+      "max_abs_Ce_over_Cb_times_sqrt_phase_space_for_tau_ge_age": 2.7819068265577255e-05,
+      "gchi_gB_for_MV100GeV": 3.311375217260425e-05
+    },
+    {
+      "mchi_GeV": 15.0,
+      "gap_MeV": 2.270004432458614,
+      "electron_pair_open": true,
+      "tau_scale_s": 2123618223.9862807,
+      "max_abs_Ce_over_Cb_times_sqrt_phase_space_for_tau_ge_age": 6.987045852634076e-05,
+      "gchi_gB_for_MV100GeV": 3.2166932634145994e-05
+    },
+    {
+      "mchi_GeV": 40.0,
+      "gap_MeV": 1.0062516621719804,
+      "electron_pair_open": false,
+      "tau_scale_s": null,
+      "max_abs_Ce_over_Cb_times_sqrt_phase_space_for_tau_ge_age": null,
+      "gchi_gB_for_MV100GeV": 3.0983408211073184e-05
+    },
+    {
+      "mchi_GeV": 100.0,
+      "gap_MeV": 0.551300664868792,
+      "electron_pair_open": false,
+      "tau_scale_s": null,
+      "max_abs_Ce_over_Cb_times_sqrt_phase_space_for_tau_ge_age": null,
+      "gchi_gB_for_MV100GeV": 3.055733941876697e-05
+    }
+  ],
+  "checks": {
+    "thresholds": true,
+    "lifetime_inequality_inversion": true
+  },
+  "full_model_admitted": false
+}

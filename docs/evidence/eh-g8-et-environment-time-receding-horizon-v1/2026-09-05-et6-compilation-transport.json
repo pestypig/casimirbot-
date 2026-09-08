@@ -1,0 +1,18 @@
+{
+  "et6_complete": false,
+  "repair": "Broker generates bounded canonical compilation transport and its validated hash. Native helper compares artifact source-plan/goal association, false-authority fields, target schema and exact delivered arguments.",
+  "verification": {
+    "broker_and_browser_tests": 7,
+    "native_filters": ["TemporalCompilationContentTest", "TemporalPlanHashCompatibilityTest"],
+    "native_result": "BUILD SUCCESSFUL",
+    "fixture_scope": "Local artifact-content fixtures for both graph kinds; not proof of compiler correctness or live authenticated delivery",
+    "casimir_run": "2660",
+    "verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true
+  },
+  "remaining": ["Connect native compilation helper into full admission", "Stabilization and resident extensions", "Packaged live ET6 qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

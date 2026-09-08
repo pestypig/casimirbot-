@@ -1,5 +1,11 @@
 import { Router, json, type Request, type Response } from "express";
-import { createRateLimiter } from "../middleware/rate-limit";
+import { z } from "zod";
+import { leasePendingEnvironmentTemporalSuccessor, readEnvironmentTemporalDeliveryState, submitEnvironmentActionWorkflowEvents } from "../services/environment-connectors/actions/action-broker";
+import type { HelixReasoningTaskBindingStore } from "../services/local-supervisor/reasoning-task-binding-store";
+import {
+  createRateLimiter,
+  DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS,
+} from "../middleware/rate-limit";
 import {
   authenticateEnvironmentActionConnector,
   EnvironmentActionBrokerError,
@@ -70,14 +76,21 @@ const noStore = (_req: Request, res: Response, next: () => void): void => {
 
 export const environmentActionRouter = Router();
 
-const actionConnectorRateLimitWindowMs = 60_000;
+const actionConnectorRateLimitWindowMs =
+  DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS.windowMs;
 const actionConnectorIpRateLimiter = createRateLimiter({
   windowMs: actionConnectorRateLimitWindowMs,
-  max: Number(process.env.HELIX_ENVIRONMENT_ACTION_CONNECTOR_IP_RATE_LIMIT ?? "3600"),
+  max: Number(
+    process.env.HELIX_ENVIRONMENT_ACTION_CONNECTOR_IP_RATE_LIMIT ??
+      DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS.perIp,
+  ),
 });
 const actionConnectorAuthorityRateLimiter = createRateLimiter({
   windowMs: actionConnectorRateLimitWindowMs,
-  max: Number(process.env.HELIX_ENVIRONMENT_ACTION_CONNECTOR_AUTHORITY_RATE_LIMIT ?? "600"),
+  max: Number(
+    process.env.HELIX_ENVIRONMENT_ACTION_CONNECTOR_AUTHORITY_RATE_LIMIT ??
+      DEFAULT_ENVIRONMENT_ACTION_CONNECTOR_RATE_LIMITS.perAuthority,
+  ),
   keyGenerator: (req) => `${req.ip ?? "unknown"}:${req.params.authorityId ?? "unknown"}`,
 });
 
@@ -88,6 +101,60 @@ environmentActionRouter.use(
   actionConnectorAuthorityRateLimiter,
   json({ limit: "1mb" }),
 );
+
+/** Dependencies come from server construction, never the connector request. */
+export function createEnvironmentTemporalDeliveryRouter(bindingStore: Pick<HelixReasoningTaskBindingStore, "inspect">) {
+  const router = Router();
+  const identity = z.object({
+    resident_action_request_id: z.string().min(1).max(512),
+    predecessor_plan_id: z.string().min(1).max(512),
+    predecessor_plan_hash: z.string().min(1).max(512),
+    checkpoint_id: z.string().min(1).max(512),
+  }).strict();
+  router.post("/v1/authorities/:authorityId/requests/temporal-successor",
+    noStore, actionConnectorIpRateLimiter, actionConnectorAuthorityRateLimiter, json({ limit: "8kb" }),
+    route(async (req, res) => {
+      const claim = await authenticateEnvironmentActionConnector({ authorityId: req.params.authorityId,
+        authorization: req.headers.authorization, requiredScope: "action.poll" });
+      const parsed = identity.safeParse(req.body);
+      if (!parsed.success) throw new EnvironmentActionBrokerError("action_request_invalid", 400,
+        "An exact resident, predecessor hash and checkpoint are required for successor delivery.");
+      const request = await leasePendingEnvironmentTemporalSuccessor({ claim, bindingStore,
+        residentActionRequestId: parsed.data.resident_action_request_id,
+        predecessorPlanId: parsed.data.predecessor_plan_id,
+        predecessorPlanHash: parsed.data.predecessor_plan_hash, checkpointId: parsed.data.checkpoint_id });
+      res.json({ schema: "helix.environment_action.temporal_successor_delivery.v1", ok: true,
+        action_request: request, automatic_replay_allowed: false, answer_authority: false,
+        assistant_answer: false, terminal_eligible: false, raw_content_included: false });
+    }));
+  router.post("/v1/authorities/:authorityId/requests/temporal-successor/status",
+    noStore, actionConnectorIpRateLimiter, actionConnectorAuthorityRateLimiter, json({ limit: "8kb" }),
+    route(async (req, res) => {
+      const claim = await authenticateEnvironmentActionConnector({ authorityId: req.params.authorityId,
+        authorization: req.headers.authorization, requiredScope: "action.poll" });
+      const parsed = identity.safeParse(req.body);
+      if (!parsed.success) throw new EnvironmentActionBrokerError("action_request_invalid", 400,
+        "Exact resident, predecessor and checkpoint identity is required for reconciliation.");
+      const state = await readEnvironmentTemporalDeliveryState({ claim, bindingStore,
+        residentActionRequestId: parsed.data.resident_action_request_id,
+        predecessorPlanId: parsed.data.predecessor_plan_id,
+        predecessorPlanHash: parsed.data.predecessor_plan_hash, checkpointId: parsed.data.checkpoint_id });
+      res.json({ schema: "helix.environment_action.temporal_delivery_status.v1", ok: true,
+        delivery_state: state, absence_proves_no_effects: false, automatic_replay_allowed: false,
+        execution_authority: false, answer_authority: false, assistant_answer: false,
+        terminal_eligible: false, raw_content_included: false });
+    }));
+  return router;
+}
+
+export function createEnvironmentActionRouter(bindingStore?: Pick<HelixReasoningTaskBindingStore, "inspect">) {
+  const router = Router();
+  // Mount before the general 1MB parser/rate limiter so temporal requests keep
+  // their own 8KB limit and are not charged twice by shared middleware.
+  if (bindingStore) router.use(createEnvironmentTemporalDeliveryRouter(bindingStore));
+  router.use(environmentActionRouter);
+  return router;
+}
 
 environmentActionRouter.post(
   "/v1/authorities/:authorityId/manifest",
@@ -136,6 +203,7 @@ environmentActionRouter.post(
       error: null,
       message: "Player-action connector heartbeat recorded.",
       heartbeat_id: recorded.heartbeatId,
+      workflow_event_batch_supported: true,
       replayed: recorded.replayed,
       answer_authority: false,
       assistant_answer: false,
@@ -201,6 +269,29 @@ environmentActionRouter.post(
       answer_authority: false,
       assistant_answer: false,
       terminal_eligible: false,
+      raw_content_included: false,
+    });
+  }),
+);
+
+environmentActionRouter.post(
+  "/v1/authorities/:authorityId/requests/events",
+  route(async (req, res) => {
+    const claim = await authenticateEnvironmentActionConnector({
+      authorityId: req.params.authorityId,
+      authorization: req.headers.authorization,
+      requiredScope: "action.event.write",
+    });
+    const body = z.object({ events: z.array(z.unknown()).min(1).max(32) }).strict().safeParse(req.body);
+    if (!body.success) throw new EnvironmentActionBrokerError(
+      "action_event_invalid", 400, "Invalid bounded workflow evidence batch.");
+    const recorded = await submitEnvironmentActionWorkflowEvents({ claim, events: body.data.events });
+    res.json({
+      schema: "helix.environment_action.events_receipt.v1",
+      ok: true, error: null, message: "Ordered player workflow events recorded.",
+      event_ids: recorded.map(item => item.event.event_id),
+      replayed: recorded.every(item => item.replayed),
+      answer_authority: false, assistant_answer: false, terminal_eligible: false,
       raw_content_included: false,
     });
   }),

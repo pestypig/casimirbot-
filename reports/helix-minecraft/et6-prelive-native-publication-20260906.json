@@ -1,0 +1,23 @@
+{
+  "scope": "Native successor handoff through runtime event publication and HTTP acknowledgement",
+  "test": "PlayerActionRuntimeTransportTest",
+  "focused_tests": 7,
+  "native_unit_tests": 298,
+  "failures": 0,
+  "errors": 0,
+  "verified": [
+    "On-time successor acceptance does not execute before committed tick",
+    "Activation advances runtime currentWire from root to child",
+    "Runtime publishes matched action event and projection with resident identity and producer epoch",
+    "Projection batch hash and paired measurements survive JSON HTTP transport",
+    "Projection HTTP 503 retries identical evidence without another action request or physical effect",
+    "Late response cancels without successor execution"
+  ],
+  "initial_fixture_failures": ["Missing capability_id", "Missing tick_index"],
+  "limits": [
+    "Local hash-bound admission fixture, not server-generated admission",
+    "Loopback acknowledgement fixture, not production server evidence persistence",
+    "Synthetic perception and simulated controller ticks, not measured live capacity",
+    "No GameTests, game launch, installed companion replacement or release verification"
+  ]
+}

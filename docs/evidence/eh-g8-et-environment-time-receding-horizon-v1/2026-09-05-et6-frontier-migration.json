@@ -1,0 +1,13 @@
+{
+  "schema": "et6.frontier_migration.v1",
+  "date": "2026-09-05",
+  "change": "Registered migration 082 for goal-scoped frontier snapshots with revision/replay uniqueness, separate producer planes, payload hashes, and retention timestamps.",
+  "verification": {
+    "command": "npx vitest run server/db/migrations/__tests__/082_environment_temporal_frontiers.spec.ts --pool=forks --maxWorkers=1",
+    "passed": 1,
+    "failed": 0,
+    "assertions": ["exact producer planes retained", "duplicate revision rejected", "duplicate replay identity rejected", "nonpositive revision rejected", "invalid retention rejected", "missing goal rejected"]
+  },
+  "limits": "Isolated pg-mem migration test only. No live database migration, publisher, retention sweep, action dispatch, or packaged rollout is claimed. Payload validation and revision assignment remain application responsibilities.",
+  "et6_complete": false
+}

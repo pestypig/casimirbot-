@@ -1,0 +1,37 @@
+{
+  "status": "zero_energy_vector_only_coupled_channel_diagnostic",
+  "source_sha256": "54fc7fe2ae81ff6062486128741a26c7bfa3931b5baf18e0286934bbd8134884",
+  "beta": 33.333333333333336,
+  "gamma": 22.22222222222222,
+  "real_pair_excitation_threshold_relative_km_s": 8479.411200015329,
+  "rows": [
+    {
+      "x_min": 0.0001,
+      "x_max": 20.0,
+      "scattering_length_GeV_inverse": 5.330907300788279,
+      "max_residual": 9.990563522549845e-09,
+      "nodes": 2554
+    },
+    {
+      "x_min": 3e-05,
+      "x_max": 30.0,
+      "scattering_length_GeV_inverse": 5.330839653551264,
+      "max_residual": 9.951923062016287e-09,
+      "nodes": 2651
+    },
+    {
+      "x_min": 1e-05,
+      "x_max": 30.0,
+      "scattering_length_GeV_inverse": 5.3308336862843575,
+      "max_residual": 9.988675009948268e-09,
+      "nodes": 2532
+    }
+  ],
+  "last_cutoff_relative": 1.1193859306146692e-06,
+  "omissions": [
+    "scalar diagonal potential",
+    "finite-velocity partial waves",
+    "spin statistics and transport weighting",
+    "halo distribution and observational inference"
+  ]
+}

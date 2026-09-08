@@ -1,0 +1,15 @@
+{
+  "et6_complete": false,
+  "finding": "Existing native SectionHasher cannot be substituted for environment-time v1 canonical hashing",
+  "cause": "TypeScript canonicalEnvironmentTimeValue uses localeCompare; Java HelixJson uses lexical String ordering",
+  "counterexample": {
+    "node_canonical": "{\"_x\":3,\"a\":1,\"A\":2,\"z\":4}",
+    "java_canonical": "{\"A\":2,\"_x\":3,\"a\":1,\"z\":4}",
+    "node_hash": "sha256:fd2472a704a598b26e234bd0be24f100f0eba5191710822df433bf629073483b"
+  },
+  "verification": "Node computed canonical bytes/hash; TemporalPlanHashCompatibilityTest asserts Java spelling and hash divergence",
+  "disposition": "Do not silently alter existing persisted hash semantics. Native admission needs exact canonical-byte transport plus semantic comparison, or an explicitly versioned cross-language format before support is enabled.",
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

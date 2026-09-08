@@ -1,0 +1,32 @@
+{
+  "status": "conditional_abundance_scaling_obstruction_not_halo_exclusion",
+  "g_SM": 1e-11,
+  "relative_speed_kms": 200,
+  "minimum_fraction_for_dark_alpha_le_one": 0.09147091740226389,
+  "rows": [
+    {
+      "local_density_fraction": 1,
+      "product_scale": 1.0,
+      "dark_alpha": 0.09147091740226389,
+      "self_transport_rate_ratio": 1.0
+    },
+    {
+      "local_density_fraction": 0.5,
+      "product_scale": 1.414213562373095,
+      "dark_alpha": 0.18294183480452775,
+      "self_transport_rate_ratio": 1.8882197934739693
+    },
+    {
+      "local_density_fraction": 0.1,
+      "product_scale": 3.162277660168379,
+      "dark_alpha": 0.9147091740226386,
+      "self_transport_rate_ratio": 8.143370958050822
+    }
+  ],
+  "assumptions": [
+    "same velocity distribution and raw xenon rate",
+    "both mediator products scale together",
+    "light repulsive self-scattering fit; heavy term omitted",
+    "local fraction need not equal cosmological fraction"
+  ]
+}

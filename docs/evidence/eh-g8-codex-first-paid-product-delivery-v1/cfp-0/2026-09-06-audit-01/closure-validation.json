@@ -1,0 +1,114 @@
+{
+  "schema": "casimirbot.cfp0.closure_validation.v1",
+  "captured_utc": "2026-09-07T02:53:28.568Z",
+  "decision": "CFP-0 closed inventory only; CFP-1 active specification; CFP-2 through CFP-6 blocked; paid product specified; environment G8 active",
+  "documentation_audit": {
+    "command": "npm run helix:environment-harness:docs-audit",
+    "exit_code": 0,
+    "ok": true,
+    "active_gate": "G8",
+    "backlink_files_checked": 6,
+    "canonical_link_targets_checked": 7,
+    "capability_status_rows_checked": 40,
+    "acceptance_claims_checked": 14
+  },
+  "coverage": {
+    "expected_recursive_packets": 39,
+    "annotated_recursive_packets": 39,
+    "supplemental_packets": 1,
+    "missing": [],
+    "duplicates": [],
+    "unknown_evidence_groups": []
+  },
+  "inspection_inputs_present": 114,
+  "declared_next_tasks": [
+    "CFP-1.SCOPE",
+    "CFP-1.CLAIMS",
+    "CFP-2.PUBLIC",
+    "CFP-1.ENTITLEMENTS",
+    "CFP-3.COMMERCE",
+    "CFP-3.DISTRIBUTION",
+    "CFP-3.SIGNING",
+    "CFP-4.INTEGRATION",
+    "CFP-1.POLICY",
+    "CFP-4.RECOVERY",
+    "CFP-4.ENVIRONMENT",
+    "CFP-2.CAPABILITY",
+    "CFP-1.RIGHTS"
+  ],
+  "local_references": [
+    {
+      "from": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "target": "docs/helix-environment-harness-work-program-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "target": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "target": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "present": true
+    },
+    {
+      "from": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "target": "docs/work-packets/",
+      "present": true
+    },
+    {
+      "from": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "target": "docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-0/2026-09-06-audit-01/",
+      "present": true
+    },
+    {
+      "from": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "target": "shared/helix-account-session.ts",
+      "present": true
+    }
+  ],
+  "scoped_diff_check": {
+    "exit_code": 0,
+    "output": "warning: in the working copy of 'docs/helix-environment-harness-work-program-v1.md', LF will be replaced by CRLF the next time Git touches it"
+  },
+  "independent_review": {
+    "agent": "distribution_audit",
+    "verdict": "APPROVE INVENTORY CLOSURE",
+    "blocking_findings": [],
+    "scope": "39 graph packets plus ET6; 114 inputs; source versus result limits; owner decisions; conditional on final docs/link validation"
+  },
+  "source_capture_note": "Canonical work program changed after the frozen audit input capture to record this reviewed closure. Frozen source snapshots remain historical inputs, not current-file hash assertions.",
+  "final_documents": [
+    {
+      "path": "docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md",
+      "sha256": "7939b329657b01c4e292219dee171df004aae81b31478e4d3f4a4c2b122f1bf3"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "ca41bec72b81ce70d729da8078c230597ed41ec5fb99c3b0b01e6a55021a01ee"
+    },
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "2122576d71a038815f613f4793e7f8e8835575261ffd4bd20405ef3e806cd18c"
+    }
+  ],
+  "not_run": [
+    "application tests/builds",
+    "live client/server/game runs",
+    "installed-user flows",
+    "Authenticode validation",
+    "updates or production deployment",
+    "remote repository/provider checks",
+    "payment transactions",
+    "Casimir adapter verification"
+  ],
+  "ok": true,
+  "failures": [],
+  "validation_attempts": [
+    {
+      "failure": "Draft review wording persisted because a newline-specific replacement did not match.",
+      "resolution": "Corrected reviewer and validation wording before sealing the new audit; rechecked."
+    }
+  ]
+}

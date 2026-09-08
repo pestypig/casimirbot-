@@ -1,0 +1,18 @@
+{
+  "scope": "Native started-event JSON through real HTTP broker receipt and local snapshot failure/retry/reopen",
+  "passed": true,
+  "verified": [
+    "Initial POST returns 503 while snapshot rename fails",
+    "Read-only exact retry also returns 503 while snapshot remains unavailable",
+    "One in-memory event and zero disk events during failure",
+    "Changed replay content returns 409",
+    "Successful exact retry returns 200/replayed and saves one event",
+    "Same event identity survives database reopen"
+  ],
+  "limits": [
+    "Fixture connector authentication, not real OAuth",
+    "Bounded three-table migrations, not full-schema persistence test",
+    "Started event only; projection and terminal HTTP fault paths remain",
+    "No live server or game touched; no power-loss durability claim"
+  ]
+}

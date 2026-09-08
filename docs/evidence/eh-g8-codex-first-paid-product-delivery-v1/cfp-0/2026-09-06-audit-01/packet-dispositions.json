@@ -1,0 +1,983 @@
+{
+  "schema": "casimirbot.cfp0.packet_dispositions.v1",
+  "captured_utc": "2026-09-07T02:42:34.084Z",
+  "scope": "Four named roots; recursively traverse literal docs/work-packets paths, normalized local Markdown links under docs/work-packets, and backticked eh-*.md packet filenames. External URLs excluded. Other source/evidence refs are inspection inputs, not recursive roadmap roots.",
+  "authority": "Dated audit inventory, not the current stage ledger. Canonical work program remains authority.",
+  "coverage": {
+    "expected_recursive_packets": 39,
+    "annotated_recursive_packets": 39,
+    "supplemental_packets": 1,
+    "missing": [],
+    "duplicates": [],
+    "unknown_evidence_groups": []
+  },
+  "rows": [
+    {
+      "filename": "eh-g8-codex-first-paid-product-delivery-v1.md",
+      "declared_stage": "CFP-0",
+      "disposition": "retain",
+      "authority_owner": "Product owner; delivery coordinator",
+      "dependencies": "G8; CFP-0 inventory closure",
+      "next_task": "CFP-1.SCOPE",
+      "evidence_limit": "Paid direction is specified, not an accepted product.",
+      "path": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "90824c15fc12d8b27d5be5d233f7e91f0974a1a334ab1321bbc67f5248ced41b",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Codex-first paid installed-product delivery",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E00"
+      ]
+    },
+    {
+      "filename": "eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "declared_stage": "CFP-0",
+      "disposition": "retain",
+      "authority_owner": "Audit coordinator and independent reviewer",
+      "dependencies": "Reviewed coverage and assigned findings",
+      "next_task": "CFP-1.SCOPE",
+      "evidence_limit": "Closure accepts the inventory only.",
+      "path": "docs/work-packets/eh-g8-cfp0-repository-release-gap-audit-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "57450cbb6345c9e571625519a3389d1d7c80e8ea3236da908349afcb5210d1b0",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E00"
+      ]
+    },
+    {
+      "filename": "eh-mc-companion-survival-party-v1.md",
+      "declared_stage": "C1; private C2/C3; C4/S6 blocked",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Actor owner; Helix grants; Fabric actor execution",
+      "dependencies": "Live NAV8 before fluent movement reliance; private/public distinction",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Broad capability projected. Private C3 A1/B replay retrieval is not live agent-operated gathering.",
+      "path": "docs/work-packets/eh-mc-companion-survival-party-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "3bf96c0872c6e2ad388eebb544ab2b57fd0cf3411727c3aaa0cc0c91c2a5690a",
+      "declared_header_maturity": [
+        "Current maturity: projected"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Optional Minecraft companion-entity embodiment",
+          "maturity": "projected"
+        },
+        {
+          "capability": "Provider-neutral spatial navigation with Minecraft capacity reference",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E09"
+      ]
+    },
+    {
+      "filename": "eh-g7-robinhood-shadow-observation-transfer-v1.md",
+      "declared_stage": "G7 closed regression",
+      "disposition": "retain",
+      "authority_owner": "Owner-private read connector; principal runtime",
+      "dependencies": "Exact retained G7 evidence",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Retain second-domain regression without adding a financial paid offer.",
+      "path": "docs/work-packets/eh-g7-robinhood-shadow-observation-transfer-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "a5c329dbb0d7bb37ea06b088d802945eb615bafdbb602f551349fac3e1df5ac3",
+      "declared_header_maturity": [
+        "Current maturity: integrated accepted"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Second-domain harness transfer",
+          "maturity": "integrated accepted"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E10"
+      ]
+    },
+    {
+      "filename": "eh-g8-installed-profile-connection-broker-v1.md",
+      "declared_stage": "Installed read broker",
+      "disposition": "release prerequisite",
+      "authority_owner": "Profile owner; native vault; connector",
+      "dependencies": "Native profile identity, custody and installed evidence",
+      "next_task": "CFP-2.PUBLIC",
+      "evidence_limit": "Deterministic read slice does not prove ordinary-user installed full catalog.",
+      "path": "docs/work-packets/eh-g8-installed-profile-connection-broker-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "5cd66666ede87badae5a1bb198d2199fdc4e0d83e51db02f92cc0737846917b6",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "User profile connection broker — Robinhood read slice",
+          "maturity": "deterministically verified"
+        },
+        {
+          "capability": "EXE-first subscription and provider-access broker",
+          "maturity": "deterministically verified"
+        },
+        {
+          "capability": "Profile-native MCP authorization and managed recovery",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E03",
+        "E04"
+      ]
+    },
+    {
+      "filename": "eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "declared_stage": "SPB-4 active; SPB-5–9 blocked",
+      "disposition": "reconcile",
+      "authority_owner": "Owner; billing ledger; native credential broker",
+      "dependencies": "Separate software purchase from provider credit chain",
+      "next_task": "CFP-1.ENTITLEMENTS",
+      "evidence_limit": "Retain SPB security/order for its offering; no implicit completion of deferred providers.",
+      "path": "docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "c77b876666a01f1f7adfde2c8e021eefb2706657b93c1efec46dd79b71a30f6a",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "EXE-first subscription and provider-access broker",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E01"
+      ]
+    },
+    {
+      "filename": "eh-g8-spb3-auth0-mfa-step-up-v1.md",
+      "declared_stage": "SPB-3 bounded live checkpoint",
+      "disposition": "retain",
+      "authority_owner": "User Auth0 ceremony; service step-up validator",
+      "dependencies": "Exact current installed high-risk operation and owner context",
+      "next_task": "CFP-3.COMMERCE",
+      "evidence_limit": "Single-node MFA does not accept all customer recovery/checkout operations.",
+      "path": "docs/work-packets/eh-g8-spb3-auth0-mfa-step-up-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "afe3d5e45c3af288f90f9c90e4f9e4e7245dc5431d86edfb61f3b39879681431",
+      "declared_header_maturity": [
+        "Current maturity: live accepted"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "EXE-first subscription and provider-access broker",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E01"
+      ]
+    },
+    {
+      "filename": "eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+      "declared_stage": "SPB-4 active",
+      "disposition": "release prerequisite",
+      "authority_owner": "Hosted signed-webhook service; owner payment decisions",
+      "dependencies": "CFP-1 software plan contract; attended deployed sandbox evidence",
+      "next_task": "CFP-3.COMMERCE",
+      "evidence_limit": "Fixture accepted; live_accepted false; no production or public capability grants.",
+      "path": "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "1bffac9de118b306e9d951ce6df63f7752b9e7ca4ad0acb026eab1b4575b7ead",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "EXE-first subscription and provider-access broker",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E01"
+      ]
+    },
+    {
+      "filename": "eh-g8-public-ui-agent-affordance-manifest-v1.md",
+      "declared_stage": "UI4 partial; UI6 installed refresh open",
+      "disposition": "release prerequisite",
+      "authority_owner": "Account policy and tool handler owners",
+      "dependencies": "Frozen paid/public capability bindings; installed catalog parity",
+      "next_task": "CFP-2.PUBLIC",
+      "evidence_limit": "Catalog discovery does not make blocked controls executable.",
+      "path": "docs/work-packets/eh-g8-public-ui-agent-affordance-manifest-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "12ed95e263a13f5a133d5a50e793e3734c747ea9f9db68861768cf6c263a6d3c",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Public-user UI agent catalog and MCP discovery",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E02"
+      ]
+    },
+    {
+      "filename": "eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "declared_stage": "PNA2 signed acceptance open; later narrow checkpoints",
+      "disposition": "reconcile",
+      "authority_owner": "External runtime owns reasoning; Helix governs effects/evidence",
+      "dependencies": "Signed PNA boundaries; optional mission/provider scope decision",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Mode A base; Mode B optional. Post-G8 capstones out of initial offer.",
+      "path": "docs/work-packets/eh-g8-provider-neutral-agent-connection-and-helix-activity-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "3944b7375cc78fbe809d5a923ed9aaf3090c731bef6d6f8e44982f6d74dc4d9c",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral external-agent connection and Helix activity surface",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E03",
+        "E04"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+      "declared_stage": "PNA1 deterministic",
+      "disposition": "release prerequisite",
+      "authority_owner": "Installed host packaging and readiness",
+      "dependencies": "Actual shipped tree and no-agent startup",
+      "next_task": "CFP-3.DISTRIBUTION",
+      "evidence_limit": "No bundled model dependency required.",
+      "path": "docs/work-packets/eh-g8-pna1-packaging-ux-readiness-boundary-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "8d3753a32e01e4e91567b9d22a1f9b55afd97e2988d969343915c98304bc3804",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral external-agent connection and Helix activity surface",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E03",
+        "E11"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+      "declared_stage": "PNA2 active pending signed repeat",
+      "disposition": "release prerequisite",
+      "authority_owner": "Owner consent; native and external client auth boundaries",
+      "dependencies": "Signing provisioning; fixed release; connection/restart/revoke/reactivate",
+      "next_task": "CFP-3.SIGNING",
+      "evidence_limit": "Recorded security hold is not a fresh provider-dashboard observation.",
+      "path": "docs/work-packets/eh-g8-pna2-provider-neutral-agent-connections-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "2420da8258f9cade455f273840f2624935711fd0a1410ca8a6613d79c8290a02",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral external-agent connection and Helix activity surface",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E03",
+        "E11"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md",
+      "declared_stage": "Ordered current-source acceptance",
+      "disposition": "release prerequisite",
+      "authority_owner": "Provider-native MCP; claimed Agent API; Helix policy",
+      "dependencies": "PNA2 boundary; separate lifecycle/pagination/isolation/recovery cases",
+      "next_task": "CFP-4.INTEGRATION",
+      "evidence_limit": "Do not substitute generic MCP connection for all product surfaces.",
+      "path": "docs/work-packets/eh-g8-pna3-current-source-cross-surface-live-acceptance-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "efe65f1730979bfa8bbd57275740038c87e5530421543f7343fbbd5ab5486d96",
+      "declared_header_maturity": [
+        "Current maturity: implemented"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral external-agent connection and Helix activity surface",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E04"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+      "declared_stage": "PNA3.4 bounded live checkpoint",
+      "disposition": "retain",
+      "authority_owner": "Exact task owner; voice presentation; separately admitted effects",
+      "dependencies": "Current task binding and principal identity; applicable voice release contract",
+      "next_task": "CFP-4.INTEGRATION",
+      "evidence_limit": "No provider task creation or hidden reasoning; advertised voice needs release repeat.",
+      "path": "docs/work-packets/eh-g8-pna3-4-exact-reasoning-binding-voice-pickup-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "0baf58d8cfa5ddd870cae934d1b48cd7f9297dc795f72ab4e08f68e952a597ff",
+      "declared_header_maturity": [
+        "Current maturity: live accepted"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral external-agent connection and Helix activity surface",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E04"
+      ]
+    },
+    {
+      "filename": "eh-g8-shared-live-room-mcp-configuration-v1.md",
+      "declared_stage": "Narrow grant/revoke/floor deterministic",
+      "disposition": "reconcile",
+      "authority_owner": "Participant consent; trusted native signer and exact delegation",
+      "dependencies": "Public policy decision; native signer/conversation binding evidence",
+      "next_task": "CFP-1.POLICY",
+      "evidence_limit": "Unaccepted authority-increasing room operations remain excluded.",
+      "path": "docs/work-packets/eh-g8-shared-live-room-mcp-configuration-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "5930c66478627f736290485ec392594a7cb0bb6a58600ab758566fea3bc60df5",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified for authority-reducing own-consent revocation, exact-epoch speaking-floor inspection/release, and signed-delegation own-consent grant/speaking-floor acquire; native signer and trusted installed-client conversation binding remain unverified external acceptance"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Shared Live Room semantic MCP configuration",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E02",
+        "E08"
+      ]
+    },
+    {
+      "filename": "eh-g8-robinhood-resident-observer-v1.md",
+      "declared_stage": "Bounded read observer live checkpoint",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Owner-scoped read connector; proposal-only observer",
+      "dependencies": "Exact task re-entry for stronger claims",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Preserve regression; no financial product in proposed Minecraft slice.",
+      "path": "docs/work-packets/eh-g8-robinhood-resident-observer-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "cb37a6d980703c3afe2e95f45ae4ff4101bf9e03862b9c5a8798bb97eeaac7bf",
+      "declared_header_maturity": [
+        "Current maturity: live accepted"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Robinhood deterministic market-observer resident profile",
+          "maturity": "live accepted"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E10"
+      ]
+    },
+    {
+      "filename": "eh-g8-brokerage-reactive-simulation-controller-v1.md",
+      "declared_stage": "R3 bridge deterministic; R3-A unavailable",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Developer-owned simulation; no provider mutations",
+      "dependencies": "Owner read preflight; two distinct regular-hours dates before R4/R5",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Do not run markets or trades from this audit.",
+      "path": "docs/work-packets/eh-g8-brokerage-reactive-simulation-controller-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "fdc0d94332a639d5a9d0d940e1e259b053c07bd9c529dd12271da66eb592acc4",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Brokerage reactive simulated-execution resident profile",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E10"
+      ]
+    },
+    {
+      "filename": "eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+      "declared_stage": "Qualification implemented",
+      "disposition": "out of scope",
+      "authority_owner": "Owner per-order consent; trading gate",
+      "dependencies": "Separate provider/read/supervisor/dead-man qualification",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "No first-offer brokerage mutation or trading acceptance claim.",
+      "path": "docs/work-packets/eh-g8-robinhood-attended-tiny-live-qualification-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "3d9b87516c0513124b51f7b82bd2694e98b9e429cda86dd5f118284a3d35d2cd",
+      "declared_header_maturity": [
+        "Current maturity: implemented"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Robinhood attended tiny-live cash-equity path",
+          "maturity": "implemented"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E10"
+      ]
+    },
+    {
+      "filename": "eh-mc-combat-awareness-arena-ladder-v1.md",
+      "declared_stage": "REC2C exploratory_not_accepted in packet",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Codex target/strategy; bounded Fabric combat controller",
+      "dependencies": "Matched repeated trials and controller-loss/player comparison",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "One contact-use trial does not accept the combat ladder.",
+      "path": "docs/work-packets/eh-mc-combat-awareness-arena-ladder-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "5a365fce6fa1ee790ae7957d8e64cb39d0b91b1a8e61b9ec08e0db1be39cc54b",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Installed multi-surface harness convergence",
+          "maturity": "specified"
+        },
+        {
+          "capability": "Profile-native MCP authorization and managed recovery",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E09"
+      ]
+    },
+    {
+      "filename": "eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "declared_stage": "M3-R open; M3-X/M4–7 downstream",
+      "disposition": "reconcile",
+      "authority_owner": "Independent node/profile owners; one principal/effect authority",
+      "dependencies": "M3-R two identities; physical M3-X; ambiguous NFO dependency",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Proposed narrow offer deferral cannot erase packet language that binds M7/G8.",
+      "path": "docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "7f511d37f65529c797290fa5cdb1b5c27b2469c2b9132ce055d118b8f0db8cfd",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified through M2.1 two-host read-only federation and bounded advisory fan-out; live same-device dual-EXE rehearsal and live cross-device acceptance remain unperformed"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Installed-node agent presence, advisory relay, and restart coordination",
+          "maturity": "live accepted"
+        },
+        {
+          "capability": "Bounded installed-node and room advisory fan-out",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E08"
+      ]
+    },
+    {
+      "filename": "eh-g8-local-supervisor-restart-coordination-v1.md",
+      "declared_stage": "M1.1 deterministic",
+      "disposition": "release prerequisite",
+      "authority_owner": "Owned native supervisor; participant acknowledgement",
+      "dependencies": "Signed owned-bootstrap restart and exact epoch reconnection",
+      "next_task": "CFP-4.RECOVERY",
+      "evidence_limit": "No permission from PID, port or advisory relay text.",
+      "path": "docs/work-packets/eh-g8-local-supervisor-restart-coordination-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "f3da4177c12636b3f17ff30546168a9bc10841f3c6bf4b558a9f57d11de5cce0",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Installed-node agent presence, advisory relay, and restart coordination",
+          "maturity": "live accepted"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E08",
+        "E03"
+      ]
+    },
+    {
+      "filename": "eh-g8-local-supervisor-mcp-coordination-v1.md",
+      "declared_stage": "M1 bounded node live checkpoint",
+      "disposition": "retain",
+      "authority_owner": "Authenticated clients; advisory presence/relay",
+      "dependencies": "Exact client/profile/thread and inert relay regression",
+      "next_task": "CFP-4.RECOVERY",
+      "evidence_limit": "One-host/two-client evidence does not prove multiple physical hosts.",
+      "path": "docs/work-packets/eh-g8-local-supervisor-mcp-coordination-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "b349218dda482b1321f2da10337b443f8d619dccf4c7b9f76c64dfc183e9450b",
+      "declared_header_maturity": [
+        "Current maturity: live accepted"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Installed-node agent presence, advisory relay, and restart coordination",
+          "maturity": "live accepted"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E08"
+      ]
+    },
+    {
+      "filename": "eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+      "declared_stage": "N0 fixture implemented",
+      "disposition": "release prerequisite",
+      "authority_owner": "Separate setup World Authority and measured Player Embodiment",
+      "dependencies": "Live profile/room convergence; setup/snapshot/release/restore receipts",
+      "next_task": "CFP-4.ENVIRONMENT",
+      "evidence_limit": "Prerequisite for retained Nether ladder, not a product outcome itself.",
+      "path": "docs/work-packets/eh-mc-nether1-n0-controlled-course-fixture-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "3f2891311986cd0fba512f291d4ec795dc8132ac477eae0c9197831f8c5e6453",
+      "declared_header_maturity": [
+        "Current maturity: implemented"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Profile-native MCP authorization and managed recovery",
+          "maturity": "specified"
+        },
+        {
+          "capability": "N0 controlled-course fixture planner",
+          "maturity": "implemented"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E06",
+        "E07"
+      ]
+    },
+    {
+      "filename": "eh-mc-nether1-perception-parity-v1.md",
+      "declared_stage": "P0–P4; broader specified",
+      "disposition": "reconcile",
+      "authority_owner": "Fabric sensing; Helix provenance; Codex decisions",
+      "dependencies": "Complete finite P3 and P4; reconcile stale Invalid-session narrative",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Later narrow scene evidence does not accept broad tactical perception.",
+      "path": "docs/work-packets/eh-mc-nether1-perception-parity-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "8f10e124813a7a0e236f0d4b9f67697b8b7480e897e056a69a22e24a02f82926",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Profile-native MCP authorization and managed recovery",
+          "maturity": "specified"
+        },
+        {
+          "capability": "Operator-visible Codex steering and action-reaction fidelity",
+          "maturity": "specified"
+        },
+        {
+          "capability": "Provider-neutral spatial navigation with Minecraft capacity reference",
+          "maturity": "deterministically verified"
+        },
+        {
+          "capability": "Minecraft tactical perception parity",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E06"
+      ]
+    },
+    {
+      "filename": "eh-g8-profile-semantic-mcp-monitor-v1.md",
+      "declared_stage": "M0–2 deterministic; partial M3",
+      "disposition": "release prerequisite",
+      "authority_owner": "Profile monitor lease; client-owned continuation",
+      "dependencies": "Material replan and required course parity; admitted continuation transport",
+      "next_task": "CFP-4.ENVIRONMENT",
+      "evidence_limit": "No closed-task wake from a monitor cursor alone.",
+      "path": "docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "6c3f81407c9bf7262d89e6bd35437a3fa8cbce7507a6f485fc69441f7d5a84d3",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Profile-scoped semantic MCP monitoring and Codex task wake",
+          "maturity": "deterministically verified"
+        },
+        {
+          "capability": "Operator-visible Codex steering and action-reaction fidelity",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E07"
+      ]
+    },
+    {
+      "filename": "eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "declared_stage": "Deterministic substrate; narrow A0",
+      "disposition": "retain",
+      "authority_owner": "Fabric sensing/effects; Codex semantic action",
+      "dependencies": "N0 compositions; A1/B exact observation re-entry",
+      "next_task": "CFP-2.CAPABILITY",
+      "evidence_limit": "Three-stone A0 receipt explicitly lacks observation re-entry.",
+      "path": "docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "4d5aa53be806e5c5585ee9d36615b68644cf9611f854e149ade27a02bce89615",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Operator-visible Codex steering and action-reaction fidelity",
+          "maturity": "specified"
+        },
+        {
+          "capability": "Responsive Player Embodiment sensing and consecutive native mining",
+          "maturity": "deterministically verified"
+        },
+        {
+          "capability": "Legitimate durable Nether entry",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E07"
+      ]
+    },
+    {
+      "filename": "eh-g8-et-environment-time-receding-horizon-v1.md",
+      "declared_stage": "ET0–5 deterministic; ET6–8 specified",
+      "disposition": "release prerequisite",
+      "authority_owner": "Codex temporal plan; bounded resident execution; arbiter",
+      "dependencies": "ET6 production repair/capacity before ET7/8 and navigation runtime",
+      "next_task": "CFP-4.ENVIRONMENT",
+      "evidence_limit": "Required for fluent/rolling claims; cannot infer from shared schemas.",
+      "path": "docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "4004aa6ef6a96eef6b2f13947ac60cf7201e3b82cc909d3a05f2ac4720187e50",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified for ET0–ET5; ET6–ET8 remain specified."
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral environment time and receding-horizon action planning",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E05",
+        "E12"
+      ]
+    },
+    {
+      "filename": "eh-g8-environment-spatial-navigation-v1.md",
+      "declared_stage": "NAV0 deterministic; NAV1–9 blocked ET6",
+      "disposition": "release prerequisite",
+      "authority_owner": "Shared planner/profile compiler; existing effect arbiter",
+      "dependencies": "ET6 then ordered NAV1–8; NAV8 for fluent companion/Nether reliance",
+      "next_task": "CFP-4.ENVIRONMENT",
+      "evidence_limit": "FiveM fixture only; defer fluent marketing until exact acceptance.",
+      "path": "docs/work-packets/eh-g8-environment-spatial-navigation-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "816aadb9b5f5153abe6f01b70605e1f3affef716da29853e95c5bd614fe0bb0f",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified for NAV0; NAV1–NAV9 remain specified and depend on the open ET6 Minecraft capacity qualification"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral spatial navigation with Minecraft capacity reference",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E05"
+      ]
+    },
+    {
+      "filename": "eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+      "declared_stage": "Evaluation-only deterministic",
+      "disposition": "out of scope",
+      "authority_owner": "Isolated black-box evaluator",
+      "dependencies": "Shipped-tree exclusion and independent navigation provenance",
+      "next_task": "CFP-1.RIGHTS",
+      "evidence_limit": "No Baritone code/API/structure as product dependency.",
+      "path": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "97de6b91ac6126a6c38ec5307c2088aabe663def17fac63a2581a06c13e9b63d",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Provider-neutral spatial navigation with Minecraft capacity reference",
+          "maturity": "deterministically verified"
+        },
+        {
+          "capability": "Baritone v1.15.0 non-shipping navigation comparison",
+          "maturity": "deterministically verified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E11"
+      ]
+    },
+    {
+      "filename": "eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "declared_stage": "N0–N4; specified",
+      "disposition": "release prerequisite",
+      "authority_owner": "Codex legitimate strategy; Fabric Player Embodiment",
+      "dependencies": "Controlled readiness; A1/B parity; ET/NAV where relied on",
+      "next_task": "CFP-4.ENVIRONMENT",
+      "evidence_limit": "Retained G8 objective; not a claim of smallest paid demonstration.",
+      "path": "docs/work-packets/eh-mc-nether1-legitimate-nether-entry-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "7f24ef31926470ba6ab6c628d189acc12f859ed4346eb69bed9dcdef33d112e5",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [
+        {
+          "capability": "Legitimate durable Nether entry",
+          "maturity": "specified"
+        }
+      ],
+      "inspected_evidence_groups": [
+        "E06",
+        "E07"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md",
+      "declared_stage": "PNA3.5 deterministic",
+      "disposition": "release prerequisite",
+      "authority_owner": "User/native setup; exact client binding",
+      "dependencies": "Public-user access; signed-in successful time-to-ready",
+      "next_task": "CFP-2.PUBLIC",
+      "evidence_limit": "Existing disposable unpacked smoke is unconfigured failure-path evidence.",
+      "path": "docs/work-packets/eh-g8-pna3-5-finite-agent-onboarding-recovery-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "1db2cafed127ae3548d462e9a4d4fb0f3d448bcd4c8b5b6ef983436ab8fae1c9",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E02",
+        "E03"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna3-6-play-minecraft-with-helix-v1.md",
+      "declared_stage": "Narrow installed action boundary live checkpoint",
+      "disposition": "retain",
+      "authority_owner": "Exact profile/task grant; Fabric effects",
+      "dependencies": "One useful ordinary-user task on same artifact/principal; signed repeat",
+      "next_task": "CFP-2.CAPABILITY",
+      "evidence_limit": "350ms walk and composed earlier reasoning are not a full paid journey.",
+      "path": "docs/work-packets/eh-g8-pna3-6-play-minecraft-with-helix-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "452b584578ee227ec76836c2dc61a39325573735c7c43a51619c52fa47a33c92",
+      "declared_header_maturity": [
+        "Current maturity: installed-node live accepted at the governed action lifecycle boundary; G8 release evaluation remains active."
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E04"
+      ]
+    },
+    {
+      "filename": "eh-g6-concurrent-environment-reasoning-roles-v1.md",
+      "declared_stage": "Historical G6 closed; header specified",
+      "disposition": "retain",
+      "authority_owner": "Principal Runtime Codex; advisory roles; single arbiter",
+      "dependencies": "Retained canonical G6 closure evidence",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "Historical header does not reopen G6 or grant parallel writers.",
+      "path": "docs/work-packets/eh-g6-concurrent-environment-reasoning-roles-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "1bb13d7a130a1857769b1f8ce2293d362a63793fe3eb60ae0bd419ccbb1172fe",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E10"
+      ]
+    },
+    {
+      "filename": "eh-nfo-0-network-field-observer-v1.md",
+      "declared_stage": "Fixture reservation projected",
+      "disposition": "reconcile",
+      "authority_owner": "Site owner; restricted field companion",
+      "dependencies": "Fixture before EH-NFO-1; reconcile federation G8 dependency wording",
+      "next_task": "CFP-1.CLAIMS",
+      "evidence_limit": "No live field scan or physical-device claims; proposed offer deferral only.",
+      "path": "docs/work-packets/eh-nfo-0-network-field-observer-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "eacaf9a0d7c0047e05b1e762a2a11035da49af47fc6000fbb37a0fd77c39d846",
+      "declared_header_maturity": [
+        "Current maturity: projected"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E08"
+      ]
+    },
+    {
+      "filename": "eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "declared_stage": "RTP5 specified",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Owner capture/provider/spend; bounded provider adapter",
+      "dependencies": "Separate attended capped RTP5 approval and prior stage evidence",
+      "next_task": "CFP-1.ENTITLEMENTS",
+      "evidence_limit": "No image-provider cost required for external-client base purchase.",
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-fal-attended-api-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "0a4d08294cc5353aafd5488409690dd44c1a5c7e50dffe04af79757451f68baf",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E13"
+      ]
+    },
+    {
+      "filename": "eh-g8-pna3-helix-operator-activity-v1.md",
+      "declared_stage": "PNA3 deterministic",
+      "disposition": "release prerequisite",
+      "authority_owner": "Public lifecycle projection; external runtime completion",
+      "dependencies": "Full current-source activity matrix; signed-stage prerequisites",
+      "next_task": "CFP-4.INTEGRATION",
+      "evidence_limit": "Historical tests not rerun or promoted to present release.",
+      "path": "docs/work-packets/eh-g8-pna3-helix-operator-activity-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "18c9d750fc6f52342f24cae6e10b4d33f9cb1f37f9b790238b98d344d48c175f",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E04"
+      ]
+    },
+    {
+      "filename": "eh-g5-durable-survival-goal-v1.md",
+      "declared_stage": "Historical G5 closed; header deterministic",
+      "disposition": "retain",
+      "authority_owner": "Codex milestones; append-only Helix state; Fabric effects",
+      "dependencies": "Retained G5 recovery/evidence/participant regression",
+      "next_task": "CFP-4.RECOVERY",
+      "evidence_limit": "Do not reopen closed G5 from old packet header.",
+      "path": "docs/work-packets/eh-g5-durable-survival-goal-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "009e69c4820d8856c906dd308c932c224a6caa5ee0357e67e1f23becb640980b",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E10"
+      ]
+    },
+    {
+      "filename": "eh-g8-realtime-texture-pack-v1.md",
+      "declared_stage": "RTP0–4 deterministic; RTP5 separate",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Owner capture; non-authoritative visual presentation",
+      "dependencies": "Existing RTP stage order; separate provider session",
+      "next_task": "CFP-1.ENTITLEMENTS",
+      "evidence_limit": "Generated pixels remain non-authoritative.",
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "55e40cf9004b214c43d8d52148322a840c0fc85302f8a45c67ec69f39b810416",
+      "declared_header_maturity": [
+        "Current maturity: deterministically verified through the provider-neutral API boundary"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E13"
+      ]
+    },
+    {
+      "filename": "eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md",
+      "declared_stage": "Compiler specified; RTP6 later",
+      "disposition": "defer from the proposed offer",
+      "authority_owner": "Developer visual treatment; no environment strategy",
+      "dependencies": "Compiler deterministic evidence and attended RTP5 before RTP6",
+      "next_task": "CFP-1.ENTITLEMENTS",
+      "evidence_limit": "Presentation-only direction; no private interpreter/runtime loop.",
+      "path": "docs/work-packets/eh-g8-realtime-texture-pack-dynamic-visual-direction-v1.md",
+      "traversal_class": "recursive_packet",
+      "captured_source_sha256": "0548477030031243c4de3669448c2ec4e8b8a4292e253fd03cbf0474f83a4649",
+      "declared_header_maturity": [
+        "Current maturity: specified"
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E13"
+      ]
+    },
+    {
+      "filename": "eh-g8-et6-production-rolling-integration-repair-v1.md",
+      "declared_stage": "Pre-live timing repair; broader specified",
+      "disposition": "release prerequisite",
+      "authority_owner": "Codex proposal; broker admission; existing Fabric controller",
+      "dependencies": "Correlated phase attribution before unchanged ET6 live qualification",
+      "next_task": "CFP-4.ENVIRONMENT",
+      "evidence_limit": "Supplemental working-tree input: isolated diagnostic startup now passes as recorded; phase breakdown remains false, NAV1 locked.",
+      "path": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+      "traversal_class": "explicit_supplemental_packet",
+      "captured_source_sha256": "54cd1cfe29f2f5c154f82a4a23de98e8a8f7840468c1f4f36ab06ec8831c239e",
+      "declared_header_maturity": [
+        "Current maturity: specified for this production integration; existing ET0–ET5 deterministic component maturity is unchanged."
+      ],
+      "canonical_scope_claims": [],
+      "inspected_evidence_groups": [
+        "E12"
+      ]
+    }
+  ]
+}

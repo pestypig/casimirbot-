@@ -1,0 +1,14 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "tool admission",
+  "change": "Added a strict caller-metadata schema for the pending temporal admission MCP boundary. It excludes authenticated participant identity and compiler-owned executable/canonical fields, and preserves false authority flags. Complete assembled requests must still pass the canonical action schema and broker admission.",
+  "checks": [
+    { "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-admission-request-schema.test.ts --pool=forks", "exit_code": 0, "passed": 14 },
+    { "command": "npx tsc -p tsconfig.et6-temporal.json --noEmit --pretty false", "exit_code": 0 }
+  ],
+  "negative_evidence": ["Injected participant, profile, client and session identifiers rejected", "Injected arguments, temporal plan and canonical compilation fields rejected", "Answer, assistant-answer, terminal and raw-content flags cannot be promoted"],
+  "limitations": ["Schema is not yet wired into a public MCP admission tool", "No authenticated end-to-end MCP submission tested", "No full build, runtime restart, native feature advertisement, EXE packaging or live Minecraft action", "No capability maturity advancement or ET6 completion"]
+}

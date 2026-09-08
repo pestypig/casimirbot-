@@ -1,0 +1,19 @@
+{
+  "scope": "Exact post-action durable-run re-entry diagnosis",
+  "probe_evidence_ref": "environment_probe_evidence:e994a9d30e0c28d9819b14c7bac95c937e4ff5d1",
+  "probe_tool": "helix_minecraft_situation_probe",
+  "probe_response_has_mcp_evidence": false,
+  "matching_persisted_mcp_observation_count": 0,
+  "destination_tool": "helix_run_evidence_reenter",
+  "destination_requires": "Still-valid owner-scoped MCP observation references, not raw receipt text",
+  "external_task_observed_tool_result": true,
+  "durable_run_api_attachment_proven": false,
+  "proposed_repair_classification": "evidence normalization and evidence re-entry",
+  "repair_constraints": [
+    "Use existing MCP evidence store and envelope contracts",
+    "Keep exact owner, room, source, subject, epoch and freshness provenance",
+    "No invented observation reference or raw-text evidence substitution",
+    "Do not grant answer, execution or terminal authority"
+  ],
+  "et6_complete": false
+}

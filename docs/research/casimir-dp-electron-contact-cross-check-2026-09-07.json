@@ -1,0 +1,30 @@
+{
+  "status": "conditional_contact_cross_experiment_rate_ratio_not_new_confidence_limit",
+  "rows": [
+    {
+      "response": "withLFE",
+      "unit_contact_D": 1.1026775989358773e-19,
+      "unit_contact_ROI_events": 104802.45690137266,
+      "D_at_reference_24_8": 2.6093285655836176e-23,
+      "W_at_reference_24_8_GeV_minus2": 0.015382967001026156,
+      "formal_ROI_events_at_DP_target": 2.8048760695090426e+22
+    },
+    {
+      "response": "noLFE",
+      "unit_contact_D": 1.4154942159669681e-19,
+      "unit_contact_ROI_events": 104802.45690137266,
+      "D_at_reference_24_8": 3.3495642749116727e-23,
+      "W_at_reference_24_8_GeV_minus2": 0.015382967001026156,
+      "formal_ROI_events_at_DP_target": 2.1850135272549266e+22
+    }
+  ],
+  "fold_sha256": "520b80c7fbfac42b1628c4a3f0245cc48424269649dc6687d17a87ec887ed44c",
+  "diamond_sha256": "3dcaf0f4eb4ab7e66f4b67f3175098b2a93bcfce8195539ec298343c3bf6a9d9",
+  "assumptions": [
+    "same unattenuated 100 GeV mono-speed population",
+    "constant electron-density contact potential",
+    "published 186 eV cutoff and fixed 165.3-271.7 PE ROI",
+    "24.8 is a reference-model allowance, not a newly calculated limit",
+    "covered electronic response only"
+  ]
+}

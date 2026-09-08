@@ -1,0 +1,50 @@
+{
+  "scope": "Restricted UV boundary; full implemented top-only SM trajectory and linearized VLL matching. Fixed gu preserves tree dark operator only; yR-dependent loops are not held fixed.",
+  "gu": 5.5700260688158226e-05,
+  "rows": [
+    {
+      "yL": 0.05,
+      "yR_fixed_gu": 0.012798181988641555,
+      "left_mixing_squared": 1.894165370695871e-05,
+      "H_imag_GeV_minus2": 1.7354203380591467e-16,
+      "conditional_epsilon_magnitude": 5.656745893635541e-05,
+      "fraction_dated_measured_magnitude": 0.02538934422637137
+    },
+    {
+      "yL": 0.1,
+      "yR_fixed_gu": 0.006399272805786438,
+      "left_mixing_squared": 7.576230963753525e-05,
+      "H_imag_GeV_minus2": 6.940617186471449e-16,
+      "conditional_epsilon_magnitude": 0.0002262351483835758,
+      "fraction_dated_measured_magnitude": 0.1015418080716229
+    },
+    {
+      "yL": 0.15,
+      "yR_fixed_gu": 0.004266383875611691,
+      "left_mixing_squared": 0.00017044905466688295,
+      "H_imag_GeV_minus2": 1.5612398047747717e-15,
+      "conditional_epsilon_magnitude": 0.0005088990062498073,
+      "fraction_dated_measured_magnitude": 0.2284106850313318
+    },
+    {
+      "yL": 0.2,
+      "yR_fixed_gu": 0.0032,
+      "left_mixing_squared": 0.0003029803750711703,
+      "H_imag_GeV_minus2": 2.7745442092905028e-15,
+      "conditional_epsilon_magnitude": 0.0009043855957206955,
+      "fraction_dated_measured_magnitude": 0.4059181309338849
+    }
+  ],
+  "H_polynomial_coefficients_y2_y4": [
+    6.942036074170608e-14,
+    -1.418887736087926e-15
+  ],
+  "heldout_polynomial_relative_error": 5.3206328232136e-12,
+  "ledger_sha256": "0c809ee41ba1b4ac5cf13ed86476fe0fa8efe8be7fc80d6d3ea32aaa235f7d71",
+  "checks": {
+    "reference_reproduced": true,
+    "interior_evolutions_reproduce_polynomial": true
+  },
+  "allowed_region": false,
+  "full_model_admitted": false
+}

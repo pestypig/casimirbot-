@@ -1,0 +1,24 @@
+{
+  "scope": "ET6 accumulated temporal integration typecheck",
+  "classification": "evidence normalization",
+  "repairs": [
+    "Use an explicit ReductionState union in the reducer transition table instead of flow-narrowed typeof state.",
+    "Return the resident identity from the admission-retention mock.",
+    "Make two test teardown callbacks return void."
+  ],
+  "verification": {
+    "command": "npx tsc -p tsconfig.et6-temporal.json --noEmit --pretty false",
+    "verdict": "FAIL before and after scoped repair",
+    "resolved": "Reducer state/next inference, retention mock shape and teardown return diagnostics disappeared.",
+    "remaining": "Manifest fixture fields, probe types, live-transform readonly arrays, navigation state/waypoint types, world-event projection, Stage Play nullability and reactive condition narrowing still report errors.",
+    "focused_tests": "43 passed across ledger, admission transaction, ordinary queue and admission composition"
+  },
+  "limitations": [
+    "No complete TypeScript build success is claimed.",
+    "This temporal config does not establish full MCP/server-entry-point build readiness.",
+    "No runtime restart, packaged deployment or Minecraft live acceptance occurred."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

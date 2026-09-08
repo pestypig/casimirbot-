@@ -1,0 +1,150 @@
+{
+  "checks": {
+    "matching_identity": true,
+    "finite_wall_first_integral": true,
+    "weak_sphere_size_parameter": true,
+    "surface_and_exterior_ordered": true
+  },
+  "kappa_GeV_at_conditional_Higgs_ceiling": 99.3773964852485,
+  "a_N_GeV_inverse": 1.7905526447794945e-07,
+  "a_chi_GeV_inverse": 1.0323019541509686e-05,
+  "M_N_equivalent_GeV": 2290.0198610103544,
+  "lambda_threshold_shift": 0.00512937402950788,
+  "sphere_density_size_parameter": 5.6399626131467925e-06,
+  "Xe_mu_critical_eV_at_2900": 0.0015438494993255817,
+  "rows": [
+    {
+      "density_kg_m3_benchmark": 2700.0,
+      "mu_eV": 0.0001,
+      "density_over_critical": 221.90939471493758,
+      "bulk_restored": true,
+      "bulk_decay_length_m": 0.000132763709170655,
+      "single_wall_surface_phi_over_vacuum": 0.04746758729481535,
+      "phi_over_vacuum_10um_from_single_wall": 0.05104231662390243,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.4709028174801428e-15,
+      "local_alpha_10um_at_lambda_1e_minus24": 3.832169713621693e-18
+    },
+    {
+      "density_kg_m3_benchmark": 2700.0,
+      "mu_eV": 0.001,
+      "density_over_critical": 2.219093947149376,
+      "bulk_restored": true,
+      "bulk_decay_length_m": 0.00017871783002663434,
+      "single_wall_surface_phi_over_vacuum": 0.4746758729481535,
+      "phi_over_vacuum_10um_from_single_wall": 0.501960287960465,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.470902817480143e-13,
+      "local_alpha_10um_at_lambda_1e_minus24": 3.706147497349041e-14
+    },
+    {
+      "density_kg_m3_benchmark": 2700.0,
+      "mu_eV": 0.003,
+      "density_over_critical": 0.24656599412770847,
+      "bulk_restored": false,
+      "bulk_decay_length_m": null,
+      "single_wall_surface_phi_over_vacuum": null,
+      "phi_over_vacuum_10um_from_single_wall": null,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.3238125357321283e-12,
+      "local_alpha_10um_at_lambda_1e_minus24": null
+    },
+    {
+      "density_kg_m3_benchmark": 2700.0,
+      "mu_eV": 0.01,
+      "density_over_critical": 0.02219093947149376,
+      "bulk_restored": false,
+      "bulk_decay_length_m": null,
+      "single_wall_surface_phi_over_vacuum": null,
+      "phi_over_vacuum_10um_from_single_wall": null,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.4709028174801427e-11,
+      "local_alpha_10um_at_lambda_1e_minus24": null
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "mu_eV": 0.0001,
+      "density_over_critical": 238.3471276567848,
+      "bulk_restored": true,
+      "bulk_decay_length_m": 0.00012808388145689538,
+      "single_wall_surface_phi_over_vacuum": 0.045801535803550904,
+      "phi_over_vacuum_10um_from_single_wall": 0.049376843209886306,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.4709028174801428e-15,
+      "local_alpha_10um_at_lambda_1e_minus24": 3.5861679233014335e-18
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "mu_eV": 0.001,
+      "density_over_critical": 2.3834712765678483,
+      "bulk_restored": true,
+      "bulk_decay_length_m": 0.00016776501373067779,
+      "single_wall_surface_phi_over_vacuum": 0.4580153580355091,
+      "phi_over_vacuum_10um_from_single_wall": 0.4858634032695554,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.470902817480143e-13,
+      "local_alpha_10um_at_lambda_1e_minus24": 3.472260945813946e-14
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "mu_eV": 0.003,
+      "density_over_critical": 0.26483014184087206,
+      "bulk_restored": false,
+      "bulk_decay_length_m": null,
+      "single_wall_surface_phi_over_vacuum": null,
+      "phi_over_vacuum_10um_from_single_wall": null,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.3238125357321283e-12,
+      "local_alpha_10um_at_lambda_1e_minus24": null
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "mu_eV": 0.01,
+      "density_over_critical": 0.023834712765678487,
+      "bulk_restored": false,
+      "bulk_decay_length_m": null,
+      "single_wall_surface_phi_over_vacuum": null,
+      "phi_over_vacuum_10um_from_single_wall": null,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.4709028174801427e-11,
+      "local_alpha_10um_at_lambda_1e_minus24": null
+    },
+    {
+      "density_kg_m3_benchmark": 3100.0,
+      "mu_eV": 0.0001,
+      "density_over_critical": 254.78486059863206,
+      "bulk_restored": true,
+      "bulk_decay_length_m": 0.00012386642824913763,
+      "single_wall_surface_phi_over_vacuum": 0.04429943558111086,
+      "phi_over_vacuum_10um_from_single_wall": 0.047875247133391065,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.4709028174801428e-15,
+      "local_alpha_10um_at_lambda_1e_minus24": 3.371367046616862e-18
+    },
+    {
+      "density_kg_m3_benchmark": 3100.0,
+      "mu_eV": 0.001,
+      "density_over_critical": 2.547848605986321,
+      "bulk_restored": true,
+      "bulk_decay_length_m": 0.00015860695591409535,
+      "single_wall_surface_phi_over_vacuum": 0.4429943558111085,
+      "phi_over_vacuum_10um_from_single_wall": 0.47133435416149444,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.470902817480143e-13,
+      "local_alpha_10um_at_lambda_1e_minus24": 3.2676999430326164e-14
+    },
+    {
+      "density_kg_m3_benchmark": 3100.0,
+      "mu_eV": 0.003,
+      "density_over_critical": 0.2830942895540357,
+      "bulk_restored": false,
+      "bulk_decay_length_m": null,
+      "single_wall_surface_phi_over_vacuum": null,
+      "phi_over_vacuum_10um_from_single_wall": null,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.3238125357321283e-12,
+      "local_alpha_10um_at_lambda_1e_minus24": null
+    },
+    {
+      "density_kg_m3_benchmark": 3100.0,
+      "mu_eV": 0.01,
+      "density_over_critical": 0.02547848605986321,
+      "bulk_restored": false,
+      "bulk_decay_length_m": null,
+      "single_wall_surface_phi_over_vacuum": null,
+      "phi_over_vacuum_10um_from_single_wall": null,
+      "vacuum_alpha_at_lambda_1e_minus24": 1.4709028174801427e-11,
+      "local_alpha_10um_at_lambda_1e_minus24": null
+    }
+  ],
+  "scope": "Tree matching; nucleon-density approximation; semi-infinite single wall with empty exterior, no canonical cavity geometry. Lambda examples illustrative, not admitted; thermal, QCD/species, loop, transport and three-field vacuum corrections unresolved."
+}

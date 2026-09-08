@@ -9,6 +9,50 @@ The active development gate, dependency order, capability-specific maturity
 and required evidence are maintained only in
 `docs/helix-environment-harness-work-program-v1.md`.
 
+## Commercial delivery direction
+
+The selected product direction is a paid installed CasimirBot harness for users
+of an existing supported reasoning application, with Codex App as the first
+polished connection profile. Users purchase CasimirBot's environment
+capabilities, maintained integrations, updates, and support. The ordinary
+external-client journey does not require a second bundled model runtime,
+provider-key enrollment, or CasimirBot-funded inference. Any required hosted
+coordination must be costed into the subscription. Managed model/API consumption
+and credit purchases or bundles are deferred outside the initial offer.
+
+The intended source boundary is proprietary future first-party product
+implementation where ownership and dependency obligations permit, with
+deliberately selected public contracts, examples, and components. Existing
+licensed copies and third-party obligations require a rights/distribution
+review; this specification changes no license or repository visibility.
+An indefinitely free full harness is not a product requirement. Trial/demo
+scope, commercial term, offline allowance, and expiry behavior must be frozen
+before dependent implementation; stop, revocation, export, and account recovery
+must remain available under the defined lifecycle.
+
+`docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md` defines staged
+audits and implementation handoffs. Current stage and capability maturity live
+only in `docs/helix-environment-harness-work-program-v1.md`. The prior
+provider-credit offering and mission-overwatch pricing draft require scoped
+reconciliation; they do not make model resale or an open-source core mandatory
+for this base offer. This direction promotes no installed or commercial
+capability maturity and does not relax the release ladder below.
+
+The owner selected bounded Minecraft assistance as the first technical pilot
+on 2026-09-06. The exact offer is being specified in
+`docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md`. Minecraft
+commercial classification/permission and the component-rights review remain
+open; this selection does not approve a paid mod or paid in-game access check.
+The broad acceptance requirements below remain unchanged.
+
+The owner selected recurring subscription for the broader harness. Minecraft
+is a visible proof of concept among its capability combinations, not the
+whole paid product or a selected Minecraft-only action subscription. Reuse
+existing Stripe subscription groundwork. The initial offer excludes provider
+credits and CasimirBot-funded inference, including managed GPT Live. Component rights are established through
+ownership or sufficient existing licenses, with unclear material separately
+resolved or excluded; no blanket assignment or relicense is inferred.
+
 ## Product thesis
 
 CasimirBot extends Codex into software people already use. An existing program
@@ -141,8 +185,9 @@ The product must keep these credentials distinct:
 | CasimirBot MCP client authorization | Allows Codex or another client to call the user's CasimirBot node | Short-lived, least-scope OAuth/PKCE or device authorization; never substitutes for a provider or connector credential |
 | Environment/provider authorization | Connects Minecraft, brokerage, a device, or another adapter to its environment | Owned only by the corresponding connector boundary; results are normalized and credential-free before model re-entry |
 
-Payment entitlement is a fourth, non-credential class. It may grant Casimir
-features or bounded managed-provider credit, but it never substitutes for
+Payment entitlement is a fourth, non-credential class. The initial subscription
+grants selected Casimir features; managed-provider credit is a deferred separate
+proposal. Payment never substitutes for
 profile identity, MCP client authorization, provider authorization, device
 trust, a capability grant, or a billable-session lease. Likewise, a ChatGPT or
 Codex login is not an OpenAI API credential or API billing balance. The staged

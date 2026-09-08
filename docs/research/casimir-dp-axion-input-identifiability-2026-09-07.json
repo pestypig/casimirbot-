@@ -1,0 +1,135 @@
+{
+  "scope": "CP/gauge-allowed tree deformation family and finite AA triangle subset; not a spurion-order claim, fitted family or full loop matching",
+  "checks": {
+    "no_tree_mass_or_tadpole_shift": true,
+    "trilinear_rank_two": true,
+    "two_remaining_null_directions": true,
+    "signed_light_vertex_fixed": true,
+    "exchange_sum_and_degenerate_family": true
+  },
+  "trilinear_jacobian": [
+    [
+      246.1994009641539,
+      -0.6485514660080266,
+      -0.6485514660080266,
+      0.0
+    ],
+    [
+      0.5431067038475379,
+      293.99928466068747,
+      293.99928466068747,
+      0.0
+    ]
+  ],
+  "rows": [
+    {
+      "xi_radial_GeV": 0.0,
+      "kappa_H": 0.0,
+      "kappa_S": 0.0,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.0,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 0.0,
+      "triangle_over_tree": 3.661189038215299e-07,
+      "triangle_relative_to_minimal": 0.9999999998658371,
+      "scalar_rate_factor_for_this_subset": 1.0000007322379418
+    },
+    {
+      "xi_radial_GeV": 0.0,
+      "kappa_H": 0.0,
+      "kappa_S": 0.0,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.05,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 0.0,
+      "triangle_over_tree": 3.670190505932556e-07,
+      "triangle_relative_to_minimal": 0.999999999893823,
+      "scalar_rate_factor_for_this_subset": 1.0000007340382358
+    },
+    {
+      "xi_radial_GeV": 0.0,
+      "kappa_H": 0.0,
+      "kappa_S": 0.0,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.246,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 0.0,
+      "triangle_over_tree": 3.8788923027567495e-07,
+      "triangle_relative_to_minimal": 0.9999999998980256,
+      "scalar_rate_factor_for_this_subset": 1.0000007757786111
+    },
+    {
+      "xi_radial_GeV": 0.1,
+      "kappa_H": 8.960043601793421e-07,
+      "kappa_S": 0.00034013605442176874,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.0,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 0.10000024331328336,
+      "triangle_over_tree": 5.36975223774282e-07,
+      "triangle_relative_to_minimal": 1.4666689375973785,
+      "scalar_rate_factor_for_this_subset": 1.0000010739507361
+    },
+    {
+      "xi_radial_GeV": 0.1,
+      "kappa_H": 8.960043601793421e-07,
+      "kappa_S": 0.00034013605442176874,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.05,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 0.10000024331328336,
+      "triangle_over_tree": 5.378683452393015e-07,
+      "triangle_relative_to_minimal": 1.465505249149256,
+      "scalar_rate_factor_for_this_subset": 1.0000010757369797
+    },
+    {
+      "xi_radial_GeV": 0.1,
+      "kappa_H": 8.960043601793421e-07,
+      "kappa_S": 0.00034013605442176874,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.246,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 0.10000024331328336,
+      "triangle_over_tree": 5.585764769990464e-07,
+      "triangle_relative_to_minimal": 1.4400412111083947,
+      "scalar_rate_factor_for_this_subset": 1.0000011171532661
+    },
+    {
+      "xi_radial_GeV": 1.0,
+      "kappa_H": 8.96004360179342e-06,
+      "kappa_S": 0.003401360544217687,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.0,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 1.0000024331328334,
+      "triangle_over_tree": 2.0746821028874024e-06,
+      "triangle_relative_to_minimal": 5.666689375920321,
+      "scalar_rate_factor_for_this_subset": 1.00000414936851
+    },
+    {
+      "xi_radial_GeV": 1.0,
+      "kappa_H": 8.96004360179342e-06,
+      "kappa_S": 0.003401360544217687,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.05,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 1.0000024331328334,
+      "triangle_over_tree": 2.075511996638248e-06,
+      "triangle_relative_to_minimal": 5.6550524913161455,
+      "scalar_rate_factor_for_this_subset": 1.000004151028301
+    },
+    {
+      "xi_radial_GeV": 1.0,
+      "kappa_H": 8.96004360179342e-06,
+      "kappa_S": 0.003401360544217687,
+      "eta_GeV": 0.0,
+      "q_GeV": 0.246,
+      "delta_g_light_AA_GeV": 0.0,
+      "delta_g_heavy_AA_GeV": 1.0000024331328334,
+      "triangle_over_tree": 2.094761697048198e-06,
+      "triangle_relative_to_minimal": 5.400412110812739,
+      "scalar_rate_factor_for_this_subset": 1.000004189527782
+    }
+  ],
+  "full_model_admitted": false
+}

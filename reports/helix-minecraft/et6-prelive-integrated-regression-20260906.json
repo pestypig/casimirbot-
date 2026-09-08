@@ -1,0 +1,16 @@
+{
+  "scope": "Consolidated source regression after broker/SQL/HTTP fault integration and native wait/outbox repairs",
+  "server": { "files": 23, "tests": 211, "failures": 0 },
+  "native": { "tests": 289, "failures": 0, "errors": 0, "skipped": 0, "game_tests": "explicitly excluded" },
+  "server_build": { "passed": true, "warnings": 4, "warnings_scope": "Existing duplicate keys/case outside this repair" },
+  "test_concurrency": "One heavy worker tree at a time; one worker per suite",
+  "remaining": [
+    "Full authenticated route and persistence-barrier integration",
+    "Complete native runtime HTTP/callback/controller fault integration",
+    "Correlated timing trace with measured remaining window and budget disposition",
+    "Required protocol verification and packaged verification before live testing"
+  ],
+  "live_movement_performed": false,
+  "deployment_performed": false,
+  "live_acceptance": false
+}

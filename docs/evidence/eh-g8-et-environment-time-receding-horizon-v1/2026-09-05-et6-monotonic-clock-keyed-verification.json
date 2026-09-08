@@ -1,0 +1,26 @@
+{
+  "schema": "et6.monotonic_clock_keyed_verification.v1",
+  "date": "2026-09-05",
+  "prior_attempt": "2026-09-05-et6-monotonic-clock-measurement.json",
+  "server": {
+    "startup": "Previously authorized repository-standard opaque keyed launcher",
+    "app_ready_observed_at": "2026-09-05T08:17:29Z",
+    "port": 1522,
+    "pid": 34892,
+    "health_endpoints_reachable": ["/api/account/session", "/api/helix/pipeline", "/api/agi/agent-providers"],
+    "packaged_service_restarted": false
+  },
+  "verification": {
+    "command": "npm run casimir:verify -- --ci --url http://127.0.0.1:1522/api/agi/adapter/run --trace-out artifacts/et6-monotonic-clock-keyed-training-trace.jsonl",
+    "exit_code": 0,
+    "pack": "repo-convergence",
+    "run_id": "2653",
+    "verdict": "PASS",
+    "first_fail": null,
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "integrity_ok": true,
+    "certificate_status": "GREEN"
+  },
+  "limits": "Repository constraint-pack verification is not native clock synchronization, live environment acceptance, physical viability, or ET6 capacity proof. The packaged broker 401 remains a separate failed attempt; no credentials were extracted to bypass it.",
+  "et6_complete": false
+}

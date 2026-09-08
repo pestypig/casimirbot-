@@ -1,0 +1,21 @@
+{
+  "schema": "et6.checkpoint_server_build.v1",
+  "date": "2026-09-05",
+  "server_build": {"command": "npm run build:server", "exit_code": 0, "warning_count": 4, "warnings": "Duplicate keys/case in agi.demonstration, halobank-solar/derived, structure-mesa and oscillation-gyre; those source files were not changed in this repair."},
+  "identity_source_inspection": {
+    "source": "server/services/environment-connectors/probe/durable-broker.ts",
+    "finding": "Probe submission persists normalized observations, evidence refs, provenance and eligibility flags. readDurableEnvironmentProbeContinuationEvidence checks exact request/prior-turn/room/capability, active binding, success, provenance and age.",
+    "constraint": "Observation revision currently derives from audit time; it must not be relabeled as a native execution tick or fabricated independent affordance revision. Frontier admission must also resolve current subject and producer identity."
+  },
+  "live_connection": {
+    "service_instance_ref": "service_instance:a75cd5b59ac01ff0b907962910d0cb80",
+    "presence_refresh_succeeded": true,
+    "reasoning_binding_id": "reasoning_binding:682844c34203856dec59b416501137db",
+    "steering_read_succeeded": true,
+    "delivery_count": 0,
+    "independent_external_principal_proven": false
+  },
+  "server_restarted": false,
+  "exe_rebuilt": false,
+  "et6_complete": false
+}

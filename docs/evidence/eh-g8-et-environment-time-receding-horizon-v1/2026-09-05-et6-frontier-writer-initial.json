@@ -1,0 +1,9 @@
+{
+  "schema": "et6.frontier_writer_initial.v1",
+  "date": "2026-09-05",
+  "implementation": "Internal EnvironmentTemporalFrontierStore assigns goal-scoped revisions under a goal row lock, validates the frontier schema, checks steering grant and goal revision, verifies replay payload integrity and rejects changed replay semantics.",
+  "verification": {"sql_tests_passed": 1, "failed": 0, "assertions": ["first revision", "identical replay", "changed replay rejected", "second revision", "stale goal rejected", "two stored rows"]},
+  "not_proven": ["Concurrent PostgreSQL transaction behavior", "Predecessor delta linkage", "Bounded retention cleanup", "Authenticated sensor/catalog publisher", "Production dispatch", "Live capacity"],
+  "exposure": "Not registered as a tool and not called by production workflows. Initial writer currently builds standalone snapshots rather than linked deltas.",
+  "et6_complete": false
+}

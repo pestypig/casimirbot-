@@ -1,0 +1,13 @@
+{
+  "status": "Exploratory diagnostic, not a justified table correction",
+  "source": "https://arxiv.org/src/1705.00619",
+  "fit_points": 3,
+  "heldout_points": 8,
+  "series_over_table_constant": 1.005892976002616,
+  "heldout_max_fractional_residual": 5.0612863136123565e-06,
+  "electron_mass_rounding_max_shape_change": 1.3013299386965826e-06,
+  "alpha_137_vs_137035999_width_fractional_change": 0.0010514824976552983,
+  "table_rescaled": false,
+  "normalization_origin_resolved": false,
+  "full_model_admitted": false
+}

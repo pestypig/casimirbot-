@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "scope": "ET6 immediate native handoff evidence",
+  "finding": "Periodic 20-tick progress emission could hide short resident handoffs. Existing terminal workflow schema requires controls released, so a continuous handoff cannot truthfully be emitted as terminal success.",
+  "repair": "Emit workflow.progress immediately when the serial engine handoff count increases, preserving current action identity and controls_released=false. Retain existing final settlement behavior.",
+  "verification": {
+    "native_sequence_controller_runtime_tests": "PASS",
+    "cases": ["three immediate handoff progress events", "each event retains resident action and current sequence IDs", "no duplicate on repeated tick", "one final success only after release"],
+    "casimir": { "run_id": "2671", "verdict": "PASS", "firstFail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true }
+  },
+  "limitations": ["Resident envelope ownership versus separately admitted successor action IDs still requires production integration; do not relabel events or fabricate released-controls terminals.", "No temporal delivery transport is enabled and no packaged Minecraft qualification ran."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

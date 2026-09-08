@@ -1,0 +1,40 @@
+{
+  "status": "large_gap_rigid_atom_finite_q_shape_not_coherence_rate",
+  "rows": [
+    {
+      "q_eV": 0,
+      "amplitude_ratio": 1.0000000000000002,
+      "cross_section_shape_ratio": 1.0000000000000004,
+      "independent_absolute_difference": 6.061817714453355e-14
+    },
+    {
+      "q_eV": 0.7141704424363171,
+      "amplitude_ratio": 0.9999999980766792,
+      "cross_section_shape_ratio": 0.9999999961533583,
+      "independent_absolute_difference": 6.084022174945858e-14
+    },
+    {
+      "q_eV": 3472.823879,
+      "amplitude_ratio": 0.9568294770836087,
+      "cross_section_shape_ratio": 0.915522648216092,
+      "independent_absolute_difference": 6.117328865684613e-14
+    },
+    {
+      "q_eV": 10000.0,
+      "amplitude_ratio": 0.7411668540332343,
+      "cross_section_shape_ratio": 0.5493283055175217,
+      "independent_absolute_difference": 6.361577931102147e-14
+    },
+    {
+      "q_eV": 100000.0,
+      "amplitude_ratio": 0.11087513999374905,
+      "cross_section_shape_ratio": 0.012293296668633451,
+      "independent_absolute_difference": 1.1585177261963508e-13
+    }
+  ],
+  "assumptions": [
+    "massless mediator; point nucleus; Gaussian rigid electron cloud rms 0.1 nm",
+    "constant-gap propagator; no extension of forward finite-gap check claimed",
+    "no atomic arrangement, medium response, flux or xenon normalization"
+  ]
+}

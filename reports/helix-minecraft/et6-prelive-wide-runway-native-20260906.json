@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-06",
+  "scope": "Native positive advancing-clock fixture with predeclared runway",
+  "fixture_generation_tests_passed": 2,
+  "native_transport_suite": "passed after separating wide and narrow publication artifacts",
+  "runway": { "stop_tick": 20, "committed_tick": 21, "nominal_tick_ms": 50, "reservation_window_ms": 1000 },
+  "verified": ["Acceptance before fixed one-second nominal reservation limit", "No scripted tick advance supplies acceptance", "Narrow one-tick expiry test retained", "Independent hash-linked wide fixture and publication output"],
+  "limits": ["Clock begins before polling, not at the earlier evidence checkpoint", "Committed activation remains scripted", "Not live Minecraft scheduling or sustained capacity", "Connected wide-mode verification and full checkpoint budget remain open"]
+}

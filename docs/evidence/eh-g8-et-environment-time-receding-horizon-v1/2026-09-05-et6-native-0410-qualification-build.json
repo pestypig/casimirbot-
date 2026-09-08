@@ -1,0 +1,14 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "adapter execution",
+  "change": "Native adapter and artifact version 0.4.10 advertise temporal_plan_v1 only on execute_sequence, alongside latest_start_tick_v1. Initial temporal admission requires an available inventory sensor before controller creation. Reactive temporal execution remains unadvertised. This is executable-support advertisement for qualification, not accepted maturity.",
+  "artifact": { "path": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.10.jar", "bytes": 532939, "sha256": "30d028d209482c2d14c245408db3e86f77ab7305d923be7d87b2fa9be7762d07", "installed_into_running_game": false },
+  "checks": [
+    { "check": "Offline one-worker Gradle test plus remapJar; runGameTest excluded", "exit_code": 0, "passed": 107, "failures": 0, "errors": 0, "suites": ["FluidSequenceEngineTest", "InventoryCountObservationTest", "PlayerActionControllerTest", "PlayerActionRuntimeLifecycleTest", "ResidentEffectMeasurementsTest", "ResidentInventoryObservationTest", "ResidentMutationBudgetTest", "TemporalPlanDeliveryPreflightTest"] }
+  ],
+  "casimir": { "run_id": "2689", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN" },
+  "limitations": ["Artifact built but not installed; running Minecraft retains its prior implementation", "No packaged EXE rebuild or server restart", "No new temporal MCP call executed against the live service", "Asynchronous HTTP delivery and complete rolling capacity still require live qualification", "Sensor lower bound is not complete effect attribution", "ET6 remains incomplete; no ET7/ET8 or release maturity promotion"]
+}

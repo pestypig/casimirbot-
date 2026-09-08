@@ -1,0 +1,72 @@
+{
+  "observed_at": "2026-09-07T04:38:21.873Z",
+  "scope": "ET6 bounded diagnostic; not rolling acceptance",
+  "proposal_failure": {
+    "code": "action_policy_denied",
+    "cause": "Caller used player_motion for execute_sequence; companion declares continuous_control",
+    "policy_weakened": false
+  },
+  "corrected_request": "action_request:et6-live-20260907-diagnostic03",
+  "admitted": true,
+  "plan_hash": "sha256:2af78832afdc71ae2bce7026a46023e539246bda456b9cb3abdb52862bacfa8e",
+  "status": {
+    "operation": "minecraft.player.workflow.status",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "ok": false,
+    "status": "failed",
+    "summary": "The exact workflow was not running in this Fabric client.",
+    "observation": {
+      "schema": "helix.environment_action.control_observation.v1",
+      "control_request_ref": "environment_action_control:92d7b0ea-9b5a-4d84-962e-ed897d689f5d",
+      "workflow_ref": "workflow:et6-live-20260907-diagnostic03",
+      "control_kind": "status",
+      "outcome": "not_running",
+      "summary": "The exact workflow was not running in this Fabric client.",
+      "affected_workflow_refs": [],
+      "workflow_state": null,
+      "controls_released": false,
+      "evidence_refs": [],
+      "evidence_ref": "environment_action_control_evidence:45a07f01178867db088fb4ea42ec670c543203fef",
+      "observed_at": "2026-09-07T04:37:56.113Z",
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "content_role": "environment_action_control_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "post_observation": {
+    "evidence_ref": "environment_probe_evidence:c2ac09b6c26872e7ce0681e99b931802fe7fcaa0",
+    "actor": {
+      "air": 300,
+      "food_level": 20,
+      "freezing": false,
+      "health": 20,
+      "max_health": 20,
+      "on_fire": false,
+      "on_ground": true,
+      "pitch": 4.65,
+      "position": {
+        "x": 7.14,
+        "y": 65,
+        "z": 0.38
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.08,
+        "z": 0
+      },
+      "yaw": 94.23
+    }
+  },
+  "execution_proven": false,
+  "rolling_extensions_proven": 0,
+  "chat_prompt_submission_proven": false
+}

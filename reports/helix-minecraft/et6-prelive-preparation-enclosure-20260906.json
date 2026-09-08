@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-06",
+  "scope": "Complete server preparation enclosure validation",
+  "tests": { "focused": 44, "connected_persistent": 2, "failures": 0 },
+  "repair": "The full server response-preparation-start through lease-return interval must fit within native checkpoint-to-acceptance, not only the later draft-publication interval",
+  "negative": "Oversized preparation interval rejects the enclosing budget and complete server partition",
+  "next_required_test": "Separately compiled positive advancing-clock fixture with a declared wider runway, keeping the existing narrow deadline rejection unchanged",
+  "limits": ["No live capacity claim", "No authority changes", "Positive advancing-clock budget and artifact refresh remain"]
+}

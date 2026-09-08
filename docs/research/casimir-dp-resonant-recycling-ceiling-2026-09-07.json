@@ -1,0 +1,61 @@
+{
+  "scope": "Single isolated spin-1/2 resonance, incoherent incident particles near resonance, nonrelativistic ground targets; use16pi/k^2 as a deliberately loose peak ceiling, neglect stimulated losses, allow all targets in ground state and flux speed c. Coupling capgB=4pi retained. Not a coherent-drive, broad-resonance or arbitrary-multichannel bound.",
+  "derivation": "Rrequired>=n/tau_ref, Rabs<=n*nV*c*sigma_ceiling => nV>=1/(tau_ref*c*sigma_ceiling).",
+  "source": "https://pdgaws.lbl.gov/2022/reviews/rpp2022-rev-cross-section-formulae.pdf equation51.1",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 0.001,
+      "resonant_CM_momentum_GeV": 0.0001119914823161656,
+      "resonant_lab_vector_energy_GeV": 0.0010062518189520755,
+      "adopted_absorption_ceiling_cm2": 1.5605324712799582e-18,
+      "min_vector_density_cm3": 1053.2201973086985,
+      "min_resonant_vector_energy_density_GeV_cm3": 1.0598047392989418,
+      "ratio_to_frozen_DM_density": 3.532682464329806
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-06,
+      "resonant_CM_momentum_GeV": 0.0010062385088228129,
+      "resonant_lab_vector_energy_GeV": 0.0010062643189395757,
+      "adopted_absorption_ceiling_cm2": 1.9330403887340175e-20,
+      "min_vector_density_cm3": 61670965493275.03,
+      "min_resonant_vector_energy_density_GeV_cm3": 62057292090.43647,
+      "ratio_to_frozen_DM_density": 206857640301.4549
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-09,
+      "resonant_CM_momentum_GeV": 0.0010062390057097778,
+      "resonant_lab_vector_energy_GeV": 0.0010062643189520757,
+      "adopted_absorption_ceiling_cm2": 1.9330384796401955e-20,
+      "min_vector_density_cm3": 6.167111775842192e+19,
+      "min_resonant_vector_energy_density_GeV_cm3": 6.205744531019169e+16,
+      "ratio_to_frozen_DM_density": 2.068581510339723e+17
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-06,
+      "resonant_CM_momentum_GeV": 0.0005512982382706867,
+      "resonant_lab_vector_energy_GeV": 0.0005513021845259075,
+      "adopted_absorption_ceiling_cm2": 6.439758581469208e-20,
+      "min_vector_density_cm3": 2233778549837.6113,
+      "min_resonant_vector_energy_density_GeV_cm3": 1231486994.272589,
+      "ratio_to_frozen_DM_density": 4104956647.575297
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-09,
+      "resonant_CM_momentum_GeV": 0.0005512991452141477,
+      "resonant_lab_vector_energy_GeV": 0.0005513021845309075,
+      "adopted_absorption_ceiling_cm2": 6.439737393364048e-20,
+      "min_vector_density_cm3": 2.233796923789096e+18,
+      "min_resonant_vector_energy_density_GeV_cm3": 1231497123883349.8,
+      "ratio_to_frozen_DM_density": 4104990412944499.5
+    }
+  ],
+  "checks": {
+    "resonant_momentum_two_frames": true
+  },
+  "full_model_admitted": false
+}

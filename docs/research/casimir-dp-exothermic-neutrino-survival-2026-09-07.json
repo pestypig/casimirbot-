@@ -1,0 +1,54 @@
+{
+  "operator": "sum_i Cnu_i (chi_bar gamma_mu chi_star+h.c.) nu_bar_i gamma^mu PL nu_i; PL=(1-gamma5)/2",
+  "width_GeV": "gap^5 sum_i abs(Cnu_i)^2 / (120 pi^3)",
+  "population": "x=sigma/sigma_ref; S=x*f0*exp(-b*x); b=age/tau0*sum_i abs(Cnu_i/Cb)^2/2; max S=f0/(e*b)",
+  "scope": "Leading gap/mchi, massless active neutrinos, constant contacts and coupling ratios, primordial population with no replenishment. Necessary survival condition, not full mediator matching or external exclusion.",
+  "age_s": 4.35e+17,
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "massless_vector_tau0_s": 293706998.5977566,
+      "equal_three_flavor_r_max_f0_1": 1.2868254711854725e-05,
+      "equal_three_flavor_r_max_f0_half": 9.099230168788218e-06,
+      "illustrative_r_test": 0.0005807048664429298,
+      "neutrino_only_max_strength_at_r_test": 0.0004910529973002466,
+      "neutrino_only_max_strength_at_r_1": 1.6559197932917133e-10,
+      "other_channels_included": false
+    },
+    {
+      "mchi_GeV": 15.0,
+      "massless_vector_tau0_s": 1963422713.1314182,
+      "equal_three_flavor_r_max_f0_1": 3.3271272122415707e-05,
+      "equal_three_flavor_r_max_f0_half": 2.352634213646308e-05,
+      "illustrative_r_test": 0.0005807048664429298,
+      "neutrino_only_max_strength_at_r_test": 0.0032826749544739285,
+      "neutrino_only_max_strength_at_r_1": 1.1069775486438366e-09,
+      "other_channels_included": false
+    },
+    {
+      "mchi_GeV": 40.0,
+      "massless_vector_tau0_s": 123644614271.07489,
+      "equal_three_flavor_r_max_f0_1": 0.00026402807119394183,
+      "equal_three_flavor_r_max_f0_half": 0.0001866960395648408,
+      "illustrative_r_test": 0.0005807048664429298,
+      "neutrino_only_max_strength_at_r_test": 0.2067232266432888,
+      "neutrino_only_max_strength_at_r_1": 6.971082237839321e-08,
+      "other_channels_included": false
+    },
+    {
+      "mchi_GeV": 100.0,
+      "massless_vector_tau0_s": 2575093355228.7407,
+      "equal_three_flavor_r_max_f0_1": 0.001204922155788859,
+      "equal_three_flavor_r_max_f0_half": 0.0008520086271602158,
+      "illustrative_r_test": 0.0005807048664429298,
+      "neutrino_only_max_strength_at_r_test": 4.305335986034212,
+      "neutrino_only_max_strength_at_r_1": 1.4518374015108715e-06,
+      "other_channels_included": false
+    }
+  ],
+  "checks": {
+    "chiral_trace_max_error": 0.0,
+    "numerical_population_optimum": true
+  },
+  "full_model_admitted": false
+}

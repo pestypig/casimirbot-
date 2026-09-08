@@ -1,0 +1,25 @@
+{
+  "scope": "Native compiled late-delivery cancellation through real result HTTP handler and local snapshot failure/retry/reopen",
+  "passed": true,
+  "verification": {
+    "native_transport": { "tests": 9, "failures": 0, "errors": 0 },
+    "persisted_http": { "tests": 3, "failures": 0 }
+  },
+  "verified": [
+    "Native-generated cancellation result passes shared schema validation",
+    "Initial POST and exact retry return 503 while snapshot rename fails",
+    "One result exists in memory and zero results on disk during failure",
+    "Changed-content replay returns 409",
+    "Exact retry after recovery returns 200/replayed and saves one result",
+    "Result identity survives database reopen",
+    "Incomplete provenance stays invalid and ineligible for current-turn re-entry; terminal eligibility remains false"
+  ],
+  "initial_failure": "The fixture omitted postconditions, causing native result schema rejection before persistence. Added a checkpoint postcondition to the fixture input and regenerated the native output; no production validation was weakened.",
+  "limits": [
+    "Authentication and bounded database migrations are fixtures",
+    "Cancellation result persistence is not successful execution evidence",
+    "No full initial-admission/native-delivery round trip or live capacity claim",
+    "No live server, installed EXE, game, credential or user binding changed",
+    "No fsync or power-loss durability claim"
+  ]
+}

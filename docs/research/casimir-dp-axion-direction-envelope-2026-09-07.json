@@ -1,0 +1,201 @@
+{
+  "scope": "Any fixed crystal orientation, shifted truncated Maxwellian; retains Born/contact and nonnegative target energy assumptions",
+  "full_model_admitted": false,
+  "checks": {
+    "directional_integral_recovers_speed_pdf": true,
+    "pointwise_majorant_samples": true,
+    "majorant_not_renormalized": true,
+    "zero_wind_limit": true
+  },
+  "max_speed_pdf_absolute_error": 1.3010426069826053e-18,
+  "halos": [
+    {
+      "halo": "central",
+      "flux_majorant_km_s": 2629.6626246178494,
+      "mean_speed_km_s": 353.8620953395386,
+      "flux_factor": 7.431320447290714,
+      "envelope_integral": 6.440039480044146
+    },
+    {
+      "halo": "v0_220",
+      "flux_majorant_km_s": 2808.507524099611,
+      "mean_speed_km_s": 341.7175093058359,
+      "flux_factor": 8.218799000978342,
+      "envelope_integral": 7.173194812617178
+    },
+    {
+      "halo": "vesc_528",
+      "flux_majorant_km_s": 2634.290578799665,
+      "mean_speed_km_s": 352.7730529253307,
+      "flux_factor": 7.467380393584793,
+      "envelope_integral": 6.461189895656373
+    },
+    {
+      "halo": "vesc_560",
+      "flux_majorant_km_s": 2626.0938737209963,
+      "mean_speed_km_s": 354.76099352947824,
+      "flux_factor": 7.402431275192563,
+      "envelope_integral": 6.42353176113895
+    },
+    {
+      "halo": "summer_speed",
+      "flux_majorant_km_s": 2929.920137842202,
+      "mean_speed_km_s": 363.8201329434944,
+      "flux_factor": 8.053210563521105,
+      "envelope_integral": 6.999270054052927
+    },
+    {
+      "halo": "winter_speed",
+      "flux_majorant_km_s": 2353.739091905928,
+      "mean_speed_km_s": 344.2835005534243,
+      "flux_factor": 6.8366305330414345,
+      "envelope_integral": 5.9104392471408485
+    }
+  ],
+  "rows": [
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "central",
+      "D_any_orientation_upper": 3.743160706089837e-16,
+      "flux_factor": 7.431320447290714
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "v0_220",
+      "D_any_orientation_upper": 3.9977352640417354e-16,
+      "flux_factor": 8.218799000978342
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "vesc_528",
+      "D_any_orientation_upper": 3.7497483101728793e-16,
+      "flux_factor": 7.467380393584793
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "vesc_560",
+      "D_any_orientation_upper": 3.7380808118091536e-16,
+      "flux_factor": 7.402431275192563
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "summer_speed",
+      "D_any_orientation_upper": 4.1705585459070176e-16,
+      "flux_factor": 8.053210563521105
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "halo": "winter_speed",
+      "D_any_orientation_upper": 3.3504007695626747e-16,
+      "flux_factor": 6.8366305330414345
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "central",
+      "D_any_orientation_upper": 3.3694328902195245e-15,
+      "flux_factor": 7.431320447290714
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "v0_220",
+      "D_any_orientation_upper": 3.5985899999264876e-15,
+      "flux_factor": 8.218799000978342
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "vesc_528",
+      "D_any_orientation_upper": 3.3753627691662213e-15,
+      "flux_factor": 7.467380393584793
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "vesc_560",
+      "D_any_orientation_upper": 3.364860187038406e-15,
+      "flux_factor": 7.402431275192563
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "summer_speed",
+      "D_any_orientation_upper": 3.75415811357044e-15,
+      "flux_factor": 8.053210563521105
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "halo": "winter_speed",
+      "D_any_orientation_upper": 3.015887223333751e-15,
+      "flux_factor": 6.8366305330414345
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "central",
+      "D_any_orientation_upper": 1.8350675271542408e-14,
+      "flux_factor": 7.431320447290714
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "v0_220",
+      "D_any_orientation_upper": 1.959871547397651e-14,
+      "flux_factor": 8.218799000978342
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "vesc_528",
+      "D_any_orientation_upper": 1.838297070121731e-14,
+      "flux_factor": 7.467380393584793
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "vesc_560",
+      "D_any_orientation_upper": 1.8325771320662893e-14,
+      "flux_factor": 7.402431275192563
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "summer_speed",
+      "D_any_orientation_upper": 2.044597376019232e-14,
+      "flux_factor": 8.053210563521105
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "halo": "winter_speed",
+      "D_any_orientation_upper": 1.6425187529817706e-14,
+      "flux_factor": 6.8366305330414345
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "central",
+      "D_any_orientation_upper": 3.7459469578802556e-14,
+      "flux_factor": 7.431320447290714
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "v0_220",
+      "D_any_orientation_upper": 4.0007110104527655e-14,
+      "flux_factor": 8.218799000978342
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "vesc_528",
+      "D_any_orientation_upper": 3.7525394654994026e-14,
+      "flux_factor": 7.467380393584793
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "vesc_560",
+      "D_any_orientation_upper": 3.740863282339389e-14,
+      "flux_factor": 7.402431275192563
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "summer_speed",
+      "D_any_orientation_upper": 4.1736629347185026e-14,
+      "flux_factor": 8.053210563521105
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "halo": "winter_speed",
+      "D_any_orientation_upper": 3.352894667334049e-14,
+      "flux_factor": 6.8366305330414345
+    }
+  ]
+}

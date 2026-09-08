@@ -1,0 +1,80 @@
+{
+  "status": "conditional_nonrelativistic_interval_envelopes_not_realized_stopping",
+  "path_column_g_cm2": 7000000000.0,
+  "speed_km_s": 776,
+  "formula": "2 pi ne_per_gram/(me v^2) integral dy y [sum alpha_i/(y+m_i^2)]^2",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "intervals": [
+        {
+          "q_ceiling_keV": 100.0,
+          "missing_37p2895keV_to_ceiling_fsum_budget_eV": 12.698455103495858,
+          "all_q_below_ceiling_fsum_budget_eV": 52.87951515390615,
+          "free_electron_recoil_over_rest_mass_at_ceiling": 0.019148289674168442
+        },
+        {
+          "q_ceiling_keV": 200.0,
+          "missing_37p2895keV_to_ceiling_fsum_budget_eV": 21.625691991728726,
+          "all_q_below_ceiling_fsum_budget_eV": 61.80675204213901,
+          "free_electron_recoil_over_rest_mass_at_ceiling": 0.07659315869667377
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "intervals": [
+        {
+          "q_ceiling_keV": 100.0,
+          "missing_37p2895keV_to_ceiling_fsum_budget_eV": 1.1916619507405615,
+          "all_q_below_ceiling_fsum_budget_eV": 1.243953679976938,
+          "free_electron_recoil_over_rest_mass_at_ceiling": 0.019148289674168442
+        },
+        {
+          "q_ceiling_keV": 200.0,
+          "missing_37p2895keV_to_ceiling_fsum_budget_eV": 5.160790950943903,
+          "all_q_below_ceiling_fsum_budget_eV": 5.213082680180282,
+          "free_electron_recoil_over_rest_mass_at_ceiling": 0.07659315869667377
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "intervals": [
+        {
+          "q_ceiling_keV": 100.0,
+          "missing_37p2895keV_to_ceiling_fsum_budget_eV": 3.2827413493266423e-08,
+          "all_q_below_ceiling_fsum_budget_eV": 3.347472766543495e-08,
+          "free_electron_recoil_over_rest_mass_at_ceiling": 0.019148289674168442
+        },
+        {
+          "q_ceiling_keV": 200.0,
+          "missing_37p2895keV_to_ceiling_fsum_budget_eV": 5.347257158785889e-07,
+          "all_q_below_ceiling_fsum_budget_eV": 5.353730300507613e-07,
+          "free_electron_recoil_over_rest_mass_at_ceiling": 0.07659315869667377
+        }
+      ]
+    }
+  ],
+  "assumptions": [
+    "isotropic zero-temperature nonrelativistic electronic density response",
+    "all 30 electrons per nominal 60 u SiO2 formula",
+    "full positive energy f-sum allocated to accessible energy for upper envelope",
+    "initial-speed diagnostic; no evolving path or capture probability"
+  ],
+  "limitations": [
+    "no bound on omitted q above chosen ceiling",
+    "no relativistic error bound; ceiling diagnostic is not an error estimate",
+    "do not add table contribution to all-q envelope: that double counts",
+    "material table not used as exact response to claim a tighter bound"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "status": "compact_support_eikonal_arrival_bound_not_universal_force_bound",
+  "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+  "rows": [
+    {
+      "dark_mass_GeV": 100.0,
+      "D_bound_if_support_radius_equals_sphere": 0.0005583442461599607,
+      "necessary_support_radius_m_for_comparator": 2.0087641925097735e-06
+    },
+    {
+      "dark_mass_GeV": 100000.0,
+      "D_bound_if_support_radius_equals_sphere": 5.583442461599607e-07,
+      "necessary_support_radius_m_for_comparator": 6.35227013051983e-05
+    },
+    {
+      "dark_mass_GeV": 100000000.0,
+      "D_bound_if_support_radius_equals_sphere": 5.583442461599608e-10,
+      "necessary_support_radius_m_for_comparator": 0.0020087641925097734
+    }
+  ],
+  "assumptions": [
+    "straight-line elastic eikonal scattering",
+    "Poisson incident objects at rho=0.3 GeV/cm3 and speed=776 km/s",
+    "impact phase vanishes outside radius b_max",
+    "no unbounded force tail or enhanced local population"
+  ]
+}

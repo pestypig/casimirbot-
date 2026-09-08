@@ -1,0 +1,53 @@
+{
+  "status": "formal_Born_charge_scaling_not_nonperturbative_bound",
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "formal_D_per_excess_charge_squared_upper": 3.6378878663244777e-28,
+      "formal_required_charge_lower": 9006804339264.45,
+      "required_over_electron_inventory": 96.72514155045472,
+      "pointlike_individual_range_strengths_at_required_charge": [
+        3724979983.3392096,
+        1497524.0989254909
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "formal_D_per_excess_charge_squared_upper": 3.933152347714286e-32,
+      "formal_required_charge_lower": 866213600076122.4,
+      "required_over_electron_inventory": 9302.370732651476,
+      "pointlike_individual_range_strengths_at_required_charge": [
+        3582455713.827661,
+        144021793.61047336
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "formal_D_per_excess_charge_squared_upper": 9.423809835960016e-35,
+      "formal_required_charge_lower": 1.7696285879378898e+16,
+      "required_over_electron_inventory": 190042.51587195275,
+      "pointlike_individual_range_strengths_at_required_charge": [
+        775751320.3475832,
+        2950726187.0905514
+      ]
+    }
+  ],
+  "carbon_electron_inventory": 93117510038.1345,
+  "derivation": "|F_excess|<=|Q|; branch filter<=2; L2 triangle inequality integral_0^infty q dq |A|^2 <= (sum |alpha_i|/m_i)^2/2",
+  "limitations": [
+    "one-sign excess-charge distribution; net Q alone does not bound mixed-sign patches",
+    "no finite-size suppression, physical kinematic cutoff or destructive mediator interference retained",
+    "large required charge is outside any established macroscopic Born validity domain",
+    "fully removed electron inventory is a scale comparison, not a realizable stable diamond sphere",
+    "not a physical total bound or charged-apparatus prediction"
+  ]
+}

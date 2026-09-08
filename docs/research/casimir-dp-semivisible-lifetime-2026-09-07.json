@@ -1,0 +1,30 @@
+{
+  "status": "conditional_semivisible_benchmark_lifetime",
+  "interaction": "gD A_mu (eta1_bar gamma^mu eta2 + h.c.) + epsilon e A_mu e_bar gamma^mu e",
+  "product": 2.962226282872868e-06,
+  "masses_GeV": {
+    "eta1": 0.003,
+    "eta2": 0.006,
+    "mediator": 0.01,
+    "electron": 0.00051099895
+  },
+  "width_GeV": 5.654458148876953e-18,
+  "proper_decay_length_m": 34.89759322724701,
+  "chosen_parent_energy_GeV": 50.0,
+  "minimum_daughter_energy_GeV": 21.35468876476034,
+  "minimum_lab_decay_length_m": 124204.53543194487,
+  "maximum_decay_probability_within_chosen_10m": 8.050911679061395e-05,
+  "checks": {
+    "heavy_small_gap_massless_ratio": 0.9985594148388884,
+    "closed_threshold": true,
+    "electron_mass_suppression": true
+  },
+  "source_sha256": "09817da48f1ef67b049ecb00588254a9e69a8a8a1838cdade36a6607ab8d9bc1",
+  "limitations": [
+    "Specific added light-sector vector transition, not full gauge completion",
+    "50 GeV parent and 10 m flight distance are diagnostic choices, not authenticated NA64 acceptance",
+    "Tree three-body width with off-shell propagator; no extra decay channels",
+    "No cosmology or new local coherence prediction",
+    "No exclusion of all semivisible models"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-06",
+  "classification": "evidence normalization",
+  "scope": "Bounded request-relative mapping of server delivery completion",
+  "verification": { "clock_envelope_tests": 12, "correlated_budget_tests": 41 },
+  "method": "Given an identity-correlated request, use native roundtrip and server receive/return durations to bound a server mark relative to native request start; never subtract absolute cross-process clocks",
+  "negative_cases": ["invalid clocks", "out-of-request extrapolation", "impossible enclosure", "double spending the error allowance"],
+  "limits": [
+    "The supplied error allowance must cover rate error and quantization over the request",
+    "Current correlated diagnostic uses a one-ms quantization allowance, not a measured live drift bound",
+    "Bounds are not clock synchronization or an exact network split",
+    "Five-stage attribution and live capacity remain unproven"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "et6.ledger_record_isolation_checkpoint.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "scope": "Internal temporal-ledger record ownership; no transport, adapter schema, authority grant or live execution change.",
+  "defect": "Admission, duplicate-admission, get and transition results exposed mutable references to retained plans or hash-linked events. A caller could change authority revision/effect ceilings or corrupt event identity after validation.",
+  "repair": "Deep-copy retained parsed plans and all outgoing retained plan/event projections, including duplicate successor events.",
+  "red_test": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts --pool=forks --maxWorkers=1",
+    "exit_code": 1,
+    "passed": 13,
+    "failed": 4,
+    "failure_families": ["admit_result_alias", "duplicate_result_alias", "get_result_alias", "transition_event_alias"]
+  },
+  "green_test": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks --maxWorkers=1",
+    "exit_code": 0,
+    "passed": 20,
+    "failed": 0
+  },
+  "discipline_quick": {
+    "exit_code": 0,
+    "sensitive_files_detected": 0,
+    "runtime_acceptance_proof": false
+  },
+  "casimir_verification": "Not run: internal non-physics ledger ownership repair; no adapter contract, certificate or verification semantics changed.",
+  "packaged_build_updated": false,
+  "production_rolling_path_connected": false,
+  "et6_complete": false
+}

@@ -1,0 +1,128 @@
+{
+  "status": "conditional_visible_completion_excluded_in_declared_domain",
+  "rows": [
+    {
+      "scale": 1,
+      "effective_alpha_product": 1.4999815854376353e-06,
+      "epsilon_domain": [
+        1.755914085630656e-05,
+        0.01
+      ],
+      "alpha_D_domain": [
+        3.083234276116143e-06,
+        1
+      ],
+      "covered": true,
+      "covering_searches": [
+        "E137_Andreas2012mt",
+        "E141_Riordan1987aw",
+        "NA64_Banerjee2019hmi",
+        "NA48_Batley2015lha"
+      ]
+    },
+    {
+      "scale": 3.9,
+      "effective_alpha_product": 2.962226282872868e-06,
+      "epsilon_domain": [
+        3.467652473483027e-05,
+        0.01
+      ],
+      "alpha_D_domain": [
+        1.202461367685296e-05,
+        1
+      ],
+      "covered": true,
+      "covering_searches": [
+        "E137_Andreas2012mt",
+        "E141_Riordan1987aw",
+        "NA64_Banerjee2019hmi",
+        "NA48_Batley2015lha"
+      ]
+    }
+  ],
+  "contour_commit": "5a2a53a8984827be06e2939e6c3705f79d180048",
+  "contour_receipt_sha256": "5869097f6c0d682f55532141a4fbcbe436018f72ed37f30ee3a0664cd90b7ca5",
+  "intervals": [
+    {
+      "name": "E137_Andreas2012mt",
+      "lower": 2.87011803941002e-08,
+      "upper": 4.0881193063836935e-05,
+      "bracket": [
+        [
+          0.0093937,
+          2.8374e-08,
+          4.3469e-05
+        ],
+        [
+          0.010197,
+          2.8804e-08,
+          4.0106e-05
+        ]
+      ],
+      "sha256": "a742631a577e17a5ebbcf90ecddbdd8b9b4cf917630bb89fe7d59d6da2e1ca2e"
+    },
+    {
+      "name": "E141_Riordan1987aw",
+      "lower": 2.4357057689025432e-05,
+      "upper": 0.0004788482343042372,
+      "bracket": [
+        [
+          0.0097001,
+          2.3621e-05,
+          0.00050001
+        ],
+        [
+          0.010286,
+          2.5059e-05,
+          0.00046005
+        ]
+      ],
+      "sha256": "cc2178b3c1ff9ca2439b9a765863c9221e1428e1423adad5aec9f289afb9aa31"
+    },
+    {
+      "name": "NA64_Banerjee2019hmi",
+      "lower": 9.884948506359192e-05,
+      "upper": 0.001391694385131656,
+      "bracket": [
+        [
+          0.0099505,
+          9.8745e-05,
+          0.0014007
+        ],
+        [
+          0.010373,
+          9.9624e-05,
+          0.001327
+        ]
+      ],
+      "sha256": "ecf558c5157316cf07d1eb4b2c7558735c7df34d7149f07b6d532f3db5d892bb"
+    },
+    {
+      "name": "NA48_Batley2015lha",
+      "lower": 0.0008067491275550794,
+      "upper": 0.01,
+      "bracket": [
+        [
+          0.0099599,
+          0.00080459
+        ],
+        [
+          0.01004,
+          0.0008089
+        ]
+      ],
+      "sha256": "63b2b2d4f839ab3acc450e1c3ea0403ae0b97baa9d8e045651f3babfe6c3059b"
+    }
+  ],
+  "assumptions": [
+    "10 MeV kinetically mixed dark photon",
+    "100 GeV Dirac dark matter; no additional open dark decays",
+    "Standard electromagnetic production and dominant electron-pair decay",
+    "alpha_D<=1 and epsilon<=.01 declared weak-coupling scope"
+  ],
+  "limitations": [
+    "Union of published/recast contours, not a combined confidence level",
+    "No exclusion of altered mediator masses or decay completions",
+    "Does not validate the Born transport normalization or produce a shared signal"
+  ]
+}

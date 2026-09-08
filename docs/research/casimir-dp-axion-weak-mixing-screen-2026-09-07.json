@@ -1,0 +1,68 @@
+{
+  "scope": "Tree-level up-mass-basis alignment, no other new flavor/lepton interactions. Gaussian screen of a dated independent CKM row sum, not a global likelihood or exclusion.",
+  "checks": {
+    "full_rectangular_current_has_orthonormal_columns": true,
+    "first_row_norm_matches_projection": true,
+    "fixed_pseudoscalar_coupling": true,
+    "archived_mixing_recovered": true,
+    "inverse_mixing_map": true
+  },
+  "data_source": "https://pdg.lbl.gov/2025/reviews/rpp2025-rev-ckm-matrix.pdf",
+  "observed_row_sum": 0.9984,
+  "observed_sigma": 0.0007,
+  "gaussian_1p96sigma_deficit_interval": [
+    0.00022800000000004587,
+    0.002972000000000046
+  ],
+  "corresponding_yL_interval_at_fixed_M": [
+    0.17348977493308912,
+    0.6272312243833384
+  ],
+  "rows": [
+    {
+      "yL": 0.1,
+      "yR_at_fixed_exact_gu": 0.006399272805786437,
+      "exact_gu": 5.5700260688158226e-05,
+      "deficit": 7.576230963753527e-05,
+      "first_row_sum": 0.9999242376903624,
+      "charged_current_amplitude_factor": 0.9999621181276631,
+      "delta_Z_left_up_coupling": -3.7881154818767634e-05,
+      "gaussian_pull_to_dated_row_sum": 2.177482414803533,
+      "leading_mass_threshold_scaling_at_fixed_M": 3.999091058874786
+    },
+    {
+      "yL": 0.2,
+      "yR_at_fixed_exact_gu": 0.0032,
+      "exact_gu": 5.5700260688158226e-05,
+      "deficit": 0.0003029803750711703,
+      "first_row_sum": 0.999697019624929,
+      "charged_current_amplitude_factor": 0.9998484983360874,
+      "delta_Z_left_up_coupling": -0.00015149018753558515,
+      "gaussian_pull_to_dated_row_sum": 1.852885178470011,
+      "leading_mass_threshold_scaling_at_fixed_M": 1.0
+    },
+    {
+      "yL": 0.4,
+      "yR_at_fixed_exact_gu": 0.0016007269877404287,
+      "exact_gu": 5.5700260688158226e-05,
+      "deficit": 0.0012108209353412804,
+      "first_row_sum": 0.9987891790646586,
+      "charged_current_amplitude_factor": 0.99939440616038,
+      "delta_Z_left_up_coupling": -0.0006054104676706402,
+      "gaussian_pull_to_dated_row_sum": 0.55597009236947,
+      "leading_mass_threshold_scaling_at_fixed_M": 0.25022723528130336
+    },
+    {
+      "yL": 0.6,
+      "yR_at_fixed_exact_gu": 0.0010679586005462234,
+      "exact_gu": 5.570026068815822e-05,
+      "deficit": 0.0027202299652792517,
+      "first_row_sum": 0.9972797700347209,
+      "charged_current_amplitude_factor": 0.9986389588007875,
+      "delta_Z_left_up_coupling": -0.0013601149826396259,
+      "gaussian_pull_to_dated_row_sum": -1.6003285218272165,
+      "leading_mass_threshold_scaling_at_fixed_M": 0.11138042700006327
+    }
+  ],
+  "full_model_admitted": false
+}

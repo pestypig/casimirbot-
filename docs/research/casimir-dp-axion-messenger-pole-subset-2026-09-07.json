@@ -1,0 +1,54 @@
+{
+  "scope": "Finite leading-yL^2/yR^2 neutral two-point and tadpole subset at mu=MU; delta v and delta f set to zero for this isolated contribution. Not the complete messenger or electroweak input conversion.",
+  "checks": {
+    "closed_B0_matches_integral": true,
+    "six_renormalization_conditions": true,
+    "propagator_insertion_matches_inverse_derivative": true
+  },
+  "counterterms": {
+    "delta_lambdaH": 4.911575339219981e-05,
+    "delta_muHS_GeV": 0.0018266748093326978,
+    "delta_muH2_GeV2": 6082.785184821257,
+    "delta_mS2_GeV2": 0.00016545087512473335,
+    "delta_t_GeV3": -55.4100778721908,
+    "delta_mA2_GeV2": -3.1125865669559114
+  },
+  "momentum_points": [
+    {
+      "p2_GeV2": 15625.0,
+      "PiH_minus_PiH0_GeV2": 5.9522636114005945,
+      "linear_derivative_GeV2": 5.936788104043229,
+      "nonlinear_fraction_of_momentum_increment": 0.00259993648932565
+    },
+    {
+      "p2_GeV2": 507812.5,
+      "PiH_minus_PiH0_GeV2": 209.82205455845892,
+      "linear_derivative_GeV2": 192.94561338140494,
+      "nonlinear_fraction_of_momentum_increment": 0.08043216053988268
+    },
+    {
+      "p2_GeV2": 1000000.0,
+      "PiH_minus_PiH0_GeV2": 447.69169167586045,
+      "linear_derivative_GeV2": 379.95443865876666,
+      "nonlinear_fraction_of_momentum_increment": 0.1513033506686946
+    }
+  ],
+  "rows": [
+    {
+      "q_GeV": 0.0,
+      "scalar_propagator_only_relative_amplitude": -0.00017383920848352698,
+      "pseudoscalar_propagator_only_relative_amplitude": -1.945367050160693e-07
+    },
+    {
+      "q_GeV": 0.05,
+      "scalar_propagator_only_relative_amplitude": -0.00017383920832505774,
+      "pseudoscalar_propagator_only_relative_amplitude": -1.9453670493501236e-07
+    },
+    {
+      "q_GeV": 0.246,
+      "scalar_propagator_only_relative_amplitude": -0.000173839204647557,
+      "pseudoscalar_propagator_only_relative_amplitude": -1.9453670305397233e-07
+    }
+  ],
+  "full_model_admitted": false
+}

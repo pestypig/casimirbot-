@@ -69,10 +69,18 @@ export function HelixAskSharedLiveRoomControls({
   useEffect(() => () => resetSharedLiveRoomGuideProjection(), []);
 
   useEffect(() => {
-    const openDialog = (): void => setDialogOpen(true);
+    const openDialog = (event: Event): void => {
+      const expectedRoom = (event as CustomEvent<{ roomId?: unknown }>).detail?.roomId;
+      if (expectedRoom !== undefined && (typeof expectedRoom !== "string" ||
+          room?.room_id !== expectedRoom || room.status === "closed")) return;
+      // An exact navigation request may check whether this controller handled
+      // it. This never joins a different room or changes any room consent.
+      if (expectedRoom !== undefined) event.preventDefault();
+      setDialogOpen(true);
+    };
     window.addEventListener(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT, openDialog);
     return () => window.removeEventListener(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT, openDialog);
-  }, []);
+  }, [room?.room_id, room?.status]);
 
   useEffect(() => {
     onActiveRoomChange?.(room?.status === "closed" ? null : room?.room_id ?? null);

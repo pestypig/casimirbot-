@@ -1,0 +1,55 @@
+{
+  "status": "source_intake_and_kinematic_diagnostic_not_rate",
+  "commit": "b448a86a7660808bc5123d8a54e943e5a61994f7",
+  "source_url": "https://github.com/benroberts999/AtomicIonisation",
+  "raw_local_sha256": "a38c1cc4d8bd0445b6cb1953a99b1c11afd5129023c6463303bc74ae18dc07a9",
+  "normalized_no_CR_sha256": "bcdc6de584619d833cb5e1645f7a8f81d8aa8128098935a97b0dd7f902d1c031",
+  "energy_range_eV": [
+    5.0000131158,
+    9999.9990202
+  ],
+  "momentum_range_eV": [
+    100.000102662,
+    4999986.4884
+  ],
+  "shape": [
+    256,
+    1024
+  ],
+  "zeros": 30720,
+  "free_stationary_electron_q_endpoint_eV": 2645.4022116407737,
+  "kinematic_rows": [
+    {
+      "q_eV": 37289.5,
+      "free_electron_transfer_eV": 1358.7704564721887,
+      "incident_energy_ceiling_eV": 96.51532889038671
+    },
+    {
+      "q_eV": 200000.0,
+      "free_electron_transfer_eV": 37745.00386291274,
+      "incident_energy_ceiling_eV": 517.4914757475319
+    },
+    {
+      "q_eV": 1000000.0,
+      "free_electron_transfer_eV": 611997.0103226997,
+      "incident_energy_ceiling_eV": 2583.45737873766
+    },
+    {
+      "q_eV": 5000000.0,
+      "free_electron_transfer_eV": 4515045.212848264,
+      "incident_energy_ceiling_eV": 12817.286893688299
+    }
+  ],
+  "interpretation": [
+    "a stationary free electron cannot realize the high-q f-sum allocation",
+    "bound electrons and the recoiling atom can permit high-q low-energy ionization; free endpoint is not an atomic cutoff",
+    "vector Gamma=1 table matches the electron density vertex of the current charge-coupled lead",
+    "Xe table enables a separate electron-recoil prediction, not a silica stopping substitution"
+  ],
+  "next_checks": [
+    "match K normalization and Hartree units to shared mediator products",
+    "preserve zeros and prohibit out-of-domain interpolation; example log interpolator has unsafe outside fill",
+    "audit partial-wave L=6 convergence and omitted momentum above 5 MeV",
+    "fold a covered raw xenon electron spectrum through appropriate detector response before claiming a constraint"
+  ]
+}

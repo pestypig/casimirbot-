@@ -1,0 +1,16 @@
+{
+  "schema": "et6.focused-development-evidence.v1",
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "classification": "tool admission",
+  "first_divergence": "Broker required temporal_plan_v1 but the shared connector manifest schema could not represent it.",
+  "repair": "Accept temporal_plan_v1 only with unique features, latest_start_tick_v1, execute_sequence, native_fabric and long_running support. Keep finite manifests compatible; reject unknown features and unsupported temporal combinations. Native advertisement remains unchanged.",
+  "checks": [
+    { "command": "npx vitest run server/services/environment-connectors/actions/__tests__/temporal-manifest-feature.test.ts server/services/environment-connectors/actions/__tests__/action-admission-transaction.test.ts --pool=forks --maxWorkers=1 --minWorkers=1", "exit_code": 0, "passed": 14 },
+    { "command": "npx tsc -p tsconfig.et6-temporal.json --noEmit --pretty false", "exit_code": 0 },
+    { "check": "Gradle test --rerun with PlayerActionRuntimeLifecycleTest, TemporalPlanDeliveryPreflightTest and FluidSequenceEngineTest; runGameTest excluded; offline one worker", "exit_code": 0, "passed": 51, "failures": 0, "errors": 0, "xml_timestamp_start": "2026-09-05T16:20:00.658Z", "initial_attempt": "Initial invocation reused up-to-date tests; subsequent --rerun executed the test task." }
+  ],
+  "casimir": { "run_id": "2683", "verdict": "PASS", "first_fail": null, "deltas": [], "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45", "integrity_ok": true, "status": "GREEN", "limitation": "Existing keyed server verification is not deployment or native capacity proof." },
+  "limitations": ["Native runtime still advertises only latest_start_tick_v1", "No new EXE, server restart or live action", "Native component tests do not prove the complete asynchronous packaged HTTP handoff", "Actual effect-budget accounting and live rolling-cycle qualification remain unfinished", "No ET6 completion or maturity promotion"]
+}

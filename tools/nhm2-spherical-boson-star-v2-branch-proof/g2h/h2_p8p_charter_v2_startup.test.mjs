@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { startupGuard } from './h2_p8p_charter_v2_retrieval.mjs';
+const base='https://www.googleapis.com/compute/v1/projects/dark-stratum-455714-h4/zones/us-east1-b';
+const name='nhm2-h2-p8p-r39-rescue-e2-small-20260904';
+const h={metadata:{fingerprint:'C3UU6ZIGvtM=',items:[]}},p={name:'dark-stratum-455714-h4',commonInstanceMetadata:{items:[{key:'ssh-keys'}]}};
+const d={id:'1064813028101755842',name,sizeGb:'10',type:`${base}/diskTypes/pd-standard`,sourceImage:'https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-12-bookworm-v20260817',creationTimestamp:'2026-09-04T13:42:21.741-07:00',status:'READY',users:[`${base}/instances/${name}`]};
+test('accept recorded startup configuration',()=>startupGuard(h,p,d));
+test('reject instance startup hook',()=>assert.throws(()=>startupGuard({metadata:{items:[{key:'startup-script'}]}},p,d)));
+test('reject project startup hook',()=>assert.throws(()=>startupGuard(h,{commonInstanceMetadata:{items:[{key:'user-data'}]}},d)));
+test('reject recreated boot disk',()=>assert.throws(()=>startupGuard(h,p,{...d,id:'other'})));
+test('reject changed boot image',()=>assert.throws(()=>startupGuard(h,p,{...d,sourceImage:'other'})));
+test('reject absent metadata schemas',()=>assert.throws(()=>startupGuard({}, {},d)));

@@ -1,0 +1,23 @@
+{
+  "scope": "Connected native runtime and real broker with executable successor payload withheld after lease",
+  "passed": true,
+  "fault": "HTTP 503 after successful real broker lease, without returning action_request",
+  "server_tests": 2,
+  "selected_native_tests": 1,
+  "verified": [
+    "Native uncertainty remains set and queued successor remains null",
+    "One delivery request followed by one status-only request",
+    "Real reconciliation reports leased without execution or effects authority",
+    "Child database row remains leased with attempt_count=1",
+    "Native current request remains root and no plan:1 activation event occurs",
+    "Published root evidence is retained in the event store"
+  ],
+  "limits": [
+    "HTTP 503 fault rather than socket disconnection",
+    "No disk persistence failure injected in this connected run",
+    "Initial admission, authority, binding and synthetic heartbeat remain fixture-owned",
+    "No new safe-stop timing claim; stop-window tests remain separate evidence",
+    "No live game, installed package or user binding changed"
+  ],
+  "reproduction": "Use simultaneous-native-broker recipe with HELIX_NATIVE_BROKER_LOST_RESPONSE=1"
+}

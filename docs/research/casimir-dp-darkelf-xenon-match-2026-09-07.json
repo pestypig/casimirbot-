@@ -1,0 +1,72 @@
+{
+  "status": "conditional_shared_coefficients_not_joint_population",
+  "local_sha256": "08d49d1ed65f5f693da2e8addfa3818fa57bb641dba9bea6ab1068f991ba86dc",
+  "isotope_source_sha256": "50587429875f189c69f249728c55d3c1a2fb8fc702af5e397ef8d4812c1cbdaa",
+  "mchi_GeV": 100.0,
+  "mediator_GeV": 0.01,
+  "reference_momentum_GeV": 0.07338410094359346,
+  "reference_proton_cross_section_cm2": 1e-38,
+  "equivalent_zero_momentum_proton_cross_section_cm2": 3.008770724735438e-35,
+  "fast_distribution": "mono-speed 776 km/s; number density 1/cm3; no attenuation",
+  "raw_high_counts_per_fast_cm3": 3746685.898339859,
+  "raw_full_counts_per_fast_cm3": 411826761543.11487,
+  "raw_full_to_high_ratio": 109917.6105810187,
+  "ratios": [
+    {
+      "particle_temperature_K": 300.0,
+      "partial_D_per_raw_high_Xe_at_equal_number_density": 7.635600533779262e-30,
+      "slow_to_fast_density_ratio_for_DP_and_one_raw_high_count": 3.864982798875906e+27
+    },
+    {
+      "particle_temperature_K": 5000.0,
+      "partial_D_per_raw_high_Xe_at_equal_number_density": 1.8879232151105386e-24,
+      "slow_to_fast_density_ratio_for_DP_and_one_raw_high_count": 1.5631708157376849e+22
+    }
+  ],
+  "raw_differential_counts_per_keV_per_fast_cm3": [
+    {
+      "E_keV": 5.4,
+      "value": 112144492474.56265
+    },
+    {
+      "E_keV": 10,
+      "value": 27735662198.836536
+    },
+    {
+      "E_keV": 25,
+      "value": 2085431435.8305264
+    },
+    {
+      "E_keV": 50,
+      "value": 106934624.58519252
+    },
+    {
+      "E_keV": 100,
+      "value": 115231.58617314401
+    },
+    {
+      "E_keV": 150,
+      "value": 741784.344497335
+    },
+    {
+      "E_keV": 200,
+      "value": 186671.54560923393
+    },
+    {
+      "E_keV": 248,
+      "value": 13548.772371871886
+    },
+    {
+      "E_keV": 269.9,
+      "value": 1203.8658249541259
+    }
+  ],
+  "limitations": [
+    "partial diamond channel",
+    "conditional independent distributions",
+    "Helm charge form factor",
+    "no detector acceptance or resolution",
+    "no LZ fit/exclusion",
+    "no terrestrial supply calculation"
+  ]
+}

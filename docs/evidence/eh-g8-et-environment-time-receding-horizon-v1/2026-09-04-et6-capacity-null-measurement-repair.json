@@ -1,0 +1,74 @@
+{
+  "schema": "casimirbot.environment_time.et6_capacity_null_measurement_repair.v1",
+  "recorded_at": "2026-09-04T21:49:26.699Z",
+  "program_gate": "G8",
+  "workstream": "ET6 live Minecraft capacity qualification",
+  "capability_or_component": "environment.capacity_sample.v1 and environment.capacity_report.v1",
+  "lifecycle_stage": "live qualification measurement aggregation",
+  "reaction_timescale": "mixed",
+  "authority_owner": "Helix validates measurements; Codex remains the terminal writer",
+  "current_maturity": "implemented",
+  "target_maturity": "live_qualified",
+  "classification": "evidence_normalization",
+  "first_divergence": "The work packet correctly stated that planning lead time, observation byte measurements, and controlled-versus-unknown course classification were not yet available, but the strict sample schema required concrete values and the report schema could not preserve their absence. A caller could therefore use zero for numeric placeholders or guess a course label and receive a falsely complete required-measurement gate.",
+  "repair": {
+    "nullable_sample_measurements": [
+      "lead_time_ticks",
+      "observation_input_bytes",
+      "observation_output_bytes",
+      "course"
+    ],
+    "nullable_report_measurements": [
+      "lead_time_ticks_p50",
+      "observation_input_bytes",
+      "observation_output_bytes"
+    ],
+    "new_missing_measurement_codes": [
+      "planning:lead_time_ticks",
+      "observation:input_bytes",
+      "observation:output_bytes",
+      "course:classification"
+    ],
+    "measured_zero_preserved": true,
+    "unknown_coerced_to_zero": false,
+    "unknown_course_forced_into_category": false,
+    "reported_courses_exclude_null": true
+  },
+  "live_state_observed_before_repair": {
+    "packaged_service_instance_ref": "service_instance:77682a4cfafbcbd8cff300456205745f",
+    "exact_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "minecraft_environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+    "connector_health": "online",
+    "connector_probe_ready": true,
+    "action_authority_id": "environment_action_authority:74b342f9-918c-4ede-a4b4-04d0d9f5f400",
+    "action_authority_status": "active",
+    "controls_asserted": false,
+    "fresh_perception_evidence_ref": "environment_probe_evidence:d9070fc8e12abff528b5a2677fef8c8d478c98a5",
+    "fresh_perception_semantic_fingerprint": "sha256:2ac6a58b5d63d6999a99e54c0aae2fe4eb7f87b48f7f050d553299b18e5243fa",
+    "credential_included": false
+  },
+  "verification": {
+    "command": "npx vitest run server/__tests__/helix.environment-capacity-report.test.ts shared/__tests__/helix-environment-time.spec.ts --pool=forks",
+    "test_files_passed": 2,
+    "tests_passed": 32,
+    "tests_failed": 0,
+    "production_server_build": "passed_with_4_known_unrelated_duplicate_key_and_case_warnings",
+    "git_diff_check": "passed_with_line_ending_warnings_only"
+  },
+  "remaining_live_requirements": [
+    "Measure genuine adapter-0.4.7 manual-or-safety-to-release latency from local input during an admitted scheduler window.",
+    "Create a fresh exact reasoning-task binding on the current packaged service and measure finalized provider-neutral steering pickup, acknowledgement, and stop/replan timing.",
+    "Capture controlled_n0 and unknown_world samples with observation byte/token/coalescing and continuation lead-time measurements, then require the canonical reporter to return exit_satisfied=true.",
+    "Revoke current action and reasoning authorities, prove stale rejection with zero further effect, and shut down Minecraft and Fabric normally after the final live segment."
+  ],
+  "explicit_non_goals": [
+    "No ET7 or ET8 promotion.",
+    "No credential, hidden reasoning, answer authority, or terminal authority is added by this repair."
+  ],
+  "credential_included": false,
+  "hidden_reasoning_included": false,
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false,
+  "et6_promoted": false
+}

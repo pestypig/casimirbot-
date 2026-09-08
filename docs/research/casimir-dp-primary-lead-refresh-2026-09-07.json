@@ -1,0 +1,60 @@
+{
+  "checks": {
+    "pseudoscalar_zero_momentum_zero": true,
+    "soft_shape_strongly_suppressed": true,
+    "carbon_cannot_supply_350keV": true
+  },
+  "axion_source": "https://arxiv.org/html/2609.04186v1",
+  "seasonal_source": "https://arxiv.org/html/2609.04181v1",
+  "axion_shape_rows": [
+    {
+      "q_eV": 0.7141704424,
+      "pion_pole_operator_shape_over_246MeV": 1.4919906498292497e-33
+    },
+    {
+      "q_eV": 0.7893079216,
+      "pion_pole_operator_shape_over_246MeV": 2.2260989230602048e-33
+    },
+    {
+      "q_eV": 1000.0,
+      "pion_pole_operator_shape_over_246MeV": 5.735332670251504e-21
+    },
+    {
+      "q_eV": 1000000.0,
+      "pion_pole_operator_shape_over_246MeV": 5.734691675015968e-09
+    }
+  ],
+  "inelastic_threshold_rows": [
+    {
+      "mass_chi_GeV": 400.0,
+      "A_target_benchmark": 12.0,
+      "max_endothermic_splitting_keV_at_810kms": 39.69083067407559
+    },
+    {
+      "mass_chi_GeV": 400.0,
+      "A_target_benchmark": 13.0,
+      "max_endothermic_splitting_keV_at_810kms": 42.90121028258006
+    },
+    {
+      "mass_chi_GeV": 400.0,
+      "A_target_benchmark": 131.0,
+      "max_endothermic_splitting_keV_at_810kms": 341.28572674592266
+    },
+    {
+      "mass_chi_GeV": 1000.0,
+      "A_target_benchmark": 12.0,
+      "max_endothermic_splitting_keV_at_810kms": 40.34896602813968
+    },
+    {
+      "mass_chi_GeV": 1000.0,
+      "A_target_benchmark": 13.0,
+      "max_endothermic_splitting_keV_at_810kms": 43.6711501301418
+    },
+    {
+      "mass_chi_GeV": 1000.0,
+      "A_target_benchmark": 131.0,
+      "max_endothermic_splitting_keV_at_810kms": 396.96043817935214
+    }
+  ],
+  "scope": "Operator shape excludes nuclear responses, halo, normalization and target exposure. Free stationary nuclei only for inelastic threshold; no bound-solid exclusion. Primary-lead screening, not a shared detection claim."
+}

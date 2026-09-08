@@ -31,7 +31,8 @@ export type EnvironmentDurableGoalErrorCode =
   | "durable_goal_evidence_missing"
   | "durable_goal_evidence_identity_mismatch"
   | "durable_goal_event_invalid"
-  | "durable_goal_terminal";
+  | "durable_goal_terminal"
+  | "durable_goal_session_ambiguous";
 
 export class EnvironmentDurableGoalError extends Error {
   constructor(
@@ -636,6 +637,88 @@ export class EnvironmentDurableGoalStore {
       throw new EnvironmentDurableGoalError("durable_goal_not_found", 404, "The durable environment goal was not found.");
     }
     return reduceDurableGoalEvents(await readGoalEvents(db, input.goalId));
+  }
+
+  /** Internal proposal preflight only. Dispatch must revalidate in its own transaction. */
+  async resolveTemporalAdmissionContext(input: {
+    goalId: string; profileId: string; participantId: string;
+    expectedRevision: number; roomId: string; runId: string | null; turnId: string;
+  }) {
+    return this.transaction(async (db) => {
+      const selected = await db.query<GoalRow>(
+        `SELECT g.*, p.scopes AS granted_scopes FROM helix_environment_durable_goals g
+          INNER JOIN helix_environment_durable_goal_participants p ON p.goal_id=g.goal_id
+         WHERE g.goal_id=$1 AND p.profile_id=$2 AND p.participant_id=$3
+           AND p.status='active' LIMIT 1;`,
+        [input.goalId, input.profileId, input.participantId],
+      );
+      const goal = selected.rows[0];
+      if (!goal || !parseJson<string[]>(goal.granted_scopes ?? []).includes("steer")) {
+        throw new EnvironmentDurableGoalError("durable_goal_forbidden", 403, "Temporal planning requires a current goal steering grant.");
+      }
+      const projection = reduceDurableGoalEvents(await readGoalEvents(db, input.goalId));
+      if (projection.revision !== input.expectedRevision) {
+        throw new EnvironmentDurableGoalError("durable_goal_revision_conflict", 409, "The temporal proposal references a stale goal revision.");
+      }
+      if (projection.status !== "active" || projection.recovery.required) {
+        throw new EnvironmentDurableGoalError("durable_goal_authority_stale", 409, "Temporal planning requires an active goal with completed recovery.");
+      }
+      const prior = projection.identity;
+      if (prior.room_id !== input.roomId || prior.run_id !== input.runId) {
+        throw new EnvironmentDurableGoalError("durable_goal_identity_mismatch", 409, "The temporal proposal must use the goal's exact room and run.");
+      }
+      const current = await this.resolveIdentity(db, {
+        ownerProfileId: goal.owner_profile_id, roomId: prior.room_id,
+        participantId: input.participantId, goalOwnerParticipantId: goal.participant_id,
+        authorityParticipantId: prior.authority_participant_id,
+        environmentBindingId: prior.environment_binding_id,
+        subjectNativeId: prior.subject_native_id, actionAuthorityId: prior.action_authority_id,
+        runId: prior.run_id, turnId: input.turnId,
+      });
+      if (runtimeIdentityChanged(prior, current) ||
+          prior.source_id !== current.source_id || prior.world_id !== current.world_id ||
+          prior.subject_native_id !== current.subject_native_id || prior.room_id !== current.room_id) {
+        throw new EnvironmentDurableGoalError("durable_goal_authority_stale", 409, "Temporal planning requires fresh checkpoint recovery for changed identity.");
+      }
+      return { goal_id: input.goalId, goal_revision: projection.revision,
+        identity: current, execution_authority: false as const,
+        answer_authority: false as const, terminal_eligible: false as const };
+    });
+  }
+
+  /** Exact session lookup for setup, never a newest-goal fallback or resume. */
+  async findForSession(input: {
+    roomId: string; profileId: string; participantId: string; runId: string;
+  }): Promise<HelixEnvironmentDurableGoalProjection | null> {
+    if (!input.runId.trim()) return null;
+    const db = await this.readDatabase();
+    const candidates = await db.query<GoalRow>(
+      `SELECT g.*, p.scopes AS granted_scopes
+         FROM helix_environment_durable_goals g
+         INNER JOIN helix_environment_durable_goal_participants p ON p.goal_id=g.goal_id
+         INNER JOIN helix_environment_durable_goal_events e
+           ON e.goal_id=g.goal_id AND e.sequence=g.current_sequence
+        WHERE g.room_id=$1 AND p.profile_id=$2 AND p.participant_id=$3
+          AND p.status='active' AND e.run_id=$4
+          AND g.status NOT IN ('completed', 'canceled')
+        LIMIT 2;`,
+      [input.roomId, input.profileId, input.participantId, input.runId],
+    );
+    if (!candidates.rows.length) return null;
+    if (candidates.rows.length > 1) {
+      throw new EnvironmentDurableGoalError("durable_goal_session_ambiguous", 409,
+        "Select the intended unfinished goal for this environment session.");
+    }
+    const goal = await this.inspect({ goalId: candidates.rows[0].goal_id,
+      profileId: input.profileId, participantId: input.participantId });
+    // Re-read the authoritative ledger: a concurrent identity/status change
+    // cannot turn a candidate query into current-session evidence.
+    if (goal.identity.room_id !== input.roomId || goal.identity.run_id !== input.runId ||
+        ["completed", "canceled"].includes(goal.status)) {
+      throw new EnvironmentDurableGoalError("durable_goal_revision_conflict", 409,
+        "The environment session changed during discovery.");
+    }
+    return goal;
   }
 
   async listForRoom(input: {

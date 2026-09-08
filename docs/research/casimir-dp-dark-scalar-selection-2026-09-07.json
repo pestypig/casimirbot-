@@ -1,0 +1,64 @@
+{
+  "scope": "New symmetric candidate branch compared with previous asymmetric pilot; real Majorana masses proportional to vev, invariant Dirac mass. Physical radial coupling from Takagi-rotated dM/dvev. Tree selection rule only; no all-orders protection, portal matching, relic density or viability claim.",
+  "vev_GeV": 500.0,
+  "gchi": 0.1,
+  "vector_mass_GeV": 100.0,
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "gap_GeV": 0.0010062516621719803,
+      "tree_baryon_coupling_symmetric": 0.00030983408211073183,
+      "cases": [
+        {
+          "branch": "symmetric",
+          "scalar_diagonal_couplings": [
+            -1.00625166217198e-06,
+            1.00625166217198e-06
+          ],
+          "scalar_transition_magnitude": 1.0247980039725436e-23,
+          "offdiagonal_pure_imaginary_in_this_phase_convention": true
+        },
+        {
+          "branch": "previous_asymmetric_pilot",
+          "scalar_diagonal_couplings": [
+            -1.0062484980167557e-06,
+            1.006254826327205e-06
+          ],
+          "scalar_transition_magnitude": 5.031258310760406e-07,
+          "offdiagonal_pure_imaginary_in_this_phase_convention": true
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "gap_GeV": 0.0005513006648687921,
+      "tree_baryon_coupling_symmetric": 0.00030557339418766966,
+      "cases": [
+        {
+          "branch": "symmetric",
+          "scalar_diagonal_couplings": [
+            -5.513006648687919e-07,
+            5.513006648687919e-07
+          ],
+          "scalar_transition_magnitude": 8.93993834874034e-24,
+          "offdiagonal_pure_imaginary_in_this_phase_convention": true
+        },
+        {
+          "branch": "previous_asymmetric_pilot",
+          "scalar_diagonal_couplings": [
+            -5.513002849543105e-07,
+            5.513010447832737e-07
+          ],
+          "scalar_transition_magnitude": 2.7565033243413424e-07,
+          "offdiagonal_pure_imaginary_in_this_phase_convention": true
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "Takagi_positive_masses": true,
+    "analytic_scalar_matrix": true,
+    "symmetric_transition_zero": true
+  },
+  "full_model_admitted": false
+}

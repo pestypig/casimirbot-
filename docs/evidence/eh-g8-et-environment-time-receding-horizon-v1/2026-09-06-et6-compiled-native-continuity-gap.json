@@ -1,0 +1,26 @@
+{
+  "schema": "et6_differential_diagnosis.v1",
+  "scope": "Actual serial compiler output executed by native FluidSequenceEngine",
+  "fixture": "minecraft/helix-fabric-player-agent/src/test/resources/compiled-walk-continuity.json",
+  "native_test": "FluidSequenceEngineTest.productionCompiledWalkReleasesBeforeGraphSettlement",
+  "native_test_passed": true,
+  "automatically_included_fabric_game_tests_passed": 5,
+  "test_server_shutdown_normal": true,
+  "observation": {
+    "duration_ms_parameter": 525,
+    "native_duration_ticks": 11,
+    "movement_released_at_step": 12,
+    "graph_succeeded_at_step": 13,
+    "bridge_motion": "deterministic fixture, not live Minecraft"
+  },
+  "correction": "Native walk already uses ceil(duration_ms / 50); describing execution as wall-clock timed was inaccurate. Child settlement releases resources and returns running before graph continuation.",
+  "repair_required": true,
+  "repair_constraints": [
+    "Preserve measurable-motion postcondition and locomotion safety",
+    "Preserve stop, cancellation, manual ownership and exact committed boundary",
+    "Do not silently reinterpret existing action parameters",
+    "Require compiler-to-native differential coverage, then packaged real rolling acceptance"
+  ],
+  "rolling_extensions_proven": 0,
+  "release_maturity_promoted": false
+}

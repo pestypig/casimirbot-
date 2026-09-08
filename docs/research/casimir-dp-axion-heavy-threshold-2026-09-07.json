@@ -1,0 +1,64 @@
+{
+  "scope": "Leading spin-two threshold exactly at mb; source rounded PDF/LO running compatibility audit, not a global PDF assessment",
+  "checks": {
+    "rounded_source_rejected_at_LO_threshold": true,
+    "compatible_input_round_trip": true,
+    "threshold_amplitude_invariant": true,
+    "threshold_momentum_conservation": true
+  },
+  "mb_GeV": 4.18,
+  "alpha_s_mb_LO": 0.2124928846491839,
+  "moments_at_mb_from_rounded_source": [
+    0.3055328795809131,
+    0.1637158291036255,
+    0.04028247035487512,
+    0.021898778626337836,
+    0.0035150868978005524,
+    0.4650549554364478
+  ],
+  "heavy_moment_residual": 0.0035150868978005524,
+  "M": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "replacement_PDF_constructed": false,
+  "full_model_admitted": false
+}

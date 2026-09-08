@@ -1,0 +1,22 @@
+{
+  "scope": "Connected native deadline rejection with real admission, lease, event and result handlers",
+  "server_tests": 2,
+  "selected_native_tests": 1,
+  "passed": true,
+  "verified": [
+    "Simulated clock advances to stop boundary before delivery response returns",
+    "Native controller cancels and releases controls",
+    "No plan:1 activation is published",
+    "Real result handler stores root request_canceled result",
+    "Child remains leased with attempt_count=1, without replay or execution promotion",
+    "Targeted TypeScript passes"
+  ],
+  "fixture_assertion_correction": "Cancellation is expressed by outcome=request_canceled, not a failure_reason field",
+  "limits": [
+    "Discrete simulated tick advance, not wall-clock-driven game ticking",
+    "Minimal in-memory transaction fixture, no disk failure injected here",
+    "Authority and preflight inputs remain fixtures",
+    "No live capacity or installed Minecraft acceptance"
+  ],
+  "reproduction": "Use connected fixture recipe with HELIX_NATIVE_BROKER_LATE_RESPONSE=1, without HELIX_NATIVE_BROKER_LOST_RESPONSE"
+}

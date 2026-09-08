@@ -1,0 +1,163 @@
+{
+  "status": "bulk_rigid_gaussian_shell_sum_with_analytic_outer_bound",
+  "amplitude_multiplier": 1.047932536050565,
+  "outside_1nm_amplitude_bound": 4.413215588577371e-13,
+  "number_sites": 728,
+  "rows": [
+    {
+      "distance_nm": 0.1545855345755223,
+      "neighbors": 4,
+      "overlap": 0.011521180589779488
+    },
+    {
+      "distance_nm": 0.2524371208835975,
+      "neighbors": 12,
+      "overlap": 0.00014005717819143455
+    },
+    {
+      "distance_nm": 0.2960087625392194,
+      "neighbors": 12,
+      "overlap": 1.3700494757674196e-05
+    },
+    {
+      "distance_nm": 0.357,
+      "neighbors": 6,
+      "overlap": 3.592933024529418e-07
+    },
+    {
+      "distance_nm": 0.3890317307110051,
+      "neighbors": 12,
+      "overlap": 4.398737727728794e-08
+    },
+    {
+      "distance_nm": 0.4372339190867972,
+      "neighbors": 24,
+      "overlap": 1.4495001735314484e-09
+    },
+    {
+      "distance_nm": 0.4637566037265669,
+      "neighbors": 16,
+      "overlap": 1.9430338143709526e-10
+    },
+    {
+      "distance_nm": 0.504874241767195,
+      "neighbors": 12,
+      "overlap": 7.142020336410041e-12
+    },
+    {
+      "distance_nm": 0.5280101206416408,
+      "neighbors": 24,
+      "overlap": 1.0056445624137296e-12
+    },
+    {
+      "distance_nm": 0.5644665623400558,
+      "neighbors": 24,
+      "overlap": 3.9421372219552665e-14
+    },
+    {
+      "distance_nm": 0.5852513882939535,
+      "neighbors": 12,
+      "overlap": 5.7252663559516636e-15
+    },
+    {
+      "distance_nm": 0.6183421383020892,
+      "neighbors": 8,
+      "overlap": 2.341740023720079e-16
+    },
+    {
+      "distance_nm": 0.6373724872474493,
+      "neighbors": 24,
+      "overlap": 3.4741584737183473e-17
+    },
+    {
+      "distance_nm": 0.6678858435391485,
+      "neighbors": 48,
+      "overlap": 1.4645465175101094e-18
+    },
+    {
+      "distance_nm": 0.6855422579972732,
+      "neighbors": 36,
+      "overlap": 2.20683232993891e-19
+    },
+    {
+      "distance_nm": 0.714,
+      "neighbors": 6,
+      "overlap": 9.515282694119047e-21
+    },
+    {
+      "distance_nm": 0.7305427348896162,
+      "neighbors": 12,
+      "overlap": 1.4509105472711029e-21
+    },
+    {
+      "distance_nm": 0.7573113626507924,
+      "neighbors": 36,
+      "overlap": 6.366437215626731e-23
+    },
+    {
+      "distance_nm": 0.7729276728776115,
+      "neighbors": 28,
+      "overlap": 9.798876753534066e-24
+    },
+    {
+      "distance_nm": 0.7982762679674249,
+      "neighbors": 24,
+      "overlap": 4.360184142110448e-25
+    },
+    {
+      "distance_nm": 0.8131061969386286,
+      "neighbors": 36,
+      "overlap": 6.761887176419873e-26
+    },
+    {
+      "distance_nm": 0.8372392131284822,
+      "neighbors": 24,
+      "overlap": 3.043399863869964e-27
+    },
+    {
+      "distance_nm": 0.8513907372646239,
+      "neighbors": 24,
+      "overlap": 4.749324197704845e-28
+    },
+    {
+      "distance_nm": 0.8744678381735944,
+      "neighbors": 24,
+      "overlap": 2.1580156845142638e-29
+    },
+    {
+      "distance_nm": 0.8880262876176582,
+      "neighbors": 36,
+      "overlap": 3.385337091299751e-30
+    },
+    {
+      "distance_nm": 0.910174983176312,
+      "neighbors": 72,
+      "overlap": 1.55066600822977e-31
+    },
+    {
+      "distance_nm": 0.9232091786263826,
+      "neighbors": 36,
+      "overlap": 2.4434421382224359e-32
+    },
+    {
+      "distance_nm": 0.9570996225576519,
+      "neighbors": 24,
+      "overlap": 1.7826399632988626e-34
+    },
+    {
+      "distance_nm": 0.9776847651467214,
+      "neighbors": 48,
+      "overlap": 8.271140814919382e-36
+    },
+    {
+      "distance_nm": 0.9898303831970405,
+      "neighbors": 24,
+      "overlap": 1.3127155386410861e-36
+    }
+  ],
+  "limitations": [
+    "toy positive potentials and bulk lattice only",
+    "quadrature error separate from analytic outer bound",
+    "no finite-q crystal response or common xenon normalization"
+  ]
+}

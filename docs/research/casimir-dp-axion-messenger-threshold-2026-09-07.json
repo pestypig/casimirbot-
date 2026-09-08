@@ -1,0 +1,82 @@
+{
+  "scope": "Leading yu=0 finite potential threshold; independent renormalized kappa boundary remains; not full matching",
+  "kappa_threshold": -3.112586761492618e-08,
+  "gu_from_messenger": 5.5708700649000965e-05,
+  "checks": {
+    "CW_mixed_coefficient_converges_to_two": true,
+    "scale_cancels_at_target_order": true,
+    "messenger_matching_product": true,
+    "both_couplings_required": true
+  },
+  "CW_checks": [
+    {
+      "epsilon": 0.0001,
+      "scale_over_M": 0.5,
+      "mixed_coefficient": 1.999799849189853,
+      "relative_error": -0.00010007540507351726
+    },
+    {
+      "epsilon": 0.0001,
+      "scale_over_M": 1.0,
+      "mixed_coefficient": 1.999799849189853,
+      "relative_error": -0.00010007540507351726
+    },
+    {
+      "epsilon": 0.0001,
+      "scale_over_M": 2.0,
+      "mixed_coefficient": 1.999799849189853,
+      "relative_error": -0.00010007540507351726
+    },
+    {
+      "epsilon": 1e-05,
+      "scale_over_M": 0.5,
+      "mixed_coefficient": 1.99997999803083,
+      "relative_error": -1.0000984584996233e-05
+    },
+    {
+      "epsilon": 1e-05,
+      "scale_over_M": 1.0,
+      "mixed_coefficient": 1.99997999803083,
+      "relative_error": -1.0000984584996233e-05
+    },
+    {
+      "epsilon": 1e-05,
+      "scale_over_M": 2.0,
+      "mixed_coefficient": 1.99997999803083,
+      "relative_error": -1.0000984584996233e-05
+    },
+    {
+      "epsilon": 1e-06,
+      "scale_over_M": 0.5,
+      "mixed_coefficient": 1.9999979999757025,
+      "relative_error": -1.000012148793796e-06
+    },
+    {
+      "epsilon": 1e-06,
+      "scale_over_M": 1.0,
+      "mixed_coefficient": 1.9999979999757025,
+      "relative_error": -1.000012148793796e-06
+    },
+    {
+      "epsilon": 1e-06,
+      "scale_over_M": 2.0,
+      "mixed_coefficient": 1.9999979999757025,
+      "relative_error": -1.000012148793796e-06
+    }
+  ],
+  "triangle_threshold_only_boundary": [
+    {
+      "q_GeV": 0.0,
+      "triangle_over_tree": -1.3738227630804453e-08
+    },
+    {
+      "q_GeV": 0.05,
+      "triangle_over_tree": -1.2822402013707823e-08
+    },
+    {
+      "q_GeV": 0.246,
+      "triangle_over_tree": 8.409438447273311e-09
+    }
+  ],
+  "full_model_admitted": false
+}

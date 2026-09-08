@@ -1,0 +1,42 @@
+{
+  "status": "conditional_phase_space_screen",
+  "primary": "https://arxiv.org/html/2606.00237v1",
+  "assumptions": {
+    "density_GeV_cm3": 0.3,
+    "gaussian_width_m_s": 220000.0,
+    "population": "one spin-zero boson; untruncated isotropic Gaussian"
+  },
+  "elastic_xenon_mass_threshold_GeV": 77.86556301055496,
+  "rows": [
+    {
+      "mass_GeV": 77.86556301055496,
+      "peak_occupation": 7.068183484930103e-39,
+      "maximum_relative_bose_correction": 7.068183484930103e-39,
+      "gaussian_width_m_s_for_unit_peak_at_same_density": 4.222068603674116e-08
+    },
+    {
+      "mass_GeV": 100,
+      "peak_occupation": 2.598301400937331e-39,
+      "maximum_relative_bose_correction": 2.598301400937331e-39,
+      "gaussian_width_m_s_for_unit_peak_at_same_density": 3.024492579494868e-08
+    },
+    {
+      "mass_GeV": 1000,
+      "peak_occupation": 2.598301400937331e-43,
+      "maximum_relative_bose_correction": 2.598301400937331e-43,
+      "gaussian_width_m_s_for_unit_peak_at_same_density": 1.4038450984328093e-09
+    }
+  ],
+  "checks": {
+    "gaussian_normalization": 1.0000000000000018,
+    "mass_scaling": true,
+    "inverse_width": true
+  },
+  "limitations": [
+    "No scattering amplitude or absolute decoherence computed",
+    "Not a bound on arbitrary cold streams, condensates, or captured populations",
+    "A high peak alone does not ensure occupied kinematically accessible final states",
+    "Xenon threshold assumes elastic free-nucleus recoil and a specified speed endpoint",
+    "No apparatus sensitivity or boundary residual established"
+  ]
+}

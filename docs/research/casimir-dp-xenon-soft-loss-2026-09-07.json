@@ -1,0 +1,97 @@
+{
+  "status": "conditional_initial_speed_moments",
+  "source_sha256": "6a8a73e52583756565490daf1f2938401f367a38f75228bfb1ba550465ca47d9",
+  "thresholds_keV": [
+    0,
+    1,
+    5.4,
+    14,
+    50
+  ],
+  "column_g_cm2": 300,
+  "rows": [
+    {
+      "speed_kms": 98.7743,
+      "tau_above_threshold": [
+        14.235391873361145,
+        3.1340562666581517,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "incident_kinetic_keV": 5.427708552512806,
+      "initial_speed_loss_keV": 10.115950709560607,
+      "initial_speed_loss_over_kinetic": 1.8637608507695826
+    },
+    {
+      "speed_kms": 150,
+      "tau_above_threshold": [
+        6.353977582490607,
+        1.5402596872738172,
+        0.17954909387105444,
+        0.0,
+        0.0
+      ],
+      "incident_kinetic_keV": 12.51731313060321,
+      "initial_speed_loss_keV": 5.79812542210037,
+      "initial_speed_loss_over_kinetic": 0.463208466673627
+    },
+    {
+      "speed_kms": 250,
+      "tau_above_threshold": [
+        2.3064384370848585,
+        0.573499994806814,
+        0.08364418118181952,
+        0.014419578076776707,
+        0.0
+      ],
+      "incident_kinetic_keV": 34.77031425167558,
+      "initial_speed_loss_keV": 2.4320983838172956,
+      "initial_speed_loss_over_kinetic": 0.06994755256490363
+    },
+    {
+      "speed_kms": 400,
+      "tau_above_threshold": [
+        0.9013927996031621,
+        0.22446372058830105,
+        0.033113793391037524,
+        0.006072932803130175,
+        7.088425760737922e-05
+      ],
+      "incident_kinetic_keV": 89.01200448428946,
+      "initial_speed_loss_keV": 0.9688938738233955,
+      "initial_speed_loss_over_kinetic": 0.01088497983431442
+    },
+    {
+      "speed_kms": 601.1214,
+      "tau_above_threshold": [
+        0.3991276814178636,
+        0.09939177281894324,
+        0.014664367737930438,
+        0.002691005728709958,
+        3.337211535530325e-05
+      ],
+      "incident_kinetic_keV": 201.02634515320727,
+      "initial_speed_loss_keV": 0.4293008681767409,
+      "initial_speed_loss_over_kinetic": 0.002135545308002092
+    },
+    {
+      "speed_kms": 776,
+      "tau_above_threshold": [
+        0.23950409518119314,
+        0.05964197406979413,
+        0.008799714744344147,
+        0.001614875604183834,
+        2.0112997763705245e-05
+      ],
+      "incident_kinetic_keV": 335.00558007707184,
+      "initial_speed_loss_keV": 0.25762919118878524,
+      "initial_speed_loss_over_kinetic": 0.0007690295520734751
+    }
+  ],
+  "limitations": [
+    "Thresholds are diagnostic recoil cuts, not LZ pulse thresholds",
+    "Initial-speed loss is not propagated energy loss; values above kinetic energy signal failure of fixed-speed approximation",
+    "Same Born model and diagnostic column; no geometry or pulse simulation"
+  ]
+}

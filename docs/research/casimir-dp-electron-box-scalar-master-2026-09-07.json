@@ -1,0 +1,23 @@
+{
+  "status": "forward_scalar_denominator_masters_not_matched_amplitude",
+  "candidate_sha256": "54fc7fe2ae81ff6062486128741a26c7bfa3931b5baf18e0286934bbd8134884",
+  "rows": [
+    {
+      "electron_routing_sign": -1,
+      "scalar_master_GeV_minus4": 0.0031872391365396556,
+      "coordinate_relative_difference": 8.048228750112685e-12
+    },
+    {
+      "electron_routing_sign": 1,
+      "scalar_master_GeV_minus4": 0.0031577709371414997,
+      "coordinate_relative_difference": 8.821832153671494e-12
+    }
+  ],
+  "missing": [
+    "fermion tensor numerators and Majorana diagram conventions",
+    "relative signs and symmetry factors",
+    "gauge completion and operator reduction",
+    "finite external momentum corrections",
+    "material convolution"
+  ]
+}

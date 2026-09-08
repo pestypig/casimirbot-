@@ -1,0 +1,17 @@
+{
+  "scope": "ET6 environment dependency typecheck repair",
+  "classification": "tool admission",
+  "repairs": [
+    "Explicitly narrow fire/lava condition variants before reading expected, preserving matched hazard-transition semantics.",
+    "Manifest fixtures specify required confirmation/mutation flags and satisfy the actual capability type without readonly tuple mismatches."
+  ],
+  "verification": {
+    "tests": "31 passed across reactive contract, reactive evidence and manifest admission lease suites",
+    "typecheck": "FAIL; repaired-file diagnostics disappeared, 18 remaining diagnostics in imported dependencies",
+    "next_investigation": "Continuation evidence collector references nonexistent drift_id; verify canonical drift-event identity before repairing behavior."
+  },
+  "limitations": ["No full build success, runtime restart, deployment or live capacity proof."],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

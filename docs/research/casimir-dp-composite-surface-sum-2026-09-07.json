@@ -1,0 +1,333 @@
+{
+  "status": "conditional one-phonon Born sum; neither inclusive rate nor accepted events",
+  "initial_state": "ground state",
+  "speed_kms": 776.0,
+  "mass_GeV": 100000.0,
+  "N": 10000.0,
+  "rows": [
+    {
+      "gap2_keV": 28.0,
+      "mediator_eV": 0.001,
+      "modes": [
+        {
+          "ell": 2,
+          "gap_keV": 28.0,
+          "epsilon": 0.2958156583642543,
+          "epsilon_qR_at_window_top": 0.314262506360963,
+          "angular_scale_over_constituent_scale": 0.0928317766722556,
+          "raw_full": 1.6709632181470353e-16,
+          "raw_high": 4.606711103357178e-19
+        },
+        {
+          "ell": 3,
+          "gap_keV": 54.22176684690383,
+          "epsilon": 0.2603508328536449,
+          "epsilon_qR_at_window_top": 0.2765861202823919,
+          "angular_scale_over_constituent_scale": 0.1392476650083834,
+          "raw_full": 3.9729814136405247e-19,
+          "raw_high": 9.383676160816747e-21
+        },
+        {
+          "ell": 4,
+          "gap_keV": 84.0,
+          "epsilon": 0.2415324736392979,
+          "epsilon_qR_at_window_top": 0.256594261957504,
+          "angular_scale_over_constituent_scale": 0.1856635533445112,
+          "raw_full": 1.350754423889989e-21,
+          "raw_high": 1.171135187253874e-22
+        },
+        {
+          "ell": 5,
+          "gap_keV": 117.13240371477058,
+          "epsilon": 0.22868182574979873,
+          "epsilon_qR_at_window_top": 0.24294225706889386,
+          "angular_scale_over_constituent_scale": 0.23207944168063901,
+          "raw_full": 6.042405531145827e-24,
+          "raw_high": 9.665271005652974e-25
+        },
+        {
+          "ell": 6,
+          "gap_keV": 153.3623161014465,
+          "epsilon": 0.218928082054949,
+          "epsilon_qR_at_window_top": 0.23258027705439605,
+          "angular_scale_over_constituent_scale": 0.2784953300167668,
+          "raw_full": 2.539035306553811e-26,
+          "raw_high": 5.6470907357379204e-27
+        },
+        {
+          "ell": 7,
+          "gap_keV": 192.46817918814529,
+          "epsilon": 0.211083714354143,
+          "epsilon_qR_at_window_top": 0.22424674032377187,
+          "angular_scale_over_constituent_scale": 0.3249112183528946,
+          "raw_full": 8.747750500027148e-29,
+          "raw_high": 2.4581877696391175e-29
+        },
+        {
+          "ell": 8,
+          "gap_keV": 234.26480742954115,
+          "epsilon": 0.20453924303812468,
+          "epsilon_qR_at_window_top": 0.21729416056531015,
+          "angular_scale_over_constituent_scale": 0.3713271066890224,
+          "raw_full": 2.4376347864227765e-31,
+          "raw_high": 8.286567560318093e-32
+        },
+        {
+          "ell": 9,
+          "gap_keV": 278.5964823898536,
+          "epsilon": 0.19893839827136553,
+          "epsilon_qR_at_window_top": 0.21134405121723412,
+          "angular_scale_over_constituent_scale": 0.4177429950251502,
+          "raw_full": 5.5782679922352585e-34,
+          "raw_high": 2.2293233485395155e-34
+        },
+        {
+          "ell": 10,
+          "gap_keV": 325.330601081423,
+          "epsilon": 0.19405405341981188,
+          "epsilon_qR_at_window_top": 0.20615512219478724,
+          "angular_scale_over_constituent_scale": 0.46415888336127803,
+          "raw_full": 1.0613541139945004e-36,
+          "raw_high": 4.902938625759666e-37
+        },
+        {
+          "ell": 11,
+          "gap_keV": 374.3527747993863,
+          "epsilon": 0.18973217742452833,
+          "epsilon_qR_at_window_top": 0.20156373717490889,
+          "angular_scale_over_constituent_scale": 0.5105747716974058,
+          "raw_full": 7.767721361081342e-40,
+          "raw_high": 7.767721361081342e-40
+        }
+      ],
+      "one_phonon_raw_full": 1.6749497677837507e-16,
+      "one_phonon_raw_high": 4.701728722141162e-19,
+      "elastic_raw_full": 4.511189387002708e-11,
+      "elastic_raw_high": 3.959443392645652e-16,
+      "one_phonon_over_elastic_full": 3.7128784098701044e-06,
+      "one_phonon_over_elastic_high": 0.0011874721408757214
+    },
+    {
+      "gap2_keV": 28.0,
+      "mediator_eV": 0.01,
+      "modes": [
+        {
+          "ell": 2,
+          "gap_keV": 28.0,
+          "epsilon": 0.2958156583642543,
+          "epsilon_qR_at_window_top": 0.314262506360963,
+          "angular_scale_over_constituent_scale": 0.0928317766722556,
+          "raw_full": 1.670963218147035e-09,
+          "raw_high": 4.6067111033571784e-12
+        },
+        {
+          "ell": 3,
+          "gap_keV": 54.22176684690383,
+          "epsilon": 0.2603508328536449,
+          "epsilon_qR_at_window_top": 0.2765861202823919,
+          "angular_scale_over_constituent_scale": 0.1392476650083834,
+          "raw_full": 3.972981413640524e-12,
+          "raw_high": 9.383676160816746e-14
+        },
+        {
+          "ell": 4,
+          "gap_keV": 84.0,
+          "epsilon": 0.2415324736392979,
+          "epsilon_qR_at_window_top": 0.256594261957504,
+          "angular_scale_over_constituent_scale": 0.1856635533445112,
+          "raw_full": 1.3507544238899889e-14,
+          "raw_high": 1.1711351872538738e-15
+        },
+        {
+          "ell": 5,
+          "gap_keV": 117.13240371477058,
+          "epsilon": 0.22868182574979873,
+          "epsilon_qR_at_window_top": 0.24294225706889386,
+          "angular_scale_over_constituent_scale": 0.23207944168063901,
+          "raw_full": 6.042405531145826e-17,
+          "raw_high": 9.665271005652973e-18
+        },
+        {
+          "ell": 6,
+          "gap_keV": 153.3623161014465,
+          "epsilon": 0.218928082054949,
+          "epsilon_qR_at_window_top": 0.23258027705439605,
+          "angular_scale_over_constituent_scale": 0.2784953300167668,
+          "raw_full": 2.539035306553811e-19,
+          "raw_high": 5.64709073573792e-20
+        },
+        {
+          "ell": 7,
+          "gap_keV": 192.46817918814529,
+          "epsilon": 0.211083714354143,
+          "epsilon_qR_at_window_top": 0.22424674032377187,
+          "angular_scale_over_constituent_scale": 0.3249112183528946,
+          "raw_full": 8.747750500027147e-22,
+          "raw_high": 2.458187769639117e-22
+        },
+        {
+          "ell": 8,
+          "gap_keV": 234.26480742954115,
+          "epsilon": 0.20453924303812468,
+          "epsilon_qR_at_window_top": 0.21729416056531015,
+          "angular_scale_over_constituent_scale": 0.3713271066890224,
+          "raw_full": 2.4376347864227767e-24,
+          "raw_high": 8.286567560318092e-25
+        },
+        {
+          "ell": 9,
+          "gap_keV": 278.5964823898536,
+          "epsilon": 0.19893839827136553,
+          "epsilon_qR_at_window_top": 0.21134405121723412,
+          "angular_scale_over_constituent_scale": 0.4177429950251502,
+          "raw_full": 5.578267992235259e-27,
+          "raw_high": 2.2293233485395154e-27
+        },
+        {
+          "ell": 10,
+          "gap_keV": 325.330601081423,
+          "epsilon": 0.19405405341981188,
+          "epsilon_qR_at_window_top": 0.20615512219478724,
+          "angular_scale_over_constituent_scale": 0.46415888336127803,
+          "raw_full": 1.0613541139945002e-29,
+          "raw_high": 4.902938625759666e-30
+        },
+        {
+          "ell": 11,
+          "gap_keV": 374.3527747993863,
+          "epsilon": 0.18973217742452833,
+          "epsilon_qR_at_window_top": 0.20156373717490889,
+          "angular_scale_over_constituent_scale": 0.5105747716974058,
+          "raw_full": 7.767721361081341e-33,
+          "raw_high": 7.767721361081341e-33
+        }
+      ],
+      "one_phonon_raw_full": 1.6749497677837506e-09,
+      "one_phonon_raw_high": 4.701728722141162e-12,
+      "elastic_raw_full": 0.00045111893870027075,
+      "elastic_raw_high": 3.959443392645651e-09,
+      "one_phonon_over_elastic_full": 3.712878409870105e-06,
+      "one_phonon_over_elastic_high": 0.0011874721408757216
+    },
+    {
+      "gap2_keV": 100.0,
+      "mediator_eV": 0.001,
+      "modes": [
+        {
+          "ell": 2,
+          "gap_keV": 99.99999999999999,
+          "epsilon": 0.15653093319013214,
+          "epsilon_qR_at_window_top": 0.16629208764459236,
+          "angular_scale_over_constituent_scale": 0.0928317766722556,
+          "raw_full": 4.284722991576942e-17,
+          "raw_high": 1.2898791089400097e-19
+        },
+        {
+          "ell": 3,
+          "gap_keV": 193.6491673103708,
+          "epsilon": 0.13776471147185781,
+          "epsilon_qR_at_window_top": 0.14635561807188135,
+          "angular_scale_over_constituent_scale": 0.1392476650083834,
+          "raw_full": 5.978999833204502e-20,
+          "raw_high": 2.6274293250286886e-21
+        },
+        {
+          "ell": 4,
+          "gap_keV": 300.0,
+          "epsilon": 0.12780697175916922,
+          "epsilon_qR_at_window_top": 0.13577692099714345,
+          "angular_scale_over_constituent_scale": 0.1856635533445112,
+          "raw_full": 2.382286290279957e-22,
+          "raw_high": 3.279178524310846e-23
+        }
+      ],
+      "one_phonon_raw_full": 4.29072581427305e-17,
+      "one_phonon_raw_high": 1.3164813200427276e-19,
+      "elastic_raw_full": 4.511189387002708e-11,
+      "elastic_raw_high": 3.959443392645652e-16,
+      "one_phonon_over_elastic_full": 9.511296126549594e-07,
+      "one_phonon_over_elastic_high": 0.0003324915119352346
+    },
+    {
+      "gap2_keV": 100.0,
+      "mediator_eV": 0.01,
+      "modes": [
+        {
+          "ell": 2,
+          "gap_keV": 99.99999999999999,
+          "epsilon": 0.15653093319013214,
+          "epsilon_qR_at_window_top": 0.16629208764459236,
+          "angular_scale_over_constituent_scale": 0.0928317766722556,
+          "raw_full": 4.284722991576942e-10,
+          "raw_high": 1.2898791089400096e-12
+        },
+        {
+          "ell": 3,
+          "gap_keV": 193.6491673103708,
+          "epsilon": 0.13776471147185781,
+          "epsilon_qR_at_window_top": 0.14635561807188135,
+          "angular_scale_over_constituent_scale": 0.1392476650083834,
+          "raw_full": 5.978999833204501e-13,
+          "raw_high": 2.6274293250286883e-14
+        },
+        {
+          "ell": 4,
+          "gap_keV": 300.0,
+          "epsilon": 0.12780697175916922,
+          "epsilon_qR_at_window_top": 0.13577692099714345,
+          "angular_scale_over_constituent_scale": 0.1856635533445112,
+          "raw_full": 2.3822862902799567e-15,
+          "raw_high": 3.2791785243108457e-16
+        }
+      ],
+      "one_phonon_raw_full": 4.2907258142730497e-10,
+      "one_phonon_raw_high": 1.3164813200427276e-12,
+      "elastic_raw_full": 0.00045111893870027075,
+      "elastic_raw_high": 3.959443392645651e-09,
+      "one_phonon_over_elastic_full": 9.511296126549596e-07,
+      "one_phonon_over_elastic_high": 0.0003324915119352347
+    },
+    {
+      "gap2_keV": 248.0,
+      "mediator_eV": 0.001,
+      "modes": [
+        {
+          "ell": 2,
+          "gap_keV": 248.0,
+          "epsilon": 0.09939724197302557,
+          "epsilon_qR_at_window_top": 0.1055955812499502,
+          "angular_scale_over_constituent_scale": 0.0928317766722556,
+          "raw_full": 1.0365478399616826e-18,
+          "raw_high": 5.2011254392742323e-20
+        }
+      ],
+      "one_phonon_raw_full": 1.0365478399616826e-18,
+      "one_phonon_raw_high": 5.2011254392742323e-20,
+      "elastic_raw_full": 4.511189387002708e-11,
+      "elastic_raw_high": 3.959443392645652e-16,
+      "one_phonon_over_elastic_full": 2.2977262780146285e-08,
+      "one_phonon_over_elastic_high": 0.0001313600151206835
+    },
+    {
+      "gap2_keV": 248.0,
+      "mediator_eV": 0.01,
+      "modes": [
+        {
+          "ell": 2,
+          "gap_keV": 248.0,
+          "epsilon": 0.09939724197302557,
+          "epsilon_qR_at_window_top": 0.1055955812499502,
+          "angular_scale_over_constituent_scale": 0.0928317766722556,
+          "raw_full": 1.0365478399616826e-11,
+          "raw_high": 5.201125439274232e-13
+        }
+      ],
+      "one_phonon_raw_full": 1.0365478399616826e-11,
+      "one_phonon_raw_high": 5.201125439274232e-13,
+      "elastic_raw_full": 0.00045111893870027075,
+      "elastic_raw_high": 3.959443392645651e-09,
+      "one_phonon_over_elastic_full": 2.2977262780146288e-08,
+      "one_phonon_over_elastic_high": 0.00013136001512068353
+    }
+  ]
+}

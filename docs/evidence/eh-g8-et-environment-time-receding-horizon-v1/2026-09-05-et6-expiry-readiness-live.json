@@ -1,0 +1,30 @@
+{
+  "scope": "Packaged live read-only expired-run regression",
+  "package": "apps/desktop/release-et6-expiry-readiness-20260905-2118/win-unpacked/CasimirBot.exe",
+  "normal_previous_host_close": true,
+  "previous_host_and_service_exit_verified": true,
+  "host_pid": 24236,
+  "service_pid": 32224,
+  "ready_at": "2026-09-05T21:20:54.144Z",
+  "origin": "http://127.0.0.1:58816",
+  "service_instance_ref": "service_instance:33bd5202b5de4bd95ae9e358e114e828",
+  "same_continuation_presence_verified": true,
+  "transport_recovered_with_existing_trusted_device_delegation": true,
+  "manual_plugin_reconnect": false,
+  "run_id": "run_c7929dcb-70ca-4dcf-89f4-f21e0bbb0958",
+  "run_expires_at": "2026-09-05T20:55:53.974Z",
+  "observed_projection": {
+    "recommended_next_action": { "operation": "none", "reason": "run_expired" },
+    "summary": "The run budget has expired; this run is not ready for continuation. Stored lifecycle status is unchanged.",
+    "lifecycle_status": "waiting",
+    "version": 1,
+    "steps_used": 0,
+    "terminal_authority_status": "not_evaluated",
+    "terminal_eligible": false
+  },
+  "result": "readiness contradiction repaired in packaged MCP observation",
+  "minecraft_and_fabric_preserved": true,
+  "movement_dispatched": false,
+  "et6_capacity_qualified": false,
+  "independent_external_task_binding_proven": false
+}

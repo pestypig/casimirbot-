@@ -1,0 +1,33 @@
+{
+  "status": "conditional_two_operator_forward_fit",
+  "motion_input_sha256": "068933261a1bf35fb4711c4320c8b5e4d66b858f3c8d461106267a96f28112b5",
+  "rows": [
+    {
+      "momentum_GeV": 3e-06,
+      "c0_without_couplings_GeV_minus3": 0.6062956603520236,
+      "c2_without_couplings_GeV_minus3": 0.8072677154842466,
+      "c0_conditional_GeV_minus3": 8.827485995238288e-10,
+      "c2_conditional_GeV_minus3": 1.1753579843714624e-09
+    },
+    {
+      "momentum_GeV": 3e-05,
+      "c0_without_couplings_GeV_minus3": 0.6062956041448584,
+      "c2_without_couplings_GeV_minus3": 0.8072677904271337,
+      "c0_conditional_GeV_minus3": 8.827485176878539e-10,
+      "c2_conditional_GeV_minus3": 1.1753580934860958e-09
+    },
+    {
+      "momentum_GeV": 0.0001,
+      "c0_without_couplings_GeV_minus3": 0.6062950278722369,
+      "c2_without_couplings_GeV_minus3": 0.807268558790629,
+      "c0_conditional_GeV_minus3": 8.827476786519134e-10,
+      "c2_conditional_GeV_minus3": 1.175359212200683e-09
+    }
+  ],
+  "limitations": [
+    "two-operator ansatz does not exclude higher-derivative operators",
+    "on-shell forward only; no bound-state or nonforward matching",
+    "spin-dependent operator remains separate",
+    "candidate diagram completion remains conditional"
+  ]
+}

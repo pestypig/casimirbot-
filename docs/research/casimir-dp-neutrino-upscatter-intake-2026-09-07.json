@@ -1,0 +1,228 @@
+{
+  "scope": "Free-nucleus exact kinematics only; no neutrino flux, detector fit, local decoherence rate or new-particle stability assumption",
+  "full_model_admitted": false,
+  "checks": {
+    "fixed_recoil_inverse_matches_endpoint": true,
+    "elastic_limit": true,
+    "asymptotic_low_recoil_tail": true,
+    "production_threshold_below_fixed_recoil": true
+  },
+  "rows": [
+    {
+      "target": "Xe131",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0041013956940854,
+      "incident_for_248keV_GeV": 2.1584661902900715,
+      "E_nu_GeV": 5.0,
+      "recoil_min_keV": 41.89076393815947,
+      "recoil_max_keV": 371113.3668179678
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0041013956940854,
+      "incident_for_248keV_GeV": 2.1584661902900715,
+      "E_nu_GeV": 10.0,
+      "recoil_min_keV": 10.309339613980638,
+      "recoil_max_keV": 1401711.6609162893
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0041013956940854,
+      "incident_for_248keV_GeV": 2.1584661902900715,
+      "E_nu_GeV": 100.0,
+      "recoil_min_keV": 0.10254422547710569,
+      "recoil_max_keV": 62123565.88076219
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0041013956940854,
+      "incident_for_248keV_GeV": 2.1584661902900715,
+      "E_nu_GeV": 1000.0,
+      "recoil_min_keV": 0.0010253536415802907,
+      "recoil_max_keV": 942542832.2942946
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.0164055827763416,
+      "incident_for_248keV_GeV": 8.264641319899324,
+      "E_nu_GeV": 5.0,
+      "recoil_min_keV": 717.3199991073732,
+      "recoil_max_keV": 346762.33676490636
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.0164055827763416,
+      "incident_for_248keV_GeV": 8.264641319899324,
+      "E_nu_GeV": 10.0,
+      "recoil_min_keV": 167.70501392497857,
+      "recoil_max_keV": 1378679.9776638574
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.0164055827763416,
+      "incident_for_248keV_GeV": 8.264641319899324,
+      "E_nu_GeV": 100.0,
+      "recoil_min_keV": 1.6411557933164338,
+      "recoil_max_keV": 62106600.46352266
+    },
+    {
+      "target": "Xe131",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.0164055827763416,
+      "incident_for_248keV_GeV": 8.264641319899324,
+      "E_nu_GeV": 1000.0,
+      "recoil_min_keV": 0.016405884736496602,
+      "recoil_max_keV": 942529821.1814548
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0447432768947698,
+      "incident_for_248keV_GeV": 6.775717203725966,
+      "E_nu_GeV": 5.0,
+      "recoil_min_keV": 460.8641143830038,
+      "recoil_max_keV": 2292473.295196739
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0447432768947698,
+      "incident_for_248keV_GeV": 6.775717203725966,
+      "E_nu_GeV": 10.0,
+      "recoil_min_keV": 112.9301170701549,
+      "recoil_max_keV": 6354530.3273882745
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0447432768947698,
+      "incident_for_248keV_GeV": 6.775717203725966,
+      "E_nu_GeV": 100.0,
+      "recoil_min_keV": 1.1191386318222296,
+      "recoil_max_keV": 94661129.65353054
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0447432768947698,
+      "incident_for_248keV_GeV": 6.775717203725966,
+      "E_nu_GeV": 1000.0,
+      "recoil_min_keV": 0.011186325329832597,
+      "recoil_max_keV": 994398622.4084442
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.178973107579079,
+      "incident_for_248keV_GeV": 26.990821903869026,
+      "E_nu_GeV": 5.0,
+      "recoil_min_keV": 8128.092409466117,
+      "recoil_max_keV": 2079737.5260292892
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.178973107579079,
+      "incident_for_248keV_GeV": 26.990821903869026,
+      "E_nu_GeV": 10.0,
+      "recoil_min_keV": 1860.7897229820296,
+      "recoil_max_keV": 6170436.948869482
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.178973107579079,
+      "incident_for_248keV_GeV": 26.990821903869026,
+      "E_nu_GeV": 100.0,
+      "recoil_min_keV": 17.93299599292803,
+      "recoil_max_keV": 94519779.89085719
+    },
+    {
+      "target": "C12",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.178973107579079,
+      "incident_for_248keV_GeV": 26.990821903869026,
+      "E_nu_GeV": 1000.0,
+      "recoil_min_keV": 0.17900550279341518,
+      "recoil_max_keV": 994263646.57723
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0412899565546154,
+      "incident_for_248keV_GeV": 6.511136687543616,
+      "E_nu_GeV": 5.0,
+      "recoil_min_keV": 424.98876052897407,
+      "recoil_max_keV": 2197143.4423878873
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0412899565546154,
+      "incident_for_248keV_GeV": 6.511136687543616,
+      "E_nu_GeV": 10.0,
+      "recoil_min_keV": 104.17767131436797,
+      "recoil_max_keV": 6171723.780445752
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0412899565546154,
+      "incident_for_248keV_GeV": 6.511136687543616,
+      "E_nu_GeV": 100.0,
+      "recoil_min_keV": 1.032726974044,
+      "recoil_max_keV": 94247280.0765642
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 1.0,
+      "production_threshold_GeV": 1.0412899565546154,
+      "incident_for_248keV_GeV": 6.511136687543616,
+      "E_nu_GeV": 1000.0,
+      "recoil_min_keV": 0.010322920533161644,
+      "recoil_max_keV": 993940159.6246637
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.1651598262184613,
+      "incident_for_248keV_GeV": 25.927923639714923,
+      "E_nu_GeV": 5.0,
+      "recoil_min_keV": 7476.152500710859,
+      "recoil_max_keV": 1998378.215417101
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.1651598262184613,
+      "incident_for_248keV_GeV": 25.927923639714923,
+      "E_nu_GeV": 10.0,
+      "recoil_min_keV": 1714.6836525134208,
+      "recoil_max_keV": 5999528.232509943
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.1651598262184613,
+      "incident_for_248keV_GeV": 25.927923639714923,
+      "E_nu_GeV": 100.0,
+      "recoil_min_keV": 16.54662322433395,
+      "recoil_max_keV": 94116322.87337865
+    },
+    {
+      "target": "C13",
+      "mchi_GeV": 2.0,
+      "production_threshold_GeV": 2.1651598262184613,
+      "incident_for_248keV_GeV": 25.927923639714923,
+      "E_nu_GeV": 1000.0,
+      "recoil_min_keV": 0.16518743894950177,
+      "recoil_max_keV": 993815544.1138618
+    }
+  ]
+}

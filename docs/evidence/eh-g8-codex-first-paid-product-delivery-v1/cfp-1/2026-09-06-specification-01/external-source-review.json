@@ -1,0 +1,41 @@
+{
+  "captured_utc": "2026-09-07T03:02:41.744Z",
+  "sources": [
+    {
+      "url": "https://learn.chatgpt.com/docs/auth",
+      "topic": "External client authentication",
+      "finding": "Official documentation distinguishes ChatGPT sign-in from usage-based API-key access. Client/workspace and plugin support must be tested for the selected profile; no assumption that harness purchase supplies either.",
+      "use": "Casimir Mode A does not collect or resell client credentials."
+    },
+    {
+      "url": "https://learn.chatgpt.com/docs/extend/mcp?surface=cli",
+      "topic": "MCP transport",
+      "finding": "Official documentation describes STDIO and Streamable HTTP with OAuth. This establishes protocol options, not acceptance of Casimir profile-native setup or exact continuation.",
+      "use": "No inference that Casimir can create or steer arbitrary provider chats."
+    },
+    {
+      "url": "https://learn.chatgpt.com/docs/app",
+      "topic": "Client identity",
+      "finding": "Current official pages redirect legacy Codex app links to ChatGPT desktop app documentation; preserve exact executable/product build in future evidence rather than treating a name as compatibility proof.",
+      "use": "Version/build capture is a prerequisite to acceptance."
+    },
+    {
+      "url": "https://www.minecraft.net/en-us/eula",
+      "topic": "Minecraft-dependent commercial scope",
+      "finding": "Using mods section includes tools/plugins within Mods and restricts sale/monetization; actual external harness and connector design needs commercial classification/permission review.",
+      "use": "Unresolved rights dependency; no paid Minecraft clearance inferred."
+    },
+    {
+      "url": "https://www.minecraft.net/en-us/usage-guidelines",
+      "topic": "Minecraft additional permissions",
+      "finding": "Extended functionality and modifications restricts direct or indirect verification of out-of-game product access affecting in-game functions. This requires review of the proposed software admission relationship; no commercial permission is inferred.",
+      "use": "Rights reviewer must match the actual offering and branding."
+    }
+  ],
+  "not_performed": [
+    "No provider login or API operation",
+    "No EULA acceptance on behalf of user",
+    "No external contact",
+    "No license or repository visibility change"
+  ]
+}

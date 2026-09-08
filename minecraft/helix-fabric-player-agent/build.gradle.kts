@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.casimirbot"
-version = "0.4.0"
+version = "0.4.12"
 
 base {
     archivesName.set("HelixFabricPlayerAgent")
@@ -53,4 +53,7 @@ tasks.processResources {
 
 tasks.test {
     useJUnitPlatform()
+    // An opt-in broker run must execute against its current ephemeral endpoint,
+    // never reuse an earlier successful Gradle test output.
+    inputs.property("brokerFixtureOrigin", System.getenv("HELIX_NATIVE_BROKER_FIXTURE_ORIGIN") ?: "")
 }

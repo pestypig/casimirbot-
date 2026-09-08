@@ -1,0 +1,45 @@
+{
+  "status": "fixed_product_range_scan_not_refitted_or_allowed_model",
+  "rows": [
+    {
+      "light_mass_eV": 1000.0,
+      "conditional_neutral_elastic_D_upper": 1.3324836260724682e-06
+    },
+    {
+      "light_mass_eV": 100.0,
+      "conditional_neutral_elastic_D_upper": 4.935024444826456e-06
+    },
+    {
+      "light_mass_eV": 10.0,
+      "conditional_neutral_elastic_D_upper": 8.661269043479119e-06
+    },
+    {
+      "light_mass_eV": 1.0,
+      "conditional_neutral_elastic_D_upper": 1.2183335750113133e-05
+    },
+    {
+      "light_mass_eV": 0.1,
+      "conditional_neutral_elastic_D_upper": 1.3229669301534776e-05
+    },
+    {
+      "light_mass_eV": 0.01,
+      "conditional_neutral_elastic_D_upper": 1.3268095237673243e-05
+    },
+    {
+      "light_mass_eV": 0.0,
+      "conditional_neutral_elastic_D_upper": 1.3268785371497805e-05
+    }
+  ],
+  "uniform_nonnegative_light_mass_envelope": 1.3268785387196561e-05,
+  "comparator_over_uniform_envelope": 2224.127066718632,
+  "assumptions": [
+    "leading pair products unchanged; heavy mediator 1 GeV",
+    "same neutral arbitrary-cell rms bound 0.1 nm",
+    "q<=qBZ only; Born elastic maximal positional coherence"
+  ],
+  "limitations": [
+    "new mediator masses require their own external constraints and complete xenon normalization",
+    "massless endpoint is a formal limiting kernel, not a UV completion",
+    "no total inelastic or nonneutral bound"
+  ]
+}

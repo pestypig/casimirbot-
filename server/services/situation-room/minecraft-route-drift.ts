@@ -82,7 +82,9 @@ export function reduceMinecraftRouteDrift(input: {
   const route = input.routeRehearsal;
   if (!route) return null;
   const waypoint = route.candidate_next_waypoint;
-  if (!waypoint || typeof waypoint.x !== "number" || typeof waypoint.z !== "number") return null;
+  if (!waypoint || typeof waypoint.x !== "number" || typeof waypoint.z !== "number" ||
+      !Number.isFinite(waypoint.x) || !Number.isFinite(waypoint.z)) return null;
+  const waypointPosition = { x: waypoint.x, z: waypoint.z };
   const key = keyFor(event.room_id, event.world_id, event.actor_label ?? route.actor_label ?? null);
   const existing = stateByKey.get(key);
   const nextSample: RouteSample = {
@@ -131,7 +133,7 @@ export function reduceMinecraftRouteDrift(input: {
     context_role: "tool_evidence",
     current_position: current.position,
     next_waypoint_label: waypoint.label,
-    expected_direction: waypoint.expected_direction ?? directionBetween(current.position, waypoint),
+    expected_direction: waypoint.expected_direction ?? directionBetween(current.position, waypointPosition),
     observed_direction: directionBetween(previous.position, current.position),
     heading_error_degrees: error,
     distance_delta_blocks: distanceDelta,

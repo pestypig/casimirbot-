@@ -1,0 +1,75 @@
+{
+  "scope": "Unmodified library loop mass 173 GeV; common v/MW/scale, up-aligned qu probe, all four external indices rotated, SM subtraction and H=-L. Tests only these probes, not full model.",
+  "probe_amplitude_GeV_minus2": 1e-06,
+  "rows": [
+    {
+      "operator": "qu1",
+      "scale_GeV": 80.379,
+      "library_H_real": -3.2849546219413676e-13,
+      "library_H_imag": 1.4929871870147397e-13,
+      "selected_H_real": -3.2849546219286166e-13,
+      "selected_H_imag": 1.4929871870147776e-13,
+      "ratio_real": 1.0000000000032128,
+      "ratio_imag": 1.471683591645657e-12,
+      "relative_difference": 3.533794162855971e-12
+    },
+    {
+      "operator": "qu1",
+      "scale_GeV": 173.0,
+      "library_H_real": -4.7881193814841735e-15,
+      "library_H_imag": 2.1761642729347675e-15,
+      "selected_H_real": -4.788119381487258e-15,
+      "selected_H_imag": 2.1761642729361697e-15,
+      "ratio_real": 0.9999999999993558,
+      "ratio_imag": 6.8273994689236e-17,
+      "relative_difference": 6.441514025057167e-13
+    },
+    {
+      "operator": "qu1",
+      "scale_GeV": 300.0,
+      "library_H_real": 2.276827949886414e-13,
+      "library_H_imag": -1.0348011914155301e-13,
+      "selected_H_real": 2.2768279500876386e-13,
+      "selected_H_imag": -1.0348011914156157e-13,
+      "ratio_real": 0.999999999926737,
+      "ratio_imag": -3.325986060545989e-11,
+      "relative_difference": 8.045917197557708e-11
+    },
+    {
+      "operator": "qu8",
+      "scale_GeV": 80.379,
+      "library_H_real": -1.0949848739761237e-13,
+      "library_H_imag": 4.976623956715962e-14,
+      "selected_H_real": -1.0949848739762058e-13,
+      "selected_H_imag": 4.9766239567159273e-14,
+      "ratio_real": 0.999999999999939,
+      "ratio_imag": -3.085777903459214e-14,
+      "relative_difference": 6.831732341379134e-14
+    },
+    {
+      "operator": "qu8",
+      "scale_GeV": 173.0,
+      "library_H_real": -1.5960397938328247e-15,
+      "library_H_imag": 7.253880909804224e-16,
+      "selected_H_real": -1.5960397938290863e-15,
+      "selected_H_imag": 7.253880909787234e-16,
+      "ratio_real": 1.0000000000023423,
+      "ratio_imag": 5.120549601692699e-17,
+      "relative_difference": 2.3423485379138504e-12
+    },
+    {
+      "operator": "qu8",
+      "scale_GeV": 300.0,
+      "library_H_real": 7.589426499280438e-14,
+      "library_H_imag": -3.4493373047186515e-14,
+      "selected_H_real": 7.589426500292131e-14,
+      "selected_H_imag": -3.44933730471872e-14,
+      "ratio_real": 0.9999999998895149,
+      "ratio_imag": -5.0205503278701365e-11,
+      "relative_difference": 1.2135708577188462e-10
+    }
+  ],
+  "tree_rotation_relative_error": 1.1102230246251565e-16,
+  "all_qu_probes_agree": true,
+  "full_model_admitted": false
+}

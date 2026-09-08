@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-06",
+  "classification": "evidence normalization",
+  "findings": [
+    "Correlated timing auditor omitted native successor action identity equality",
+    "Native acceptance timing lacked successor action identity, although activation timing supplied it",
+    "Server delivery elapsed time was not checked against its enclosing native HTTP round trip"
+  ],
+  "negative_evidence": "After strengthening the auditor, the connected persistent fixture failed with identity_mismatch; one test passed and one failed",
+  "repair": "Carry validated successor action identity only during the synchronous controller queue callback, clear it in finally, and record it in native acceptance diagnostics",
+  "positive_evidence": {
+    "correlated_budget_unit_tests": 28,
+    "connected_persistent_native_tests_after_repair": 2,
+    "connected_persistent_native_failures_after_repair": 0
+  },
+  "limits": [
+    "Connected tests use fixture authority and controlled native ticks, not live Minecraft capacity",
+    "Full five-stage attribution remains incomplete",
+    "Native full regression and artifact refresh remain after this source change",
+    "No admission, replay, controller policy, resident identity or authority change"
+  ]
+}

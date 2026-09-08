@@ -1,0 +1,18 @@
+{
+  "status": "specified_vector_pair_spin_operator_not_complete_Majorana_match",
+  "max_matrix_error": 1.895011925157064e-14,
+  "rows": [
+    {
+      "sign": -1,
+      "spin_integral_GeV_minus2": -0.00042490292709598083,
+      "coordinate_relative_difference": 2.935429677108914e-13
+    },
+    {
+      "sign": 1,
+      "spin_integral_GeV_minus2": -0.00042391121518879583,
+      "coordinate_relative_difference": 3.6071146070071336e-13
+    }
+  ],
+  "conditional_sigma_dot_sigma_coefficient_GeV_minus2": -1.2358483564320065e-12,
+  "spin_convention": "Pauli sigma_chi dot sigma_e; coefficient for S_chi dot S_e is four times larger"
+}

@@ -1,0 +1,29 @@
+{
+  "scope": "Leading heavy-messenger CP-even local gluon operators only, yu=0; no light-quark integration or full DM two-loop matching",
+  "full_model_admitted": false,
+  "operator_convention": "L=(alpha_s/pi) G_a_munu G_a^munu (Kaa a^2 + Kh h_fluctuation)",
+  "Kaa_GeV_m2": 1.0660204064500963e-13,
+  "Kh_GeV_m1": 1.0255225259652396e-07,
+  "Kh_over_one_SM_heavy_quark_Higgs_coefficient": 0.00030298037507117036,
+  "mixing_suppression_of_Kaa": 0.9993941310469652,
+  "checks": {
+    "heavy_eigenvalue_derivative": true,
+    "zero_mixing_limit": true,
+    "positive_CP_even_threshold": true,
+    "decoupling_at_fixed_yukawas": true
+  },
+  "derivative_checks": [
+    {
+      "c2_over_M2": 0.0001,
+      "relative_derivative_error": -4.993609470092417e-05
+    },
+    {
+      "c2_over_M2": 1e-06,
+      "relative_derivative_error": -4.993938446215432e-07
+    },
+    {
+      "c2_over_M2": 1e-08,
+      "relative_derivative_error": -4.99394173622277e-09
+    }
+  ]
+}

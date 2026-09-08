@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "mass_eV": 0.001,
+      "inherited_residual_force_fraction": 1.0061448852948141e-13,
+      "linear_coupling_mismatch_fraction": 5.0307244264740704e-14,
+      "linear_mass_mismatch_fraction_at_r_equals_range": 2.0122897705896281e-13
+    },
+    {
+      "mass_eV": 0.01,
+      "inherited_residual_force_fraction": 6.479849494701313e-07,
+      "linear_coupling_mismatch_fraction": 3.2399247473506563e-07,
+      "linear_mass_mismatch_fraction_at_r_equals_range": 1.2959698989402625e-06
+    }
+  ],
+  "relative_mass_shift_demo": 1e-06,
+  "force_residuals_after_matching_at_one_range": {
+    "0.5": -3.333334583244499e-07,
+    "1.0": -0.0,
+    "2.0": 8.333330833721228e-07
+  },
+  "DM_static_amplitude_relative_to_scalar_for_gchiV_over_gchiS": {
+    "0": 1,
+    "1": 0,
+    "-1": 2
+  },
+  "scope": "Equal ordinary-charge scalar/vector cancellation toy. Inherited single-force ceilings only motivate relative precision; no two-mediator geometric likelihood or allowed model. DM ratios use equal mediator mass and matched ordinary couplings, leading static limit.",
+  "model_admitted": false
+}

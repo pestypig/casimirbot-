@@ -1,0 +1,43 @@
+{
+  "scope": "Only aa-gluon triangle and Higgs-gluon propagators acquire q dependence. Other scalar/box channels retain their contact approximations; raw counts, no fit or full momentum-dependent amplitude.",
+  "integral_reduction_max_relative_error": 0.0,
+  "rows": [
+    {
+      "yL": 0.05,
+      "Xe_contact": 1.3680750434164781,
+      "Xe_selected_q_dependent": 1.3680750436308113,
+      "delta_Xe": 2.1433330913788885e-10,
+      "relative_total_shift": 1.5666780135294094e-10,
+      "delta_high": 1.696540212221315e-12
+    },
+    {
+      "yL": 0.1,
+      "Xe_contact": 1.3680953280706039,
+      "Xe_selected_q_dependent": 1.3680953281164294,
+      "delta_Xe": 4.5825629506746613e-11,
+      "relative_total_shift": 3.349593304391554e-11,
+      "delta_high": 3.624572864145449e-13
+    },
+    {
+      "yL": 0.15,
+      "Xe_contact": 1.3681263233741705,
+      "Xe_selected_q_dependent": 1.3681263233796022,
+      "delta_Xe": 5.43154464786788e-12,
+      "relative_total_shift": 3.970060772218912e-12,
+      "delta_high": 4.23477220008148e-14
+    },
+    {
+      "yL": 0.2,
+      "Xe_contact": 1.3681693385252824,
+      "Xe_selected_q_dependent": 1.3681693385057248,
+      "delta_Xe": -1.95577597083369e-11,
+      "relative_total_shift": -1.4294838480606317e-11,
+      "delta_high": -1.5596489581425479e-13
+    }
+  ],
+  "checks": {
+    "analytic_u_integral_vs_double_quad": true,
+    "split_energy_integral": true
+  },
+  "full_model_admitted": false
+}

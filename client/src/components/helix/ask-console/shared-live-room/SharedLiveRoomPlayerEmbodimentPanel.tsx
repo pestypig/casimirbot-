@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ConnectionExpiryNotice from "../../../agent-access/ConnectionExpiryNotice";
 import { Copy, Gamepad2, KeyRound, Loader2, Power, RefreshCw, ShieldCheck, X } from "lucide-react";
 import type {
   HelixConnectorPairing,
@@ -1089,6 +1090,10 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
 
       {authority ? (
         <div className="mt-2 space-y-1 text-[9px] text-emerald-100/55">
+          {authority.expires_at && (authority.status === "active" || authority.status === "expired") ? (
+            <ConnectionExpiryNotice deadline={authority.expires_at} label="Minecraft action permission"
+              recovery="Refresh Player Embodiment authority here. If the server confirms expiry, review the capabilities and duration before activating a new finite lease, then pair the player client if requested. Keep the existing chat binding and environment run; an expired action lease does not require rebinding or chat-only mode." />
+          ) : null}
           <p>
             {authority.allowed_capability_ids.length} capabilities &middot; manual
             input {authority.manual_override_policy}s &middot; expires {authority.expires_at

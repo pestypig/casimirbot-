@@ -1,0 +1,17 @@
+{
+  "scope": "Root and successor real broker enqueue/retention/publication plus ordinary root lease in connected native fixture",
+  "verified": [
+    "Connected mode no longer preinserts action requests or retained plans",
+    "Root reaches admitted through enqueueEnvironmentAction and real retainTemporalAdmission",
+    "leasePendingEnvironmentActions returns exactly root and matching native arguments",
+    "Native start/checkpoint publication precedes real successor admission",
+    "Connected success and post-lease HTTP 503 cases pass",
+    "Targeted TypeScript passes"
+  ],
+  "limits": [
+    "Membership, catalog, authority, binding and preflight observations remain fixtures",
+    "Root lease is called directly; native root startup uses matching compiled fixture rather than polling root HTTP endpoint",
+    "Minimal pg-mem schema/transaction wrapper, no disk fault in this fixture",
+    "No live player, provider sampling or live timing claim"
+  ]
+}

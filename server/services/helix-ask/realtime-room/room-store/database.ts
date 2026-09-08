@@ -3,6 +3,7 @@ import {
   ensureDatabase,
   getPool,
   persistLocalDatabaseSnapshotIfEnabled,
+  requireLocalDatabaseSnapshotIfEnabled,
 } from "../../../../db/client";
 import type { Queryable } from "./types";
 
@@ -41,10 +42,13 @@ export const readSharedRealtimeRoomDatabase = async (): Promise<Queryable> => {
 
 export const withSharedRealtimeRoomTransaction = async <T>(
   run: (client: PoolClient) => Promise<T>,
+  options?: { requireLocalSnapshot?: boolean; snapshotTables?: readonly string[] },
 ): Promise<T> => {
   await ensureDatabase();
   const client = await getPool().connect();
-  const touchedTables = new Set<string>();
+  // Idempotent receipt retries may perform no SQL mutation after an earlier
+  // commit whose snapshot failed. Their acknowledged tables still need saving.
+  const touchedTables = new Set<string>(options?.snapshotTables ?? []);
   let mutationTableUnknown = false;
   const transactionClient = new Proxy(client, {
     get(target, property, receiver) {
@@ -63,7 +67,7 @@ export const withSharedRealtimeRoomTransaction = async <T>(
     await client.query("BEGIN");
     const result = await run(transactionClient);
     await client.query("COMMIT");
-    await persistLocalDatabaseSnapshotIfEnabled(
+    await (options?.requireLocalSnapshot ? requireLocalDatabaseSnapshotIfEnabled : persistLocalDatabaseSnapshotIfEnabled)(
       mutationTableUnknown ? undefined : [...touchedTables],
     );
     return result;

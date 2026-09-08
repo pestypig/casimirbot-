@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "scope": "Recorded serial rolling terminal evidence",
+  "changes": [
+    "Read the stored terminal producer epoch and resolve its retained plan chain for successful serial rolling results.",
+    "Validate completion, condition observations and checkpoints against each retained request graph using its local scheduler duration.",
+    "Check predecessor completion at its committed boundary, nonregressing absolute ticks, final resident tick correlation, cumulative mutation ceilings and the original wall-duration limit.",
+    "Preserve existing referenced terminal event, controls-release, identity, current-turn and required result postcondition checks. No synthetic per-plan result is persisted."
+  ],
+  "verification": {
+    "focused_tests": 70,
+    "focused_exit_code": 0,
+    "files": ["minecraft-environment-time-compiler.test.ts", "temporal-resident-effects.test.ts", "action-result-canonicalization.test.ts"],
+    "positive": "Two retained source plans with distinct origins in the same tick clock pass through the recorded-workflow evidence reader using mocked database rows.",
+    "negative": "Missing release, incomplete history, incorrect handoff duration, incorrect final resident tick and exceeded resident wall-duration limit are rejected.",
+    "fixture_failures_before_repair": "The initial fixture omitted required request postconditions and checkpoint elapsed fields, then omitted generated checkpoint IDs from satisfied IDs. Correcting the fixture produced the passing result.",
+    "typecheck": "tsconfig.et6-temporal.json remains failing in its wider dependency graph; no diagnostics matched action-broker, temporal-event-plan, compiler-test or resident-effects files in the filtered run. Not a clean typecheck."
+  },
+  "limitations": [
+    "No actual database transaction, production extension delivery or packaged live result was exercised.",
+    "The fixture does not prove world motion, checkpoint physical truth, three rolling cycles, or latency capacity.",
+    "Reactive rolling acceptance is not implemented by this serial branch.",
+    "No packaged build, deployment, or Minecraft action performed."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

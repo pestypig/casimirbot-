@@ -1,0 +1,109 @@
+{
+  "schema": "casimirbot.cfp0.local_distribution_inspection.v1",
+  "captured_utc": "2026-09-07T02:37:15.165Z",
+  "artifacts": [
+    {
+      "path": "apps/desktop/runtime/runtime-manifest.json",
+      "present": true,
+      "bytes": 1902,
+      "sha256": "86c484a0be31d523dddca47ba1ad3e3398eb68b24677bb331183f0db67e853b3",
+      "top_level_fields": [
+        "schemaVersion",
+        "generatedAt",
+        "sourceCommit",
+        "serverSha256",
+        "clientTreeSha256",
+        "codexMarketplaceTreeSha256",
+        "desktopLockfileSha256",
+        "releaseSliceManifestSha256",
+        "minecraftFabricLoopbackLifecycle",
+        "allowlist",
+        "tunnelClient",
+        "servicePackaging",
+        "requiredRuntimePackages",
+        "requiredDataAssets",
+        "dependencyClosureStatus",
+        "providerNeutralAgentBoundary"
+      ],
+      "selected_public_metadata": {
+        "sourceCommit": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+        "generatedAt": "2026-09-07T02:09:18.789Z"
+      }
+    },
+    {
+      "path": "apps/desktop/release/runtime-manifest.json",
+      "present": false
+    },
+    {
+      "path": "apps/desktop/release/release-manifest.json",
+      "present": false
+    },
+    {
+      "path": "apps/desktop/release/authenticode-receipt.json",
+      "present": false
+    },
+    {
+      "path": "apps/desktop/release/site-release-metadata.json",
+      "present": false
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/runtime-manifest.json",
+      "present": true,
+      "bytes": 1902,
+      "sha256": "bd1a8fa5ff8f97a0310a0b54fbe7c93c5d9ac7c03e817d8fba361bc18a096aad",
+      "top_level_fields": [
+        "schemaVersion",
+        "generatedAt",
+        "sourceCommit",
+        "serverSha256",
+        "clientTreeSha256",
+        "codexMarketplaceTreeSha256",
+        "desktopLockfileSha256",
+        "releaseSliceManifestSha256",
+        "minecraftFabricLoopbackLifecycle",
+        "allowlist",
+        "tunnelClient",
+        "servicePackaging",
+        "requiredRuntimePackages",
+        "requiredDataAssets",
+        "dependencyClosureStatus",
+        "providerNeutralAgentBoundary"
+      ],
+      "selected_public_metadata": {
+        "sourceCommit": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+        "generatedAt": "2026-09-04T21:31:56.669Z"
+      }
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+      "present": true,
+      "bytes": 225533440,
+      "sha256": "761fca984241f306709fc066d2f528409d8bd229c5fb0b4ef0f4f84231c848cb"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar",
+      "present": true,
+      "bytes": 64952581,
+      "sha256": "d1eff4c58e158b6ca8f086c9f6a5ca60c0ed7468007bf3517f29a2fa2813494d"
+    }
+  ],
+  "root_package_license_history": [
+    {
+      "commit": "515bc564dd0b7fb4e8ab8c0030eff81c39bd0c9d",
+      "root_package_license": "MIT"
+    },
+    {
+      "commit": "d4d99ae98d6a858d9b1c62c665d2fa3c81547b50",
+      "root_package_license": "MIT"
+    },
+    {
+      "commit": "cc3b9d8a72369226133424782117bfaf1804af6e",
+      "root_package_license": "MIT"
+    }
+  ],
+  "limits": [
+    "Read-only file presence/hash/selected metadata; no installed application launched.",
+    "No Authenticode verification, signed distribution acceptance, update network request or installer execution.",
+    "No correspondence to all current dirty source inferred from a build manifest."
+  ]
+}

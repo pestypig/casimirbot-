@@ -1,0 +1,27 @@
+{
+  "schema": "et6.native_checkpoint_timing_checkpoint.v1",
+  "date": "2026-09-05",
+  "classification": "evidence normalization",
+  "change": "FluidSequenceEngine records checkpoint id, node id, zero-based local tick index, scheduler elapsed ticks and monotonic elapsed nanoseconds when a checkpoint condition is satisfied. Records are emitted through existing workflow measurements and reset with each sequence.",
+  "authority": "Observation only. No successor admission, execution extension, permission or terminal authority is granted.",
+  "verification": {
+    "java": 21,
+    "gradle": "8.14.3",
+    "arguments": "test --tests *FluidSequenceEngineTest --no-daemon --max-workers=1 --offline",
+    "build_exit_code": 0,
+    "sequence_unit_tests": {"passed": 13, "failed": 0, "skipped": 0},
+    "attached_game_tests": {"passed": 5, "failed": 0},
+    "temporary_game_test_server_shutdown": "normal",
+    "assertions": [
+      "No checkpoint settlement before the checkpoint executes.",
+      "One settlement identifies the exact checkpoint and node.",
+      "Settlement reports tick index 3 and scheduler elapsed ticks 4 for the fixture.",
+      "Elapsed monotonic time is nonnegative and returned settlement list is immutable."
+    ]
+  },
+  "remaining": ["Production temporal admission", "Resident extension transport and watermarks", "Exact checkpoint revision and evidence linkage", "Original packaged ET6 capacity qualification"],
+  "packaged_exe_updated": false,
+  "live_player_agent_updated": false,
+  "live_rolling_capacity_proven": false,
+  "et6_complete": false
+}

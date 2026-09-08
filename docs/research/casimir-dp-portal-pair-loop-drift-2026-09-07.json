@@ -1,0 +1,57 @@
+{
+  "checks": {
+    "Feynman_parameter_vs_closed_form": true,
+    "logarithmic_hard_limit": true,
+    "subtraction_reference_cancels": true,
+    "within_Xe_drift_smaller_than_cross_scale": true
+  },
+  "q_soft_eV": 0.7141704424363171,
+  "q_hard_eV": 250000000.0,
+  "light_mass_eV_benchmark": 0.001176,
+  "bubble_log_difference": 39.347135277034326,
+  "within_Xe_log_difference": 3.911652566453732,
+  "Delta_lambda_max_for_diagnostic_10percent_drift": 0.40133460620600486,
+  "rows": [
+    {
+      "b_GeV": 100.0,
+      "lambda_threshold_shift": 0.00512937402950788,
+      "absolute_bubble_coefficient_difference_over_tree_C_soft_to_hard": 0.0012780791763755792,
+      "absolute_bubble_coefficient_difference_over_tree_C_Xe_window": 0.00012705884825415988,
+      "satisfies_declared_10percent_cross_scale_drift": true,
+      "tree_confinement_threshold_Hz": 9617756.963680308
+    },
+    {
+      "b_GeV": 30.0,
+      "lambda_threshold_shift": 0.05499582790603745,
+      "absolute_bubble_coefficient_difference_over_tree_C_soft_to_hard": 0.013703235917265534,
+      "absolute_bubble_coefficient_difference_over_tree_C_Xe_window": 0.0013622922626282947,
+      "satisfies_declared_10percent_cross_scale_drift": true,
+      "tree_confinement_threshold_Hz": 2937251.340018925
+    },
+    {
+      "b_GeV": 10.0,
+      "lambda_threshold_shift": 0.4933831834773661,
+      "absolute_bubble_coefficient_difference_over_tree_C_soft_to_hard": 0.12293561926830521,
+      "absolute_bubble_coefficient_difference_over_tree_C_Xe_window": 0.012221510593685333,
+      "satisfies_declared_10percent_cross_scale_drift": false,
+      "tree_confinement_threshold_Hz": 980649.5001815098
+    },
+    {
+      "b_GeV": 3.0,
+      "lambda_threshold_shift": 5.480039460920944,
+      "absolute_bubble_coefficient_difference_over_tree_C_soft_to_hard": 1.3654540067516736,
+      "absolute_bubble_coefficient_difference_over_tree_C_Xe_window": 0.1357451217802429,
+      "satisfies_declared_10percent_cross_scale_drift": false,
+      "tree_confinement_threshold_Hz": 294248.42022492544
+    },
+    {
+      "b_GeV": 2.8192133233569483,
+      "lambda_threshold_shift": 6.205381523244409,
+      "absolute_bubble_coefficient_difference_over_tree_C_soft_to_hard": 1.546186505546245,
+      "absolute_bubble_coefficient_difference_over_tree_C_Xe_window": 0.15371244615529114,
+      "satisfies_declared_10percent_cross_scale_drift": false,
+      "tree_confinement_threshold_Hz": 276516.93771053106
+    }
+  ],
+  "scope": "Vacuum Gaussian light bubble at two spacelike momenta, low-energy quadratic vertices. Finite momentum dependence only; does not fix counterterm/absolute amplitude. Medium occupations, full heavy matching, other diagrams and renormalization-group improvement absent."
+}

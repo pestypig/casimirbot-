@@ -1,0 +1,9 @@
+{
+  "scope": "Pre-live reliability regression; not ET6 live acceptance",
+  "server": { "files_passed": 19, "tests_passed": 204, "worker_count": 1 },
+  "native": { "tests_passed": 283, "failures": 0, "errors": 0, "skipped": 0, "game_tests_excluded": true },
+  "http_fault_coverage": "The production HTTP client completes a control GET while a successor POST is held open on an isolated concurrent loopback server; the production delivery lane rejects another task while pending.",
+  "server_bundle": { "command": "npm run build:server", "exit_code": 0, "warnings": 4 },
+  "warning_locations": ["server/routes/agi.demonstration.ts", "server/modules/halobank-solar/derived.ts", "server/modules/starsim/lanes/structure-mesa.ts", "server/modules/starsim/lanes/oscillation-gyre.ts"],
+  "limitations": ["No packaged deployment", "No process restart acceptance", "No measured live reaction latency", "No complete correlated timing budget", "No live rolling extension"]
+}

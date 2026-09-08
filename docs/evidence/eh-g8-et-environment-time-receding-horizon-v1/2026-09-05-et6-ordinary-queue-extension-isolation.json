@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-05",
+  "classification": "tool admission",
+  "first_divergence": "Ordinary pending-action polling did not distinguish admitted temporal successors from initial workflows.",
+  "repair": "Exclude temporal plans with a predecessor from ordinary work detection, candidate selection and queue-depth measurement. Preserve cancellation polling and the native active-envelope guard. Dedicated extension delivery remains required.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/actions/__tests__/temporal-ordinary-queue.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "tests_passed": 3,
+    "positive": "Finite and initial temporal rows reach the ordinary transaction boundary.",
+    "negative": "A successor-only queue returns no ordinary work and leaves the row admitted, using the actual detection SQL against pg-mem."
+  },
+  "limitations": [
+    "The test stops at the ordinary transaction boundary; it does not prove complete lease transactions or concurrency.",
+    "Dedicated successor delivery and runtime acceptance are not yet wired.",
+    "No production server restart, packaged build, or live Minecraft execution performed."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

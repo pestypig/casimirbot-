@@ -1,0 +1,86 @@
+{
+  "schema": "casimirbot.cfp1.owner_decisions.v1",
+  "captured_utc": "2026-09-07T03:18:13.896Z",
+  "authority": "Explicit user messages select product choices; agents prepare proposals. Canonical work program owns stage status.",
+  "decisions": [
+    {
+      "id": "D01",
+      "topic": "First technical pilot",
+      "state": "owner_selected",
+      "value": "Bounded Minecraft assistance through an existing supported Codex client",
+      "evidence": "User reply: Bounded Minecraft assistance first (recommended)",
+      "limit": "Exact task/thresholds still proposals. No commercial permission or product acceptance implied."
+    },
+    {
+      "id": "D02",
+      "topic": "Software term",
+      "state": "awaiting_owner",
+      "proposal": "Version license with 12 months of updates, paired with an explicit funded essential-hosting term; subscription alternative prepared",
+      "limit": "Do not promise perpetual hosted access; no price selected."
+    },
+    {
+      "id": "D03",
+      "topic": "First-party ownership",
+      "state": "awaiting_owner_and_provenance_review",
+      "proposal": "Review ownership and prior licensed material per component; future owned implementation may be private while existing terms and third-party obligations are retained."
+    },
+    {
+      "id": "D04",
+      "topic": "Useful trial",
+      "state": "proposal",
+      "proposal": "14 days, no automatic charge, same bounded capability envelope; initial compatibility/safety/recovery access remains available."
+    },
+    {
+      "id": "D05",
+      "topic": "Devices and sessions",
+      "state": "proposal",
+      "proposal": "Two registered Windows devices; one concurrent paid environment session; no new offline session until exclusive slot can be verified."
+    },
+    {
+      "id": "D06",
+      "topic": "Validation and revocation",
+      "state": "proposal",
+      "proposal": "24-hour refresh, maximum 72-hour cached validation bounded by paid term; known revoke prevails; connected recognition within60s and connector release within5s or stricter existing contract."
+    },
+    {
+      "id": "D07",
+      "topic": "Download and source boundary",
+      "state": "proposal",
+      "proposal": "Public binary-only release repository, forward-version migration before any source visibility change; exact repository/owner not created or selected."
+    },
+    {
+      "id": "D08",
+      "topic": "Minecraft commercial rights",
+      "state": "rights_review_required",
+      "proposal": "Review actual harness/connector/paywall offer against Minecraft EULA and Usage Guidelines; obtain documented permission basis or written permission where necessary.",
+      "limit": "A free connector does not itself establish permission for the paid offering. No external contact authorized or performed."
+    },
+    {
+      "id": "D09",
+      "topic": "G8 scope",
+      "state": "retained_existing_contract",
+      "value": "All12 product acceptance requirements and stricter unresolved federation/room/voice prerequisites remain. Bounded pilot is not G8 closure."
+    },
+    {
+      "id": "D10",
+      "topic": "Model payer",
+      "state": "selected_prior_direction",
+      "value": "External client account funds reasoning; no required second Codex runtime, Casimir API-key enrollment or inference purchase; optional provider services separate."
+    },
+    {
+      "id": "D11",
+      "topic": "Signing",
+      "state": "historical_dependency_not_reverified",
+      "value": "PNA2 records owner deferral due to Microsoft account hold ending2026-10-01; exact provider provisioning must be reverified before signed build scheduling."
+    },
+    {
+      "id": "D12",
+      "topic": "Navigation evaluation mods",
+      "state": "owner_reaffirmed_exclusion",
+      "value": "Navigation evaluation mods are to be removed before release; existing Baritone non-shipping contract retained.",
+      "evidence": "User reply: the mods we are using in the nav plan will be removed before release, thats the plan",
+      "limit": "This answers intended release exclusion, not first-party Fabric connector commercial classification or written permission. No current user game installation is modified by this specification."
+    }
+  ],
+  "stage_closure_allowed": false
+}

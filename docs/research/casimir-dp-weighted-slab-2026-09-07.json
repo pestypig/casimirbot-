@@ -1,0 +1,186 @@
+{
+  "status": "weighted_method_control_checked_tail_quality_reported_not_joint_model",
+  "transport_sha256": "dcb25aeacd1d563858dfa057b5eb70185c1f92a79d49f00acb82a49bf7635113",
+  "rows": [
+    {
+      "N": 100000,
+      "seed": 1410,
+      "bias": 1,
+      "energy_bias": 1,
+      "scale": 126927.18909930163,
+      "capable": {
+        "mean": 0.24977,
+        "se": 0.0013688930599875565,
+        "ess": 24977.0,
+        "max_share": 4.00368338871762e-05
+      },
+      "fast": {
+        "mean": 0.14076,
+        "se": 0.0010997628466097532,
+        "ess": 14076.0,
+        "max_share": 7.104290991759022e-05
+      },
+      "total": {
+        "mean": 1.0,
+        "se": 0.0,
+        "ess": 100000.0,
+        "max_share": 1e-05
+      },
+      "relative_to_strong_root": 1,
+      "raw_subset_coefficient_estimate": 135449377.35473815,
+      "raw_subset_coefficient_sampling_se": 1058270.7645010334
+    },
+    {
+      "N": 100000,
+      "seed": 2110,
+      "bias": 1,
+      "energy_bias": 0.7,
+      "scale": 126927.18909930163,
+      "capable": {
+        "mean": 0.24767173132112433,
+        "se": 0.0014082803171252432,
+        "ess": 23623.2721215657,
+        "max_share": 0.0003926146206981624
+      },
+      "fast": {
+        "mean": 0.13901587349236835,
+        "se": 0.0009734103164345468,
+        "ess": 16940.640203170376,
+        "max_share": 0.0004888703126103542
+      },
+      "total": {
+        "mean": 1.0026000688660652,
+        "se": 0.0030419519256667535,
+        "ess": 52068.561162187776,
+        "max_share": 0.0001502051868862747
+      },
+      "relative_to_strong_root": 1,
+      "raw_subset_coefficient_estimate": 133771053.61584498,
+      "raw_subset_coefficient_sampling_se": 936685.2889438618
+    },
+    {
+      "N": 500000,
+      "seed": 3101,
+      "bias": 0.85,
+      "energy_bias": 0.5,
+      "scale": 380781.56729790487,
+      "capable": {
+        "mean": 1.1319955555265328e-06,
+        "se": 5.934849332893784e-08,
+        "ess": 363.54236834230414,
+        "max_share": 0.022743274998189435
+      },
+      "fast": {
+        "mean": 1.2616855092099116e-07,
+        "se": 1.9883804041174687e-08,
+        "ess": 40.25957440245986,
+        "max_share": 0.13599538400115088
+      },
+      "total": {
+        "mean": 1.0069914652208403,
+        "se": 0.00585490429024999,
+        "ess": 27928.68302192793,
+        "max_share": 0.0009002721634627412
+      },
+      "relative_to_strong_root": 3,
+      "raw_subset_coefficient_estimate": 364.22531253192295,
+      "raw_subset_coefficient_sampling_se": 57.400871202488005
+    },
+    {
+      "N": 500000,
+      "seed": 3102,
+      "bias": 0.75,
+      "energy_bias": 0.6,
+      "scale": 380781.56729790487,
+      "capable": {
+        "mean": 1.2471320335432771e-06,
+        "se": 3.560411825852373e-08,
+        "ess": 1223.9420678622014,
+        "max_share": 0.006591685296754594
+      },
+      "fast": {
+        "mean": 1.0510935917860792e-07,
+        "se": 4.808562415643439e-09,
+        "ess": 477.3515199162712,
+        "max_share": 0.017319611881061795
+      },
+      "total": {
+        "mean": 0.9901343150077965,
+        "se": 0.004867461673725171,
+        "ess": 38216.622555413094,
+        "max_share": 0.0006364980161189554
+      },
+      "relative_to_strong_root": 3,
+      "raw_subset_coefficient_estimate": 303.4313140430088,
+      "raw_subset_coefficient_sampling_se": 13.881431909000412
+    },
+    {
+      "N": 500000,
+      "seed": 4101,
+      "bias": 0.7,
+      "energy_bias": 0.5,
+      "scale": 507708.7563972065,
+      "capable": {
+        "mean": 1.0418361445401154e-10,
+        "se": 7.337427395685822e-12,
+        "ess": 201.5287423309563,
+        "max_share": 0.02073460839260736
+      },
+      "fast": {
+        "mean": 3.746411232698824e-12,
+        "se": 5.847944679903866e-13,
+        "ess": 41.03832289051589,
+        "max_share": 0.11288215854425285
+      },
+      "total": {
+        "mean": 0.9860918639749714,
+        "se": 0.012282735871898195,
+        "ess": 6363.306238672003,
+        "max_share": 0.005509315399139674
+      },
+      "relative_to_strong_root": 4,
+      "raw_subset_coefficient_estimate": 0.014420263392550516,
+      "raw_subset_coefficient_sampling_se": 0.002250924881210378
+    },
+    {
+      "N": 500000,
+      "seed": 4102,
+      "bias": 0.75,
+      "energy_bias": 0.5,
+      "scale": 507708.7563972065,
+      "capable": {
+        "mean": 1.1600218237665075e-10,
+        "se": 1.456302785353966e-11,
+        "ess": 63.44168651452954,
+        "max_share": 0.06833837570050524
+      },
+      "fast": {
+        "mean": 5.360666027597997e-12,
+        "se": 1.6020480827294676e-12,
+        "ess": 11.196378017612979,
+        "max_share": 0.19432393383040328
+      },
+      "total": {
+        "mean": 1.0021082643904236,
+        "se": 0.008808588973638223,
+        "ess": 12615.916426634456,
+        "max_share": 0.0024664871906449246
+      },
+      "relative_to_strong_root": 4,
+      "raw_subset_coefficient_estimate": 0.02063367080548014,
+      "raw_subset_coefficient_sampling_se": 0.006166422713783984
+    }
+  ],
+  "checks": [
+    "resolved-region control agreement",
+    "analytic no-collision likelihood identity",
+    "inherited collision kinematics and termination"
+  ],
+  "limitations": [
+    "finite-sample standard errors can miss unobserved large weights",
+    "ESS is diagnostic not accuracy proof",
+    "raw subset coefficient not accepted count or full-rate upper bound",
+    "same conditional slab/Born model",
+    "no capture solution"
+  ]
+}

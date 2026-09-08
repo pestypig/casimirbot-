@@ -1,0 +1,28 @@
+{
+  "scope": "Packaged live binding and expired-run preflight, not capacity acceptance",
+  "binding_id": "reasoning_binding:055bd9b6a7a124027ce506e6b5be8a10",
+  "binding_epoch": 1,
+  "claimed_at": "2026-09-06T06:56:25.042Z",
+  "run_id": "run_f567eefd-623e-4e53-add9-e197f6a3365a",
+  "run_expires_at": "2026-09-06T07:09:41.339Z",
+  "run_inspection": "none / run_expired",
+  "steering_read_after_run_expiry": "succeeded, empty deliveries",
+  "identity_ceiling": "Authenticated native client and declared continuation; not independent external provider-task proof",
+  "fresh_observation": {
+    "observed_at": "2026-09-06T07:10:34.768Z",
+    "evidence_ref": "environment_probe_evidence:f9a0b5f4296f21625ed4c0757ee2f7fbef588ee7",
+    "probe_request_ref": "environment_probe_request:125a4610-83b7-46c2-9d05-56aa9d9312ef",
+    "prior_turn_id": "mcp_environment_probe_turn:ebf925df-fa4a-4d41-8a5f-99473c2fa5f9",
+    "game_tick": 8416963,
+    "position": {"x": 5.45, "y": 65, "z": 2.55},
+    "health": 20,
+    "hazards_in_bounded_snapshot": 0,
+    "reachable_footholds_in_bounded_snapshot": 116,
+    "client_screen_state": "unobserved"
+  },
+  "natural_objective_candidate_not_submitted": "Walk across the open platform, choosing a clear route and adjusting if something gets in the way. Stop when I take control.",
+  "movement_dispatched": false,
+  "rolling_extensions_proven": 0,
+  "interpretation": "Successful task/run claim did not extend the finite run. Read-only perception and an empty steering read are not temporal execution, acknowledgement of a real prompt, voice acceptance, or capacity proof.",
+  "credentials_included": false
+}

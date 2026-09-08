@@ -1,0 +1,16 @@
+{
+  "schema": "et6.exact_probe_identity_read.v1",
+  "date": "2026-09-05",
+  "classification": "evidence re-entry prerequisite",
+  "change": "Existing persisted prior-probe reader accepts optional exact environment/source/world/subject-binding/native-subject/observation-producer constraints. Missing or mismatched identity returns null. Legacy callers remain unchanged.",
+  "verification": {
+    "broker_tests_passed": 16,
+    "broker_tests_failed": 0,
+    "new_assertions": ["unbound legacy evidence rejected in strict mode", "exact binding accepted", "each of six identity fields mismatched is rejected"],
+    "earlier_failed_runs": ["test referenced an unimported database helper", "test omitted required foreign-key subject fixture"],
+    "discipline_full_exit_code": 0,
+    "discipline_full_battery": "skipped by classifier; zero sensitive files detected"
+  },
+  "limits": "Caller must derive expected identity from current authenticated server records. This comparison is not authority, frontier persistence, native clock alignment, or dispatch. No temporal production caller supplies these constraints yet.",
+  "et6_complete": false
+}

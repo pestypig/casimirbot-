@@ -856,6 +856,39 @@ describe("durable environment probe broker", () => {
     expect(JSON.stringify(evidence)).not.toContain(lease.lease_token);
     expect(JSON.stringify(evidence)).not.toContain("credential");
 
+    const exactIdentity = {
+      environmentBindingId: connector.environmentBindingId, sourceId: SOURCE_ID,
+      worldId: WORLD_ID, subjectBindingId: "subject-binding:temporal-test",
+      subjectNativeId: "player:temporal-test", observationProducerEpochRef: admission.producer_epoch_ref,
+    };
+    const readExact = (expectedEnvironmentIdentity = exactIdentity) =>
+      readDurableEnvironmentProbeContinuationEvidence({
+        requestId: dispatched.requestId,
+        expectedPriorTurnId: "ask:durable-probe:continuation-evidence",
+        expectedRoomId: ROOM_ID, expectedCapabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        now: new Date(NOW.getTime() + 1_000), expectedEnvironmentIdentity,
+      });
+    // Legacy unbound evidence remains readable above, but is not exact-player proof.
+    await expect(readExact()).resolves.toBeNull();
+    const exactDb = await getPool();
+    await exactDb.query(`INSERT INTO helix_room_environment_subject_bindings (
+      subject_binding_id, room_id, participant_id, profile_id, environment_binding_id,
+      room_source_binding_id, source_id, world_id, subject_kind, subject_ref,
+      subject_native_id, subject_label, verification_method, confidence,
+      producer_epoch_ref, verified_at, last_confirmed_at, created_at, updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'minecraft.player','environment_subject:temporal-test',
+      $9,'TemporalPlayer','self_claim',0.8,$10,$11,$11,$11,$11)`,
+      [exactIdentity.subjectBindingId, ROOM_ID, PARTICIPANT_ID, PROFILE_ID,
+        connector.environmentBindingId, BINDING_ID, SOURCE_ID, WORLD_ID,
+        exactIdentity.subjectNativeId, admission.producer_epoch_ref, NOW.toISOString()]);
+    await exactDb.query(`UPDATE helix_environment_probe_requests
+      SET resolved_subject_binding_id=$2, resolved_subject_native_id=$3
+      WHERE probe_request_id=$1`, [dispatched.requestId, exactIdentity.subjectBindingId, exactIdentity.subjectNativeId]);
+    await expect(readExact()).resolves.toMatchObject({ probe_request_ref: dispatched.requestId });
+    for (const key of Object.keys(exactIdentity) as Array<keyof typeof exactIdentity>) {
+      await expect(readExact({ ...exactIdentity, [key]: "wrong:identity" })).resolves.toBeNull();
+    }
+
     await expect(
       readDurableEnvironmentProbeContinuationEvidence({
         requestId: dispatched.requestId,

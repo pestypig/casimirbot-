@@ -1,0 +1,9 @@
+{
+  "schema": "et6.frontier_publisher_initial.v1",
+  "date": "2026-09-05",
+  "implementation": "Internal publisher connects resolved perception/catalog context to the frontier writer. Observation revision and world tick derive from the snapshot. Policy or native-engine absence blocks capabilities; remaining action-specific prerequisites are explicitly conditional. Server-publication monotonic clock is labeled separately from resident execution.",
+  "verification": {"publisher_wiring_tests_passed": 2, "store_tests_passed": 1, "failed": 0},
+  "limits": "Publisher tests mock resolved context and storage. No production endpoint calls the publisher yet. Action-specific bounds, resource ownership, complete availability projection, resident clock alignment and dispatch remain incomplete. Conditional entries are not a substitute for those requirements.",
+  "replay_behavior": "Re-publication preserves stored clocks and does not refresh observation time; exact environment clock and semantic entry/expiry differences still conflict.",
+  "et6_complete": false
+}

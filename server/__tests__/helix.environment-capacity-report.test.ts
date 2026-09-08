@@ -63,6 +63,89 @@ const sample = (cycle: number, patch: Record<string, unknown> = {}) => ({
 });
 
 describe("ET6 capacity report capture utility", () => {
+  it.each(["environment_id", "subject_id", "goal_id"])(
+    "rejects mixed %s even when the reasoning binding matches",
+    (field) => {
+      const changed = sample(2);
+      expect(() => buildCapacityReportFromCapture({
+        schema: "environment.capacity_capture.v1",
+        report_id: "capacity_report:mixed-identity",
+        samples: [sample(1), { ...changed, identity: {
+          ...changed.identity, [field]: "other:identity",
+        } }, sample(3)],
+        evidence_refs: ["fixture:mixed-identity"],
+      })).toThrow("one environment, subject, and goal");
+    },
+  );
+
+  it("rejects a repeated sample identity with a relabeled cycle", () => {
+    expect(() => buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:replayed-sample",
+      samples: [sample(1), sample(2, { sample_id: sample(1).sample_id }), sample(3)],
+      evidence_refs: ["fixture:replayed-sample"],
+    })).toThrow("unique sample identities");
+  });
+
+  it("does not confuse reconnect epoch changes with a different subject or goal", () => {
+    const reconnected = sample(3);
+    const report = buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:reconnect-fixture",
+      samples: [sample(1), sample(2), { ...reconnected, identity: {
+        ...reconnected.identity, producer_epoch: "epoch:reconnected", goal_revision: 2,
+      } }],
+      evidence_refs: ["fixture:reconnect-not-live-proof"],
+    });
+    expect(report.rolling_cycle_count).toBe(3);
+  });
+
+  it("keeps duplicate effects across reconnect samples as failed acceptance", () => {
+    const report = buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:duplicate-effects",
+      samples: [sample(1), sample(2), sample(3, {
+        performed_effect_refs: sample(1).performed_effect_refs,
+      })],
+      evidence_refs: ["fixture:duplicate-effects"],
+    });
+    expect(report.duplicate_effect_count).toBe(1);
+    expect(report.exit_satisfied).toBe(false);
+  });
+
+  it("retains native missed intervals separately from observed scheduler ticks", () => {
+    // EnvironmentCapacityTelemetryTest: invocations at 1010 and 1160 ms.
+    // Two nominal 50 ms slots were missed between the two actual invocations.
+    const report = buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:native-lag",
+      samples: [sample(1, {
+        scheduler_ticks: 2,
+        active_control_ticks: 1,
+        stalled_ticks: 1,
+        missed_ticks: 2,
+      })],
+      evidence_refs: ["fixture:native-capacity-telemetry"],
+    });
+    expect(report.missed_tick_count).toBe(2);
+    expect(report.stalled_tick_count).toBe(1);
+    expect(report.continuous_control_ratio).toBe(0.5);
+    expect(report.exit_satisfied).toBe(false);
+  });
+
+  it.each([
+    { stalled_ticks: 21 },
+    { active_control_ticks: 21 },
+    { missed_ticks: -1 },
+  ])("still rejects impossible observed or negative counters: %j", (patch) => {
+    expect(() => buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:invalid-counters",
+      samples: [sample(1, patch)],
+      evidence_refs: ["fixture:invalid-counters"],
+    })).toThrow();
+  });
+
   it("builds the canonical passing report from one exact measured binding", () => {
     const report = buildCapacityReportFromCapture({
       schema: "environment.capacity_capture.v1",
@@ -103,5 +186,44 @@ describe("ET6 capacity report capture utility", () => {
     });
     expect(report.exit_satisfied).toBe(false);
     expect(report.missing_measurements).toContain("observation:tokens");
+  });
+
+  it("does not coerce unavailable lead-time or byte measurements to zero", () => {
+    const report = buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:et6:unavailable-measurements",
+      samples: [
+        sample(1, {
+          lead_time_ticks: null,
+          observation_input_bytes: null,
+          observation_output_bytes: null,
+        }),
+      ],
+      evidence_refs: ["evidence:et6:unavailable-measurements"],
+    });
+
+    expect(report.lead_time_ticks_p50).toBeNull();
+    expect(report.observation_input_bytes).toBeNull();
+    expect(report.observation_output_bytes).toBeNull();
+    expect(report.missing_measurements).toEqual(expect.arrayContaining([
+      "planning:lead_time_ticks",
+      "observation:input_bytes",
+      "observation:output_bytes",
+    ]));
+    expect(report.exit_satisfied).toBe(false);
+  });
+
+  it("does not force an unavailable course label into a measured category", () => {
+    const report = buildCapacityReportFromCapture({
+      schema: "environment.capacity_capture.v1",
+      report_id: "capacity_report:et6:unavailable-course",
+      samples: [sample(1, { course: null })],
+      evidence_refs: ["evidence:et6:unavailable-course"],
+    });
+
+    expect(report.courses_observed).toEqual([]);
+    expect(report.missing_measurements).toContain("course:classification");
+    expect(report.exit_criteria.required_measurements_complete).toBe(false);
+    expect(report.exit_satisfied).toBe(false);
   });
 });

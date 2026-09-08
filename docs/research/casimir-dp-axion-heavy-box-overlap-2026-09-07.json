@@ -1,0 +1,41 @@
+{
+  "scope": "Pure-heavy overlap and mixed loop asymptotics only, tree GF relation, no QCD or full mixed finite matching.",
+  "rows": [
+    {
+      "M_GeV": 2000.0,
+      "full_H_LL_real_GeV_minus2": 1.5872302466305995e-14,
+      "matched_H_LL_real_GeV_minus2": 1.5149729624861534e-14,
+      "full_over_matched": 1.0476954281915818,
+      "imaginary_full": 0.0
+    },
+    {
+      "M_GeV": 5000.0,
+      "full_H_LL_real_GeV_minus2": 2.449269738786405e-15,
+      "matched_H_LL_real_GeV_minus2": 2.4239567399778455e-15,
+      "full_over_matched": 1.0104428426428067,
+      "imaginary_full": 0.0
+    },
+    {
+      "M_GeV": 20000.0,
+      "full_H_LL_real_GeV_minus2": 1.5163681270081383e-16,
+      "matched_H_LL_real_GeV_minus2": 1.5149729624861534e-16,
+      "full_over_matched": 1.000920917109765,
+      "imaginary_full": 0.0
+    },
+    {
+      "M_GeV": 200000.0,
+      "full_H_LL_real_GeV_minus2": 1.5149936747457141e-18,
+      "matched_H_LL_real_GeV_minus2": 1.5149729624861533e-18,
+      "full_over_matched": 1.0000136717024486,
+      "imaginary_full": 0.0
+    }
+  ],
+  "mixed_asymptotic_ratio": 0.9999999998418847,
+  "checks": {
+    "pure_heavy_asymptotic_normalization": true,
+    "convergence": true,
+    "pure_heavy_no_CP_phase": true,
+    "mixed_large_mass_expansion": true
+  },
+  "full_matching_completed": false
+}

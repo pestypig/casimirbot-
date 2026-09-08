@@ -1,0 +1,9 @@
+{
+  "schema": "et6.temporal_action_catalog.v1",
+  "date": "2026-09-05",
+  "classification": "tool admission input projection",
+  "implementation": "Internal catalog wrapper reuses resolveEnvironmentActionAuthorityBase and projects capability/version/action/effect, native-engine availability and policy listing as separate fields. Projection is bounded to 256 entries with explicit truncation and no execution authority.",
+  "verification": {"projection_tests_passed": 2, "failed": 0},
+  "limits": "Tests cover pure projection only, not the freshness resolver or an authenticated publisher. No new MCP tool or temporal dispatch caller is connected.",
+  "et6_complete": false
+}

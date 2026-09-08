@@ -1,0 +1,27 @@
+{
+  "et6_complete": false,
+  "classification": "tool admission",
+  "implemented": [
+    "Existing enqueue transaction optionally retains internal temporal metadata before commit",
+    "Both idempotency return paths invoke retention without creating a new action",
+    "Retention input is snapshotted before asynchronous work",
+    "Task revalidation callback runs before and after retention SQL",
+    "Temporal requests fail closed without temporal_plan_v1 native execution support; no finite fallback"
+  ],
+  "availability": "Internal broker argument only. No route or MCP tool exposes it. Current manifest schema does not allow temporal_plan_v1, so no current connector can activate this path.",
+  "checks": {
+    "action_and_temporal_vitest": { "files": 20, "tests_passed": 163 },
+    "broker_transaction_fixture": "5 cases; mocked SQL and transaction. Future-feature fixture is not an actual native advertisement.",
+    "typescript": "tsconfig.et6-temporal.json still exits 1. Filtered output had no diagnostics in temporal-plans, action-broker, action-admission-transaction or reasoning-task-binding; not a clean project typecheck."
+  },
+  "unproven": [
+    "Real database rollback and concurrent revocation races",
+    "Current goal/frontier admission revalidation",
+    "Native temporal envelope, extension delivery and watermark enforcement",
+    "All original packaged live ET6 capacity requirements"
+  ],
+  "live_actions_performed": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

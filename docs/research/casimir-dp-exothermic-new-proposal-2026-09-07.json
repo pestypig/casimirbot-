@@ -1,0 +1,22 @@
+{
+  "status": "new_primary_direct_channel_screen",
+  "source": "https://arxiv.org/html/2609.05204v1",
+  "inputs": {
+    "mass_GeV": 45.0,
+    "gap_GeV": 0.001,
+    "mediator_GeV": 1.0,
+    "weighted_coupling_product": 1.7e-17,
+    "maximum_speed_kms": 798
+  },
+  "zero_speed_carbon_recoil_keV": 801.0263215031107,
+  "independent_carbon_event_upper": 8.249305445647617e-26,
+  "independent_scattering_D_upper": 1.6498610891295234e-25,
+  "ratio_to_frozen_DP_exponent": 5.5905767628386004e-24,
+  "integration_max_relative_error": 2.6645352591003757e-15,
+  "limitations": [
+    "Independent free-carbon charge response; F=1 and contact propagator upper",
+    "Direct excited-state channel only, not elastic loops or complete solid response",
+    "Source product is illustrative; no LZ likelihood reproduced",
+    "No empirical local sensitivity, population-evolution replay or lifetime verification"
+  ]
+}

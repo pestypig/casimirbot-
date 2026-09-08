@@ -1,0 +1,42 @@
+{
+  "scope": "Deterministic repair of missing durable MCP situation-probe observation; not live ET6 acceptance",
+  "classification": ["evidence normalization", "evidence re-entry"],
+  "first_divergence": "Successful situation probe returned no persisted mcp_evidence reference",
+  "red_test": "Exact fresh situation observation regression failed because mcp_evidence was undefined",
+  "repair": {
+    "uses_existing_evidence_store": true,
+    "preserves_exact_probe_payload": true,
+    "owner_scoped": true,
+    "freshness_window_not_restarted": true,
+    "rejects_stale_future_unknown_age_invalid_provenance_late_ineligible_failed_or_different_capability": true,
+    "storage_failure_preserves_original_observation_without_durable_reference": true,
+    "execution_answer_and_terminal_authority": false
+  },
+  "verification": {
+    "minecraft_mcp_tests": { "passed": 15, "total": 15 },
+    "environment_monitor_tests": { "passed": 5, "total": 5 },
+    "agent_api_service_tests": { "passed": 21, "total": 21 },
+    "evidence_store_tests": { "passed": 8, "total": 8 },
+    "evidence_lifecycle_tests": { "passed": 8, "total": 8 },
+    "discipline_quick": "passed; scans the dirty checkout, not solely this patch",
+    "documentation_audit": "passed with zero failures",
+    "desktop_host_service_build": "passed with four unrelated duplicate-key/case warnings",
+    "full_typecheck": "not run",
+    "diff_check": "pre-existing trailing whitespace at helix-mcp-server.ts line 13 remains",
+    "casimir_verification": "not applicable: no physics, adapter contract, certificate or release verification changes"
+  },
+  "built_service_sha256": "46941951e5dfad3c372c30a172a0baafa283cc90433fa1ace0a082381772d88f",
+  "packaged_or_live_repair_proven": false,
+  "packaging_blocker": { "free_disk_bytes": 331243520, "recycle_bin_requires_emptying_to_reclaim_space": true },
+  "recycled_relative_directories": [
+    "apps/desktop/release/win-unpacked.pre-bootstrap-compat-20260904-165840",
+    "apps/desktop/release/win-unpacked.pre-et6-20260904-163909",
+    "apps/desktop/release/win-unpacked.pre-et6-trusted-renewal-20260903-1710",
+    "apps/desktop/release/win-unpacked.pre-ui-expiry-reconcile-20260904-1733"
+  ],
+  "running_exe_preserved": true,
+  "latest_rollback_build_preserved": true,
+  "et6_complete": false,
+  "nav1_unlocked": false,
+  "next": "Package after disk recovery, then verify live exact probe reference re-entry and resume original rolling-extension/interruption/revocation capacity acceptance"
+}

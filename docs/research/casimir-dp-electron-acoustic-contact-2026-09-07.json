@@ -1,0 +1,32 @@
+{
+  "status": "long_wavelength_longitudinal_acoustic_contact_model_not_total_phonons",
+  "rows": [
+    {
+      "cutoff_fraction_2pi_over_a": 0.03,
+      "q_cut_eV": 104.18840201339445,
+      "D": 2.004027134975725e-29,
+      "refinement_relative": 0.0
+    },
+    {
+      "cutoff_fraction_2pi_over_a": 0.1,
+      "q_cut_eV": 347.2946733779815,
+      "D": 7.403916261159707e-28,
+      "refinement_relative": 2.220446049250313e-16
+    },
+    {
+      "cutoff_fraction_2pi_over_a": 1.0,
+      "q_cut_eV": 3472.9467337798155,
+      "D": 7.403325029076021e-25,
+      "refinement_relative": 2.220446049250313e-16
+    }
+  ],
+  "input_sha256": "e4da7ed8bb4716093a2f3c5dbe3b818d6eaaa19942d8c75c95b12387e3b2e96b",
+  "temperature_K": 4,
+  "sound_speed_km_s": 18,
+  "assumptions": [
+    "adiabatic six-electron density follows each carbon atom",
+    "linear isotropic LA dispersion",
+    "single-phonon emission and absorption, Debye-Waller factor set to one",
+    "no Umklapp, optical modes, finite-size mode discretization or microscopic response"
+  ]
+}

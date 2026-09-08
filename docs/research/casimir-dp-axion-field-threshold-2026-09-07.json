@@ -1,0 +1,53 @@
+{
+  "scope": "Unbroken/small-background leading heavy-light one-loop MS-bar subset, yu=0. Inverse propagator=p^2-m0^2+Pi; kinetic coefficient 1+delta_Z. No full broken-vacuum, fermion, vertex, gauge or parameter matching.",
+  "checks": {
+    "two_point_derivative": true,
+    "mass_sign_matches_potential": true,
+    "field_redefinition_amplitude": true
+  },
+  "rows": [
+    {
+      "field": "A",
+      "mu_GeV": 1000.0,
+      "delta_Z": -3.4483351190091597e-07,
+      "inverse_two_point_at_zero_GeV2": 1.2023747144610195
+    },
+    {
+      "field": "A",
+      "mu_GeV": 2000.0,
+      "delta_Z": 1.9453667259328852e-07,
+      "inverse_two_point_at_zero_GeV2": -3.1125867614926164
+    },
+    {
+      "field": "A",
+      "mu_GeV": 4000.0,
+      "delta_Z": 7.33906857087493e-07,
+      "inverse_two_point_at_zero_GeV2": -7.427548237446253
+    },
+    {
+      "field": "h",
+      "mu_GeV": 1000.0,
+      "delta_Z": -0.0006735029529314765,
+      "inverse_two_point_at_zero_GeV2": 2348.3881141816787
+    },
+    {
+      "field": "h",
+      "mu_GeV": 2000.0,
+      "delta_Z": 0.00037995443865876665,
+      "inverse_two_point_at_zero_GeV2": -6079.271018540267
+    },
+    {
+      "field": "h",
+      "mu_GeV": 4000.0,
+      "delta_Z": 0.0014334118302490098,
+      "inverse_two_point_at_zero_GeV2": -14506.930151262211
+    }
+  ],
+  "derived": {
+    "field_only_delta_kappaA": -5.836100177798656e-09,
+    "field_only_delta_lambdaA": -2.2506310586394564e-06,
+    "field_only_delta_lambdaH": -9.797348893518277e-05,
+    "field_only_relative_A_Yukawa": -9.726833629664426e-08
+  },
+  "full_model_admitted": false
+}

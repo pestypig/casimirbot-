@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-06",
+  "scope": "ET6 temporal delivery lifecycle persistence",
+  "classification": "evidence normalization",
+  "prior_evidence": "2026-09-06-et6-event-delivery-query-reproduction.json",
+  "repair": "Replace UPDATE FROM target alias with an exact resident-and-plan filtered subquery, retaining root exclusion, active-state filters and terminal timestamp semantics.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/actions/__tests__/temporal-delivery-status.test.ts server/services/environment-connectors/temporal-plans/__tests__/temporal-accepted-lease.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed": 16,
+    "failed": 0,
+    "database": "isolated pg-mem",
+    "negative_cases": ["different resident", "different plan", "resident root", "unadmitted action", "terminal action", "queued action"]
+  },
+  "package_verification": {
+    "path": "apps/desktop/release-et6-delivery-query-20260906/win-unpacked/CasimirBot.exe",
+    "host_build_exit": 0,
+    "runtime_stage_exit": 0,
+    "package_exit": 0,
+    "packed_service_matches_built": true,
+    "service_sha256": "7bf668868bf3b01866454f1123b7825bfae6045482ca7d0506a2de0bb555c373",
+    "packed_runtime_manifest_matches_staged": true,
+    "full_runtime_tree_check": "FAIL after launch: staged file count 645 versus packed 647; provider-neutral scan has zero violations",
+    "extra_runtime_files": ["artifacts/diagnostics/voice-lane-crash-latest.json", "artifacts/diagnostics/voice-lane-crash.jsonl"],
+    "build_warnings": "Four duplicate-key/case warnings outside the query repair"
+  },
+  "packaged_repair_deployed": true,
+  "deployment": {
+    "old_host_pid": 24236,
+    "old_service_pid": 32224,
+    "old_host_closed_normally": true,
+    "new_host_pid": 19344,
+    "new_service_instance": "service_instance:d1378d765a382e4fbfbcb65066d3a5b2",
+    "presence_refreshed_at": "2026-09-06T07:38:40.427Z",
+    "authenticated_mcp_presence": true,
+    "old_workflow_status": "not_running",
+    "old_binding_pickup_rejected": "reasoning_binding_not_found",
+    "retained_run_verified_by_presence": false,
+    "live_llm_key_health": "not proven; startup warns orchestrator key is absent",
+    "old_exe_preserved": true
+  },
+  "live_failure_resolved": false,
+  "rolling_acceptance_proven": false,
+  "next": "Build and deliberately deploy the verified repair, then repeat the natural-prompt live journey with fresh identity and admitted authority. Retain all prior failed-attempt evidence."
+}

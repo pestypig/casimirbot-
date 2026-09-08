@@ -1,0 +1,20 @@
+{
+  "scope": "Native runtime event-zero capture, evidence fence and correlated timing",
+  "native_tests_enabled": 8,
+  "passed": true,
+  "verified": [
+    "Runtime attached before controller startup; event stream begins at zero",
+    "Real outbox checkpoint fence settles before successor polling",
+    "Server event integration no longer seeds a prior event cursor",
+    "Timing identity correlates run, resident, successor, epoch and checkpoint",
+    "Reservation margin uses stop minus acceptance tick, not committed lead",
+    "Split same-origin intervals match total within ceiling rounding",
+    "Late rejection has no completed activation timing"
+  ],
+  "limits": [
+    "Simulated controller ticks with measured fixture process intervals",
+    "Provider/proposal/admission delays absent from this native timing fixture",
+    "Successor HTTP response fixture-served; server request rows seeded",
+    "No live capacity or package refresh claim"
+  ]
+}

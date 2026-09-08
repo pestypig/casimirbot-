@@ -1,0 +1,142 @@
+{
+  "schema": "et6_live_debug_evidence.v1",
+  "recorded_at": "2026-09-06T19:29:04.163Z",
+  "qualification": "direct MCP mechanical qualification; not natural EXE prompt acceptance",
+  "package": "apps/desktop/release-et6-checkpoint-anchor-20260906/win-unpacked/CasimirBot.exe",
+  "binding_id": "reasoning_binding:f6c2f36051d2e92c73d62b25f001a324",
+  "run_id": "run_37bc3de3-0a24-4134-9c10-afa3dd417cc7",
+  "goal_revision": 37,
+  "root_action_id": "et6-root-1927-action",
+  "root_plan_hash": "sha256:1116f0e778db18b3b903b51c8c64ddb6c992f32546c2dfa4c9f1f016f6f983f6",
+  "root_admitted": true,
+  "successor_context": {
+    "available": true,
+    "previous_plan_id": "plan:et6-root-1927",
+    "previous_plan_hash": "sha256:1116f0e778db18b3b903b51c8c64ddb6c992f32546c2dfa4c9f1f016f6f983f6",
+    "checkpoint": {
+      "event_id": "environment_event:f9c2b0ed-4fb0-4e10-9c09-5dee6a29a79c",
+      "checkpoint_id": "checkpoint:et6-root-1927"
+    },
+    "workflow_id": "et6-root-1927-workflow",
+    "observed_at": "2026-09-06T19:27:18.295774400Z",
+    "predecessor_clocks": {
+      "environment": {
+        "kind": "tick",
+        "sequence": 8220,
+        "resolution_unit": "minecraft_tick",
+        "nominal_units_per_second": 20
+      },
+      "monotonic": {
+        "origin_id": "minecraft_monotonic_clock:52408557-c190-4d69-9926-4b03c8e1eee7",
+        "elapsed_ms": 410935
+      },
+      "audit_at": "2026-09-06T19:27:12.290491400Z"
+    },
+    "predecessor_watermarks": {
+      "decision_unit": 100,
+      "stop_unit": 200,
+      "committed_through_unit": 220,
+      "stabilization_node_id": "settled"
+    },
+    "revalidation_required": true,
+    "execution_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "successor_submission": {
+    "schema": "helix.environment_durable_goal_error.v1",
+    "error": "durable_goal_evidence_identity_mismatch",
+    "message": "Temporal admission requires current durable-goal identity and evidence; revalidate the named prerequisite.",
+    "retryable": false,
+    "credential_included": false,
+    "raw_content_included": false,
+    "content_role": "environment_durable_goal_error_not_assistant_answer",
+    "reentry_required": true,
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "successor_perception_observed_at": "2026-09-06T19:27:17.160Z",
+  "successor_request_created_at": "2026-09-06T19:27:45.654Z",
+  "workflow_status": {
+    "schema": "helix.environment_action.control_observation.v1",
+    "control_request_ref": "environment_action_control:51ee8325-bc8e-4f89-ac03-0315c728850a",
+    "workflow_ref": "et6-root-1927-workflow",
+    "control_kind": "status",
+    "outcome": "not_running",
+    "summary": "The exact workflow was not running in this Fabric client.",
+    "affected_workflow_refs": [],
+    "workflow_state": null,
+    "controls_released": false,
+    "evidence_refs": [],
+    "evidence_ref": "environment_action_control_evidence:c166cbf55c518f724e5d89b34795546988bbe67b5",
+    "observed_at": "2026-09-06T19:28:26.477Z",
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "content_role": "environment_action_control_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "before": {
+    "at": "2026-09-06T19:27:11.172Z",
+    "evidence": "environment_probe_evidence:1515262312ec2646dcf9b28a9d5a6ad0951058c9",
+    "actor": {
+      "air": 300,
+      "food_level": 20,
+      "freezing": false,
+      "health": 20,
+      "max_health": 20,
+      "on_fire": false,
+      "on_ground": true,
+      "pitch": -6.45,
+      "position": {
+        "x": -1.03,
+        "y": 65,
+        "z": -6.7
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.08,
+        "z": 0
+      },
+      "yaw": 2.43
+    }
+  },
+  "after": {
+    "at": "2026-09-06T19:28:29.143Z",
+    "evidence": "environment_probe_evidence:9aceafc9028f7bd3aa0c9599066b2cd41d40df38",
+    "actor": {
+      "air": 300,
+      "food_level": 20,
+      "freezing": false,
+      "health": 20,
+      "max_health": 20,
+      "on_fire": false,
+      "on_ground": true,
+      "pitch": -6.45,
+      "position": {
+        "x": -2.13,
+        "y": 65,
+        "z": 7.7
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.08,
+        "z": 0
+      },
+      "yaw": 2.43
+    }
+  },
+  "rolling_extensions_proven": 0,
+  "limitations": [
+    "Submission was outside the five-second perception window; generic evidence identity mismatch also covers freshness rejection.",
+    "No successor admitted, no natural EXE prompt pickup proved.",
+    "Status reports not_running; it does not provide authoritative terminal reason or controls-release proof.",
+    "Separate readiness inspection at 19:28:01.457Z reported zero workflows and controls_asserted false."
+  ]
+}

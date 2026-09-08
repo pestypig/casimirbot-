@@ -1,0 +1,19 @@
+{
+  "scope": "Native event/projection real HTTP routes with local snapshot failure, exact retry and reopen",
+  "tests": 2,
+  "passed": true,
+  "verified": [
+    "Projection initial POST and exact retry return 503 while save fails",
+    "One committed in-memory event and zero saved events during failure",
+    "Changed-content replay returns 409",
+    "Recovery acknowledges exact replay with one saved batch/event/digest",
+    "Saved event identity survives reopen",
+    "Operator activity is not invoked before persistence succeeds"
+  ],
+  "limits": [
+    "Auth, operator activity, adapter lookup and semantic-wake services are fixtures",
+    "Bounded schema rather than full database graph",
+    "Terminal-result persisted HTTP fault test still pending",
+    "No live harness, game, credential or installed build changed"
+  ]
+}

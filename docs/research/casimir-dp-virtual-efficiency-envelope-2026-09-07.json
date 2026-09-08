@@ -1,0 +1,65 @@
+{
+  "status": "conditional_nominal_efficiency_envelope_not_exclusion",
+  "source_sha256": "aef9a2af3615f06bf5e0a2720789ecd8509f14d65e5893800fa59d14bce1bad5",
+  "paper": "https://arxiv.org/pdf/2609.02823v1",
+  "source_locations": [
+    "Figure 1 caption",
+    "Figure S2 caption"
+  ],
+  "true_energy_low_keV": [
+    5.4,
+    200
+  ],
+  "true_energy_high_keV": [
+    200,
+    269.9
+  ],
+  "nominal_efficiency_interval": [
+    0.5,
+    1.0
+  ],
+  "caveats": [
+    "Not a calibration-nuisance confidence envelope",
+    "Accepted events grouped by true origin energy, not reconstructed bins",
+    "No background likelihood or model exclusion",
+    "Input spectra retain their original microscopic approximations"
+  ],
+  "rows": [
+    {
+      "mediator_GeV": 0.003,
+      "raw_low_high": 22229.94480435775,
+      "nominal_accepted_ratio_lower": 11114.972402178875,
+      "nominal_accepted_ratio_upper": 44459.8896087155
+    },
+    {
+      "mediator_GeV": 0.01,
+      "raw_low_high": 15962.752662656167,
+      "nominal_accepted_ratio_lower": 7981.376331328083,
+      "nominal_accepted_ratio_upper": 31925.505325312333
+    },
+    {
+      "mediator_GeV": 0.03,
+      "raw_low_high": 5952.714469549695,
+      "nominal_accepted_ratio_lower": 2976.3572347748477,
+      "nominal_accepted_ratio_upper": 11905.42893909939
+    },
+    {
+      "mediator_GeV": 0.1,
+      "raw_low_high": 716.1933429767698,
+      "nominal_accepted_ratio_lower": 358.0966714883849,
+      "nominal_accepted_ratio_upper": 1432.3866859535397
+    },
+    {
+      "mediator_GeV": 0.3,
+      "raw_low_high": 180.42055273453278,
+      "nominal_accepted_ratio_lower": 90.21027636726639,
+      "nominal_accepted_ratio_upper": 360.84110546906555
+    },
+    {
+      "mediator_GeV": 1.0,
+      "raw_low_high": 207.77520391905006,
+      "nominal_accepted_ratio_lower": 103.88760195952503,
+      "nominal_accepted_ratio_upper": 415.5504078381001
+    }
+  ]
+}

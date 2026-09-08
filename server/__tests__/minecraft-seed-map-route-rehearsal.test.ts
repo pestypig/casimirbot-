@@ -495,6 +495,12 @@ describe("Minecraft seed map route rehearsal", () => {
       },
     });
 
+    const originalX = route.candidate_next_waypoint.x;
+    route.candidate_next_waypoint.x = Number.NaN;
+    expect(sample(0, "2026-05-20T12:00:00.000Z")).toBeNull();
+    route.candidate_next_waypoint.x = Number.POSITIVE_INFINITY;
+    expect(sample(0, "2026-05-20T12:00:00.000Z")).toBeNull();
+    route.candidate_next_waypoint.x = originalX;
     expect(sample(0, "2026-05-20T12:00:00.000Z")).toBeNull();
     expect(sample(-20, "2026-05-20T12:00:01.000Z")).toBeNull();
     const drift = sample(-45, "2026-05-20T12:00:02.000Z");

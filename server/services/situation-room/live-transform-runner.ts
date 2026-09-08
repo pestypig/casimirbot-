@@ -71,7 +71,8 @@ function runTransformSpec(args: {
     `live_source_event:${args.event.event_id}`,
     `pipeline:${args.pipeline.pipeline_id}`,
   ])).slice(-24);
-  const base = {
+  const base: Pick<LiveTransformResult, "schema" | "transform_id" | "pipeline_id" | "source_event_ids" |
+    "window_id" | "kind" | "evidence_refs" | "ts"> = {
     schema: HELIX_LIVE_TRANSFORM_RESULT_SCHEMA,
     transform_id: args.transform.transform_id,
     pipeline_id: args.pipeline.pipeline_id,
@@ -80,7 +81,7 @@ function runTransformSpec(args: {
     kind: args.transform.kind,
     evidence_refs: evidenceRefs,
     ts: args.now,
-  } as const;
+  };
 
   if (args.transform.kind === "sequence_gap_analyzer") {
     const payload = args.event.payload ?? {};

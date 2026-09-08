@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-05",
+  "scope": "Server recomputation of reported resident effects over retained temporal event chains",
+  "classification": "evidence normalization",
+  "changes": [
+    "After retained-chain and checkpoint validation, compare the seven native cumulative effect fields with independently computed totals.",
+    "Require explicit booleans and nonnegative safe-integer counts; reject aggregate overflow and missing or extra total fields.",
+    "Route rolling evidence through validation even when checkpoint_settlements is omitted; reject rolling fields on non-temporal actions."
+  ],
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-resident-effects.test.ts server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "exit_code": 0,
+    "tests_passed": 25,
+    "positive": "Earlier motion and mutation totals survive a quiet current sample; input measurements remain unchanged.",
+    "negative": "Each falsified total, invalid counts, missing booleans, unsafe sums, missing or extra total fields, and mismatched chain endpoint are rejected."
+  },
+  "limitations": [
+    "Arithmetic consistency is not independent physical effect verification.",
+    "No database-backed broker event submission or live native transport qualification was run for this snapshot.",
+    "No packaged build, deployment, Minecraft action, or three-cycle capacity run was performed.",
+    "Production extension delivery and rolling final-result integration remain incomplete."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

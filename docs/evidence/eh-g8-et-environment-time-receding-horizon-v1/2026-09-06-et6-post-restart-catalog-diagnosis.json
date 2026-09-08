@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-06",
+  "scope": "ET6 post-restart run recovery",
+  "live": {
+    "service_instance": "service_instance:d1378d765a382e4fbfbcb65066d3a5b2",
+    "authenticated_presence": "succeeded",
+    "run_inspect": "MCP error -32602: Tool helix_run_inspect not found",
+    "read_repeated_once": true,
+    "run_recovered": false,
+    "old_binding": "reasoning_binding_not_found"
+  },
+  "source": {
+    "run_inspect_registration": "unconditional in server/mcp/helix-mcp-server.ts",
+    "run_only_catalog_tests": "3 passed",
+    "full_facade_catalog_test": "failed: invalid_output_schema for helix_room_command_request",
+    "full_facade_skipped_tests": 20,
+    "live_root_cause": "unproven",
+    "catalog_test_failure_is_live_root_cause": false
+  },
+  "recovery": {
+    "cause_supported": "Restricted local-supervisor surface returns before durable run-tool registration; governed transition to full surface restored exact run inspection.",
+    "transition_request": "desktop_tunnel_request:dc5befee-c59b-4ac1-afb0-29eadb94bb11",
+    "trusted_device_delegation_applied": true,
+    "lease_seconds": 300,
+    "transition_accepted_at": "2026-09-06T07:43:22.396Z",
+    "run_inspection_after_transition": "succeeded, original run version 1 waiting, expiry 2026-09-06T08:15:06.011Z",
+    "presence_retained_run_identity": "server_verified",
+    "reconnect_performed": false,
+    "human_control_activated_by_agent": false,
+    "environment_authority_granted_by_transition": false
+  },
+  "next": "Re-establish exact human-approved chat/run binding and revalidate environment authority before live replay.",
+  "rolling_acceptance_proven": false
+}

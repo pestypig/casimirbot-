@@ -1,0 +1,43 @@
+{
+  "scope": "Nonrelativistic single common spacelike propagator 1/(q^2+mV^2), constant proton/neutron charges, existing isotope/Helm and carbon F=1 independent-nucleus approximations. All nonnegative mediator masses allowed algebraically; no total survival or detector fit claimed.",
+  "inequality": "(C_m/X_m)/(C_contact/X_contact) <= ((qXe_max^2+mV^2)/(qC_min^2+mV^2))^2 <= max(1,(qXe_max/qC_min)^4)",
+  "rows": [
+    {
+      "mchi_GeV": 10.0,
+      "carbon_qmin_GeV": 0.17263638119192967,
+      "xenon_window_qmax_GeV": 0.2613848514556038,
+      "max_propagator_ratio": 5.255237681424548,
+      "combined_charge_and_propagator_enhancement_bound": 1000.7709610758612,
+      "D_upper_at_reference_raw_Xe": 1.3455130912981314e-21
+    },
+    {
+      "mchi_GeV": 15.0,
+      "carbon_qmin_GeV": 0.15438792061559034,
+      "xenon_window_qmax_GeV": 0.2613848514556038,
+      "max_propagator_ratio": 8.216150505148482,
+      "combined_charge_and_propagator_enhancement_bound": 1543.5829911632036,
+      "D_upper_at_reference_raw_Xe": 1.4525315424124036e-21
+    },
+    {
+      "mchi_GeV": 40.0,
+      "carbon_qmin_GeV": 0.11144853957064287,
+      "xenon_window_qmax_GeV": 0.2613848514556038,
+      "max_propagator_ratio": 30.256879142950392,
+      "combined_charge_and_propagator_enhancement_bound": 5514.147298672904,
+      "D_upper_at_reference_raw_Xe": 1.91972634599502e-21
+    },
+    {
+      "mchi_GeV": 100.0,
+      "carbon_qmin_GeV": 0.0819625416855736,
+      "xenon_window_qmax_GeV": 0.2613848514556038,
+      "max_propagator_ratio": 103.43320633637656,
+      "combined_charge_and_propagator_enhancement_bound": 18523.18828915839,
+      "D_upper_at_reference_raw_Xe": 2.301748719281368e-21
+    }
+  ],
+  "checks": {
+    "independent_q_endpoint": true,
+    "mediator_mass_envelope_scan": true
+  },
+  "full_model_admitted": false
+}

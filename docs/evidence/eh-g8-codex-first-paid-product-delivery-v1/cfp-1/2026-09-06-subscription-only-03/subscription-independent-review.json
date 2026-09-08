@@ -1,0 +1,21 @@
+{
+  "captured_utc": "2026-09-07T03:46:24.163Z",
+  "reviewer": "/root/cfp1_subscription_review",
+  "scope": "Subscription-only prepared specification reconciliation; not whole CFP-1 closure",
+  "initial_findings": [
+    "Parent still offered version license and launch provider opt-in",
+    "D14 current register still requested software-versus-credit mapping",
+    "Historical ENT04 ENT07 DIST05 scenario references required scope reconciliation"
+  ],
+  "resolution": "All three findings independently rechecked and resolved in current files",
+  "verdict": "accepted_within_review_scope",
+  "residual_material_contradictions": [],
+  "remaining_stage_dependencies": [
+    "Exact subscription benefits and lifecycle terms",
+    "Final capability and acceptance freeze",
+    "Applicable component rights/distribution evidence and Minecraft commercial classification"
+  ],
+  "validation": "subscription-validation.json",
+  "stage_closure": false,
+  "runtime_or_payment_changes": false
+}

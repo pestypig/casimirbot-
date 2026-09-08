@@ -9,6 +9,140 @@ import org.junit.jupiter.api.Test;
 
 final class PlayerActionRuntimeLifecycleTest {
     @Test
+    void delayedProjectionBlocksSuccessorEvenAfterCriticalCheckpointAcknowledgement() {
+        // Characterization, not desired capacity acceptance: a non-draining
+        // projection lane defeats the deferred-poll fix for the whole horizon.
+        var outbox = new PlayerActionDeliveryOutbox(9);
+        var checkpoint = new PlayerActionDeliveryOutbox.Delivery(
+            PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, Map.of("id", "checkpoint"));
+        var projection = new PlayerActionDeliveryOutbox.Delivery(
+            PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, Map.of("id", "projection"));
+        assertTrue(outbox.enqueueSequence(java.util.List.of(checkpoint, projection), 3));
+        assertSameDeliveryCheckpoint(outbox, checkpoint);
+        assertTrue(outbox.isCriticalEmpty());
+        int acceptedPollOpportunities = 0;
+        for (long tick = 1; tick <= 200; tick++) {
+            boolean pending = !outbox.isEmpty();
+            if (PlayerActionRuntime.actionPollDue(tick, true, pending) &&
+                PlayerActionRuntime.temporalDeliveryReady(PlayerActionWorkflow.State.RUNNING, false, false, pending)) {
+                acceptedPollOpportunities++;
+            }
+        }
+        assertEquals(0, acceptedPollOpportunities);
+        assertEquals(projection, outbox.peekProjection());
+        assertTrue(outbox.acknowledge(projection));
+        assertTrue(PlayerActionRuntime.actionPollDue(201, true, !outbox.isEmpty()));
+        assertTrue(PlayerActionRuntime.temporalDeliveryReady(PlayerActionWorkflow.State.RUNNING, false, false, !outbox.isEmpty()));
+    }
+
+    private static void assertSameDeliveryCheckpoint(PlayerActionDeliveryOutbox outbox,
+        PlayerActionDeliveryOutbox.Delivery checkpoint) {
+        assertEquals(checkpoint, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(checkpoint));
+    }
+
+    @Test
+    void evidenceBlockedPollRetainsOneOpportunityAfterDrain() {
+        assertTrue(PlayerActionRuntime.actionPollDue(20, false, true));
+        assertFalse(PlayerActionRuntime.actionPollDue(21, true, true));
+        assertTrue(PlayerActionRuntime.actionPollDue(22, true, false));
+        assertFalse(PlayerActionRuntime.actionPollDue(23, false, false));
+        assertFalse(PlayerActionRuntime.actionPollDue(0, true, false));
+        assertFalse(PlayerActionRuntime.actionPollDue(-1, true, false));
+        for (long tick = 1; tick <= 100; tick++) {
+            assertEquals(tick % 20 == 0, PlayerActionRuntime.actionPollDue(tick, false, false));
+        }
+        // Fixed-phase evidence publication cannot postpone every opportunity
+        // until the next periodic tick once each batch has been acknowledged.
+        int afterDrain = 0;
+        for (long cycle = 1; cycle <= 5; cycle++) {
+            assertFalse(PlayerActionRuntime.actionPollDue(cycle * 20 + 1, true, true));
+            if (PlayerActionRuntime.actionPollDue(cycle * 20 + 2, true, false)) afterDrain++;
+        }
+        assertEquals(5, afterDrain);
+    }
+
+    @Test
+    void residentClockPublicationHasFiveBoundedOpportunitiesPerHundredTicks() {
+        int publications = 0;
+        for (long tick = 1; tick <= 100; tick++) {
+            boolean due = PlayerActionRuntime.heartbeatPublicationDue(tick, true);
+            assertEquals(tick % 20 == 0, due);
+            if (due) publications++;
+            assertFalse(PlayerActionRuntime.heartbeatPublicationDue(tick, false));
+        }
+        assertEquals(5, publications);
+        assertFalse(PlayerActionRuntime.heartbeatPublicationDue(0, true));
+        assertFalse(PlayerActionRuntime.heartbeatPublicationDue(-20, true));
+        assertTrue(PlayerActionRuntime.heartbeatPublicationDue(3_000_000_000L, true));
+    }
+
+    @Test
+    void receivedSuccessorWaitsForEvidenceWithoutReplayOrReplacement() {
+        var slot = new PlayerActionRuntime.TemporalResponseSlot<String>();
+        assertTrue(slot.offer("leased-response"));
+        assertFalse(slot.offer("competing-response"));
+        assertEquals(null, slot.take(true, true));
+        assertTrue(slot.pending());
+        assertEquals("leased-response", slot.take(true, false));
+        assertFalse(slot.pending());
+        assertEquals(null, slot.take(true, false));
+        assertTrue(slot.offer("interrupted-response"));
+        assertEquals(null, slot.take(false, true));
+        assertFalse(slot.pending());
+        assertEquals(null, slot.take(true, false));
+    }
+
+    @Test
+    void successorResponseCannotCrossResyncInterruptionOrEvidenceBackpressure() {
+        for (PlayerActionWorkflow.State state : PlayerActionWorkflow.State.values()) {
+            assertEquals(state == PlayerActionWorkflow.State.RUNNING,
+                PlayerActionRuntime.temporalDeliveryReady(state, false, false, false));
+            assertFalse(PlayerActionRuntime.temporalDeliveryReady(state, true, false, false));
+            assertFalse(PlayerActionRuntime.temporalDeliveryReady(state, false, true, false));
+            assertFalse(PlayerActionRuntime.temporalDeliveryReady(state, false, false, true));
+        }
+    }
+
+    @Test
+    void eventIdentityCannotBeRelabeledToTheCurrentEnvelope() {
+        PlayerActionWorkflow.WorkflowEvent event = new PlayerActionWorkflow.WorkflowEvent("action:first", "workflow:resident",
+            1, "workflow.progress", PlayerActionWorkflow.State.RUNNING, 0.1, "Measured progress", Map.of(), false, false);
+        assertTrue(PlayerActionRuntime.eventMatchesEnvelope(event, Map.of("action_request_id", "action:first", "workflow_id", "workflow:resident")));
+        assertFalse(PlayerActionRuntime.eventMatchesEnvelope(event, Map.of("action_request_id", "action:successor", "workflow_id", "workflow:resident")));
+        assertFalse(PlayerActionRuntime.eventMatchesEnvelope(event, Map.of("action_request_id", "action:first", "workflow_id", "workflow:other")));
+        assertFalse(PlayerActionRuntime.eventMatchesEnvelope(event, Map.of()));
+        PlayerActionWorkflow.WorkflowEvent missing = new PlayerActionWorkflow.WorkflowEvent(null, "workflow:resident",
+            1, "workflow.progress", PlayerActionWorkflow.State.RUNNING, 0.1, "Missing identity", Map.of(), false, false);
+        assertFalse(PlayerActionRuntime.eventMatchesEnvelope(missing, Map.of("workflow_id", "workflow:resident")));
+    }
+
+    @Test
+    void temporalWireMetadataCannotSilentlyFallBackToFiniteExecution() {
+        assertTrue(PlayerActionRuntime.hasTemporalMetadata(Map.of("temporal_plan", Map.of())));
+        assertTrue(PlayerActionRuntime.hasTemporalMetadata(Map.of("temporal_plan", "malformed")));
+        Map<String, Object> nullPlan = new java.util.LinkedHashMap<>();
+        nullPlan.put("temporal_plan", null);
+        assertTrue(PlayerActionRuntime.hasTemporalMetadata(nullPlan));
+        for (String field : java.util.List.of("temporal_plan_canonical_json",
+                "temporal_compilation_canonical_json", "temporal_compilation_hash")) {
+            assertTrue(PlayerActionRuntime.hasTemporalMetadata(Map.of(field, "orphaned")));
+        }
+        assertFalse(PlayerActionRuntime.hasTemporalMetadata(Map.of("action_kind", "execute_sequence")));
+    }
+
+    @Test
+    void onlyImplementedGraphCapabilitiesAdvertiseStartDeadlines() {
+        for (String kind : java.util.List.of("execute_sequence", "execute_reactive_program", "walk")) {
+            Map<String, Object> capability = PlayerActionRuntime.capability("capability:test", kind,
+                "continuous_control", java.util.List.of("long_running"), java.util.List.of("native_fabric"), false);
+            assertEquals(!kind.equals("walk"), capability.containsKey("execution_features"));
+            if (kind.equals("execute_sequence")) assertEquals(java.util.List.of("latest_start_tick_v1", "temporal_plan_v1"), capability.get("execution_features"));
+            if (kind.equals("execute_reactive_program")) assertEquals(java.util.List.of("latest_start_tick_v1"), capability.get("execution_features"));
+        }
+    }
+
+    @Test
     void actionPollingWaitsForTheFirstAdmittedHeartbeat() {
         assertFalse(PlayerActionRuntime.actionPollingReady(false, false));
         assertFalse(PlayerActionRuntime.actionPollingReady(true, false));

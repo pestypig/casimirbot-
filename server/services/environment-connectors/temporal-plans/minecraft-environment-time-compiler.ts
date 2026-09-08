@@ -60,6 +60,12 @@ export type MinecraftEnvironmentTimeCompilation<T> = {
   source_goal_revision: number;
   target_schema: string;
   arguments: T;
+  source_checkpoint_bindings: Array<{
+    source_node_id: string;
+    source_checkpoint_id: string;
+    native_node_id: string;
+    native_checkpoint_id: string;
+  }>;
   compilation_hash: string;
   execution_authority: false;
   answer_authority: false;
@@ -80,6 +86,15 @@ const wrapCompilation = <T extends object>(
     source_goal_revision: plan.identity.goal_revision,
     target_schema: targetSchema,
     arguments: argumentsValue,
+    // Generated action postconditions are intentionally absent. Only explicit
+    // source checkpoints can anchor a source-plan extension. Both current
+    // compilers preserve these node/checkpoint IDs; the map is hash-bound.
+    source_checkpoint_bindings: plan.nodes.flatMap(node => node.kind === "checkpoint" ? [{
+      source_node_id: node.node_id,
+      source_checkpoint_id: node.checkpoint_id,
+      native_node_id: node.node_id,
+      native_checkpoint_id: node.checkpoint_id,
+    }] : []),
     execution_authority: false as const,
     answer_authority: false as const,
     assistant_answer: false as const,
@@ -316,6 +331,7 @@ export const compileEnvironmentTimePlanToMinecraftFluidSequence = (input: {
       node_id: node.preconditions.length === 0 ? node.node_id : actionId,
       node_kind: "workflow_action",
       earliest_tick: node.timing.earliest_start_unit,
+      latest_start_tick: node.timing.latest_start_unit,
       timeout_ticks: node.timing.maximum_duration_units,
       action,
       on_success: completionIds[0],
@@ -435,6 +451,7 @@ export const compileEnvironmentTimePlanToMinecraftReactiveProgram = (input: {
       node_id: node.preconditions.length === 0 ? node.node_id : actionId,
       node_kind: "action",
       earliest_tick: node.timing.earliest_start_unit,
+      latest_start_tick: node.timing.latest_start_unit,
       timeout_ticks: node.timing.maximum_duration_units,
       action,
       on_success: completionIds[0] ?? node.on_success_node_id,

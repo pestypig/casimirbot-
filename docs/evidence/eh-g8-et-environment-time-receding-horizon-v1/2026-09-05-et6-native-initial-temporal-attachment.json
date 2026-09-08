@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-05",
+  "classification": "adapter execution",
+  "scope": "Native initial serial temporal delivery",
+  "implementation": [
+    "All temporal metadata, including orphaned or null fields, enters strict preflight instead of finite fallback.",
+    "Initial serial delivery requires source/compiler/paired identity, native engine, no predecessor, matching sequence identity and maximum ticks, a valid native graph and named stabilization node.",
+    "After controller start, attach the temporal clock and stabilization path before first execution; failed attachment cancels the workflow."
+  ],
+  "verification": {
+    "native_tests": ["TemporalPlanDeliveryPreflightTest", "PlayerActionRuntimeLifecycleTest", "FluidSequenceEngineTest"],
+    "native_test_count": 48,
+    "gradle_exit_code": 0,
+    "negative": "Cross-bound identity, malformed metadata, successor-as-initial, graph identity or duration mismatch and invalid graph are rejected.",
+    "initial_fixture_failure": "The first fixture had an unreachable failed terminal. A conditional checkpoint made both terminals reachable; the engine validator was preserved."
+  },
+  "limitations": [
+    "No Minecraft GameTests or live server execution performed.",
+    "No full temporal capability advertisement, successor polling, production route mount or packaged EXE build yet.",
+    "The test validates preflight and existing controller regressions, not a full HTTP-to-runtime acceptance journey."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

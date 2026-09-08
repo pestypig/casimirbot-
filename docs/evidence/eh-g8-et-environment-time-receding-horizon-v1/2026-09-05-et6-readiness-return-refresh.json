@@ -1,0 +1,57 @@
+{
+  "scope": "ET6 prerequisite: packaged Agent Access readiness presentation",
+  "classification": "presentation",
+  "observed_defect": "A mounted ready panel retains continuation unavailable after MCP presence refresh until an explicit UI recheck. Native accessibility reads succeeded, but mouse input geometry failed and Tab did not change reported focus.",
+  "repair": "Coalesce visible window-focus and visibility-return events into one read-only readiness refresh on the ready step. Skip while readiness or binding work is busy; remove listeners and pending timers on cleanup.",
+  "verification": {
+    "focused_command": "npx vitest run client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx --pool=forks --maxWorkers=1 --minWorkers=1",
+    "focused_tests_passed": 24,
+    "new_coverage": [
+      "server-confirmed polling readiness enables the existing human-only bind button on return",
+      "paired focus and visibility events issue one readiness read",
+      "later unavailable response disables binding again",
+      "no mutating request is issued",
+      "unmount cancels the pending refresh"
+    ],
+    "discipline_quick": "passed; no sensitive Helix Ask surfaces detected",
+    "diff_check": "passed with CRLF warnings",
+    "client_build": "passed; Vite completed in 45.72 seconds with browser externalization, eval, and mixed-import warnings",
+    "environment_harness_docs_audit": "passed"
+  },
+  "packaged_candidate": {
+    "path": "apps/desktop/release-et6-readiness-20260905/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "761fca984241f306709fc066d2f528409d8bd229c5fb0b4ef0f4f84231c848cb",
+    "host_build": "passed with four pre-existing duplicate-key/case warnings",
+    "runtime_staging": "passed",
+    "electron_builder": "passed",
+    "runtime_files_matching_staged_bytes": 645,
+    "asar_matches_built_files": ["main.cjs", "preload.cjs", "service.mjs"],
+    "current_exe_replaced_or_restarted": true,
+    "release_readiness_claimed": false
+  },
+  "live_exe_verified": false,
+  "live_switch": {
+    "old_exe_shutdown": "Normal Alt+F4; subsequently no CasimirBot window or process remained",
+    "candidate_pid": 10000,
+    "candidate_window_observed": true,
+    "new_service_instance_ref": "service_instance:8579e21b0f61c44eec162c08b5eb3392",
+    "presence_registered_at": "2026-09-05T00:19:19.952Z",
+    "same_continuation_ref": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "mcp_reconnect_required": false,
+    "native_input_failure": "Panel-picker click failed: coordinate input geometry is unavailable; Tab did not reach panel controls",
+    "readiness_return_refresh_live_verified": false,
+    "minecraft_preflight": "action_adapter_admission_inactive; no movement was requested",
+    "native_panel_presentation": {
+      "tool": "helix_desktop_tunnel_transition_request",
+      "request_ref": "desktop_tunnel_request:d64d5a8f-95a4-4159-819b-a47afd0d8b35",
+      "native_attention_requested": true,
+      "observed_exe_state": "Agent Access open; catalog current; continuation polling; thread visibility continuation ready; Bind current Helix chat enabled",
+      "consent_control_activated": false,
+      "note": "Existing native-guidance path refreshed readiness. This does not independently prove the new window-focus refresh listener."
+    }
+  },
+  "binding_created": false,
+  "authority_changed": false,
+  "et6_complete": false,
+  "remaining": "Deliver through verified packaged workflow, verify native return refresh and exact binding, then resume the full ET6 capacity journey. This fixture does not prove native click recovery or Minecraft capacity."
+}

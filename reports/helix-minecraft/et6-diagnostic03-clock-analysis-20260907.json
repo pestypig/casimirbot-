@@ -1,0 +1,21 @@
+{
+  "action_request_id": "action_request:et6-live-20260907-diagnostic03",
+  "source_tick": 4120,
+  "terminal_clock_tick": 4218,
+  "elapsed_ticks": 98,
+  "nominal_tick_rate_hz": 20,
+  "source_monotonic_elapsed_ms": 205979,
+  "terminal_monotonic_elapsed_ms": 210865.4128,
+  "elapsed_monotonic_ms": 4886.4128,
+  "same_monotonic_origin": true,
+  "plan_stop_unit": 20,
+  "plan_maximum_total_units": 80,
+  "plan_monotonic_deadline_elapsed_ms": 213979,
+  "native_clock_rule": "currentClientTick - sourceTick must be less than stop_unit",
+  "recorded_terminal_clock_satisfies_rule": false,
+  "interpretation": "Caller proposal runway was undersized relative to measured delivery latency. Terminal clock is the rejection-time snapshot, not an independently recorded exact preflight entry tick.",
+  "do_not_weaken_clock_validation": true,
+  "next_proposal_requirement": "Measure and budget delivery lead before choosing stop watermark and horizon. Verify fresh bounded terrain before choosing movement duration. This single diagnostic does not establish latency percentiles or ET6 capacity.",
+  "rolling_extensions_proven": 0,
+  "et6_complete": false
+}

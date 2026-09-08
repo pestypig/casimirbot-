@@ -1,0 +1,19 @@
+{
+  "scope": "Real Java HTTP client against isolated loopback fault endpoint; not a live broker or Minecraft test",
+  "test": "PlayerActionHttpClientFaultTest.lostSuccessorResponseRemainsUncertainAndDoesNotReplayTheLease",
+  "result": "passed",
+  "fault": "HTTP 200 body truncated after fixture records one-shot lease",
+  "observed": {
+    "first_call": "IOException",
+    "requests_after_first_call": 1,
+    "requests_after_explicit_later_poll": 2,
+    "fixture_leases": 1,
+    "later_poll_action": null
+  },
+  "not_proven": [
+    "Actual broker admission or storage concurrency",
+    "Native controller execution or reconciliation",
+    "Restart recovery or live timing capacity"
+  ],
+  "remaining_gap": "Empty polling cannot distinguish an uncertain leased delivery. Existing readEnvironmentActionObservation joins terminal results and does not return a leased request without a result. Exact nonterminal reconciliation still requires implementation and authorization tests."
+}

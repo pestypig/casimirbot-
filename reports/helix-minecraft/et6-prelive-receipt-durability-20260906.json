@@ -1,0 +1,23 @@
+{
+  "finding": "Workflow and player-projection acknowledgements previously used best-effort local persistence",
+  "repair": "Require local snapshot before receipt, including explicit table barriers on read-only idempotent retries",
+  "verified": [
+    "Read-only retry rejects on injected snapshot rename failure",
+    "Disk state unchanged on failure; subsequent successful retry saves committed state",
+    "Workflow handler requests strict request/event snapshot",
+    "Projection handler requests strict batch/event/digest snapshot",
+    "Full migrated schema can be snapshotted"
+  ],
+  "test_runs": [
+    { "tests": 50, "failed": 0, "scope": "receipt handlers plus local persistence fault fixture" },
+    { "tests": 50, "failed": 0, "scope": "same receipt handlers plus full-schema snapshot fixture" }
+  ],
+  "targeted_typecheck": "passed",
+  "limits": [
+    "Overlapping test counts, not 100 distinct tests",
+    "Handler option tests and real disk fault test remain separate fixtures",
+    "Terminal-result receipt and full workflow admission integration still pending",
+    "Source-only, no package or live-session replacement",
+    "No fsync or power-loss durability claim"
+  ]
+}

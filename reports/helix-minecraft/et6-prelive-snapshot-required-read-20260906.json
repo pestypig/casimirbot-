@@ -1,0 +1,24 @@
+{
+  "scope": "Strict local snapshot read failure at temporal delivery boundary",
+  "characterization": {
+    "fault": "Reject SELECT of required helix_environment_action_requests during save",
+    "before": "HTTP 200 despite required snapshot read failure",
+    "after": "HTTP 503, no action_request, previous on-disk snapshot unchanged"
+  },
+  "repair": [
+    "Strict saves propagate reads that fail for required tables instead of substituting an empty table",
+    "Re-mark required tables after waiting for an earlier writer so strict save refreshes them itself"
+  ],
+  "verification": {
+    "persistence_restart_scheduler_tests": 5,
+    "passed": true,
+    "targeted_typecheck_passed": true
+  },
+  "fixture_adjustment": "The process-restart fixture names its two migrated tables explicitly; it does not install the full application schema",
+  "limits": [
+    "Persistence HTTP fixture uses mocked authentication and broker body with the real transaction/snapshot barrier",
+    "No full production migration, broker-to-controller or power-loss proof",
+    "Latest service bundle predates this repair and requires rebuilding before installation",
+    "No live movement or ET6 qualification"
+  ]
+}

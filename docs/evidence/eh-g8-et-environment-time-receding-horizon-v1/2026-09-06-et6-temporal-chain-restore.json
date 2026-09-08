@@ -1,0 +1,29 @@
+{
+  "schema": "et6.temporal_chain_restore.v1",
+  "classification": "evidence retention",
+  "red_test": "Child-first snapshot restored one root and discarded all three successors (expected 4, received 1).",
+  "repair": "Iterative exact predecessor-ID/hash ordering before local temporal admission restoration. Unresolved rows still undergo normal database validation; no parent, authority, or execution is fabricated.",
+  "verification": {
+    "command": "npx vitest run server/__tests__/local-pg-mem-persistence.test.ts server/__tests__/local-temporal-restore-order.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed": 12,
+    "failed": 0,
+    "cases": ["reversed four-plan restart chain", "exact parent/hash ordering", "missing/wrong-hash/cyclic references left unchanged", "10000-plan iterative ordering"],
+    "build_server": "passed; four existing warnings in unrelated modules",
+    "diff_check": "passed"
+  },
+  "live_recheck": {
+    "goal_inspection": "succeeded without restart after prior HTTP 504",
+    "goal_revision": 25,
+    "goal_status": "active",
+    "readiness_heartbeat_at": "2026-09-06T17:43:21.454Z",
+    "ready_for_actions": true,
+    "active_workflow_count": 0,
+    "controls_asserted": false,
+    "manual_input_detected": false,
+    "same_task_presence_refreshed_at": "2026-09-06T17:43:23.660Z"
+  },
+  "packaged_deployment": "not yet deployed",
+  "original_root_submission_result": "still unavailable; current idle readiness does not reconstruct historical outcome",
+  "live_rolling_extensions_proven": 0,
+  "goal_complete": false
+}

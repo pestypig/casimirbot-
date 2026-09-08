@@ -1,0 +1,39 @@
+{
+  "scope": "One-loop CP-even neutral messenger two-point and tadpole at yu=0, exact in yL*v/MU. No CP-odd light-quark, gauge/GF, vertex or fermion matching.",
+  "checks": {
+    "zero_momentum_matches_CW_curvature": true,
+    "tadpole_matches_CW_derivative": true,
+    "zero_background_recovers_archived_loop": true,
+    "five_CP_even_input_conditions": true
+  },
+  "heavy_eigenmass_GeV": 2000.3030492402895,
+  "left_mixing_sine": 0.017406331465049444,
+  "counterterms": {
+    "delta_lambdaH": 4.9060577856623996e-05,
+    "delta_muHS_GeV": 0.0018243950454266257,
+    "delta_mS2_GeV2": 0.00016535901187787603,
+    "delta_t_GeV3": -55.34095755814683,
+    "delta_muH2_GeV2": 6082.780890965772
+  },
+  "rows": [
+    {
+      "q_GeV": 0.0,
+      "relative_scalar_propagator_amplitude": -0.0001735982917575757,
+      "change_from_leading_amplitude": 2.409167259512918e-07,
+      "fractional_change_of_this_correction": -0.00138585954257909
+    },
+    {
+      "q_GeV": 0.05,
+      "relative_scalar_propagator_amplitude": -0.00017359829159918811,
+      "change_from_leading_amplitude": 2.4091672586962426e-07,
+      "fractional_change_of_this_correction": -0.0013858595433726313
+    },
+    {
+      "q_GeV": 0.246,
+      "relative_scalar_propagator_amplitude": -0.00017359828792358261,
+      "change_from_leading_amplitude": 2.4091672397438466e-07,
+      "fractional_change_of_this_correction": -0.0013858595617876944
+    }
+  ],
+  "full_model_admitted": false
+}

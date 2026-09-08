@@ -1,0 +1,46 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "status": "source_repair_live_requalification_pending",
+  "classification": ["evidence normalization", "evidence re-entry"],
+  "binding": {
+    "id": "reasoning_binding:7378fd90d1e862bfd48b279a0fc1d599",
+    "epoch": 3,
+    "continuation": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "run_id": "run_c3865d6b-e542-46d7-aa83-385b0a2ff5e4",
+    "identity_basis": "authenticated native-desktop client and client-declared continuation; not independent external OAuth provider-task proof"
+  },
+  "steering": {
+    "event_ref": "reasoning_steering:53036aab36b9300b7c327849a5138d07",
+    "origin": "typed",
+    "instruction": "Walk across this platform, keep checking the path ahead, and stop if it becomes unsafe.",
+    "created_at": "2026-09-05T18:48:52.830Z",
+    "acknowledged_at": "2026-09-05T18:53:02.518Z",
+    "advisory_only": true,
+    "answer_authority": false,
+    "execution_authority": false,
+    "voice_test": false
+  },
+  "goal_id": "environment_durable_goal:896355ef-445f-4edd-8465-e02596d619b8",
+  "negative_evidence": [
+    "First goal-create request rejected at connector validation because required_postcondition_ids was empty; corrected request created revision 1.",
+    "Frontier publish rejected with durable_goal_evidence_identity_mismatch; no plan was submitted and no movement was issued.",
+    "Caller used the typed steering turn instead of the independently generated probe turn; the installed MCP probe response exposes no such probe-turn locator. The probe may also age beyond the unchanged five-second freshness gate. The returned generic failure does not distinguish those predicates."
+  ],
+  "probe": {
+    "request_ref": "environment_probe_request:4a6536f0-208f-4595-9133-ac6171532d13",
+    "evidence_ref": "environment_probe_evidence:69ba855ecb08329e66abcaca9d19ee152ade870b",
+    "observed_at": "2026-09-05T18:54:13.348Z",
+    "position": {"x": 5.45, "y": 65, "z": 2.55},
+    "hazard_count_within_declared_bounds": 0,
+    "client_screen_state": "unobserved"
+  },
+  "repair": {
+    "change": "Return prior_turn_id using the same public local locator passed to the probe executor; keep exact identity and five-second freshness admission unchanged.",
+    "focused_tests": {"files": 2, "passed": 11},
+    "discipline_quick": "PASS; zero sensitive files inferred, not behavioral proof",
+    "deployed_to_exe": false
+  },
+  "remaining": ["deploy tested repair", "fresh exact-locator frontier admission", "three continuous resident rolling cycles", "remaining ET6 perturbations and lifecycle proof"],
+  "goal_complete": false
+}

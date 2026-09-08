@@ -1,0 +1,33 @@
+{
+  "status": "rigid_gaussian_atom_large_gap_toy_not_material_prediction",
+  "electron_rms_m": 1e-10,
+  "rows": [
+    {
+      "mediator_eV": 0,
+      "integral_eV_inverse": 0.00021480884180703774,
+      "minus_delta_Ueff0_over_alpha_squared_Z_squared": 0.001718470734456302
+    },
+    {
+      "mediator_eV": 1,
+      "integral_eV_inverse": 0.00021480882447276638,
+      "minus_delta_Ueff0_over_alpha_squared_Z_squared": 0.001718470595782131
+    },
+    {
+      "mediator_eV": 1000.0,
+      "integral_eV_inverse": 0.00020306223854909042,
+      "minus_delta_Ueff0_over_alpha_squared_Z_squared": 0.0016244979083927234
+    },
+    {
+      "mediator_eV": 100000.0,
+      "integral_eV_inverse": 7.853164118692114e-06,
+      "minus_delta_Ueff0_over_alpha_squared_Z_squared": 6.282531294953691e-05
+    }
+  ],
+  "analytic_relative_error": 1.4988010832439613e-14,
+  "parseval_relative_error": 4.440892098500626e-16,
+  "assumptions": [
+    "point nucleus plus rigid Gaussian electron density",
+    "large-gap constant propagator",
+    "no target excitation, material correlations, finite nuclear radius or xenon normalization"
+  ]
+}

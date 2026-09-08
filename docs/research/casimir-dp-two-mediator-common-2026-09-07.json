@@ -1,0 +1,180 @@
+{
+  "status": "conditional_common_kernel_partial_response_not_supplied_population",
+  "fast_reference": {
+    "density_cm3": 0.003,
+    "speed_kms": 776,
+    "normalization": "one raw unattenuated high-window event"
+  },
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -402.0220526347782
+      ],
+      "common_strength": 2.4122884978697244e-07,
+      "effective_alpha_products": [
+        2.06786993645485e-12,
+        -8.313293164353272e-10
+      ],
+      "thermal": [
+        {
+          "T_K": 300.0,
+          "grid_rates": [
+            369.15353530692533,
+            368.4028306336019
+          ],
+          "partial_D_per_cm3": 9.0316439515124e-22,
+          "density_for_DP_comparator_cm3": 3.267562902233615e+19
+        },
+        {
+          "T_K": 5000.0,
+          "grid_rates": [
+            194549948.55549845,
+            194556186.6989558
+          ],
+          "partial_D_per_cm3": 4.769676182473586e-16,
+          "density_for_DP_comparator_cm3": 61873099122715.89
+        }
+      ],
+      "range_strength_diagnostics": [
+        {
+          "A": 12,
+          "individual_range_strengths": [
+            0.00024948660905816744,
+            1.0029911867845492e-07
+          ]
+        },
+        {
+          "A": 131,
+          "individual_range_strengths": [
+            0.012274253214980095,
+            4.9345204720453235e-06
+          ]
+        }
+      ],
+      "raw_low_count_at_reference": 131.05038092496864
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -402.0197459931579
+      ],
+      "common_strength": 2.4123175732664716e-07,
+      "effective_alpha_products": [
+        2.0678823984712527e-12,
+        -8.313295565771352e-10
+      ],
+      "thermal": [
+        {
+          "T_K": 300.0,
+          "grid_rates": [
+            79.53419091356035,
+            79.34784731113015
+          ],
+          "partial_D_per_cm3": 1.9452660122089017e-22,
+          "density_for_DP_comparator_cm3": 1.5170914690805436e+20
+        },
+        {
+          "T_K": 5000.0,
+          "grid_rates": [
+            24785704.381767783,
+            24786749.084016025
+          ],
+          "partial_D_per_cm3": 6.076638772218223e-17,
+          "density_for_DP_comparator_cm3": 485654418970368.3
+        }
+      ],
+      "range_strength_diagnostics": [
+        {
+          "A": 12,
+          "individual_range_strengths": [
+            2.4948811258900343e-06,
+            1.0029914765134354e-07
+          ]
+        },
+        {
+          "A": 131,
+          "individual_range_strengths": [
+            0.00012274327185756592,
+            4.934521897454778e-06
+          ]
+        }
+      ],
+      "raw_low_count_at_reference": 131.0498441209097
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "relative_products": [
+        1.0,
+        -380.3701147125923
+      ],
+      "common_strength": 2.710214171096352e-07,
+      "effective_alpha_products": [
+        2.191847842070492e-12,
+        -8.337134151209009e-10
+      ],
+      "thermal": [
+        {
+          "T_K": 300.0,
+          "grid_rates": [
+            2.9346212207930047e-06,
+            2.9266036821794046e-06
+          ],
+          "partial_D_per_cm3": 7.174766382541112e-30,
+          "density_for_DP_comparator_cm3": 4.113230054982272e+27
+        },
+        {
+          "T_K": 5000.0,
+          "grid_rates": [
+            0.7236155571760979,
+            0.723611832668816
+          ],
+          "partial_D_per_cm3": 1.77398322931616e-24,
+          "density_for_DP_comparator_cm3": 1.6635706716077972e+22
+        }
+      ],
+      "range_strength_diagnostics": [
+        {
+          "A": 12,
+          "individual_range_strengths": [
+            2.644444295307682e-08,
+            1.0058675799572434e-07
+          ]
+        },
+        {
+          "A": 131,
+          "individual_range_strengths": [
+            1.3010148727440685e-06,
+            4.9486717638845005e-06
+          ]
+        }
+      ],
+      "raw_low_count_at_reference": 125.91518686678263
+    }
+  ],
+  "checks": [
+    "frozen config and shape hash",
+    "pinned clean DarkELF",
+    "one-count normalization",
+    "partial response grid refinement"
+  ],
+  "limitations": [
+    "no source/overburden or capture solution",
+    "conditional Maxwell particles, not apparatus temperature",
+    "partial q>=qBZ multiphonon band only",
+    "not boundary-contrast visibility prediction",
+    "individual range strengths are diagnostics not screening or full Born proof",
+    "no detector fit or external constraints"
+  ]
+}

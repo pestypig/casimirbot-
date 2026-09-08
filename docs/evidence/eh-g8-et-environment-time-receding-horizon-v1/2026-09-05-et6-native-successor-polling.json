@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-05",
+  "classification": "adapter execution and evidence re-entry",
+  "scope": "Native controls-first serial successor polling integration, not advertised or deployed",
+  "implementation": [
+    "Poll the dedicated successor route only after controls and evidence-outbox checks while a temporal root envelope remains active.",
+    "Use the current source plan and an explicit source checkpoint; never change the root envelope to the successor action.",
+    "Validate source/compiler/paired identity, exact predecessor hash, goal/run and distinct action before asking the existing controller to queue it.",
+    "Advance the current-plan reference only when the native event reports the queued sequence identity. Reject stale envelope responses; incompatible or late delivery cancels the resident without executing the successor."
+  ],
+  "verification": {
+    "native_tests": ["TemporalPlanDeliveryPreflightTest", "PlayerActionRuntimeLifecycleTest", "FluidSequenceEngineTest"],
+    "native_test_count": 48,
+    "gradle_exit_code": 0,
+    "negative": "Wrong run and predecessor hash are rejected in successor preflight; existing controller handoff, manual-interruption and lifecycle regressions pass."
+  },
+  "remaining_before_advertisement": [
+    "End-to-end transport fixture including acceptance/start receipt delivery, response loss, late responses and duplicate behavior.",
+    "Verify cumulative resident effect ceilings before successor effects, not only during final server normalization.",
+    "Mount dependency-injected route and coordinate manifest support only after these checks pass.",
+    "Packaged EXE and actual three-cycle Minecraft qualification."
+  ],
+  "limitations": ["No native HTTP integration fixture or live GameTest was run.", "No route mount, server restart, packaged build or live game action occurred."],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

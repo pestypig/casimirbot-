@@ -1,0 +1,43 @@
+{
+  "status": "conditional_shared_contact_normalization",
+  "prior_sha256": "1be84a1bcb305f22a5f0bf725fd4434544a5bc38986548148c717286246d3cf1",
+  "model": "C n_target n_chi; dsigma/dE=mA A^2 C^2 F^2/(2 pi v^2)",
+  "population": "unshifted isotropic truncated Gaussian, v0=220 km/s, vmax=776 km/s, rho=.3 GeV/cm3",
+  "xenon": "mean-A uniform sphere radius 1.2 A^(1/3) fm; raw true energies; 2.84 tonne-year",
+  "rows": [
+    {
+      "mass_GeV": 77.86556301055496,
+      "raw_high_per_C2": 8816553159112.418,
+      "raw_low_per_C2": 5.466901851961504e+19,
+      "raw_low_high_ratio": 6200724.6520270165,
+      "C_for_one_raw_high_GeV_minus2": 3.367833284551797e-07,
+      "stimulated_D_upper_per_raw_high": 4.973279031372011e-31,
+      "point_speed_energy_relative_error": 1.2212453270876722e-15
+    },
+    {
+      "mass_GeV": 100,
+      "raw_high_per_C2": 114010890263221.78,
+      "raw_low_per_C2": 5.1604001778292515e+19,
+      "raw_low_high_ratio": 452623.4437706097,
+      "C_for_one_raw_high_GeV_minus2": 9.365410794092991e-08,
+      "stimulated_D_upper_per_raw_high": 2.3317725009114527e-32,
+      "point_speed_energy_relative_error": 2.9110491794881455e-11
+    },
+    {
+      "mass_GeV": 1000,
+      "raw_high_per_C2": 4229242306173087.0,
+      "raw_low_per_C2": 8.456446723126545e+18,
+      "raw_low_high_ratio": 1999.518143186865,
+      "C_for_one_raw_high_GeV_minus2": 1.53768973799153e-08,
+      "stimulated_D_upper_per_raw_high": 6.285935859768015e-36,
+      "point_speed_energy_relative_error": 2.1368284919276448e-10
+    }
+  ],
+  "limitations": [
+    "One raw high count is a normalization illustration, not a fit",
+    "Uniform mean-isotope target is not authenticated LZ nuclear or detector response",
+    "Stimulated upper bound only, not total coherence",
+    "No cold population substituted into xenon normalization",
+    "No microscopic completion, external constraint admission, or transport"
+  ]
+}

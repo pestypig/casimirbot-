@@ -1,0 +1,95 @@
+{
+  "status": "elastic_capture_kinematics_not_capture_rate",
+  "incident_mass_GeV": 100.0,
+  "local_incident_speed_km_s": 776.0,
+  "chosen_escape_speed_km_s": 11.2,
+  "one_collision_target_mass_interval_GeV": [
+    97.15447154471546,
+    102.92887029288701
+  ],
+  "rows": [
+    {
+      "target_mass_number": 16,
+      "target_mass_GeV": 14.90390563872,
+      "max_energy_fraction_lost": 0.4515340459270849,
+      "minimum_outgoing_speed_km_s": 574.6938614252041,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 15
+    },
+    {
+      "target_mass_number": 24,
+      "target_mass_GeV": 22.35585845808,
+      "max_energy_fraction_lost": 0.5973127784284349,
+      "minimum_outgoing_speed_km_s": 492.4312950423427,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 10
+    },
+    {
+      "target_mass_number": 28,
+      "target_mass_GeV": 26.081834867759998,
+      "max_energy_fraction_lost": 0.6562859265461028,
+      "minimum_outgoing_speed_km_s": 454.94655279073606,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 8
+    },
+    {
+      "target_mass_number": 56,
+      "target_mass_GeV": 52.163669735519996,
+      "max_energy_fraction_lost": 0.9011688693066576,
+      "minimum_outgoing_speed_km_s": 243.9543706441724,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 4
+    },
+    {
+      "target_mass_number": 58,
+      "target_mass_GeV": 54.026657940359996,
+      "max_energy_fraction_lost": 0.9109117623177182,
+      "minimum_outgoing_speed_km_s": 231.61778561795666,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 4
+    },
+    {
+      "target_mass_number": 96,
+      "target_mass_GeV": 89.42343383232,
+      "max_energy_fraction_lost": 0.9968823886698407,
+      "minimum_outgoing_speed_km_s": 43.32840546743011,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 2
+    },
+    {
+      "target_mass_number": 107,
+      "target_mass_GeV": 99.66986895894,
+      "max_energy_fraction_lost": 0.9999972663201157,
+      "minimum_outgoing_speed_km_s": 1.2830262733093731,
+      "capture_in_one_collision": true,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 1
+    },
+    {
+      "target_mass_number": 108,
+      "target_mass_GeV": 100.60136306135999,
+      "max_energy_fraction_lost": 0.9999910131863378,
+      "minimum_outgoing_speed_km_s": 2.326293941844308,
+      "capture_in_one_collision": true,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 1
+    },
+    {
+      "target_mass_number": 131,
+      "target_mass_GeV": 122.02572741702,
+      "max_energy_fraction_lost": 0.9901586672255747,
+      "minimum_outgoing_speed_km_s": 76.98190959421797,
+      "capture_in_one_collision": false,
+      "minimum_maximal_transfer_collisions_at_fixed_potential": 2
+    }
+  ],
+  "assumptions": [
+    "stationary free nuclei and nonrelativistic elastic two-body kinematics",
+    "chosen fixed gravitational potential, 776 km/s is local speed",
+    "multiple-collision count grants maximal energy transfer every time on the same target species"
+  ],
+  "limitations": [
+    "approximate nuclear masses A times u; no abundance or terrestrial profile",
+    "kinematically open is not a predicted or likely collision",
+    "no form factors, transport, thermal motion or retention",
+    "counts are favorable kinematic minima, not required mean optical depths"
+  ]
+}

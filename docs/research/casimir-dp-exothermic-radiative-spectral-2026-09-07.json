@@ -1,0 +1,50 @@
+{
+  "scope": "Heavy transition-current spectral kernel; source six-term large-electron-mass series convolved exactly term by term. No remainder bound or exact radiative lifetime.",
+  "source": "https://arxiv.org/pdf/1705.00619 Eq9-10 TableI",
+  "coefficients": [
+    1,
+    0.469187675070028,
+    0.15356261552239944,
+    0.04364115776180602,
+    0.011563893446896649,
+    0.002947254805816412,
+    0.0005374683015683631
+  ],
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "gap_GeV": 0.0010062516621719801,
+      "convolved_terms": [
+        1.0,
+        1.2129099038409377,
+        1.0866082003392672,
+        0.8823306827996646,
+        0.6907375942875966,
+        0.5342500506887657,
+        0.3022337337260483
+      ],
+      "partial_sum": 5.709070165682279,
+      "direct_endpoint_series": 14.698708609535839
+    },
+    {
+      "mchi_GeV": 100.0,
+      "gap_GeV": 0.0005513006648687921,
+      "convolved_terms": [
+        1.0,
+        0.36407625328304594,
+        0.09790403702981755,
+        0.023862877665277008,
+        0.0056074878014417354,
+        0.0013018580317559322,
+        0.00022106795920320125
+      ],
+      "partial_sum": 1.4929735817705414,
+      "direct_endpoint_series": 1.8518375808940366
+    }
+  ],
+  "checks": {
+    "vector_pair_normalization": true,
+    "analytic_moments_vs_quadrature": true
+  },
+  "full_model_admitted": false
+}

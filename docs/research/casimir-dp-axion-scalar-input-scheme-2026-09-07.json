@@ -1,0 +1,38 @@
+{
+  "scope": "Complete CP/gauge-invariant nonderivative scalar potential for one Higgs doublet and one complex singlet, dimension <=4, modulo constant, with fixed field origin. Tree input reconstruction only.",
+  "checks": {
+    "complete_nonderivative_monomials": true,
+    "vacuum_mass_map_rank_six": true,
+    "seven_free_inputs_close_tree_map": true,
+    "minimal_reference_recovery": true
+  },
+  "reference_scale_GeV": 2000.0,
+  "field_convention": "Cartesian, canonical renormalized fields; fixed S vacuum f=294 GeV",
+  "seven_MSbar_boundary_assumptions": {
+    "muS": 0.0,
+    "muSA": 0.0,
+    "lambdaS": 5.784593281660516,
+    "lambdaSA": 5.784593281660516,
+    "lambdaA": 5.784593281660516,
+    "lambdaHS": 0.03,
+    "lambdaHA": 0.03
+  },
+  "tree_reconstructed_coefficients": {
+    "muS": 0.0,
+    "muSA": 0.0,
+    "lambdaS": 5.784593281660516,
+    "lambdaSA": 5.784593281660516,
+    "lambdaA": 5.784593281660516,
+    "lambdaHS": 0.03,
+    "lambdaHA": 0.03,
+    "lambdaH": 0.12892794367796792,
+    "muHS": 0.0,
+    "muH2": 9111.435106391564,
+    "mS2": -500905.32149360835,
+    "t": -294.0000000158325,
+    "mA2": -500905.3214936084
+  },
+  "max_scaled_reconstruction_error": 2.808064891723916e-11,
+  "loop_counterterms_evaluated": false,
+  "full_model_admitted": false
+}

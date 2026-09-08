@@ -89,6 +89,105 @@ const issueAndClaim = (store: HelixReasoningTaskBindingStore) => {
 };
 
 describe("HelixReasoningTaskBindingStore", () => {
+  it("resolves only the exact owned preparation target without mutating the binding", () => {
+    const { store, entries } = setup();
+    const { binding } = issueAndClaim(store);
+    entries.unshift(presence({ client_session_ref: "other-session",
+      conversation_thread_ref: "other-task" }));
+    const input = { profileRef: "profile-current", bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch, helixConversationId: "helix-conversation-current",
+      missionId: "mission-current", runId: "run-current" };
+    for (let index = 0; index < 3; index++) {
+      expect(store.resolveOwnedPreparationTarget(input)).toEqual({ ...input,
+        authenticatedMcpClientRef: "mcp-client-current", clientSessionRef: "client-session-current",
+        clientContinuationRef: "provider-thread-private" });
+    }
+    expect(store.inspect({ profileRef: input.profileRef, bindingId: input.bindingId })).toEqual(binding);
+    for (const change of [{ profileRef: "other-profile" }, { bindingEpoch: 999 },
+      { helixConversationId: "other-chat" }, { runId: "other-run" }, { missionId: null }]) {
+      expect(() => store.resolveOwnedPreparationTarget({ ...input, ...change })).toThrow(HelixReasoningTaskBindingError);
+    }
+    store.revoke({ profileRef: input.profileRef, bindingId: input.bindingId });
+    expect(() => store.resolveOwnedPreparationTarget(input)).toThrow("reasoning_binding_revoked");
+  });
+
+  it("cannot substitute another task or expired presence for an owner preparation target", () => {
+    const { store, entries, advance } = setup();
+    const { binding } = issueAndClaim(store);
+    const input = { profileRef: "profile-current", bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch, helixConversationId: "helix-conversation-current",
+      missionId: "mission-current", runId: "run-current" };
+    entries[0] = presence({ conversation_thread_ref: "other-task" });
+    expect(() => store.resolveOwnedPreparationTarget(input)).toThrow("reasoning_binding_target_inactive");
+    entries[0] = presence();
+    advance(300);
+    expect(() => store.resolveOwnedPreparationTarget(input)).toThrow("reasoning_binding_target_inactive");
+  });
+
+  it("keeps a chat-only claim active without treating a later declared run as bound", () => {
+    const { store, entries } = setup();
+    // Reproduce the browser claim, which currently omits mission/run identity.
+    const issued = store.issueClaim({
+      profileRef: "profile-current",
+      clientSessionRef: "client-session-current",
+      helixConversationId: "helix-conversation-current",
+    });
+    const binding = store.claim({
+      profileRef: "profile-current",
+      authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current",
+      claimHandle: issued.claim_handle,
+    });
+    const input = {
+      profileRef: "profile-current", authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current", clientContinuationRef: "provider-thread-private",
+      bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+      helixConversationId: "helix-conversation-current", missionId: null, runId: null,
+    };
+    expect(store.verifyTaskAssociation(input)).toMatchObject({
+      status: "active", mission_id: null, run_id: null, execution_authority: false,
+    });
+    entries[0] = presence({ run_ref: "run-current" });
+    expect(() => store.verifyTaskAssociation({ ...input, runId: "run-current" }))
+      .toThrow("reasoning_binding_task_association_mismatch");
+    // A rejected environment association must not consume or revoke chat binding.
+    expect(store.verifyTaskAssociation(input)).toMatchObject({
+      status: "active", run_id: null, binding_epoch: binding.binding_epoch,
+    });
+  });
+
+  it("verifies the exact live task association without granting execution", () => {
+    const { store, advance } = setup();
+    const { binding } = issueAndClaim(store);
+    const input = { profileRef: "profile-current", authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current", clientContinuationRef: "provider-thread-private",
+      bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+      helixConversationId: "helix-conversation-current", missionId: "mission-current", runId: "run-current" };
+    expect(store.verifyTaskAssociation(input)).toMatchObject({ execution_authority: false, answer_authority: false, terminal_eligible: false });
+    for (const patch of [
+      { profileRef: "profile-other" }, { authenticatedMcpClientRef: "mcp-other" },
+      { clientSessionRef: "session-other" }, { clientContinuationRef: "thread-other" },
+      { bindingEpoch: binding.binding_epoch + 1 }, { helixConversationId: "helix-other" },
+      { missionId: null }, { runId: null }, { runId: "run-other" },
+    ]) expect(() => store.verifyTaskAssociation({ ...input, ...patch })).toThrow(HelixReasoningTaskBindingError);
+    advance(300);
+    expect(() => store.verifyTaskAssociation(input)).toThrow("reasoning_binding_target_inactive");
+  });
+
+  it("does not validate an association after revoke or a presence capability loss", () => {
+    const { store, entries } = setup();
+    const { binding } = issueAndClaim(store);
+    const input = { profileRef: "profile-current", authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current", clientContinuationRef: "provider-thread-private",
+      bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+      helixConversationId: "helix-conversation-current", missionId: "mission-current", runId: "run-current" };
+    entries[0] = presence({ thread_observability_bridge: null });
+    expect(() => store.verifyTaskAssociation(input)).toThrow("reasoning_binding_target_inactive");
+    entries[0] = presence();
+    store.revoke({ profileRef: input.profileRef, bindingId: input.bindingId });
+    expect(() => store.verifyTaskAssociation(input)).toThrow("reasoning_binding_revoked");
+  });
+
   it("claims a show-once handle only from the exact authenticated task", () => {
     const { store } = setup();
     const issued = store.issueClaim({

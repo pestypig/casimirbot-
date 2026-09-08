@@ -1,0 +1,52 @@
+{
+  "scope": "Three degenerate orthogonal chi flavors with universal inclusive coupling; shared site flux, independent point nuclei; no detector fit",
+  "full_model_admitted": false,
+  "mu_GeV": 0.00216,
+  "md_GeV": 0.00467,
+  "coupling_ratio_GeV_m1": 0.02,
+  "checks": {
+    "flux_kernel_direct_check": true,
+    "carbon_quadrature_refinement": true,
+    "nested_xenon_windows": true,
+    "coupling_fourth_power": true
+  },
+  "carbon_refinement_relative_change": -8.939510376282378e-06,
+  "rows": [
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 1.0,
+      "equal_yukawas": 0.02,
+      "Xe_raw_full": 1.7219979872099624,
+      "Xe_raw_high": 0.04960948313789445,
+      "Xe_raw_source_window": 0.09101073538306205,
+      "D_independent_carbon_upper": 9.648205243241561e-23
+    },
+    {
+      "mchi_GeV": 1.0,
+      "mediator_GeV": 10.0,
+      "equal_yukawas": 0.2,
+      "Xe_raw_full": 1.7967783624620506,
+      "Xe_raw_high": 0.055075599086554926,
+      "Xe_raw_source_window": 0.1024137690405171,
+      "D_independent_carbon_upper": 1.980840918922781e-21
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 1.0,
+      "equal_yukawas": 0.02,
+      "Xe_raw_full": 0.028345679635745188,
+      "Xe_raw_high": 0.0009307924668268873,
+      "Xe_raw_source_window": 0.0017510698339814382,
+      "D_independent_carbon_upper": 1.527973543281362e-23
+    },
+    {
+      "mchi_GeV": 2.0,
+      "mediator_GeV": 10.0,
+      "equal_yukawas": 0.2,
+      "Xe_raw_full": 0.029638774517533953,
+      "Xe_raw_high": 0.0010335596055376691,
+      "Xe_raw_source_window": 0.001971489221419606,
+      "D_independent_carbon_upper": 9.36763336961296e-22
+    }
+  ]
+}

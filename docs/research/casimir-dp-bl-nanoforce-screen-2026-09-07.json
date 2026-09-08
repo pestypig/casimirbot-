@@ -1,0 +1,11 @@
+{
+  "status": "conservative_composition_screen_not_precision_recast",
+  "mediator_eV": 1,
+  "range_m": 1.973269804e-07,
+  "visual_yukawa_ceiling": 100000000000.0,
+  "assumed_effective_charge_factor": 0.2,
+  "g_SM_ceiling": 1.912464742121246e-13,
+  "perturbative_g_SM_floor": 3.0244159337343772e-12,
+  "floor_over_ceiling": 15.814231065926945,
+  "source_pdf_sha256": "7d785668bc9298d44da28ac242272761341a44880773e8a568eadef465773756"
+}

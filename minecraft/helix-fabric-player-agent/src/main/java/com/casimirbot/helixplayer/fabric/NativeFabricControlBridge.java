@@ -989,6 +989,18 @@ final class NativeFabricControlBridge implements ControlBridge {
     }
 
     @Override
+    public boolean enterWorkflowStabilization(String actionKind, String admittedNodeId) {
+        return "execute_sequence".equals(actionKind) && fluidSequenceEngine.enterStabilization(admittedNodeId);
+    }
+
+    @Override
+    public boolean queueTemporalSequenceSuccessor(String predecessorSequenceId, String checkpointId,
+        Map<String, Object> arguments, long boundaryTick, long receivedTick, long stopTick, long sourceOriginTick) {
+        return fluidSequenceEngine.queueAdmittedSuccessor(predecessorSequenceId, checkpointId, arguments,
+            boundaryTick, receivedTick, stopTick, sourceOriginTick);
+    }
+
+    @Override
     public WorkflowStep runWorkflowStep(
         String actionKind,
         Map<String, Object> arguments,
@@ -1217,6 +1229,19 @@ final class NativeFabricControlBridge implements ControlBridge {
     }
 
     @Override
+    public InventoryCountObservation inventoryCountObservation() {
+        LocalPlayer player = minecraft.player;
+        if (player == null || minecraft.level == null) return InventoryCountObservation.unavailable();
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        Inventory inventory = player.getInventory();
+        for (int index = 0; index < inventory.getContainerSize(); index++) {
+            ItemStack stack = inventory.getItem(index);
+            if (!stack.isEmpty()) counts.merge(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(), stack.getCount(), Math::addExact);
+        }
+        return new InventoryCountObservation(true, counts);
+    }
+
+    @Override
     public Map<String, Object> compactFluidState() {
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.level == null) return Map.of();
@@ -1243,15 +1268,7 @@ final class NativeFabricControlBridge implements ControlBridge {
             )
         );
 
-        Map<String, Integer> inventoryCounts = new LinkedHashMap<>();
-        Inventory inventory = player.getInventory();
-        for (int index = 0; index < inventory.getContainerSize(); index++) {
-            ItemStack stack = inventory.getItem(index);
-            if (stack.isEmpty()) continue;
-            String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-            inventoryCounts.merge(itemId, stack.getCount(), Integer::sum);
-        }
-        state.put("inventory_counts", Map.copyOf(inventoryCounts));
+        state.put("inventory_counts", inventoryCountObservation().counts());
 
         Map<String, String> equipment = new LinkedHashMap<>();
         for (String destination : List.of(

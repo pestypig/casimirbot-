@@ -1,0 +1,24 @@
+{
+  "status": "kinematic screen of same-speed elastic Xe-capable population only",
+  "representative_Xe_mass_GeV": 122.0,
+  "recoil_keV": 248,
+  "qxe_GeV": 0.24599186978434878,
+  "conditional_halo_vmax_kms": 794.2,
+  "minimum_elastic_particle_mass_GeV": 74.95169821556135,
+  "rows": [
+    {
+      "label": "inverse_separation",
+      "q_eV": 0.7893079216000001,
+      "pair_covariance_upper": 1.0295594181327864e-17,
+      "fractional_second_moment_enhancement_upper_N10000": 1.0294564621909731e-13,
+      "formal_hits_for_unit_enhancement": 9.712892547897862e+16
+    },
+    {
+      "label": "soft_interval_top",
+      "q_eV": 57.13363539490537,
+      "pair_covariance_upper": 5.394388374930564e-14,
+      "fractional_second_moment_enhancement_upper_N10000": 5.393848936093071e-10,
+      "formal_hits_for_unit_enhancement": 18537782793825.48
+    }
+  ]
+}

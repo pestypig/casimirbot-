@@ -1,0 +1,11 @@
+{
+  "schema": "et6.extension_stop_boundaries.v1",
+  "date": "2026-09-05",
+  "scope": "Deterministic temporal-ledger extension admission; no native execution claim.",
+  "new_cases": ["predecessor_canceling", "predecessor_stabilizing", "predecessor_settled_canceled"],
+  "observed": "Each case rejects a new extension with temporal_plan_transition_invalid, leaves predecessor history unchanged, and creates no successor record.",
+  "code_repair_required_for_these_cases": false,
+  "verification": {"command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/environment-time-ledger.test.ts --pool=forks --maxWorkers=1", "passed": 22, "failed": 0, "exit_code": 0},
+  "not_proven": ["Preventing execution of a previously admitted successor after stop", "Native cancellation/extension same-tick races", "Production temporal dispatch", "Live ET6 capacity"],
+  "et6_complete": false
+}

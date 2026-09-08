@@ -1,0 +1,14 @@
+{
+  "et6_complete": false,
+  "change": "ConcurrentReactiveScheduler now retains measured checkpoint settlements with checkpoint/node/lane IDs, local tick_index and workflow-relative monotonic_elapsed_ns. begin clears prior settlements.",
+  "verification": {
+    "filter": "*ConcurrentReactiveSchedulerTest",
+    "result": "BUILD SUCCESSFUL",
+    "exit_code": 0,
+    "assertions": ["one settlement at tick 2", "exact checkpoint and lane identity", "nonnegative elapsed measurement", "subsequent settled poll preserves the same list"]
+  },
+  "limitations": ["Elapsed time is workflow-relative, not the process clock origin", "No server observation/frontier association", "No resident extension acceptance", "Not deployed or live tested"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

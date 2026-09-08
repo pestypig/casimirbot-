@@ -135,6 +135,119 @@ const expectCode = (fn: () => unknown, code: string) => {
 };
 
 describe("EnvironmentTimePlanLedger", () => {
+  it.each(["canceling", "stabilizing", "settled", "running", "succeeded"] as const)(
+    "checks the predecessor state before starting an admitted extension (%s)",
+    (state) => {
+      const ledger = new EnvironmentTimePlanLedger();
+      const first = plan();
+      ledger.admit({ plan: first, current_identity: identity(), monotonic_elapsed_ms: 100 });
+      ledger.start({ plan_id: first.plan_id, clocks: clocks(11, 150) });
+      const current = identity({ observation_revision: 2, affordance_revision: 2 });
+      ledger.checkpoint({ plan_id: first.plan_id, clocks: clocks(12, 200), checkpoint_id: "checkpoint:test:1", observation_revision: 2, affordance_revision: 2, evidence_refs: ["evidence:checkpoint"] });
+      const successor = plan({ plan_id: "temporal_plan:queued", previous: first, identity: current });
+      ledger.commitExtension({ predecessor_plan_id: first.plan_id, successor, after_checkpoint_id: "checkpoint:test:1", current_identity: current, monotonic_elapsed_ms: 250, clocks: clocks(13, 250) });
+      if (state === "stabilizing") {
+        ledger.requireStabilization({ plan_id: first.plan_id, clocks: clocks(14, 300), stabilization_node_id: "node:checkpoint", reason_code: "runway_exhausted" });
+      } else if (state === "succeeded") {
+        ledger.settle({ plan_id: first.plan_id, clocks: clocks(14, 300), outcome: "succeeded", performed_effects: {}, evidence_refs: ["evidence:complete"] });
+      } else if (state !== "running") {
+        ledger.requestCancel({ plan_id: first.plan_id, clocks: clocks(14, 300), reason_code: "operator_stop" });
+        if (state === "settled") ledger.settle({ plan_id: first.plan_id, clocks: clocks(15, 350), outcome: "canceled", performed_effects: {}, evidence_refs: ["evidence:released"] });
+      }
+      const before = ledger.get(successor.plan_id);
+      if (state === "running" || state === "succeeded") {
+        expect(ledger.start({ plan_id: successor.plan_id, clocks: clocks(16, 400) }).projection.state).toBe("running");
+        return;
+      }
+      expectCode(() => ledger.start({ plan_id: successor.plan_id, clocks: clocks(16, 400) }), "temporal_plan_transition_invalid");
+      expect(ledger.get(successor.plan_id)).toEqual(before);
+    },
+  );
+
+  it.each(["canceling", "stabilizing", "settled"] as const)(
+    "cannot admit new extension work after predecessor enters %s",
+    (state) => {
+      const ledger = new EnvironmentTimePlanLedger();
+      const first = plan();
+      ledger.admit({ plan: first, current_identity: identity(), monotonic_elapsed_ms: 100 });
+      ledger.start({ plan_id: first.plan_id, clocks: clocks(11, 150) });
+      const current = identity({ observation_revision: 2, affordance_revision: 2 });
+      ledger.checkpoint({ plan_id: first.plan_id, clocks: clocks(12, 200), checkpoint_id: "checkpoint:test:1", observation_revision: 2, affordance_revision: 2, evidence_refs: ["evidence:checkpoint"] });
+      if (state === "stabilizing") {
+        ledger.requireStabilization({ plan_id: first.plan_id, clocks: clocks(13, 250), stabilization_node_id: "node:checkpoint", reason_code: "runway_exhausted" });
+      } else {
+        ledger.requestCancel({ plan_id: first.plan_id, clocks: clocks(13, 250), reason_code: "operator_stop" });
+        if (state === "settled") ledger.settle({ plan_id: first.plan_id, clocks: clocks(14, 300), outcome: "canceled", performed_effects: {}, evidence_refs: ["evidence:released"] });
+      }
+      const before = ledger.get(first.plan_id);
+      const successor = plan({ plan_id: "temporal_plan:late", previous: first, identity: current });
+      expectCode(() => ledger.commitExtension({ predecessor_plan_id: first.plan_id, successor, after_checkpoint_id: "checkpoint:test:1", current_identity: current, monotonic_elapsed_ms: 350, clocks: clocks(15, 350) }), "temporal_plan_transition_invalid");
+      expect(ledger.get(first.plan_id)).toEqual(before);
+      expectCode(() => ledger.get(successor.plan_id), "temporal_plan_not_found");
+    },
+  );
+
+  it("rejects checkpoint identities absent from the admitted graph without appending facts", () => {
+    const ledger = new EnvironmentTimePlanLedger();
+    const first = plan();
+    ledger.admit({ plan: first, current_identity: identity(), monotonic_elapsed_ms: 100 });
+    ledger.start({ plan_id: first.plan_id, clocks: clocks(11, 150) });
+    const before = ledger.get(first.plan_id);
+    expectCode(() => ledger.checkpoint({
+      plan_id: first.plan_id, clocks: clocks(12, 200), checkpoint_id: "checkpoint:forged",
+      observation_revision: 2, affordance_revision: 2, evidence_refs: ["evidence:test"],
+    }), "temporal_plan_checkpoint_mismatch");
+    expect(ledger.get(first.plan_id)).toEqual(before);
+  });
+
+  it("cannot resettle a finite graph checkpoint with replacement evidence", () => {
+    const ledger = new EnvironmentTimePlanLedger();
+    const first = plan();
+    ledger.admit({ plan: first, current_identity: identity(), monotonic_elapsed_ms: 100 });
+    ledger.start({ plan_id: first.plan_id, clocks: clocks(11, 150) });
+    const checkpoint = {
+      plan_id: first.plan_id, clocks: clocks(12, 200), checkpoint_id: "checkpoint:test:1",
+      observation_revision: 2, affordance_revision: 2, evidence_refs: ["evidence:test"],
+    };
+    ledger.checkpoint(checkpoint);
+    const before = ledger.get(first.plan_id);
+    expectCode(() => ledger.checkpoint({ ...checkpoint, clocks: clocks(13, 250), evidence_refs: ["evidence:replacement"] }), "temporal_plan_checkpoint_mismatch");
+    expect(ledger.get(first.plan_id)).toEqual(before);
+  });
+
+  it.each(["admit", "duplicate", "get"] as const)(
+    "isolates retained plan identity and effects from the %s result",
+    (surface) => {
+      const ledger = new EnvironmentTimePlanLedger();
+      const original = plan();
+      const input = { plan: original, current_identity: identity(), monotonic_elapsed_ms: 100 };
+      const first = ledger.admit(input);
+      const result = surface === "admit" ? first
+        : surface === "duplicate" ? ledger.admit(input)
+          : ledger.get(original.plan_id);
+      result.plan.identity.authority_revision = 999;
+      result.plan.effect_ceiling["effect:motion"] = 999;
+      result.plan.nodes.splice(0);
+      expect(ledger.get(original.plan_id).plan).toEqual(original);
+      expect(ledger.start({ plan_id: original.plan_id, clocks: clocks(11, 150) }).event.identity)
+        .toEqual(identity());
+    },
+  );
+
+  it("isolates the hash-linked event history from returned transition events", () => {
+    const ledger = new EnvironmentTimePlanLedger();
+    const original = plan();
+    ledger.admit({ plan: original, current_identity: identity(), monotonic_elapsed_ms: 100 });
+    const started = ledger.start({ plan_id: original.plan_id, clocks: clocks(11, 150) });
+    const before = ledger.get(original.plan_id);
+    started.event.identity.authority_revision = 999;
+    started.event.clocks.environment.sequence = 999;
+    expect(ledger.get(original.plan_id)).toEqual(before);
+    expect(() => ledger.noteRunwayLow({
+      plan_id: original.plan_id, clocks: clocks(12, 200), remaining_units: 5,
+    })).not.toThrow();
+  });
+
   it("admits idempotently and rejects semantic reuse of a plan id", () => {
     const ledger = new EnvironmentTimePlanLedger();
     const admitted = plan();

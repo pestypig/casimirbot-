@@ -1,0 +1,38 @@
+{
+  "purpose": "Diagnostic artifact refresh after strict receipt persistence repair; not installed or live acceptance",
+  "native": {
+    "tests": 300,
+    "suites": 41,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "runGameTest": "excluded",
+    "build": "PASS",
+    "jar": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+    "sha256": "fc8d2580b6bfb8bde9e1b0b5288f10348a750d510c6bc80bea0b18a245ea8a95"
+  },
+  "desktop": {
+    "path": "apps/desktop/release-et6-receipt-durability-20260906/win-unpacked/CasimirBot.exe",
+    "build": "PASS",
+    "exe_sha256": "86958c6636de676b6a0f2d83e94d7a6b7dc3ab4e2688257eaa83054bd0818614",
+    "service_sha256": "af73f22e74cd3410390ad36332dca472bb4b343a8172fdd158e7be8dd41a21e3",
+    "matching_runtime_files": 645,
+    "asar_main_preload_service_dependency_manifest_match": true,
+    "existing_unrelated_bundle_warnings": 4
+  },
+  "isolated_launch": {
+    "verdict": "PASS",
+    "processes": 4,
+    "loopback_listeners": 4,
+    "full_readiness_receipt": "PASS",
+    "service_listener_receipt": "PASS",
+    "provider_key_vault_exists": "PASS",
+    "protocol_registration_preserved": "PASS",
+    "minimum_free_physical_gib": 4.26,
+    "maximum_commit_percent": 64.6,
+    "temporary_profile_and_processes_cleaned": true
+  },
+  "installed": false,
+  "live_minecraft_tested": false,
+  "simultaneous_broker_native_roundtrip_verified": false
+}

@@ -1,0 +1,32 @@
+{
+  "schema": "casimirbot.et6.clock_window_deployment.v1",
+  "recorded_at": "2026-09-05T19:55:06.967Z",
+  "package": "apps/desktop/release-et6-clock-window-20260905/win-unpacked/CasimirBot.exe",
+  "previous_host_pid": 21308,
+  "previous_service_pid": 35612,
+  "previous_host_closed_normally": true,
+  "previous_processes_absent_before_launch": true,
+  "host_pid": 34596,
+  "service_pid": 31696,
+  "service_ready_at": "2026-09-05T19:53:23.705Z",
+  "origin": "http://127.0.0.1:52338",
+  "service_instance": "service_instance:0e185083b91bae8b834796e852052fe3",
+  "full_transport_restored_with_existing_device_trust": true,
+  "claim_consumed": true,
+  "binding_id": "reasoning_binding:60ea529188aec7cb21d82b13d270fe98",
+  "binding_epoch": 2,
+  "binding_status": "active",
+  "binding_run_id": null,
+  "helix_conversation_id": "0e2d91dd-1ee7-4972-b546-26fd5f559c30",
+  "old_run": {
+    "id": "run_c3865d6b-e542-46d7-aa83-385b0a2ff5e4",
+    "budget_expires_at": "2026-09-05T19:39:59.210Z",
+    "inspect_projection_lifecycle": "waiting",
+    "inspect_recommended_next_action": "continue",
+    "expiry_in_past": true,
+    "presence_retained_run_verified": false
+  },
+  "no_new_motion_request_issued": true,
+  "rolling_qualification_complete": false,
+  "next": "Prepare a valid governed environment session before requesting any run-associated binding; do not confuse this chat-only binding with run authority."
+}

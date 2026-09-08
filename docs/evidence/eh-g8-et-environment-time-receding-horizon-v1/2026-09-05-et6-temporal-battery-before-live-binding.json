@@ -1,0 +1,20 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "previous_turn_classification": "progress",
+  "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__ --pool=forks --maxWorkers=1 --minWorkers=1",
+  "exit_code": 0,
+  "test_files_passed": 12,
+  "tests_passed": 115,
+  "duration_seconds": 15.71,
+  "scope": ["compiler", "ledger", "preflight", "perception identity", "frontier store and publisher", "resident effects", "admission", "accepted lease", "request schema", "resident clock", "browser projection"],
+  "limits": ["Deterministic fixtures include mocked collaborators and pg-mem; not a real PostgreSQL concurrency test", "No native live rolling cycles proven", "No new exact run-bound operator claim received in this turn"],
+  "presence": {
+    "continuation": "codex-continuation:et6-minecraft-capacity-20260903-main",
+    "retained_run_server_verified": true,
+    "run_id": "run_c3865d6b-e542-46d7-aa83-385b0a2ff5e4",
+    "heartbeat_expires_at": "2026-09-05T19:31:06.467Z"
+  },
+  "next": "Explicit operator run-bound claim, then freshly admitted temporal plan; no movement permitted from these test results.",
+  "goal_complete": false
+}

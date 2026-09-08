@@ -1,0 +1,31 @@
+{
+  "status": "on_shell_forward_spin_average_motion_diagnostic_not_material_error_bound",
+  "candidate_sha256": "54fc7fe2ae81ff6062486128741a26c7bfa3931b5baf18e0286934bbd8134884",
+  "normalization": "external 2M and 2E factors divided out",
+  "rows": [
+    {
+      "electron_momentum_GeV": 0,
+      "normalized_forward_trace_GeV_minus2": 0.0012384023241309046,
+      "quadrature_relative_difference": 2.220446049250313e-16,
+      "ratio_to_rest": 1.0
+    },
+    {
+      "electron_momentum_GeV": 3e-06,
+      "normalized_forward_trace_GeV_minus2": 0.0012384094183379535,
+      "quadrature_relative_difference": 0.0,
+      "ratio_to_rest": 1.000005728515613
+    },
+    {
+      "electron_momentum_GeV": 3e-05,
+      "normalized_forward_trace_GeV_minus2": 0.0012391123521810336,
+      "quadrature_relative_difference": 0.0,
+      "ratio_to_rest": 1.0005733419877318
+    },
+    {
+      "electron_momentum_GeV": 0.0001,
+      "normalized_forward_trace_GeV_minus2": 0.0012463566486595112,
+      "quadrature_relative_difference": 2.220446049250313e-16,
+      "ratio_to_rest": 1.0064230536180467
+    }
+  ]
+}

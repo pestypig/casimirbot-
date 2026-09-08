@@ -1,0 +1,32 @@
+{
+  "scope": "Offline runtime-boundary verification; no live user-session execution",
+  "typescript": {
+    "passed": 59,
+    "failed": 0,
+    "suites": {
+      "environment-time-ledger": 27,
+      "temporal-plan-preflight": 9,
+      "temporal-resident-effects": 18,
+      "temporal-plan-admission": 5
+    },
+    "coverage": ["exact checkpoint successor", "stale goal/frontier rejection", "idempotent retention and replay conflict", "reconnect from settled checkpoint without performed-node reuse", "cumulative effect arithmetic", "request identity mismatch and failed preflight prevent enqueue"],
+    "limitations": "Admission tests mock broker/preflight; ledger and effect checks are isolated. They do not establish live broker-to-Minecraft execution."
+  },
+  "native": {
+    "java": 21,
+    "gradle_exit_code": 0,
+    "junit_tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "suites": ["EnvironmentCapacityTelemetryTest", "TemporalPlanDeliveryPreflightTest", "TemporalPlanWindowTest"],
+    "isolated_fabric_gametests_passed": 5,
+    "isolated_gametest_shutdown": "normal, players/worlds/chunks saved",
+    "coverage": ["native telemetry including missed intervals", "paired identity mismatch", "sticky inclusive stop", "elapsed deadline with paused game ticks", "clock origin changes and regressions"]
+  },
+  "production_exe_restarted": false,
+  "live_consent_changed": false,
+  "live_movement_dispatched": false,
+  "live_rolling_cycles_proven": false,
+  "external_binding_proven": false,
+  "et6_acceptance": "incomplete"
+}

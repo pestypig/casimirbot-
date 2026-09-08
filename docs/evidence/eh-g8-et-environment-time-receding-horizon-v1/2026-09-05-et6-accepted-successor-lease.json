@@ -1,0 +1,20 @@
+{
+  "scope": "ET6 queued successor lifecycle prerequisite",
+  "classification": "evidence normalization",
+  "defect": "Accepted successors retained the short delivery lease while waiting for a committed handoff; ordinary queue cleanup could mark their outcome unknown before that handoff.",
+  "repair": "Inside the workflow-event transaction, validated acceptance retains the successor lease until the earlier resident or successor admitted deadline. Status remains leased. Expired or non-leased rows are not revived. Exact event replay returns before this update.",
+  "tests": {
+    "temporal_accepted_lease": "7 passed",
+    "compiler_and_acceptance": "9 passed",
+    "negative_evidence": "Initial lease fixture run failed because pg-mem does not implement timestamp LEAST. Registered the PostgreSQL function semantics in the fixture; production SQL was unchanged."
+  },
+  "limitations": [
+    "In-memory SQL tests do not prove PostgreSQL concurrency or live reconnect behavior.",
+    "Native acceptance measurement persistence across immediate interruption needs review before production qualification.",
+    "Production route/admission wiring and packaged three-cycle live acceptance remain outstanding."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

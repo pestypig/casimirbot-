@@ -1,0 +1,49 @@
+{
+  "status": "conditional_invisible_variant_yield_screen",
+  "mediator_GeV": 0.01,
+  "added_Dirac_mass_GeV": 0.001,
+  "charge": "same unit dark charge as heavy species",
+  "epsilon_domain": [
+    0.00010965679950123001,
+    0.01
+  ],
+  "alpha_D_max": 0.1,
+  "tabulated_limit_epsilon": 3.302358561650848e-05,
+  "table_sha256": "44d28b6bbb32e7371a0353f5661556693079d14adc49f1881f61e62f3e04a6a1",
+  "parent_sha256": "09817da48f1ef67b049ecb00588254a9e69a8a8a1838cdade36a6607ab8d9bc1",
+  "rows": [
+    {
+      "epsilon": 0.00010965679950123001,
+      "alpha_D": 0.10000000000000002,
+      "invisible_branching": 0.9999999991220235,
+      "width_over_mass": 0.03331306053109931,
+      "yield_ratio_to_tabulated_limit": 11.137494056030855
+    },
+    {
+      "epsilon": 0.001,
+      "alpha_D": 0.001202461367685296,
+      "invisible_branching": 0.9999939279136051,
+      "width_over_mass": 0.00040057911527938627,
+      "yield_ratio_to_tabulated_limit": 926.2190651016385
+    },
+    {
+      "epsilon": 0.01,
+      "alpha_D": 1.202461367685296e-05,
+      "invisible_branching": 0.9427547683749283,
+      "width_over_mass": 4.249001928877895e-06,
+      "yield_ratio_to_tabulated_limit": 87320.27423468296
+    }
+  ],
+  "primary": "https://arxiv.org/abs/1906.00176",
+  "assumptions": [
+    "Prompt invisible Dirac pair production with escape and unchanged missing-energy efficiency",
+    "Narrow-width production approximation; maximum width/mass about .0333",
+    "Only added Dirac pair and electron pair decay channels"
+  ],
+  "limitations": [
+    "No full detector efficiency or finite-width recast",
+    "alpha_D>.1 not screened here",
+    "No light-species cosmology, abundance or local coherence calculated",
+    "Not every possible invisible or semivisible completion"
+  ]
+}

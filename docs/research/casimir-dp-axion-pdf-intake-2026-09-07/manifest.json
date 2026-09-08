@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://lhapdfsets.web.cern.ch/current/CT14lo/CT14lo.info",
+    "file": "CT14lo.info",
+    "bytes": 1732,
+    "sha256": "f8158114ae9527dd086326c72049f889e0e6d65142cce4249c257a8c0068777c"
+  },
+  {
+    "url": "https://lhapdfsets.web.cern.ch/current/CT14lo/CT14lo_0000.dat",
+    "file": "CT14lo_0000.dat",
+    "bytes": 1483308,
+    "sha256": "1358d9c6da6d720006adc6d1d75371446978b56a0fa635868014b6fb1b4dbffe"
+  }
+]

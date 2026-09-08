@@ -1,0 +1,45 @@
+{
+  "status": "conditional_overlap_and_timescale_diagnostic",
+  "rows": [
+    {
+      "mass_GeV": 77.86556301055496,
+      "unit_occupation_width_m_s": 4.222068603674118e-08,
+      "momentum_width_eV": 1.0966044679291862e-05,
+      "branch_resolution_momentum_eV": 0.7893079216,
+      "normalized_overlap_branch_filter": 9.651106395925893e-11,
+      "log_overlap_ratio_at_resolution": -2590376582.04111,
+      "zero_drift_coherence_time_s": 2677879.568869026,
+      "coherence_time_over_hold": 10711518.275476104
+    },
+    {
+      "mass_GeV": 100.0,
+      "unit_occupation_width_m_s": 3.02449257949487e-08,
+      "momentum_width_eV": 1.0088621307127312e-05,
+      "branch_resolution_momentum_eV": 0.7893079216,
+      "normalized_overlap_branch_filter": 8.168470071354954e-11,
+      "log_overlap_ratio_at_resolution": -3060548643.821136,
+      "zero_drift_coherence_time_s": 4063329.0668250686,
+      "coherence_time_over_hold": 16253316.267300274
+    },
+    {
+      "mass_GeV": 1000.0,
+      "unit_occupation_width_m_s": 1.4038450984328101e-09,
+      "momentum_width_eV": 4.68272320057101e-06,
+      "branch_resolution_momentum_eV": 0.7893079216,
+      "normalized_overlap_branch_filter": 1.7598435286778242e-11,
+      "log_overlap_ratio_at_resolution": -14205808409.888914,
+      "zero_drift_coherence_time_s": 188603028.23869467,
+      "coherence_time_over_hold": 754412112.9547787
+    }
+  ],
+  "density_GeV_cm3": 0.3,
+  "frozen_separation_m": 2.5e-07,
+  "frozen_hold_s": 0.25,
+  "primary": "https://arxiv.org/html/2606.00237v1",
+  "limitations": [
+    "No energy-conservation, mediator, or target weighting in overlap diagnostic",
+    "No absolute decoherence or upper bound on it",
+    "Coherence time assumes zero drift; not a universal cold-stream time",
+    "No supplied cold population or xenon fit"
+  ]
+}

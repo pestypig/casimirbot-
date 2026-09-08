@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-06",
+  "scope": "Deterministic evidence-outbox saturation audit",
+  "change": "Test-only; no production runtime or authority changes",
+  "fixture": "PlayerActionDeliveryOutboxTest.saturatedProjectionLanePreservesTerminalDeliveryAndCheckpointFence",
+  "assertions": [
+    "765 nonterminal entries retain the three terminal slots at capacity 768",
+    "Further nonterminal enqueue is rejected without dropping the pinned required projection",
+    "Terminal workflow event, projection and result fit in reserved slots",
+    "Critical terminal event and result drain while projection remains blocked",
+    "Checkpoint fence remains pending until its required projection is acknowledged",
+    "Acknowledging that projection clears only the fixed fence, retaining 765 later entries",
+    "All retained projection entries subsequently drain"
+  ],
+  "verification": {
+    "gradle_exit": 0,
+    "outbox_tests_passed": 6,
+    "runtime_transport_tests_passed": 7,
+    "runtime_transport_tests_skipped": 2,
+    "skip_reason": "Server-compiled handoff opt-in was not set for this focused run; previously verified separately",
+    "gametest_dependency": "Command omitted -x runGameTest; Gradle ran five isolated game tests, all passed, and test server saved and shut down normally",
+    "diff_check": "passed"
+  },
+  "limits": [
+    "In-memory outbox fixture, not an HTTP outage at saturation or live capacity proof",
+    "No installed app, keyed server, user binding or player session operated",
+    "Does not replace restart evidence-gap behavior or prove durable outbox recovery"
+  ]
+}

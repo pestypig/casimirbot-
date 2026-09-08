@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-05",
+  "program_gate": "G8",
+  "result": "catalog_repair_packaged_and_process_launched",
+  "checks": {
+    "build_host": "PASS exit 0; four pre-existing unrelated bundle warnings",
+    "stage_runtime": "PASS exit 0; dependency closure verified",
+    "electron_builder": "PASS exit 0; --dir --publish never",
+    "runtime_tree": "PASS; verifier executed in memory with output-root and module-location substitutions only",
+    "asar_service_hash": "PASS"
+  },
+  "package": "apps/desktop/release-et6-catalog-20260905/win-unpacked/CasimirBot.exe",
+  "server_sha256": "273d4a8e83ec3aa1ccabfbdac81fd2afd730e0c30e80bda92396ec1307389ff7",
+  "service_bytes": 62432725,
+  "runtime_manifest_sha256": "01da16f70f9b4ed89ee5671bcecd974e33bfabb1608a8aa417f0fc7f3b68a82a",
+  "renderer_sha256": "44bed21c1960bef11b3b2996904c577f51092a8ca4f9e2bb280c0f10273f564a",
+  "runtime": {
+    "pre_restart_active_workflows": 0,
+    "pre_restart_controls_asserted": false,
+    "old_exe_pid": 6136,
+    "old_exe_normal_close_verified": true,
+    "new_exe_pid": 38084,
+    "minecraft_pid_preserved": 35952,
+    "fabric_pid_preserved": 5216,
+    "keyed_server_pid_preserved": 34892,
+    "older_packages_deleted": false
+  },
+  "limits": ["Process launch is not proof of MCP catalog delivery", "Exact presence and reasoning binding require revalidation after service restart", "No temporal execution or ET6 capacity acceptance is claimed"]
+}

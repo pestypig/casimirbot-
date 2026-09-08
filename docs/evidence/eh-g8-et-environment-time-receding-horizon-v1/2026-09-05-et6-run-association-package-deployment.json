@@ -1,0 +1,37 @@
+{
+  "schema": "casimirbot.et6.repair_evidence.v1",
+  "recorded_at": "2026-09-05T18:38:00Z",
+  "package": "apps/desktop/release-et6-run-association-20260905/win-unpacked/CasimirBot.exe",
+  "checks": {
+    "client_build": "PASS exit 0; externalization, eval and chunk-size warnings",
+    "host_build": "PASS exit 0; four unrelated duplicate-key/case warnings",
+    "runtime_stage": "PASS exit 0; staged dependency closure verified",
+    "packaging_exit_code": null,
+    "packaging_exit_limit": "Process session handle missing on next poll; no exit code claimed. Output artifacts verified independently.",
+    "runtime_tree": "PASS; existing verifier executed in memory with only output-root and module-location substitutions",
+    "asar_service_hash": "PASS; extracted service equals built service and contains association guards",
+    "service_sha256": "85b949b09ec8b0ce1f364537223753fe62a62b751aa1e3b472b12e8471f41fb7",
+    "service_bytes": 62436270,
+    "renderer_sha256": "4caf3a1ae1aab25fd60ec9dea6e4b7d001eaf51d21a4e0a492c367acc5b1d048",
+    "renderer_files": 635,
+    "runtime_manifest_sha256": "1363a7afb8d3326a447e2685dd8cda552f52a4e94ee7c7c8fab57d0d5d5fec24"
+  },
+  "deployment": {
+    "old_exe_pid": 14192,
+    "normal_close_requested_and_exit_verified": true,
+    "new_exe_pid": 19656,
+    "service_pid": 5432,
+    "service_ready_at": "2026-09-05T18:35:52.236Z",
+    "service_origin": "http://127.0.0.1:61580",
+    "unauthenticated_account_route_status": 401,
+    "first_presence_attempt": "HTTP 504",
+    "same_task_presence_retry": "success after local readiness; no reconnect or authentication loop",
+    "service_instance_ref": "service_instance:4a688b95fbd6b4b07665d04e74816da6",
+    "client_session_ref": "supervisor_client:31d03cc3a25ae4cbe3245d37426f8d8d",
+    "presence_at": "2026-09-05T18:37:53.408Z",
+    "continuation_basis": "authenticated native-desktop client, client-declared exact continuation",
+    "independent_external_oauth_principal_proven": false
+  },
+  "limits": ["New exact run binding and live acceptance still required", "No Minecraft effects issued", "No maturity promotion"],
+  "goal_complete": false
+}

@@ -1,0 +1,87 @@
+{
+  "status": "conditional_column_opacity_not_detector_selection",
+  "column_g_cm2": 300,
+  "scale_relative_old_strong_root": 3.9,
+  "source_sha256": "6eaf46b926f7c93e75b6a5b4751be6995f7fc7076899b82fde11fddaf3ee1c23",
+  "rows": [
+    {
+      "speed_kms": 42.5057,
+      "Helm_tau": 59.862771059631946,
+      "point_tau": 60.73505918910521,
+      "fixed_speed_P0": 1.0044512356623137e-26,
+      "fixed_speed_P1": 6.01292343610175e-25,
+      "fixed_speed_Pge2": 1.0
+    },
+    {
+      "speed_kms": 98.7743,
+      "Helm_tau": 14.235391873361145,
+      "point_tau": 14.74784353804796,
+      "fixed_speed_P0": 6.57124805783879e-07,
+      "fixed_speed_P1": 9.354429120039852e-06,
+      "fixed_speed_Pge2": 0.9999899884460742
+    },
+    {
+      "speed_kms": 150,
+      "Helm_tau": 6.353977582490607,
+      "point_tau": 6.661816032518205,
+      "fixed_speed_P0": 0.0017398131049192697,
+      "fixed_speed_P1": 0.011054733466380418,
+      "fixed_speed_Pge2": 0.9872054534287004
+    },
+    {
+      "speed_kms": 250,
+      "Helm_tau": 2.3064384370848585,
+      "point_tau": 2.448324683294173,
+      "fixed_speed_P0": 0.09961540705127979,
+      "fixed_speed_P1": 0.22975680374892576,
+      "fixed_speed_Pge2": 0.6706277891997946
+    },
+    {
+      "speed_kms": 400,
+      "Helm_tau": 0.9013927996031621,
+      "point_tau": 0.9632704639695122,
+      "fixed_speed_P0": 0.40600378384719266,
+      "fixed_speed_P1": 0.3659688873714981,
+      "fixed_speed_Pge2": 0.22802732878130924
+    },
+    {
+      "speed_kms": 500,
+      "Helm_tau": 0.5768926250648989,
+      "point_tau": 0.6175202830708947,
+      "fixed_speed_P0": 0.561640886645366,
+      "fixed_speed_P1": 0.32400648544062255,
+      "fixed_speed_Pge2": 0.11435262791401132
+    },
+    {
+      "speed_kms": 601.1214,
+      "Helm_tau": 0.3991276814178636,
+      "point_tau": 0.42762534861784235,
+      "fixed_speed_P0": 0.670905033778519,
+      "fixed_speed_P1": 0.2677767705835937,
+      "fixed_speed_Pge2": 0.061318195637887374
+    },
+    {
+      "speed_kms": 650,
+      "Helm_tau": 0.3413576555932777,
+      "point_tau": 0.36583905387342674,
+      "fixed_speed_P0": 0.7108046394837657,
+      "fixed_speed_P1": 0.2426386053190032,
+      "fixed_speed_Pge2": 0.04655675519723111
+    },
+    {
+      "speed_kms": 776,
+      "Helm_tau": 0.23950409518119314,
+      "point_tau": 0.2568152414056326,
+      "fixed_speed_P0": 0.7870180503538416,
+      "fixed_speed_P1": 0.18849404604126355,
+      "fixed_speed_Pge2": 0.024487903604894837
+    }
+  ],
+  "limitations": [
+    "Chosen 300 g/cm2 path column, not actual LZ chord distribution",
+    "Fixed speed Poisson diagnostic ignores energy-angle redistribution after collision",
+    "Born Helm cross sections, not validated strong scattering amplitude",
+    "Total nuclear scattering, not resolvable multiple-S2 efficiency",
+    "No selected-count prediction or exclusion"
+  ]
+}

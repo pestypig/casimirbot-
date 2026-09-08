@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
+import { MinecraftLocalLifecycleError } from "../../services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle";
 import { buildHelixSharedRealtimeRoomsExperimentPolicy } from
   "@shared/helix-account-session";
 import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from
@@ -146,6 +147,31 @@ const connect = async (
 };
 
 describe("Helix MCP local Minecraft lifecycle", () => {
+  it.each([
+    ["minecraft_fabric_profile_selection_required", "minecraft_fabric_profile_selection_required"],
+    ["minecraft_loopback_server_not_listening", "minecraft_loopback_server_not_listening"],
+    ["minecraft_launch_memory_ceiling", "minecraft_launch_memory_ceiling"],
+    ["secret-test-runner-stderr", "minecraft_local_lifecycle_unavailable"],
+  ])("preserves safe lifecycle reason %s without exposing runner details or blindly retrying", async (code, expected) => {
+    const connection = await connect(authority());
+    try {
+      connection.launch.mockRejectedValueOnce(new MinecraftLocalLifecycleError(
+        code, 409, "secret-test-runner-stderr",
+      ));
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: { room_id: ROOM_ID, environment_binding_id: ENVIRONMENT_ID,
+          action_authority_id: AUTHORITY_ID, operator_confirmation: true,
+          request: { address: "localhost:25565", restart_client: true } },
+      });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({ error: expected, retryable: false,
+        answer_authority: false, assistant_answer: false, terminal_eligible: false });
+      expect(JSON.stringify(result)).not.toContain("secret-test-runner-stderr");
+      expect(connection.launch).toHaveBeenCalledOnce();
+    } finally { await connection.client.close(); await connection.server.close(); }
+  });
+
   it("launches only through the exact active authority and returns nonterminal evidence", async () => {
     const connection = await connect(authority());
     try {
@@ -212,6 +238,61 @@ describe("Helix MCP local Minecraft lifecycle", () => {
     }
   });
 
+  it("accepts the exact string-only catalog bootstrap token without inventing authority", async () => {
+    const connection = await connect(null, { trustedDevice: true });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: ENVIRONMENT_ID,
+          action_authority_id:
+            "trusted_device_workstation_lifecycle_bootstrap",
+          operator_confirmation: true,
+          request: { address: "localhost:25565" },
+        },
+      });
+      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        status: "connected",
+        action_authority_id: null,
+        launch_authority_basis: "trusted_device_workstation_lifecycle",
+        authority_widened: false,
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(connection.launch).toHaveBeenCalledOnce();
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
+  it("rejects a near-match bootstrap token as a missing authority", async () => {
+    const connection = await connect(null, { trustedDevice: true });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_local_lifecycle_launch",
+        arguments: {
+          room_id: ROOM_ID,
+          environment_binding_id: ENVIRONMENT_ID,
+          action_authority_id:
+            "trusted_device_workstation_lifecycle_bootstrap_typo",
+          operator_confirmation: true,
+          request: { address: "localhost:25565" },
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result)).toContain(
+        "The exact Player Embodiment authority was not found.",
+      );
+      expect(connection.launch).not.toHaveBeenCalled();
+    } finally {
+      await connection.client.close();
+      await connection.server.close();
+    }
+  });
+
   it("rejects authority-free bootstrap without installed-device trust", async () => {
     const connection = await connect(null);
     try {
@@ -249,6 +330,8 @@ describe("Helix MCP local Minecraft lifecycle", () => {
         arguments: {
           room_id: ROOM_ID,
           environment_binding_id: ENVIRONMENT_ID,
+          action_authority_id:
+            "trusted_device_workstation_lifecycle_bootstrap",
           operator_confirmation: true,
           request: {
             address: "localhost:25565",

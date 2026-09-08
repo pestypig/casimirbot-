@@ -1,0 +1,142 @@
+{
+  "schema": "et6.chat_open_focus_diagnostic.v1",
+  "evidence_kind": "live_packaged_native_fabric",
+  "observed_at": "2026-09-06T17:18:10.196Z",
+  "package": "release-et6-checkpoint-context-20260906",
+  "binding_id": "reasoning_binding:a09e3a528a0693542224ca662012c338",
+  "run_id": "run_9fa4fc1a-463d-46d4-8491-8bd6f640c22a",
+  "authority_id": "environment_action_authority:b7aa14f3-baa9-4f59-8a89-51c88956d3ff",
+  "steering_event_ref": "reasoning_steering:5e3019b323e93778ca5408abca951837",
+  "prompt_origin": "automated_typed_exe",
+  "window_state": "foreground_chat_open_before_and_after",
+  "user_draft_preserved": true,
+  "action": {
+    "kind": "walk",
+    "direction": "right",
+    "duration_ms": 250
+  },
+  "action_observation": {
+    "schema": "helix.environment_action.observation.v1",
+    "action_request_ref": "environment_action_request:01b12398-666f-40c7-8b2e-50d5ad48a4c3",
+    "workflow_ref": "environment_action_workflow:1fcae649-2fea-42fb-8426-47b3badbf357",
+    "action_execution_ref": "environment_action_execution:a8ab3b00-564d-465c-b281-5b4c863667b0",
+    "capability_id": "com.casimirbot.minecraft.player.walk",
+    "capability_version": 1,
+    "action_kind": "walk",
+    "outcome": "succeeded",
+    "summary": "The bounded walk completed with 0.832 blocks of measured motion.",
+    "result": {
+      "control_engine": "native_fabric",
+      "started_clock": {
+        "schema": "helix.environment_clock_snapshot.v1",
+        "clock_id": "minecraft_client_tick_clock:6a48b90f-ec92-4fa8-a6ea-6661e095a6b7",
+        "clock_kind": "minecraft_game_tick",
+        "tick_rate_hz": 20,
+        "tick_index": 9282,
+        "world_tick_index": 9131315,
+        "monotonic": {
+          "origin_id": "minecraft_monotonic_clock:612039fb-4492-43ff-84f4-138cefc9ea3a",
+          "elapsed_ms": 464092.265
+        },
+        "synchronization": "server_synchronized",
+        "observed_at": "2026-09-06T17:18:09.854512700Z"
+      },
+      "completed_clock": {
+        "schema": "helix.environment_clock_snapshot.v1",
+        "clock_id": "minecraft_client_tick_clock:6a48b90f-ec92-4fa8-a6ea-6661e095a6b7",
+        "clock_kind": "minecraft_game_tick",
+        "tick_rate_hz": 20,
+        "tick_index": 9287,
+        "world_tick_index": 9131321,
+        "monotonic": {
+          "origin_id": "minecraft_monotonic_clock:612039fb-4492-43ff-84f4-138cefc9ea3a",
+          "elapsed_ms": 464326.5761
+        },
+        "synchronization": "server_synchronized",
+        "observed_at": "2026-09-06T17:18:10.087909900Z"
+      },
+      "duration_ticks": 5,
+      "postconditions": [
+        {
+          "condition_id": "environment_action_condition:d29a200f-b1c1-429f-bd22-1a55aa84bdc1",
+          "condition_kind": "minecraft.player.motion_completed",
+          "required": true,
+          "status": "satisfied",
+          "summary": "The native Fabric executor completed its action-specific postcondition check.",
+          "evidence_refs": [
+            "environment_action_event:a7b4bcaa-e9ef-435e-9c1a-6a59e288276e",
+            "environment_action_event:ac8439b4-c7eb-4aac-a04d-e08ad1523034"
+          ],
+          "checked_at": "2026-09-06T17:18:10.156506800Z"
+        }
+      ],
+      "verified_terminal_measurements": {
+        "active_control_ticks": 6,
+        "answer_authority": false,
+        "dispatch_to_client_accept_ms": 14,
+        "dispatch_to_first_tick_ms": 16,
+        "distance_blocks": 0.8322909211907836,
+        "duration_ticks": 5,
+        "manual_or_safety_to_release_ms": null,
+        "measurement_authority": false,
+        "missed_ticks": 0,
+        "oldest_pending_age_ms": 797,
+        "planned_runway_ticks_at_accept": 300,
+        "queue_depth_at_lease": 1,
+        "resident_computation_ms": 2,
+        "runway_ticks_remaining": 294,
+        "scheduler_ticks": 6,
+        "stalled_ticks": 0,
+        "terminal_eligible": false
+      },
+      "side_effects_performed": true,
+      "player_motion_performed": true,
+      "player_interaction_performed": false,
+      "inventory_mutation_performed": false,
+      "world_mutation_performed": false,
+      "manual_override_detected": false,
+      "manual_override_reason": null,
+      "controls_released": true,
+      "host_access_performed": false,
+      "automatic_replay_performed": false,
+      "model_invoked": false
+    },
+    "progress_observation_refs": [
+      "environment_action_event:a7b4bcaa-e9ef-435e-9c1a-6a59e288276e",
+      "environment_action_event:ac8439b4-c7eb-4aac-a04d-e08ad1523034"
+    ],
+    "postcondition_evidence_refs": [
+      "environment_action_event:a7b4bcaa-e9ef-435e-9c1a-6a59e288276e",
+      "environment_action_event:ac8439b4-c7eb-4aac-a04d-e08ad1523034"
+    ],
+    "evidence_ref": "environment_action_evidence:a7487b1fd5bc75411f62956d7975de4ed800b5291",
+    "observed_at": "2026-09-06T17:18:10.196Z",
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "content_role": "environment_action_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "pre_position": {
+    "x": -1.27,
+    "y": 65,
+    "z": 1.06
+  },
+  "post_position": {
+    "x": -1.23,
+    "y": 65,
+    "z": -0.01
+  },
+  "post_evidence_ref": "environment_probe_evidence:09fb991ae41ecbe6d2e4e276054fd8b72ded354c",
+  "live_rolling_extensions_proven": 0,
+  "not_proven": [
+    "background_window_motion",
+    "pause_menu_rejection",
+    "three_continuous_rolling_extensions",
+    "voice"
+  ],
+  "goal_complete": false
+}

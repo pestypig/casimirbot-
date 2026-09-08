@@ -1,0 +1,14 @@
+{
+  "et6_complete": false,
+  "change": "Added content-only source-plan/compilation/checkpoint settlement validation with hash association, exact explicit checkpoint mapping, duplicate rejection and bounded native timing checks.",
+  "verification": {
+    "test_file": "server/services/environment-connectors/temporal-plans/__tests__/minecraft-environment-time-compiler.test.ts",
+    "tests": 4,
+    "result": "PASS",
+    "cases": ["valid mapped settlement", "duplicate", "generated/unknown checkpoint", "wrong node", "negative/out-of-horizon/fractional/NaN tick"]
+  },
+  "limitations": ["No database event identity or event hash check in this content-only helper", "No server frontier association", "No production caller yet", "No native successor dispatch or live qualification"],
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "et6_source_repair_evidence.v1",
+  "classification": "adapter execution; evidence normalization unchanged",
+  "repair": "Successful walk child settlement follows its admitted edge in the same native tick. At the exact successor boundary only a duration-consumed walk can perform no-new-input settlement; all normal controller checks remain active.",
+  "failed_initial_attempt": "Generalizing same-tick continuation to every successful action failed five existing tests. The repair was narrowed to walks, preserving discrete-action scheduling.",
+  "verification": {
+    "native_unit_tests": 274,
+    "native_failures": 0,
+    "native_skipped": 0,
+    "compiler_tests": 11,
+    "compiler_failures": 0,
+    "docs_audit_passed": true,
+    "compiler_derived_resident_handoffs": 3,
+    "negative_cases": ["manual takeover", "no measured motion", "unfinished action at committed boundary"],
+    "game_tests": "Excluded from this native unit run; the preceding diagnosis ran five successfully"
+  },
+  "deployment": "source only; live companion not replaced",
+  "live_rolling_extensions_proven": 0,
+  "remaining": ["companion build and deployment", "packaged live capacity and latency battery", "final revocation and stale rejection", "normal live game/server shutdown"],
+  "release_maturity_promoted": false
+}

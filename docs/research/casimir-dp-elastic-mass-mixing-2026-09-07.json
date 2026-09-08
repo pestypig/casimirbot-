@@ -1,0 +1,292 @@
+{
+  "scope": "Real two-Weyl mass matrix [[mL,mD],[mD,mR]], opposite charge matrix diag(1,-1), branch with one negative signed eigenvalue. Majorana rephasing changes off-diagonal phase but not reported magnitudes. No elastic scattering rate inferred.",
+  "source": "https://arxiv.org/html/2405.08081v2 equations 7-10 and Appendix A",
+  "rows": [
+    {
+      "ground_mass_GeV": 10.0,
+      "gap_GeV": 0.003281006648687921,
+      "same_sign_max_coupling_ratio": 0.00016402342654352374,
+      "cases": [
+        {
+          "label": "symmetric",
+          "mL_GeV": 0.0016405033243439605,
+          "mR_GeV": 0.0016405033243439605,
+          "mD_GeV": 10.001640503324344,
+          "physical_masses_GeV": [
+            10.0,
+            10.003281006648688
+          ],
+          "charge_matrix": [
+            [
+              -2.2371143170757382e-17,
+              -0.9999999999999998
+            ],
+            [
+              -0.9999999999999998,
+              -2.2371143170757382e-17
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 2.2371143170757388e-17
+        },
+        {
+          "label": "same_sign_endpoint",
+          "mL_GeV": 0.003281006648687921,
+          "mR_GeV": 0.0,
+          "mD_GeV": 10.001640368783857,
+          "physical_masses_GeV": [
+            10.0,
+            10.003281006648688
+          ],
+          "charge_matrix": [
+            [
+              -0.00016402342433711992,
+              -0.999999986548158
+            ],
+            [
+              -0.999999986548158,
+              0.00016402342433714443
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 0.00016402342654353713
+        },
+        {
+          "label": "opposite_sign_diagnostic",
+          "mL_GeV": 1.0018045536567786,
+          "mR_GeV": -0.9985235470080905,
+          "mD_GeV": 9.951506651264454,
+          "physical_masses_GeV": [
+            10.000000000000002,
+            10.003281006648688
+          ],
+          "charge_matrix": [
+            [
+              -0.10000000000000003,
+              -0.9949874371066197
+            ],
+            [
+              -0.9949874371066197,
+              0.09999999999999996
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 0.10050378152592127
+        }
+      ]
+    },
+    {
+      "ground_mass_GeV": 15.0,
+      "gap_GeV": 0.002270004432458614,
+      "same_sign_max_coupling_ratio": 7.566108959824319e-05,
+      "cases": [
+        {
+          "label": "symmetric",
+          "mL_GeV": 0.001135002216229307,
+          "mR_GeV": 0.001135002216229307,
+          "mD_GeV": 15.001135002216229,
+          "physical_masses_GeV": [
+            15.0,
+            15.002270004432457
+          ],
+          "charge_matrix": [
+            [
+              -2.2371143170757382e-17,
+              -0.9999999999999998
+            ],
+            [
+              -0.9999999999999998,
+              -2.2371143170757382e-17
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 2.2371143170757388e-17
+        },
+        {
+          "label": "same_sign_endpoint",
+          "mL_GeV": 0.002270004432458614,
+          "mR_GeV": 0.0,
+          "mD_GeV": 15.001134959278476,
+          "physical_masses_GeV": [
+            15.0,
+            15.002270004432456
+          ],
+          "charge_matrix": [
+            [
+              -7.56610893816144e-05,
+              -0.9999999971376997
+            ],
+            [
+              -0.9999999971376997,
+              7.566108938157474e-05
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 7.566108959817916e-05
+        },
+        {
+          "label": "opposite_sign_diagnostic",
+          "mL_GeV": 1.5012485024378524,
+          "mR_GeV": -1.4989784980053937,
+          "mD_GeV": 14.925940869545535,
+          "physical_masses_GeV": [
+            15.000000000000002,
+            15.002270004432457
+          ],
+          "charge_matrix": [
+            [
+              -0.10000000000000003,
+              -0.99498743710662
+            ],
+            [
+              -0.99498743710662,
+              0.10000000000000003
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 0.10050378152592124
+        }
+      ]
+    },
+    {
+      "ground_mass_GeV": 40.0,
+      "gap_GeV": 0.0010062516621719803,
+      "same_sign_max_coupling_ratio": 1.2577987570383477e-05,
+      "cases": [
+        {
+          "label": "symmetric",
+          "mL_GeV": 0.0005031258310859902,
+          "mR_GeV": 0.0005031258310859902,
+          "mD_GeV": 40.00050312583109,
+          "physical_masses_GeV": [
+            40.0,
+            40.001006251662176
+          ],
+          "charge_matrix": [
+            [
+              -2.2371143170757382e-17,
+              -0.9999999999999998
+            ],
+            [
+              -0.9999999999999998,
+              -2.2371143170757382e-17
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 2.2371143170757388e-17
+        },
+        {
+          "label": "same_sign_endpoint",
+          "mL_GeV": 0.0010062516621719803,
+          "mR_GeV": 0.0,
+          "mD_GeV": 40.000503122666935,
+          "physical_masses_GeV": [
+            40.000000000000014,
+            40.00100625166217
+          ],
+          "charge_matrix": [
+            [
+              -1.2577987569163655e-05,
+              -0.9999999999208972
+            ],
+            [
+              -0.9999999999208972,
+              1.2577987569210716e-05
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 1.2577987570158609e-05
+        },
+        {
+          "label": "opposite_sign_diagnostic",
+          "mL_GeV": 4.000553438414195,
+          "mR_GeV": -3.9995471867520225,
+          "mD_GeV": 39.79999808814601,
+          "physical_masses_GeV": [
+            39.99999999999999,
+            40.001006251662176
+          ],
+          "charge_matrix": [
+            [
+              -0.10000000000000003,
+              -0.9949874371066197
+            ],
+            [
+              -0.9949874371066197,
+              0.09999999999999996
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 0.10050378152592127
+        }
+      ]
+    },
+    {
+      "ground_mass_GeV": 100.0,
+      "gap_GeV": 0.0005513006648687921,
+      "same_sign_max_coupling_ratio": 2.7564957260648003e-06,
+      "cases": [
+        {
+          "label": "symmetric",
+          "mL_GeV": 0.00027565033243439604,
+          "mR_GeV": 0.00027565033243439604,
+          "mD_GeV": 100.00027565033244,
+          "physical_masses_GeV": [
+            100.0,
+            100.00055130066488
+          ],
+          "charge_matrix": [
+            [
+              -2.2371143170757382e-17,
+              -0.9999999999999998
+            ],
+            [
+              -0.9999999999999998,
+              -2.2371143170757382e-17
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 2.2371143170757388e-17
+        },
+        {
+          "label": "same_sign_endpoint",
+          "mL_GeV": 0.0005513006648687921,
+          "mR_GeV": 0.0,
+          "mD_GeV": 100.00027564995253,
+          "physical_masses_GeV": [
+            100.0,
+            100.00055130066488
+          ],
+          "charge_matrix": [
+            [
+              -2.7564957259956574e-06,
+              -0.999999999996201
+            ],
+            [
+              -0.999999999996201,
+              2.7564957259561594e-06
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 2.7564957260061293e-06
+        },
+        {
+          "label": "opposite_sign_diagnostic",
+          "mL_GeV": 10.00030321536568,
+          "mR_GeV": -9.99975191470081,
+          "mD_GeV": 99.49901797927981,
+          "physical_masses_GeV": [
+            100.0,
+            100.0005513006649
+          ],
+          "charge_matrix": [
+            [
+              -0.10000000000000003,
+              -0.99498743710662
+            ],
+            [
+              -0.99498743710662,
+              0.10000000000000003
+            ]
+          ],
+          "abs_diagonal_over_offdiagonal": 0.10050378152592124
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "numerical_mass_diagonalization": true,
+    "rotated_charge_identity": true,
+    "analytic_charge_ratio": true
+  },
+  "full_model_admitted": false
+}

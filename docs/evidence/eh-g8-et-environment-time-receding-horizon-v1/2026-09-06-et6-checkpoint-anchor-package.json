@@ -1,0 +1,17 @@
+{
+  "schema": "et6.checkpoint_anchor_package.v1",
+  "classification": "evidence normalization and tool admission",
+  "package_path": "apps/desktop/release-et6-checkpoint-anchor-20260906/win-unpacked/CasimirBot.exe",
+  "package_exit_code": 0,
+  "client_build_exit_code": 0,
+  "server_build_exit_code": 0,
+  "focused_tests_passed": 31,
+  "service_sha256": "5ea9987f8bd4134a3ef7c27af9c75a5471779d3a780d051d2dcecac05f5f179a",
+  "packaged_service_matches_staging": true,
+  "runtime_files_checked": 645,
+  "runtime_mismatches": 0,
+  "deployed": false,
+  "live_rolling_extensions_proven": 0,
+  "limitations": ["Package content equality is not live acceptance", "Packaged checkpoint query and resident handoff require live qualification", "Existing unrelated build warnings remain"],
+  "goal_complete": false
+}

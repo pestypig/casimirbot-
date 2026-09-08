@@ -1,0 +1,1122 @@
+{
+  "schema": "casimirbot.cfp1.rights_source_inspection.v1",
+  "captured_utc": "2026-09-07T03:03:21.930Z",
+  "head": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+  "scope": "Selected source/metadata and standard unpacked artifact inspection only; moving staging is not a frozen release; no runtime execution, signature, title, or rights clearance.",
+  "observed": [
+    {
+      "path": "package.json",
+      "present": true,
+      "bytes": 74352,
+      "sha256": "7a85515b909c8769d98c29ef81535c1c8fa6219ed903719eb004bc0ebe9fa291",
+      "name": "rest-express",
+      "version": "1.0.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "package-lock.json",
+      "present": true,
+      "bytes": 805697,
+      "sha256": "2c755f40f32cbf527964c668e760292d8fbeeb60cd4973dc1d1fa2e07840c888"
+    },
+    {
+      "path": "sdk/package.json",
+      "present": true,
+      "bytes": 758,
+      "sha256": "03ef1214b00c052bb863714982d1cb594d10ef4fd2af92c98caa44cd2928049b",
+      "name": "shadow-of-intent-sdk",
+      "version": "0.1.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "cli/package.json",
+      "present": true,
+      "bytes": 779,
+      "sha256": "c63e16629daa39ba162d6092946c6b7273ad79859c3dcd32805c45c42d803f9f",
+      "name": "shadow-of-intent",
+      "version": "0.1.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "packages/create-casimir-verifier/package.json",
+      "present": true,
+      "bytes": 443,
+      "sha256": "b4f9eb0b3d15fcf458eda6678f86d6d586cb4950af0cfc16dcea49e2d73af770",
+      "name": "create-casimir-verifier",
+      "version": "0.1.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "packages/create-casimir-verifier/LICENSE",
+      "present": true,
+      "bytes": 1067,
+      "sha256": "d2ad01b7f9a41b728135d18d838648f1dfa6f6784cd99707ae8b50fce26f6957"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "present": true,
+      "bytes": 1762,
+      "sha256": "5c0533e803ce91e67d2644badd7e92a203570dca1182f7a8ee0c729bf068c939",
+      "name": "@casimirbot/desktop",
+      "version": "0.1.0-alpha.11",
+      "license": null,
+      "private": true
+    },
+    {
+      "path": "apps/desktop/package-lock.json",
+      "present": true,
+      "bytes": 159647,
+      "sha256": "35d137eeb3dd27eda1f6fc6aa9bf48ef9f712bee053cb984a3bdcc9519218306"
+    },
+    {
+      "path": "apps/desktop/electron-builder.config.cjs",
+      "present": true,
+      "bytes": 1507,
+      "sha256": "91623f7b399c56edfa468cdfeb00e15ca173ae53c6a5fbc2c42b4f2f29b19336"
+    },
+    {
+      "path": "apps/desktop/scripts/stage-runtime.mjs",
+      "present": true,
+      "bytes": 8502,
+      "sha256": "76514293548def2f9ca2b9932c15a0f2c73158c051d0e4820359adff0f102ee8"
+    },
+    {
+      "path": "apps/desktop/scripts/build-host.mjs",
+      "present": true,
+      "bytes": 4712,
+      "sha256": "3513909b4daa7198f42ae6c01f564e1c598fd55b7c3994788cb2d577ee1d0b73"
+    },
+    {
+      "path": "apps/desktop/scripts/provider-neutral-runtime-guard-lib.mjs",
+      "present": true,
+      "bytes": 2228,
+      "sha256": "2543a824149c931288a76a8c2c4eb69383e8ee05f1a7f921e0c67ca23acf7794"
+    },
+    {
+      "path": "apps/desktop/tunnel-client.v1.json",
+      "present": true,
+      "bytes": 640,
+      "sha256": "f51e1bfa11ca38dbd5387b9c9529206352ee0c258be7ed1e4fc90fcab880e7c4"
+    },
+    {
+      "path": "apps/desktop/runtime/runtime-manifest.json",
+      "present": true,
+      "bytes": 1902,
+      "sha256": "e14e06f76bf7b8a870d12f9e2dbf99ce0f9039ba008dd2fc782b84b83e3a3640"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/runtime-manifest.json",
+      "present": true,
+      "bytes": 1902,
+      "sha256": "bd1a8fa5ff8f97a0310a0b54fbe7c93c5d9ac7c03e817d8fba361bc18a096aad"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/LICENSE.electron.txt",
+      "present": true,
+      "bytes": 1096,
+      "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/LICENSES.chromium.html",
+      "present": true,
+      "bytes": 20313957,
+      "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar",
+      "present": true,
+      "bytes": 64952581,
+      "sha256": "d1eff4c58e158b6ca8f086c9f6a5ca60c0ed7468007bf3517f29a2fa2813494d"
+    },
+    {
+      "path": "apps/desktop/vendor/tunnel-client/v0.0.13/windows-amd64/expanded/LICENSE",
+      "present": true,
+      "bytes": 10758,
+      "sha256": "f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
+    },
+    {
+      "path": "apps/desktop/vendor/tunnel-client/v0.0.13/windows-amd64/expanded/NOTICE",
+      "present": true,
+      "bytes": 551,
+      "sha256": "1364c020d86ecf948b78b7c655175032068203d13aece70fb0bfe112d7802dc2"
+    },
+    {
+      "path": "apps/desktop/vendor/tunnel-client/v0.0.13/windows-amd64/expanded/tunnel-client-v0.0.13-windows-amd64-licenses.txt",
+      "present": true,
+      "bytes": 13456,
+      "sha256": "ef3c7083e248bb7ccc1a8d2757afbc6e53a1d22ec686ee461b677c4e43699ae4"
+    },
+    {
+      "path": "plugins/casimirbot-device-check/.codex-plugin/plugin.json",
+      "present": true,
+      "bytes": 1230,
+      "sha256": "3ba44b286775b3565f273a038c6561d0b3d62f4e07c061403ec3aacf3ebeaf4a"
+    },
+    {
+      "path": "minecraft/helix-fabric-player-agent/build.gradle.kts",
+      "present": true,
+      "bytes": 1460,
+      "sha256": "db31f0322a705e2385889819e299974ed1398f8924ba45042f95dd26a545be8e"
+    },
+    {
+      "path": "minecraft/helix-fabric-player-agent/src/main/resources/fabric.mod.json",
+      "present": true,
+      "bytes": 598,
+      "sha256": "3a8258991cd8b21fd137939cb7f5cfc9a626e86939d291c6f5bb2617acaf872a"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/build.gradle.kts",
+      "present": true,
+      "bytes": 1033,
+      "sha256": "c3d6ca9123088fdfd8ef901d8937e4e2f2ff31d9c337a6547646d9ead1f5b512"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/main/resources/fabric.mod.json",
+      "present": true,
+      "bytes": 551,
+      "sha256": "baa1a4cb50a9fad752fefaef920ba8ca161c0549097b0a42a29b2fe52a26ee19"
+    },
+    {
+      "path": "docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md",
+      "present": true,
+      "bytes": 7705,
+      "sha256": "97de6b91ac6126a6c38ec5307c2088aabe663def17fac63a2581a06c13e9b63d"
+    },
+    {
+      "path": "node_modules/mapbox-gl/LICENSE.txt",
+      "present": true,
+      "bytes": 4297,
+      "sha256": "dcd8c5e27012f2c0754081a51b5e742ca71f4928d557bd204ab14447b9b76f44"
+    },
+    {
+      "path": "node_modules/@plotly/mapbox-gl/LICENSE.txt",
+      "present": true,
+      "bytes": 4297,
+      "sha256": "dcd8c5e27012f2c0754081a51b5e742ca71f4928d557bd204ab14447b9b76f44"
+    },
+    {
+      "path": "node_modules/maplibre-gl/LICENSE.txt",
+      "present": true,
+      "bytes": 5984,
+      "sha256": "ee5fc05a0677eaf69601d2c7db0d9ecd6cc27c3abc1d0733bc9ed34707cf8ef2"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/package.json",
+      "present": true,
+      "bytes": 908,
+      "sha256": "547483ab8172343adefa802509c8778ef018538febf0710fae8e962d2d128419",
+      "name": "@img/sharp-win32-x64",
+      "version": "0.34.3",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "private": null
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/LICENSE",
+      "present": true,
+      "bytes": 10464,
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/versions.json",
+      "present": true,
+      "bytes": 592,
+      "sha256": "cb5fc5ebccbfbc0e18f5530ee0527035cef3bdc4024912a759ca796cb0830da4"
+    }
+  ],
+  "archive_file_count": 442,
+  "archivedPackages": [
+    {
+      "path": "node_modules/@img/sharp-win32-x64/package.json",
+      "sha256": "547483ab8172343adefa802509c8778ef018538febf0710fae8e962d2d128419",
+      "name": "@img/sharp-win32-x64",
+      "version": "0.34.3",
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "private": null
+    },
+    {
+      "path": "node_modules/argparse/package.json",
+      "sha256": "800e809f5cdb0a7dec1834e1d2c0a165b1b63c2d6d7b2a97034b8c668de24a8f",
+      "name": "argparse",
+      "version": "2.0.1",
+      "license": "Python-2.0",
+      "private": null
+    },
+    {
+      "path": "node_modules/builder-util-runtime/package.json",
+      "sha256": "a5aefd7643b47da51c78d230068d71035cac7f660cbeaf2af5ab8953bc79b31d",
+      "name": "builder-util-runtime",
+      "version": "9.7.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/color/package.json",
+      "sha256": "b8ae18b5d6b1bce2da45a56bb025858fd699676fa37d8a18e15fdebbefe34a8c",
+      "name": "color",
+      "version": "4.2.3",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/color-convert/package.json",
+      "sha256": "5a56bf5ce5ddd347644a5e7804435e583742717221d1c7024c75de766214c8f7",
+      "name": "color-convert",
+      "version": "2.0.1",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/color-name/package.json",
+      "sha256": "fcae3844baef45d10ea5b3d36962c4bb517f6c0c0502da5dab6debc55c3e9359",
+      "name": "color-name",
+      "version": "1.1.4",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/color-string/package.json",
+      "sha256": "4969196834845164fc84316695843ae5ffc082c5843c13d49e648028a2ca475b",
+      "name": "color-string",
+      "version": "1.9.1",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/debug/package.json",
+      "sha256": "85f3f142cda5b1a1ed18f4a5181a6c6b31b07a6d35da48dacc507586924c7ccd",
+      "name": "debug",
+      "version": "4.4.3",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/detect-libc/package.json",
+      "sha256": "14eb612003e36897f20862653e538f26afa41f9662c4dd641e75618207b8851e",
+      "name": "detect-libc",
+      "version": "2.1.2",
+      "license": "Apache-2.0",
+      "private": null
+    },
+    {
+      "path": "node_modules/electron-updater/package.json",
+      "sha256": "12cd713a0d940fe32d8b74843aeca32ad4e2674da777e635b72dd0d7252be1fd",
+      "name": "electron-updater",
+      "version": "6.8.9",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/fs-extra/package.json",
+      "sha256": "8625f8d6674f3dacbdd5ed9fc553d9583234a6403ef90b1612f786b8fad17711",
+      "name": "fs-extra",
+      "version": "10.1.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/graceful-fs/package.json",
+      "sha256": "5f558a45ee1f8ea431e950ab3864f842b9de5325e30a31ba1bd68f6f768457ed",
+      "name": "graceful-fs",
+      "version": "4.2.11",
+      "license": "ISC",
+      "private": null
+    },
+    {
+      "path": "node_modules/is-arrayish/package.json",
+      "sha256": "e22f3da25b59bb7b1f646523c60163fe3485b29ad489449caa6ce33a3f2d1079",
+      "name": "is-arrayish",
+      "version": "0.3.4",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/js-yaml/package.json",
+      "sha256": "1ccdc693bf7e12b3ef59660ab35ddc0ccc70e23c2b3aff648ad45c823e27ad24",
+      "name": "js-yaml",
+      "version": "4.3.1",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/jsonfile/package.json",
+      "sha256": "19b7f70104b503224fc101fc465fb40765b077aa1f996f2d008463689a4fe4e6",
+      "name": "jsonfile",
+      "version": "6.2.1",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/lazy-val/package.json",
+      "sha256": "a6f4140d0187f32d95545835aca38684e18d0fcfbecb51709b0aaa54decd3c0b",
+      "name": "lazy-val",
+      "version": "1.0.5",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/lodash.escaperegexp/package.json",
+      "sha256": "c71b659d3f3f5dfab55d736b6bd17d97f822b13bcf9b1edbce479f8e691e7892",
+      "name": "lodash.escaperegexp",
+      "version": "4.1.2",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/lodash.isequal/package.json",
+      "sha256": "6e84ac44b54c17317d096a280e9d0bd72d736e0a0245095cc7c5d72657890406",
+      "name": "lodash.isequal",
+      "version": "4.5.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/ms/package.json",
+      "sha256": "f983ec581f1dd5a47b7f12b58f97c0b44c4e0cce56cbecc40140031aeef99bdf",
+      "name": "ms",
+      "version": "2.1.3",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/sax/package.json",
+      "sha256": "26df984c41445dbfe2a4981d80660bebc7611e69ab260226b29021a202ee0834",
+      "name": "sax",
+      "version": "1.6.1",
+      "license": "BlueOak-1.0.0",
+      "private": null
+    },
+    {
+      "path": "node_modules/semver/package.json",
+      "sha256": "783e44dd42d6021177385b15de76f71d49d472f79b60ab22ed69f336d5e0f9d9",
+      "name": "semver",
+      "version": "7.7.4",
+      "license": "ISC",
+      "private": null
+    },
+    {
+      "path": "node_modules/sharp/package.json",
+      "sha256": "c90338220bbd40066d83c42478bc0c9565443f2ef30730d0f51416fb8fe229ff",
+      "name": "sharp",
+      "version": "0.34.3",
+      "license": "Apache-2.0",
+      "private": null
+    },
+    {
+      "path": "node_modules/sharp/node_modules/semver/package.json",
+      "sha256": "58ad67ac517e1610524a9327efa766de640856fb2ea62244f9fb45aa7f9f3694",
+      "name": "semver",
+      "version": "7.8.5",
+      "license": "ISC",
+      "private": null
+    },
+    {
+      "path": "node_modules/simple-swizzle/package.json",
+      "sha256": "3a73d233ae7841b02dc496578195fecae11f0142bf30eca57815d1671381f9b5",
+      "name": "simple-swizzle",
+      "version": "0.2.4",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/tiny-typed-emitter/package.json",
+      "sha256": "eb7f51a4a5a7f41baf54271c726724a047f60d45762d650dc00439a10c37645b",
+      "name": "tiny-typed-emitter",
+      "version": "2.1.0",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "node_modules/universalify/package.json",
+      "sha256": "5b39e9c6305a5ba27c76caf4817244dd1a308b68c7559dfe15471173466cf06e",
+      "name": "universalify",
+      "version": "2.0.1",
+      "license": "MIT",
+      "private": null
+    },
+    {
+      "path": "package.json",
+      "sha256": "9f6ec985b01d5f9b985f8af2e6610600431785d6a7b1d36f9d2a2ed3153fa6ab",
+      "name": "@casimirbot/desktop",
+      "version": "0.1.0-alpha.11",
+      "license": null,
+      "private": true
+    }
+  ],
+  "archiveLicensePaths": [
+    "node_modules/@img/sharp-win32-x64/LICENSE",
+    "node_modules/argparse/LICENSE",
+    "node_modules/builder-util-runtime/LICENSE",
+    "node_modules/color/LICENSE",
+    "node_modules/color-convert/LICENSE",
+    "node_modules/color-name/LICENSE",
+    "node_modules/color-string/LICENSE",
+    "node_modules/debug/LICENSE",
+    "node_modules/detect-libc/LICENSE",
+    "node_modules/electron-updater/LICENSE",
+    "node_modules/fs-extra/LICENSE",
+    "node_modules/graceful-fs/LICENSE",
+    "node_modules/is-arrayish/LICENSE",
+    "node_modules/js-yaml/LICENSE",
+    "node_modules/jsonfile/LICENSE",
+    "node_modules/lodash.escaperegexp/LICENSE",
+    "node_modules/lodash.isequal/LICENSE",
+    "node_modules/ms/license.md",
+    "node_modules/sax/LICENSE.md",
+    "node_modules/semver/LICENSE",
+    "node_modules/sharp/LICENSE",
+    "node_modules/sharp/node_modules/semver/LICENSE",
+    "node_modules/simple-swizzle/LICENSE",
+    "node_modules/tiny-typed-emitter/LICENSE",
+    "node_modules/universalify/LICENSE"
+  ],
+  "interestingPhysical": [
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2",
+      "bytes": 28076,
+      "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_AMS-Regular-DMm9YOAa.woff",
+      "bytes": 33516,
+      "sha256": "30da91e84c893f875e252689faebdc590b2871145e8adc7f9a9d4dbd8ce0b251"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_AMS-Regular-DRggAlZN.ttf",
+      "bytes": 63632,
+      "sha256": "68534840bcfdd2bffb6f0e8deb48684dd01e7f04ea2813267577afb906de1d13"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf",
+      "bytes": 12368,
+      "sha256": "07d8e303ce4fc12b4bb54f1004170dd190a1f3db45d400fe68060df3e0897268"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff",
+      "bytes": 7716,
+      "sha256": "1ae6bd7475590e97e7f145a89e09ccde322f7a6bc0b91607b1c8b8ee28290fed"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2",
+      "bytes": 6912,
+      "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff",
+      "bytes": 7656,
+      "sha256": "3398dd02302557a793f2863f88e02d96ce10df2abffa07c8e9fa90775116e65c"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2",
+      "bytes": 6908,
+      "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf",
+      "bytes": 12344,
+      "sha256": "ed0b74372feefcbb9c0666b2e210da37b7e49fa7fbbf3eeb11db5f693dacfbb7"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf",
+      "bytes": 19584,
+      "sha256": "9163df9c7122432e6495b4229fa9071cf9ae86a758ae5efc4924ec2e1a6dbce1"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Fraktur-Bold-BsDP51OF.woff",
+      "bytes": 13296,
+      "sha256": "9be7ceb88004ab8ad124082246fbfcca4091e36385d4ec6ed1df67375dad50fb"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2",
+      "bytes": 11348,
+      "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Fraktur-Regular-CB_wures.ttf",
+      "bytes": 19572,
+      "sha256": "1e6f9579e90e2cac37f8f60a597c436e075c114385652b7cbeb0dec0421291b3"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2",
+      "bytes": 11316,
+      "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff",
+      "bytes": 13208,
+      "sha256": "5e28753be717dac97f559f49bc10be9cf3c124ddcabda6659d11cb68febc6463"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Bold-Cx986IdX.woff2",
+      "bytes": 25324,
+      "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Bold-Jm3AIy58.woff",
+      "bytes": 29912,
+      "sha256": "c76c5d696297d51b9cb1639c7da4334f0e7dec81b42b11213b5e25ef671bb822"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Bold-waoOVXN0.ttf",
+      "bytes": 51336,
+      "sha256": "138ac28d1663b3037e9c5f52371fa5c63d8324f4a38d22cd573e6ea3a3fd0cf8"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2",
+      "bytes": 16780,
+      "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf",
+      "bytes": 32968,
+      "sha256": "70ee1f64a20f2048c21940ef46d0144fd215baa953ca69afd1e31e98544f708f"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-BoldItalic-SpSLRI95.woff",
+      "bytes": 19412,
+      "sha256": "a6f7ec0d846ac7ad975adb8959c37ed49b94acbc4ae436db9ce9e20287e4a64c"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Italic-3WenGoN9.ttf",
+      "bytes": 33580,
+      "sha256": "0d85ae7cc30f23790a7f1a58c4a112fdca8aae769b6ba11429af1d98b1b6cb3a"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Italic-BMLOBm91.woff",
+      "bytes": 19676,
+      "sha256": "f1d6ef86f3b11a528bd5185199bd2443ecb2b0dead96d88674b5a2c12be24bdf"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2",
+      "bytes": 16988,
+      "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Regular-B22Nviop.woff2",
+      "bytes": 26272,
+      "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Regular-Dr94JaBh.woff",
+      "bytes": 30772,
+      "sha256": "c6368d87e8a1a3a5d337623d83d8dc4b868f242a9ad476237d6f8d1e0f168cdc"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Main-Regular-ypZvNtVU.ttf",
+      "bytes": 53580,
+      "sha256": "d0332f52868370fd83ae7fa46470f90c8f2eab2fcf12bc4f88080b340c95a830"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf",
+      "bytes": 31196,
+      "sha256": "f9377ab0271cda59af24bcffbd46a4d0c8a3572ffafdbb38de2ad5ea7b0d5ee5"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2",
+      "bytes": 16400,
+      "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff",
+      "bytes": 18668,
+      "sha256": "850c0af5c2238497febaf5e461d880bf458c341f42f4f330f1b1ab5698b1998e"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Math-Italic-DA0__PXp.woff",
+      "bytes": 18748,
+      "sha256": "8a8d244581371912b8f3f5a23e2437cb2a59cd9bcaebb0346e722c05737a2571"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Math-Italic-flOr_0UB.ttf",
+      "bytes": 31308,
+      "sha256": "08ce98e51b04d58945a301e639e02b6998af29fdfd61a7b8afdd07bbfc479d4a"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Math-Italic-t53AETM-.woff2",
+      "bytes": 16440,
+      "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf",
+      "bytes": 24504,
+      "sha256": "1ece03f79f95277d57dc7f6b435a74e1379b0d46104a8530286b60ff49369ea0"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2",
+      "bytes": 12216,
+      "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff",
+      "bytes": 14408,
+      "sha256": "ece03cfd83e22c212cdef66feb8442d25a083beb988db3f1883f3f9738d750ba"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2",
+      "bytes": 12028,
+      "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Italic-DN2j7dab.woff",
+      "bytes": 14112,
+      "sha256": "91ee67500cc0129aa0ace3ac5c61ff1692102f0f31d02b69347fba35dcb75bf2"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf",
+      "bytes": 22364,
+      "sha256": "3931dd81faed86ba021bb2bbdc36f5bed9a38d6b4f4077aca59b265aa1b02083"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf",
+      "bytes": 19436,
+      "sha256": "f36ea897e19f4a2e571d1e900e4e3710e438deb05a842486045ba0a3e616a4ad"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff",
+      "bytes": 12316,
+      "sha256": "11e4dc8a6471ff6d6ee561d53d10fde8f7489e798257ff449c5d37c197435605"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2",
+      "bytes": 10344,
+      "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Script-Regular-C5JkGWo-.ttf",
+      "bytes": 16648,
+      "sha256": "1c67f068fea8bb09bf099c088b1cf64bd27516a6e07f4684344873564bb66a67"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Script-Regular-D3wIWfF6.woff2",
+      "bytes": 9644,
+      "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Script-Regular-D5yQViql.woff",
+      "bytes": 10588,
+      "sha256": "d96cdf2b3bdd4d64a8fd5f74a4c467f123a8a73931cd435889f08ffaf9bf947a"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size1-Regular-C195tn64.woff",
+      "bytes": 6496,
+      "sha256": "c943cc986384f59e86bea5fd7dc50a9c4dfe567a7c05eb40d6790720dead97c9"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size1-Regular-Dbsnue_I.ttf",
+      "bytes": 12228,
+      "sha256": "95b6d2f1a50173bfedb8c63e1d1c99b10427d0a4df4201cb44513b226951a22b"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2",
+      "bytes": 5468,
+      "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size2-Regular-B7gKUWhC.ttf",
+      "bytes": 11508,
+      "sha256": "a6b2099fb555c60e3a0db3a08842ebf1d732c6eb4e4bf44913613bed4fc4e39b"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2",
+      "bytes": 5208,
+      "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size2-Regular-oD1tc_U0.woff",
+      "bytes": 6188,
+      "sha256": "2014c523c3210bcc166648c4d4cc57f05b747df07a24277bf71c51e67dc79e3d"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size3-Regular-CTq5MqoE.woff",
+      "bytes": 4420,
+      "sha256": "6ab6b62e9b62dae2c00dd90f791bd10950be0ecc3490d7d6045f51c2e8fe0949"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size3-Regular-DgpXs0kz.ttf",
+      "bytes": 7588,
+      "sha256": "500e04d54f0d51666332c9d2089aa803be22aa878eca539e59fa53c6e522b082"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size4-Regular-BF-4gkZK.woff",
+      "bytes": 5980,
+      "sha256": "99f9c6750b489c9462bf04900bd3f939df9b829339daaaaa99ef5495cdddea58"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2",
+      "bytes": 4928,
+      "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Size4-Regular-DWFBv043.ttf",
+      "bytes": 10364,
+      "sha256": "c647367d1dd4e162468717d020e1fc0f1dc5c26ebfdffbe55261713bf88c5877"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff",
+      "bytes": 16028,
+      "sha256": "e14fed02b1aba7ce9f5afd5844b5d0321b22351febc720e0de8b8723527609f7"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2",
+      "bytes": 13568,
+      "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/dist/public/assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf",
+      "bytes": 27556,
+      "sha256": "f01f3e87d9c6a61c0c081ceb577abd864eb00a612f7ac1620dd6915fad2ef5aa"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/licenses/openai-tunnel-client-LICENSE",
+      "bytes": 10758,
+      "sha256": "f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/lib/libvips-42.dll",
+      "bytes": 19093504,
+      "sha256": "58521f26388327a857ea33cde241415491e679c8ab741d1fc12bf9e89daaff4d"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/lib/libvips-cpp-8.17.1.dll",
+      "bytes": 327168,
+      "sha256": "01d34f0128d1726e96c839e22f9b59f82dd24474d07446d9d1d36a0e9fd92f8c"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/lib/sharp-win32-x64.node",
+      "bytes": 433152,
+      "sha256": "9b1f537ce2090cd240b04ffbbaade542bdcb1dfdd91e094c5a57a83652dcd80e"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/@img/sharp-win32-x64/LICENSE",
+      "bytes": 10464,
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/sharp/LICENSE",
+      "bytes": 10273,
+      "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/sharp/node_modules/semver/LICENSE",
+      "bytes": 765,
+      "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+    }
+  ],
+  "public_asset_extension_counts": {
+    ".js": 413,
+    ".ts": 2,
+    ".css": 2,
+    ".woff2": 19,
+    ".woff": 20,
+    ".ttf": 20,
+    ".mjs": 105,
+    ".wasm": 5,
+    ".json": 6,
+    ".txt": 2,
+    ".html": 3,
+    ".png": 4,
+    ".svg": 24,
+    ".wav": 5,
+    ".glb": 3,
+    ".md": 1,
+    ".webmanifest": 1
+  },
+  "mapMetadata": [
+    {
+      "path": "node_modules/@mapbox/geojson-rewind",
+      "version": "0.5.2",
+      "license": "ISC",
+      "dependencies": {
+        "get-stream": "^6.0.1",
+        "minimist": "^1.2.6"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/geojson-types",
+      "version": "1.0.2",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/jsonlint-lines-primitives",
+      "version": "2.0.2",
+      "license": null,
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/mapbox-gl-supported",
+      "version": "1.5.0",
+      "license": "BSD-3-Clause",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/point-geometry",
+      "version": "0.1.0",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/tiny-sdf",
+      "version": "1.2.5",
+      "license": "BSD-2-Clause",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/unitbezier",
+      "version": "0.0.0",
+      "license": "BSD-2-Clause",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/vector-tile",
+      "version": "1.3.1",
+      "license": "BSD-3-Clause",
+      "dependencies": {
+        "@mapbox/point-geometry": "~0.1.0"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@mapbox/whoots-js",
+      "version": "3.1.0",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@maplibre/maplibre-gl-style-spec",
+      "version": "20.4.0",
+      "license": "ISC",
+      "dependencies": {
+        "@mapbox/jsonlint-lines-primitives": "~2.0.2",
+        "@mapbox/unitbezier": "^0.0.1",
+        "json-stringify-pretty-compact": "^4.0.0",
+        "minimist": "^1.2.8",
+        "quickselect": "^2.0.0",
+        "rw": "^1.3.3",
+        "tinyqueue": "^3.0.0"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@maplibre/maplibre-gl-style-spec/node_modules/@mapbox/unitbezier",
+      "version": "0.0.1",
+      "license": "BSD-2-Clause",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@maplibre/maplibre-gl-style-spec/node_modules/tinyqueue",
+      "version": "3.0.0",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@plotly/mapbox-gl",
+      "version": "1.13.4",
+      "license": "SEE LICENSE IN LICENSE.txt",
+      "dependencies": {
+        "@mapbox/geojson-rewind": "^0.5.2",
+        "@mapbox/geojson-types": "^1.0.2",
+        "@mapbox/jsonlint-lines-primitives": "^2.0.2",
+        "@mapbox/mapbox-gl-supported": "^1.5.0",
+        "@mapbox/point-geometry": "^0.1.0",
+        "@mapbox/tiny-sdf": "^1.1.1",
+        "@mapbox/unitbezier": "^0.0.0",
+        "@mapbox/vector-tile": "^1.3.1",
+        "@mapbox/whoots-js": "^3.1.0",
+        "csscolorparser": "~1.0.3",
+        "earcut": "^2.2.2",
+        "geojson-vt": "^3.2.1",
+        "gl-matrix": "^3.2.1",
+        "grid-index": "^1.1.0",
+        "murmurhash-js": "^1.0.0",
+        "pbf": "^3.2.1",
+        "potpack": "^1.0.1",
+        "quickselect": "^2.0.0",
+        "rw": "^1.3.3",
+        "supercluster": "^7.1.0",
+        "tinyqueue": "^2.0.3",
+        "vt-pbf": "^3.1.1"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@types/mapbox__point-geometry",
+      "version": "0.1.4",
+      "license": "MIT",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/@types/mapbox__vector-tile",
+      "version": "1.3.4",
+      "license": "MIT",
+      "dependencies": {
+        "@types/geojson": "*",
+        "@types/mapbox__point-geometry": "*",
+        "@types/pbf": "*"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/mapbox-gl",
+      "version": "1.13.3",
+      "license": "SEE LICENSE IN LICENSE.txt",
+      "dependencies": {
+        "@mapbox/geojson-rewind": "^0.5.2",
+        "@mapbox/geojson-types": "^1.0.2",
+        "@mapbox/jsonlint-lines-primitives": "^2.0.2",
+        "@mapbox/mapbox-gl-supported": "^1.5.0",
+        "@mapbox/point-geometry": "^0.1.0",
+        "@mapbox/tiny-sdf": "^1.1.1",
+        "@mapbox/unitbezier": "^0.0.0",
+        "@mapbox/vector-tile": "^1.3.1",
+        "@mapbox/whoots-js": "^3.1.0",
+        "csscolorparser": "~1.0.3",
+        "earcut": "^2.2.2",
+        "geojson-vt": "^3.2.1",
+        "gl-matrix": "^3.2.1",
+        "grid-index": "^1.1.0",
+        "murmurhash-js": "^1.0.0",
+        "pbf": "^3.2.1",
+        "potpack": "^1.0.1",
+        "quickselect": "^2.0.0",
+        "rw": "^1.3.3",
+        "supercluster": "^7.1.0",
+        "tinyqueue": "^2.0.3",
+        "vt-pbf": "^3.1.1"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl",
+      "version": "4.7.1",
+      "license": "BSD-3-Clause",
+      "dependencies": {
+        "@mapbox/geojson-rewind": "^0.5.2",
+        "@mapbox/jsonlint-lines-primitives": "^2.0.2",
+        "@mapbox/point-geometry": "^0.1.0",
+        "@mapbox/tiny-sdf": "^2.0.6",
+        "@mapbox/unitbezier": "^0.0.1",
+        "@mapbox/vector-tile": "^1.3.1",
+        "@mapbox/whoots-js": "^3.1.0",
+        "@maplibre/maplibre-gl-style-spec": "^20.3.1",
+        "@types/geojson": "^7946.0.14",
+        "@types/geojson-vt": "3.2.5",
+        "@types/mapbox__point-geometry": "^0.1.4",
+        "@types/mapbox__vector-tile": "^1.3.4",
+        "@types/pbf": "^3.0.5",
+        "@types/supercluster": "^7.1.3",
+        "earcut": "^3.0.0",
+        "geojson-vt": "^4.0.2",
+        "gl-matrix": "^3.4.3",
+        "global-prefix": "^4.0.0",
+        "kdbush": "^4.0.2",
+        "murmurhash-js": "^1.0.0",
+        "pbf": "^3.3.0",
+        "potpack": "^2.0.0",
+        "quickselect": "^3.0.0",
+        "supercluster": "^8.0.1",
+        "tinyqueue": "^3.0.0",
+        "vt-pbf": "^3.1.3"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/@mapbox/tiny-sdf",
+      "version": "2.0.6",
+      "license": "BSD-2-Clause",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/@mapbox/unitbezier",
+      "version": "0.0.1",
+      "license": "BSD-2-Clause",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/earcut",
+      "version": "3.0.2",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/geojson-vt",
+      "version": "4.0.2",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/potpack",
+      "version": "2.1.0",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/quickselect",
+      "version": "3.0.0",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/supercluster",
+      "version": "8.0.1",
+      "license": "ISC",
+      "dependencies": {
+        "kdbush": "^4.0.2"
+      },
+      "optional": false,
+      "dev": false
+    },
+    {
+      "path": "node_modules/maplibre-gl/node_modules/tinyqueue",
+      "version": "3.0.0",
+      "license": "ISC",
+      "dependencies": {},
+      "optional": false,
+      "dev": false
+    }
+  ],
+  "archive_map_codex_baritone_paths": []
+}

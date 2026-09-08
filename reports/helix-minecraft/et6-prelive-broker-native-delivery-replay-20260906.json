@@ -1,0 +1,26 @@
+{
+  "scope": "Real broker successor lease and reconciliation joined to unchanged compiled native checkpoint/acceptance/activation replay",
+  "passed": true,
+  "verification": { "cross_language_and_persistence_tests": 5, "failures": 0 },
+  "verified": [
+    "Child starts admitted rather than pre-leased",
+    "Native checkpoint and retained association admit one real broker lease",
+    "Leased plan, canonical plan bytes and arguments match native child",
+    "Second poll returns null and attempt count remains one",
+    "Stale event, wrong checkpoint and revoked binding reject",
+    "Status-only reconciliation reports leased without effects or execution authority",
+    "Revoked binding rejects reconciliation",
+    "Native acceptance and activation record the same child as running"
+  ],
+  "fixture_corrections": [
+    "Moved chain verification after actual lease; pre-lease validation correctly rejected undelivered child",
+    "Fixture adapter resolution supplies freshness policy for synthetic world identity",
+    "Scoped Date.now to captured native audit time without changing native event payloads"
+  ],
+  "limits": [
+    "Initial admission and retention rows remain seeded",
+    "Authority join observations, adapter resolution, binding inspection and transaction wrapper are fixtures",
+    "Native process previously generated artifacts; this is offline replay, not simultaneous broker HTTP/native execution",
+    "No live timing, authorization, Minecraft capacity or packaged acceptance claim"
+  ]
+}

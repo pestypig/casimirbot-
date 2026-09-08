@@ -1,0 +1,19 @@
+{
+  "scope": "ET6 MCP planning-frontier publication",
+  "classification": "source admission",
+  "implementation": "Registered helix_environment_temporal_frontier_publish with action scopes and OAuth catalog entry. Owner comes from authenticated principal; participant comes from current room membership. Existing publisher checks current goal steering grant, revision, authority and perception evidence. Output remains conditional planning context without execution or answer authority.",
+  "verification": {
+    "mcp_suite": "3 tests passed, including catalog visibility, authenticated identity forwarding and injected identity rejection",
+    "publisher_and_perception_suites": "11 tests passed",
+    "discipline_quick": "Passed, but static classifier inferred no sensitive files and skipped its battery"
+  },
+  "limitations": [
+    "In-memory MCP test mocks publisher; underlying source tests are deterministic fixtures.",
+    "No runtime restart or refreshed external MCP catalog is proven.",
+    "This tool publishes planning context only. Public temporal execution admission and packaged live capacity remain incomplete."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

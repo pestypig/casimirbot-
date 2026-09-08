@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-05",
+  "classification": "tool admission",
+  "scope": "Internal resident successor lease foundation; no route or native caller",
+  "implementation": [
+    "Lock and recheck authority, credential identity and policy before inspecting the active resident.",
+    "Require exact resident identities, current manifest, running state, fresh hashed running evidence, no queued controls, and retained predecessor/checkpoint association.",
+    "Inspect the server-owned reasoning binding without impersonating its MCP client; require active epoch, continuation hash and run association.",
+    "Lease at most one admitted successor once with a deadline bounded by successor, resident and lease duration. Leased rows are not replay candidates."
+  ],
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/actions/__tests__/temporal-ordinary-queue.test.ts server/services/environment-connectors/actions/__tests__/action-admission-transaction.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "tests_passed": 11,
+    "exit_code": 0,
+    "negative": "Revoked authority, replaced credential and canceled resident stop before successor selection or lease mutation.",
+    "typecheck": "Wider temporal project remains failing; filtered run emitted no action-broker or temporal-ordinary-queue diagnostics."
+  },
+  "remaining_before_exposure": [
+    "Positive lease transaction, pending controls, predecessor/checkpoint/binding negatives, and duplicate/race qualification.",
+    "Delivery-time goal/current-checkpoint validation and child running-state lifecycle integration.",
+    "Server-owned binding-store route wiring, native controls-first polling, resident acceptance and acknowledgement.",
+    "Packaged EXE and three-cycle live qualification."
+  ],
+  "et6_complete": false,
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

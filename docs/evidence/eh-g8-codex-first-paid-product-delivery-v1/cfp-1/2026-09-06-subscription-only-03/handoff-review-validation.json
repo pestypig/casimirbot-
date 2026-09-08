@@ -1,0 +1,31 @@
+{
+  "captured_utc": "2026-09-07T03:49:43.296Z",
+  "scope": "Uninstall contract and specification/artifact freeze sequencing",
+  "docs_audit": {
+    "exit_code": 0,
+    "stdout": "\n> rest-express@1.0.0 helix:environment-harness:docs-audit\n> tsx scripts/audit-environment-harness-work-program.ts\n\n{\n  \"schema\": \"casimirbot.environment_harness_work_program_audit.v1\",\n  \"work_program\": \"docs/helix-environment-harness-work-program-v1.md\",\n  \"active_gate\": \"G8\",\n  \"backlink_files_checked\": 6,\n  \"canonical_link_targets_checked\": 7,\n  \"capability_status_rows_checked\": 40,\n  \"allowed_maturity_terms\": [\n    \"projected\",\n    \"specified\",\n    \"implemented\",\n    \"deterministically verified\",\n    \"live accepted\",\n    \"integrated accepted\",\n    \"release-ready\"\n  ],\n  \"acceptance_claims_checked\": 14,\n  \"ok\": true,\n  \"failures\": []\n}\n",
+    "stderr": ""
+  },
+  "links_checked": 33,
+  "missing_links": [],
+  "artifacts": [
+    {
+      "file": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "cc08c1481bd9d9d2ee55a37a22c159c55d432104a6d096b8d2c508b9ca3518fc"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "sha256": "f1880f1a20f8abb0040ffb49f2ed668f320b45ddac3592ee34ca2f5c6444deb9"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp3-distribution-migration-v1.md",
+      "sha256": "778498925053cf26fd90babcfa3ec4eb53abd642ed4f22a3d50c67ab6f5780fe"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cfp3-license-enforcement-v1.md",
+      "sha256": "1535fb6b1814715bd0407a2a55a97e9792bd5851063dd3c1aa21b1775365939c"
+    }
+  ],
+  "runtime_tests": "Not run: planning documentation only",
+  "stage_closure": false
+}

@@ -1,0 +1,88 @@
+{
+  "schema": "et6_live_diagnostic_snapshot.v1",
+  "recorded_at": "2026-09-07T16:18:18.969Z",
+  "classification": "bounded_root_admission_and_post_observation_not_rolling_acceptance",
+  "binding_id": "reasoning_binding:22dc1c01bc1eb3a8c499429ea3393de0",
+  "binding_epoch": 2,
+  "run_id": "run_9a38524a-e0f7-4c94-bee8-d214da937161",
+  "prompt_pickup": {
+    "event_id": "reasoning_steering:96a74c749e1fd5c0324085aa0f03157c",
+    "acknowledged_at": "2026-09-07T16:07:19.790Z",
+    "authority": "advisory_only"
+  },
+  "root_admission": {
+    "action_request_id": "action_request:et6-rolling-20260907-1614-root",
+    "workflow_id": "workflow:et6-rolling-20260907-1614-root",
+    "created_at": "2026-09-07T16:15:12.053Z",
+    "plan_hash": "sha256:ad6ac36dc8b1322abbf27e3e81edc3c216903bee3321f4960bcd0df4d86ba11c",
+    "admitted": true,
+    "execution_proven_by_admission": false
+  },
+  "workflow_status": {
+    "operation": "minecraft.player.workflow.status",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "ok": false,
+    "status": "failed",
+    "summary": "The exact workflow was not running in this Fabric client.",
+    "observation": {
+      "schema": "helix.environment_action.control_observation.v1",
+      "control_request_ref": "environment_action_control:db5b4ab5-4bce-46bc-9973-cd484ab541f4",
+      "workflow_ref": "workflow:et6-rolling-20260907-1614-root",
+      "control_kind": "status",
+      "outcome": "not_running",
+      "summary": "The exact workflow was not running in this Fabric client.",
+      "affected_workflow_refs": [],
+      "workflow_state": null,
+      "controls_released": false,
+      "evidence_refs": [],
+      "evidence_ref": "environment_action_control_evidence:ebf0ecfb9219ff557e32258e610ecce60b5e5ee49",
+      "observed_at": "2026-09-07T16:17:55.978Z",
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "content_role": "environment_action_control_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "post_observation": {
+    "evidence_ref": "environment_probe_evidence:25881048ddeeb9414ad0c190b7809c9243abbf27",
+    "observed_at": "2026-09-07T16:18:18.969Z",
+    "outcome": "succeeded",
+    "actor": {
+      "air": 300,
+      "food_level": 20,
+      "freezing": false,
+      "health": 20,
+      "max_health": 20,
+      "on_fire": false,
+      "on_ground": true,
+      "pitch": 1.5,
+      "position": {
+        "x": -1.47,
+        "y": 65,
+        "z": -0.07
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.08,
+        "z": 0
+      },
+      "yaw": 91.68
+    },
+    "provenance_valid": true
+  },
+  "interpretation": {
+    "rolling_extensions_proven": 0,
+    "root_terminal_outcome": "not_yet_recovered",
+    "post_position_change_is_not_exclusive_causal_attribution": true,
+    "live_capacity_pass": false,
+    "nav1_unlocked": false
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "scope": "Top-only SM Yukawa approximation, full one-loop g/gp/gs/yt/Lambda/m2 trajectory. Tree-derived diagnostic EW/Higgs inputs, no finite input-scheme conversion. UV boundary remains restricted; finite matching still current/qu selected plus broad qq only.",
+  "SM_order": [
+    "g",
+    "gp",
+    "gs",
+    "yt",
+    "Lambda",
+    "m2_GeV2"
+  ],
+  "SM_low": [
+    0.6529569455727052,
+    0.35731419321927116,
+    1.1649755475334196,
+    0.9340013210473813,
+    0.25777685977136805,
+    7812.5
+  ],
+  "SM_high": [
+    0.6393821786840267,
+    0.3623738246885436,
+    1.0209821494428075,
+    0.8341656604499582,
+    0.17657633257272093,
+    8309.065506576573
+  ],
+  "beta_max_relative_error": 3.902805810333096e-16,
+  "rows": [
+    {
+      "rtol": 1e-07,
+      "partial_H_imag_GeV_minus2": 2.7745106895426197e-15,
+      "phiq1_11_real": 2.201907313393788e-09
+    },
+    {
+      "rtol": 1e-09,
+      "partial_H_imag_GeV_minus2": 2.7745106895407824e-15,
+      "phiq1_11_real": 2.2019073133936236e-09
+    }
+  ],
+  "previous_top_QCD_partial": 2.716798183957349e-15,
+  "fractional_partial_change": 0.021242838693070754,
+  "checks": {
+    "SM_beta_agreement": true,
+    "coefficient_tolerance": true
+  },
+  "full_model_admitted": false
+}

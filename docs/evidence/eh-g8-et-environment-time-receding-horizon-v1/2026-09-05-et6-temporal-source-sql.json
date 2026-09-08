@@ -1,0 +1,16 @@
+{
+  "schema": "et6.temporal_source_sql.v1",
+  "date": "2026-09-05",
+  "classification": "source admission",
+  "repair": "Require the source device's installation and adapter admission's source binding, room, source and world to match the environment record.",
+  "verification": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-perception-context.test.ts --pool=forks --maxWorkers=1",
+    "passed": 6,
+    "failed": 0,
+    "sql_backend": "pg-mem with minimal columns inspected from migrations 038 and 039",
+    "sql_assertions": ["active source accepted", "each of six source-chain records revoked rejected before probe read", "expired credential rejected", "device installation mismatch rejected", "admission world mismatch rejected"],
+    "goal_and_probe_boundaries_mocked": true
+  },
+  "limits": "This is SQL predicate coverage, not a full migration/transaction/concurrent-revocation integration test. Frontier persistence and resident temporal dispatch remain absent.",
+  "et6_complete": false
+}

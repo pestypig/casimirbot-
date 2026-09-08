@@ -1,6 +1,12 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as temporalFrontier from "../../services/environment-connectors/temporal-plans/temporal-frontier-publisher";
+import { TemporalPlanError } from "../../services/environment-connectors/temporal-plans/temporal-plan-error";
+import * as temporalAdmission from "../../services/environment-connectors/temporal-plans/temporal-plan-admission";
+import { EnvironmentDurableGoalError } from "../../services/environment-connectors/goals/durable-goal-store";
+import { EnvironmentActionBrokerError } from "../../services/environment-connectors/actions/action-broker";
+import temporalSubmissionFixture from "./fixtures/temporal-submission.json";
 import { buildHelixSharedRealtimeRoomsExperimentPolicy } from
   "@shared/helix-account-session";
 import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE } from
@@ -45,6 +51,8 @@ import type { HelixAgentApiService } from
   "../../services/helix-agent-api/service";
 import type { HelixAgentApiPrincipal } from
   "../../services/helix-agent-api/types";
+import type { HelixMcpEvidenceObservation } from
+  "@shared/contracts/helix-mcp-evidence-capability.v1";
 import type { SharedLiveRoomBindingStore } from
   "../../services/shared-live-room-control/binding-store";
 import type { SharedLiveRoomControlService } from
@@ -164,6 +172,7 @@ const connect = async (input: {
   executeProbe?: HelixEnvironmentProbeMcpExecutor;
   extendAuthority?: HelixEnvironmentActionAuthorityLeaseExtender;
   reasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
+  temporalStores?: boolean;
 }) => {
   const putMcpEvidence = vi.fn(async () => undefined);
   const roomControlService = {
@@ -172,7 +181,8 @@ const connect = async (input: {
     })),
   } as unknown as SharedLiveRoomControlService;
   const server = createHelixMcpServer({
-    principal: principal(input.scopes),
+    principal: { ...principal(input.scopes),
+      ...(input.temporalStores ? { mcpClientRef: "mcp_client:isolated-temporal-test" } : {}) },
     service: {} as HelixAgentApiService,
     roomControlService,
     roomBindingStore: {} as Pick<
@@ -183,6 +193,12 @@ const connect = async (input: {
       | "revokeClaimedRunChatBindingForOwner"
     >,
     deviceCheckService: vi.fn(),
+    ...(input.temporalStores ? {
+      localSupervisorCoordinationStore: {
+        serviceInstanceRef: "service:test", authenticateClient: vi.fn(),
+      } as never,
+      reasoningTaskBindingStore: { verifyTaskAssociation: vi.fn() } as never,
+    } : {}),
     environmentActionExecutor: input.executeAction,
     environmentProbeExecutor: input.executeProbe,
     environmentActionAuthorityLeaseExtender: input.extendAuthority,
@@ -214,6 +230,167 @@ afterEach(() => {
 });
 
 describe("Helix MCP Minecraft action boundary", () => {
+  it("persists the exact fresh situation observation for owner-scoped durable re-entry", async () => {
+    const observedAt = new Date(Date.now() - 1_000).toISOString();
+    const probeObservation = {
+      ...situationObservation(HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY),
+      observed_at: observedAt,
+      freshness_age_ms: 1_000,
+      observation_revision: 17,
+    };
+    const connection = await connect({
+      scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_READ_SCOPE],
+      executeAction: vi.fn(),
+      executeProbe: vi.fn(async () => ({
+        ok: true, status: "completed", summary: probeObservation.summary,
+        observation: probeObservation,
+      })),
+    });
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_situation_probe",
+        arguments: { room_id: ROOM_ID, probe: {
+          kind: "perception_snapshot", freshness_requirement_ms: 5_000,
+        } },
+      });
+      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      const envelope = result.structuredContent?.mcp_evidence as HelixMcpEvidenceObservation;
+      expect(envelope).toMatchObject({
+        payload: probeObservation,
+        observed_at: observedAt,
+        capability_id: "helix.minecraft.situation.observe_result",
+        support_refs: [probeObservation.evidence_ref],
+        authority: { answer_authority: false, agent_executable: false,
+          assistant_answer: false, terminal_eligible: false, reentry_required: true },
+      });
+      expect(envelope.freshness.age_ms).toBeGreaterThanOrEqual(1_000);
+      expect(Date.parse(envelope.freshness.expires_at!)).toBeLessThanOrEqual(
+        Date.parse(observedAt) + 5_000,
+      );
+      expect(connection.putMcpEvidence).toHaveBeenCalledWith({
+        owner: { tenantId: "tenant-mcp-minecraft-action", accountProfileId: "profile-mcp-minecraft-action" },
+        toolName: "helix_minecraft_situation_probe", observation: envelope,
+      });
+    } finally { await connection.close(); }
+  });
+
+  it.each([
+    ["stale timestamp", { observed_at: "2020-01-01T00:00:00.000Z" }],
+    ["future timestamp", { observed_at: "2099-01-01T00:00:00.000Z" }],
+    ["stale age", { freshness_age_ms: 5_000 }],
+    ["unknown age", { freshness_age_ms: null }],
+    ["invalid provenance", { provenance_valid: false }],
+    ["ineligible", { eligible_for_current_turn_reentry: false }],
+    ["late result", { late_result_disposition: "late_after_timeout" }],
+    ["unsuccessful outcome", { outcome: "result_stale" }],
+    ["different capability", { capability_id: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY }],
+  ] satisfies Array<[string, Partial<HelixEnvironmentProbeObservation>]>)(
+    "does not mint reusable situation evidence for %s", async (_label, overrides) => {
+      const probeObservation = {
+        ...situationObservation(HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY),
+        observed_at: new Date().toISOString(), ...overrides,
+      };
+      const connection = await connect({
+        scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_READ_SCOPE],
+        executeAction: vi.fn(),
+        executeProbe: vi.fn(async () => ({ ok: true, status: "completed",
+          summary: probeObservation.summary, observation: probeObservation })),
+      });
+      try {
+        const result = await connection.client.callTool({
+          name: "helix_minecraft_situation_probe",
+          arguments: { room_id: ROOM_ID, probe: { kind: "perception_snapshot" } },
+        });
+        expect(result.isError, JSON.stringify(result)).not.toBe(true);
+        expect(result.structuredContent?.mcp_evidence).toBeNull();
+        expect(result.structuredContent?.observation).toEqual(probeObservation);
+        expect(connection.putMcpEvidence).not.toHaveBeenCalled();
+      } finally { await connection.close(); }
+    },
+  );
+
+  it("preserves probe truth without a durable reference when evidence storage fails", async () => {
+    const probeObservation = {
+      ...situationObservation(HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY),
+      observed_at: new Date().toISOString(),
+    };
+    const connection = await connect({
+      scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_READ_SCOPE],
+      executeAction: vi.fn(),
+      executeProbe: vi.fn(async () => ({ ok: true, status: "completed",
+        summary: probeObservation.summary, observation: probeObservation })),
+    });
+    connection.putMcpEvidence.mockRejectedValueOnce(new Error("private-storage-detail"));
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const result = await connection.client.callTool({
+        name: "helix_minecraft_situation_probe",
+        arguments: { room_id: ROOM_ID, probe: { kind: "perception_snapshot" } },
+      });
+      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({ ok: true,
+        observation: probeObservation, mcp_evidence: null, terminal_eligible: false });
+      expect(connection.putMcpEvidence).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify([result, warning.mock.calls])).not.toContain("private-storage-detail");
+    } finally { warning.mockRestore(); await connection.close(); }
+  });
+
+  it("preserves durable admission rejection on the supervisor path without leaking exception text", async () => {
+    const admit = vi.spyOn(temporalAdmission, "admitTemporalPlan").mockRejectedValue(
+      new EnvironmentDurableGoalError("durable_goal_evidence_identity_mismatch", 409, "private-error-sentinel"));
+    const executeAction = vi.fn() as unknown as HelixEnvironmentActionMcpExecutor;
+    const connection = await connect({ temporalStores: true, executeAction,
+      scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE] });
+    try {
+      const result = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit",
+        arguments: temporalSubmissionFixture });
+      expect(admit, JSON.stringify(result)).toHaveBeenCalledOnce();
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({ error: "durable_goal_evidence_identity_mismatch",
+        retryable: false, execution_authority: false, answer_authority: false, terminal_eligible: false });
+      expect(JSON.stringify(result)).not.toContain("private-error-sentinel");
+      expect(executeAction).not.toHaveBeenCalled();
+      admit.mockRejectedValueOnce(new EnvironmentActionBrokerError(
+        "action_policy_denied", 409, "private-broker-error-sentinel"));
+      const brokerRejection = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit",
+        arguments: temporalSubmissionFixture });
+      expect(brokerRejection.isError).toBe(true);
+      expect(brokerRejection.structuredContent).toMatchObject({ error: "action_policy_denied",
+        retryable: false, execution_authority: false, answer_authority: false, terminal_eligible: false });
+      expect(JSON.stringify(brokerRejection)).not.toContain("private-broker-error-sentinel");
+      expect(executeAction).not.toHaveBeenCalled();
+      admit.mockRejectedValueOnce(new Error("private-unexpected-sentinel"));
+      const unexpected = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit",
+        arguments: temporalSubmissionFixture });
+      expect(unexpected.isError).toBe(true);
+      expect(unexpected.structuredContent).toMatchObject({ error: "internal_error" });
+      expect(JSON.stringify(unexpected)).not.toContain("private-unexpected-sentinel");
+    } finally {
+      admit.mockRestore();
+      await connection.close();
+    }
+  });
+  it("preserves a typed frontier clock rejection across MCP without dispatch or private error text", async () => {
+    const error = new TemporalPlanError("temporal_frontier_resident_clock_expired");
+    error.message = "private-error-sentinel";
+    const publish = vi.spyOn(temporalFrontier, "publishTemporalPerceptionFrontier").mockRejectedValue(error);
+    const executeAction = vi.fn() as HelixEnvironmentActionMcpExecutor;
+    const connection = await connect({ scopes: [HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+      HELIX_ENVIRONMENT_ACTION_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE], executeAction });
+    try {
+      const result = await connection.client.callTool({ name: "helix_environment_temporal_frontier_publish",
+        arguments: { room_id: ROOM_ID, goal_id: "goal:test", expected_revision: 1,
+          run_id: "run:test", turn_id: "turn:test", prior_turn_id: "turn:prior", probe_request_id: "probe:test" } });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({ error: "temporal_frontier_resident_clock_expired",
+        retryable: false, execution_authority: false, answer_authority: false, terminal_eligible: false });
+      expect(JSON.stringify(result)).not.toContain("private-error-sentinel");
+      expect(executeAction).not.toHaveBeenCalled();
+    } finally {
+      publish.mockRestore();
+      await connection.close();
+    }
+  });
   it("publishes typed non-terminal tools with separate read and write scopes", async () => {
     const executeAction = vi.fn(async () => ({
       ok: true,
@@ -619,12 +796,16 @@ describe("Helix MCP Minecraft action boundary", () => {
         });
         expect(executeProbe).toHaveBeenLastCalledWith(expect.objectContaining({
           capabilityId: situationCase.capabilityId,
+          turnId: situationResult.structuredContent?.prior_turn_id,
           arguments: situationCase.arguments,
           accountContext: expect.objectContaining({
             profile_id: "profile-mcp-minecraft-action",
           }),
           conversationThreadId: `helix-ask:room:${ROOM_ID}`,
         }));
+        expect(situationResult.structuredContent?.prior_turn_id).toMatch(
+          /^mcp_environment_probe_turn:[0-9a-f-]+$/u,
+        );
       }
 
       const missingPosition = await connection.client.callTool({

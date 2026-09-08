@@ -1,0 +1,13 @@
+{
+  "schema": "et6.live-preflight-evidence.v1",
+  "observed_at": "2026-09-05T16:37:14Z",
+  "program_gate": "G8",
+  "packet": "docs/work-packets/eh-g8-et6-production-rolling-integration-repair-v1.md",
+  "process_observations": { "keyed_server_port": 1522, "keyed_server_pid": 34892, "fabric_ports": [25566, 25576], "fabric_pid": 5216, "exe_window_pid": 33688, "minecraft_window_pid": 19912 },
+  "same_task_presence": { "ref": "codex-continuation:et6-minecraft-capacity-20260903-main", "service_instance_ref": "service_instance:a75cd5b59ac01ff0b907962910d0cb80", "refresh_succeeded": true, "observed_at": "2026-09-05T16:35:54.632Z", "expires_at": "2026-09-05T16:38:54.632Z", "identity_assurance": "native tunnel client plus server-derived continuation, not independent external provider OAuth" },
+  "reasoning_binding": { "ref": "reasoning_binding:682844c34203856dec59b416501137db", "epoch": 1, "steering_read_succeeded": true, "deliveries": 0 },
+  "transport": { "initial_actor_status": "full_mcp_transition_required", "initial_lease_request_600_seconds": "Rejected by connector maximum 300 before request creation", "request_ref": "desktop_tunnel_request:13522c99-ca6c-4928-aaa5-b13b1a61c0dc", "requested_lease_seconds": 300, "trusted_device_delegation_applied": true, "transition_accepted": true, "reconnect_required": false, "actor_status_reached_real_tool_after_transition": true, "environment_authority_granted": false },
+  "environment": { "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef", "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b", "actor_status": "connector_offline", "actor_evidence_ref": "environment_probe_failure:813fcc51d1d65004c7439135bfa0e4f5d275fe2c", "subject_listing_succeeded": true, "latest_environment_connection_status": "error", "latest_subject_binding_status": "stale", "latest_observed_at": null, "authority_inspect_error": "action_adapter_admission_inactive" },
+  "next_runtime_prerequisite": "Restore registry-admitted observation connector and current subject identity through governed pairing; do not infer readiness from running Minecraft or an accepted transport receipt.",
+  "limitations": ["No physical action, launch, restart, re-pairing, authority grant or revoke performed", "No fresh perception obtained", "No new temporal source code deployed", "ET6 remains incomplete"]
+}

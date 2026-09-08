@@ -10,6 +10,153 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 final class PlayerActionDeliveryOutboxTest {
+    private static PlayerActionDeliveryOutbox.Delivery event(int sequence) {
+        return new PlayerActionDeliveryOutbox.Delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
+            Map.of("event_id", "event:" + sequence, "workflow_id", "workflow:test",
+                "action_request_id", "request:test", "sequence", sequence));
+    }
+
+    @Test
+    void legacyServerUsesSingletonButCannotSplitAnUncertainBatch() {
+        var box = new PlayerActionDeliveryOutbox(10);
+        box.enqueueSequence(List.of(event(0), event(1)), 0);
+        var legacy = box.peekCriticalBatch(false);
+        assertEquals(1, legacy.size());
+        assertTrue(box.acknowledge(legacy.get(0)));
+        box.enqueueSequence(List.of(event(2)), 0);
+        var batch = box.peekCriticalBatch(true);
+        assertEquals(2, batch.size());
+        assertSame(batch, box.peekCriticalBatch(false));
+        assertTrue(box.acknowledgeCriticalBatch(batch, List.of("event:1", "event:2")));
+        assertTrue(box.isEmpty());
+    }
+
+    @Test
+    void freezesBatchAndRejectsPartialOrReorderedReceipts() {
+        var box = new PlayerActionDeliveryOutbox(20);
+        var first = event(0);
+        var second = event(1);
+        var projection = delivery(PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, "projection");
+        box.enqueueSequence(List.of(first, projection, second), 0);
+        long fence = box.watermark();
+        var batch = box.peekCriticalBatch();
+        assertEquals(List.of(first, second), batch);
+        box.enqueueSequence(List.of(event(2)), 0);
+        assertSame(batch, box.peekCriticalBatch());
+        assertFalse(box.acknowledge(first));
+        assertFalse(box.acknowledgeCriticalBatch(batch, List.of("event:0")));
+        assertFalse(box.acknowledgeCriticalBatch(batch, List.of("event:1", "event:0")));
+        assertEquals(4, box.size());
+        assertTrue(box.acknowledgeCriticalBatch(batch, List.of("event:0", "event:1")));
+        assertTrue(box.hasPendingThrough(fence));
+        assertSame(projection, box.peekProjection());
+        assertTrue(box.acknowledge(projection));
+        assertFalse(box.hasPendingThrough(fence));
+        assertEquals(1, box.peekCriticalBatch().size());
+    }
+
+    @Test
+    void neverBatchesPastAResultOrAcrossASequenceGap() {
+        var box = new PlayerActionDeliveryOutbox(20);
+        var result = delivery(PlayerActionDeliveryOutbox.Stage.ACTION_RESULT, "result");
+        box.enqueueSequence(List.of(event(0), result, event(1)), 0);
+        var first = box.peekCriticalBatch();
+        assertEquals(1, first.size());
+        assertTrue(box.acknowledge(first.get(0)));
+        assertEquals(List.of(result), box.peekCriticalBatch());
+        var gap = new PlayerActionDeliveryOutbox(20);
+        gap.enqueueSequence(List.of(event(0), event(2)), 0);
+        assertEquals(1, gap.peekCriticalBatch().size());
+    }
+
+    @Test
+    void capsBatchCountAndSerializedBytes() {
+        var box = new PlayerActionDeliveryOutbox(40);
+        for (int i = 0; i < 35; i++) box.enqueueSequence(List.of(event(i)), 0);
+        assertEquals(32, box.peekCriticalBatch().size());
+        var large = new PlayerActionDeliveryOutbox(10);
+        for (int i = 0; i < 3; i++) {
+            var payload = new java.util.LinkedHashMap<>(event(i).payload());
+            payload.put("summary", "x".repeat(300_000));
+            large.enqueueSequence(List.of(new PlayerActionDeliveryOutbox.Delivery(
+                PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, payload)), 0);
+        }
+        assertEquals(1, large.peekCriticalBatch().size());
+        assertEquals(3, large.size());
+    }
+
+    @Test
+    void byteBudgetIncludesNullFieldsExactlyAsHttpTransportDoes() {
+        var box = new PlayerActionDeliveryOutbox(10);
+        for (int i = 0; i < 2; i++) {
+            var payload = new java.util.LinkedHashMap<>(event(i).payload());
+            payload.put("x".repeat(270_000), null);
+            assertTrue(box.enqueueSequence(List.of(new PlayerActionDeliveryOutbox.Delivery(
+                PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, payload)), 0));
+        }
+        assertEquals(1, box.peekCriticalBatch().size());
+        assertEquals(2, box.size());
+    }
+
+    @Test
+    void duplicateIdentityCannotEraseAnUnacknowledgedFenceEntry() {
+        var outbox = new PlayerActionDeliveryOutbox(9);
+        var original = delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "same");
+        assertFalse(outbox.enqueueSequence(List.of(original, original), 0));
+        assertEquals(0, outbox.size());
+        assertEquals(0, outbox.watermark());
+        assertTrue(outbox.enqueueSequence(List.of(original), 0));
+        long fence = outbox.watermark();
+        var equalButDistinct = delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "same");
+        assertFalse(outbox.enqueueSequence(List.of(equalButDistinct, original), 0));
+        assertEquals(1, outbox.size());
+        assertEquals(fence, outbox.watermark());
+        assertTrue(outbox.hasPendingThrough(fence));
+        assertTrue(outbox.enqueueSequence(List.of(equalButDistinct), 0));
+        long secondFence = outbox.watermark();
+        assertSame(original, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(original));
+        assertFalse(outbox.hasPendingThrough(fence));
+        assertTrue(outbox.hasPendingThrough(secondFence));
+        assertSame(equalButDistinct, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(equalButDistinct));
+        assertFalse(outbox.hasPendingThrough(secondFence));
+        assertTrue(outbox.isEmpty());
+    }
+
+    @Test
+    void checkpointFenceRequiresBothLanesButDoesNotChaseLaterProgress() {
+        PlayerActionDeliveryOutbox outbox = new PlayerActionDeliveryOutbox(9);
+        assertTrue(outbox.hasPendingThrough(0));
+        var checkpoint = delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "checkpoint");
+        var projection = delivery(PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, "checkpoint-projection");
+        assertTrue(outbox.enqueueSequence(List.of(checkpoint, projection), 3));
+        long fence = outbox.watermark();
+        assertSame(checkpoint, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(checkpoint));
+        assertTrue(outbox.hasPendingThrough(fence));
+        var progress = delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "later");
+        var laterProjection = delivery(PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, "later-projection");
+        assertTrue(outbox.enqueueSequence(List.of(progress, laterProjection), 3));
+        long nextFence = outbox.watermark();
+        assertSame(projection, outbox.peekProjection());
+        assertTrue(outbox.acknowledge(projection));
+        assertFalse(outbox.hasPendingThrough(fence));
+        assertTrue(outbox.hasPendingThrough(nextFence));
+        assertFalse(outbox.isEmpty());
+        // No pending evidence was dropped to clear the checkpoint fence.
+        assertEquals(2, outbox.size());
+        int opportunities = 0;
+        for (int tick = 1; tick <= 200; tick++) {
+            boolean pending = outbox.hasPendingThrough(fence);
+            if (PlayerActionRuntime.actionPollDue(tick, false, pending) &&
+                PlayerActionRuntime.temporalDeliveryReady(PlayerActionWorkflow.State.RUNNING, false, false, pending)) {
+                opportunities++;
+            }
+        }
+        assertEquals(10, opportunities);
+    }
+
     @Test
     void settlesTheActionLaneBeforeSlowEnvironmentProjection() {
         PlayerActionDeliveryOutbox outbox = new PlayerActionDeliveryOutbox(9);
@@ -81,6 +228,50 @@ final class PlayerActionDeliveryOutboxTest {
             delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "overflow")
         ), 3));
         assertEquals(2, outbox.size());
+    }
+
+    @Test
+    void saturatedProjectionLanePreservesTerminalDeliveryAndCheckpointFence() {
+        var outbox = new PlayerActionDeliveryOutbox(768);
+        var checkpoint = delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "checkpoint");
+        var requiredProjection = delivery(PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, "required");
+        assertTrue(outbox.enqueueSequence(List.of(checkpoint, requiredProjection), 3));
+        long fence = outbox.watermark();
+        assertSame(checkpoint, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(checkpoint));
+        assertSame(requiredProjection, outbox.peekProjection());
+        // Keep the required projection unacknowledged while later evidence
+        // fills every nonterminal slot. A retry must keep the identical head.
+        for (int i = 0; i < 764; i++) {
+            assertTrue(outbox.enqueueSequence(List.of(delivery(
+                PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, "later-" + i)), 3));
+        }
+        assertEquals(765, outbox.size());
+        assertFalse(outbox.enqueueSequence(List.of(delivery(
+            PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "overflow")), 3));
+        assertTrue(outbox.hasPendingThrough(fence));
+        assertSame(requiredProjection, outbox.peekProjection());
+        var terminal = delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT, "terminal");
+        var terminalProjection = delivery(PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, "terminal-projection");
+        var result = delivery(PlayerActionDeliveryOutbox.Stage.ACTION_RESULT, "result");
+        assertTrue(outbox.enqueueSequence(List.of(terminal, terminalProjection, result), 0));
+        assertEquals(768, outbox.size());
+        assertSame(terminal, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(terminal));
+        assertSame(result, outbox.peekCritical());
+        assertTrue(outbox.acknowledge(result));
+        assertTrue(outbox.hasPendingThrough(fence));
+        assertTrue(outbox.acknowledge(requiredProjection));
+        assertFalse(outbox.hasPendingThrough(fence));
+        // Clearing the fixed checkpoint fence never drops the later backlog.
+        assertEquals(765, outbox.size());
+        int drained = 0;
+        while (!outbox.isProjectionEmpty()) {
+            assertTrue(outbox.acknowledge(outbox.peekProjection()));
+            drained++;
+        }
+        assertEquals(765, drained);
+        assertTrue(outbox.isEmpty());
     }
 
     @Test

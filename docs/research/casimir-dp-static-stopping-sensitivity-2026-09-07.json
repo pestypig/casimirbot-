@@ -1,0 +1,102 @@
+{
+  "status": "illustrative_static_response_sensitivity_not_material_bound",
+  "plasma_frequency_eV": 30,
+  "rows": [
+    {
+      "masses_GeV": [
+        1e-06,
+        1.0
+      ],
+      "models": [
+        {
+          "model": "fsum_only",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 26.08589829490306,
+          "integration_refinement": 5.551115123125783e-16
+        },
+        {
+          "model": "unchecked_qminus4",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 0.002022054429291879,
+          "integration_refinement": 0.0
+        },
+        {
+          "model": "freeze_at_200keV",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 24.21236247474815,
+          "integration_refinement": 5.112688050701308e-12
+        },
+        {
+          "model": "freeze_at_100keV",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 25.552757727276322,
+          "integration_refinement": 1.495603640933041e-11
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.0001,
+        1.0
+      ],
+      "models": [
+        {
+          "model": "fsum_only",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 26.02658961232397,
+          "integration_refinement": 0.0
+        },
+        {
+          "model": "unchecked_qminus4",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 4.482960583148192e-06,
+          "integration_refinement": 1.1102230246251565e-16
+        },
+        {
+          "model": "freeze_at_200keV",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 24.210348114450408,
+          "integration_refinement": 1.0915934822719464e-10
+        },
+        {
+          "model": "freeze_at_100keV",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 25.550685776558694,
+          "integration_refinement": 8.427369913022176e-11
+        }
+      ]
+    },
+    {
+      "masses_GeV": [
+        0.01,
+        1.0
+      ],
+      "models": [
+        {
+          "model": "fsum_only",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 26.055467697076033,
+          "integration_refinement": 0.0
+        },
+        {
+          "model": "unchecked_qminus4",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 5.82594100631e-10,
+          "integration_refinement": 1.3322676295501878e-15
+        },
+        {
+          "model": "freeze_at_200keV",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 24.281422697477492,
+          "integration_refinement": 1.0163332397894465e-09
+        },
+        {
+          "model": "freeze_at_100keV",
+          "formal_initial_speed_electronic_envelope_keV_at_7e9": 25.61160804256066,
+          "integration_refinement": 2.978817192911265e-11
+        }
+      ]
+    }
+  ],
+  "factor": "min[1,omega_max(q)^2/omega_p^2 * (1-1/epsilon_model(q,0))]",
+  "assumptions": [
+    "zero-temperature isotropic electronic response",
+    "trial epsilon-1=4 me^2 omega_p^2/q^4, optionally frozen",
+    "same summed mediator products and diagnostic electron count per gram"
+  ],
+  "limitations": [
+    "trial response is not silica data or the papers DFT curve",
+    "unchecked q^-4 continuation is outside nonrelativistic validity at high momentum",
+    "plateau is an assumption, not a rigorous relativistic envelope",
+    "no capture probability, finite-temperature response, or supplied population"
+  ]
+}

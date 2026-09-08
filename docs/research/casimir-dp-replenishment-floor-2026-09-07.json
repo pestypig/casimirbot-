@@ -1,0 +1,80 @@
+{
+  "scope": "Necessary steady-state source at selected raw Xe normalization, same cold halo, density .3 GeV/cm3, gB cap4pi and decay result. No inverse-vector absorption, high-energy source, medium energy release, or spatial transport solution. Energy throughput is not net heating or an external-power limit.",
+  "source_relation": "S=xf=1, tau<=tau_ref/x implies excitation source >= n/tau_ref independent of x.",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 0.001,
+      "gap_GeV": 0.0010062516621719803,
+      "max_halo_pair_CM_kinetic_GeV": 0.00013170928279531346,
+      "min_relative_speed_for_one_excitation_km_s": 3007.2809853580325,
+      "cold_halo_single_excitation_open": false,
+      "cold_halo_double_excitation_open": false,
+      "max_stationary_target_available_GeV": 0.00014036161458040478,
+      "any_stationary_free_target_excitation_possible": false,
+      "min_gross_excitation_source_cm3_s": 3.695506368120373e-07,
+      "gross_gap_energy_throughput_W_m3": 5.957869132489461e-14,
+      "max_reference_halo_decay_length_m": 16118224152.94504
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-06,
+      "gap_GeV": 0.0010062516621719803,
+      "max_halo_pair_CM_kinetic_GeV": 0.00013170928279531346,
+      "min_relative_speed_for_one_excitation_km_s": 3007.2809853580325,
+      "cold_halo_single_excitation_open": false,
+      "cold_halo_double_excitation_open": false,
+      "max_stationary_target_available_GeV": 0.00014036161458040478,
+      "any_stationary_free_target_excitation_possible": false,
+      "min_gross_excitation_source_cm3_s": 268.04248904525747,
+      "gross_gap_energy_throughput_W_m3": 4.321361980200398e-05,
+      "max_reference_halo_decay_length_m": 22.222223130431676
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-09,
+      "gap_GeV": 0.0010062516621719803,
+      "max_halo_pair_CM_kinetic_GeV": 0.00013170928279531346,
+      "min_relative_speed_for_one_excitation_km_s": 3007.2809853580325,
+      "cold_halo_single_excitation_open": false,
+      "cold_halo_double_excitation_open": false,
+      "max_stationary_target_available_GeV": 0.00014036161458040478,
+      "any_stationary_free_target_excitation_possible": false,
+      "min_gross_excitation_source_cm3_s": 268042886.11751,
+      "gross_gap_energy_throughput_W_m3": 43.21368381771065,
+      "max_reference_halo_decay_length_m": 2.2222190210967472e-05
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-06,
+      "gap_GeV": 0.0005513006648687921,
+      "max_halo_pair_CM_kinetic_GeV": 0.0003292732069882836,
+      "min_relative_speed_for_one_excitation_km_s": 1407.8129529051473,
+      "cold_halo_single_excitation_open": false,
+      "cold_halo_double_excitation_open": false,
+      "max_stationary_target_available_GeV": 0.000350904036451012,
+      "any_stationary_free_target_excitation_possible": false,
+      "min_gross_excitation_source_cm3_s": 12.937538655238003,
+      "gross_gap_energy_throughput_W_m3": 1.1427482644515135e-06,
+      "max_reference_halo_decay_length_m": 184.16176859385538
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-09,
+      "gap_GeV": 0.0005513006648687921,
+      "max_halo_pair_CM_kinetic_GeV": 0.0003292732069882836,
+      "min_relative_speed_for_one_excitation_km_s": 1407.8129529051473,
+      "cold_halo_single_excitation_open": false,
+      "cold_halo_double_excitation_open": false,
+      "max_stationary_target_available_GeV": 0.000350904036451012,
+      "any_stationary_free_target_excitation_possible": false,
+      "min_gross_excitation_source_cm3_s": 12937602.505534219,
+      "gross_gap_energy_throughput_W_m3": 1.1427539042271408,
+      "max_reference_halo_decay_length_m": 0.00018416085970958016
+    }
+  ],
+  "checks": {
+    "source_scaling_cancels": true
+  },
+  "full_model_admitted": false
+}

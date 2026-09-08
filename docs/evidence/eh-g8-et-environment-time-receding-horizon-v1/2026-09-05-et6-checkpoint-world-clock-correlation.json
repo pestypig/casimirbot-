@@ -1,0 +1,14 @@
+{
+  "et6_complete": false,
+  "change": "Checkpoint reader verifies action process-clock origin, action client tick at/after settlement, and event world tick at/after action world tick. Retention requires the authenticated frontier world tick at/after the event world tick in addition to audit ordering.",
+  "verification": {
+    "combined_tests": 14,
+    "result": "PASS",
+    "followup_reader_tests": 5,
+    "negative_cases": ["action tick before settlement", "action world tick ahead of event", "different process-clock origin"],
+    "limitations": ["Mocked clock/event rows", "No live cross-producer clock proof", "No resident handoff", "Not deployed"]
+  },
+  "execution_authority": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

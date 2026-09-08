@@ -1,0 +1,86 @@
+{
+  "checks": {
+    "independent_cartesian_integral": true,
+    "quadratic_length_scaling": true,
+    "external_below_global": true,
+    "two_plate_bound_positive": true
+  },
+  "cartesian_relative_error": 6.661338147750939e-16,
+  "side_m": 8e-05,
+  "gap_m": 1e-05,
+  "rows": [
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 0.1,
+      "one_plate_deficit_upper_10um": 0.00011005964079004491,
+      "one_plate_field_fraction_lower_10um": 0.99988994035921,
+      "two_plate_midgap_deficit_upper": 0.0002456075975327432,
+      "two_plate_midgap_field_fraction_lower": 0.9997543924024672,
+      "one_plate_global_deficit_upper": 0.0001373078208352104
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 1.0,
+      "one_plate_deficit_upper_10um": 0.0010899509746914134,
+      "one_plate_field_fraction_lower_10um": 0.9989100490253086,
+      "two_plate_midgap_deficit_upper": 0.0024318330314251,
+      "two_plate_midgap_field_fraction_lower": 0.9975681669685749,
+      "one_plate_global_deficit_upper": 0.0013662202674517938
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 10.0,
+      "one_plate_deficit_upper_10um": 0.009925388320428054,
+      "one_plate_field_fraction_lower_10um": 0.9900746116795719,
+      "two_plate_midgap_deficit_upper": 0.022088928046488862,
+      "two_plate_midgap_field_fraction_lower": 0.9779110719535111,
+      "one_plate_global_deficit_upper": 0.013001927436407745
+    },
+    {
+      "density_kg_m3_benchmark": 2900.0,
+      "thickness_um_assumed": 80.0,
+      "one_plate_deficit_upper_10um": 0.047003725941619744,
+      "one_plate_field_fraction_lower_10um": 0.9529962740583803,
+      "two_plate_midgap_deficit_upper": 0.10230370556035627,
+      "two_plate_midgap_field_fraction_lower": 0.8976962944396437,
+      "one_plate_global_deficit_upper": 0.07419901947587017
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 0.1,
+      "one_plate_deficit_upper_10um": 0.00032638376234289185,
+      "one_plate_field_fraction_lower_10um": 0.9996736162376572,
+      "two_plate_midgap_deficit_upper": 0.0007283535650971006,
+      "two_plate_midgap_field_fraction_lower": 0.9992716464349028,
+      "one_plate_global_deficit_upper": 0.00040718871006303783
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 1.0,
+      "one_plate_deficit_upper_10um": 0.003232268407705571,
+      "one_plate_field_fraction_lower_10um": 0.9967677315922945,
+      "two_plate_midgap_deficit_upper": 0.007211642782846849,
+      "two_plate_midgap_field_fraction_lower": 0.9927883572171532,
+      "one_plate_global_deficit_upper": 0.004051549758650148
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 10.0,
+      "one_plate_deficit_upper_10um": 0.029433910191614232,
+      "one_plate_field_fraction_lower_10um": 0.9705660898083858,
+      "two_plate_midgap_deficit_upper": 0.06550509696544973,
+      "two_plate_midgap_field_fraction_lower": 0.9344949030345503,
+      "one_plate_global_deficit_upper": 0.038557439983829864
+    },
+    {
+      "density_kg_m3_benchmark": 8600.0,
+      "thickness_um_assumed": 80.0,
+      "one_plate_deficit_upper_10um": 0.1393903596889413,
+      "one_plate_field_fraction_lower_10um": 0.8606096403110587,
+      "two_plate_midgap_deficit_upper": 0.303383402696229,
+      "two_plate_midgap_field_fraction_lower": 0.696616597303771,
+      "one_plate_global_deficit_upper": 0.22003847154913225
+    }
+  ],
+  "scope": "Positive static scalar branch u->1 at infinity, matched nucleon-density approximation, isolated square prisms. Maximum-principle deficit ceiling, not a fitted solution. Thickness/densities illustrative; mounts, chamber, other sources and fluctuating propagator absent."
+}

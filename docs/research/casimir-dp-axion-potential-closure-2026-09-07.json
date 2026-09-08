@@ -1,0 +1,93 @@
+{
+  "scope": "Minimal soft-breaking tree potential only; explicit-breaking messenger counterterms not fixed",
+  "checks": {
+    "physical_eigenmasses": true,
+    "Cartesian_polar_on_shell_vertices": true,
+    "exact_scalar_coefficient_identity": true,
+    "positive_quartic_tree_potential": true
+  },
+  "rows": [
+    {
+      "lambda_PhiH": 0.0,
+      "theta": 0.0,
+      "lambda_H": 0.12888842988568402,
+      "lambda_Phi": 5.784620991253644,
+      "muH_squared_GeV2": 7812.5,
+      "muPhi_squared_GeV2": 499998.5,
+      "soft_mu_cubed_GeV3": 207.88939366884495,
+      "g_h_aa_GeV": 0.0,
+      "g_heavy_aa_GeV": 3401.3571428571427,
+      "Gamma_h_aa_GeV": 0.0,
+      "branching_fraction_with_4p1MeV_SM_reference": 0.0,
+      "scalar_C_GeV_m2": 0.0,
+      "quartic_loop_counting_LP_over_16pi2": 0.036631540359758276,
+      "kappa_A_cancel_h_aa": -0.0
+    },
+    {
+      "lambda_PhiH": 0.01,
+      "theta": 0.0007353175983868522,
+      "lambda_H": 0.12889282028805787,
+      "lambda_Phi": 5.784617912423282,
+      "muH_squared_GeV2": 8244.946121781266,
+      "muPhi_squared_GeV2": 500301.3060782188,
+      "soft_mu_cubed_GeV3": 207.88939366884495,
+      "g_h_aa_GeV": -0.03907687456427622,
+      "g_heavy_aa_GeV": 3401.356223313937,
+      "Gamma_h_aa_GeV": 1.2149941329795356e-07,
+      "branching_fraction_with_4p1MeV_SM_reference": 2.9633141117201904e-05,
+      "scalar_C_GeV_m2": 7.21152e-11,
+      "quartic_loop_counting_LP_over_16pi2": 0.03663152086283725,
+      "kappa_A_cancel_h_aa": 0.0001587200858186627
+    },
+    {
+      "lambda_PhiH": 0.03,
+      "theta": 0.002205959156500728,
+      "lambda_H": 0.12892794367796792,
+      "lambda_Phi": 5.784593281660516,
+      "muH_squared_GeV2": 9111.435106391564,
+      "muPhi_squared_GeV2": 500905.3214936084,
+      "soft_mu_cubed_GeV3": 207.88939366884495,
+      "g_h_aa_GeV": -0.11723087723760273,
+      "g_heavy_aa_GeV": 3401.348866923536,
+      "Gamma_h_aa_GeV": 1.093499449677256e-06,
+      "branching_fraction_with_4p1MeV_SM_reference": 0.0002666373662708365,
+      "scalar_C_GeV_m2": 2.1634559999999995e-10,
+      "quartic_loop_counting_LP_over_16pi2": 0.036631364886709906,
+      "kappa_A_cancel_h_aa": 0.0004761623171238799
+    },
+    {
+      "lambda_PhiH": 0.07,
+      "theta": 0.005147312250937642,
+      "lambda_H": 0.12910356518560545,
+      "lambda_Phi": 5.784470124650273,
+      "muH_squared_GeV2": 10850.80030572897,
+      "muPhi_squared_GeV2": 502106.965094271,
+      "soft_mu_cubed_GeV3": 207.88939366884495,
+      "g_h_aa_GeV": -0.27354167171113986,
+      "g_heavy_aa_GeV": 3401.312083778204,
+      "Gamma_h_aa_GeV": 5.953625771476279e-06,
+      "branching_fraction_with_4p1MeV_SM_reference": 0.001450036661014188,
+      "scalar_C_GeV_m2": 5.048063999999999e-10,
+      "quartic_loop_counting_LP_over_16pi2": 0.036630584985831674,
+      "kappa_A_cancel_h_aa": 0.0011110694373285452
+    },
+    {
+      "lambda_PhiH": 0.1,
+      "theta": 0.007353438412393678,
+      "lambda_H": 0.12932749362677456,
+      "lambda_Phi": 5.784313091735035,
+      "muH_squared_GeV2": 12160.913602790508,
+      "muPhi_squared_GeV2": 503002.6083972095,
+      "soft_mu_cubed_GeV3": 207.88939366884495,
+      "g_h_aa_GeV": -0.3907792052654102,
+      "g_heavy_aa_GeV": 3401.2651823830706,
+      "Gamma_h_aa_GeV": 1.2150591768213142e-05,
+      "branching_fraction_with_4p1MeV_SM_reference": 0.0029549615459901805,
+      "scalar_C_GeV_m2": 7.21152e-10,
+      "quartic_loop_counting_LP_over_16pi2": 0.036629590563279,
+      "kappa_A_cancel_h_aa": 0.0015872858278492134
+    }
+  ],
+  "max_vertex_error_GeV": 4.547473508864641e-13,
+  "full_loop_matching_complete": false
+}

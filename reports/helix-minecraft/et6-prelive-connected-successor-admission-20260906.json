@@ -1,0 +1,22 @@
+{
+  "scope": "Connected successor enqueue, real retention and publication, broker lease, native acceptance/activation or uncertain response",
+  "verified": [
+    "No child request or retention row is preinserted in connected mode",
+    "Real enqueueEnvironmentAction queues, retains and publishes the successor",
+    "Real retention resolves current paired native checkpoint evidence",
+    "Fixture no longer writes checkpoint_association",
+    "Connected normal and post-lease HTTP 503 modes pass",
+    "Targeted TypeScript check passes"
+  ],
+  "fixture_defects_found": [
+    "Real admission rejected old compiled child timing with temporal_retention_committed_window_overlap; fixed fixture earliest action start and added an assertion",
+    "Real checkpoint admission rejected missing simulated world_tick_index with temporal_checkpoint_clock_unmapped; explicit simulated mapping added"
+  ],
+  "limits": [
+    "Initial root request and root retention remain seeded",
+    "Authority, membership, catalog and binding observations are fixtures",
+    "Frontier/preflight inputs are fixture-provided, not a provider-authored live turn",
+    "Minimal pg-mem transaction wrapper, not full authenticated persistent database",
+    "No live movement or capacity claim; all world ticks and bridge movement remain simulated"
+  ]
+}

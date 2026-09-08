@@ -1,0 +1,8 @@
+{
+  "schema": "et6.frontier_retained_read.v1",
+  "date": "2026-09-05",
+  "implementation": "Internal frontier reader requires the exact active profile/participant goal read grant, retention eligibility, and payload integrity. Returned frontier retains execution_authority=false.",
+  "verification": {"sql_tests_passed": 1, "failed": 0, "new_assertions": ["steer-only grant cannot read", "read grant succeeds", "other profile rejected", "retention boundary rejected", "future observation rejected"]},
+  "limits": "Retention eligibility is not environment freshness or current authority. Expired-row cleanup, production publication and resident dispatch are still absent.",
+  "et6_complete": false
+}

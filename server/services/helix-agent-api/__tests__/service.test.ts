@@ -614,6 +614,7 @@ describe("HelixAgentApiService", () => {
 
     const restarted = new HelixAgentApiService({
       store: new HelixAgentRunStore(pool),
+      now: () => new Date(first.body.created_at),
       executor: buildExecutor().executor,
       databaseScopePolicies: new Map(),
       databaseScopeAllowlist: new Set(),
@@ -1327,6 +1328,38 @@ describe("HelixAgentApiService", () => {
       limit: 100,
     });
     expect(events.events.at(-1)?.event_type).toBe("budget_exhausted");
+  });
+
+  it("projects expiry at the deadline without mutating lifecycle or executing", async () => {
+    let current = new Date("2026-07-26T19:00:00.000Z");
+    const fake = buildExecutor();
+    const { service } = await serviceHarness({ executor: fake.executor, now: () => current });
+    const owner = principal();
+    const started = await service.startRun({
+      principal: owner,
+      idempotencyKey: "inspect-expiry",
+      request: startRequest({ budget: { max_steps: 2, expires_in_seconds: 60 } }),
+    });
+    const inspect = () => service.inspectRun({ principal: owner, runId: started.body.run_id });
+    current = new Date("2026-07-26T19:00:59.999Z");
+    expect((await inspect()).recommended_next_action.operation).toBe("continue");
+    for (const time of ["2026-07-26T19:01:00.000Z", "2026-07-26T19:01:01.000Z"]) {
+      current = new Date(time);
+      const observed = await inspect();
+      expect(observed).toMatchObject({
+        lifecycle_status: started.body.lifecycle_status,
+        completion_status: started.body.completion_status,
+        terminal_authority_status: started.body.terminal_authority_status,
+        version: started.body.version,
+        updated_at: started.body.updated_at,
+        budget: started.body.budget,
+        recommended_next_action: { operation: "none", reason: "run_expired" },
+        answer_authority: false,
+        terminal_eligible: false,
+      });
+      expect(observed.summary).toContain("not ready for continuation");
+    }
+    expect(fake.executeTurn).not.toHaveBeenCalled();
   });
 
   it("expires a durable run without invoking the executor", async () => {

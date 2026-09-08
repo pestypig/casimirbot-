@@ -1,0 +1,223 @@
+{
+  "scope": "Physical off-diagonal vector vertex g12; leading scattering normalization retained, exact two-body mass kinematics. Constant primordial population with no replenishment, f0<=1, selected coupling caps are assumptions not experimental bounds. Other decay modes can reduce lifetimes.",
+  "width": "g12^2 sqrt((gap^2-mV^2)*((M+m)^2-mV^2))*(gap^2-mV^2)*((M+m)^2+2mV^2)/(16 pi M^3 mV^2)",
+  "population": "At fixed mediator and gB cap, tau_max(x)=tau_ref/x, S<=x exp(-age*x/tau_ref), max S=tau_ref/(e age).",
+  "rows": [
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1.0,
+      "gap_GeV": 0.0010062516621719803,
+      "required_transition_times_gB": 3.252515842560505e-09,
+      "real_vector_decay_open": false,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 9.175177793483455e-10,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 2.588269869141026e-10,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 0.01,
+      "gap_GeV": 0.0010062516621719803,
+      "required_transition_times_gB": 1.5167299047684518e-10,
+      "real_vector_decay_open": false,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 4.2786160666287044e-11,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.206975308395994e-11,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 0.001,
+      "gap_GeV": 0.0010062516621719803,
+      "required_transition_times_gB": 1.513601460314589e-10,
+      "real_vector_decay_open": true,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 4.269790887760819e-11,
+          "max_partial_lifetime_s_at_reference": 1615.0182874618358,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.3658207472945288e-15
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.2044857714008904e-11,
+          "max_partial_lifetime_s_at_reference": 20294.918349213094,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.7163409703284054e-14
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-06,
+      "gap_GeV": 0.0010062516621719803,
+      "required_transition_times_gB": 1.5135698585693951e-10,
+      "real_vector_decay_open": true,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 4.2697017408835177e-11,
+          "max_partial_lifetime_s_at_reference": 2.226628467451053e-06,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.8830593937984335e-24
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.2044606235311008e-11,
+          "max_partial_lifetime_s_at_reference": 2.798063854247252e-05,
+          "max_present_Xe_strength_over_reference_no_replenishment": 2.3663222231321636e-23
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 40.0,
+      "mediator_GeV": 1e-09,
+      "gap_GeV": 0.0010062516621719803,
+      "required_transition_times_gB": 1.5135698585377937e-10,
+      "real_vector_decay_open": true,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 4.2697017407943715e-11,
+          "max_partial_lifetime_s_at_reference": 2.2266251689774626e-12,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.883056604279764e-30
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.2044606235059533e-11,
+          "max_partial_lifetime_s_at_reference": 2.7980597092630915e-11,
+          "max_present_Xe_strength_over_reference_no_replenishment": 2.3663187177196197e-29
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1.0,
+      "gap_GeV": 0.0005513006648687921,
+      "required_transition_times_gB": 3.190454959338554e-09,
+      "real_vector_decay_open": false,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 9.000107274185463e-10,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 2.538883387453914e-10,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 0.01,
+      "gap_GeV": 0.0005513006648687921,
+      "required_transition_times_gB": 1.299670204326577e-10,
+      "real_vector_decay_open": false,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 3.6663019566421945e-11,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.0342446870391418e-11,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 0.001,
+      "gap_GeV": 0.0005513006648687921,
+      "required_transition_times_gB": 1.2965182776029085e-10,
+      "real_vector_decay_open": false,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 3.6574105355141964e-11,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.0317364634474654e-11,
+          "max_partial_lifetime_s_at_reference": null,
+          "max_present_Xe_strength_over_reference_no_replenishment": null
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-06,
+      "gap_GeV": 0.0005513006648687921,
+      "required_transition_times_gB": 1.2964864367004883e-10,
+      "real_vector_decay_open": true,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 3.657320713986815e-11,
+          "max_partial_lifetime_s_at_reference": 1.845269189137362e-05,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.560543903702835e-23
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.031711125262402e-11,
+          "max_partial_lifetime_s_at_reference": 0.0002318833651395812,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.9610373053908655e-22
+        }
+      ]
+    },
+    {
+      "mchi_GeV": 100.0,
+      "mediator_GeV": 1e-09,
+      "gap_GeV": 0.0005513006648687921,
+      "required_transition_times_gB": 1.2964864366686472e-10,
+      "real_vector_decay_open": true,
+      "coupling_caps": [
+        {
+          "gB_cap": 3.5449077018110318,
+          "min_transition_coupling": 3.6573207138969935e-11,
+          "max_partial_lifetime_s_at_reference": 1.8452600822735292e-11,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.5605362020293232e-29
+        },
+        {
+          "gB_cap": 12.566370614359172,
+          "min_transition_coupling": 1.0317111252370636e-11,
+          "max_partial_lifetime_s_at_reference": 2.3188222073732077e-10,
+          "max_present_Xe_strength_over_reference_no_replenishment": 1.9610276271824967e-28
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "symbolic_spin_tensor_contraction": true,
+    "threshold_closure": true,
+    "numerical_population_maximum": true
+  },
+  "full_model_admitted": false
+}

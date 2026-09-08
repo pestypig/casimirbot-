@@ -1,0 +1,18 @@
+{
+  "scope": "Self-consistent one-loop gs/yt subsystem only. Other SM couplings remain imposed zero, not a closed full SM flow. Frozen UV subset includes quartic current terms; mixed hard boundary updated with yt(M).",
+  "QCD_only_imag_GeV_minus2": 2.7046482419853686e-15,
+  "top_self_imag_GeV_minus2": 2.7377230375606335e-15,
+  "fractional_coefficient_change": 0.012228871415451037,
+  "yt_low": 0.9340013210473813,
+  "yt_high_QCD_only": 0.803273254074444,
+  "yt_high_with_self": 0.850039132894191,
+  "analytic_ODE_max_relative_error": 3.6086578170113626e-11,
+  "beta_max_relative_error": 5.071540641088963e-16,
+  "checks": {
+    "analytic_vs_ODE": true,
+    "library_beta": true,
+    "coefficient_tolerance": true,
+    "low_boundary": true
+  },
+  "full_model_admitted": false
+}

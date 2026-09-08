@@ -80,6 +80,11 @@ import { migration078 } from "./migrations/078_environment_action_result_control
 import { migration079 } from "./migrations/079_linked_provider_exact_unique_constraint";
 import { migration080 } from "./migrations/080_operator_activity_ledger";
 import { migration081 } from "./migrations/081_installed_device_full_harness_trust";
+import { migration082 } from "./migrations/082_environment_temporal_frontiers";
+import { migration083 } from "./migrations/083_environment_temporal_plan_admissions";
+import { migration084 } from "./migrations/084_environment_action_heartbeat_clock";
+import { migration085 } from "./migrations/085_environment_temporal_checkpoint_association";
+import { migration086 } from "./migrations/086_environment_temporal_resident_action";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -164,6 +169,11 @@ const MIGRATIONS = [
   migration079,
   migration080,
   migration081,
+  migration082,
+  migration083,
+  migration084,
+  migration085,
+  migration086,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

@@ -1,0 +1,16 @@
+{
+  "schema": "et6_acceptance_checkpoint.v1",
+  "date": "2026-09-05",
+  "follows": "2026-09-05-et6-typed-pickup-probe-locator-repair.json",
+  "focused_tests_passed": 27,
+  "test_files": {
+    "server/mcp/__tests__/helix-mcp-minecraft-action.test.ts": 2,
+    "server/services/environment-connectors/temporal-plans/__tests__/temporal-perception-context.test.ts": 9,
+    "server/services/environment-connectors/probe/__tests__/durable-broker.test.ts": 16
+  },
+  "negative_contracts_preserved": ["wrong prior turn", "wrong room", "wrong environment identity", "stale observation", "revoked source", "changed action epoch"],
+  "docs_audit": "PASS G8, 39 capability rows, 14 acceptance claims",
+  "deployed_to_exe": false,
+  "live_rolling_proven": false,
+  "goal_complete": false
+}

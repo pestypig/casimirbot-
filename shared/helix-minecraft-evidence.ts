@@ -477,7 +477,7 @@ export type HelixMinecraftNavigationState = {
   route_rehearsal_refs: string[];
   route_drift_refs: string[];
   route_lifecycle_refs?: string[];
-  route_lifecycle_status?: "active" | "stale" | "cancelled" | "completed" | "unknown";
+  route_lifecycle_status?: "pending_identity" | "active" | "stale" | "superseded" | "cancelled" | "completed" | "unknown";
   route_intent_status?: "hypothesized" | "confirmed" | "direct_request" | "completed" | "cancelled" | "unknown";
   latest_lifecycle_receipt_id?: string | null;
   evidence_refs: string[];

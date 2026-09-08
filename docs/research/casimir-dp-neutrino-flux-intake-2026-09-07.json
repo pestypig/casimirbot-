@@ -1,0 +1,111 @@
+{
+  "scope": "Homestake annual-average no-mountain Honda 2014 tables; four production species; no oscillation or event fold",
+  "full_model_admitted": false,
+  "transport_provenance": "Publisher HTTP endpoint, no TLS authenticity; hashes pin retrieved bytes, not publisher signatures",
+  "checks": {
+    "angular_blocks_20": true,
+    "positive_ordered_tables": true,
+    "angular_average_reproduces_published": true,
+    "solar_tables_same_energy_grid": true
+  },
+  "angular_average_max_relative_difference": 4.510309278349389e-05,
+  "grid_GeV": [
+    0.1,
+    10000.0
+  ],
+  "energy_nodes": 101,
+  "manifest": [
+    {
+      "file": "hms-ally-01-01-solmin.d.gz",
+      "sha256": "765f8b46f2c0f5981ae10c37434acb545f394d69a7ee91873c4127478fcea07f",
+      "bytes": 2242,
+      "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-01-01-solmin.d.gz"
+    },
+    {
+      "file": "hms-ally-01-01-solmax.d.gz",
+      "sha256": "44aaa10c5367ad420430381d2858187cb7b12c57bdc37531cb30fd84cc777c36",
+      "bytes": 2247,
+      "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-01-01-solmax.d.gz"
+    },
+    {
+      "file": "hms-ally-20-01-solmin.d.gz",
+      "sha256": "13c399f4476ff93e7e5461b0051ba3abd786db2829c9a600bdb796b8161ee055",
+      "bytes": 36733,
+      "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-20-01-solmin.d.gz"
+    }
+  ],
+  "rows": [
+    {
+      "solar": "solmin",
+      "threshold_GeV": 1.0,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.36383052183010345
+    },
+    {
+      "solar": "solmin",
+      "threshold_GeV": 2.0,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.10944364338067024
+    },
+    {
+      "solar": "solmin",
+      "threshold_GeV": 2.15846619029,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.09521238675154105
+    },
+    {
+      "solar": "solmin",
+      "threshold_GeV": 8.2646413199,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.006980278205375161
+    },
+    {
+      "solar": "solmin",
+      "threshold_GeV": 10.0,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.004746190660407659
+    },
+    {
+      "solar": "solmin",
+      "threshold_GeV": 26.9908219039,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.0006228172454913466
+    },
+    {
+      "solar": "solmax",
+      "threshold_GeV": 1.0,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.3542231254855616
+    },
+    {
+      "solar": "solmax",
+      "threshold_GeV": 2.0,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.10820102042628439
+    },
+    {
+      "solar": "solmax",
+      "threshold_GeV": 2.15846619029,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.09424318014018337
+    },
+    {
+      "solar": "solmax",
+      "threshold_GeV": 8.2646413199,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.006978766230507883
+    },
+    {
+      "solar": "solmax",
+      "threshold_GeV": 10.0,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.004746144746958475
+    },
+    {
+      "solar": "solmax",
+      "threshold_GeV": 26.9908219039,
+      "upper_GeV": 10000.0,
+      "sum_four_species_flux_cm_m2_s_m1": 0.0006228172454913466
+    }
+  ]
+}

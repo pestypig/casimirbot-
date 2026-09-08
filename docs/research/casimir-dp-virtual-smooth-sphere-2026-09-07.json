@@ -1,0 +1,14 @@
+{
+  "status": "nuclear_only_smooth_sphere_component_not_total_diamond_prediction",
+  "partial_D": 1.487315541901919e-30,
+  "outer_tail_D_bound": 1.40595212519491e-35,
+  "loose_full_D_bound": 4.134233545674008e-29,
+  "central_phase": 2.2426411993587965e-13,
+  "atom_count": 15519585028.038734,
+  "source_sha256": "5dd97935c6c3559c0eb8fd2d15eae38b79af9e1f955a790def87be9b8888be9e",
+  "assumptions": [
+    "uniform rigid sphere of identical nuclear contact amplitudes",
+    "same xenon-normalized coefficient, speed, density and frozen hold",
+    "no electrons, lattice excitations, correlations or detector fit"
+  ]
+}

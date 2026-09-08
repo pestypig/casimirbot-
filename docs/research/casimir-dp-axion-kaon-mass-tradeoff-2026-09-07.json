@@ -1,0 +1,74 @@
+{
+  "scope": "One-loop yu=0 potential curvature at mu=M, fixed tree gu and M. Not a pole-mass correction, full tuning measure, or exclusion.",
+  "exact_gu": 5.5700260688158226e-05,
+  "reference_ma_GeV": 1.0,
+  "rows": [
+    {
+      "yL": 0.025,
+      "yR": 0.0255961821625889,
+      "epsilon_NP": 1.5762171456318364e-05,
+      "leading_potential_mass_threshold_GeV2": 199.14614041514784,
+      "broken_background_mass_curvature_GeV2": 199.1451973602105,
+      "threshold_over_reference_ma2": 199.1451973602105,
+      "reference_ma2_over_threshold": 0.005021461793985505,
+      "epsilon_times_threshold_GeV2": 0.003138960745493997
+    },
+    {
+      "yL": 0.05,
+      "yR": 0.012798181988641555,
+      "epsilon_NP": 6.304791517502179e-05,
+      "leading_potential_mass_threshold_GeV2": 49.787242393315296,
+      "broken_background_mass_curvature_GeV2": 49.78629933167925,
+      "threshold_over_reference_ma2": 49.78629933167925,
+      "reference_ma2_over_threshold": 0.020085847179320184,
+      "epsilon_times_threshold_GeV2": 0.0031389223771419576
+    },
+    {
+      "yL": 0.075,
+      "yR": 0.008532222332967862,
+      "epsilon_NP": 0.00014185491930591513,
+      "leading_potential_mass_threshold_GeV2": 22.12818720408704,
+      "broken_background_mass_curvature_GeV2": 22.127244131286655,
+      "threshold_over_reference_ma2": 22.127244131286655,
+      "reference_ma2_over_threshold": 0.0451931561864072,
+      "epsilon_times_threshold_GeV2": 0.0031388584307059527
+    },
+    {
+      "yL": 0.09916784176599759,
+      "yR": 0.006452967690041848,
+      "epsilon_NP": 0.00024800000000000007,
+      "leading_potential_mass_threshold_GeV2": 12.657283002384954,
+      "broken_background_mass_curvature_GeV2": 12.656339914546885,
+      "threshold_over_reference_ma2": 12.656339914546885,
+      "reference_ma2_over_threshold": 0.07901178435091054,
+      "epsilon_times_threshold_GeV2": 0.0031387722988076286
+    },
+    {
+      "yL": 0.10639429909400437,
+      "yR": 0.00601470647621809,
+      "epsilon_NP": 0.0002854581638610149,
+      "leading_potential_mass_threshold_GeV2": 10.996396367538347,
+      "broken_background_mass_curvature_GeV2": 10.995453274393421,
+      "threshold_over_reference_ma2": 10.995453274393421,
+      "reference_ma2_over_threshold": 0.0909466826919117,
+      "epsilon_times_threshold_GeV2": 0.0031387419025279304
+    },
+    {
+      "yL": 0.2,
+      "yR": 0.0032,
+      "epsilon_NP": 0.001008520102279449,
+      "leading_potential_mass_threshold_GeV2": 3.1125867614926173,
+      "broken_background_mass_curvature_GeV2": 3.111643565896084,
+      "threshold_over_reference_ma2": 3.111643565896084,
+      "reference_ma2_over_threshold": 0.32137356956950247,
+      "epsilon_times_threshold_GeV2": 0.003138155087334708
+    }
+  ],
+  "checks": {
+    "reference_leading_threshold_recovered": true,
+    "fixed_gu": true,
+    "CW_second_derivative": true,
+    "opposing_monotonic_trends": true
+  },
+  "full_model_admitted": false
+}

@@ -1,0 +1,49 @@
+{
+  "scope": "ET6 live preparation and initial temporal admission; not capacity acceptance",
+  "run_id": "run_cc12b167-8120-4f5b-bea0-f5bc880ee038",
+  "reasoning_binding_id": "reasoning_binding:d140957238a9542f2af1b4086ac16f07",
+  "binding_epoch": 5,
+  "environment_goal_id": "environment_durable_goal:4c9293eb-f29c-4d04-ac7e-6ff82471b50f",
+  "typed_prompt_acknowledged_at": "2026-09-07T03:52:23.273Z",
+  "steering_event_ref": "reasoning_steering:5be7e026093ea574d9e789c913365821",
+  "operator_errors_corrected": [
+    "Presence omitted retained_runtime resource claim, so run association was correctly absent from UI",
+    "Goal creation supplied subject binding ID instead of subject reference",
+    "Initial action request omitted world_id and required postcondition; clocks required integer milliseconds",
+    "Initial node latest start plus duration exceeded plan horizon"
+  ],
+  "measured_attempt": {
+    "snapshot_observed_at": "2026-09-07T04:00:52.882Z",
+    "probe_ms": 2573,
+    "frontier_ms": 2109,
+    "external_hash_round_trip_ms": 1662,
+    "submit_started_at": "2026-09-07T04:00:57.725Z",
+    "submit_ms": 1340,
+    "outcome": "durable_goal_evidence_identity_mismatch",
+    "freshness_window_ms": 5000,
+    "interpretation": "Snapshot was 4843 ms old before submit transport and server processing; freshness expiry is consistent with rejection, not independently proven by typed error."
+  },
+  "hash_optimization": {
+    "external_round_trip_removed": true,
+    "known_sha256_vector_passed": true,
+    "matches_dotnet_hash_for_plan": true,
+    "subsequent_outcome": "internal_error",
+    "automatic_replay": false
+  },
+  "local_checks": {
+    "exact_stored_plan_compilation": "passed",
+    "compiled_action_request_schema": "passed"
+  },
+  "workflow_lookup": {
+    "workflow_ref": "workflow:et6-live-20260907-root01",
+    "observed_at": "2026-09-07T04:01:58.845Z",
+    "outcome": "No exact active workflow found for room participant",
+    "proves_zero_effects": false
+  },
+  "rolling_extensions_proven": 0,
+  "live_admission_proven": false,
+  "voice_acceptance_proven": false,
+  "et6_complete": false,
+  "nav1_unlocked": false,
+  "credentials_included": false
+}

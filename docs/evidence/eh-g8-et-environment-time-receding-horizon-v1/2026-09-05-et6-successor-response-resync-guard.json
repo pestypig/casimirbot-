@@ -1,0 +1,22 @@
+{
+  "scope": "ET6 native in-flight successor delivery guard",
+  "classification": "tool admission",
+  "defect": "Successor polling and response processing did not recheck evidence resynchronization state; an in-flight response could be queued before the next controller tick handled resync.",
+  "repair": "Require running controller, no resync, no Emergency Stop and no pending evidence at both poll capture and response processing, retaining existing exact envelope/plan checks.",
+  "verification": {
+    "native": "PlayerActionRuntimeLifecycleTest and FluidSequenceEngineTest PASS",
+    "coverage": "Readiness predicate tested across every controller state and each blocking flag; existing rolling and interruption fixtures pass.",
+    "casimir_run": "2680",
+    "casimir_verdict": "PASS",
+    "certificate_hash": "6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45",
+    "certificate_integrity_ok": true
+  },
+  "limitations": [
+    "Predicate and controller tests do not simulate the complete asynchronous HTTP runtime.",
+    "A response blocked after leasing is not replayed. Capacity under transient evidence backpressure and safe bounded retention of received responses remain to be tested.",
+    "No deployed native or packaged EXE acceptance is established; reconnect recovery remains unqualified."
+  ],
+  "et6_complete": false,
+  "answer_authority": false,
+  "terminal_eligible": false
+}

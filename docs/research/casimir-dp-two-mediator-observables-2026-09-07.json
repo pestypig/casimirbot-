@@ -1,0 +1,41 @@
+{
+  "status": "observable_identity_and_static_range_diagnostic_not_signal_prediction",
+  "primary_estimand": "heldout_complex_coherence_contraction_following_frozen_mass_separation_time_law",
+  "boundary_estimand": "four_cell_complex_cross_ratio_nonfactorization",
+  "gap_m": 1e-05,
+  "static_range_rows": [
+    {
+      "mediator_mass_eV": 1000.0,
+      "range_m": 1.9732698039999998e-10,
+      "gap_over_range": 50677.30717679396,
+      "log10_static_Yukawa_gap_factor": -22008.874864597678
+    },
+    {
+      "mediator_mass_eV": 100000.0,
+      "range_m": 1.973269804e-12,
+      "gap_over_range": 5067730.717679396,
+      "log10_static_Yukawa_gap_factor": -2200887.486459768
+    },
+    {
+      "mediator_mass_eV": 10000000.0,
+      "range_m": 1.973269804e-14,
+      "gap_over_range": 506773071.7679396,
+      "log10_static_Yukawa_gap_factor": -220088748.64597678
+    },
+    {
+      "mediator_mass_eV": 1000000000.0,
+      "range_m": 1.973269804e-16,
+      "gap_over_range": 50677307176.79396,
+      "log10_static_Yukawa_gap_factor": -22008874864.597675
+    }
+  ],
+  "demonstration_log_cross_ratio": -2.6020852139652106e-18,
+  "demonstration_primary_contraction_difference": 0.029511464722144533,
+  "caveats": [
+    "demonstration exponent is the frozen comparator, not a scattering prediction",
+    "direct static Yukawa gap factor is not a bound on real-particle flux modulation",
+    "gap is the configured scale; actual source-sphere distance needs as-built geometry",
+    "boundary-dependent material noise and transport require their own response calculation",
+    "primary measurability still requires supplied population, branch-history kernel and qualified noise"
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "repository": "https://github.com/icecube/nuflux",
+  "commit": "86e0de529457901dcc42d899a62f2aaab11b3acb",
+  "files": [
+    {
+      "source_path": "LICENSE",
+      "local_name": "LICENSE",
+      "git_blob": "0a041280bd00a9d068f503b8ee7ce35214bd24a1",
+      "bytes": 7652,
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+    },
+    {
+      "source_path": "README.md",
+      "local_name": "README.md",
+      "git_blob": "1cbdc044f750d86e2de4550b5f2d50f625146ce1",
+      "bytes": 5144,
+      "sha256": "452cbba54e17bb8330bac533eb5bdee6036b79b448413abf93d4ea621b64c886"
+    },
+    {
+      "source_path": "docs/evaluation.rst",
+      "local_name": "evaluation.rst",
+      "git_blob": "6f2aada31a3978b2ff1b501a21362552be75c784",
+      "bytes": 3166,
+      "sha256": "d36425c35e40b56ae133cbefea70b214c40e2d20d1742b5894b19b6764cee1c8"
+    },
+    {
+      "source_path": "docs/fluxes.rst",
+      "local_name": "fluxes.rst",
+      "git_blob": "a33c7600fbbbece7fc9bcb0764f5a88a74dd041c",
+      "bytes": 7742,
+      "sha256": "5677f6dd20fce86e25f39c86ef75302ba56ac69949a1a1ad8b42bb8ae2668321"
+    },
+    {
+      "source_path": "src/library/SplineFlux2.cpp",
+      "local_name": "SplineFlux2.cpp",
+      "git_blob": "b52c34e0f8d082f5fabfeb2d1f4d25865643cc3a",
+      "bytes": 4630,
+      "sha256": "7620c6a300f218bc0ebf4bcff8a1efaac0271bf8a9eed2e8e2f07136ee9d83ab"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_conv_nue.fits",
+      "local_name": "H3a_SIBYLL23C_conv_nue.fits",
+      "git_blob": "be47b1b580fc5854bdf209163b7492183262e4e4",
+      "bytes": 28800,
+      "sha256": "c495d89ef3e7e4456719a76c8e2b45427e8add2b9831125e80fd202f680be4c1"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_conv_nuebar.fits",
+      "local_name": "H3a_SIBYLL23C_conv_nuebar.fits",
+      "git_blob": "b49113280b1834d41e758efb316da857d2fc4bfb",
+      "bytes": 28800,
+      "sha256": "8bdd04c074d66830128741c7a283b117a71c353874bb319c20cf40c3515ca619"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_conv_numu.fits",
+      "local_name": "H3a_SIBYLL23C_conv_numu.fits",
+      "git_blob": "030a20c7b888627f13b0fabc8a9082d5d6910827",
+      "bytes": 28800,
+      "sha256": "b952d085511fd97f64a5041be2dcf372464a5fb24ab308615ee6745e620e890f"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_conv_numubar.fits",
+      "local_name": "H3a_SIBYLL23C_conv_numubar.fits",
+      "git_blob": "c18d4c8f7e82a6c589118e83099909030e147499",
+      "bytes": 28800,
+      "sha256": "1f63b311cbd305098ae1adb11141dc93fb00762aaa3264a6081df4ac9b2a1386"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_nue.fits",
+      "local_name": "H3a_SIBYLL23C_nue.fits",
+      "git_blob": "785de091b294938a6507ff65f9fb4c75cc719878",
+      "bytes": 28800,
+      "sha256": "c24235303dbc45cbf1b5f25e95701a8d02c57e9961d5f6bc9fb6c752abf47074"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_nuebar.fits",
+      "local_name": "H3a_SIBYLL23C_nuebar.fits",
+      "git_blob": "1eb075a56345e555a59fb7ed51f6585a1de8dcc2",
+      "bytes": 28800,
+      "sha256": "0f1cb5d49a1076ff8f6a16e6239096887f84f6985afed03dfb24bfe29f34e606"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_numu.fits",
+      "local_name": "H3a_SIBYLL23C_numu.fits",
+      "git_blob": "fa53230943d6856132decd5aae51bcfb98995ecb",
+      "bytes": 28800,
+      "sha256": "92be13c8520397dde98670da420da26714166effea919a6604f241861f7019b2"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_numubar.fits",
+      "local_name": "H3a_SIBYLL23C_numubar.fits",
+      "git_blob": "9cc58c2136d64757caaf9fe912189efb73173355",
+      "bytes": 28800,
+      "sha256": "e72c5bf3f639d74c0e303bfa97ded9d19621d37819d245515ea3c28c82ac8c34"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_nutau.fits",
+      "local_name": "H3a_SIBYLL23C_nutau.fits",
+      "git_blob": "ff57e292911ae6822fd726db711dbb1d94a43632",
+      "bytes": 28800,
+      "sha256": "ffd5ab2c202513e8384c5bdcdf2259197e995b3d62d0e21e6e65a5bbae7a414a"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_nutaubar.fits",
+      "local_name": "H3a_SIBYLL23C_nutaubar.fits",
+      "git_blob": "10636420d5ec27e48769cf011e6a5f22b071051c",
+      "bytes": 28800,
+      "sha256": "f2ade3bf68b4c7a62140c12633c4ac8e2a3bd5695e6fd152975562c577a278e0"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_pr_nue.fits",
+      "local_name": "H3a_SIBYLL23C_pr_nue.fits",
+      "git_blob": "a397de851f50e9401a1e8d2907ee4701b3a93fde",
+      "bytes": 28800,
+      "sha256": "040e2bca7bb08946ce0e56a15baf386774b923ea34fef8fd80aa414173cc35c3"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_pr_nuebar.fits",
+      "local_name": "H3a_SIBYLL23C_pr_nuebar.fits",
+      "git_blob": "67d1410c2995de2ac7b17f93199cdb8f18009c73",
+      "bytes": 28800,
+      "sha256": "e2be5bcfa3533c7b270e23e94ce84c4b2124092c88658f34dd34b8f8a641b7c0"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_pr_numu.fits",
+      "local_name": "H3a_SIBYLL23C_pr_numu.fits",
+      "git_blob": "2add49b4ccf257186bdd6044ff9cd8c8abb1b5fe",
+      "bytes": 28800,
+      "sha256": "e06387be2c111b0341341be3a421257859520f3c67ab8b04b1d98c9c2350bb3d"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_pr_numubar.fits",
+      "local_name": "H3a_SIBYLL23C_pr_numubar.fits",
+      "git_blob": "09f4feabe93008bff8591e38764b25a0ddcf2994",
+      "bytes": 28800,
+      "sha256": "0c2d2a1dbe96e53e8fd661a9ef821391b0309a2fb600203ac7be68c527a2980c"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_pr_nutau.fits",
+      "local_name": "H3a_SIBYLL23C_pr_nutau.fits",
+      "git_blob": "ff57e292911ae6822fd726db711dbb1d94a43632",
+      "bytes": 28800,
+      "sha256": "ffd5ab2c202513e8384c5bdcdf2259197e995b3d62d0e21e6e65a5bbae7a414a"
+    },
+    {
+      "source_path": "src/nuflux/data/SplineFlux2/H3a_SIBYLL23C_pr_nutaubar.fits",
+      "local_name": "H3a_SIBYLL23C_pr_nutaubar.fits",
+      "git_blob": "10636420d5ec27e48769cf011e6a5f22b071051c",
+      "bytes": 28800,
+      "sha256": "f2ade3bf68b4c7a62140c12633c4ac8e2a3bd5695e6fd152975562c577a278e0"
+    },
+    {
+      "source_path": "tests/test_data.json",
+      "local_name": "test_data.json",
+      "git_blob": "f21e595bc8d8976c1acb98c4c4142e98229b9d51",
+      "bytes": 185860,
+      "sha256": "21daf52bdf6d84cf26db8c3bd58e30572bd8ad09d61fc42ee87d0b8e5df4d36e"
+    },
+    {
+      "source_path": "tests/test_fluxes.py",
+      "local_name": "test_fluxes.py",
+      "git_blob": "49672d681a511e61450bf9708c0f668f86c579d9",
+      "bytes": 2786,
+      "sha256": "f2197ca2fe9a851abb3f324ec4db3c74e25ce1a042d5dc6670617451192cae23"
+    }
+  ]
+}
