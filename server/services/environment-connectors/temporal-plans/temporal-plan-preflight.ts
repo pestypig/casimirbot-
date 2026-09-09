@@ -1,3 +1,4 @@
+import type { ReasoningTaskAssociationVerifier } from "../../local-supervisor/reasoning-binding-ports";
 import { evaluateHelixEnvironmentPlanCurrentness, helixEnvironmentTemporalPlanSchema } from "@shared/helix-environment-time";
 import type { HelixReasoningTaskBindingStore } from "../../local-supervisor/reasoning-task-binding-store";
 import { resolveTemporalPerceptionContext } from "./temporal-perception-context";
@@ -14,7 +15,7 @@ export const preflightTemporalPlan = async (input: {
   plan: unknown; frontierId: string;
   compilation: { target: "serial"; options: Omit<Parameters<typeof serial>[0], "plan"> } |
     { target: "reactive"; options: Omit<Parameters<typeof reactive>[0], "plan"> };
-}, bindingStore: Pick<HelixReasoningTaskBindingStore, "verifyTaskAssociation">) => {
+}, bindingStore: ReasoningTaskAssociationVerifier) => {
   if (input.context.profileId !== input.binding.profileRef || input.context.runId !== input.binding.runId) {
     throw new TemporalPlanError("temporal_plan_task_context_mismatch");
   }
@@ -64,7 +65,7 @@ export const preflightTemporalPlan = async (input: {
       resident.clock.world_tick_index >= frontier.expires_at_environment_sequence) throw new TemporalPlanError("temporal_plan_frontier_expired_or_unmapped");
   const compilation = input.compilation.target === "serial"
     ? serial({ ...input.compilation.options, plan }) : reactive({ ...input.compilation.options, plan });
-  const binding = bindingStore.verifyTaskAssociation(input.binding);
+  const binding = await bindingStore.verifyTaskAssociation(input.binding);
   return { plan, compilation, binding, frontier, resident_clock_observation: resident,
     preflight_only: true as const, execution_authority: false as const, answer_authority: false as const,
     terminal_eligible: false as const };

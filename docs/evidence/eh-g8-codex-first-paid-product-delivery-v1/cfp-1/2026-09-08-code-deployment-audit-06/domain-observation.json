@@ -1,0 +1,88 @@
+{
+  "captured_utc": "2026-09-09T00:03:47.386Z",
+  "scope": "Public read-only endpoints; no account/DB/provider settings inspected",
+  "results": [
+    {
+      "url": "https://casimirbot.com/api/desktop-release/latest",
+      "status": 200,
+      "observation": {
+        "schemaVersion": "casimir_desktop_release_status/1",
+        "available": false,
+        "approved": false,
+        "reason": "not_configured"
+      }
+    },
+    {
+      "url": "https://casimirbot.com/api/agi/runtime-parity/fingerprint",
+      "status": 200,
+      "observation": {
+        "schema": "helix.runtime_parity_fingerprint.v1",
+        "build": {
+          "execution_mode": "compiled_production",
+          "metadata_available": true,
+          "schema": "casimir.replit_build_meta.v1",
+          "source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+          "runtime_source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+          "artifact_source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+          "source_commit_matches_artifact": true,
+          "runtime_worktree": {
+            "available": false,
+            "dirty": null,
+            "change_count": null,
+            "status_sha256": null
+          },
+          "build_id": "42c5b19b4be2",
+          "built_at": "2026-09-01T19:18:38.201Z",
+          "node_version": "v20.20.0",
+          "artifact_contract_sha256": "sha256:8d44fe570c6fae77c1b8cd29c8d1ce2e967ac1495210e23339ca77eb8bb7a1c7",
+          "git_authority_strict": true,
+          "git_authority_verified": true,
+          "git_worktree_clean_at_authority_check": true,
+          "package_lock_sha256": "sha256:b33d68312713d5b1fe14568aa551e63dc42fc60486f30f86237f06098aa806db",
+          "source_tree_sha256": "sha256:f979d12d016d10fc504bece0c0f1f4929a76c14d60351e12130d2f70611c00db",
+          "source_tree_file_count": 15506,
+          "source_tree_line_endings": "lf_normalized_text_v1",
+          "theory_sources_sha256": "sha256:58c7205a1d1876075148f3c78b2615582c024cb17a7bd9acf1dc59e4a60e4fb1",
+          "parity_fixture_sha256": "sha256:a392c63226dd0bf94b572ade9cca46503c0522ced10d4ccb3e7005f8d43243cd",
+          "client_experience_configuration_sha256": "sha256:7e5fb5573172eb9db06ccd5401539f69b031c5497edab8daf7e5c79de94b2724",
+          "build_docs_metadata_sha256": "sha256:1f51f260f50c94fa262908267285638e3da65ea0d3e20c65729df94c67d1177e",
+          "build_code_lattice_sha256": "sha256:bf0d582ea3ce78d3807267780ebeb8506bda44fca5077c12e2daca43b016d7bc",
+          "runtime_docs_metadata_sha256": "sha256:1f51f260f50c94fa262908267285638e3da65ea0d3e20c65729df94c67d1177e",
+          "runtime_code_lattice_sha256": "sha256:5ce49de5fd5baa6418c7d7ce14c497a1b3d2e35c1d395a95a5114789fd998937",
+          "server_bundle_sha256": "sha256:5eb1100cfe08ddbf73c132801bd7d613695ab9b0a02cc0237d8c2e0ddf301890",
+          "server_bundle_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+          "server_build_identity_verified": true,
+          "client_index_sha256": "sha256:4636d0166d6b17cdb86f41e286cc327993d9686ecc6801f4eff24d360d3439ed",
+          "client_tree_sha256": "sha256:a719274d9516d48fe3048a6624a55294a1437cafa3814eeae4aebe0dc842244b",
+          "client_file_count": 615,
+          "client_total_bytes": 55435188,
+          "client_bundle_build_id": "42c5b19b4be2",
+          "client_build_identity_verified": true,
+          "runtime_data_sha256": {
+            "solar_product_registry": "sha256:bdc3ca4b60a0f23876f0f4fc5090a95808cb0d72a76ebe57769df2eb2b6291eb",
+            "solar_reference_pack": "sha256:ae3990294980f3ec9c9f272fb695f2b8bc676337f1f3c2d1b93e6a7bdfbbfb36"
+          },
+          "parity_static_result_sha256": "sha256:751568a3d655cc3eb6b96a945ee0a372cb1edbd9b6097525e19afd8eea463b97"
+        },
+        "source_identity": {
+          "source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+          "source_tree_sha256": "sha256:f979d12d016d10fc504bece0c0f1f4929a76c14d60351e12130d2f70611c00db",
+          "package_lock_sha256": "sha256:b33d68312713d5b1fe14568aa551e63dc42fc60486f30f86237f06098aa806db",
+          "theory_sources_sha256": "sha256:58c7205a1d1876075148f3c78b2615582c024cb17a7bd9acf1dc59e4a60e4fb1",
+          "parity_fixture_sha256": "sha256:a392c63226dd0bf94b572ade9cca46503c0522ced10d4ccb3e7005f8d43243cd",
+          "client_experience_configuration_sha256": "sha256:7e5fb5573172eb9db06ccd5401539f69b031c5497edab8daf7e5c79de94b2724",
+          "reasoning_materials_sha256": "sha256:7bbf72f35127755d34c9401487b85ecb6315d04379d8114b8db1a694056fb935",
+          "source_identity_sha256": "sha256:dacc6552730b089045f890d24b225dddf269ff97c05bc5a4d644c3b691187b81"
+        },
+        "account_policy": {
+          "account_type": "user",
+          "policy_sha256": "sha256:892c59062fcbebcf522b82c1a8645b6f8a71bc7e930feab36050cd5ceaea2277"
+        },
+        "experience_contract_sha256": "sha256:c45aa0665f1cbcb8c12636cb2edb115f3ff419a9c7f609cf4f003cf4e3f826d1",
+        "secret_values_included": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      }
+    }
+  ]
+}

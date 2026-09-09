@@ -1,13 +1,19 @@
 import { newDb } from "pg-mem";
 import type { Pool } from "pg";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import { helixAgentStartRequestSchema } from "@shared/contracts/helix-agent-api.v1";
+import type { HelixLocalSupervisorPresence } from "@shared/helix-local-supervisor-coordination";
+import { EnvironmentSessionPreparationIntentStore } from "../../environment-connectors/session/preparation-intent-store";
+import { HelixAgentApiService } from "../../helix-agent-api/service";
+import type { HelixAgentApiPrincipal } from "../../helix-agent-api/types";
 import { migration023 } from "../../../db/migrations/023_chat_sessions";
 import { migration026 } from "../../../db/migrations/026_helix_accounts";
 import { migration030 } from "../../../db/migrations/030_shared_realtime_rooms";
 import { migration031 } from "../../../db/migrations/031_room_source_ingress";
 import { migration032 } from "../../../db/migrations/032_helix_agent_api";
 import { migration034 } from "../../../db/migrations/034_shared_live_room_agent_bindings";
-import type { HelixAgentRunOwner } from "../../helix-agent-api/run-store";
+import { HelixAgentRunStore, type HelixAgentRunOwner } from "../../helix-agent-api/run-store";
 import {
   SharedLiveRoomBindingStore,
   SharedLiveRoomBindingStoreError,
@@ -187,6 +193,163 @@ afterEach(async () => {
 });
 
 describe("SharedLiveRoomBindingStore", () => {
+  it("discovers candidates in a retained indexed history without truncating before eligibility checks", async () => {
+    const pool = await createPool(); await seedBase(pool);
+    const store = new SharedLiveRoomBindingStore(pool);
+    const runs = new HelixAgentRunStore(pool);
+    const original = (await runs.getRun(owner(), RUN_ID))!;
+    for (let index = 0; index < 18; index++) {
+      const runId = `run:history:${String(index).padStart(2, "0")}`;
+      await runs.createRun({ run: { ...original, runId,
+        providerGoalId: `goal:${index}`, providerThreadId: `thread:${index}`,
+        providerSessionId: `session:${index}`,
+        evidenceBundle: { ...original.evidenceBundle, run_id: runId },
+      }, eventId: `event:${index}`, now: NOW });
+      await store.bindRunToRoom({ owner: owner(), runId, roomId: ROOM_ID, now: NOW });
+      if (index < 16) await pool.query("UPDATE helix_agent_runs SET expires_at = $1 WHERE run_id = $2", [NOW, runId]);
+    }
+    const selection = { owner: owner(), roomId: ROOM_ID, participantId: "participant:observer-owner", now: NOW };
+    expect((await store.listRunPreparationCandidates(selection)).map(row => row.runId))
+      .toEqual(["run:history:16", "run:history:17"]);
+    expect((await store.listRunPreparationCandidates({ ...selection, runId: "run:history:17" })).map(row => row.runId))
+      .toEqual(["run:history:17"]);
+  });
+  it("prepares through the real run API and room database with stable replay identities", async () => {
+    const pool = await createPool(); await seedBase(pool);
+    const bindings = new SharedLiveRoomBindingStore(pool);
+    const executor = vi.fn(async () => { throw new Error("setup_must_not_execute_a_turn"); });
+    const service = new HelixAgentApiService({ store: new HelixAgentRunStore(pool),
+      now: () => new Date(NOW), executor });
+    // Explicit test principal; no browser identity is promoted to an MCP principal.
+    const principal: HelixAgentApiPrincipal = { ...owner(), accountType: "developer",
+      scopes: new Set(["helix.agent_runs.read", "helix.agent_runs.write"]),
+      tokenExpiresAt: "2026-07-27T08:00:00.000Z", accountContext: {
+        session_id: "session:fixture", profile_id: OWNER_PROFILE_ID, trusted_account_session: true,
+        account_session: null, account_policy: buildHelixAccountCapabilityPolicy("developer"),
+      } };
+    const selection = { owner: owner(), roomId: ROOM_ID, participantId: "participant:observer-owner", now: NOW };
+    expect(await bindings.listRunPreparationCandidates(selection)).toEqual([]);
+    const target = { profileRef: OWNER_PROFILE_ID, authenticatedMcpClientRef: "mcp:fixture",
+      clientSessionRef: "session:fixture", continuationRef: "task:fixture" };
+    const mailbox = new EnvironmentSessionPreparationIntentStore({ serviceInstanceRef: "service:fixture",
+      listPresence: () => [{ active: true, service_instance_ref: "service:fixture",
+        authenticated_profile_ref: target.profileRef, authenticated_mcp_client_ref: target.authenticatedMcpClientRef,
+        client_session_ref: target.clientSessionRef, conversation_thread_ref: target.continuationRef,
+        observed_at: NOW, heartbeat_expires_at: "2026-07-26T20:03:00.000Z" } as HelixLocalSupervisorPresence],
+    }, async () => {}, () => Date.parse(NOW));
+    const intent = await mailbox.request({ requestId: "request:fixture", profileRef: target.profileRef,
+      clientSessionRef: target.clientSessionRef, continuationRef: target.continuationRef,
+      helixConversationId: CHAT_ID, roomId: ROOM_ID, requestedDurationSeconds: 28800 });
+    const create = vi.fn(async ({ idempotencyKey, objective, durationSeconds }: {
+      idempotencyKey: string; objective: string; durationSeconds: number;
+    }) => {
+      const result = await service.startRun({ principal, idempotencyKey,
+        request: helixAgentStartRequestSchema.parse({ objective, budget: { expires_in_seconds: durationSeconds } }) });
+      return result.body.run_id;
+    });
+    const prepare = () => mailbox.prepareRun(target, intent.intentId, {
+      objective: "Prepare this environment session for separately authorized user requests.",
+    }, {
+      discover: roomId => bindings.listRunPreparationCandidates({ ...selection, roomId }),
+      create,
+      attach: async (roomId, runId) => { await bindings.bindRunToRoom({ owner: owner(), roomId, runId,
+        now: NOW, preserveRevocation: true }); },
+      verify: async ({ roomId, runId }) => {
+        if (!(await bindings.listRunPreparationCandidates({ ...selection, roomId, runId })).length) {
+          throw new Error("run_not_verified");
+        }
+      },
+    });
+    let firstRun = ""; let firstBinding = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const prepared = await prepare();
+      const runId = prepared.preparedRunId!;
+      expect(prepared.status).toBe("run_prepared");
+      expect(prepared.execution_authority).toBe(false);
+      const bound = (await bindings.getActiveRunRoomBinding({ owner: owner(), runId }))!;
+      if (!attempt) { firstRun = runId; firstBinding = bound.bindingId; }
+      expect(runId).toBe(firstRun); expect(bound.bindingId).toBe(firstBinding);
+      const run = await service.inspectRun({ principal, runId });
+      expect(run.budget.expires_at).toBe("2026-07-27T04:00:00.000Z");
+      expect(run.budget.steps_used).toBe(0);
+      expect(run.answer_authority).toBe(false);
+      expect(await bindings.listRunPreparationCandidates(selection)).toEqual([
+        expect.objectContaining({ runId: firstRun, roomBindingId: firstBinding }),
+      ]);
+    }
+    expect(executor).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(mailbox.read(target)).toEqual([]);
+    expect((await pool.query("SELECT * FROM helix_agent_run_room_bindings")).rows).toHaveLength(1);
+    await expect(service.inspectRun({ principal: { ...principal, subjectId: "foreign" }, runId: firstRun }))
+      .rejects.toMatchObject({ status: 404 });
+    await pool.query("UPDATE helix_agent_run_room_bindings SET status = 'revoked'");
+    await expect(prepare()).rejects.toMatchObject({ code: "run_room_binding_conflict" });
+    expect(create).toHaveBeenCalledTimes(1);
+    await expect(bindings.bindRunToRoom({ owner: owner(), runId: firstRun, roomId: ROOM_ID,
+      now: NOW, preserveRevocation: true })).rejects.toMatchObject({ code: "run_room_binding_conflict" });
+    expect((await pool.query("SELECT * FROM helix_agent_run_room_bindings WHERE status = 'active'")).rows).toHaveLength(0);
+  });
+  it("keeps multiple candidates visible and excludes exhausted or completed runs", async () => {
+    const pool = await createPool();
+    await seedBase(pool);
+    const store = new SharedLiveRoomBindingStore(pool);
+    const runs = new HelixAgentRunStore(pool);
+    const original = await runs.getRun(owner(), RUN_ID);
+    expect(original).not.toBeNull();
+    for (const runId of [RUN_ID, "run:second"]) {
+      if (runId !== RUN_ID) await runs.createRun({ run: { ...original!, runId,
+        providerGoalId: "goal:second", providerThreadId: "thread:second", providerSessionId: "session:second",
+        evidenceBundle: { ...original!.evidenceBundle, run_id: runId } }, eventId: "event:second", now: NOW });
+      await store.bindRunToRoom({ owner: owner(), runId, roomId: ROOM_ID, now: NOW });
+    }
+    const input = { owner: owner(), roomId: ROOM_ID, participantId: "participant:observer-owner", now: NOW };
+    expect((await store.listRunPreparationCandidates(input)).map(row => row.runId)).toEqual([RUN_ID, "run:second"]);
+    await pool.query("UPDATE helix_agent_runs SET steps_used = max_steps WHERE run_id = $1", [RUN_ID]);
+    expect((await store.listRunPreparationCandidates(input)).map(row => row.runId)).toEqual(["run:second"]);
+    await pool.query("UPDATE helix_agent_runs SET completed_at = $1 WHERE run_id = $2", [NOW, "run:second"]);
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+  });
+
+  it("discovers preparation candidates without rotating bindings and rejects changed ownership, consent and expiry", async () => {
+    const pool = await createPool();
+    await seedBase(pool);
+    const store = new SharedLiveRoomBindingStore(pool);
+    const binding = await store.bindRunToRoom({ owner: owner(), runId: RUN_ID, roomId: ROOM_ID, now: NOW });
+    const input = { owner: owner(), roomId: ROOM_ID, participantId: "participant:observer-owner", now: NOW };
+    const before = (await pool.query("SELECT * FROM helix_agent_run_room_bindings")).rows;
+    for (let i = 0; i < 3; i++) {
+      expect(await store.listRunPreparationCandidates(input)).toEqual([
+        expect.objectContaining({ runId: RUN_ID, runVersion: 1, roomBindingId: binding.bindingId }),
+      ]);
+    }
+    expect((await pool.query("SELECT * FROM helix_agent_run_room_bindings")).rows).toEqual(before);
+    for (const key of ["tenantId", "issuer", "subjectId", "accountProfileId"] as const) {
+      expect(await store.listRunPreparationCandidates({ ...input, owner: owner({ [key]: "foreign" }) })).toEqual([]);
+    }
+    expect(await store.listRunPreparationCandidates({ ...input, participantId: "foreign" })).toEqual([]);
+    expect(await store.listRunPreparationCandidates({ ...input, roomId: "room:foreign" })).toEqual([]);
+    await pool.query("UPDATE helix_shared_realtime_room_members SET consent = '{}'::jsonb");
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+    await pool.query("UPDATE helix_shared_realtime_room_members SET consent = $1::jsonb", [JSON.stringify({ consent_version: CONSENT_VERSION, consent_receipt_ref: CONSENT_RECEIPT_REF })]);
+    await pool.query("UPDATE helix_agent_run_room_bindings SET status = 'revoked'");
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+    await pool.query("UPDATE helix_agent_run_room_bindings SET status = 'active'");
+    await pool.query("UPDATE helix_agent_runs SET cancelled_at = $1", [NOW]);
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+    await pool.query("UPDATE helix_agent_runs SET cancelled_at = NULL");
+    await pool.query("UPDATE helix_shared_realtime_room_members SET presence = 'left'");
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+    await pool.query("UPDATE helix_shared_realtime_room_members SET presence = 'present'");
+    await pool.query("UPDATE helix_shared_realtime_rooms SET status = 'closed'");
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+    await pool.query("UPDATE helix_shared_realtime_rooms SET status = 'ready'");
+    expect(await store.listRunPreparationCandidates(input)).toHaveLength(1);
+    await pool.query("UPDATE helix_agent_runs SET expires_at = $1", [NOW]);
+    expect(await store.listRunPreparationCandidates(input)).toEqual([]);
+    await expect(store.listRunPreparationCandidates({ ...input, now: "invalid" })).rejects.toMatchObject({ code: "binding_invalid" });
+  });
+
   it("durably binds an exact run owner to one current room membership", async () => {
     const pool = await createPool();
     await seedBase(pool);

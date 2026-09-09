@@ -1,0 +1,44 @@
+{
+  "schema": "casimirbot.continuous_session_development_observation.v1",
+  "date": "2026-09-08",
+  "scope": "External app catalog and invocation discrepancy; no gameplay",
+  "same_task_presence": {
+    "succeeded": true,
+    "observed_at": "2026-09-08T16:24:36.570Z",
+    "service_instance_ref": "service_instance:e7580e5a042cad2d79b138b3dd76f507",
+    "run_association": null
+  },
+  "advertised_authorization_status_call": {
+    "capability_profile": "g2-action",
+    "outcome": "Unknown tool",
+    "mcp_error_code": -32001,
+    "authorization_readiness_proven": false
+  },
+  "published_app_page": {
+    "app_name": "CasimirBot Device Check v2",
+    "observation_method": "Existing signed-in browser tab accessibility tree, read-only",
+    "ready_up_listed": true,
+    "ready_up_goal_bootstrap_field_in_displayed_schema": false,
+    "current_source_goal_bootstrap_field": true,
+    "prompt_submit_in_observed_reasoning_section": false,
+    "refresh_control_visible": true,
+    "refresh_or_reconnect_performed": false
+  },
+  "current_task_callable_catalog": {
+    "ready_up_found": false,
+    "prompt_submit_found": false
+  },
+  "local_check": {
+    "command": "npx vitest run shared/__tests__/helix-environment-session-request.spec.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed": 9,
+    "failed": 0,
+    "scope": "Local request schema validation only; not published catalog adoption"
+  },
+  "conclusion": "Working presence transport does not establish coherent published or callable tool catalogs. Published Ready up schema differs from current source. Required tools remain unavailable in this task; exact refresh/adoption ownership remains unresolved.",
+  "next_evidence": "Supported app catalog refresh should expose current Ready up goal_bootstrap and prompt submission; separately verify same-task callable discovery and authorized invocation. Do not generate another binding first.",
+  "limits": [
+    "Does not prove an internal Codex defect or missing OAuth scopes",
+    "Published page observation does not prove current upstream tools/list contents",
+    "No permission change, binding, gameplay or stage completion"
+  ]
+}

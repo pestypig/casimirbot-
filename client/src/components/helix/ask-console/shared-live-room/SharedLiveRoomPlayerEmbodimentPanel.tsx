@@ -40,6 +40,7 @@ import {
 import type { HelixRoomSourceBinding } from "@shared/helix-room-source-ingress";
 import {
   inspectCurrentReasoningBinding,
+  useBrowserReasoningBindingStore,
   type BrowserReasoningBinding,
 } from "@/lib/agent-access/reasoningTaskBinding";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
@@ -215,6 +216,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   isOwner: boolean;
 }) {
   const activeChatId = useAgiChatStore((state) => state.activeId);
+  const observedReasoningBinding = useBrowserReasoningBindingStore((state) => state.current);
   const authorityPath = useMemo(
     () => actionAuthoritiesPath(roomId, environment.environment_binding_id),
     [environment.environment_binding_id, roomId],
@@ -678,6 +680,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
           actionAuthorityId: currentAuthority.action_authority_id,
           allowedCapabilityIds: currentAuthority.allowed_capability_ids,
           authorityExpiresAt: currentAuthority.expires_at,
+          boundRunId: reasoningBinding.run_id ?? null,
         }),
       });
       await load();
@@ -695,7 +698,13 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   };
 
   const playProjection = diagnoseMinecraftPlayJourney({
-    reasoningBinding: playReasoningBinding,
+    // This is presentation only. Activation still inspects the exact chat on
+    // the server before launching, pairing or requesting goal setup. Prefer
+    // the latest exact-chat projection so revocation supersedes an older Play
+    // result, and never display another chat's binding as this chat's state.
+    reasoningBinding: observedReasoningBinding?.helix_conversation_id === activeChatId
+      ? observedReasoningBinding
+      : playReasoningBinding?.helix_conversation_id === activeChatId ? playReasoningBinding : null,
     roomPresent: Boolean(roomId),
     isOwner,
     environmentStatus: environment.connection_status,

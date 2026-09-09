@@ -4,6 +4,23 @@ import { readBoundSessionEvidence, type BoundSessionEvidenceInput } from "../bou
 
 afterEach(() => vi.restoreAllMocks());
 
+it("awaits durable authorization before perception and rejects asynchronous revocation after it", async () => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const read = vi.spyOn(perception, "resolveTemporalPerceptionContext").mockResolvedValue({} as never);
+  const verifyTaskAssociation = vi.fn().mockImplementationOnce(async () => {
+    await pending; return {};
+  }).mockRejectedValueOnce(new Error("pairing_revoked"));
+  const outcome = readBoundSessionEvidence(request(), { verifyTaskAssociation });
+  const rejected = expect(outcome).rejects.toThrow("pairing_revoked");
+  await Promise.resolve();
+  expect(read).not.toHaveBeenCalled();
+  release();
+  await rejected;
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(verifyTaskAssociation).toHaveBeenCalledTimes(2);
+});
+
 const request = (): BoundSessionEvidenceInput => ({
   context: { profileId: "profile:a", participantId: "participant:a", runId: "run:a",
     goalId: "goal:a", expectedRevision: 1, roomId: "room:a", turnId: "turn:a",

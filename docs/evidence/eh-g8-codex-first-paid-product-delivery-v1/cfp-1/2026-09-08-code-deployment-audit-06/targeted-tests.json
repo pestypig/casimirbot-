@@ -1,0 +1,35 @@
+{
+  "captured_utc": "2026-09-09T00:05:32.912Z",
+  "command": "npx vitest run server/__tests__/environment-adapter-registry.test.ts server/services/environment-connectors/conformance/__tests__/sdk-conformance.test.ts server/__tests__/google-auth.test.ts server/mcp/__tests__/helix-mcp-public-ui-catalog.test.ts --pool=forks --maxWorkers=1",
+  "exit_code": 1,
+  "files_passed": 3,
+  "files_failed": 1,
+  "tests_passed": 19,
+  "tests_failed": 2,
+  "duration_seconds": 23.71,
+  "results": [
+    {
+      "file": "server/__tests__/environment-adapter-registry.test.ts",
+      "passed": 7
+    },
+    {
+      "file": "server/services/environment-connectors/conformance/__tests__/sdk-conformance.test.ts",
+      "passed": 5
+    },
+    {
+      "file": "server/__tests__/google-auth.test.ts",
+      "passed": 5
+    },
+    {
+      "file": "server/mcp/__tests__/helix-mcp-public-ui-catalog.test.ts",
+      "passed": 2,
+      "failed": 2,
+      "failures": [
+        "public_control_count and matched_control_count expected 398, received 402 at line151",
+        "roomCatalog controls expected100 received101 at line286"
+      ]
+    }
+  ],
+  "scope": "Deterministic component checks; not installed journey, live OAuth, paid grants or deployment acceptance",
+  "no_runtime_repairs": true
+}

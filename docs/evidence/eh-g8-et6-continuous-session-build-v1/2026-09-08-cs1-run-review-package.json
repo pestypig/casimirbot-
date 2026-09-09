@@ -1,0 +1,26 @@
+{
+  "scope": "Package content equality; no live acceptance claim",
+  "output": "apps/desktop/release-cs1-run-review-20260908/win-unpacked",
+  "runtime_files_compared": 645,
+  "runtime_mismatches": [],
+  "bundles": {
+    "main.cjs": {
+      "sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+      "matches": true
+    },
+    "preload.cjs": {
+      "sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+      "matches": true
+    },
+    "service.mjs": {
+      "sha256": "29a41e0d0bc0fd5a2890f156bf5820d76b269b7f2230c1de209df22473808eeb",
+      "matches": true
+    }
+  },
+  "exe_sha256": "f96161cd3a0f4e70271e418fd6a678c56d54a03c9b3c4248bcb169e734987e50",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false
+}

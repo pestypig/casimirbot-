@@ -1,6 +1,18 @@
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import * as pairingRepository from "../../services/local-supervisor/pairing-ledger-repository";
+import { migration087 } from "../../db/migrations/087_pairing_ledger";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import express from "express";
+import { newDb } from "pg-mem";
+import * as destinationRegistration from "../../services/local-supervisor/pairing-destination-registration";
+import { migration088 } from "../../db/migrations/088_pairing_destinations";
+import { migration089 } from "../../db/migrations/089_pairing_destination_identity";
+import { ephemeralPairingVault } from "../../services/local-supervisor/__tests__/pairing-vault-fixture";
+import httpRequest from "supertest";
+import { createAgentConnectionsRouter } from "../../routes/agent-connections";
+import * as roomMembership from "../../services/helix-ask/realtime-room/room-store";
 import { z } from "zod";
+import { EnvironmentSessionPreparationError } from "../../services/environment-connectors/session/preparation-error";
 import { ToolListChangedNotificationSchema } from
   "@modelcontextprotocol/sdk/types.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -102,6 +114,267 @@ afterEach(async () => {
 });
 
 describe("Helix MCP local-supervisor coordination", () => {
+  it("accepts a durable invitation through MCP after idle and service replacement without extending consent", async () => {
+    const pool = new (newDb().adapters.createPg().Pool)();
+    await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
+    await pool.query("INSERT INTO helix_accounts VALUES ('profile:pairing')");
+    const dbClient = await pool.connect();
+    try { for (const migration of [migration087, migration088, migration089]) {
+      await migration.run(dbClient, { enablePgvector: false });
+    } } finally { dbClient.release(); }
+    const vault = ephemeralPairingVault();
+    const repo = new pairingRepository.PairingLedgerRepository(pool, vault, async () => {});
+    const factory = vi.spyOn(pairingRepository, "createNativePairingLedgerRepository").mockResolvedValue(repo);
+    const registrations = new destinationRegistration.PairingDestinationRegistrationStore(pool, async () => {}, () => new Date(), vault);
+    const registrationFactory = vi.spyOn(destinationRegistration, "createPairingDestinationRegistrationStore").mockResolvedValue(registrations);
+    const identity = principal("profile:pairing", "oauth:pairing");
+    const actor = { profileId: identity.accountProfileId, taskId: "task:pairing" };
+    vi.stubEnv("HELIX_DESKTOP_DEVICE_ID", "fixture-pairing-device");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-08T12:00:00Z"));
+    try {
+      const trust = vi.fn().mockResolvedValue({ trusted: true, accountSessionReady: true, agentAccountBindingReady: true });
+      const store = new HelixLocalSupervisorCoordinationStore("service:pairing-before");
+      const client = await connect(store, identity, { desktopFullHarnessTrustReader: trust });
+      const registered = await client.callTool({ name: "helix_reasoning_destination_register", arguments: {
+        client_continuation_ref: actor.taskId, request_id: "fixture-register", duration_seconds: 3600 } });
+      expect(registered.isError).not.toBe(true);
+      const browser = (reasoningBindingStore?: HelixReasoningTaskBindingStore) => {
+        const app = express(); app.use(express.json());
+        app.use("/api/account", createAgentConnectionsRouter({ coordinationStore: store,
+          destinationRegistrationStore: registrations,
+          reasoningBindingStore,
+          pairingLedgerRepository: new pairingRepository.PairingLedgerRepository(pool, vault, async () => {}),
+          resolveSession: async id => id === "browser:pairing" ? {
+            session_id: id, profile: { profile_id: actor.profileId } } : null,
+          bindingStore: { listBindings: async () => ({ bindings: [{ status: "active", issuer: identity.issuer }] }) } as never,
+          readPairingDeviceTrust: async () => ({ trusted: true }) as never,
+        }));
+        return app;
+      };
+      const app = browser();
+      const listed = await httpRequest(app).get("/api/account/session/agent-connections/reasoning-destinations")
+        .set("Cookie", "helix_session=browser:pairing");
+      expect(listed.status).toBe(200);
+      expect(listed.body.destinations).toHaveLength(1);
+      expect(listed.body.destinations[0].destination.taskId).toBe(actor.taskId);
+      const issued = await httpRequest(app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", "helix_session=browser:pairing").send({ requestId: "fixture-issue",
+          registrationId: listed.body.destinations[0].registrationId, chatId: "chat:fixture", environment: null,
+          invitationSeconds: 900, pairingSeconds: 28800 });
+      expect(issued.status).toBe(200);
+      const secret = issued.body.invitation.secret;
+      const args = { client_continuation_ref: actor.taskId, id: issued.body.invitation.id, secret };
+      const statusPath = `/api/account/session/agent-connections/reasoning-pairings/${encodeURIComponent(args.id)}`;
+      vi.setSystemTime(new Date("2026-09-08T12:05:01Z"));
+      const call = (target: Client, arguments_ = args) => target.callTool({ name: "helix_reasoning_pairing_accept", arguments: arguments_ });
+      const recover = (target: Client, continuation = actor.taskId) => target.callTool({ name: "helix_reasoning_pairing_recover",
+        arguments: { client_continuation_ref: continuation, id: args.id } });
+      const pendingRecovery = await recover(client);
+      expect(pendingRecovery.isError).toBe(true);
+      expect(JSON.stringify(pendingRecovery)).toContain("pairing_not_accepted");
+      const wrong = await call(client, { ...args, client_continuation_ref: "task:foreign" });
+      expect(wrong.isError).toBe(true);
+      expect(JSON.stringify(wrong)).toContain("pairing_destination_mismatch");
+      expect((await repo.read(actor.profileId, args.id))?.revision).toBe(1);
+      const accepted = await Promise.all([call(client), call(client)]);
+      expect(accepted[0].isError).not.toBe(true);
+      expect(accepted[0].structuredContent).toEqual(accepted[1].structuredContent);
+      expect(accepted[0].structuredContent).toMatchObject({ runtime_binding_active: false, pairing: {
+        state: "accepted", revision: 2, executionAuthority: false, pairingExpiresAt: "2026-09-08T20:00:00.000Z" } });
+      expect(JSON.stringify(accepted)).not.toContain(secret);
+      expect((await repo.read(actor.profileId, args.id))?.acceptanceSecret).toBeNull();
+      expect(store.listPresence()).toHaveLength(0);
+      vi.setSystemTime(new Date("2026-09-08T12:20:00Z"));
+      const recovered = await connect(new HelixLocalSupervisorCoordinationStore("service:pairing-after"), identity,
+        { desktopFullHarnessTrustReader: trust });
+      expect((await call(recovered)).structuredContent).toEqual(accepted[0].structuredContent);
+      expect((await recover(recovered)).structuredContent).toEqual(accepted[0].structuredContent);
+      expect((await recover(recovered, "task:foreign")).isError).toBe(true);
+      vi.setSystemTime(new Date("2026-09-08T20:00:00Z"));
+      const expiredRecovery = await recover(recovered);
+      expect(expiredRecovery.isError).toBe(true);
+      expect(JSON.stringify(expiredRecovery)).toContain("pairing_expired");
+      vi.setSystemTime(new Date("2026-09-08T12:20:00Z"));
+      const restoredBrowser = browser();
+      const status = await httpRequest(restoredBrowser).get(statusPath).set("Cookie", "helix_session=browser:pairing");
+      expect(status.status).toBe(200);
+      expect(status.body.runtime_binding_active).toBeNull();
+      expect(status.body.pairing).toEqual((accepted[0].structuredContent as any).pairing);
+      expect(JSON.stringify(status.body)).not.toContain(secret);
+      const runtimePresence = new HelixLocalSupervisorCoordinationStore("service:runtime-restored");
+      const runtimeStore = new HelixReasoningTaskBindingStore(runtimePresence);
+      const visualManifests = vi.fn(async () => []);
+      const runtimeClient = await connect(runtimePresence, { ...identity, mcpClientRef: identity.oauthClientRef }, {
+        desktopFullHarnessTrustReader: trust, reasoningTaskBindingStore: runtimeStore,
+        visualSequenceService: { listManifests: visualManifests, listReasoningGrants: () => [] } });
+      const restoredRuntime = await recover(runtimeClient);
+      expect(restoredRuntime.isError).not.toBe(true);
+      expect(restoredRuntime.structuredContent).toMatchObject({ runtime_binding_active: true,
+        binding: { status: "active", continuation_transport: "unavailable", execution_authority: false } });
+      const runtimeBinding = (restoredRuntime.structuredContent as any).binding;
+      const visualArgs = { reasoning_binding_id: runtimeBinding.reasoning_binding_id, binding_epoch: runtimeBinding.binding_epoch };
+      const visualRead = await runtimeClient.callTool({ name: "helix_visual_sequence_list", arguments: visualArgs });
+      expect(visualRead.isError).not.toBe(true);
+      expect(visualManifests).toHaveBeenCalledTimes(1);
+      visualManifests.mockImplementationOnce(async () => {
+        trust.mockResolvedValue({ trusted: false, accountSessionReady: true, agentAccountBindingReady: true });
+        return [];
+      });
+      const revokedDuringRead = await runtimeClient.callTool({ name: "helix_visual_sequence_list", arguments: visualArgs });
+      expect(revokedDuringRead.isError).toBe(true);
+      expect(JSON.stringify(revokedDuringRead)).toContain("visual_sequence_reasoning_binding_invalid");
+      trust.mockResolvedValue({ trusted: true, accountSessionReady: true, agentAccountBindingReady: true });
+      const currentPresence = await runtimeClient.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
+        client_continuation_ref: actor.taskId, declared_objective_summary: "Fixture steering exchange",
+        lifecycle_state: "active", resource_claims: [], heartbeat_ttl_seconds: 180,
+        thread_observability_bridge: { supported_levels: ["tool_activity_only", "checkpoint_publish", "continuation_ready"],
+          requested_level: "continuation_ready", checkpoint_publication: {
+            freshness_window_seconds: 120, retention: "current_session", revocation: "independent" } },
+      } });
+      expect(currentPresence.isError).not.toBe(true);
+      const prompt = { client_continuation_ref: actor.taskId, reasoning_binding_id: runtimeBinding.reasoning_binding_id,
+        binding_epoch: runtimeBinding.binding_epoch, helix_conversation_id: "chat:fixture", run_id: null,
+        mission_id: null, client_event_ref: "fixture-durable-prompt", instruction_text: "Inspect the surroundings." };
+      const submitted = await runtimeClient.callTool({ name: "helix_reasoning_prompt_submit", arguments: prompt });
+      expect(submitted.isError).not.toBe(true);
+      expect(submitted.structuredContent).toMatchObject({ event: { origin: "agent_submitted", delivery_state: "pending" } });
+      expect((await runtimeClient.callTool({ name: "helix_reasoning_prompt_submit", arguments: prompt })).structuredContent)
+        .toEqual(submitted.structuredContent);
+      const readArgs = { client_continuation_ref: actor.taskId, reasoning_binding_id: runtimeBinding.reasoning_binding_id,
+        binding_epoch: runtimeBinding.binding_epoch, after_cursor: 0 };
+      const pickup = await runtimeClient.callTool({ name: "helix_reasoning_steering_read", arguments: readArgs });
+      expect(pickup.isError).not.toBe(true);
+      expect((pickup.structuredContent as any).deliveries).toHaveLength(1);
+      const acknowledgement = await runtimeClient.callTool({ name: "helix_reasoning_steering_acknowledge", arguments: {
+        client_continuation_ref: actor.taskId, reasoning_binding_id: runtimeBinding.reasoning_binding_id,
+        binding_epoch: runtimeBinding.binding_epoch, steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref,
+      } });
+      expect(acknowledgement.isError).not.toBe(true);
+      expect(acknowledgement.structuredContent).toMatchObject({ event: { delivery_state: "acknowledged" } });
+      const runtimeBrowser = browser(runtimeStore);
+      const displayPath = `/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(runtimeBinding.reasoning_binding_id)}/chat-prompts`;
+      const display = () => httpRequest(runtimeBrowser).get(displayPath).set("Cookie", "helix_session=browser:pairing")
+        .query({ binding_epoch: runtimeBinding.binding_epoch, helix_conversation_id: "chat:fixture" });
+      const displayed = await display();
+      expect(displayed.status).toBe(200);
+      expect(displayed.body.deliveries).toHaveLength(1);
+      expect(displayed.body.deliveries[0]).toMatchObject({ instruction_text: prompt.instruction_text,
+        event: { origin: "agent_submitted", delivery_state: "acknowledged" } });
+      const currentBinding = await httpRequest(runtimeBrowser).get("/api/account/session/agent-connections/reasoning-bindings/current")
+        .set("Cookie", "helix_session=browser:pairing").query({ helix_conversation_id: "chat:fixture" });
+      expect(currentBinding.status).toBe(200);
+      expect(currentBinding.body.binding).toMatchObject({ reasoning_binding_id: runtimeBinding.reasoning_binding_id, status: "active" });
+      const typedBody = { reasoning_binding_id: runtimeBinding.reasoning_binding_id, binding_epoch: runtimeBinding.binding_epoch,
+        helix_conversation_id: "chat:fixture", run_id: null, origin: "typed", client_event_ref: "fixture-browser-prompt",
+        instruction_text: "Report what you observe." };
+      const typed = await httpRequest(runtimeBrowser).post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
+        .set("Cookie", "helix_session=browser:pairing").send(typedBody);
+      expect(typed.status).toBe(202);
+      expect(typed.body.event.origin).toBe("typed");
+      const typedReplay = await httpRequest(runtimeBrowser).post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
+        .set("Cookie", "helix_session=browser:pairing").send(typedBody);
+      expect(typedReplay.body).toEqual(typed.body);
+      expect((await display()).body.deliveries).toHaveLength(2);
+      trust.mockResolvedValueOnce({ trusted: false });
+      expect((await runtimeClient.callTool({ name: "helix_reasoning_steering_read", arguments: readArgs })).isError).toBe(true);
+      expect((await call(recovered, { ...args, secret: "z".repeat(43) })).isError).toBe(true);
+      expect((await recovered.callTool({ name: "helix_reasoning_pairing_accept",
+        arguments: { ...args, human_approved: true } })).isError).toBe(true);
+      trust.mockResolvedValueOnce({ trusted: false });
+      expect((await call(recovered)).isError).toBe(true);
+      const foreign = await connect(new HelixLocalSupervisorCoordinationStore("service:foreign"),
+        principal("profile:pairing", "oauth:foreign"), { desktopFullHarnessTrustReader: trust });
+      expect((await call(foreign)).isError).toBe(true);
+      expect((await recover(foreign)).isError).toBe(true);
+      const revokeBindingPath = `/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(runtimeBinding.reasoning_binding_id)}/revoke`;
+      expect((await httpRequest(runtimeBrowser).post(revokeBindingPath).send({})).status).toBe(401);
+      const revokedBinding = await httpRequest(runtimeBrowser).post(revokeBindingPath)
+        .set("Cookie", "helix_session=browser:pairing").send({});
+      expect(revokedBinding.status).toBe(200);
+      expect(revokedBinding.body.binding.status).toBe("revoked");
+      const replayedRevoke = await httpRequest(runtimeBrowser).post(revokeBindingPath)
+        .set("Cookie", "helix_session=browser:pairing").send({});
+      expect(replayedRevoke.body).toEqual(revokedBinding.body);
+      const revokedByOwner = await httpRequest(restoredBrowser).post(`${statusPath}/revoke`)
+        .set("Cookie", "helix_session=browser:pairing").send({});
+      expect(revokedByOwner.status).toBe(200);
+      expect(revokedByOwner.body.pairing).toMatchObject({ state: "revoked", revision: 3 });
+      const revoked = await call(recovered);
+      expect(revoked.isError).toBe(true);
+      expect(JSON.stringify(revoked)).toContain("pairing_revoked");
+      expect((await recover(recovered)).isError).toBe(true);
+      expect((await runtimeClient.callTool({ name: "helix_reasoning_steering_read", arguments: readArgs })).isError).toBe(true);
+      expect((await runtimeClient.callTool({ name: "helix_reasoning_prompt_submit", arguments: prompt })).isError).toBe(true);
+      const revokedDisplay = await display();
+      expect(revokedDisplay.status).toBe(409);
+      expect(revokedDisplay.body.error).toBe("pairing_revoked");
+      expect((await repo.read(actor.profileId, args.id))?.revision).toBe(3);
+    } finally { factory.mockRestore(); registrationFactory.mockRestore(); vi.useRealTimers(); vi.unstubAllEnvs(); await pool.end(); }
+  });
+  it("registers a durable declared destination through the real handler without heartbeat or consent", async () => {
+    const pool = new (newDb().adapters.createPg().Pool)();
+    await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
+    await pool.query("INSERT INTO helix_accounts VALUES ('profile:registration')");
+    const dbClient = await pool.connect();
+    try { await migration088.run(dbClient, { enablePgvector: false }); await migration089.run(dbClient, { enablePgvector: false }); } finally { dbClient.release(); }
+    let clock = Date.parse("2026-09-08T12:00:00Z");
+    const registrationStore = new destinationRegistration.PairingDestinationRegistrationStore(pool, async () => {}, () => new Date(clock), ephemeralPairingVault());
+    const factory = vi.spyOn(destinationRegistration, "createPairingDestinationRegistrationStore").mockResolvedValue(registrationStore);
+    vi.stubEnv("HELIX_DESKTOP_DEVICE_ID", "fixture-installed-device");
+    try {
+      const presence = new HelixLocalSupervisorCoordinationStore("service:registration");
+      const identity = principal("profile:registration", "oauth:registration");
+      const trust = vi.fn().mockResolvedValue({ trusted: true, accountSessionReady: true,
+        agentAccountBindingReady: true, delegatedAccountSessionId: "fixture-session" });
+      const client = await connect(presence, identity, { desktopFullHarnessTrustReader: trust });
+      const args = { client_continuation_ref: "task:registration", request_id: "fixture-register", duration_seconds: 900 };
+      const first = await client.callTool({ name: "helix_reasoning_destination_register", arguments: args });
+      expect(first.isError).not.toBe(true);
+      expect(first.structuredContent).toMatchObject({ ok: true, registration: {
+        proofBasis: "authenticated_client_declaration", currentPresence: false, pairingAuthority: false, executionAuthority: false } });
+      clock += 301000;
+      const replay = await client.callTool({ name: "helix_reasoning_destination_register", arguments: args });
+      expect(replay.structuredContent).toEqual(first.structuredContent);
+      expect(presence.listPresence()).toHaveLength(0);
+      const forged = await client.callTool({ name: "helix_reasoning_destination_register",
+        arguments: { ...args, profile_id: "profile:foreign" } });
+      expect(forged.isError).toBe(true);
+      trust.mockResolvedValue({ trusted: false });
+      const denied = await client.callTool({ name: "helix_reasoning_destination_register", arguments: args });
+      expect(denied.isError).toBe(true);
+      expect(JSON.stringify(denied)).toContain("pairing_registration_device_trust_required");
+      expect((await pool.query("SELECT * FROM helix_pairing_destinations")).rows).toHaveLength(1);
+    } finally { factory.mockRestore(); vi.unstubAllEnvs(); await pool.end(); }
+  });
+  it("revalidates expired session selectors without restoring expired mutation claims or disconnected selections", async () => {
+    let clock = Date.now();
+    const store = new HelixLocalSupervisorCoordinationStore("service_instance:55555555555555555555555555555555", () => new Date(clock));
+    const identity = principal("profile:heartbeat", "oauth:heartbeat");
+    const inspectRun = vi.fn().mockResolvedValue({ run_id: "run:heartbeat", version: 1, lifecycle_status: "waiting" });
+    const client = await connect(store, identity, { service: { inspectRun }, roomControlService: {
+      inspectRoom: async () => ({ room: { self_participant_id: "participant:heartbeat" } }),
+    }, roomBindingStore: { getActiveRunRoomBinding: async () => ({ roomId: "room:heartbeat",
+      participantIdAtBind: "participant:heartbeat", bindingId: "binding:heartbeat", version: 1 }) } });
+    const refresh = (extra = {}) => client.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
+      client_continuation_ref: "task:heartbeat", declared_objective_summary: "Maintain selected session",
+      lifecycle_state: "active", ...extra } });
+    expect((await refresh({ room_ref: "room:heartbeat", run_ref: "run:heartbeat", resource_claims: [
+      { claim_class: "read", resource_ref: "room:heartbeat" },
+      { claim_class: "retained_runtime", resource_ref: "run:heartbeat" },
+      { claim_class: "mutation_lease_active", resource_ref: "lease:advisory-only" },
+    ] })).isError).not.toBe(true);
+    clock += 180_001;
+    expect(store.listPresence()[0].active).toBe(false);
+    const recovered = (await refresh()).structuredContent as any;
+    expect(recovered.presence.verified_retained_runtime_identity).toMatchObject({ run_ref: "run:heartbeat" });
+    expect(recovered.presence.resource_claims.map((row: any) => row.claim_class)).toEqual(["read", "retained_runtime"]);
+    expect(inspectRun).toHaveBeenCalledTimes(2);
+    await refresh({ lifecycle_state: "disconnected" });
+    expect((await refresh()).structuredContent).toMatchObject({ presence: { run_ref: null,
+      verified_retained_runtime_identity: null } });
+    expect(inspectRun).toHaveBeenCalledTimes(2);
+  });
   it("presents only a catalogued human-only control without invoking it", async () => {
     const store = new HelixLocalSupervisorCoordinationStore(
       "service_instance:34343434343434343434343434343434",
@@ -191,6 +464,9 @@ describe("Helix MCP local-supervisor coordination", () => {
       ["helix_reasoning_steering_acknowledge", [{
         type: "oauth2",
         scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      }]],
+      ["helix_reasoning_prompt_submit", [{
+        type: "oauth2", scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
       }]],
     ]);
     for (const catalog of catalogs) {
@@ -288,6 +564,57 @@ describe("Helix MCP local-supervisor coordination", () => {
       answer_authority: false,
       terminal_eligible: false,
     });
+    const promptArgs = { client_continuation_ref: continuation,
+      reasoning_binding_id: binding.reasoning_binding_id, binding_epoch: binding.binding_epoch,
+      helix_conversation_id: "helix-chat:reasoning-current", mission_id: "mission:reasoning-current",
+      run_id: "run:reasoning-current", client_event_ref: "agent:mcp-request",
+      instruction_text: "Inspect the platform" };
+    const submit = (patch = {}) => client.callTool({ name: "helix_reasoning_prompt_submit",
+      arguments: { ...promptArgs, ...patch } });
+    const submitted = await submit();
+    expect(submitted.isError, JSON.stringify(submitted)).not.toBe(true);
+    expect((await submit()).structuredContent).toEqual(submitted.structuredContent);
+    const displayApp = express();
+    displayApp.use("/api/account", createAgentConnectionsRouter({ coordinationStore: store,
+      reasoningBindingStore: reasoningStore,
+      resolveSession: async () => ({ session_id: "browser:display", profile: { profile_id: identity.accountProfileId } }) as never,
+      bindingStore: { listBindings: async () => ({ bindings: [] }) } as never,
+    }));
+    const display = () => httpRequest(displayApp)
+      .get(`/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(binding.reasoning_binding_id)}/chat-prompts`)
+      .set("Cookie", "helix_session=browser:display")
+      .query({ binding_epoch: binding.binding_epoch, helix_conversation_id: promptArgs.helix_conversation_id,
+        run_id: promptArgs.run_id, after_cursor: event.cursor });
+    const visible = await display();
+    expect(visible.status).toBe(200);
+    expect(visible.body.deliveries).toHaveLength(1);
+    expect(visible.body.deliveries[0]).toMatchObject({ instruction_text: promptArgs.instruction_text,
+      event: (submitted.structuredContent as any).event });
+    expect(visible.body.provider_pickup_confirmed).toBe(false);
+    for (const patch of [{ origin: "typed" }, { run_id: "run:foreign" },
+      { binding_epoch: binding.binding_epoch + 1 }, { helix_conversation_id: "chat:foreign" },
+      { instruction_text: "Changed replay" }]) expect((await submit(patch)).isError).toBe(true);
+    const delivery = await client.callTool({ name: "helix_reasoning_steering_read", arguments: {
+      client_continuation_ref: continuation, reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch, after_cursor: event.cursor } });
+    expect((delivery.structuredContent as any).deliveries).toHaveLength(1);
+    expect((delivery.structuredContent as any).deliveries[0]).toMatchObject({
+      content_role: "agent_steering_advisory_not_execution",
+      event: { origin: "agent_submitted", delivery_state: "pending", answer_authority: false } });
+    const agentAck = await client.callTool({ name: "helix_reasoning_steering_acknowledge", arguments: {
+      client_continuation_ref: continuation, reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch,
+      steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref } });
+    expect(agentAck.structuredContent).toMatchObject({ event: { delivery_state: "acknowledged" }, answer_authority: false });
+    const visibleAfterAck = await display();
+    expect(visibleAfterAck.body.deliveries).toHaveLength(1);
+    expect(visibleAfterAck.body.deliveries[0]).toMatchObject({ instruction_text: promptArgs.instruction_text,
+      event: { steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref,
+        delivery_state: "acknowledged", answer_authority: false } });
+    const removedScope = HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES[0];
+    identity.scopes.delete(removedScope);
+    expect((await submit({ client_event_ref: "agent:denied" })).isError).toBe(true);
+    identity.scopes.add(removedScope);
     const wrongContinuation = await client.callTool({
       name: "helix_reasoning_steering_read",
       arguments: {
@@ -359,6 +686,122 @@ describe("Helix MCP local-supervisor coordination", () => {
     }
   });
 
+  it("shares a browser preparation mailbox with exact MCP pickup and verified acknowledgement", async () => {
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    const membership = vi.spyOn(roomMembership, "readSharedRealtimeRoomMembership").mockResolvedValue({
+      participantId: "participant:verified", roomStatus: "ready",
+    } as never);
+    try {
+      const store = new HelixLocalSupervisorCoordinationStore("service_instance:88888888888888888888888888888888");
+      const reasoning = new HelixReasoningTaskBindingStore(store);
+      const identity = principal("profile:preparation", "oauth_client:preparation");
+      identity.scopes.add(HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE);
+      const verify = vi.fn().mockResolvedValue([{ runId: "run:prepared" }]);
+      const startRun = vi.fn().mockResolvedValue({ body: { run_id: "run:new-preparation" }, idempotencyReplayed: false });
+      const bindRun = vi.fn().mockResolvedValue({});
+      const inspectRun = vi.fn().mockResolvedValue({ run_id: "run:new-preparation", version: 1, lifecycle_status: "waiting" });
+      const activeBinding = vi.fn().mockResolvedValue({ roomId: "room:selected", participantIdAtBind: "participant:verified",
+        bindingId: "binding:new-preparation", version: 1 });
+      const client = await connect(store, identity, { reasoningTaskBindingStore: reasoning,
+        service: { startRun, inspectRun },
+        roomBindingStore: { listRunPreparationCandidates: verify, bindRunToRoom: bindRun,
+          getActiveRunRoomBinding: activeBinding }, roomControlService: {
+          inspectRoom: async () => ({ room: { self_participant_id: "participant:verified" } }),
+        } });
+      const presenceReply = await heartbeat(client, "task:preparation", "Prepare the selected session");
+      expect(presenceReply.isError).not.toBe(true);
+      const presence = (presenceReply.structuredContent as any).presence;
+      const app = express();
+      app.use("/api/account", createAgentConnectionsRouter({ coordinationStore: store,
+        reasoningBindingStore: reasoning, preparationBindingStore: reasoning,
+        resolveSession: async () => ({ session_id: "browser:preparation", profile: { profile_id: identity.accountProfileId } }) as never,
+        bindingStore: { listBindings: async () => ({ bindings: [{ status: "active", binding_ref: "account:fixture" }] }) } as never,
+      }));
+      const enqueue = (requestId: string, chat = "chat:browser-selected") => httpRequest(app)
+        .post("/api/account/session/agent-connections/environment-session/prepare-request")
+        .set("Cookie", "helix_session=browser:preparation").send({ request_id: requestId,
+          client_session_ref: presence.client_session_ref, client_continuation_ref: "task:preparation",
+          helix_conversation_id: chat, room_id: "room:selected", requested_duration_seconds: 28800 });
+      const browserReply = await enqueue("request:a");
+      expect(browserReply.status, JSON.stringify(browserReply.body)).toBe(202);
+      const read = () => client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "read_preparation", client_continuation_ref: "task:preparation" } });
+      const picked = await read();
+      expect(picked.isError).not.toBe(true);
+      expect(picked.structuredContent).toMatchObject({ intents: [{ intentId: browserReply.body.intent.intentId,
+        helixConversationId: "chat:browser-selected", roomId: "room:selected", status: "pending" }] });
+      const acknowledge = () => client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "acknowledge_preparation", client_continuation_ref: "task:preparation",
+        intent_id: browserReply.body.intent.intentId, run_id: "run:prepared" } });
+      const receipt = await acknowledge();
+      expect(receipt.isError, JSON.stringify(receipt)).not.toBe(true);
+      expect(receipt.structuredContent).toMatchObject({ ready: false, task_binding_authority: false,
+        execution_authority: false, intent: { status: "run_prepared", preparedRunId: "run:prepared" } });
+      expect(verify).toHaveBeenCalledWith({ owner: { tenantId: identity.tenantId, issuer: identity.issuer,
+        subjectId: identity.subjectId, accountProfileId: identity.accountProfileId },
+        roomId: "room:selected", participantId: "participant:verified", runId: "run:prepared" });
+      expect((await read()).structuredContent).toMatchObject({ intents: [] });
+      expect((await enqueue("request:a")).body.intent.status).toBe("run_prepared");
+      expect((await acknowledge()).isError).not.toBe(true);
+      verify.mockResolvedValue([]);
+      expect((await acknowledge()).isError).toBe(true);
+      const next = await enqueue("request:new", "chat:new-preparation");
+      expect(next.status).toBe(202);
+      const prepare = () => client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "prepare_run", client_continuation_ref: "task:preparation",
+        intent_id: next.body.intent.intentId, objective: "Prepare the selected environment session" } });
+      expect((await prepare()).isError).toBe(true);
+      expect(startRun).not.toHaveBeenCalled();
+      identity.scopes.add("helix.agent_runs.write");
+      verify.mockImplementation(async ({ runId }) => runId === "run:new-preparation"
+        ? [{ runId }] : []);
+      for (let i = 0; i < 3; i++) {
+        const result = await prepare();
+        expect(result.isError, JSON.stringify(result)).not.toBe(true);
+        expect(result.structuredContent).toMatchObject({ operation: "prepare_run", ready: false,
+          task_binding_authority: false, execution_authority: false,
+          presence: { conversation_thread_ref: "task:preparation", client_session_ref: presence.client_session_ref,
+            room_ref: "room:selected", run_ref: "run:new-preparation",
+            verified_room_identity: { basis: "server_verified", room_ref: "room:selected" },
+            verified_retained_runtime_identity: { basis: "server_verified", run_ref: "run:new-preparation" } },
+          intent: { preparedRunId: "run:new-preparation", helixConversationId: "chat:new-preparation" } });
+      }
+      expect(startRun).toHaveBeenCalledTimes(1);
+      expect(startRun).toHaveBeenCalledWith(expect.objectContaining({ principal: identity,
+        idempotencyKey: expect.stringMatching(/^preparation:/),
+        request: expect.objectContaining({ budget: { expires_in_seconds: 28800, max_steps: 12 } }) }));
+      expect(bindRun).toHaveBeenCalledWith({ owner: { tenantId: identity.tenantId, issuer: identity.issuer,
+        subjectId: identity.subjectId, accountProfileId: identity.accountProfileId },
+        roomId: "room:selected", runId: "run:new-preparation", preserveRevocation: true });
+      expect((await read()).structuredContent).toMatchObject({ intents: [] });
+      const ordinaryRefresh = () => client.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
+        client_continuation_ref: "task:preparation", declared_objective_summary: "Continue session preparation",
+        lifecycle_state: "active" } });
+      expect((await ordinaryRefresh()).structuredContent).toMatchObject({ presence: {
+        room_ref: "room:selected", run_ref: "run:new-preparation",
+        verified_retained_runtime_identity: { run_ref: "run:new-preparation", basis: "server_verified" },
+      } });
+      activeBinding.mockResolvedValueOnce(null);
+      expect((await ordinaryRefresh()).structuredContent).toMatchObject({ presence: {
+        run_ref: "run:new-preparation", verified_retained_runtime_identity: null,
+      } });
+      const otherTask = await client.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
+        client_continuation_ref: "task:other", declared_objective_summary: "Unrelated task", lifecycle_state: "active" } });
+      expect(otherTask.structuredContent).toMatchObject({ presence: { room_ref: null, run_ref: null,
+        verified_retained_runtime_identity: null } });
+      activeBinding.mockResolvedValueOnce(null);
+      expect((await prepare()).isError).toBe(true);
+      expect((await prepare()).isError).not.toBe(true);
+      expect(startRun).toHaveBeenCalledTimes(1);
+      const cleared = await client.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
+        client_continuation_ref: "task:preparation", declared_objective_summary: "Clear selection", lifecycle_state: "active",
+        resource_claims: [], room_ref: null, run_ref: null, environment_ref: null } });
+      expect(cleared.structuredContent).toMatchObject({ presence: { room_ref: null, run_ref: null,
+        verified_retained_runtime_identity: null } });
+      expect((await ordinaryRefresh()).structuredContent).toMatchObject({ presence: { run_ref: null } });
+    } finally { membership.mockRestore(); vi.unstubAllEnvs(); }
+  });
+
   it("routes Ready up through the authenticated exact task and participant", async () => {
     vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
     try {
@@ -368,8 +811,16 @@ describe("Helix MCP local-supervisor coordination", () => {
       identity.scopes.add(HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE);
       const execute = vi.fn().mockResolvedValue({ schema: "helix.environment_session_ready_up.v1",
         readiness: { ready: false }, repairs: [], execution_authority: false, answer_authority: false });
-      const automatic = vi.fn().mockResolvedValue({ readiness: { ready: false } });
+      const blockedPreparation = { readiness: { ready: false, valid_until_ms: null,
+        checks: [{ layer: "authority", state: "revoked", human_approval_required: true }] },
+        selection: { room_id: "room:ready-up", environment_binding_id: "environment:a" },
+        session_deadlines: { run_expires_at_ms: 1900000000000 }, repairs: [],
+        execution_authority: false, answer_authority: false, terminal_eligible: false };
+      const automatic = vi.fn().mockResolvedValue(blockedPreparation);
+      const discover = vi.fn().mockResolvedValue([{ runId: "run:existing", runVersion: 1,
+        expiresAt: "2099-01-01T00:00:00.000Z", roomBindingId: "binding:room", roomBindingVersion: 1 }]);
       const client = await connect(store, identity, { reasoningTaskBindingStore: reasoning,
+        roomBindingStore: { listRunPreparationCandidates: discover },
         environmentSessionReadyUp: execute, environmentSessionAutoPrepare: automatic, roomControlService: {
           inspectRoom: async () => ({ room: { self_participant_id: "participant:verified" } }),
         } });
@@ -382,6 +833,36 @@ describe("Helix MCP local-supervisor coordination", () => {
       } });
       expect(presenceResult.isError, JSON.stringify(presenceResult)).not.toBe(true);
       const presence = (presenceResult.structuredContent as any).presence;
+      const pendingSetup = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "read_preparation", client_continuation_ref: "task:ready-up",
+      } });
+      expect(pendingSetup.isError, JSON.stringify(pendingSetup)).not.toBe(true);
+      expect(pendingSetup.structuredContent).toMatchObject({ intents: [], ready: false,
+        execution_authority: false, answer_authority: false });
+      const missingPreparation = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "acknowledge_preparation", client_continuation_ref: "task:ready-up",
+        intent_id: "nonexistent", run_id: "run:existing",
+      } });
+      expect(missingPreparation.isError).toBe(true);
+      expect(discover).not.toHaveBeenCalled();
+      const discovery = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "discover_runs", client_continuation_ref: "task:ready-up", room_id: "room:ready-up",
+      } });
+      expect(discovery.isError, JSON.stringify(discovery)).not.toBe(true);
+      expect(discovery.structuredContent).toMatchObject({ ready: false, task_binding_verified: false,
+        revalidation_required: true, execution_authority: false, candidates: [{ runId: "run:existing" }] });
+      expect(discover).toHaveBeenCalledWith({ owner: { tenantId: identity.tenantId, issuer: identity.issuer,
+        subjectId: identity.subjectId, accountProfileId: identity.accountProfileId },
+        roomId: "room:ready-up", participantId: "participant:verified" });
+      expect(automatic).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+      identity.scopes.delete(HELIX_AGENT_RUN_READ_SCOPE);
+      const deniedDiscovery = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+        operation: "discover_runs", client_continuation_ref: "task:ready-up", room_id: "room:ready-up",
+      } });
+      expect(deniedDiscovery.isError).toBe(true);
+      expect(discover).toHaveBeenCalledTimes(1);
+      identity.scopes.add(HELIX_AGENT_RUN_READ_SCOPE);
       const claim = reasoning.issueClaim({ profileRef: identity.accountProfileId, clientSessionRef: presence.client_session_ref,
         helixConversationId: "chat:ready-up", missionId: null, runId: "run:ready-up" });
       const claimed = await client.callTool({ name: "helix_reasoning_task_binding_claim", arguments: {
@@ -402,24 +883,54 @@ describe("Helix MCP local-supervisor coordination", () => {
         context: { profileId: identity.accountProfileId, participantId: "participant:verified", runId: "run:ready-up" },
         binding: { helixConversationId: "chat:ready-up", clientContinuationRef: "task:ready-up" },
       });
+      const goalBootstrap = { environment_binding_id: "environment:a", subject_binding_id: "subject:a",
+        action_authority_id: "authority:a", objective: { domain: "minecraft", goal_kind: "custom_survival",
+          objective_text: "Cross the platform", game_version: "1.21.8", mechanics_collection_ref: null,
+          milestones: [{ milestone_id: "cross", description: "Cross", dependency_milestone_ids: [], required_postcondition_ids: ["arrival"] }] } };
       const automaticArgs = { client_continuation_ref: args.client_continuation_ref,
         reasoning_binding_id: args.reasoning_binding_id, binding_epoch: args.binding_epoch,
         helix_conversation_id: args.helix_conversation_id, mission_id: null,
-        run_id: args.run_id, request_id: "ready:automatic" };
+        run_id: args.run_id, request_id: "ready:automatic", goal_bootstrap: goalBootstrap };
       const catalogue = await client.listTools();
       const readySchema = catalogue.tools.find(tool => tool.name === "helix_environment_session_ready_up")!.inputSchema;
       expect(readySchema.properties).toHaveProperty("request_id");
+      expect(readySchema.properties).toHaveProperty("goal_bootstrap");
       expect(readySchema.properties).toHaveProperty("client_continuation_ref");
       const prepared = await client.callTool({ name: "helix_environment_session_ready_up", arguments: automaticArgs });
       expect(prepared.isError, JSON.stringify(prepared)).not.toBe(true);
+      expect(prepared.structuredContent).toMatchObject({ receipt: blockedPreparation,
+        execution_authority: false, answer_authority: false, terminal_eligible: false });
       expect(automatic).toHaveBeenCalledOnce();
-      expect(automatic.mock.calls[0][0]).toMatchObject({ requestId: "ready:automatic", runId: args.run_id });
+      expect(automatic.mock.calls[0][0]).toMatchObject({ requestId: "ready:automatic", runId: args.run_id, goalBootstrap });
       expect(automatic.mock.calls[0][0].sessionId).toBe(identity.accountContext.session_id);
       expect(automatic.mock.calls[0][4].target.clientContinuationRef).toBe(args.client_continuation_ref);
+      const partialError = new EnvironmentSessionPreparationError(new Error("private detail"),
+        [{ layer: "subject", changed: true, reason_code: "subject_epoch_checked" }], true);
+      automatic.mockRejectedValueOnce(partialError);
+      const partial = await client.callTool({ name: "helix_environment_session_ready_up", arguments: automaticArgs });
+      expect(partial.isError).toBe(true);
+      expect(partial.structuredContent).toEqual(partialError.projection);
       const wrongTask = await client.callTool({ name: "helix_environment_session_ready_up",
         arguments: { ...automaticArgs, client_continuation_ref: "task:foreign" } });
       expect(wrongTask.isError).toBe(true);
-      expect(automatic).toHaveBeenCalledOnce();
+      expect(automatic).toHaveBeenCalledTimes(2);
+      for (const mismatch of [
+        { reasoning_binding_id: "binding:foreign" },
+        { binding_epoch: binding.binding_epoch + 1 },
+        { run_id: "run:foreign" },
+        { mission_id: "mission:foreign" },
+        { helix_conversation_id: "chat:foreign" },
+      ]) {
+        const stale = await client.callTool({ name: "helix_environment_session_ready_up",
+          arguments: { ...automaticArgs, ...mismatch } });
+        expect(stale.isError, JSON.stringify(mismatch)).toBe(true);
+        expect(automatic).toHaveBeenCalledTimes(2);
+        expect(execute).toHaveBeenCalledOnce();
+      }
+      expect(reasoning.inspect({ profileRef: identity.accountProfileId,
+        bindingId: binding.reasoning_binding_id })).toMatchObject({
+        status: "active", binding_epoch: binding.binding_epoch, run_id: args.run_id,
+      });
       const rejected = await client.callTool({ name: "helix_environment_session_ready_up",
         arguments: { ...args, helix_conversation_id: "chat:other" } });
       expect(rejected.isError).toBe(true);
@@ -1304,6 +1815,9 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_minecraft_workflow_control",
       "helix_minecraft_workflow_status",
       "helix_public_ui_catalog",
+      "helix_reasoning_destination_register",
+      "helix_reasoning_pairing_accept",
+      "helix_reasoning_pairing_recover",
       "helix_room_consent_grant",
       "helix_room_consent_revoke",
       "helix_room_create",

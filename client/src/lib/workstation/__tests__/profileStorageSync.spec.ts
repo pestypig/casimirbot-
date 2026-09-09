@@ -334,10 +334,16 @@ describe("profile storage sync consent", () => {
       messages: [expect.objectContaining({ content: "Restored question" })],
     });
     expect(useAgiChatStore.getState().activeId).toBe("chat:restored");
+    // Restoration normalizes derived counters before persisting again. Verify
+    // the full restored content and identity, not the legacy byte encoding.
+    const normalized = JSON.parse(chatState);
+    normalized.state.sessions['chat:restored'].messages[0].tokens = 5;
+    normalized.state.sessions['chat:restored'].messageCount = 1;
+    normalized.state.reasoningTaskBindings = {};
     expect(postedSnapshots[0]).toMatchObject({
       entries: [expect.objectContaining({
         storage_key: "agi-chat-sessions-v1",
-        value: chatState,
+        value: JSON.stringify(normalized),
       })],
     });
   });

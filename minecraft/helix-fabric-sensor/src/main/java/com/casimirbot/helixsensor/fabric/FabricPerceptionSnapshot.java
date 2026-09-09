@@ -51,6 +51,13 @@ final class FabricPerceptionSnapshot {
         int requestedHorizontalRadius,
         int requestedVerticalRadius
     ) {
+        return capture(level, player, config, requestedHorizontalRadius, requestedVerticalRadius, false);
+    }
+
+    static Map<String, Object> capture(
+        ServerLevel level, ServerPlayer player, HelixSensorConfig config,
+        int requestedHorizontalRadius, int requestedVerticalRadius, boolean includeNavigationCollision
+    ) {
         long started = System.nanoTime();
         long gameTick = level.getGameTime();
         int horizontalRadius = clamp(requestedHorizontalRadius, 1, 7);
@@ -173,6 +180,12 @@ final class FabricPerceptionSnapshot {
         semantic.put("coverage", coverageMap);
         semantic.put("ui_state", uiState);
         semantic.put("world_rules", worldRules);
+        Map<String, Object> navigationCollision = FabricNavigationCollisionObservation.capture(
+            includeNavigationCollision, gameTick,
+            () -> FabricNavigationCollisionCapture.capture(level, player,
+                FabricNavigationCollisionObservation.RADIUS, FabricNavigationCollisionObservation.RADIUS)
+        );
+        if (navigationCollision != null) semantic.put("navigation_collision", navigationCollision);
 
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("snapshot_schema", SCHEMA);
@@ -190,6 +203,7 @@ final class FabricPerceptionSnapshot {
         details.put("coverage", coverageMap);
         details.put("ui_state", uiState);
         details.put("world_rules", worldRules);
+        if (navigationCollision != null) details.put("navigation_collision", navigationCollision);
         details.put("semantic_fingerprint", SectionHasher.hash(semantic));
         details.put(
             "capture_duration_ms",
@@ -726,7 +740,7 @@ final class FabricPerceptionSnapshot {
         return "other";
     }
 
-    private static String hazardType(BlockState state) {
+    static String hazardType(BlockState state) {
         if (state.is(Blocks.LAVA)) return "lava";
         if (state.is(Blocks.FIRE) || state.is(Blocks.SOUL_FIRE)) return "fire";
         if (state.is(Blocks.MAGMA_BLOCK)) return "magma";

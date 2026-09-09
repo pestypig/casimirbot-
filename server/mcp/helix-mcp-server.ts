@@ -1,8 +1,14 @@
 import crypto from "node:crypto";
+import { DurableReasoningBindingAccess } from "../services/local-supervisor/durable-reasoning-binding-access";
+import { createNativePairingLedgerRepository } from "../services/local-supervisor/pairing-ledger-repository";
+import { PairingTransitionService } from "../services/local-supervisor/pairing-transition-service";
+import { createPairingDestinationRegistrationStore, PairingDestinationRegistrationError } from "../services/local-supervisor/pairing-destination-registration";
 import { publishTemporalPerceptionFrontier } from "../services/environment-connectors/temporal-plans/temporal-frontier-publisher";
 import { readyUpEnvironmentSession } from "../services/environment-connectors/session/ready-up-session";
 import { helixEnvironmentSessionMcpSchema, helixEnvironmentSessionMcpCommandSchema } from "@shared/helix-environment-session-request";
+import { preparationIntentsFor } from "../services/environment-connectors/session/preparation-intent-runtime";
 import { prepareBrowserEnvironmentSession } from "../services/environment-connectors/session/prepare-browser-session";
+import { EnvironmentSessionPreparationError } from "../services/environment-connectors/session/preparation-error";
 import { admitTemporalPlan } from "../services/environment-connectors/temporal-plans/temporal-plan-admission";
 import { temporalPlanErrorProjection } from "../services/environment-connectors/temporal-plans/temporal-plan-error";
 import { isEnvironmentActionBrokerError } from "../services/environment-connectors/actions/action-broker";
@@ -479,6 +485,7 @@ import {
   HelixReasoningTaskBindingError,
   type HelixReasoningTaskBindingStore,
 } from "../services/local-supervisor/reasoning-task-binding-store";
+import { agentChatSteeringDispatchSchema } from "../services/local-supervisor/exact-chat-steering-dispatch";
 import {
   readEnvironmentActionExecutionLeaseClaim,
   type EnvironmentActionExecutionLeaseClaim,
@@ -674,6 +681,7 @@ type HelixMinecraftSituationProbeToolArguments = {
     freshness_requirement_ms?: number;
     position?: { x: number; y: number; z: number };
     horizontal_radius?: number;
+    include_navigation_collision?: boolean;
     vertical_radius?: number;
     purpose?:
       | "general"
@@ -742,6 +750,7 @@ type HelixEnvironmentDurableGoalCreateToolArguments = {
   run_id?: string | null;
   turn_id: string;
   objective: HelixEnvironmentDurableGoalObjective;
+  idempotency_key?: string;
 };
 
 type HelixEnvironmentDurableGoalInspectToolArguments = {
@@ -1690,6 +1699,7 @@ const minecraftWorkflowControlOutputSchema = z
     status: z.enum(["completed", "blocked", "failed"]),
     summary: z.string(),
     observation: helixEnvironmentActionControlObservationSchema,
+    retained_result: helixEnvironmentActionObservationSchema.optional(),
     answer_authority: z.literal(false),
     assistant_answer: z.literal(false),
     terminal_eligible: z.literal(false),
@@ -3316,7 +3326,7 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
   server.registerTool("helix_minecraft_workflow_status", {
     title: "Read a Minecraft player workflow status",
     description:
-      "Reads one exact admitted workflow through its room/player authority. The result is a current non-terminal observation, not an assistant answer.",
+      "Reads one exact admitted workflow through its room/player authority. A verified retained terminal result may accompany the live status, with its original timestamp; historical release is not current control-state evidence. Neither observation is an assistant answer.",
     inputSchema: workflowSchema.strict(),
     outputSchema: minecraftWorkflowControlOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -3419,7 +3429,7 @@ export const createHelixMcpServer = (input: {
     accountSessionId: string;
   };
   roomMcpDelegationVerifier?: SharedLiveRoomMcpDelegationVerifier;
-  roomBindingStore?: Pick<
+  roomBindingStore?: Partial<Pick<SharedLiveRoomBindingStore, "listRunPreparationCandidates">> & Pick<
     SharedLiveRoomBindingStore,
     | "bindRunToRoom"
     | "getActiveRunRoomBinding"
@@ -3472,6 +3482,7 @@ export const createHelixMcpServer = (input: {
   const service = input.service ?? sharedLiveRoomAgentApiService;
   const hudSurfaceRegistry = input.surfaceRegistryService ?? surfaceRegistryService;
   const visualSequences = input.visualSequenceService ?? visualSequenceService;
+  let durableReasoningAccess: DurableReasoningBindingAccess | null = null;
   const roomControlService =
     input.roomControlService ?? getSharedLiveRoomControlService();
   const roomBindingStore =
@@ -3849,7 +3860,7 @@ export const createHelixMcpServer = (input: {
     try {
       return toolSuccess(await operation());
     } catch (error) {
-      if (error instanceof HelixLocalSupervisorCoordinationError) {
+      if (error instanceof HelixLocalSupervisorCoordinationError || error instanceof PairingDestinationRegistrationError) {
         return toolError(new HelixAgentApiServiceError(
           error.status,
           error.code,
@@ -3888,6 +3899,9 @@ export const createHelixMcpServer = (input: {
         ), requiredScopes);
       }
       const temporalProjection = temporalPlanErrorProjection(error);
+      if (error instanceof EnvironmentSessionPreparationError) {
+        return { ...toolSuccess(error.projection), isError: true as const };
+      }
       if (temporalProjection) return { ...toolSuccess(temporalProjection), isError: true as const };
       if (isEnvironmentActionBrokerError(error)) {
         // Preserve broker refusals without exposing arbitrary exception text or
@@ -4095,14 +4109,14 @@ export const createHelixMcpServer = (input: {
       throw new HelixAgentApiServiceError(403, "developer_account_required", "Visual Sequence evidence tools are restricted to developer accounts.", false);
     }
   };
-  const requireVisualReasoningBinding = (bindingInput: { reasoning_binding_id: string; binding_epoch: number }) => {
+  const requireVisualReasoningBinding = async (bindingInput: { reasoning_binding_id: string; binding_epoch: number }) => {
     requireVisualSequenceDeveloper();
     if (!input.reasoningTaskBindingStore || !input.principal.mcpClientRef) {
       throw new HelixAgentApiServiceError(409, "visual_sequence_reasoning_binding_required", "Bind this Codex chat to the local harness before reading visual evidence.", false);
     }
     let binding;
     try {
-      binding = input.reasoningTaskBindingStore.inspect({
+      binding = await (durableReasoningAccess ?? input.reasoningTaskBindingStore).inspect({
         profileRef: input.principal.accountProfileId,
         bindingId: bindingInput.reasoning_binding_id,
       });
@@ -4190,12 +4204,13 @@ export const createHelixMcpServer = (input: {
       _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
     },
     async (args) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
-      const binding = requireVisualReasoningBinding(args);
+      const binding = await requireVisualReasoningBinding(args);
       const [manifests, grants] = await Promise.all([
         visualSequences.listManifests(input.principal.accountProfileId),
         Promise.resolve(visualSequences.listReasoningGrants(input.principal.accountProfileId)),
       ]);
       const manifestsById = new Map(manifests.map((manifest) => [manifest.sequence_id, manifest]));
+      await requireVisualReasoningBinding(args);
       return {
         schema: "helix.visual_sequence_catalog.v1",
         reasoning_binding_id: binding.reasoning_binding_id,
@@ -4233,9 +4248,10 @@ export const createHelixMcpServer = (input: {
       _meta: oauthToolMeta(HELIX_AGENT_RUN_READ_SCOPE),
     },
     async (args) => callTool(HELIX_AGENT_RUN_READ_SCOPE, async () => {
-      const binding = requireVisualReasoningBinding(args);
+      const binding = await requireVisualReasoningBinding(args);
       const grant = visualSequences.requireReasoningGrant(input.principal.accountProfileId, args.sequence_id, args.reasoning_grant_id, "inspect_manifest");
       const sequence = await visualSequences.getOwnedSequence(input.principal.accountProfileId, args.sequence_id);
+      await requireVisualReasoningBinding(args);
       return {
         schema: "helix.visual_sequence_manifest_observation.v1",
         reasoning_binding_id: binding.reasoning_binding_id,
@@ -4264,14 +4280,16 @@ export const createHelixMcpServer = (input: {
     },
     async (args) => {
       try {
-        requireVisualReasoningBinding(args);
+        await requireVisualReasoningBinding(args);
         visualSequences.requireReasoningGrant(input.principal.accountProfileId, args.sequence_id, args.reasoning_grant_id, "contact_sheet");
         const sequence = await visualSequences.getOwnedSequence(input.principal.accountProfileId, args.sequence_id);
+        await requireVisualReasoningBinding(args);
         if (args.vision_capability === "unavailable") {
           const packet = buildVisualEvidencePacket({ manifest: sequence.manifest, bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch, reasoningGrantId: args.reasoning_grant_id, visionCapability: args.vision_capability, assets: [] });
           return toolSuccess(packet as unknown as RecordLike);
         }
         const artifact = await visualSequences.readOwnedArtifact(input.principal.accountProfileId, args.sequence_id, "contact-sheet.webp");
+        await requireVisualReasoningBinding(args);
         if (artifact.bytes.length > VISUAL_SEQUENCE_LIMITS.maxMcpImageBytes) {
           throw new HelixAgentApiServiceError(413, "visual_sequence_frame_byte_limit_exceeded", "The contact sheet exceeds the bounded MCP evidence budget.", false);
         }
@@ -4304,9 +4322,10 @@ export const createHelixMcpServer = (input: {
     async (rawArgs) => {
       try {
         const args = VisualSequenceFrameSelectionSchema.parse(rawArgs);
-        requireVisualReasoningBinding(args);
+        await requireVisualReasoningBinding(args);
         visualSequences.requireReasoningGrant(input.principal.accountProfileId, args.sequence_id, args.reasoning_grant_id, "frames");
         const sequence = await visualSequences.getOwnedSequence(input.principal.accountProfileId, args.sequence_id);
+        await requireVisualReasoningBinding(args);
         if (args.vision_capability === "unavailable") {
           const packet = buildVisualEvidencePacket({ manifest: sequence.manifest, bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch, reasoningGrantId: args.reasoning_grant_id, visionCapability: args.vision_capability, assets: [] });
           return toolSuccess(packet as unknown as RecordLike);
@@ -4326,6 +4345,7 @@ export const createHelixMcpServer = (input: {
           return { frame: frame!, bytes: artifact.bytes };
         }));
         const totalBytes = artifacts.reduce((sum, artifact) => sum + artifact.bytes.length, 0);
+        await requireVisualReasoningBinding(args);
         if (totalBytes > VISUAL_SEQUENCE_LIMITS.maxMcpImageBytes) {
           throw new HelixAgentApiServiceError(413, "visual_sequence_frame_byte_limit_exceeded", "The selected frame images exceed the bounded MCP evidence budget.", false);
         }
@@ -4533,11 +4553,31 @@ export const createHelixMcpServer = (input: {
   if (input.localSupervisorCoordinationStore) {
     const coordinationStore = input.localSupervisorCoordinationStore;
     const reasoningStore = input.reasoningTaskBindingStore;
+    const reasoningAccess = reasoningStore ? new DurableReasoningBindingAccess(reasoningStore, async destination => {
+      const current = await authenticatedPairingDestination(destination.taskId);
+      if ((Object.keys(current) as Array<keyof typeof current>).some(key => current[key] !== destination[key])) {
+        throw new HelixLocalSupervisorCoordinationError("pairing_destination_mismatch", 403);
+      }
+    }) : null;
+    durableReasoningAccess = reasoningAccess;
+    const supervisorPresenceSchema = z.object({
+      client_continuation_ref: localSupervisorContinuationSchema,
+      declared_objective_summary: z.string().trim().min(1).max(360),
+      lifecycle_state: helixLocalSupervisorLifecycleStateSchema,
+      resource_claims: z.array(helixLocalSupervisorResourceClaimInputSchema).max(24).optional(),
+      room_ref: localSupervisorOptionalRefSchema,
+      environment_ref: localSupervisorOptionalRefSchema,
+      run_ref: localSupervisorOptionalRefSchema,
+      blocker_summary: z.string().trim().max(240).nullable().optional(),
+      thread_observability_bridge: helixThreadObservabilityBridgeDeclarationSchema.optional(),
+      heartbeat_ttl_seconds: z.number().int().min(15).max(180).default(60),
+    }).strict();
     if (reasoningStore) {
       server.registerTool("helix_environment_session_ready_up", {
         title: "Ready up this exact environment session",
-        description: "Checks an existing exact task/chat/run session and reuses healthy state. Can refresh the same selected player's observation epoch and recover restart/disconnect goals using fresh admitted perception. Does not launch applications, select a player, create a run, renew permissions, resume user stops, or execute gameplay. Returns remaining blockers; a repair receipt is not execution or answer authority.",
-        inputSchema: helixEnvironmentSessionMcpSchema,
+        description: "Checks an existing exact task/chat/run session and reuses healthy state. Before binding, read_preparation returns this authenticated task's browser setup intents; discover_runs with room_id returns bounded owner-scoped candidates without selecting one. prepare_run takes intent_id and either an inspected run_id to reuse or a caller-authored objective to create a bounded run only when no candidates exist. It uses the requested duration as run budget, not permission, preserves retry identity and republishes verified same-task presence for human binding review. Can refresh the same player's observation epoch and recover restart/disconnect goals using fresh admitted perception. Never launches applications, selects a player, renews permissions, resumes user stops, samples a model or executes gameplay. Receipts are not readiness, binding consent or answer authority.",
+        // Preparation is run-setup evidence, never whole-session completion.
+        inputSchema: helixEnvironmentSessionMcpSchema.describe("prepare_run completes bounded run setup and republishes verified same-task presence, enabling browser review without another configuration call. For the lower-level acknowledge_preparation operation, supply intent_id and prepared run_id with this task's client_continuation_ref, then publish fresh presence separately. Neither operation approves binding or gameplay."),
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
       }, async (rawArgs: z.infer<typeof helixEnvironmentSessionMcpSchema>) => callLocalSupervisorTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
@@ -4547,19 +4587,137 @@ export const createHelixMcpServer = (input: {
         const identity = localSupervisorIdentity(args.client_continuation_ref);
         coordinationStore.authenticateClient({ profileRef: input.principal.accountProfileId,
           accountSessionId: identity.accountSessionId, clientSessionRef: identity.clientSessionRef });
+        if ("operation" in args && args.operation === "read_preparation") {
+          const intents = preparationIntentsFor(coordinationStore).read({
+            profileRef: input.principal.accountProfileId, authenticatedMcpClientRef: identity.authenticatedClientRef,
+            clientSessionRef: identity.clientSessionRef, continuationRef: args.client_continuation_ref,
+          });
+          return { ok: true, operation: "read_preparation", intents, ready: false,
+            execution_authority: false, answer_authority: false, assistant_answer: false, terminal_eligible: false };
+        }
+        if ("operation" in args && args.operation === "prepare_run") {
+          requireAllAgentScopes([...HELIX_ROOM_RUN_ATTACHMENT_SCOPES, HELIX_AGENT_RUN_READ_SCOPE]);
+          const mailbox = preparationIntentsFor(coordinationStore);
+          const candidatesFor = async (roomId: string, runId?: string) => {
+            const participantId = await resolveSelfParticipantId(roomId);
+            if (!roomBindingStore.listRunPreparationCandidates) {
+              throw new HelixAgentApiServiceError(503, "environment_session_discovery_unavailable", "Run verification is unavailable.", false);
+            }
+            return roomBindingStore.listRunPreparationCandidates({ owner: roomOwner, roomId, participantId, runId });
+          };
+          const intent = await mailbox.prepareRun({ profileRef: input.principal.accountProfileId,
+            authenticatedMcpClientRef: identity.authenticatedClientRef, clientSessionRef: identity.clientSessionRef,
+            continuationRef: args.client_continuation_ref }, args.intent_id,
+          "run_id" in args ? { runId: args.run_id } : { objective: args.objective }, {
+            discover: roomId => candidatesFor(roomId),
+            create: async ({ idempotencyKey, objective, durationSeconds }) => {
+              const result = await service.startRun({ principal: input.principal, idempotencyKey,
+                request: helixAgentStartRequestSchema.parse({ objective, budget: { expires_in_seconds: durationSeconds } }) });
+              return result.body.run_id;
+            },
+            attach: async (roomId, runId) => {
+              // Existing selection must already be a verified candidate; never
+              // use preparation to move it, revive it or renew its authority.
+              if ("run_id" in args) {
+                if (!(await candidatesFor(roomId, runId)).length) throw new HelixAgentApiServiceError(
+                  409, "environment_session_run_unverified", "The selected run is not current.", false);
+              } else {
+                await roomBindingStore.bindRunToRoom({ owner: roomOwner, roomId, runId, preserveRevocation: true });
+              }
+            },
+            verify: async ({ roomId, runId }) => {
+              if (!(await candidatesFor(roomId, runId)).some(row => row.runId === runId)) {
+                throw new HelixAgentApiServiceError(409, "environment_session_run_unverified", "The prepared run is not current. No readiness or binding approval was granted.", false);
+              }
+            },
+          });
+          const current = coordinationStore.listPresence().find(row => row.active &&
+            row.authenticated_profile_ref === input.principal.accountProfileId &&
+            row.authenticated_mcp_client_ref === identity.authenticatedClientRef &&
+            row.client_session_ref === identity.clientSessionRef &&
+            row.conversation_thread_ref === args.client_continuation_ref);
+          if (!current) throw new HelixAgentApiServiceError(409, "preparation_target_unavailable",
+            "Refresh this same task's presence before retrying preparation.", false);
+          const sameEnvironment = current.room_ref === intent.roomId && current.run_ref === intent.preparedRunId;
+          const publication = await refreshSupervisorPresence(supervisorPresenceSchema.parse({
+            client_continuation_ref: args.client_continuation_ref,
+            declared_objective_summary: current.declared_objective_summary,
+            lifecycle_state: current.lifecycle_state,
+            room_ref: intent.roomId, run_ref: intent.preparedRunId,
+            environment_ref: sameEnvironment ? current.environment_ref : null,
+            resource_claims: [
+              ...current.resource_claims.filter(row => row.claim_class !== "retained_runtime" &&
+                row.resource_ref !== current.room_ref && row.resource_ref !== intent.roomId &&
+                (sameEnvironment || (row.claim_class === "read" && row.resource_ref !== current.environment_ref)))
+                .map(row => ({ claim_class: row.claim_class, resource_ref: row.resource_ref })),
+              { claim_class: "read", resource_ref: intent.roomId },
+              { claim_class: "retained_runtime", resource_ref: intent.preparedRunId },
+            ],
+            thread_observability_bridge: {
+              supported_levels: current.thread_observability_bridge.supported_levels,
+              requested_level: current.thread_observability_bridge.requested_level,
+              checkpoint_publication: current.thread_observability_bridge.checkpoint_publication,
+            },
+          }));
+          if (publication.presence.verified_retained_runtime_identity?.run_ref !== intent.preparedRunId) {
+            throw new HelixAgentApiServiceError(409, "environment_session_run_unverified",
+              "Run preparation was retained, but current presence could not verify it. Retry without replacing the run.", false);
+          }
+          return { ok: true, operation: "prepare_run", intent, presence: publication.presence, ready: false,
+            task_binding_authority: false, execution_authority: false, answer_authority: false,
+            assistant_answer: false, terminal_eligible: false };
+        }
+        if ("operation" in args && args.operation === "acknowledge_preparation") {
+          requireAllAgentScopes([HELIX_AGENT_RUN_READ_SCOPE]);
+          const intent = await preparationIntentsFor(coordinationStore).acknowledgeRun({
+            profileRef: input.principal.accountProfileId, authenticatedMcpClientRef: identity.authenticatedClientRef,
+            clientSessionRef: identity.clientSessionRef, continuationRef: args.client_continuation_ref,
+          }, args.intent_id, args.run_id, async selection => {
+            const participantId = await resolveSelfParticipantId(selection.roomId);
+            if (!roomBindingStore.listRunPreparationCandidates) {
+              throw new HelixAgentApiServiceError(503, "environment_session_discovery_unavailable", "Run verification is unavailable.", false);
+            }
+            const candidates = await roomBindingStore.listRunPreparationCandidates({
+              owner: roomOwner, roomId: selection.roomId, participantId, runId: selection.runId,
+            });
+            if (!candidates.some(candidate => candidate.runId === selection.runId)) {
+              throw new HelixAgentApiServiceError(409, "environment_session_run_unverified", "The selected run is not a current verified candidate. No preparation acknowledgement was recorded.", false);
+            }
+          });
+          return { ok: true, operation: "acknowledge_preparation", intent, ready: false,
+            task_binding_authority: false, execution_authority: false, answer_authority: false,
+            assistant_answer: false, terminal_eligible: false };
+        }
+        if ("operation" in args && args.operation === "discover_runs") {
+          requireAllAgentScopes([HELIX_AGENT_RUN_READ_SCOPE]);
+          const participantId = await resolveSelfParticipantId(args.room_id);
+          if (!roomBindingStore.listRunPreparationCandidates) {
+            throw new HelixAgentApiServiceError(503, "environment_session_discovery_unavailable", "Run discovery is unavailable.", false);
+          }
+          const candidates = await roomBindingStore.listRunPreparationCandidates({
+            owner: roomOwner, roomId: args.room_id, participantId,
+          });
+          return { ok: true, schema: "helix.environment_session_run_discovery.v1",
+            operation: "discover_runs", room_id: args.room_id, candidates,
+            selection_required: candidates.length > 1, candidate_limit_reached: candidates.length === 2,
+            ready: false, task_binding_verified: false, revalidation_required: true,
+            execution_authority: false, answer_authority: false, assistant_answer: false,
+            terminal_eligible: false, raw_content_included: false };
+        }
         const binding = { profileRef: input.principal.accountProfileId,
           authenticatedMcpClientRef: identity.authenticatedClientRef, clientSessionRef: identity.clientSessionRef,
           clientContinuationRef: args.client_continuation_ref, bindingId: args.reasoning_binding_id,
           bindingEpoch: args.binding_epoch, helixConversationId: args.helix_conversation_id,
           missionId: args.mission_id, runId: args.run_id };
-        reasoningStore.verifyTaskAssociation(binding);
+        await reasoningAccess!.verifyTaskAssociation(binding);
         if ("request_id" in args) {
           const receipt = await (input.environmentSessionAutoPrepare ?? prepareBrowserEnvironmentSession)({
             sessionId: input.principal.accountContext.session_id ?? "", profileRef: input.principal.accountProfileId,
             bindingId: args.reasoning_binding_id, bindingEpoch: args.binding_epoch,
             helixConversationId: args.helix_conversation_id, missionId: args.mission_id,
             runId: args.run_id, requestId: args.request_id,
-          }, reasoningStore, coordinationStore.listPresence(), undefined, {
+            goalBootstrap: args.goal_bootstrap,
+          }, reasoningAccess!, coordinationStore.listPresence(), undefined, {
             accountContext: input.principal.accountContext, target: binding,
           });
           return { ok: true, receipt, requested_by: "authenticated_mcp_task",
@@ -4573,7 +4731,7 @@ export const createHelixMcpServer = (input: {
             turnId: args.turn_id, probeRequestId: args.probe_request_id, priorTurnId: args.prior_turn_id },
           binding, environmentBindingId: args.environment_binding_id, sourceId: args.source_id,
           worldId: args.world_id, subjectBindingId: args.subject_binding_id, actionAuthorityId: args.action_authority_id,
-        }, reasoningStore);
+        }, reasoningAccess!);
         return { ok: true, receipt, execution_authority: false, answer_authority: false,
           assistant_answer: false, terminal_eligible: false, raw_content_included: false };
       }));
@@ -4614,7 +4772,7 @@ export const createHelixMcpServer = (input: {
             clientContinuationRef: args.client_continuation_ref, bindingId: args.reasoning_binding_id,
             bindingEpoch: args.binding_epoch, helixConversationId: args.helix_conversation_id,
             missionId: args.mission_id, runId: args.request.run_id };
-          reasoningStore.verifyTaskAssociation(binding);
+          await reasoningAccess!.verifyTaskAssociation(binding);
           const participantId = await resolveSelfParticipantId(args.request.room_id);
           const receipt = await admitTemporalPlan({
             preflight: { context: { profileId: input.principal.accountProfileId, participantId,
@@ -4625,7 +4783,7 @@ export const createHelixMcpServer = (input: {
               compilation: { target: "serial", options: { mutation_scope: args.mutation_scope, resource_bindings: args.resource_bindings } } },
             request: { ...args.request, participant_id: participantId },
             checkpoint: args.checkpoint ? { eventId: args.checkpoint.event_id, checkpointId: args.checkpoint.checkpoint_id } : undefined,
-          }, reasoningStore);
+          }, reasoningAccess!);
           return { ok: true, receipt, answer_authority: false, assistant_answer: false, terminal_eligible: false,
             raw_content_included: false, reentry_required: true, admission_not_execution_proof: true };
         }),
@@ -4661,6 +4819,29 @@ export const createHelixMcpServer = (input: {
         }),
       );
 
+      server.registerTool("helix_reasoning_prompt_submit", {
+        title: "Submit an agent prompt to this exact bound Helix chat",
+        description: "Queues an agent-origin advisory prompt through normal exact-chat dispatch for this authenticated bound task, chat, run and epoch. Reusing the same client event ID preserves the original receipt; conflicting retries reject. Does not impersonate a user, wake an idle task, execute gameplay or supply an assistant answer. Pickup and acknowledgement remain separate; EXE display is not confirmed by this receipt.",
+        inputSchema: agentChatSteeringDispatchSchema.extend({
+          client_continuation_ref: localSupervisorContinuationSchema,
+          mission_id: localSupervisorContinuationSchema.nullable(),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      }, async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        coordinationStore.authenticateClient({ profileRef: input.principal.accountProfileId,
+          accountSessionId: identity.accountSessionId, clientSessionRef: identity.clientSessionRef });
+        const { client_continuation_ref, mission_id, ...request } = args;
+        const result = await reasoningAccess!.dispatchAgentPrompt({ profileRef: input.principal.accountProfileId,
+          authenticatedMcpClientRef: identity.authenticatedClientRef, clientSessionRef: identity.clientSessionRef,
+          clientContinuationRef: client_continuation_ref, bindingId: args.reasoning_binding_id,
+          bindingEpoch: args.binding_epoch, helixConversationId: args.helix_conversation_id,
+          missionId: mission_id, runId: args.run_id }, request);
+        return { ok: true, ...result, ...localSupervisorFlags };
+      }));
+
       server.registerTool(
         "helix_reasoning_steering_read",
         {
@@ -4675,7 +4856,7 @@ export const createHelixMcpServer = (input: {
           annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
           _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
         },
-        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, () => {
+        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, async () => {
           requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
           const identity = localSupervisorIdentity(args.client_continuation_ref);
           coordinationStore.authenticateClient({
@@ -4686,7 +4867,7 @@ export const createHelixMcpServer = (input: {
           return {
             ok: true,
             reasoning_binding_id: args.reasoning_binding_id,
-            deliveries: reasoningStore.read({
+            deliveries: await reasoningAccess!.read({
               profileRef: input.principal.accountProfileId,
               clientSessionRef: identity.clientSessionRef,
               bindingId: args.reasoning_binding_id,
@@ -4712,7 +4893,7 @@ export const createHelixMcpServer = (input: {
           annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
           _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
         },
-        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, () => {
+        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, async () => {
           requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
           const identity = localSupervisorIdentity(args.client_continuation_ref);
           coordinationStore.authenticateClient({
@@ -4722,7 +4903,7 @@ export const createHelixMcpServer = (input: {
           });
           return {
             ok: true,
-            event: reasoningStore.acknowledge({
+            event: await reasoningAccess!.acknowledge({
               profileRef: input.principal.accountProfileId,
               clientSessionRef: identity.clientSessionRef,
               bindingId: args.reasoning_binding_id,
@@ -4734,30 +4915,42 @@ export const createHelixMcpServer = (input: {
         }),
       );
     }
-    server.registerTool(
-      "helix_local_supervisor_presence_update",
-      {
-        title: "Update this Codex client's local-supervisor presence",
-        description: "Registers or refreshes this authenticated MCP client and declared Codex continuation on the installed node. Objective text and unverified resource claims remain inert advisory data.",
-        inputSchema: z.object({
-          client_continuation_ref: localSupervisorContinuationSchema,
-          declared_objective_summary: z.string().trim().min(1).max(360),
-          lifecycle_state: helixLocalSupervisorLifecycleStateSchema,
-          resource_claims: z.array(helixLocalSupervisorResourceClaimInputSchema).max(24).default([]),
-          room_ref: localSupervisorOptionalRefSchema,
-          environment_ref: localSupervisorOptionalRefSchema,
-          run_ref: localSupervisorOptionalRefSchema,
-          blocker_summary: z.string().trim().max(240).nullable().optional(),
-          thread_observability_bridge:
-            helixThreadObservabilityBridgeDeclarationSchema.optional(),
-          heartbeat_ttl_seconds: z.number().int().min(15).max(180).default(60),
-        }).strict(),
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
-      },
-      async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, async () => {
+    async function refreshSupervisorPresence(rawArgs: z.infer<typeof supervisorPresenceSchema>) {
         requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
-        const identity = localSupervisorIdentity(args.client_continuation_ref);
+        const identity = localSupervisorIdentity(rawArgs.client_continuation_ref);
+        const previous = coordinationStore.listPresence().find(row =>
+          row.authenticated_profile_ref === input.principal.accountProfileId &&
+          row.authenticated_mcp_client_ref === identity.authenticatedClientRef &&
+          row.client_session_ref === identity.clientSessionRef &&
+          row.conversation_thread_ref === rawArgs.client_continuation_ref);
+        const preserveSelection = previous &&
+          !["completed", "disconnected"].includes(previous.lifecycle_state) &&
+          !["completed", "disconnected"].includes(rawArgs.lifecycle_state) &&
+          rawArgs.room_ref === undefined && rawArgs.run_ref === undefined &&
+          rawArgs.environment_ref === undefined && rawArgs.resource_claims === undefined;
+        const resourceClaims = rawArgs.resource_claims ?? (preserveSelection
+          ? previous.resource_claims.map(row => ({ claim_class: row.claim_class, resource_ref: row.resource_ref })) : []);
+        // Expired presence deliberately drops protected claims. Only restore the
+        // advisory room/run selectors here, then re-read ownership below. Never
+        // restore an expired mutation lease from a cached projection.
+        if (preserveSelection && previous.room_ref && previous.run_ref) {
+          for (const claim of [
+            { claim_class: "read" as const, resource_ref: previous.room_ref },
+            { claim_class: "retained_runtime" as const, resource_ref: previous.run_ref },
+          ]) if (!resourceClaims.some(row => row.claim_class === claim.claim_class && row.resource_ref === claim.resource_ref)) {
+            resourceClaims.push(claim);
+          }
+        }
+        const args = { ...rawArgs, resource_claims: resourceClaims,
+          room_ref: preserveSelection ? previous.room_ref : rawArgs.room_ref,
+          run_ref: preserveSelection ? previous.run_ref : rawArgs.run_ref,
+          environment_ref: preserveSelection ? previous.environment_ref : rawArgs.environment_ref,
+          thread_observability_bridge: rawArgs.thread_observability_bridge ?? (preserveSelection ? {
+            supported_levels: previous.thread_observability_bridge.supported_levels,
+            requested_level: previous.thread_observability_bridge.requested_level,
+            checkpoint_publication: previous.thread_observability_bridge.checkpoint_publication,
+          } : undefined),
+        };
         const verifiedClaims = new Map<string, string>();
         const verifiedIdentity: {
           -readonly [Key in keyof HelixLocalSupervisorVerifiedIdentity]?:
@@ -4941,8 +5134,99 @@ export const createHelixMcpServer = (input: {
           conversation_thread: "client_declared",
           client_session: "server_derived",
         }, ...localSupervisorFlags };
-      }),
-    );
+    }
+    const authenticatedPairingDestination = async (continuationRef: string) => {
+      const identity = localSupervisorIdentity(continuationRef);
+      const deviceId = process.env.HELIX_DESKTOP_DEVICE_ID?.trim();
+      const trust = await input.desktopFullHarnessTrustReader?.({ authenticatedProfileRef: input.principal.accountProfileId });
+      if (!deviceId || !trust?.trusted || !trust.accountSessionReady || !trust.agentAccountBindingReady) {
+        throw new HelixLocalSupervisorCoordinationError("pairing_registration_device_trust_required", 403);
+      }
+      const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
+      return { issuer: opaque("issuer", input.principal.issuer), profileId: input.principal.accountProfileId,
+        installationId: opaque("installation", deviceId), clientId: identity.authenticatedClientRef,
+        taskId: identity.conversationThreadRef };
+    };
+    server.registerTool("helix_reasoning_pairing_recover", {
+      title: "Recover this task's accepted pairing",
+      description: "Recovers an already accepted, unexpired, unrevoked pairing for the same authenticated client and exact declared continuation without retaining the invitation secret. Restores its current-service binding when the reasoning store is available; subsequent operations revalidate the durable grant. Pending invitations cannot be accepted this way. Does not renew consent, establish presence or grant environment permission.",
+      inputSchema: z.object({ client_continuation_ref: localSupervisorContinuationSchema,
+        id: z.string().min(3).max(320) }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
+    }, args => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, async () => {
+      requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
+      const destination = await authenticatedPairingDestination(args.client_continuation_ref);
+      const service = new PairingTransitionService(await createNativePairingLedgerRepository(), {
+        destination: async () => destination,
+        humanOwner: async () => { throw new Error("pairing_human_owner_required"); },
+      });
+      try {
+        const pairing = await service.recover(undefined, args.id);
+        const binding = reasoningAccess ? await reasoningAccess.restore({ destination, pairingId: args.id,
+          clientSessionRef: localSupervisorIdentity(args.client_continuation_ref).clientSessionRef }) : null;
+        return { ok: true, pairing, binding, runtime_binding_active: Boolean(binding), ...localSupervisorFlags };
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "";
+        if (["pairing_acceptance_invalid", "pairing_destination_mismatch", "pairing_expired",
+          "pairing_revoked", "pairing_not_accepted"].includes(code)) {
+          throw new HelixLocalSupervisorCoordinationError(code,
+            ["pairing_acceptance_invalid", "pairing_destination_mismatch"].includes(code) ? 403 : 409);
+        }
+        throw error;
+      }
+    }));
+    server.registerTool("helix_reasoning_pairing_accept", {
+      title: "Accept this task's human-approved pairing invitation",
+      description: "Atomically accepts an existing finite human-approved invitation for this authenticated client and exact declared continuation and restores its current-service reasoning binding when available. Replays preserve the original grant deadline, including after idle or service restart. This does not grant environment permission, report current presence or provide an assistant answer.",
+      inputSchema: z.object({ client_continuation_ref: localSupervisorContinuationSchema,
+        id: z.string().min(3).max(320), secret: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+    }, args => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, async () => {
+      requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+      const destination = await authenticatedPairingDestination(args.client_continuation_ref);
+      const service = new PairingTransitionService(await createNativePairingLedgerRepository(), {
+        destination: async () => destination,
+        humanOwner: async () => { throw new Error("pairing_human_owner_required"); },
+      });
+      try {
+        const pairing = await service.accept(undefined, { id: args.id, secret: args.secret });
+        const binding = reasoningAccess ? await reasoningAccess.restore({ destination, pairingId: args.id,
+          clientSessionRef: localSupervisorIdentity(args.client_continuation_ref).clientSessionRef }) : null;
+        return { ok: true, pairing, binding, runtime_binding_active: Boolean(binding), ...localSupervisorFlags };
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "";
+        if (["pairing_acceptance_invalid", "pairing_destination_mismatch", "pairing_expired",
+          "pairing_revoked", "pairing_transition_conflict"].includes(code)) {
+          throw new HelixLocalSupervisorCoordinationError(code,
+            ["pairing_acceptance_invalid", "pairing_destination_mismatch"].includes(code) ? 403 : 409);
+        }
+        throw error;
+      }
+    }));
+    server.registerTool("helix_reasoning_destination_register", {
+      title: "Register this authenticated task destination",
+      description: "Persists a finite registration for this authenticated client and declared exact continuation, independently of heartbeat presence. Reusing request_id preserves the original deadline. This is not task binding consent, provider task attestation, message delivery, current presence or environment permission.",
+      inputSchema: z.object({ client_continuation_ref: localSupervisorContinuationSchema,
+        request_id: z.string().min(3).max(120), duration_seconds: z.number().int().min(300).max(86400) }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+    }, args => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, async () => {
+      requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+      const destination = await authenticatedPairingDestination(args.client_continuation_ref);
+      const store = await createPairingDestinationRegistrationStore();
+      const registration = await store.registerAuthenticated(destination,
+        { requestId: args.request_id, durationSeconds: args.duration_seconds });
+      return { ok: true, registration, ...localSupervisorFlags };
+    }));
+    server.registerTool("helix_local_supervisor_presence_update", {
+      title: "Update this Codex client's local-supervisor presence",
+      description: "Registers or refreshes this authenticated MCP client and exact continuation. Omitting all resource/room/run/environment selectors preserves that same task's selection and revalidates it against current stores; explicit null refs or an explicit resource_claims array replace the selection. Expired execution-lease claims are not restored. Objective text and unverified claims remain advisory, not authority.",
+      inputSchema: supervisorPresenceSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES),
+    }, args => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES, () => refreshSupervisorPresence(args)));
 
     server.registerTool(
       "helix_local_supervisor_coordination_read",
@@ -5524,6 +5808,9 @@ export const createHelixMcpServer = (input: {
         ["helix_public_ui_catalog", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
         ["helix_evidence_observation_get", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
         ["helix_local_supervisor_presence_update", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+        ["helix_reasoning_destination_register", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_reasoning_pairing_accept", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_reasoning_pairing_recover", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_local_supervisor_coordination_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
@@ -5534,6 +5821,7 @@ export const createHelixMcpServer = (input: {
           ["helix_environment_session_ready_up", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
           ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
           ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+          ["helix_reasoning_prompt_submit", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
           ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ] as Array<[string, RequiredOAuthScopes]> : []),
         ...ROOM_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
@@ -6967,7 +7255,7 @@ export const createHelixMcpServer = (input: {
     {
       title: "Create a durable environment goal",
       description:
-        "Creates an append-only Minecraft survival goal bound to the current room participant, selected player, source, world, connector epoch, and action authority. The projection is context for Codex re-entry, never an answer or strategy writer.",
+        "Creates an append-only Minecraft survival goal bound to the current room participant, selected player, source, world, connector epoch, and action authority. Supply idempotency_key to retry the exact creation without duplicating its ledger; current identity is revalidated and changed payloads are rejected. The projection is context for Codex re-entry, never an answer or strategy writer.",
       inputSchema: z.object({
         room_id: helixSharedLiveRoomIdSchema,
         environment_binding_id: z.string().trim().min(1).max(320),
@@ -6976,6 +7264,7 @@ export const createHelixMcpServer = (input: {
         run_id: z.string().trim().min(1).max(320).nullable().optional(),
         turn_id: z.string().trim().min(1).max(320),
         objective: helixEnvironmentDurableGoalObjectiveSchema,
+        idempotency_key: z.string().trim().min(1).max(320).optional(),
       }).strict(),
       outputSchema: environmentDurableGoalOutputSchema,
       annotations: {
@@ -7001,6 +7290,7 @@ export const createHelixMcpServer = (input: {
           runId: argumentsValue.run_id ?? null,
           turnId: argumentsValue.turn_id,
           objective: argumentsValue.objective,
+          idempotencyKey: argumentsValue.idempotency_key,
         });
         return { ok: true, value: durableGoalMcpObservation(HELIX_ENVIRONMENT_DURABLE_GOAL_CREATE_CAPABILITY, argumentsValue.room_id, goal) };
       }),
@@ -8090,6 +8380,7 @@ export const createHelixMcpServer = (input: {
       }).strict(),
       z.object({
         kind: z.literal("perception_snapshot"),
+        include_navigation_collision: z.boolean().optional(),
         horizontal_radius: z.number().int().min(1).max(7).optional(),
         vertical_radius: z.number().int().min(2).max(16).optional(),
         freshness_requirement_ms: situationFreshnessSchema,
@@ -9217,7 +9508,7 @@ export const createHelixMcpServer = (input: {
     {
       title: "Read a Minecraft player workflow status",
       description:
-        "Reads one exact admitted workflow through its room/player authority. The result is a current non-terminal observation, not an assistant answer.",
+        "Reads one exact admitted workflow through its room/player authority. A verified retained terminal result may accompany the live status, with its original timestamp; historical release is not current control-state evidence. Neither observation is an assistant answer.",
       inputSchema: z
         .object({
           room_id: helixSharedLiveRoomIdSchema,
@@ -9254,6 +9545,7 @@ export const createHelixMcpServer = (input: {
             status: execution.status,
             summary: execution.summary,
             observation: execution.observation,
+            ...(execution.retained_result ? { retained_result: execution.retained_result } : {}),
             answer_authority: false,
             assistant_answer: false,
             terminal_eligible: false,
@@ -9975,6 +10267,9 @@ export const createHelixMcpServer = (input: {
       ["helix_room_source_list", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_room_source_create", HELIX_SHARED_LIVE_ROOM_SOURCE_MANAGE_SCOPE],
       ["helix_local_supervisor_presence_update", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+      ["helix_reasoning_destination_register", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_reasoning_pairing_accept", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+      ["helix_reasoning_pairing_recover", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
       ["helix_local_supervisor_coordination_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
       ["helix_local_supervisor_relay_publish", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
@@ -9984,6 +10279,7 @@ export const createHelixMcpServer = (input: {
         ["helix_environment_session_ready_up", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
         ["helix_reasoning_task_binding_claim", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
+        ["helix_reasoning_prompt_submit", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ] as Array<[string, RequiredOAuthScopes]> : []),
       ...(input.desktopMcpTunnelTransitionStore ? [

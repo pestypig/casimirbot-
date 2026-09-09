@@ -84,7 +84,7 @@ describe("Minecraft Play with Helix finite journey", () => {
     });
   });
 
-  it("builds a provider-neutral instruction with exact public identities and nonterminal boundaries", () => {
+  it.each(["run:existing", null])("builds exact session guidance for bound run %s", (boundRunId) => {
     const instruction = buildMinecraftPlayActivationInstruction({
       objective: "Help me gather wood safely.",
       roomId: "room:one",
@@ -97,6 +97,7 @@ describe("Minecraft Play with Helix finite journey", () => {
       actionAuthorityId: "authority:one",
       allowedCapabilityIds: ["minecraft.walk", "minecraft.observe", "minecraft.walk"],
       authorityExpiresAt: "2026-09-03T03:00:00.000Z",
+      boundRunId,
     });
 
     expect(instruction).toContain("Continue in this exact existing Codex task");
@@ -104,6 +105,10 @@ describe("Minecraft Play with Helix finite journey", () => {
     expect(instruction).toContain("`/helix ask <natural-language prompt>`");
     expect(instruction).toContain("nonterminal evidence—not answers");
     expect(instruction).toContain("minecraft.observe, minecraft.walk");
+    expect(instruction).toContain("budget.expires_in_seconds");
+    expect(instruction).toContain("not current authorization proof");
+    expect(instruction).toContain(boundRunId ? "Existing bound environment run: run:existing" : "No environment run is associated");
+    if (boundRunId) expect(instruction).toContain("do not replace or extend it");
     expect(instruction).not.toContain("credential");
     expect(instruction).not.toContain("hidden reasoning");
   });

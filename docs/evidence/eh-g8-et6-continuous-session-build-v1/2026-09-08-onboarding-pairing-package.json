@@ -1,0 +1,31 @@
+{
+  "scope": "Built package identity and content comparison; native recovery pending",
+  "output": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-onboarding-pairing-20260908\\win-unpacked",
+  "build_exit_code": null,
+  "runtime_files_compared": 645,
+  "runtime_mismatches": [],
+  "runtime_extras": [],
+  "bundles": {
+    "main.cjs": {
+      "sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+      "matches": true
+    },
+    "preload.cjs": {
+      "sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+      "matches": true
+    },
+    "service.mjs": {
+      "sha256": "2bd8aae76ca7e8928ffb1714e52f32476fe026586efcc8e584a5322d3837e0c3",
+      "matches": true
+    }
+  },
+  "client_tree_sha256": "0d50a81036e387f3ef054d5f8bad491fdb0ccef2a04cd4894c37eb965846f78f",
+  "exe_size": 225533440,
+  "exe_sha256": "e8033cd266af87d43e116ebbcf1aca7843dfe12e78d9d9a6d40f6dc5377475e9",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

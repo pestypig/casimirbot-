@@ -26,10 +26,11 @@ describe("reasoning run association revalidation", () => {
     expect(db.query).not.toHaveBeenCalled();
   });
   it("revalidates the exact owner, run/version and room/participant association", async () => {
-    db.query.mockResolvedValue({ rows: [{ run_id: "run-owned" }] });
+    db.query.mockResolvedValue({ rows: [{ run_id: "run-owned", expires_at: "2099-01-01T00:00:00.000Z" }] });
     expect(await resolveReasoningRunAssociation(presence())).toEqual({
       run_id: "run-owned", run_version: 2, room_id: "room-owned", room_binding_id: "binding-owned",
       room_binding_version: 3, verification_ref: "verification-current",
+      run_expires_at: "2099-01-01T00:00:00.000Z",
     });
     const [sql, params] = db.query.mock.calls[0];
     expect(params).toEqual(["run-owned", "profile-owned", 2, "binding-owned", 3, "room-owned", "participant-owned"]);
@@ -49,12 +50,13 @@ describe("reasoning run association revalidation", () => {
     memory.public.none(`
       CREATE TABLE helix_agent_runs (run_id text, account_profile_id text, tenant_id text,
         issuer text, subject_id text, version bigint, lifecycle_status text,
-        expires_at timestamptz, cancelled_at timestamptz);
+        expires_at timestamptz, cancelled_at timestamptz, completed_at timestamptz,
+        steps_used integer, max_steps integer);
       CREATE TABLE helix_agent_run_room_bindings (run_id text, account_profile_id text,
         tenant_id text, issuer text, subject_id text, binding_id text, version bigint,
         status text, room_id text, participant_id_at_bind text);
       INSERT INTO helix_agent_runs VALUES ('run-owned','profile-owned','tenant','issuer','subject',
-        2,'waiting','2099-01-01',NULL);
+        2,'waiting','2099-01-01',NULL,NULL,0,20);
       INSERT INTO helix_agent_run_room_bindings VALUES ('run-owned','profile-owned','tenant','issuer',
         'subject','binding-owned',3,'active','room-owned','participant-owned');
     `);
@@ -69,6 +71,9 @@ describe("reasoning run association revalidation", () => {
         "UPDATE helix_agent_runs SET lifecycle_status = 'completed'",
         "UPDATE helix_agent_runs SET cancelled_at = '2020-01-01'",
         "UPDATE helix_agent_runs SET expires_at = '2020-01-01'",
+        "UPDATE helix_agent_runs SET steps_used = max_steps",
+        "UPDATE helix_agent_runs SET steps_used = max_steps + 1",
+        "UPDATE helix_agent_runs SET completed_at = '2020-01-01'",
         "UPDATE helix_agent_run_room_bindings SET tenant_id = 'other-tenant'",
         "UPDATE helix_agent_run_room_bindings SET issuer = 'other-issuer'",
         "UPDATE helix_agent_run_room_bindings SET subject_id = 'other-subject'",

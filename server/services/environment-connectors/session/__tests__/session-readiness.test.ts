@@ -27,6 +27,8 @@ function fixture() {
   const deps = {
     membership: vi.fn().mockResolvedValue({ participantId: "participant:a", roomStatus: "active" }),
     environments: vi.fn().mockResolvedValue([environment]),
+    devices: vi.fn().mockResolvedValue([{ ...identity, credential_status: "active",
+      credential_expires_at: new Date(now + 60_000).toISOString() }]),
     subject: vi.fn().mockResolvedValue(environment.self_subject_binding),
     authorities: vi.fn().mockResolvedValue([authority]),
     controllers: vi.fn().mockResolvedValue([controller]),
@@ -38,6 +40,39 @@ function fixture() {
   const read = () => readEnvironmentSessionReadiness(input, bindingStore, deps);
   return { input, deps, environment, authority, controller, bindingStore, read };
 }
+
+it("caps readiness at the exact source credential deadline without renewing it", async () => {
+  const f = fixture();
+  f.deps.devices.mockResolvedValue([{ ...f.authority, credential_status: "active",
+    credential_expires_at: new Date(now + 1_000).toISOString() }]);
+  const result = await f.read();
+  expect(result).toMatchObject({ ready: true, valid_until_ms: now + 1_000 });
+  expect(result.checks.find(check => check.layer === "source")?.expires_at_ms).toBe(now + 1_000);
+  expect(f.deps.devices).toHaveBeenCalledWith({ ownerProfileId: "profile:a", roomId: "room:a" });
+});
+
+it.each(["expired", "revoked", "missing", "invalid", "foreign", "ambiguous"])("rejects %s source credentials without inferring human approval", async kind => {
+  const f = fixture();
+  const device = { ...f.authority, credential_status: kind === "revoked" ? "revoked" : "active",
+    credential_expires_at: kind === "missing" ? null : kind === "invalid" ? "invalid" :
+      new Date(kind === "expired" ? now : now + 60_000).toISOString() };
+  if (kind === "foreign") device.world_id = "world:other";
+  f.deps.devices.mockResolvedValue(kind === "ambiguous" ? [device, device] : [device]);
+  const result = await f.read();
+  expect(result.ready).toBe(false);
+  expect(result.next_check).toBe("source");
+  expect(result.blockers.find(check => check.layer === "source")?.human_approval_required).toBe(false);
+  expect(result.checks.find(check => check.layer === "subject")?.state).toBe("verified");
+});
+
+it("keeps a failed credential read separate from subject verification", async () => {
+  const f = fixture();
+  f.deps.devices.mockRejectedValue(new Error("private database details"));
+  const result = await f.read();
+  expect(result.next_check).toBe("source");
+  expect(JSON.stringify(result)).not.toContain("private database details");
+  expect(result.checks.find(check => check.layer === "subject")?.state).toBe("verified");
+});
 
 it("reports stale subject and goal together despite a ready controller", async () => {
   const f = fixture();
@@ -80,13 +115,31 @@ it.each(["revoked", "expired", "unbounded", "wrong_subject"])("does not bless %s
   const result = await f.read();
   expect(result.ready).toBe(false);
   expect(result.next_check).toBe("authority");
-  expect(result.blockers[0].human_approval_required).toBe(false);
+  expect(result.blockers[0].human_approval_required).toBe(kind === "expired" || kind === "revoked");
 });
 
 it("does not trust a future controller heartbeat", async () => {
   const f = fixture();
   f.controller.heartbeat_received_at = new Date(now + 1_000).toISOString();
   expect((await f.read()).next_check).toBe("controller");
+});
+
+it("does not infer approval from an invalid authority deadline", async () => {
+  const f = fixture();
+  f.authority.expires_at = "invalid";
+  const result = await f.read();
+  expect(result.ready).toBe(false);
+  expect(result.blockers.find(check => check.layer === "authority")?.human_approval_required).toBe(false);
+});
+
+it("does not request approval for another player's revoked authority", async () => {
+  const f = fixture();
+  f.authority.status = "revoked";
+  f.authority.subject_binding_id = "subject:other";
+  const result = await f.read();
+  expect(result.blockers.find(check => check.layer === "authority")).toMatchObject({
+    human_approval_required: false, reason_codes: ["session_authority_identity_mismatch"],
+  });
 });
 
 it("sanitizes unknown failures and still collects later independent checks", async () => {

@@ -1,0 +1,34 @@
+{
+  "schema": "casimirbot.continuous_session_development_observation.v1",
+  "date": "2026-09-08",
+  "scope": "Native package launch and ordinary setup navigation only",
+  "package": "apps/desktop/release-cs2-ingress-20260908/win-unpacked/CasimirBot.exe",
+  "exe_sha256": "148cdc75ce8ee245d82d0d2cc6ed1a72b60d8283d0666e41ae2ad345ecb026a5",
+  "old_package_closed_normally": true,
+  "old_process_absence_checked_before_launch": true,
+  "launch_attempts": 1,
+  "startup_observation": "Launch helper initially reported no targetable window; exact new-package processes were alive. Subsequent window discovery found the native window without relaunching.",
+  "ready_receipt_time": "2026-09-08T16:20:35.041Z",
+  "native_window_package_path_verified": true,
+  "ordinary_navigation": [
+    "Expanded composer destination controls",
+    "Clicked Set up connection",
+    "Observed navigation-only setup dialog",
+    "Clicked Open Agent Access",
+    "Observed Agent Access: Waiting for your AI task, step 5 of 6"
+  ],
+  "observed_account_presentation": "Account access linked; device trusted for Full Harness",
+  "required_tools_missing_from_current_callable_catalog": [
+    "helix_environment_session_ready_up",
+    "helix_reasoning_prompt_submit"
+  ],
+  "consent_controls_automated": false,
+  "binding_created": false,
+  "minecraft_actions_executed": false,
+  "limits": [
+    "Service ready receipt and rendered window are startup evidence, not authenticated endpoint or provider invocation proof",
+    "No exact binding, prompt delivery, pickup or acknowledgement was tested",
+    "No integrated Ready up, resident movement, interruption or revocation trial was performed",
+    "CS1-CS4 remain incomplete; ET6 and NAV1 gates unchanged"
+  ]
+}

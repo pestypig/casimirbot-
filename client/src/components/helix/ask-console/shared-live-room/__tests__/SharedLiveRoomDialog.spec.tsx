@@ -87,6 +87,7 @@ describe("Shared Live Room dialog plane", () => {
     const room = {
       room_id: "shared_realtime_room:active",
       title: "Existing M1 room",
+      public_terminal_results: [],
       status: "ready",
       readiness: {
         ready: true,

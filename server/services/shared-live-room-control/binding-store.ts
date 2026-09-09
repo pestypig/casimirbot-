@@ -614,6 +614,7 @@ export class SharedLiveRoomBindingStore {
     runId: string;
     roomId: string;
     now?: string;
+    preserveRevocation?: true;
   }): Promise<SharedLiveRoomRunRoomBinding> {
     const runId = assertIdentifier(input.runId, "runId");
     const roomId = assertIdentifier(input.roomId, "roomId");
@@ -659,6 +660,12 @@ export class SharedLiveRoomBindingStore {
           409,
           "The run already has a different active room binding.",
         );
+      }
+      if (input.preserveRevocation) {
+        const withdrawn = await client.query(`SELECT binding_id FROM helix_agent_run_room_bindings
+          WHERE run_id = $1 AND status = 'revoked' LIMIT 1`, [runId]);
+        if (withdrawn.rows.length) throw new SharedLiveRoomBindingStoreError(
+          "run_room_binding_conflict", 409, "Preparation cannot restore a revoked run-room binding.");
       }
       const membership = await client.query<{
         participant_id: string;
@@ -768,6 +775,59 @@ export class SharedLiveRoomBindingStore {
     } finally {
       client.release();
     }
+  }
+
+  /** Discovery only: callers must verify task/objective compatibility and all
+   * current environment evidence before reuse. Never chooses the newest run. */
+  async listRunPreparationCandidates(input: {
+    owner: HelixAgentRunOwner;
+    roomId: string;
+    participantId: string;
+    runId?: string;
+    now?: string;
+  }): Promise<Array<{ runId: string; runVersion: number; expiresAt: string;
+    roomBindingId: string; roomBindingVersion: number }>> {
+    const now = input.now ?? new Date().toISOString();
+    if (!Number.isFinite(Date.parse(now))) {
+      throw new SharedLiveRoomBindingStoreError("binding_invalid", 400, "Invalid preparation clock.");
+    }
+    const pool = await this.pool();
+    // Omit the optional predicate instead of using a nullable OR: pg-mem's
+    // indexed join planner cannot evaluate that OR on retained run histories.
+    // Values remain parameters, and LIMIT still follows every eligibility gate.
+    const { rows } = await pool.query<{
+      run_id: string; run_version: number; expires_at: Date | string;
+      binding_id: string; binding_version: number;
+    }>(`
+      SELECT r.run_id, r.version AS run_version, r.expires_at,
+             b.binding_id, b.version AS binding_version
+      FROM helix_agent_runs r
+      JOIN helix_agent_run_room_bindings b ON b.run_id = r.run_id
+        AND b.tenant_id = r.tenant_id AND b.issuer = r.issuer
+        AND b.subject_id = r.subject_id AND b.account_profile_id = r.account_profile_id
+      JOIN helix_shared_realtime_rooms room ON room.room_id = b.room_id
+      JOIN helix_shared_realtime_room_members m ON m.room_id = b.room_id
+        AND m.profile_id = b.account_profile_id
+        AND m.participant_id = b.participant_id_at_bind
+      WHERE r.tenant_id = $1 AND r.issuer = $2 AND r.subject_id = $3
+        AND r.account_profile_id = $4 AND b.room_id = $5
+        AND m.participant_id = $6 AND m.presence <> 'left'
+        AND room.status <> 'closed' AND b.status = 'active'
+        AND m.member_role = b.member_role_at_bind
+        AND COALESCE(m.consent ->> 'consent_version', '0') = CAST(b.consent_version_at_bind AS text)
+        AND COALESCE(m.consent ->> 'consent_receipt_ref', '') = COALESCE(b.consent_receipt_ref_at_bind, '')
+        AND r.lifecycle_status IN ('queued', 'running', 'waiting')
+        AND r.cancelled_at IS NULL AND r.completed_at IS NULL
+        AND r.steps_used < r.max_steps AND r.expires_at > $7
+        ${input.runId === undefined ? "" : "AND r.run_id = $8"}
+      ORDER BY r.run_id
+      LIMIT 2`, [...ownerParams(input.owner), assertIdentifier(input.roomId, "roomId"),
+        assertIdentifier(input.participantId, "participantId"), now,
+        ...(input.runId === undefined ? [] : [assertIdentifier(input.runId, "runId")])]);
+    // Two rows are sufficient to prove ambiguity; do not silently pick one.
+    return rows.map(row => ({ runId: row.run_id, runVersion: Number(row.run_version),
+      expiresAt: new Date(row.expires_at).toISOString(), roomBindingId: row.binding_id,
+      roomBindingVersion: Number(row.binding_version) }));
   }
 
   async getActiveRunRoomBinding(input: {

@@ -1,0 +1,55 @@
+{
+  "scope": "Integrated pairing full discipline regression; not live acceptance",
+  "executed_tests": 101,
+  "groups": {
+    "identity": 9,
+    "continuation": 26,
+    "prompt": 35,
+    "api_scenarios": 16,
+    "api_fixed": 15
+  },
+  "server_build": "passed",
+  "session_id": 38434,
+  "et6_passed": false,
+  "exit_code": 0,
+  "source_comparison": [
+    {
+      "sha256": "a9577ec536e85567eb4a1014ecfa268f8fb96b8f0bee7f6ab582f35c278b616a",
+      "matches_start": false,
+      "path": "server/mcp/helix-mcp-server.ts"
+    },
+    {
+      "sha256": "fd48201f95041942819c154a12468164c64a03d6fb31777755ae245bcd6c4ceb",
+      "matches_start": true,
+      "path": "server/services/local-supervisor/reasoning-task-binding-store.ts"
+    },
+    {
+      "sha256": "36d0905be7da54a35ce069423d31195dfb66a26ab8a5355ee59a1c003826aba9",
+      "matches_start": true,
+      "path": "server/services/local-supervisor/durable-reasoning-binding-access.ts"
+    },
+    {
+      "sha256": "3a899bbff8ac5f97ae20f5e7ec22539b21f9db724c721ecc6c17d868d96f7350",
+      "matches_start": true,
+      "path": "server/routes/agent-connections.ts"
+    },
+    {
+      "sha256": "7bd6b55625a6b30e8b3874e429c0acdc5e4c077fa30c888ccd72ecf3de0682e1",
+      "matches_start": true,
+      "path": "shared/helix-reasoning-task-binding.ts"
+    },
+    {
+      "sha256": "10d6ef0e8e84d9f8069f42e26205eba8244db52ed7e6241a63ee13b9908518e9",
+      "matches_start": true,
+      "path": "client/src/components/agent-access/DurableTaskPairing.tsx"
+    },
+    {
+      "sha256": "af9e084002103ed1216d6bff3735ff439ddf204720b46a753d15013231a541fa",
+      "matches_start": true,
+      "path": "client/src/lib/agent-access/durablePairing.ts"
+    }
+  ],
+  "completed_at": "2026-09-09T02:06:47.4414445Z",
+  "verdict": "passed",
+  "goal_complete": false
+}

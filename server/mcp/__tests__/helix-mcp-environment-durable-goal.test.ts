@@ -307,6 +307,7 @@ describe("Helix MCP durable environment goal", () => {
           subject_native_id: "player:one",
           turn_id: "turn:create",
           objective,
+          idempotency_key: "session:first-goal",
         },
       });
       expect(created.isError, JSON.stringify(created)).not.toBe(true);
@@ -321,6 +322,7 @@ describe("Helix MCP durable environment goal", () => {
       expect(connection.goalStore.create).toHaveBeenCalledWith(expect.objectContaining({
         ownerProfileId: "profile:durable-goal-mcp",
         participantId: PARTICIPANT_ID,
+        idempotencyKey: "session:first-goal",
       }));
 
       await connection.client.callTool({ name: "helix_environment_goal_inspect", arguments: { room_id: ROOM_ID, goal_id: projection.goal_id } });

@@ -1,0 +1,30 @@
+{
+  "schema": "casimirbot.environment_session_native_checkpoint.v1",
+  "package_checkpoint": "2026-09-08-cs1-preparation-package.json",
+  "native_window_id": 47318228,
+  "service_ready_at": "2026-09-08T03:54:59.292Z",
+  "service_origin": "http://127.0.0.1:55570",
+  "service_process_id": 39912,
+  "service_instance_ref": "service_instance:29006168d43e976e9cb840c3894f09fd",
+  "continuation_ref": "01a060f9-ebfd-7251-9fd3-479a01dd3c40",
+  "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+  "observed_sequence": [
+    "Previous EXE closed normally; process absence verified before replacement launch.",
+    "Replacement launch initially lacked a targetable window; existing processes retained and subsequently became ready without restart.",
+    "Native destination disclosure -> Set up connection -> Open Agent Access -> waiting for AI task.",
+    "Authenticated MCP presence update for the same task succeeded; panel automatically advanced to AI app connected and exposed preparation controls.",
+    "Selected existing Shared GPT Live room and submitted Ready up this room with default one-hour requested duration.",
+    "EXE displayed Preparation requested and 586 seconds remaining for delivery, explicitly not the game-session duration."
+  ],
+  "negative_evidence": [
+    "One screenshot initially captured an occluding app; discarded for coordinate decisions, target activated and recaptured.",
+    "Native dropdown option click was rejected as Chrome Legacy Window; fresh observation and keyboard confirmation selected the displayed option.",
+    "Current callable tool discovery returned no helix_environment_session_ready_up tool; live pickup and acknowledgement not attempted or proven."
+  ],
+  "human_only_controls_activated": false,
+  "binding_claim_generated": false,
+  "gameplay_started": false,
+  "session_ready_proven": false,
+  "cs1_complete": false,
+  "et6_complete": false
+}

@@ -1,0 +1,38 @@
+{
+  "scope": "Build and packaged content equality; native rehearsal pending",
+  "output": "apps/desktop/release-cs1-session-recovery-20260908/win-unpacked",
+  "build_exit_code": 0,
+  "discipline_full_passed": true,
+  "discipline_executed_tests": 101,
+  "focused_ui_tests_passed": 32,
+  "focused_preparation_tests_passed": 43,
+  "host_build_passed": true,
+  "runtime_staging_passed": true,
+  "runtime_files_compared": 645,
+  "runtime_mismatches": [],
+  "runtime_extras": [],
+  "bundles": {
+    "main.cjs": {
+      "sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+      "matches": true
+    },
+    "preload.cjs": {
+      "sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+      "matches": true
+    },
+    "service.mjs": {
+      "sha256": "98ffd6a2e726111df1a5e570045297f596da4e77ca23782cfd03fa3168ffb72e",
+      "matches": true
+    }
+  },
+  "client_tree_sha256": "456f8fa1c77fc5a9a9fdb65eb8e7dc2843a82ac2db8eeb4e72b29d9371540375",
+  "exe_size": 225533440,
+  "exe_sha256": "34a0b45f9ec8a7413b9f812796dbb40496267f382cdabde3d750971e1c45e292",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "cs5_handoff_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

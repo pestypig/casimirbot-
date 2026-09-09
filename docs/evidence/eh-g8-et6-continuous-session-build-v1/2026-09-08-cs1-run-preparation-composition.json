@@ -1,0 +1,38 @@
+{
+  "schema": "casimirbot.environment_session.component_evidence.v1",
+  "date": "2026-09-08",
+  "stage": "CS1",
+  "classification": "tool admission and deterministic setup orchestration",
+  "scope": "Source-level preparation composition; not packaged or live acceptance",
+  "tests": [
+    { "suite": "preparation-intent-store.test.ts", "passed": 17 },
+    { "suite": "helix-environment-session-request.spec.ts", "passed": 9 },
+    { "suite": "shared-live-room-control/binding-store.test.ts", "passed": 10 },
+    { "suite": "helix-mcp-local-supervisor-coordination.test.ts", "passed": 26 }
+  ],
+  "positive": [
+    "Repeated and concurrent preparation retains one created run across partial attachment failure.",
+    "Run budget comes from the exact browser-selected intent, not an MCP duration override.",
+    "Browser HTTP enqueue and authenticated MCP preparation share one mailbox in the transport fixture.",
+    "Existing production run APIs remain responsible for creation and durable idempotency; no continuation executor is introduced."
+  ],
+  "negative": [
+    "Current candidate runs require explicit selection; preparation does not choose the first or newest.",
+    "Changed choices and foreign clients are rejected.",
+    "Presence loss after creation stops attachment while retaining the run for retry.",
+    "Missing run-write scope prevents creation.",
+    "Preparation attachment refuses a previously revoked room binding in the pg-mem fixture."
+  ],
+  "source_sha256": {
+    "server/services/environment-connectors/session/preparation-intent-store.ts": "720ce550073fcbe4f84d217c9a05adda33b7c2bc361d5442522d96e46d4bd52c",
+    "shared/helix-environment-session-request.ts": "3cc3639a3516c0ef7897e12119bfcc93d57d4c29ebce256c0bb9e2a6f94a134d",
+    "server/services/shared-live-room-control/binding-store.ts": "2e5c76ec3bd0ffbe9471878295d75dc8f90616edf9a63e36ce5761b451ca526b",
+    "server/mcp/helix-mcp-server.ts": "bd2b7edad97977f9195ec80e9bd3f980dadff9c9e718b0a72352703ae24c0205"
+  },
+  "limitations": [
+    "Transport fixture injects account, room and run service ports; it is not live provider authentication.",
+    "Fresh verified presence publication after preparation remains a separate task operation.",
+    "Running EXE and current callable catalog have not been updated by this patch.",
+    "No CS1 closure, CS2-CS4 qualification, ET6 acceptance or NAV1 unlock."
+  ]
+}

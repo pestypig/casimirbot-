@@ -1,0 +1,33 @@
+{
+  "schema": "casimirbot.cs1.package_checkpoint.v1",
+  "date": "2026-09-08",
+  "package": "apps/desktop/release-cs1-goal-handoff-20260908/win-unpacked",
+  "build_steps": { "client": "passed", "host": "passed", "runtime_stage": "passed", "electron_directory_package": "passed" },
+  "runtime_files_hash_compared": 645,
+  "runtime_mismatches": 0,
+  "sha256": {
+    "main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service.mjs": "0e2201b50a4e30c3d9675bb215b20d272b771ba30db3b01cb7245d07e66fb5d7",
+    "CasimirBot.exe": "8034121eabb03fb1bdd130445e0158fdbe98ad0e3d0fff0fab41fcfb8acfde08"
+  },
+  "native_observations": {
+    "previous_exe_closed_normally": true,
+    "replacement_launch_count": 1,
+    "initial_window_unavailable": true,
+    "subsequent_window_observed": true,
+    "window_id": 40960982,
+    "service_ready_at": "2026-09-08T14:55:11.356Z",
+    "destination_expanded": true,
+    "set_up_connection_visible": true,
+    "transport": "Helix Ask governed turn",
+    "capture_mismatch_recovered_by_target_activation": true
+  },
+  "ready_up_callable_in_current_task": false,
+  "first_session_integrated_trial": "not_run",
+  "human_consent_automated": false,
+  "code_signing_certificate_verified": false,
+  "cs1_complete": false,
+  "et6_pass": false,
+  "nav1_unlocked": false
+}

@@ -1,5 +1,5 @@
+import type { ReasoningTaskAssociationVerifier } from "../../local-supervisor/reasoning-binding-ports";
 import type { HelixEnvironmentActionRequest } from "@shared/helix-environment-action";
-import type { HelixReasoningTaskBindingStore } from "../../local-supervisor/reasoning-task-binding-store";
 import { enqueueEnvironmentAction } from "../actions/action-broker";
 import { preflightTemporalPlan } from "./temporal-plan-preflight";
 import { TemporalPlanError } from "./temporal-plan-error";
@@ -12,7 +12,7 @@ export async function admitTemporalPlan(input: {
   request: Omit<HelixEnvironmentActionRequest, "arguments" | "temporal_plan" |
     "temporal_plan_canonical_json" | "temporal_compilation_hash" | "temporal_compilation_canonical_json">;
   checkpoint?: { eventId: string; checkpointId: string };
-}, bindingStore: Pick<HelixReasoningTaskBindingStore, "verifyTaskAssociation">) {
+}, bindingStore: ReasoningTaskAssociationVerifier) {
   const frozen = structuredClone(input);
   const binding = frozen.preflight.binding;
   if (!binding.runId || frozen.request.run_id !== binding.runId ||
@@ -21,8 +21,8 @@ export async function admitTemporalPlan(input: {
     throw new TemporalPlanError("temporal_admission_request_context_mismatch");
   }
   const preflight = await preflightTemporalPlan(frozen.preflight, bindingStore);
-  const revalidateTask = () => { bindingStore.verifyTaskAssociation(binding); };
-  revalidateTask();
+  const revalidateTask = async () => { await bindingStore.verifyTaskAssociation(binding); };
+  await revalidateTask();
   return enqueueEnvironmentAction({ profileId: frozen.preflight.context.profileId,
     requestingParticipantId: frozen.preflight.context.participantId,
     request: { ...frozen.request, arguments: preflight.compilation.arguments, temporal_plan: preflight.plan },

@@ -130,7 +130,7 @@ cross-owner access, secret exposure or false agent-attribution in every case.
 | BND-04 | Interrupt after first removal: release controls; first result retained; second effect only after fresh evidence and current explicit authority |
 | BND-05 | Another actor removes approved target: preserve observed world change but do not credit the agent; no substitute target or invented inventory |
 | BND-06 | Duplicate request/restart/replayed result: at most one effect per idempotency identity; no replay of ambiguous interrupted work |
-| BND-07 | Separate manual override, Emergency Stop, effect expiry, software/evaluation eligibility loss, disconnect and owner revoke: bounded release, no new disallowed work, owner recovery accessible |
+| BND-07 | Separate manual override, Emergency Stop, effect expiry, personal authorization/consent loss, disconnect and owner revoke: bounded release, no new disallowed work, owner recovery accessible |
 | BND-08 | Wrong profile/node/client/room/player, forged grant/account role and direct API/MCP/service bypass: reject before effects; same predicates across transports |
 | BND-09 | No compatible client or provider limit: truthful unavailable/recovery state; no bundled runtime, secret relay or silent API-funded fallback |
 | BND-10 | Fresh install, scope upgrade, catalog refresh and account switch: ordinary-user setup without developer launcher, correct current client/run, no inherited grants |
@@ -140,7 +140,10 @@ cross-owner access, secret exposure or false agent-attribution in every case.
 An observation that both targets changed is necessary but insufficient for
 BND-01: attribution, bounds, re-entry and truthful terminal result must also
 pass. Safe cancellation passes its adverse scenario, not the normal-task
-success count. Trial/evaluation/purchase grants remain different provenance.
+success count. Personal consent and hosted trial/purchase grants remain distinct. Hosted
+subscription expiry must leave otherwise authorized personal work eligible;
+it is not a personal stop condition. Apply earlier eligibility-loss fixtures
+only to their actual personal authority or hosted grant boundary.
 
 ## Full G8 and commercial acceptance retained
 
@@ -156,6 +159,7 @@ remain commercial/reliability candidates. [DIST-06A–F](eh-g8-cfp3-distribution
 recognition and 5-second release proposal must not weaken the stricter local
 adapter stop budget here. End-to-end and local measurements are separate.
 
-CFP-2 uses only the parent's isolated pre-release evaluation interface, after
-rights and stage admission. CFP-3 repeats with authoritative commercial grants;
+CFP-2 uses the parent's free-personal authorization boundary after rights and
+stage admission. CFP-3 verifies hosted grants separately and repeats personal
+access for never-subscribed and expired-hosted users;
 CFP-4 repeats on the same signed artifact. No run is authorized by this draft.

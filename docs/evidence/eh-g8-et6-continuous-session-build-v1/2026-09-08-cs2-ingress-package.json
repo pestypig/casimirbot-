@@ -1,0 +1,20 @@
+{
+  "scope": "Build/package and SHA-256 content equality only",
+  "output": "apps/desktop/release-cs2-ingress-20260908/win-unpacked",
+  "commands_passed": ["npm run build:client", "npm --prefix apps/desktop run build:host", "npm --prefix apps/desktop run stage:runtime", "npx electron-builder --config electron-builder.config.cjs --dir --publish never --config.directories.output=release-cs2-ingress-20260908 (cwd apps/desktop)"],
+  "runtime_files_compared": 645,
+  "runtime_mismatches": [],
+  "asar_bundles_match_built_files": true,
+  "sha256": {
+    "main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service.mjs": "4c66c849f9a306cce26cedd81773c9deecc3d5728f4b1a30f8fa64c9052998c5",
+    "CasimirBot.exe": "148cdc75ce8ee245d82d0d2cc6ed1a72b60d8283d0666e41ae2ad345ecb026a5"
+  },
+  "warnings": ["Client dependency externalization, eval and chunk size", "Host four duplicate-key/case warnings"],
+  "launched": false,
+  "signature_independently_verified": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "et6_passed": false
+}

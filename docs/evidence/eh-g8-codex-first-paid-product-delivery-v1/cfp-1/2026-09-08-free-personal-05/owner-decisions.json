@@ -1,0 +1,140 @@
+{
+  "schema": "casimirbot.cfp1.owner_decisions.v1",
+  "captured_utc": "2026-09-08T23:42:35.398Z",
+  "authority": "Explicit user messages select product choices; agents prepare proposals. Canonical work program owns stage status.",
+  "decisions": [
+    {
+      "id": "D01",
+      "topic": "First technical pilot",
+      "state": "owner_selected",
+      "value": "Bounded Minecraft assistance through an existing supported Codex client",
+      "evidence": "User reply: Bounded Minecraft assistance first (recommended)",
+      "limit": "Exact task/thresholds still proposals. No commercial permission or product acceptance implied."
+    },
+    {
+      "id": "D02",
+      "topic": "Software term",
+      "state": "owner_selected",
+      "limit": "Exact software SKU/benefits/billing interval and mapping of existing presets remain to reconcile; no payment activation.",
+      "value": "Recurring subscription for the broader CasimirBot harness",
+      "evidence": "User explicitly agrees subscription is the better fit and reports existing Stripe $5/$10 presets."
+    },
+    {
+      "id": "D03",
+      "topic": "First-party ownership",
+      "state": "owner_selected_review_method",
+      "proposal": "Review ownership and prior licensed material per component; future owned implementation may be private while existing terms and third-party obligations are retained.",
+      "value": "Classify first-party work with established ownership; third-party work distributable under its existing terms; unclear code/assets requiring evidence, replacement or exclusion.",
+      "limit": "Method selected, not blanket ownership assertion. Sufficient licensed distribution rights may be enough without copyright assignment."
+    },
+    {
+      "id": "D04",
+      "topic": "Useful trial",
+      "state": "proposal",
+      "proposal": "14 days, no automatic charge, same bounded capability envelope; initial compatibility/safety/recovery access remains available."
+    },
+    {
+      "id": "D05",
+      "topic": "Devices and sessions",
+      "state": "proposal",
+      "proposal": "Two registered Windows devices; one concurrent paid environment session; no new offline session until exclusive slot can be verified."
+    },
+    {
+      "id": "D06",
+      "topic": "Validation and revocation",
+      "state": "proposal",
+      "proposal": "24-hour refresh, maximum 72-hour cached validation bounded by paid term; known revoke prevails; connected recognition within60s and connector release within5s or stricter existing contract."
+    },
+    {
+      "id": "D07",
+      "topic": "Download and source boundary",
+      "state": "proposal",
+      "proposal": "Public binary-only release repository, forward-version migration before any source visibility change; exact repository/owner not created or selected."
+    },
+    {
+      "id": "D08",
+      "topic": "Minecraft commercial rights",
+      "state": "rights_review_required",
+      "proposal": "Review actual harness/connector/paywall offer against Minecraft EULA and Usage Guidelines; obtain documented permission basis or written permission where necessary.",
+      "limit": "A free connector does not itself establish permission for the paid offering. No external contact authorized or performed."
+    },
+    {
+      "id": "D09",
+      "topic": "G8 scope",
+      "state": "retained_existing_contract",
+      "value": "All12 product acceptance requirements and stricter unresolved federation/room/voice prerequisites remain. Bounded pilot is not G8 closure."
+    },
+    {
+      "id": "D10",
+      "topic": "Model payer",
+      "state": "selected_prior_direction",
+      "value": "External client account funds reasoning; no required second Codex runtime, Casimir API-key enrollment or inference purchase. D15 excludes managed provider services from the initial offer."
+    },
+    {
+      "id": "D11",
+      "topic": "Signing",
+      "state": "historical_dependency_not_reverified",
+      "value": "PNA2 records owner deferral due to Microsoft account hold ending2026-10-01; exact provider provisioning must be reverified before signed build scheduling."
+    },
+    {
+      "id": "D12",
+      "topic": "Navigation evaluation mods",
+      "state": "owner_reaffirmed_exclusion",
+      "value": "Navigation evaluation mods are to be removed before release; existing Baritone non-shipping contract retained.",
+      "evidence": "User reply: the mods we are using in the nav plan will be removed before release, thats the plan",
+      "limit": "This answers intended release exclusion, not first-party Fabric connector commercial classification or written permission. No current user game installation is modified by this specification."
+    },
+    {
+      "id": "D13",
+      "state": "owner_selected",
+      "topic": "Minecraft role in broader product",
+      "value": "Minecraft is a visible technical proof of concept among the harness capability combinations, not the whole product or a selected Minecraft-only paid SKU.",
+      "evidence": "User explains the harness is much more than this function and the virtual game makes the results directly visible."
+    },
+    {
+      "id": "D14",
+      "state": "owner_reported_source_reconciled",
+      "topic": "Existing Stripe presets",
+      "value": "Owner reports an existing Stripe account with $5 and $10 presets. Existing sandbox fixture uses USD1000 minor units for starter_monthly and USD500 for a separate prepaid-credit purchase.",
+      "sources": [
+        "server/routes/__tests__/stripe-sandbox-acceptance.test.ts",
+        "shared/helix-billing-entitlement.ts",
+        "docs/work-packets/eh-g8-spb4-stripe-sandbox-entitlement-ledger-v1.md"
+      ],
+      "limit": "Historical source observation, not current offer scope. No dashboard inspection; fixture is not proof of current Stripe Price configuration, two software tiers or live commerce. Reuse applicable subscription foundations; D15 excludes credits. Subscription benefits and interval remain to define."
+    },
+    {
+      "id": "D15",
+      "topic": "Initial subscription offer excludes credits and managed inference",
+      "state": "owner_selected",
+      "value": "Subscription only; no credit purchases or bundles. CasimirBot-funded model/API service, including managed GPT Live, is outside initial scope. Use the supported external reasoning application.",
+      "evidence": "User: We already evaluated we arnt going for the credit thing anymore, so we are trying for just a subscription.... I dont think we can buy api's for business use to start like gpt live",
+      "limit": "Startup product scope, not a finding that commercial APIs are unavailable. No payment changes. Existing $5/$10 subscription benefits remain to define."
+    },
+    {
+      "id": "D16",
+      "topic": "Personal connection first",
+      "state": "owner_selected_direction",
+      "value": "Prove ordinary connected-tool use without mandatory manual room-to-task binding; optional coordination adds separately accepted capabilities.",
+      "evidence": "2026-09-08 user supplied base-loop and continuity direction."
+    },
+    {
+      "id": "D17",
+      "topic": "Leading paid-service candidate",
+      "state": "owner_endorsed_candidate",
+      "value": "Authenticated hosted collaboration with owner-shared program permissions, maintained connections, revocation/recovery and action history.",
+      "evidence": "User: yeah add this, accepting the preceding hosted-collaboration recommendation.",
+      "limit": "No model-subscription sharing, pricing/payer/guest selection, commercial rights clearance, runtime implementation or stage promotion."
+    },
+    {
+      "id": "D18",
+      "state": "owner_selected",
+      "topic": "Free personal MCP experience and paid collaboration",
+      "value": "Complete supported personal MCP tool experience is free. Hosted collaboration is the subscription offer; Codex owns reasoning and tools contribute procedures and evidence.",
+      "evidence": "User explicitly proposes the whole experience for one person as an MCP tool for free, and a multiplayer hosted collaboration platform across games/programs.",
+      "limit": "Supersedes historical paid-personal/trial requirements; does not establish price mapping, universal reasoning improvement, live acceptance, provider subscription sharing or source-license changes."
+    }
+  ],
+  "stage_closure_allowed": false,
+  "supersedes": "../2026-09-08-collaboration-04/owner-decisions.json"
+}

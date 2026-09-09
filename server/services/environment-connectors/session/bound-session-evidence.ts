@@ -1,3 +1,4 @@
+import type { ReasoningTaskAssociationVerifier } from "../../local-supervisor/reasoning-binding-ports";
 import type { HelixReasoningTaskBindingStore } from "../../local-supervisor/reasoning-task-binding-store";
 import { resolveTemporalPerceptionContext } from "../temporal-plans/temporal-perception-context";
 import { TemporalPlanError } from "../temporal-plans/temporal-plan-error";
@@ -15,16 +16,16 @@ export type BoundSessionEvidenceInput = {
  */
 export async function readBoundSessionEvidence(
   input: BoundSessionEvidenceInput,
-  bindingStore: Pick<HelixReasoningTaskBindingStore, "verifyTaskAssociation">,
+  bindingStore: ReasoningTaskAssociationVerifier,
 ) {
   if (input.context.profileId !== input.binding.profileRef ||
       input.context.runId !== input.binding.runId || !input.binding.runId) {
     throw new TemporalPlanError("temporal_plan_task_context_mismatch");
   }
-  bindingStore.verifyTaskAssociation(input.binding);
+  await bindingStore.verifyTaskAssociation(input.binding);
   const context = await resolveTemporalPerceptionContext(input.context);
   // Presence, exact binding or revocation may change during asynchronous reads.
-  const binding = bindingStore.verifyTaskAssociation(input.binding);
+  const binding = await bindingStore.verifyTaskAssociation(input.binding);
   return {
     context,
     binding,

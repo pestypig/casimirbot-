@@ -1,0 +1,89 @@
+{
+  "schema": "nav1c.bounded_capture_acceptance.v1",
+  "recorded_at": "2026-09-09 01:39:54 UTC",
+  "program_gate": "G8",
+  "maturity": "deterministically verified",
+  "scope": "Unregistered capture algorithm and offline native-fact replay",
+  "files": [
+    {
+      "path": "minecraft/helix-fabric-sensor/src/main/java/com/casimirbot/helixsensor/fabric/FabricNavigationCollisionCapture.java",
+      "sha256": "f14c7920ccf5e6435c4ced612389761df5cab4d0df8912602325f1e835e56118"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/main/java/com/casimirbot/helixsensor/fabric/FabricNavigationCollisionFacts.java",
+      "sha256": "5f1eea0caa7a74dbe525642bd23b742a66947aa4a7efb831b0fa124bb311e34a"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricNavigationCollisionCaptureTest.java",
+      "sha256": "6423fc1c8c7ac3f33bfcb2d6995eda0fd3488a107de4686d0fba75bd369586ed"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricNavigationCollisionFactsTest.java",
+      "sha256": "ebd5bd88251d1c3faf9b9bd9b85468181d277f3b0bef4066f67c5c5e8e92a750"
+    },
+    {
+      "path": "server/services/environment-connectors/navigation/__tests__/minecraft-native-collision-replay.test.ts",
+      "sha256": "27aacd4c83d59ebe5c7d24306c15160d554ce2f1b849ad7052f12c6de1861011"
+    },
+    {
+      "path": "docs/evidence/eh-g8-environment-spatial-navigation-v1/nav1c-selected-player-capture-fixture.json",
+      "sha256": "e37064c2cede8ccc391f9d41fc46e55ffcdcbfcc824ea82df34e73936adc75f3"
+    }
+  ],
+  "tests": {
+    "native": {
+      "capture": 13,
+      "collision_facts": 8,
+      "spatial_survey_regression": 9,
+      "passed": 30,
+      "failed": 0
+    },
+    "typescript": {
+      "replay_bridge": 13,
+      "topology": 37,
+      "neutral": 15,
+      "passed": 65,
+      "failed": 0
+    },
+    "targeted_typecheck": {
+      "diagnostics": 0,
+      "full_repository": false
+    },
+    "fresh_native_fixture_semantic_match": true
+  },
+  "bounds": {
+    "horizontal_radius": [
+      1,
+      7
+    ],
+    "vertical_radius": [
+      1,
+      8
+    ],
+    "maximum_enumerated_cells": 3825,
+    "cell_ceiling": 4096,
+    "payload_bytes": 2097152,
+    "cooperative_elapsed_budget_ms": 20
+  },
+  "fixture": {
+    "cells": 125,
+    "expected_nodes": 9,
+    "expected_edges": 40,
+    "expected_frontiers": 8,
+    "real_native_blockstate_measurement": true,
+    "thread_identity_tick_clock_injected": true,
+    "selected_player_live_capture": false
+  },
+  "not_claimed": [
+    "20 ms live latency or preemption of an individual native operation",
+    "Registered probe, transport admission or authenticated capture",
+    "Live ServerLevel/ServerPlayer acceptance",
+    "NAV1-wide, NAV-EQ, NAV8 or gameplay readiness"
+  ],
+  "runtime_changes": {
+    "deployment": false,
+    "mod_installed": false,
+    "gameplay": false,
+    "process_restart": false
+  }
+}

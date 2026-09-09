@@ -1,0 +1,27 @@
+{
+  "scope": "CS1 presence-retention development directory package; not live acceptance",
+  "package": "apps/desktop/release-cs1-presence-retention-20260908/win-unpacked",
+  "build_host_exit_code": 0,
+  "stage_runtime_exit_code": 0,
+  "packager_exit_code": 0,
+  "runtime_files_sha256_matched_to_staging": 645,
+  "asar_entrypoints_matched_to_host_outputs": {
+    "main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service.mjs": "2bc594e9a351c1331eae11a8022b4d810af69de1bee7b1cb4a66820c8052d22e"
+  },
+  "exe_sha256": "bb3d1570eb6d866baf6d1c33bb370aaeeac637ac29ad40ec7e8cc56332066da1",
+  "verification": {
+    "full_discipline_exit_code": 0,
+    "focused_mcp_coordination_passed": 27,
+    "focused_binding_store_passed": 10,
+    "first_artifact_check": "Failed to resolve @electron/asar from repository root; rerun using installed desktop dependency succeeded.",
+    "runtime_catalog_negative": "Advertised v2 helix_client_authorization_status returned MCP -32602 tool not found; this is not proof of expired authorization. Ready up absent from task callable catalog."
+  },
+  "native_launch_verified": false,
+  "previous_exe_preserved_running": true,
+  "consent_changed": false,
+  "cs1_complete": false,
+  "et6_accepted": false,
+  "nav1_unlocked": false
+}

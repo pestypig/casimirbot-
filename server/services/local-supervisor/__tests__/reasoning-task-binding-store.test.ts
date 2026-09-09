@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { dispatchAgentChatSteering, dispatchExactChatSteering } from "../exact-chat-steering-dispatch";
 import type { HelixLocalSupervisorPresence } from
   "@shared/helix-local-supervisor-coordination";
 import {
@@ -89,6 +90,65 @@ const issueAndClaim = (store: HelixReasoningTaskBindingStore) => {
 };
 
 describe("HelixReasoningTaskBindingStore", () => {
+  it("labels agent ingress truthfully and rejects origin or target substitution", () => {
+    const { store } = setup();
+    const { binding } = issueAndClaim(store);
+    const actor = { profileRef: "profile-current", authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current", clientContinuationRef: "provider-thread-private",
+      bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+      helixConversationId: "helix-conversation-current", missionId: "mission-current", runId: "run-current" };
+    const request = { reasoning_binding_id: actor.bindingId, binding_epoch: actor.bindingEpoch,
+      helix_conversation_id: actor.helixConversationId, run_id: actor.runId,
+      client_event_ref: "agent-request", instruction_text: "Inspect the platform" };
+    expect(() => dispatchAgentChatSteering(actor, { ...request, origin: "typed" }, store)).toThrow();
+    expect(() => dispatchExactChatSteering(actor.profileRef, { ...request, origin: "agent_submitted" }, store)).toThrow();
+    for (const change of [{ run_id: "foreign-run" }, { binding_epoch: 999 },
+      { helix_conversation_id: "foreign-chat" }]) {
+      expect(() => dispatchAgentChatSteering(actor, { ...request, ...change }, store)).toThrow();
+    }
+    expect(() => dispatchAgentChatSteering({ ...actor, clientContinuationRef: "foreign-task" }, request, store)).toThrow();
+    expect(store.read(actor)).toHaveLength(0);
+    const first = dispatchAgentChatSteering(actor, request, store);
+    expect(dispatchAgentChatSteering(actor, request, store)).toEqual(first);
+    const deliveries = store.read(actor);
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]).toMatchObject({ content_role: "agent_steering_advisory_not_execution",
+      event: { origin: "agent_submitted", answer_authority: false, execution_requested: false } });
+    expect(store.readForChatDisplay(actor)).toEqual(deliveries);
+    expect(store.readForChatDisplay(actor)[0].event.delivery_state).toBe("pending");
+    expect(store.readForChatDisplay({ ...actor, afterCursor: first.event.cursor })).toEqual([]);
+    for (const change of [{ profileRef: "foreign-profile" }, { runId: null },
+      { helixConversationId: "foreign-chat" }, { bindingEpoch: 999 }]) {
+      expect(() => store.readForChatDisplay({ ...actor, ...change })).toThrow();
+    }
+    store.revoke({ profileRef: actor.profileRef, bindingId: actor.bindingId });
+    expect(() => store.readForChatDisplay(actor)).toThrow("reasoning_binding_revoked");
+    expect(() => dispatchAgentChatSteering(actor, request, store)).toThrow("reasoning_binding_revoked");
+  });
+
+  it.each([false, true])("replay preserves deadline and terminal delivery state (acknowledged=%s)", (acknowledged) => {
+    const { store, advance } = setup();
+    const { binding } = issueAndClaim(store);
+    const input = { profileRef: "profile-current", bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch, clientEventRef: "expiry-replay",
+      origin: "typed" as const, instructionText: "Inspect the platform", expiresInSeconds: 30 };
+    const first = store.dispatch(input);
+    const target = { profileRef: input.profileRef, bindingId: input.bindingId,
+      bindingEpoch: input.bindingEpoch, clientSessionRef: "client-session-current" };
+    if (acknowledged) store.acknowledge({ ...target, eventRef: first.steering_event_ref });
+    advance(30);
+    const replay = store.dispatch(input);
+    expect(replay).toMatchObject({ steering_event_ref: first.steering_event_ref,
+      cursor: first.cursor, created_at: first.created_at, expires_at: first.expires_at,
+      delivery_state: acknowledged ? "acknowledged" : "expired",
+      execution_requested: false, answer_authority: false, terminal_eligible: false });
+    expect(replay).toEqual(store.inspectEvent({ ...target, eventRef: first.steering_event_ref }));
+    expect(store.read(target)).toHaveLength(1);
+    expect(store.read(target)[0].event).toEqual(replay);
+    expect(() => store.acknowledge({ ...target, eventRef: first.steering_event_ref }))
+      .toThrow("reasoning_steering_expired");
+  });
+
   it("resolves only the exact owned preparation target without mutating the binding", () => {
     const { store, entries } = setup();
     const { binding } = issueAndClaim(store);
@@ -267,9 +327,17 @@ describe("HelixReasoningTaskBindingStore", () => {
       bindingEpoch: binding.binding_epoch,
       clientEventRef: "voice-final-001",
       origin: "gpt_live_finalized",
-      instructionText: "A replay must not replace the original.",
+      instructionText: "Walk to the marked Minecraft waypoint.",
     });
     expect(replay).toEqual(first);
+    for (const change of [{ instructionText: "Different instruction" },
+      { origin: "typed" as const }, { expiresInSeconds: 300 }]) {
+      expect(() => store.dispatch({ profileRef: "profile-current",
+        bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+        clientEventRef: "voice-final-001", origin: "gpt_live_finalized",
+        instructionText: "Walk to the marked Minecraft waypoint.", ...change,
+      })).toThrowError(expect.objectContaining({ code: "reasoning_steering_request_conflict" }));
+    }
     expect(JSON.stringify(first)).not.toContain("Minecraft waypoint");
     expect(() => store.dispatch({
       profileRef: "profile-current",

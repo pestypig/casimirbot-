@@ -16,7 +16,7 @@ publication change follows from this note.
 
 `docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md` separates
 software use and required hosted identity/connection operation. The selected
-initial offer is recurring subscription for the broader harness, with no
+offer is free supported personal MCP tools and recurring subscription for hosted collaboration, with no
 credit purchases, credit bundles or CasimirBot-funded model/API service. Users
 connect their supported external reasoning application. Minecraft is a visible
 technical proof of concept. Existing Stripe $5/$10 presets are billing
@@ -27,6 +27,25 @@ source-license change is approved here.
 The subscription must define expiry and preserve owner safety/recovery access.
 The prepared cost worksheet measures hosting, support, payment and update costs
 without pretending that model resale is the value of the base product.
+
+Authenticated hosted collaboration is the leading paid-service candidate:
+maintained room hosting, scoped participant access to owner-shared program
+capabilities, revocation/recovery, action history and connector support. It does
+not grant another person's model account or subscription. Security boundaries
+apply regardless of payment; room eligibility never replaces consent. Prove
+the personal tool loop first, then the invite/grant/use/revoke/reconnect journey
+specified in CFP-1. Payer roles, guest policy and price-tier mapping remain open.
+
+The developer-platform direction is defined in
+`docs/architecture/casimirbot-developer-platform-product-contract-v1.md`: program
+developers expose reviewed capabilities once for personal use and opt into
+shared hosted collaboration. Developer-kit completeness and cross-program
+claims require independent integration evidence.
+
+The public landing page offers Download and Open app; the browser service
+uses authenticated domain accounts and durable hosted-subscription records.
+See `docs/architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md` for
+identity, payment, program-grant and GitHub/Replit deployment boundaries.
 
 ## One sentence
 Helix is a constraint-first mission overwatch platform that converts live system

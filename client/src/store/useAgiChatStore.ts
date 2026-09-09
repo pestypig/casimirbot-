@@ -496,6 +496,9 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           };
           const updatedSession: ChatSession = {
             ...target,
+            title: message.role === "user" && target.messages.length === 0 &&
+              (DEFAULT_CHAT_TITLES.has(target.title) || target.title === target.contextId)
+              ? titleFromFirstMessage(message.content) : target.title,
             messages: [...target.messages, message],
             updatedAt:
               scoreTimestamp(message.at) >= scoreTimestamp(target.updatedAt)

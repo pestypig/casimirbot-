@@ -1,0 +1,26 @@
+{
+  "scope": "Build and package only; not launched or live accepted",
+  "output": "apps/desktop/release-cs1-replay-20260908/win-unpacked",
+  "commands_passed": [
+    "npm run build:client",
+    "npm --prefix apps/desktop run build:host",
+    "npm --prefix apps/desktop run stage:runtime",
+    "npx electron-builder --config electron-builder.config.cjs --dir --publish never --config.directories.output=release-cs1-replay-20260908 (cwd apps/desktop)"
+  ],
+  "sha256": {
+    "apps/desktop/dist/main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "apps/desktop/dist/preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "apps/desktop/dist/service.mjs": "51dc9c98a1562c6fa262bdaf43afae2c885c7986a9d3a61a84384c2460d9f5d0",
+    "apps/desktop/release-cs1-replay-20260908/win-unpacked/CasimirBot.exe": "4946309d3e20943bf81485e97f7b82d8421fbbc14aa294feb1f82b7a20b9ec94"
+  },
+  "warnings": ["Client dependency externalization, eval and bundle-size warnings", "Host four duplicate-key/case warnings"],
+  "packaged_runtime_comparison": {
+    "runtime_files_compared": 645,
+    "mismatches": [],
+    "method": "SHA-256 each staged runtime file against packaged counterpart; extract app.asar dist entries and compare against built files",
+    "asar_host_matches": { "main.cjs": true, "preload.cjs": true, "service.mjs": true }
+  },
+  "signing_integrity": "not independently verified",
+  "running_exe_replaced": false,
+  "et6_passed": false
+}

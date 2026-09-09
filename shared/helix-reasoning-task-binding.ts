@@ -15,6 +15,7 @@ const opaqueRef = z.string().trim().min(3).max(320)
 export const helixReasoningTaskBindingProjectionSchema = z.object({
   schema: z.literal(HELIX_REASONING_TASK_BINDING_SCHEMA),
   reasoning_binding_id: opaqueRef,
+  pairing_id: opaqueRef.optional(),
   binding_epoch: z.number().int().positive(),
   status: z.enum(["pending_claim", "active", "revoked", "expired", "superseded"]),
   service_instance_ref: opaqueRef,
@@ -52,7 +53,7 @@ export const helixReasoningSteeringEventProjectionSchema = z.object({
   binding_epoch: z.number().int().positive(),
   cursor: z.number().int().positive(),
   client_event_ref: opaqueRef,
-  origin: z.enum(["typed", "gpt_live_finalized"]),
+  origin: z.enum(["typed", "gpt_live_finalized", "agent_submitted"]),
   delivery_state: z.enum(["pending", "acknowledged", "expired", "superseded", "revoked"]),
   instruction_sha256: z.string().regex(/^[a-f0-9]{64}$/u),
   instruction_length: z.number().int().positive().max(4_000),
@@ -77,7 +78,7 @@ export type HelixReasoningSteeringEventProjection = z.infer<
 export type HelixReasoningSteeringDelivery = Readonly<{
   event: HelixReasoningSteeringEventProjection;
   instruction_text: string;
-  content_role: "operator_steering_advisory_not_execution";
+  content_role: "operator_steering_advisory_not_execution" | "agent_steering_advisory_not_execution";
   raw_provider_content_included: false;
   hidden_reasoning_included: false;
 }>;

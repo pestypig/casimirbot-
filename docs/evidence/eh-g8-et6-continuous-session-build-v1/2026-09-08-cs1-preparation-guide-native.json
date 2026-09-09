@@ -1,0 +1,22 @@
+{
+  "scope": "Native launch and setup navigation, not live environment readiness",
+  "package": "apps/desktop/release-cs1-preparation-guide-20260908/win-unpacked",
+  "old_exe_closed_normally": true,
+  "replacement_launch_count": 1,
+  "window_id": 8850372,
+  "service_instance_ref": "service_instance:f68bc7988c881b3f68ee37ab60694a60",
+  "presence_refresh_succeeded_at": "2026-09-08T05:23:20.515Z",
+  "ordinary_destination_navigation_reached_agent_access": true,
+  "native_preparation_panel_visible": true,
+  "verified_run_present": false,
+  "run_checkbox_disabled": true,
+  "temporary_guide_label_captured": false,
+  "limitations": [
+    "Initial native click lacked geometry; fresh screenshot-backed observation recovered input.",
+    "Transient guide expired before final observation; asset and unit checks do not substitute for observing that guide.",
+    "Ready up remains absent from this task's callable catalog; no preparation or binding performed."
+  ],
+  "human_consent_changed": false,
+  "cs1_complete": false,
+  "et6_accepted": false
+}

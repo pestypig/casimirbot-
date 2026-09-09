@@ -1,0 +1,39 @@
+{
+  "state": "running",
+  "goal_complete": false,
+  "scope": "Integrated pairing full discipline regression start; not a pass",
+  "session_id": 38434,
+  "source_files": [
+    {
+      "path": "server/mcp/helix-mcp-server.ts",
+      "sha256": "5c735c93711bfab3f8fc713d97bd5bba161095392459968ccc65089ce71c8047"
+    },
+    {
+      "path": "server/services/local-supervisor/reasoning-task-binding-store.ts",
+      "sha256": "fd48201f95041942819c154a12468164c64a03d6fb31777755ae245bcd6c4ceb"
+    },
+    {
+      "path": "server/services/local-supervisor/durable-reasoning-binding-access.ts",
+      "sha256": "36d0905be7da54a35ce069423d31195dfb66a26ab8a5355ee59a1c003826aba9"
+    },
+    {
+      "path": "server/routes/agent-connections.ts",
+      "sha256": "3a899bbff8ac5f97ae20f5e7ec22539b21f9db724c721ecc6c17d868d96f7350"
+    },
+    {
+      "path": "shared/helix-reasoning-task-binding.ts",
+      "sha256": "7bd6b55625a6b30e8b3874e429c0acdc5e4c077fa30c888ccd72ecf3de0682e1"
+    },
+    {
+      "path": "client/src/components/agent-access/DurableTaskPairing.tsx",
+      "sha256": "10d6ef0e8e84d9f8069f42e26205eba8244db52ed7e6241a63ee13b9908518e9"
+    },
+    {
+      "path": "client/src/lib/agent-access/durablePairing.ts",
+      "sha256": "af9e084002103ed1216d6bff3735ff439ddf204720b46a753d15013231a541fa"
+    }
+  ],
+  "command": "HELIX_ASK_DISCIPLINE_CLASSIFICATION=source admission; npm run helix:ask:discipline:full",
+  "et6_passed": false,
+  "observed_at": "2026-09-09T01:48:21.0471107Z"
+}

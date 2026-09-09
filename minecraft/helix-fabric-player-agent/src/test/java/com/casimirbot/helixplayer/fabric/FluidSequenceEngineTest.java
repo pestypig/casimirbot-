@@ -11,6 +11,86 @@ import org.junit.jupiter.api.Test;
 
 final class FluidSequenceEngineTest {
     @Test
+    void scheduledCompilerWalksSeparateLaunchWaitFromThreeMovingHandoffs() throws Exception {
+        Object raw;
+        try (var stream = getClass().getResourceAsStream("/compiled-scheduled-handoff.json")) {
+            assertNotNull(stream);
+            raw = com.casimirbot.helixsensor.HelixJson.parse(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        }
+        List<Map<String, Object>> plans = ((List<?>) raw).stream()
+            .map(com.casimirbot.helixsensor.HelixJson::asObject).toList();
+        List<Map<String, Object>> arguments = plans.stream().map(plan ->
+            com.casimirbot.helixsensor.HelixJson.asObject(
+                com.casimirbot.helixsensor.HelixJson.asObject(plan.get("artifact")).get("arguments"))).toList();
+        for (int firstTick : List.of(0, 3, 8, 9)) {
+            FakeBridge bridge = new FakeBridge();
+            FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+            engine.begin(arguments.get(0));
+            int movingTicks = 0;
+            WorkflowStep result = null;
+            for (int tick = firstTick; tick <= 49; tick++) {
+                bridge.snapshot = new PlayerSnapshot(true, Math.max(0, tick - 8) * 0.1,
+                    64, 65.62, 0, 0, 0, 20, true, false, false, null);
+                result = engine.step(tick + 1);
+                if (firstTick > 8) {
+                    assertFalse(bridge.movement.forward());
+                    if (result.status() != WorkflowStepStatus.RUNNING) break;
+                    continue;
+                }
+                if (tick < 8) {
+                    assertFalse(bridge.movement.forward(), "Launch waiting is not motion");
+                } else if (tick < 48) {
+                    assertEquals(WorkflowStepStatus.RUNNING, result.status());
+                    assertTrue(bridge.movement.forward(), "No released tick within admitted moving runway");
+                    movingTicks++;
+                }
+                if (tick == 8 || tick == 18 || tick == 28) {
+                    int predecessor = (tick - 8) / 10;
+                    assertTrue(engine.queueAdmittedSuccessor(
+                        String.valueOf(arguments.get(predecessor).get("sequence_id")),
+                        "checkpoint:compiled-walk", arguments.get(predecessor + 1),
+                        tick + 10, tick, tick + 9, 0));
+                }
+                if (result.status() != WorkflowStepStatus.RUNNING) break;
+            }
+            assertNotNull(result);
+            assertEquals(firstTick > 8 ? WorkflowStepStatus.FAILED : WorkflowStepStatus.SUCCEEDED, result.status());
+            assertEquals(firstTick > 8 ? 0 : 40, movingTicks);
+            if (firstTick <= 8) {
+                assertEquals(3, result.measurements().get("resident_handoff_count"));
+                assertTrue(bridge.released);
+            }
+            assertFalse(bridge.movement.forward());
+        }
+    }
+
+    @Test
+    void compilerDerivedWalkRejectsHandoffWhenDeliveryConsumesOneSourceTick() throws Exception {
+        Map<String, Object> fixture;
+        try (var stream = getClass().getResourceAsStream("/compiled-rolling-walk.json")) {
+            assertNotNull(stream);
+            fixture = com.casimirbot.helixsensor.HelixJson.asObject(
+                com.casimirbot.helixsensor.HelixJson.parse(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)));
+        }
+        Map<String, Object> base = com.casimirbot.helixsensor.HelixJson.asObject(
+            com.casimirbot.helixsensor.HelixJson.asObject(fixture.get("artifact")).get("arguments"));
+        FakeBridge bridge = new FakeBridge();
+        FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+        engine.begin(base);
+        // First execution is one tick later than the fixture's source clock.
+        assertEquals(WorkflowStepStatus.RUNNING, engine.step(2).status());
+        Map<String, Object> next = new LinkedHashMap<>(base);
+        next.put("sequence_id", "must-not-start-after-delayed-root");
+        assertTrue(engine.queueAdmittedSuccessor(String.valueOf(base.get("sequence_id")),
+            "checkpoint:compiled-walk", next, 2, 1, 2, 2));
+        WorkflowStep result = engine.step(3);
+        assertEquals(WorkflowStepStatus.FAILED, result.status());
+        assertEquals(base.get("sequence_id"), result.measurements().get("sequence_id"));
+        assertFalse(bridge.movement.forward());
+        assertTrue(bridge.released);
+    }
+
+    @Test
     void walkBoundaryRejectsUnfinishedMotionAndManualTakeover() {
         for (boolean manual : List.of(false, true)) {
             FakeBridge bridge = new FakeBridge();

@@ -287,6 +287,9 @@ export const helixAgentConnectionStatusSchema = z.object({
     room_binding_id: opaqueRef,
     room_binding_version: z.number().int().positive(),
     verification_ref: opaqueRef,
+    // Current resolvers include the finite run deadline. Older projections
+    // remain readable; admission always revalidates the server-owned run.
+    run_expires_at: z.string().datetime().optional(),
   }).strict().nullable().optional(),
   proof_basis: z.enum(["none", "authenticated_presence_tool"]),
   observed_at: z.string().datetime().nullable(),

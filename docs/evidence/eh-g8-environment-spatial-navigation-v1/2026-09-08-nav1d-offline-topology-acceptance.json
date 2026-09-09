@@ -1,0 +1,83 @@
+{
+  "schema": "nav1d.offline_topology_acceptance.v1",
+  "recorded_at": "2026-09-09T01:18:40Z",
+  "local_date": "2026-09-08",
+  "program_gate": "G8",
+  "capability": "NAV1-D offline full-cube collision-fact topology",
+  "maturity": "deterministically verified",
+  "source_head": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+  "working_tree": "dirty; source hashes below identify tested files; not a running package identity",
+  "artifacts": [
+    {
+      "path": "server/services/environment-connectors/navigation/minecraft-voxel-topology.ts",
+      "sha256": "eff0cc988c86abcf5e343a7ed6e342f1824a2e0469cd5e2a8d4cdfe277615e3a"
+    },
+    {
+      "path": "server/services/environment-connectors/navigation/__tests__/minecraft-voxel-topology.test.ts",
+      "sha256": "369c91acf189804cc4b475f33ccaae296f5b7647cafc96d2a8a80e1ce6bc8fe5"
+    },
+    {
+      "path": "shared/helix-environment-navigation.ts",
+      "sha256": "e7f3851e4833ddc7e4c9d7b1d77088d09ea34de031319b5d6ba694462df34c0e"
+    }
+  ],
+  "evidence_class": "synthetic collision fixtures; existing native component regression; no live gameplay",
+  "limits": {
+    "maximum_cells": 4096,
+    "maximum_input_bytes": 2097152,
+    "maximum_nodes": 1024,
+    "maximum_edges": 16384,
+    "transition_candidates_per_node": 16
+  },
+  "checks": {
+    "targeted_typecheck": {
+      "diagnostics": 0,
+      "scope": "compiler, new tests and NAV0 tests with transitive imports; repository tsconfig options and incremental disabled",
+      "full_repository_typecheck": false
+    },
+    "documentation_audit": {
+      "ok": true,
+      "failures": 0,
+      "command": "npm run helix:environment-harness:docs-audit"
+    },
+    "typescript_tests": {
+      "passed": 52,
+      "failed": 0,
+      "new_topology_tests": 37,
+      "existing_neutral_tests": 15,
+      "command": "npx vitest run server/services/environment-connectors/navigation/__tests__/minecraft-voxel-topology.test.ts shared/__tests__/helix-environment-navigation.spec.ts --pool=forks --maxWorkers=1 --minWorkers=1"
+    },
+    "native_tests": {
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "toolchain": "portable JDK 21.0.12.1+1",
+      "gradle": "8.14.3",
+      "workers": 1,
+      "heap_mib": 512,
+      "command": "minecraft/helix-paper-sensor/gradlew.bat -p minecraft/helix-minecraft-connector-core test --tests com.casimirbot.helixsensor.navigation.BoundedNavigationFrontierTest --no-daemon --max-workers=1 -Dorg.gradle.jvmargs=-Xmx512m",
+      "claim": "existing component regression, not native replay of new topology compiler"
+    },
+    "dense_floor": {
+      "nodes": 196,
+      "edges": 1404,
+      "frontiers": 52,
+      "transition_checks": 3136
+    }
+  },
+  "repair": {
+    "file": "shared/helix-environment-navigation.ts",
+    "classification": "type narrowing only",
+    "description": "Capture narrowed coordinate destination before reduce callback; schemas and runtime goal-validation semantics unchanged."
+  },
+  "claim_limits": [
+    "No registered adapter or MCP capability added.",
+    "No current Fabric snapshot is claimed to provide full-cube collision facts.",
+    "Native SOLID includes non-empty partial shapes; native source mapping still needs qualification.",
+    "No live game capture, movement, world mutation, authority changes, restart or mod installation.",
+    "No route search or destination selection; only candidate topology.",
+    "No scheduler capacity, latency, damage-risk, public product, NAV1-wide, NAV-EQ, NAV8 or Nether acceptance.",
+    "No Baritone code, API, class structure or shipping dependency."
+  ],
+  "next": "Finish NAV1 measured sensor-to-profile mapping; NAV-EQ still gates live executor integration."
+}

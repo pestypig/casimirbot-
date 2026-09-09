@@ -160,6 +160,7 @@ export const buildMinecraftPlayActivationInstruction = (input: Readonly<{
   actionAuthorityId: string;
   allowedCapabilityIds: string[];
   authorityExpiresAt: string | null;
+  boundRunId: string | null;
 }>): string => [
   "The user explicitly activated Play Minecraft with Helix from CasimirBot for the objective below.",
   `Objective: ${input.objective.trim()}`,
@@ -172,6 +173,10 @@ export const buildMinecraftPlayActivationInstruction = (input: Readonly<{
   `Current action authority: ${input.actionAuthorityId}`,
   `Allowed player capabilities: ${compactIds(input.allowedCapabilityIds)}`,
   `Authority expiry: ${input.authorityExpiresAt ?? "server-governed"}`,
+  input.boundRunId
+    ? `Existing bound environment run: ${input.boundRunId}. Re-read and preserve this run and its actual deadline; do not replace or extend it merely to match the gameplay lease.`
+    : "No environment run is associated with this chat binding. Verify whether a reusable exact run exists before proposing a new one; do not invent a run association.",
+  "The displayed authority expiry is a requested session limit, not current authorization proof. Re-read the exact authority and source deadlines. If a new scoped environment run is necessary and authorized, explicitly set its budget.expires_in_seconds to the remaining verified finite session window, within the run API limit, rather than silently accepting the one-hour default. Never round the duration up beyond that window. If any required lease or existing run ends sooner, report that shorter deadline and the required recovery instead of renewing permission or replacing the chat binding. A missing or expired finite window is not permission to start an unbounded run.",
   "Use the CasimirBot MCP tools to re-read current room, selected-player, authority, connector-manifest, and heartbeat state. Reuse current exact resources. If the local Fabric client is not connected, call helix_minecraft_local_lifecycle_launch with this exact room, environment, and current active action-authority ID; startup alone is not permission and the tool must not widen authority. Privately pair the same-host player with helix_environment_player_pair_local only if readiness requires it. Create or restore the exact scoped durable Minecraft goal and semantic monitor for this objective without duplicating either one. Do not execute gameplay merely to prove readiness.",
   "When ready, report the accepted input paths: ordinary Helix chat and `/helix ask <natural-language prompt>`. For later requests, select only admitted tools, consume each fresh action observation before replanning or answering, and preserve manual override, cancel, Emergency Stop, revocation, and stale-epoch rejection.",
   "Steering pickup, pairing/launch/action receipts, monitor deliveries, and goal projections are nonterminal evidence—not answers or execution authority. Use helix_environment_action_authority_revoke for a requested lease stop; stale work must then fail closed. Only the completed governed solver path may provide the final text, and GPT Live may only read that same authorized result.",

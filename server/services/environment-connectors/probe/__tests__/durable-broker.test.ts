@@ -11,6 +11,7 @@ import {
   HELIX_ENVIRONMENT_PROBE_RESULT_V1_SCHEMA,
   HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA,
   HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+  HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
   HELIX_MINECRAFT_SPATIAL_REGION_INSPECT_CAPABILITY,
   type HelixEnvironmentCapabilityDescriptor,
   type HelixEnvironmentConnectorProbeResult,
@@ -396,6 +397,7 @@ const seed = async (): Promise<
 const dispatch = async (
   connector: Awaited<ReturnType<typeof materializeLegacyRoomSourceConnector>>,
   suffix: string,
+  overrides: Partial<Parameters<typeof dispatchDurableEnvironmentProbe>[0]> = {},
 ) =>
   dispatchDurableEnvironmentProbe({
     tenantId: "tenant:durable-probe",
@@ -422,9 +424,84 @@ const dispatch = async (
     timeoutMs: 10_000,
     idempotencyKey: `idempotency:durable-probe:${suffix}`,
     now: NOW,
+    ...overrides,
   });
 
 describe("durable environment probe broker", () => {
+  it.each(["captured", "connector", "wrong_player", "missing_player", "wrong_tick", "old_sensor", "expired", "replay", "wrong_source"])(
+    "carries opt-in navigation through the broker: %s", async scenario => {
+      const connector = await seed();
+      const nativeId = "00000000-0000-4000-8000-000000000001";
+      const capability = HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY;
+      const subjectBindingId = "environment_subject_binding:nav-observation";
+      if (scenario !== "missing_player") await getPool().query(`INSERT INTO helix_room_environment_subject_bindings (
+        subject_binding_id, room_id, participant_id, profile_id, environment_binding_id,
+        room_source_binding_id, source_id, world_id, subject_kind, subject_ref,
+        subject_native_id, subject_label, verification_method, confidence,
+        producer_epoch_ref, verified_at, last_confirmed_at, created_at, updated_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'minecraft.player','environment_subject:nav',
+        $9,'NavigationFixturePlayer','self_claim',0.8,$10,$11,$11,$11,$11)`,
+        [subjectBindingId, ROOM_ID, PARTICIPANT_ID, PROFILE_ID, connector.environmentBindingId,
+          BINDING_ID, SOURCE_ID, WORLD_ID, nativeId, producerEpochRef, NOW.toISOString()]);
+      const dispatched = await dispatch(connector, `nav:${scenario}`, {
+        descriptor: readEnvironmentConnectorCapabilityDescriptor(capability)!,
+        arguments: { target: "current_actor", include_navigation_collision: true },
+        requestingParticipantId: PARTICIPANT_ID,
+        ...(scenario === "missing_player" ? {} : { resolvedSubject: { subjectBindingId, subjectNativeId: nativeId } }),
+      });
+      const [lease] = await leaseDurableEnvironmentProbesForClaim({ claim, adapterAdmission: admission, limit: 1, now: new Date(NOW.getTime() + 100) });
+      expect(lease.request.target).toMatchObject({ include_navigation_collision: true });
+      const replay = JSON.parse(await fs.readFile("docs/evidence/eh-g8-environment-spatial-navigation-v1/nav1c-selected-player-capture-fixture.json", "utf8"));
+      if (scenario === "wrong_player") replay.subject_native_id = "00000000-0000-4000-8000-000000000002";
+      if (scenario === "wrong_tick") replay.tick_end++;
+      const position = { x: 0, y: 0, z: 0 };
+      const details = {
+        snapshot_schema: "helix.minecraft_perception_snapshot.v1", observation_revision: 100, game_tick: 100,
+        capture_duration_ms: 1, dimension: "minecraft:overworld",
+        actor: { position, velocity: position, yaw: 0, pitch: 0, health: 20, max_health: 20, food_level: 20, air: 300, on_ground: true, on_fire: false, freezing: false },
+        focus: { kind: "miss", distance_blocks: 0, line_of_sight: true, occlusion: "none" },
+        entities: [], hazards: [],
+        movement_candidates: ["north", "south", "east", "west"].map(cardinal_direction => ({
+          cardinal_direction, relative_direction: "forward", target_feet_position: position, support_position: position,
+          support_block: "minecraft:stone", evidence_complete: false, feet_clear: false, head_clear: false,
+          drop_depth_blocks: 0, drop_scan_complete: false, nearby_hazard_count: 0, nearby_fluid_count: 0, safe_candidate: false,
+        })),
+        inventory: { item_count: 0, slots: [] },
+        coverage: { horizontal_radius: 2, vertical_radius: 2, loaded_region_complete: true, unknown_cell_count: 0, entities_complete: true, hazards_complete: true, omitted_categories: [] },
+        ui_state: { server_container_open: false, same_revision: true, client_screen_state: "unobserved", input_capture_known: false, input_activity: false, freshness: "unobserved" },
+        world_rules: { keep_inventory: false }, semantic_fingerprint: `sha256:${"f".repeat(64)}`,
+        ...(scenario === "old_sensor" ? {} : { navigation_collision: { status: "captured", replay } }),
+      };
+      const result: HelixEnvironmentProbeResult = {
+        schema: HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA, probe_result_id: `result:nav:${scenario}`, probe_request_id: dispatched.requestId,
+        source_id: scenario === "wrong_source" ? "source:other" : SOURCE_ID, room_id: ROOM_ID, domain: "minecraft", probe_type: "perception_snapshot",
+        status: "succeeded", result_summary: "Synthetic bounded perception", result: { details }, sensor_scope: "sensor_observable",
+        requires_caveat: false, side_effects_performed: false, commands_executed: [], world_mutation_performed: false,
+        evidence_refs: [], deterministic: true, model_invoked: false, assistant_answer: false, raw_content_included: false,
+        context_policy: "compact_context_pack_only", created_at: new Date(NOW.getTime() + 200).toISOString(),
+      };
+      const submit = () => submitDurableEnvironmentProbeResult({ claim, adapterAdmission: admission,
+        submission: { schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA, probe_request_id: dispatched.requestId,
+          probe_attempt_id: lease.probe_attempt_id, lease_token: lease.lease_token,
+          result: scenario === "connector" ? { ...connectorResultFor(dispatched.requestId, "succeeded"),
+            capability_id: capability, capability_version: 2, result: { result_summary: result.result_summary, ...details } } : result },
+        now: new Date(NOW.getTime() + (scenario === "expired" ? 20_000 : 500)),
+      });
+      if (["wrong_player", "missing_player", "wrong_tick", "wrong_source"].includes(scenario)) {
+        await expect(submit()).rejects.toMatchObject({ code: "schema_validation_failed" }); return;
+      }
+      const accepted = await submit();
+      expect(accepted.observation.result.navigation_collision).toMatchObject({ status: scenario === "old_sensor" ? "unavailable" : "captured" });
+      expect(accepted.observation).toMatchObject({ answer_authority: false, assistant_answer: false, terminal_eligible: false,
+        eligible_for_current_turn_reentry: scenario !== "expired" });
+      if (scenario === "replay") expect((await submit()).replayed).toBe(true);
+      const evidence = await readDurableEnvironmentProbeContinuationEvidence({ requestId: dispatched.requestId,
+        expectedPriorTurnId: `ask:durable-probe:nav:${scenario}`, expectedRoomId: ROOM_ID, expectedCapabilityId: capability,
+        now: new Date(NOW.getTime() + 1000) });
+      if (scenario === "expired") expect(evidence).toBeNull();
+      else expect(evidence?.observation.result.navigation_collision).toEqual(accepted.observation.result.navigation_collision);
+    },
+  );
   beforeEach(async () => {
     vi.stubEnv(
       "DATABASE_URL",

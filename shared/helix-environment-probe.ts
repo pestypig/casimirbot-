@@ -43,6 +43,7 @@ export type HelixEnvironmentProbeRequest = {
     actor_id?: string | null;
     horizontal_radius?: number | null;
     vertical_radius?: number | null;
+    include_navigation_collision?: boolean;
     purpose?:
       | "general"
       | "structure_planning"

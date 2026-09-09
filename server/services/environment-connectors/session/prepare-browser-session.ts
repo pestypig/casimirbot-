@@ -1,3 +1,4 @@
+import type { ReasoningPreparationTargetStore } from "../../local-supervisor/reasoning-binding-ports";
 import { createHash } from "node:crypto";
 import { HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY, helixEnvironmentProbeObservationSchema } from "@shared/helix-environment-connector";
 import type { HelixLocalSupervisorPresence } from "@shared/helix-local-supervisor-coordination";
@@ -10,13 +11,19 @@ import { executeEnvironmentProbeGatewayCapability } from "../../helix-ask/workst
 import { environmentDurableGoalStore } from "../goals/durable-goal-store";
 import { listRoomEnvironmentProjections, refreshOwnRoomEnvironmentSubjectEpoch } from "../subjects/subject-binding-store";
 import { readyUpEnvironmentSession } from "./ready-up-session";
+import { EnvironmentSessionPreparationError } from "./preparation-error";
+import { readEnvironmentSessionReadiness } from "./session-readiness";
+import { projectEnvironmentSessionReadiness } from "@shared/helix-environment-session-readiness";
+import { helixEnvironmentDurableGoalSha256, type HelixEnvironmentDurableGoalObjective } from "@shared/helix-environment-durable-goal";
 
 const services = {
   association: resolveReasoningRunAssociation, membership: readSharedRealtimeRoomMembership,
   account: resolveWorkstationGatewayAccountContext,
   goal: environmentDurableGoalStore.findForSession.bind(environmentDurableGoalStore),
+  createGoal: environmentDurableGoalStore.create.bind(environmentDurableGoalStore),
   environments: listRoomEnvironmentProjections, refreshSubject: refreshOwnRoomEnvironmentSubjectEpoch,
   observe: executeEnvironmentProbeGatewayCapability, prepare: readyUpEnvironmentSession,
+  inspect: readEnvironmentSessionReadiness,
 };
 
 /** Owner-scoped setup using an authenticated browser or MCP account context.
@@ -26,7 +33,9 @@ const services = {
 export async function prepareBrowserEnvironmentSession(input: {
   sessionId: string; profileRef: string; bindingId: string; bindingEpoch: number;
   helixConversationId: string; missionId: string | null; runId: string; requestId: string;
-}, store: Pick<HelixReasoningTaskBindingStore, "resolveOwnedPreparationTarget" | "verifyTaskAssociation">,
+  goalBootstrap?: { environment_binding_id: string; subject_binding_id: string;
+    action_authority_id: string; objective: HelixEnvironmentDurableGoalObjective };
+}, store: ReasoningPreparationTargetStore,
 presence: HelixLocalSupervisorPresence[], dependencies = services,
 authenticatedActor?: {
   accountContext: HelixWorkstationGatewayAccountContext;
@@ -36,12 +45,12 @@ authenticatedActor?: {
   const accountContext = authenticatedActor?.accountContext ?? await dependencies.account(input.sessionId);
   if (!accountContext.trusted_account_session || accountContext.profile_id !== input.profileRef ||
       accountContext.session_id !== input.sessionId) return fail("reasoning_binding_identity_mismatch");
-  const target = store.resolveOwnedPreparationTarget({ profileRef: input.profileRef,
+  const target = await store.resolveOwnedPreparationTarget({ profileRef: input.profileRef,
     bindingId: input.bindingId, bindingEpoch: input.bindingEpoch,
     helixConversationId: input.helixConversationId, missionId: input.missionId, runId: input.runId });
   if (authenticatedActor) {
     const actor = authenticatedActor.target;
-    store.verifyTaskAssociation(actor);
+    await store.verifyTaskAssociation(actor);
     if (actor.profileRef !== target.profileRef || actor.authenticatedMcpClientRef !== target.authenticatedMcpClientRef ||
         actor.clientSessionRef !== target.clientSessionRef || actor.clientContinuationRef !== target.clientContinuationRef ||
         actor.bindingId !== target.bindingId || actor.bindingEpoch !== target.bindingEpoch ||
@@ -53,13 +62,85 @@ authenticatedActor?: {
     row.authenticated_mcp_client_ref === target.authenticatedMcpClientRef);
   const association = entry ? await dependencies.association(entry) : null;
   if (!association || association.run_id !== input.runId) return fail("reasoning_binding_run_association_stale");
+  let runExpiresAt = Date.parse(association.run_expires_at);
+  if (!Number.isFinite(runExpiresAt) || runExpiresAt <= Date.now()) return fail("reasoning_binding_run_association_stale");
+  const assertCurrentAssociation = async () => {
+    const current = entry ? await dependencies.association(entry) : null;
+    if (!current || current.run_id !== association.run_id || current.room_id !== association.room_id ||
+        current.run_version !== association.run_version || current.room_binding_id !== association.room_binding_id ||
+        current.room_binding_version !== association.room_binding_version ||
+        current.verification_ref !== association.verification_ref) return fail("reasoning_binding_run_association_stale");
+    runExpiresAt = Date.parse(current.run_expires_at);
+    if (!Number.isFinite(runExpiresAt) || runExpiresAt <= Date.now()) return fail("reasoning_binding_run_association_stale");
+    await store.verifyTaskAssociation(target);
+  };
   const roomId = association.room_id;
   const member = await dependencies.membership({ roomId, profileId: input.profileRef });
   if (!member || member.roomStatus === "closed") return fail("reasoning_binding_identity_mismatch");
-  const goal = await dependencies.goal({ roomId, profileId: input.profileRef,
+  const preparationRepairs: Awaited<ReturnType<typeof readyUpEnvironmentSession>>["repairs"] = [];
+  let uncertain = false;
+  try {
+  let goal = await dependencies.goal({ roomId, profileId: input.profileRef,
     participantId: member.participantId, runId: input.runId });
-  if (!goal) return fail("environment_session_goal_missing");
+  const bootstrap = input.goalBootstrap;
+  if (!goal && bootstrap) {
+    const candidates = await dependencies.environments({ roomId, profileId: input.profileRef });
+    const selected = candidates.find(row => row.room_id === roomId &&
+      row.environment_binding_id === bootstrap.environment_binding_id);
+    let selectedSubject = selected?.self_subject_binding;
+    if (!selectedSubject || selectedSubject.subject_binding_id !== bootstrap.subject_binding_id ||
+        selectedSubject.participant_id !== member.participantId || selectedSubject.status === "revoked") {
+      return fail("environment_session_subject_changed");
+    }
+    // First-session setup needs the same epoch recovery as an existing goal.
+    // Refresh only the already selected subject; authority is still checked by
+    // goal creation, and no permission is renewed by this observation repair.
+    if (selectedSubject.status === "stale") {
+      await assertCurrentAssociation();
+      uncertain = true;
+      const refreshed = await dependencies.refreshSubject({ roomId, profileId: input.profileRef,
+        environmentBindingId: bootstrap.environment_binding_id, subjectRef: selectedSubject.subject_ref,
+        subjectBindingId: selectedSubject.subject_binding_id, expectedProducerEpochRef: selectedSubject.producer_epoch_ref });
+      preparationRepairs.push({ layer: "subject", changed: refreshed.producer_epoch_ref !== selectedSubject.producer_epoch_ref,
+        reason_code: "subject_epoch_checked" });
+      uncertain = false;
+      await assertCurrentAssociation();
+      if (refreshed.status !== "active" || refreshed.subject_binding_id !== selectedSubject.subject_binding_id ||
+          refreshed.subject_ref !== selectedSubject.subject_ref || refreshed.participant_id !== member.participantId ||
+          refreshed.environment_binding_id !== bootstrap.environment_binding_id || refreshed.room_id !== roomId) {
+        return fail("environment_session_subject_changed");
+      }
+      selectedSubject = refreshed;
+    }
+    await assertCurrentAssociation();
+    uncertain = true;
+    goal = await dependencies.createGoal({ ownerProfileId: input.profileRef, roomId,
+      participantId: member.participantId, environmentBindingId: bootstrap.environment_binding_id,
+      subjectNativeId: selectedSubject.subject_ref, actionAuthorityId: bootstrap.action_authority_id,
+      runId: input.runId, turnId: `environment_session_goal:${createHash("sha256").update(JSON.stringify([
+        input.profileRef, input.bindingId, input.bindingEpoch, input.requestId])).digest("hex")}`,
+      objective: bootstrap.objective,
+      idempotencyKey: `session:${createHash("sha256").update(JSON.stringify([
+        input.bindingId, input.bindingEpoch, input.helixConversationId, input.runId, input.requestId])).digest("hex")}` });
+    preparationRepairs.push({ layer: "goal", changed: null, reason_code: "goal_creation_or_replay_verified" });
+    uncertain = false;
+    await assertCurrentAssociation();
+  }
+  if (!goal) {
+    // Navigation context only: do not invent a goal or select an environment.
+    // Revalidate after the goal read before exposing the room setup handoff.
+    await assertCurrentAssociation();
+    throw new EnvironmentSessionPreparationError(
+      new HelixReasoningTaskBindingError("environment_session_goal_missing", 409),
+      preparationRepairs, uncertain, { room_id: roomId });
+  }
   const identity = goal.identity;
+  if (bootstrap && (identity.environment_binding_id !== bootstrap.environment_binding_id ||
+      identity.subject_binding_id !== bootstrap.subject_binding_id ||
+      identity.action_authority_id !== bootstrap.action_authority_id ||
+      helixEnvironmentDurableGoalSha256(goal.objective) !== helixEnvironmentDurableGoalSha256(bootstrap.objective))) {
+    return fail("environment_session_goal_conflict");
+  }
   const environments = await dependencies.environments({ roomId, profileId: input.profileRef });
   const environment = environments.find(row => row.environment_binding_id === identity.environment_binding_id &&
     row.room_id === roomId && row.source_id === identity.source_id && row.world_id === identity.world_id);
@@ -67,18 +148,25 @@ authenticatedActor?: {
   if (!subject || subject.subject_binding_id !== identity.subject_binding_id ||
       subject.participant_id !== member.participantId) return fail("environment_session_subject_changed");
   if (subject.status === "stale") {
-    store.verifyTaskAssociation(target);
-    await dependencies.refreshSubject({ roomId, profileId: input.profileRef,
+    await assertCurrentAssociation();
+    await store.verifyTaskAssociation(target);
+    uncertain = true;
+    const refreshed = await dependencies.refreshSubject({ roomId, profileId: input.profileRef,
       environmentBindingId: identity.environment_binding_id, subjectRef: subject.subject_ref,
       subjectBindingId: subject.subject_binding_id, expectedProducerEpochRef: subject.producer_epoch_ref });
+    preparationRepairs.push({ layer: "subject", changed: refreshed.producer_epoch_ref !== subject.producer_epoch_ref,
+      reason_code: "subject_epoch_checked" });
+    uncertain = false;
   }
-  store.verifyTaskAssociation(target);
+  // Setup reads may outlive the run or its room association. Revalidate before
+  // admitting even the read-only probe, not only after its result returns.
+  await assertCurrentAssociation();
   // Stable per-request broker deduplication, explicitly not a Codex execution ID.
   const ref = createHash("sha256").update(JSON.stringify([input.profileRef,
     input.bindingId, input.bindingEpoch, input.requestId])).digest("hex");
   const turnId = `environment_session_preparation:${ref}`;
   const probe = await dependencies.observe({ policy: null, accountContext,
-    assertCurrentTarget: () => { store.verifyTaskAssociation(target); },
+    assertCurrentTarget: assertCurrentAssociation,
     conversationThreadId: `helix-ask:room:${roomId}`, turnId,
     toolCallId: `${turnId}:observe`, providerExecutionId: turnId,
     capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
@@ -87,14 +175,40 @@ authenticatedActor?: {
       sourceId: identity.source_id, worldId: identity.world_id,
       subjectBindingId: identity.subject_binding_id, subjectNativeId: identity.subject_native_id },
   });
-  store.verifyTaskAssociation(target);
+  await store.verifyTaskAssociation(target);
   const observation = helixEnvironmentProbeObservationSchema.safeParse(probe.observation);
   if (!probe.ok || !observation.success || observation.data.outcome !== "succeeded" ||
       observation.data.capability_id !== HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY ||
       !observation.data.provenance_valid || !observation.data.eligible_for_current_turn_reentry) {
-    return fail("environment_session_observation_unavailable");
+    // A rejected probe is not readiness, but must not hide independent setup
+    // blockers (such as a finite grant requiring owner review). Inspect only;
+    // never recover a goal using missing or rejected observation evidence.
+    await assertCurrentAssociation();
+    const diagnostic = await dependencies.inspect({ binding: target,
+      context: { profileId: input.profileRef, participantId: member.participantId, roomId,
+        runId: input.runId, goalId: goal.goal_id, expectedRevision: goal.revision, turnId,
+        probeRequestId: observation.success ? observation.data.probe_request_ref : `${turnId}:unobserved`, priorTurnId: turnId },
+      environmentBindingId: identity.environment_binding_id, sourceId: identity.source_id,
+      worldId: identity.world_id, subjectBindingId: identity.subject_binding_id,
+      actionAuthorityId: identity.action_authority_id,
+    }, store);
+    await assertCurrentAssociation();
+    const readiness = projectEnvironmentSessionReadiness({ context_ref: diagnostic.context_ref,
+      now_ms: Date.now(), maximum_check_age_ms: 5000,
+      checks: diagnostic.checks.map(check => check.layer === "perception" ? {
+        ...check, state: "blocked" as const, human_approval_required: false,
+        reason_codes: ["environment_session_observation_unavailable"],
+      } : check),
+    });
+    return { schema: "helix.environment_session_ready_up.v1" as const,
+      selection: { room_id: roomId, environment_binding_id: identity.environment_binding_id },
+      session_deadlines: { run_expires_at_ms: runExpiresAt },
+      readiness, repairs: preparationRepairs, execution_authority: false as const,
+      answer_authority: false as const, assistant_answer: false as const, terminal_eligible: false as const };
   }
-  return dependencies.prepare({ binding: target,
+  await assertCurrentAssociation();
+  uncertain = true;
+  const receipt = await dependencies.prepare({ binding: target,
     context: { profileId: input.profileRef, participantId: member.participantId, roomId,
       runId: input.runId, goalId: goal.goal_id, expectedRevision: goal.revision, turnId,
       probeRequestId: observation.data.probe_request_ref, priorTurnId: turnId },
@@ -102,4 +216,22 @@ authenticatedActor?: {
     worldId: identity.world_id, subjectBindingId: identity.subject_binding_id,
     actionAuthorityId: identity.action_authority_id,
   }, store);
+  preparationRepairs.push(...receipt.repairs);
+  uncertain = receipt.repairs.some(repair => repair.changed === null);
+  await assertCurrentAssociation();
+  // Final association reads can outlive the observation-backed readiness.
+  // Keep completed repairs, but never publish an expired ready receipt.
+  if (receipt.readiness.ready && (receipt.readiness.valid_until_ms === null ||
+      !Number.isFinite(receipt.readiness.valid_until_ms) ||
+      receipt.readiness.valid_until_ms <= Date.now())) {
+    return fail("environment_session_readiness_expired");
+  }
+  return { ...receipt, repairs: preparationRepairs,
+    session_deadlines: { run_expires_at_ms: runExpiresAt },
+    readiness: { ...receipt.readiness, valid_until_ms: receipt.readiness.valid_until_ms === null
+      ? null : Math.min(receipt.readiness.valid_until_ms, runExpiresAt) } };
+  } catch (error) {
+    if (error instanceof EnvironmentSessionPreparationError) throw error;
+    throw new EnvironmentSessionPreparationError(error, preparationRepairs, uncertain);
+  }
 }

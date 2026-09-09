@@ -1,0 +1,186 @@
+{
+  "captured_utc": "2026-09-09T00:03:26.760Z",
+  "repository": "pestypig/casimirbot-",
+  "visibility": "public",
+  "default_branch": "main",
+  "main_sha": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+  "main_protected": false,
+  "source": "https://api.github.com/repos/pestypig/casimirbot-/branches/main",
+  "recent_runs": [
+    {
+      "id": 34178068397,
+      "name": "Robotics Benchmark",
+      "sha": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/pestypig/casimirbot-/actions/runs/34178068397"
+    },
+    {
+      "id": 34178068386,
+      "name": "Voice Train (Vertex AI)",
+      "sha": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/pestypig/casimirbot-/actions/runs/34178068386"
+    },
+    {
+      "id": 34178068359,
+      "name": "Repo Atlas Benchmark",
+      "sha": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/pestypig/casimirbot-/actions/runs/34178068359"
+    },
+    {
+      "id": 34178068357,
+      "name": "Casimir Verify",
+      "sha": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/pestypig/casimirbot-/actions/runs/34178068357"
+    },
+    {
+      "id": 33912309164,
+      "name": "Robotics Benchmark",
+      "sha": "1db9f34661ffc95d29c5250a6c0a61cbdac0f15d",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/pestypig/casimirbot-/actions/runs/33912309164"
+    }
+  ],
+  "casimir_failed_job": [
+    {
+      "name": "casimir-verify",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Setup Node",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Guard deprecated helix-core UI surface",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify ideology verifiers pack",
+          "conclusion": "success"
+        },
+        {
+          "name": "Validate agent context checklist",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Validate Helix Dottie docs/schema alignment",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Validate math stages",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Validate curvature-collapse reproducibility contract",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Generate CI reports",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Solar pipeline determinism gate",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Start AGI API",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Run Helix Ask patch probe (strict)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Run Casimir verify",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Evolution report-only gate (optional)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Public claim disclaimer check",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Ultimate warp readiness doc check",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Evidence pack determinism test",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Evolution hardening contract checks (optional)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Decision-grade checks skipped by default",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Generate helix decision package",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Validate helix decision package",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Generate math report",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload training trace",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload helix ask patch probe artifacts",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload evolution report",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload math report",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Setup Node",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "url": "https://github.com/pestypig/casimirbot-/actions/runs/34178068357/job/101911337767"
+    }
+  ],
+  "releases_returned": [],
+  "releases_scope": "GET releases?per_page=3 returned []; not proof of no local artifacts or private drafts"
+}

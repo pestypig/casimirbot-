@@ -7,6 +7,39 @@ import {
 } from "@shared/helix-environment-time";
 import { compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact } from "../minecraft-environment-time-compiler";
 
+it("generates four linked scheduled walks with a separate pre-motion launch window", () => {
+  const template = JSON.parse(readFileSync(
+    "minecraft/helix-fabric-player-agent/src/test/resources/compiled-rolling-walk.json", "utf8"));
+  const { plan_hash: ignored, ...draft } = template.source;
+  const plans: Array<{ source: ReturnType<typeof buildHelixEnvironmentTemporalPlan>; artifact: ReturnType<typeof compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact> }> = [];
+  for (let index = 0; index < 4; index++) {
+    const start = 8 + index * 10;
+    const previous = plans.at(-1)?.source;
+    const source = buildHelixEnvironmentTemporalPlan({
+      ...draft,
+      plan_id: `plan:scheduled:${index}`,
+      previous_plan_id: previous?.plan_id ?? null,
+      previous_plan_hash: previous?.plan_hash ?? null,
+      watermarks: { ...draft.watermarks, decision_unit: start, stop_unit: start + 9, committed_through_unit: start + 10 },
+      nodes: draft.nodes.map((node: any) => node.kind === "action" ? {
+        ...node,
+        arguments: { ...node.arguments, duration_ms: 500 },
+        timing: { earliest_start_unit: start, latest_start_unit: start, maximum_duration_units: 20 },
+      } : node),
+    });
+    const artifact = compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact({
+      plan: source, mutation_scope: template.artifact.arguments.mutation_scope,
+      resource_bindings: { "resource:locomotion": "locomotion" },
+    });
+    expect(artifact.arguments.nodes.find(node => node.node_kind === "workflow_action"))
+      .toMatchObject({ earliest_tick: start, latest_start_tick: start, action: { duration_ms: 500 } });
+    expect(artifact.execution_authority).toBe(false);
+    plans.push({ source, artifact });
+  }
+  expect(plans).toEqual(JSON.parse(readFileSync(
+    "minecraft/helix-fabric-player-agent/src/test/resources/compiled-scheduled-handoff.json", "utf8")));
+});
+
 it.each(["narrow", "wide"])("generates a hash-linked server-compiled pair (%s)", mode => {
   const template = JSON.parse(
     readFileSync(

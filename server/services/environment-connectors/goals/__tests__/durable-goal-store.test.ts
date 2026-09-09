@@ -1,5 +1,6 @@
 import { newDb } from "pg-mem";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { prepareBrowserEnvironmentSession } from "../../session/prepare-browser-session";
 import type { Queryable } from "../../../helix-ask/realtime-room/room-store/types";
 import { migration059 } from "../../../../db/migrations/059_environment_durable_goals";
 import { helixEnvironmentDurableGoalSha256 } from "@shared/helix-environment-durable-goal";
@@ -139,6 +140,71 @@ const createHarness = async () => {
   };
 };
 
+it.each(["unchanged", "canceled"] as const)("first-session preparation preserves %s goal after a committed response loss", async disposition => {
+  const harness = await createHarness();
+  try {
+    const input = { sessionId: "session:one", profileRef: "profile:owner", bindingId: "binding:one",
+      bindingEpoch: 1, helixConversationId: "chat:one", missionId: null, runId: "run:one", requestId: "request:one",
+      goalBootstrap: { environment_binding_id: identity.environment_binding_id,
+        subject_binding_id: identity.subject_binding_id, action_authority_id: identity.action_authority_id, objective } };
+    const target = { ...input, authenticatedMcpClientRef: "client:one", clientSessionRef: "client-session:one",
+      clientContinuationRef: "task:one" };
+    const bindings = { resolveOwnedPreparationTarget: () => target, verifyTaskAssociation: vi.fn() };
+    const presence = [{ authenticated_profile_ref: input.profileRef, client_session_ref: target.clientSessionRef,
+      authenticated_mcp_client_ref: target.authenticatedMcpClientRef, conversation_thread_ref: target.clientContinuationRef }];
+    const createGoal = vi.fn(async (request: Parameters<EnvironmentDurableGoalStore["create"]>[0]): ReturnType<EnvironmentDurableGoalStore["create"]> => {
+      const goal = await harness.makeStore().create(request);
+      if (disposition === "canceled") {
+        await harness.makeStore().append({ ...request, goalId: goal.goal_id,
+          expectedRevision: goal.revision, payload: { kind: "goal_canceled", reason: "Operator canceled before retry" } });
+      }
+      throw new Error("simulated response lost after commit");
+    });
+    const observe = vi.fn().mockResolvedValue({ ok: false });
+    const inspect = vi.fn().mockResolvedValue({ context_ref: "check:one", checks: [] });
+    const deps = {
+      account: async () => ({ trusted_account_session: true, profile_id: input.profileRef, session_id: input.sessionId }),
+      association: async () => ({ room_id: identity.room_id, run_id: input.runId, run_expires_at: "2099-01-01T00:00:00.000Z" }),
+      membership: async () => ({ participantId: identity.participant_id, roomStatus: "active" }),
+      goal: (request: Parameters<EnvironmentDurableGoalStore["findForSession"]>[0]) => harness.makeStore().findForSession(request), createGoal,
+      environments: async () => [{ ...identity, self_subject_binding: {
+        subject_binding_id: identity.subject_binding_id, participant_id: identity.participant_id,
+        subject_ref: identity.subject_native_id, status: "active" } }],
+      refreshSubject: vi.fn(), observe, inspect, prepare: vi.fn(),
+    };
+    const run = (request = input) => prepareBrowserEnvironmentSession(request, bindings as never, presence as never, deps as never);
+    await expect(run()).rejects.toMatchObject({ projection: { partial_effects_unknown: true, readiness_confirmed: false } });
+    expect(observe).not.toHaveBeenCalled();
+    if (disposition === "canceled") {
+      // Discovery omits terminal goals. The stable creation key must nevertheless
+      // return the stopped ledger, not create a replacement or restore it.
+      createGoal.mockImplementation(request => harness.makeStore().create(request));
+    }
+    for (let retry = 0; retry < 3; retry++) {
+      const result = await run();
+      expect(result.readiness.ready).toBe(false);
+      expect(result.execution_authority).toBe(false);
+    }
+    expect(createGoal).toHaveBeenCalledTimes(disposition === "canceled" ? 4 : 1);
+    expect(observe).toHaveBeenCalledTimes(3);
+    expect(deps.prepare).not.toHaveBeenCalled();
+    expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goals")).rows).toHaveLength(1);
+    const expectedEvents = disposition === "canceled" ? 2 : 1;
+    expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events")).rows).toHaveLength(expectedEvents);
+    if (disposition === "canceled") {
+      const row = (await harness.pool.query("SELECT goal_id FROM helix_environment_durable_goals")).rows[0];
+      expect(await harness.makeStore().inspect({ goalId: row.goal_id, profileId: input.profileRef,
+        participantId: identity.participant_id })).toMatchObject({ status: "canceled" });
+    }
+    await expect(run({ ...input, goalBootstrap: { ...input.goalBootstrap,
+      objective: { ...objective, objective_text: "A different objective" } } })).rejects.toMatchObject({
+      projection: { error: disposition === "canceled" ? "durable_goal_request_conflict" : "environment_session_goal_conflict", readiness_confirmed: false },
+    });
+    expect(observe).toHaveBeenCalledTimes(3);
+    expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events")).rows).toHaveLength(expectedEvents);
+  } finally { await harness.pool.end(); }
+});
+
 it("Ready up recovers through the real ledger once without completing milestones", async () => {
   const harness = await createHarness();
   try {
@@ -181,6 +247,34 @@ it("Ready up recovers through the real ledger once without completing milestones
 });
 
 describe("EnvironmentDurableGoalStore", () => {
+  it("replays keyed creation across store instances without duplicate ledger rows", async () => {
+    const harness = await createHarness();
+    try {
+      const request = { ownerProfileId: "profile:owner", roomId: "room:one", participantId: "participant:one",
+        environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one",
+        runId: "run:one", turnId: "turn:create", objective, idempotencyKey: "session:first-goal" };
+      const first = await harness.makeStore().create(request);
+      for (let i = 0; i < 3; i++) expect(await harness.makeStore().create(request)).toEqual(first);
+      expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goals")).rows).toHaveLength(1);
+      expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events")).rows).toHaveLength(1);
+      await expect(harness.makeStore().create({ ...request, objective: { ...objective, objective_text: "Different objective" } }))
+        .rejects.toMatchObject({ code: "durable_goal_request_conflict" });
+      await expect(harness.makeStore().create({ ...request, runId: "run:other" }))
+        .rejects.toMatchObject({ code: "durable_goal_request_conflict" });
+      const paused = await harness.makeStore().append({ ...request, goalId: first.goal_id,
+        expectedRevision: first.revision, payload: { kind: "goal_paused", reason: "operator pause" } });
+      expect(await harness.makeStore().create(request)).toEqual(paused);
+      const canceled = await harness.makeStore().append({ ...request, goalId: first.goal_id,
+        expectedRevision: paused.revision, payload: { kind: "goal_canceled", reason: "operator canceled" } });
+      expect(await harness.makeStore().create(request)).toEqual(canceled);
+      expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events")).rows).toHaveLength(3);
+      harness.setCurrentIdentity({ ...identity, producer_epoch_ref: "epoch:changed" } as typeof identity);
+      await expect(harness.makeStore().create(request)).rejects.toMatchObject({ code: "durable_goal_request_conflict" });
+      harness.setIdentityAvailable(false);
+      await expect(harness.makeStore().create(request)).rejects.toThrow("identity unavailable");
+    } finally { await harness.pool.end(); }
+  });
+
   it("discovers the exact unfinished session goal without newest-run fallback", async () => {
     const harness = await createHarness();
     try {

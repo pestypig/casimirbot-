@@ -12,6 +12,14 @@ Downstream gate unlocked: evidence-based G8 release decision for a paid Codex-fi
 
 # EH-G8 Codex-first paid product delivery v1
 
+
+Offer precedence (owner selection 2026-09-08): the complete supported personal
+MCP experience is free; subscription gates hosted collaboration only. Apply
+CFP-1's "Selected offer: free personal tools, paid hosted collaboration" section
+to all older paid-software, evaluation and entitlement wording below. Freeze
+exact capability/scenario mapping before dispatch. No payment fixture, trial
+expiry or purchase may become a requirement for the personal customer path.
+
 ## Purpose and document ownership
 
 Deliver a product people can install, connect to their existing Codex app, and

@@ -182,7 +182,7 @@ delivery tasks, not new program gates or inherited capability acceptance.
 | Stage | State | Dependency and advancement evidence |
 | --- | --- | --- |
 | CFP-0 — Baseline and plan reconciliation | closed (inventory only) | Reviewed 39 recursively linked packets plus the ET6 supplement, assigned 14 release gaps, and prepared the CFP-1 handoff. Closure evidence: `docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md`; validation and packet matrix under `docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-0/2026-09-06-audit-01/`. No product or G8 acceptance is implied. |
-| CFP-1 — Product and rights boundary | active (specification) | `docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md`: owner selected subscription for the broader harness, Minecraft as visible technical proof of concept, and component-by-component distribution-rights review. Reuse applicable Stripe subscription foundations; credit purchases/bundles and managed model/API services are excluded from the initial offer. Exact subscription benefit mapping, lifecycle terms, commercial rights and acceptance freeze remain open. Child implementation remains unadmitted. |
+| CFP-1 — Product and rights boundary | active (specification) | `docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md`: owner selected subscription for the broader harness, Minecraft as visible technical proof of concept, and component-by-component distribution-rights review. Reuse applicable Stripe subscription foundations; credit purchases/bundles and managed model/API services are excluded from the initial offer. Free personal use and paid hosted collaboration now control the offer. Current source/GitHub/domain reconciliation and build direction: `docs/work-packets/eh-g8-cfp1-code-deployment-alignment-audit-v1.md`. Exact hosted benefit/payer mapping, lifecycle terms, commercial rights and acceptance freeze remain open. Child implementation remains unadmitted. |
 | CFP-2 — Useful installed capability | blocked | CFP-1 closure plus existing PNA and selected environment prerequisites; current installed external-Codex useful-task and interruption/recovery evidence. |
 | CFP-3 — Paid entitlement and distributable build | blocked | CFP-2 closure; software entitlement and sandbox commerce tests, signed artifact, and reviewed customer download/update path. |
 | CFP-4 — Integrated reliability audit | blocked | CFP-3 closure; one signed artifact passes the frozen installed matrix and retains applicable G8 prerequisite evidence. |
@@ -241,7 +241,7 @@ or verified surface; nearby capabilities do not inherit the maturity.
 | Profile-scoped semantic MCP monitoring and Codex task wake | deterministically verified | `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `reports/helix-minecraft/g8-m3-external-codex-monitor-continuity-20260825.json`; `shared/helix-client-authorization-readiness.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `server/services/environment-connectors/monitoring/__tests__/environment-monitor-store.test.ts`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md`; `docs/architecture/helix-environment-agent-reasoning-v1.md`; `docs/architecture/helix-minecraft-dual-plane-adapter-v1.md` | The 2026-08-25 bounded installed-node trace repaired the exact Auth0 permission, proved the four-scope readiness projection, semantic delivery, a 264 ms fresh actor snapshot, cursor acknowledgement, bounded typed recovery, fresh-process reconnect without duplicate wake/effect, revocation and post-revocation `lease_inactive`. Complete the remaining M3 release evidence inside the unknown-world Nether course: operator-visible material replanning through the accepted arbiter, portal entry, safe-return-point evidence and cross-surface agreement. Native closed-task wake remains unsupported until the client supplies a continuation transport. |
 | Operator-visible Codex steering and action-reaction fidelity | specified | `docs/helix-environment-harness-work-program-v1.md`; `docs/work-packets/eh-g8-profile-semantic-mcp-monitor-v1.md`; `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/architecture/casimirbot-environment-harness-product-goal-v1.md` | Prove a bounded, evidence-linked sense-decide-act-observe loop in which an authenticated Codex task receives every admitted material change and action receipt needed for the next decision, the operator can inspect the same ordered trace, latency and gap states are explicit, and neither surface receives raw tick spam, credentials, hidden reasoning, or a second mutation authority. This is required before the full Nether journey is used as G8 release evidence. |
 | Provider-neutral environment time and receding-horizon action planning | deterministically verified | `docs/architecture/helix-environment-time-action-planning-v1.md`; `docs/work-packets/eh-g8-et-environment-time-receding-horizon-v1.md`; `docs/evidence/eh-g8-et-environment-time-receding-horizon-v1/2026-09-03-et0-et5-deterministic-acceptance.json`; `shared/helix-environment-time.ts`; `server/services/environment-connectors/temporal-plans/` | ET0–ET5 are deterministically verified: strategy-free shared clocks/plans/frontiers/interruptions, hash-linked lifecycle and rolling recovery, and fail-closed Minecraft compilation to existing finite and concurrent schemas. ET6 must measure runway, stalls, reaction latency, evidence volume and duplicate effects in Minecraft before tuning. ET7 second-adapter conformance and ET8 installed multi-surface acceptance remain specified. |
-| Provider-neutral spatial navigation with Minecraft capacity reference | deterministically verified | `docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`; `docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json`; `shared/helix-environment-navigation.ts`; `shared/__tests__/helix-environment-navigation.spec.ts`; `docs/architecture/helix-environment-time-action-planning-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md`; `docs/work-packets/eh-mc-companion-survival-party-v1.md` | NAV0 is deterministically verified: strict hash-bound spatial, topology, request, plan, feedback and black-box benchmark contracts; adversarial currentness/route/effect/interrupt fixtures; and a non-voxel navmesh-shaped conformance fixture. NAV1–NAV9 remain specified and cannot begin until ET6 passes. Minecraft will own voxel foothold/traversal compilation; FiveM remains contract-only here. Baritone remains isolated, non-shipping and supplies no code, API, structure or product capability. Live-accepted NAV8 is required before companion C4/S6 or the unknown-world Nether journey may rely on fluent goal-directed movement. |
+| Provider-neutral spatial navigation with Minecraft capacity reference | deterministically verified | `docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`; `docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-03-nav0-deterministic-acceptance.json`; `shared/helix-environment-navigation.ts`; `shared/__tests__/helix-environment-navigation.spec.ts`; `docs/architecture/helix-environment-time-action-planning-v1.md`; `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md`; `docs/work-packets/eh-mc-companion-survival-party-v1.md` | NAV0 is deterministically verified: strict hash-bound spatial, topology, request, plan, feedback and black-box benchmark contracts; adversarial currentness/route/effect/interrupt fixtures; and a non-voxel navmesh-shaped conformance fixture. NAV1-D's restricted synthetic full-cube topology profile is deterministically verified (37 new tests, 15 NAV0 regressions, 9 existing native component tests); see `docs/work-packets/eh-g8-nav1d-offline-minecraft-topology-v1.md`. Remaining NAV1–NAV9 work stays specified; live executor integration requires live-accepted NAV-EQ direct-MCP execution qualification in `docs/work-packets/eh-g8-nav-direct-mcp-execution-qualification-v1.md`. Full ET6 and room-driven steering retain separate exits. Minecraft will own voxel foothold/traversal compilation; FiveM remains contract-only here. Baritone remains isolated, non-shipping and supplies no code, API, structure or product capability. Live-accepted NAV8 is required before companion C4/S6 or the unknown-world Nether journey may rely on fluent goal-directed movement. |
 | Minecraft tactical perception parity | specified | `docs/work-packets/eh-mc-nether1-perception-parity-v1.md`; `server/mcp/__tests__/helix-mcp-minecraft-action.test.ts`; `server/mcp/__tests__/helix-mcp-environment-monitor.test.ts`; `shared/__tests__/helix-minecraft-perception-benchmark.spec.ts`; `minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricManifestContractTest.java` | The typed MCP reads, bounded snapshot, actor-status catalog-compatibility projection, consecutive-change monitor projection, semantic action idempotency and deterministic critical-hazard benchmark are implementation prerequisites only. The unrestarted-task compatibility call is live-proven. The earlier dedicated-server `Invalid session` failure produced no gameplay evidence in that attempt; later observations in the linked perception packet record partial authenticated Survival, narrow movement and sensor evidence. They do not complete the screenshot-labelled P3 benchmark or the full P4 course, and do not accept the separately gated NAV program. Keep this capability `specified` until the screenshot/human ground-truth record and authenticated `keepInventory=false` Survival course prove the packet thresholds, explicit unknowns, latency, zero duplicate effects and safe control release. |
 | Responsive Player Embodiment sensing and consecutive native mining | deterministically verified | `docs/work-packets/eh-mc-nether1-responsive-action-reaction-sensing-v1.md`; `reports/helix-minecraft/nether1-responsive-stone-sequence-a0.json`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/PlayerSensorFrameTest.java`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/MiningTargetAffordanceTest.java`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/ConcurrentReactiveSchedulerTest.java` | Preserve the 4 ms p95 tick budget, exact frame identity, typed bounded failures, same-tick handoff, postcondition verification, and control release while completing the remaining N0 compositions and keyed A1/B parity. |
 | Baritone v1.15.0 non-shipping navigation comparison | deterministically verified | `docs/work-packets/eh-mc-baritone-v1.15.0-compatibility-license-v1.md`; `reports/helix-minecraft/nether1-baritone-movement-only-a0.json`; `minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/BaritoneFacadeTest.java` | Preserve this only as attributed, local, evaluation-only compatibility evidence. Baritone is not a planned product engine, release dependency, or durable harness capability, and shipping profiles must omit it. Use the observed capability requirements to test an independently implemented provider-neutral planner without copying Baritone code, assets, APIs, or implementation structure. This does not promote the Nether objective or admit Baritone mining/building/inventory behavior. |
@@ -307,8 +307,14 @@ not begin until the packet's declared prerequisites pass.
 At the user's 2026-09-07 request, repeated ET6 live acceptance attempts are
 deferred in favor of the build-first prerequisite packet
 `docs/work-packets/eh-g8-et6-continuous-session-build-v1.md`.
+The user-requested durable-pairing and deterministic-testability repair plan is
+`docs/work-packets/eh-g8-cs-onboarding-pairing-plan-v1.md`. It is subordinate to
+the same CS1-CS4 exits and does not dispatch the separately gated CFP-2 program
+or promote any existing evidence to integrated acceptance.
 G8 remains the sole active gate. ET6 remains specified and unproven; existing
-ET0–ET5 and NAV0 evidence is unchanged, and NAV1 remains gated on ET6 closure.
+ET0–ET5 and NAV0 evidence is unchanged. NAV1 now depends on the separate
+NAV-EQ direct-MCP execution qualification; CS1–CS5 and full ET6 retain their
+original exits.
 
 | Stage | State | Advancement evidence |
 | --- | --- | --- |
@@ -324,6 +330,78 @@ Do not mark the persistent ET6 objective complete merely to replace its task.
 Product goal controls must be deliberately paused or replaced by the user;
 this repository plan governs the next engineering work without claiming a
 runtime goal-control operation occurred.
+
+### NAV direct execution prerequisite revision — 2026-09-08
+
+NAV-EQ is a parallel qualification lane within G8:
+`docs/work-packets/eh-g8-nav-direct-mcp-execution-qualification-v1.md`.
+Its current maturity is `specified`; target maturity is `live accepted` for
+the declared direct-MCP execution profile. No live evidence is promoted here.
+This supersedes the ET6-only NAV dependency recorded in earlier dated notes.
+
+NAV live executor integration depends on a real external-MCP course proving at least
+three rolling extensions, fresh evidence re-entry, changed-affordance repair,
+local/manual and direct-user interruption, reconnect, explicit revocation and
+zero duplicate or stale effects within frozen measured capacity limits. Reuse
+the existing temporal compiler, broker, scheduler, controller and watchdog.
+Room prompt ingress and acknowledgement are additional requirements for
+room-driven use; any current room-scoped execution authorization still applies.
+Do not assume that a roomless public execution endpoint already exists.
+
+CS1–CS5 and original ET6 retain their exits and ledger states. NAV-EQ does not
+depend on completing the whole collaboration onboarding sequence, but must
+resolve any actual execution-path prerequisites it encounters. NAV8 direct
+and room-driven evidence is recorded separately, and its full acceptance,
+companion/Nether prerequisites and G8 release requirements remain in force.
+
+### NAV personal-product alignment and offline lane — 2026-09-08
+
+The free personal MCP journey is owned by the existing product contract and
+CFP onboarding/public-access packets, under their own admission gates.
+Navigation consumes their connection, identity, target consent and recovery;
+it does not create a parallel personal execution service or require hosted
+subscription/room steering for personal use. See
+`docs/architecture/casimirbot-developer-platform-product-contract-v1.md` and
+`docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md`.
+
+NAV1-D is admitted as an offline parallel G8 slice in
+`docs/work-packets/eh-g8-environment-spatial-navigation-v1.md`: inventory
+existing Minecraft sensor facts, freeze deterministic support/clearance/hazard/
+unknown-boundary fixtures and implement a pure bounded evidence-to-topology
+compiler. No dispatch, native movement or authority mutation is permitted in
+this slice. It therefore does not depend on measured scheduler capacity.
+This narrowly supersedes blanket NAV implementation holds above; NAV0 remains
+deterministically verified and NAV1–NAV9 remain specified until their own
+evidence is recorded. NAV-EQ still gates live executor integration. Full ET6,
+NAV8, companion/Nether and product release exits are not reduced.
+
+NAV1-D offline result (2026-09-08): the restricted synthetic full-cube
+collision profile is deterministically verified in
+`docs/work-packets/eh-g8-nav1d-offline-minecraft-topology-v1.md`, with evidence
+in `docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-08-nav1d-offline-topology-acceptance.json`.
+Thirty-seven new topology tests, fifteen NAV0 regressions, nine existing
+native component tests and the targeted typecheck passed. This narrows the
+specified status above only for NAV1-D; native snapshot mapping, full NAV1,
+NAV-EQ and live integration remain unaccepted. No gameplay was dispatched.
+
+NAV1-M native measurement/replay result (2026-09-08):
+`docs/work-packets/eh-g8-nav1m-native-collision-replay-v1.md` records the
+deterministically verified unregistered native shape-measurement helper and
+offline bridge (64 TypeScript and 16 native tests; zero targeted type errors).
+Real Minecraft block-state fixture output enters the neutral topology, but its
+identity, ticks and layout remain synthetic. Live capture wiring, selected
+player context/provenance and NAV1-wide acceptance remain open. Evidence is
+`docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-08-nav1m-native-collision-replay-acceptance.json`.
+
+NAV1-C bounded capture result (2026-09-08):
+`docs/work-packets/eh-g8-nav1c-bounded-native-capture-v1.md` records the
+deterministically verified unregistered capture orchestration and replay
+fixtures (65 TypeScript, 30 native tests). The actual ServerLevel/player entry
+is implemented and compiles, but selected-player/thread/tick behavior is
+fixture-tested rather than live accepted. Next is integration into the existing
+admitted observation path and read-only qualification. Full NAV1, NAV-EQ and
+gameplay acceptance remain open; no deployment occurred. Evidence is
+`docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-08-nav1c-bounded-capture-acceptance.json`.
 
 ## Closed gate: G1 canonical lifecycle authority
 

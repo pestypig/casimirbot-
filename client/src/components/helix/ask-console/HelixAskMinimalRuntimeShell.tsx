@@ -1,5 +1,6 @@
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HelixAgentRuntimeId } from "@shared/helix-agent-runtime";
+import { BoundAgentPromptDisplay } from "./BoundAgentPromptDisplay";
 import type {
   HelixLanguageModelProfileId,
   HelixLanguageModelSelectionRequest,
@@ -94,7 +95,6 @@ import {
 } from "./HelixAskComposerDestination";
 import { HelixAskComposerDestinationStrip } from "./HelixAskComposerDestinationStrip";
 import {
-  dispatchReasoningSteering,
   dispatchCurrentReasoningSteering,
   HELIX_REASONING_BINDING_STORAGE_KEY,
   HELIX_REASONING_BINDING_UPDATED_EVENT,
@@ -561,6 +561,8 @@ export function HelixAskMinimalRuntimeShell({
     [runtimePickerModel.selectedLabel, runtimeState.askBusy, shellProps.placeholder],
   );
   const selectedHelixConversationId = activeChatSessionId ?? chatSessionId;
+  const displayBinding = [sharedReasoningBinding, currentReasoningBinding].find(binding =>
+    binding?.status === "active" && binding.helix_conversation_id === selectedHelixConversationId);
   const latestIssuedReasoningBinding = typeof window === "undefined"
     ? null
     : readLatestReasoningBinding();
@@ -602,12 +604,19 @@ export function HelixAskMinimalRuntimeShell({
     clientEventRef: string,
   ): Promise<boolean> => {
     const candidateSessionId = activeChatSessionId ?? chatSessionId;
+    if (!candidateSessionId) {
+      setBoundAgentState("unavailable");
+      setRuntimeState((state) => ({ ...state,
+        askStatus: "Select the Helix chat to receive this prompt before submitting to a bound task." }));
+      return false;
+    }
     const verifiedPanelCandidate = [
       readLatestReasoningBinding(),
       sharedReasoningBinding,
       currentReasoningBinding,
     ]
-      .find((candidate) => candidate?.status === "active") ?? null;
+      .find((candidate) => candidate?.status === "active" &&
+        candidate.helix_conversation_id === candidateSessionId) ?? null;
     const bindingCandidates = [
       sharedReasoningBinding,
       currentReasoningBinding,
@@ -620,27 +629,10 @@ export function HelixAskMinimalRuntimeShell({
     // any browser projection. Stored `active` is only a historical status and
     // can outlive the short lease; it must never mask a newer exact binding.
     let binding: BrowserReasoningBinding | null = null;
-    let currentDispatch: Record<string, unknown> | null = null;
     try {
-      const dispatched = await dispatchCurrentReasoningSteering({
-        ...(candidateSessionId
-          ? { helixConversationId: candidateSessionId }
-          : {}),
-        clientEventRef,
-        origin,
-        instructionText: text,
-      });
-      binding = dispatched.binding;
-      currentDispatch = dispatched as unknown as Record<string, unknown>;
-      setCurrentReasoningBinding(dispatched.binding);
-      setBoundAgentState("active");
-    } catch {
-      // Fall through to exact browser projections for compatibility with an
-      // older server that does not yet expose the current-binding dispatch.
-    }
-    try {
-      const authoritative = binding ?? await inspectLatestReasoningBinding();
-      if (authoritative.status === "active") {
+      const authoritative = binding ?? (candidateSessionId
+        ? await inspectCurrentReasoningBinding(candidateSessionId) : null);
+      if (authoritative?.status === "active" && authoritative.helix_conversation_id === candidateSessionId) {
         binding = authoritative;
         setCurrentReasoningBinding(authoritative);
         setBoundAgentState("active");
@@ -653,7 +645,7 @@ export function HelixAskMinimalRuntimeShell({
         const authoritative = await inspectReasoningBinding(
           verifiedPanelCandidate.reasoning_binding_id,
         );
-        if (authoritative.status === "active") {
+        if (authoritative.status === "active" && authoritative.helix_conversation_id === candidateSessionId) {
           binding = authoritative;
           setCurrentReasoningBinding(authoritative);
           setBoundAgentState("active");
@@ -665,7 +657,7 @@ export function HelixAskMinimalRuntimeShell({
     if (!binding && candidateSessionId) {
       try {
         const authoritative = await inspectCurrentReasoningBinding(candidateSessionId);
-        if (authoritative.status === "active") {
+        if (authoritative.status === "active" && authoritative.helix_conversation_id === candidateSessionId) {
           binding = authoritative;
           setCurrentReasoningBinding(authoritative);
           setBoundAgentState("active");
@@ -715,25 +707,51 @@ export function HelixAskMinimalRuntimeShell({
     }
     setBoundAgentState("awaiting_agent_pickup");
     try {
-      const dispatch = currentDispatch ?? await dispatchReasoningSteering({
+      // Pin the verified target in the write. A replacement between this read
+      // and submission must reject, never inherit the prompt or trigger another
+      // mutation through a compatibility fallback.
+      const dispatch = await dispatchCurrentReasoningSteering({
+          helixConversationId: sessionId,
           bindingId: binding.reasoning_binding_id,
           bindingEpoch: binding.binding_epoch,
+          runId: binding.run_id ?? null,
           clientEventRef,
           origin,
           instructionText: text,
         });
       setChatSessionId(sessionId);
       setActiveChatSession(sessionId);
-      addChatMessage(sessionId, {
+      // The same accepted transport request can be replayed after a lost
+      // response. Preserve one visible prompt per exact binding/request tuple.
+      useAgiChatStore.getState().appendMessageOnce(sessionId, {
+        id: `bound-steering:${JSON.stringify([binding.reasoning_binding_id, binding.binding_epoch, clientEventRef])}`,
+        at: new Date().toISOString(),
         role: "user",
         content: text,
         traceId: clientEventRef,
       });
+      const event = dispatch.event;
+      bindingPickupPollRef.current?.abort();
+      if (event?.delivery_state === "acknowledged") {
+        setBoundAgentState("active");
+        setRuntimeState((state) => ({ ...state,
+          askStatus: "The bound agent acknowledged exact pickup. This confirms transport pickup, not task completion.",
+        }));
+        publishMinecraftPlaySteeringResult(clientEventRef, "acknowledged");
+        return true;
+      }
+      if (event?.delivery_state && event.delivery_state !== "pending") {
+        setBoundAgentState("unavailable");
+        setRuntimeState((state) => ({ ...state,
+          askStatus: `Exact pickup ended with ${event.delivery_state}; no provider answer is claimed.`,
+        }));
+        publishMinecraftPlaySteeringResult(clientEventRef, event.delivery_state);
+        return true;
+      }
       setRuntimeState((state) => ({
         ...state,
         askStatus: "Steering queued for exact agent pickup. Provider delivery is not claimed until acknowledgement.",
       }));
-      const event = dispatch.event as { steering_event_ref?: string } | undefined;
       if (event?.steering_event_ref) {
         bindingPickupPollRef.current?.abort();
         const controller = new AbortController();
@@ -1170,6 +1188,9 @@ export function HelixAskMinimalRuntimeShell({
             <HelixAskVoiceConfirmationRuntimeSurface {...visibleSurface.voiceConfirmationRuntime} />
           ) : null}
           <HelixAskRuntimeStatusLine text={runtimeState.askStatus} />
+          {displayBinding ? <BoundAgentPromptDisplay
+            key={`${displayBinding.reasoning_binding_id}:${displayBinding.binding_epoch}:${displayBinding.helix_conversation_id}`}
+            binding={displayBinding} /> : null}
           <HelixAskMinimalRuntimeTurnList
             replies={runtimeState.replies}
             className={shellProps.replyListClassName ?? "relative z-10 mt-4 space-y-5"}

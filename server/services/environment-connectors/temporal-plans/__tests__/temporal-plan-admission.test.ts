@@ -4,6 +4,14 @@ import * as broker from "../../actions/action-broker";
 import { admitTemporalPlan } from "../temporal-plan-admission";
 
 afterEach(() => { vi.restoreAllMocks(); });
+
+it("awaits asynchronous task rejection before calling the action broker", async () => {
+  vi.spyOn(preflightModule, "preflightTemporalPlan").mockResolvedValue({ plan: {}, compilation: { arguments: {} } } as never);
+  const enqueue = vi.spyOn(broker, "enqueueEnvironmentAction");
+  const verifyTaskAssociation = vi.fn().mockRejectedValue(new Error("pairing_revoked"));
+  await expect(admitTemporalPlan(input() as never, { verifyTaskAssociation })).rejects.toThrow("pairing_revoked");
+  expect(enqueue).not.toHaveBeenCalled();
+});
 const input = () => ({ preflight: { context: { profileId: "owner", participantId: "player" },
   binding: { runId: "run", bindingId: "binding", bindingEpoch: 1, clientContinuationRef: "exact-task" },
   compilation: { target: "serial" } }, request: { run_id: "run", participant_id: "player", action_kind: "execute_sequence" } });
@@ -19,7 +27,7 @@ it("hands compiler output and retained identity to the existing broker with live
   const retention = enqueue.mock.calls[0][1]!;
   expect(retention.retention).toMatchObject({ bindingId: "binding", bindingEpoch: 1, continuationRef: "exact-task", runId: "run" });
   store.verifyTaskAssociation.mockImplementation(() => { throw new Error("revoked"); });
-  expect(() => retention.revalidateTask()).toThrow("revoked");
+  await expect(retention.revalidateTask()).rejects.toThrow("revoked");
 });
 
 it.each(["run_id", "participant_id", "action_kind"])("rejects mismatched %s before preflight", async key => {

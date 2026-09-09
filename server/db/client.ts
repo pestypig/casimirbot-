@@ -46,6 +46,9 @@ const localPersistenceTables = [
   "helix_operator_activity_streams",
   "helix_operator_activity_events",
   "helix_account_profile_storage",
+  // Server-owned consent ledger; never restore authority from browser snapshots.
+  "helix_pairing_ledger",
+  "helix_pairing_destinations",
   "helix_account_events",
   "helix_account_credentials",
   "helix_account_sign_in_attempts",
@@ -796,6 +799,16 @@ export async function flushLocalDatabaseSnapshotIfEnabled(): Promise<void> {
 export async function requireLocalDatabaseSnapshotIfEnabled(touchedTables?: readonly string[]): Promise<void> {
   if (!pool || !localPersistencePath || !localPersistenceReady || localPersistenceSuppress) return;
   if (touchedTables?.length === 0) return;
+  await strictSnapshotBarrier.request(touchedTables);
+}
+
+/** Authority records cannot acknowledge a write to a volatile-only database. */
+export async function requireDurableDatabaseSnapshot(touchedTables: readonly string[]): Promise<void> {
+  if (!pool) throw new Error("durable_database_unavailable");
+  if (lastDsn && !lastDsn.startsWith("pg-mem://")) return;
+  if (!localPersistencePath || !localPersistenceReady || localPersistenceSuppress) {
+    throw new Error("durable_database_unavailable");
+  }
   await strictSnapshotBarrier.request(touchedTables);
 }
 

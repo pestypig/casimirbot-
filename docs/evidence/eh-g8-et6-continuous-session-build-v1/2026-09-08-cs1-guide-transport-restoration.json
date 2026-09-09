@@ -1,0 +1,19 @@
+{
+  "scope": "Supported native transport restoration, not session readiness",
+  "service_instance_ref": "service_instance:f68bc7988c881b3f68ee37ab60694a60",
+  "transition_request_ref": "desktop_tunnel_request:0e84e79e-0960-4c87-a76f-b23531f8e753",
+  "trusted_device_delegation_applied": true,
+  "requested_delegation_seconds": 300,
+  "execute_idempotency_key": "cs1-preparation-guide-full-20260908",
+  "transition_accepted": true,
+  "tool_list_changed_requested": true,
+  "reconnect_required": false,
+  "subsequent_g2_action_authorization_ready": true,
+  "missing_action_scopes": [],
+  "authorization_expires_at": "2026-09-08T06:26:11.547Z",
+  "ready_up_callable_in_task": false,
+  "correction": "The earlier authorization-status tool-not-found result is explained by the coordination-only server returning before that registration. It was not sufficient evidence of stale catalog or expired credentials. After full transport restoration the same tool succeeds, but Ready up remains absent from task enumeration.",
+  "environment_authority_granted_by_transition": false,
+  "binding_changed": false,
+  "cs1_complete": false
+}

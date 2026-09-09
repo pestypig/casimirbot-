@@ -8,6 +8,7 @@ import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from
 import { SharedLiveRoomPlayerEmbodimentPanel } from
   "../SharedLiveRoomPlayerEmbodimentPanel";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { useBrowserReasoningBindingStore } from "@/lib/agent-access/reasoningTaskBinding";
 import {
   HELIX_BOUND_AGENT_STEERING_REQUEST_EVENT,
   HELIX_BOUND_AGENT_STEERING_RESULT_EVENT,
@@ -104,12 +105,44 @@ const activeAuthority = (allowedCapabilityIds: string[]) => ({
 afterEach(() => {
   cleanup();
   useAgiChatStore.setState({ activeId: undefined });
+  useBrowserReasoningBindingStore.setState({ current: null });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe("Shared Live Room Player Embodiment controls", () => {
+  it("shows the existing exact-chat binding before Play without granting authority", async () => {
+    useAgiChatStore.setState({ activeId: "helix-chat:play-ui" });
+    const binding = {
+      reasoning_binding_id: "reasoning_binding:play-ui",
+      helix_conversation_id: "helix-chat:play-ui",
+      status: "active" as const,
+      continuation_transport: "polling" as const,
+      binding_epoch: 4,
+    };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse(authorityReceipt()));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SharedLiveRoomPlayerEmbodimentPanel roomId={roomId}
+      environment={environment} selfParticipantId={participantId}
+      sourceBinding={sourceBinding} isOwner />);
+    expect(screen.getByText("reasoning binding required")).toBeTruthy();
+    act(() => useBrowserReasoningBindingStore.setState({ current: binding }));
+    expect(screen.getByText("authority confirmation required")).toBeTruthy();
+    expect(screen.queryByText("reasoning binding required")).toBeNull();
+    expect((screen.getByRole("button", { name: "Save player authority" }) as HTMLButtonElement).disabled).toBe(true);
+    act(() => useBrowserReasoningBindingStore.setState({ current: { ...binding, status: "revoked" } }));
+    expect(screen.getByText("reasoning binding required")).toBeTruthy();
+    act(() => useBrowserReasoningBindingStore.setState({ current: { ...binding, helix_conversation_id: "helix-chat:other" } }));
+    expect(screen.getByText("reasoning binding required")).toBeTruthy();
+    act(() => useBrowserReasoningBindingStore.setState({ current: binding }));
+    act(() => useAgiChatStore.setState({ activeId: "helix-chat:other" }));
+    expect(screen.getByText("reasoning binding required")).toBeTruthy();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls.every(call => !call[1]?.method || call[1].method === "GET")).toBe(true);
+  });
+
   it("runs one explicit finite play activation and waits for exact task acknowledgement", async () => {
     useAgiChatStore.setState({ activeId: "helix-chat:play-ui" });
     let authority: ReturnType<typeof activeAuthority> | null = null;

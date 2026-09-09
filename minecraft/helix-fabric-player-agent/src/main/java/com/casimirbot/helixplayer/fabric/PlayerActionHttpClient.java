@@ -9,6 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 final class PlayerActionHttpClient implements AutoCloseable {
     record Response(int statusCode, Map<String, Object> body) {
@@ -26,10 +27,16 @@ final class PlayerActionHttpClient implements AutoCloseable {
 
     private final PlayerActionConfig config;
     private final HttpClient client;
+    private final UnaryOperator<String> endpointResolver;
 
     PlayerActionHttpClient(PlayerActionConfig config) {
+        this(config, InstalledDesktopServiceEndpointResolver::resolve);
+    }
+
+    PlayerActionHttpClient(PlayerActionConfig config, UnaryOperator<String> endpointResolver) {
         if (!config.ready()) throw new IllegalArgumentException("Player-action config is inactive.");
         this.config = config;
+        this.endpointResolver = endpointResolver;
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NEVER)
@@ -82,9 +89,12 @@ final class PlayerActionHttpClient implements AutoCloseable {
     }
 
     private URI endpoint(String suffix) {
-        String value = InstalledDesktopServiceEndpointResolver.resolve(
-            config.endpoint().replaceAll("/+$", "") + suffix
-        );
+        // Resolve the paired base before adding protocol query parameters.
+        // The installed-origin resolver deliberately rejects query-bearing
+        // inputs; passing a poll URL left it on the closed pre-restart port.
+        String value = endpointResolver.apply(
+            config.endpoint().replaceAll("/+$", "")
+        ) + suffix;
         if (!HelixSensorConfig.secureEndpointAllowed(value)) {
             throw new IllegalArgumentException("Player-action endpoint must use HTTPS or loopback HTTP.");
         }

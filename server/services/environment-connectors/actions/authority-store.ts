@@ -820,6 +820,17 @@ export const configureEnvironmentActionAuthority = async (input: {
   });
 };
 
+/** Apply only to an owner-scoped, identity-verified authority record. A
+ * transport error, unknown identity or invalid timestamp is not new consent. */
+export const environmentActionAuthorityRequiresNewGrant = (authority: {
+  status: string; expires_at: Date | string | null;
+}, nowMs = Date.now()): boolean => {
+  if (!Number.isFinite(nowMs)) return false;
+  if (authority.status === "revoked" || authority.status === "expired") return true;
+  const expiry = authority.expires_at === null ? NaN : new Date(authority.expires_at).getTime();
+  return authority.status === "active" && Number.isFinite(expiry) && expiry <= nowMs;
+};
+
 export const extendEnvironmentActionAuthorityLease = async (input: {
   roomId: string;
   ownerProfileId: string;
@@ -832,7 +843,8 @@ export const extendEnvironmentActionAuthorityLease = async (input: {
     profileId: input.ownerProfileId,
     owner: true,
   });
-  if (Date.parse(input.expiresAt) <= Date.now()) {
+  const requestedExpiry = Date.parse(input.expiresAt);
+  if (!Number.isFinite(requestedExpiry) || requestedExpiry <= Date.now()) {
     throw new EnvironmentActionAuthorityError(
       "action_authority_expiry_invalid",
       400,
@@ -860,22 +872,46 @@ export const extendEnvironmentActionAuthorityLease = async (input: {
         "The exact active player-action authority was not found for this owner and environment.",
       );
     }
+    // Stored status can remain active after its finite consent has elapsed.
+    // An extension is not a new grant and must never resurrect that consent.
+    const priorExpiry = authority.expires_at === null
+      ? null
+      : new Date(authority.expires_at).getTime();
+    if (
+      requestedExpiry <= Date.now() ||
+      environmentActionAuthorityRequiresNewGrant(authority) ||
+      (priorExpiry !== null &&
+        !Number.isFinite(priorExpiry))
+    ) {
+      throw new EnvironmentActionAuthorityError(
+        "action_authority_expiry_invalid",
+        409,
+        "Expired player-action authority requires a new explicit grant, not lease extension.",
+      );
+    }
     const extended = await db.query<AuthorityRow>(
       `UPDATE helix_environment_action_authorities
           SET expires_at = $2, updated_at = now()
         WHERE action_authority_id = $1 AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > clock_timestamp())
+          AND $2::timestamptz > clock_timestamp()
         RETURNING *;`,
       [input.actionAuthorityId, input.expiresAt],
     );
+    if (!extended.rows[0]) {
+      throw new EnvironmentActionAuthorityError(
+        "action_authority_expiry_invalid",
+        409,
+        "Player-action authority expired before the lease could be extended.",
+      );
+    }
     await db.query(
       `UPDATE helix_environment_action_connector_credentials
           SET expires_at = $2
-        WHERE action_authority_id = $1 AND status = 'active';`,
+        WHERE action_authority_id = $1 AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > clock_timestamp());`,
       [input.actionAuthorityId, input.expiresAt],
     );
-    if (!extended.rows[0]) {
-      throw new Error("Player-action authority lease extension failed.");
-    }
     return projectAuthority(extended.rows[0]);
   });
 };

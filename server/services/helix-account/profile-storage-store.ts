@@ -9,6 +9,10 @@ import {
   type HelixProfileStorageWriteRequest,
 } from "@shared/helix-profile-storage";
 import { ensureDatabase, getPool } from "../../db/client";
+import {
+  decryptNativeProfileSnapshot, encryptNativeProfileSnapshot,
+  nativeProfileEncryptionConfigured, NATIVE_PROFILE_SNAPSHOT_PREFIX,
+} from './profile-storage-native-encryption';
 
 const DEFAULT_PROFILE_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;
 const MAX_PROFILE_STORAGE_QUOTA_BYTES = 50 * 1024 * 1024;
@@ -62,11 +66,14 @@ function resolveProfileStorageEncryptionKey(): {
   };
 }
 
-function encryptProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): {
+async function encryptProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): Promise<{
   encrypted_snapshot: string;
   encryption_key_id: string;
   encryption_algorithm: string;
-} {
+}> {
+  if (nativeProfileEncryptionConfigured()) {
+    return encryptNativeProfileSnapshot(snapshot.profile_id!, snapshot);
+  }
   const { key, key_id } = resolveProfileStorageEncryptionKey();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
@@ -231,7 +238,9 @@ export async function readProfileStorageSnapshot(
     );
     if (!rows[0]) return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
     const parsed = rows[0].encrypted_snapshot
-      ? decryptProfileStorageSnapshot(rows[0].encrypted_snapshot)
+      ? rows[0].encrypted_snapshot.startsWith(NATIVE_PROFILE_SNAPSHOT_PREFIX)
+        ? await decryptNativeProfileSnapshot<HelixProfileStorageSnapshot>(normalizedProfileId, rows[0].encrypted_snapshot)
+        : decryptProfileStorageSnapshot(rows[0].encrypted_snapshot)
       : (
       typeof rows[0].snapshot === "string"
         ? JSON.parse(rows[0].snapshot) as HelixProfileStorageSnapshot
@@ -312,7 +321,7 @@ export async function writeProfileStorageSnapshot(input: {
     encryption_algorithm: string;
   };
   try {
-    encrypted = encryptProfileStorageSnapshot(snapshot);
+    encrypted = await encryptProfileStorageSnapshot(snapshot);
   } catch {
     return {
       schema: HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA,

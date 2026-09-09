@@ -1,6 +1,6 @@
 Program gate: G8 — Environment-harness release evaluation
 Workstream: CFP-3.LICENSE candidate implementation contract
-Capability or component: Trusted software entitlement, cached validation, device/session grants and admission
+Capability or component: Trusted hosted-collaboration entitlement, cached validation, device/session grants and admission
 Lifecycle stage: tool admission; source admission; evidence normalization
 Reaction timescale: durable implementation planning; runtime limits must be frozen by CFP-1
 Authority owner: Entitlement implementer; independent account/admission reviewer; product owner retains commercial and release decisions
@@ -10,7 +10,7 @@ Required evidence: CFP-1 closure, CFP-2 completion, rights and terms freeze, exa
 Explicit non-goals: no dispatch from this draft, no production charging/publication, source privatization, automatic rights clearance, capability promotion, or replacement agent runtime
 Downstream gate unlocked: CFP-4 integrated same-signed-artifact acceptance only after parent CFP-3 evidence closure
 
-# CFP-3.LICENSE — Trusted software entitlement, cached validation, device/session grants and admission
+# CFP-3.LICENSE — Trusted hosted-collaboration entitlement, cached validation, device/session grants and admission
 
 Status: candidate child packet, NOT DISPATCHABLE. Owner-selected bounded
 Minecraft assistance is a product direction, not permission for paid Minecraft
@@ -23,6 +23,14 @@ Parent packet: `docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md`
 Stage and task ID: CFP-3.LICENSE.
 Change classification: tool admission; source admission; evidence normalization.
 Current stage authority: `docs/helix-environment-harness-work-program-v1.md`.
+
+
+Offer precedence (owner selection 2026-09-08): the complete supported personal
+MCP experience is free; subscription gates hosted collaboration only. Apply
+CFP-1's "Selected offer: free personal tools, paid hosted collaboration" section
+to all older paid-software, evaluation and entitlement wording below. Freeze
+exact capability/scenario mapping before dispatch. No payment fixture, trial
+expiry or purchase may become a requirement for the personal customer path.
 
 ## Admission prerequisites
 
@@ -49,9 +57,9 @@ or expiry semantics during implementation.
 
 Owner/reviewer responsibilities: Entitlement implementer; independent account/admission reviewer.
 
-Allowed files: Proposed new shared software-entitlement schema and server software-entitlement service/store/migration/tests (exact paths frozen at dispatch); shared/helix-account-session.ts; server/services/helix-account/account-session-store.ts; server/services/helix-ask/workstation-tool-gateway/account-policy.ts and targeted tests; explicitly enumerated MCP/API admission handlers only after rights review. No blanket edits to server/mcp/helix-mcp-server.ts. Native cache custody changes require separate native-host file ownership.
+Allowed files: Proposed new shared hosted-entitlement schema and server hosted-entitlement service/store/migration/tests (exact paths frozen at dispatch); shared/helix-account-session.ts; server/services/helix-account/account-session-store.ts; server/services/helix-ask/workstation-tool-gateway/account-policy.ts and targeted tests; explicitly enumerated MCP/API admission handlers only after rights review. No blanket edits to server/mcp/helix-mcp-server.ts. Native cache custody changes require separate native-host file ownership.
 
-Define an independent versioned software grant and signed validation lease; implement authoritative state/revision ordering, device and concurrent-session admission, bounded cache and typed errors. Preserve developer superset without granting developer role on purchase. Preserve safety/revoke/history/account privacy independently. Optional provider-credit state cannot become software permission. Software-to-Minecraft admission is conditionally proposed and blocked on classification/permission review; no in-game capability lock or indirect out-of-game product check is approved by this packet.
+Define an independent versioned hosted-collaboration grant and signed validation lease; implement authoritative state/revision ordering, device and concurrent-session admission, bounded cache and typed errors. Preserve developer superset without granting developer role on purchase. Preserve safety/revoke/history/account privacy independently. Optional provider-credit state cannot become personal or hosted permission. Only hosted collaboration is gated by purchase; personal Minecraft access uses ordinary non-payment permissions. Review any hosted-to-game relationship separately; this packet establishes no commercial permission.
 
 The coordinator freezes exact file ownership before dispatch. Shared builder,
 schema or handler files have one writer; changes required by another packet
@@ -65,6 +73,10 @@ offer's scenario meanings over the earlier entitlement draft.
 Coordinate local credential/device-grant invalidation and offline revocation limits
 with DIST-06A–F in the [distribution uninstall contract](eh-g8-cfp3-distribution-migration-v1.md).
 Uninstall must not preserve usable local authority or silently cancel billing.
+
+Apply the [domain/account delivery contract](../architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md)
+and its DOM-01–07 cases to this component's assigned ownership; coordinate
+shared identity, database and deployment files before implementation.
 
 ## Acceptance and commands
 
@@ -83,7 +95,7 @@ npm run helix:ask:discipline:quick
 npm run helix:environment-harness:docs-audit
 ```
 
-Proposed additional software-entitlement state-machine, clock/restart, device-race, direct-service/API/MCP and cancellation integration tests must be authored and exact paths frozen before implementation. Existing billing tests protect reuse; they do not prove new licensing behavior. Run prompt benchmark/API parity/full discipline only when the changed contracts require them.
+Proposed additional hosted-entitlement state-machine, clock/restart, device-race, direct-service/API/MCP and cancellation integration tests must be authored and exact paths frozen before implementation. Existing billing tests protect reuse; they do not prove new licensing behavior. Run prompt benchmark/API parity/full discipline only when the changed contracts require them.
 
 Read applicable repository/adapter contracts and skills before implementation.
 Run the narrowest meaningful checks for actual edits. If release verification,

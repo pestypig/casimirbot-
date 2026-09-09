@@ -115,7 +115,10 @@ it("overlapping broker enqueues retain and publish independently when one bindin
         retention: { preflight: { plan, compilation, frontier, binding: { reasoning_binding_id: `binding:${label}`, binding_epoch: 1,
           run_id: "run:test", provider_thread_ref_hash: createHash("sha256").update("continuation:test").digest("hex"), authenticated_profile_ref: "profile:test" } },
           bindingId: `binding:${label}`, bindingEpoch: 1, continuationRef: "continuation:test", runId: "run:test" } as never,
-        revalidateTask: () => { if (++checks === 2 && label === "revoked") throw new Error("fixture_binding_revoked_after_retention"); },
+        revalidateTask: async () => {
+          await Promise.resolve();
+          if (++checks === 2 && label === "revoked") throw new Error("fixture_binding_revoked_after_retention");
+        },
       });
       return result.then(() => "published", error => String(error.message));
     }));

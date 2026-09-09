@@ -1,0 +1,110 @@
+{
+  "captured_utc": "2026-09-09T00:07:57.486Z",
+  "head": "0f25f3538466d64c6468ad7e09b0a7300a8e9412",
+  "initial_changed_entries": 118,
+  "current_changed_entries": 123,
+  "status_sha256": "a73d458a70b2483ab45a1c9dbeaf49dfb0274ac65f287da95a788f85a110ea1f",
+  "qualification": "Shared dirty Desktop checkout. No stash/reset/stage/commit. Source hashes identify inspected files; no secret values captured.",
+  "files": [
+    {
+      "path": ".replit",
+      "sha256": "bb03854e0ef43c9f589ed8036cc7d1902268301f691bb6c55a7a84a304f3ac30"
+    },
+    {
+      "path": "scripts/replit-build.sh",
+      "sha256": "9e05e8063a49292adf19dc201756060e3a39b092f6c30b2b88203880c96ef48c"
+    },
+    {
+      "path": "docs/replit-parity-contract.md",
+      "sha256": "a9465307ae62262706443321f2cddaa2df552e20e4c404de9c59e8a9649c5092"
+    },
+    {
+      "path": "client/src/App.tsx",
+      "sha256": "cd5d7324fb47438b28a35bef481a39918991c58dad5ec9f9b730bfe75de19a4e"
+    },
+    {
+      "path": "client/src/pages/download.tsx",
+      "sha256": "184f5ae323a800b604303b0ef594793a668a1ce8cda8498e57e6f193fd19b099"
+    },
+    {
+      "path": "server/routes/desktop-release.ts",
+      "sha256": "5a53a472e11aa5d84161a918101576191bdaf2f48b634c37d6c8a0452ca2b9b7"
+    },
+    {
+      "path": ".github/workflows/desktop-release.yml",
+      "sha256": "c60ac703e524fab98df6a9943a9464094fd6f0ecd6db20b6a77332f7e8adacd5"
+    },
+    {
+      "path": ".github/workflows/casimir-verify.yml",
+      "sha256": "d75c55df00d6e60a76f82bc2c4c111b3520dd9de8bff6c192bb2bd80f354d1b2"
+    },
+    {
+      "path": "server/db/client.ts",
+      "sha256": "424dcc0ec8db5f640087953fbb7dbc236046ecd23ec0e6d7acd58f7a6b6a7d47"
+    },
+    {
+      "path": "server/routes/google-auth.ts",
+      "sha256": "32f1eacd86efadb24acfe99a5ee556cefc044581154870745fe513ec762215e2"
+    },
+    {
+      "path": "client/src/components/auth/GoogleSignInButton.tsx",
+      "sha256": "70f41b7e4c8995417eea62289ce27cf7bc1a185007cc41cdbc38ba41da902d3c"
+    },
+    {
+      "path": "server/services/helix-account/account-session-store.ts",
+      "sha256": "29fc227aab9e46f95c89bb2d12ea3d1e96c190c5328a625270d863dd7c1bb7a2"
+    },
+    {
+      "path": "server/services/helix-account/auth0-native-account-link.ts",
+      "sha256": "8148547b533a82e201db793090f557bd10f4185d0045f6b459f9decf05aed4e6"
+    },
+    {
+      "path": "server/services/helix-account/agent-account-link-store.ts",
+      "sha256": "abac0e5000661d7be92fbf3604d1a1553bba16283697720ef956ad648f7cbf24"
+    },
+    {
+      "path": "server/services/helix-account/billing-entitlement-store.ts",
+      "sha256": "82ecd2751826e9f0f5fb4ce457d9e0608ab8ec205ba0f6ec955c7cca3886e9db"
+    },
+    {
+      "path": "server/routes/stripe-sandbox-webhook.ts",
+      "sha256": "f70d2171f663907e08362ce22af824ad930b526ea1c1e4454122b3930f64e3ff"
+    },
+    {
+      "path": "shared/helix-billing-entitlement.ts",
+      "sha256": "4d6c41e756d6f433fedacec5f25504c426e25cf2e8cfce9126c5b6f98cf55185"
+    },
+    {
+      "path": "server/services/shared-live-room-control/service.ts",
+      "sha256": "35bf083ce913b4db2ee029630929723815a6cdc7446564b0439089df9db0ea48"
+    },
+    {
+      "path": "shared/helix-account-session.ts",
+      "sha256": "b11ed6a8e419af3a8b55f15586e45fd0f1839ddffb261524bcbcf2174694dee4"
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/minecraft-local-lifecycle.ts",
+      "sha256": "fb973f3174c90a4890a1816efa93cc330dd15e352ff7311e8c43702b9e35e5b7"
+    },
+    {
+      "path": "server/mcp/helix-mcp-server.ts",
+      "sha256": "94f376e8017913c8f2f75f49b2c5c14440fa9d64ecaa4d03a544cfa4034a8b66"
+    },
+    {
+      "path": "server/routes/helix-mcp.ts",
+      "sha256": "06b7d1ac11b068f5ad561f2018366a705bf656f497077daa518662d8b9dec829"
+    },
+    {
+      "path": "connectors/environment/README.md",
+      "sha256": "3350a548cafe8fe60770b4c6773f6e2674658f30a85e45186fca07d05f817c52"
+    },
+    {
+      "path": "connectors/environment/sdk/typescript/index.ts",
+      "sha256": "584ca91277a1538e43baa683a7ffb651ea3455a96884c33c3692563a1261d16b"
+    },
+    {
+      "path": "server/services/situation-room/environment-adapter-registry.ts",
+      "sha256": "63afff6d89c6e6f520cc772b04694e8aad67fd8f75342fe35fb335401ca751f0"
+    }
+  ]
+}

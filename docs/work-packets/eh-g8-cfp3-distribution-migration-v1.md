@@ -85,6 +85,10 @@ Uninstall does not cancel the subscription, delete the hosted account or erase r
 
 CFP-3.DISTRIBUTION owns uninstall design and targeted verification; CFP-3.LICENSE owns credential/grant invalidation semantics. CFP-4.RECOVERY repeats DIST-06A–F on the same signed artifact, with before/after path inventories, sanitized credential-presence checks, exact grant revisions, effect-release timings and retained-data hashes. No user data or raw credentials belong in evidence.
 
+Apply the [domain/account delivery contract](../architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md)
+and its DOM-01–07 cases to this component's assigned ownership; coordinate
+shared identity, database and deployment files before implementation.
+
 ## Acceptance and commands
 
 Required scenario IDs: DIST-01, DIST-02, DIST-03, DIST-05, DIST-06A–F; DIST-04 and the signed DIST-06 repeat coordinated with CFP-4.RECOVERY.

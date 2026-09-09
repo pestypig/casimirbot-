@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import {
   HELIX_ENVIRONMENT_ACTION_CONTROL_OBSERVATION_SCHEMA,
   type HelixEnvironmentActionControlObservation,
+  type HelixEnvironmentActionObservation,
 } from "@shared/helix-environment-action";
 import {
   HELIX_MINECRAFT_PLAYER_CANCEL_CAPABILITY,
@@ -19,6 +20,7 @@ import {
   requestEnvironmentActionWorkflowControl,
 } from "../../environment-connectors/actions/authority-store";
 import { readSharedRealtimeRoomMembership } from "../realtime-room/room-store";
+import { readRetainedEnvironmentWorkflowResult } from "../../environment-connectors/actions/retained-workflow-status";
 import type { HelixWorkstationGatewayAccountContext } from "./account-policy";
 import type { HelixWorkstationCapabilityManifest } from "./types";
 
@@ -176,6 +178,7 @@ export type EnvironmentActionControlGatewayDependencies = {
   requestControl: typeof requestEnvironmentActionWorkflowControl;
   emergencyStop: typeof emergencyStopEnvironmentActionAuthority;
   awaitObservation: typeof awaitEnvironmentActionControlObservation;
+  readRetainedResult: typeof readRetainedEnvironmentWorkflowResult;
 };
 
 const dependencies = (
@@ -190,6 +193,7 @@ const dependencies = (
     overrides.emergencyStop ?? emergencyStopEnvironmentActionAuthority,
   awaitObservation:
     overrides.awaitObservation ?? awaitEnvironmentActionControlObservation,
+  readRetainedResult: overrides.readRetainedResult ?? readRetainedEnvironmentWorkflowResult,
 });
 
 const selectedParticipantId = async (input: {
@@ -220,6 +224,7 @@ export type EnvironmentActionControlGatewayExecution = {
   status: "completed" | "blocked" | "failed";
   summary: string;
   observation: HelixEnvironmentActionControlObservation;
+  retained_result?: HelixEnvironmentActionObservation;
   executedArgs?: Record<string, unknown>;
   repairAction?: "repair" | "retry" | "ask_user";
   error?: string;
@@ -326,6 +331,17 @@ export const executeEnvironmentActionControlGatewayCapability = async (input: {
       controlRequestId: control.control_request_id,
       deadlineAt: control.deadline_at,
     });
+    if (spec.controlKind === "status" && rawObservation.outcome === "not_running" &&
+        rawObservation.provenance_valid && rawObservation.eligible_for_current_turn_reentry) {
+      const retained = await deps.readRetainedResult({roomId, profileId, workflowId: workflowRef,
+        requestingParticipantId: participantId});
+      if (retained) return {
+        ok: true, status: "completed",
+        summary: `The exact workflow is not currently running. Its retained result is ${retained.outcome}, recorded at ${retained.observed_at}. Recorded control release is historical, not a current control-state check.`,
+        observation: rawObservation, retained_result: retained,
+        executedArgs: {workflow_ref: workflowRef, control_kind: spec.controlKind},
+      };
+    }
     const emergencyStopPostconditionSatisfied = Boolean(
       spec.controlKind === "emergency_stop" &&
       emergencyStopResult?.authority.status === "suspended" &&

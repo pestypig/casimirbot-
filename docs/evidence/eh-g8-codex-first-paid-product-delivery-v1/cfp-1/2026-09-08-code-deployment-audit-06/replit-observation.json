@@ -1,0 +1,36 @@
+{
+  "audit_date_local": "2026-09-08",
+  "method": "Authenticated read-only browser inspection after user selected pestypig Google profile",
+  "project_url": "https://replit.com/@pestypig/CasimirBot",
+  "production": {
+    "status_text": "published 7 days ago",
+    "visibility": "Public",
+    "type": "Autoscale",
+    "geography": "North America",
+    "capacity_text": "4 vCPU / 8 GiB RAM / 1 Max",
+    "database_status_text": "Production database connected",
+    "domains": ["casimir-bot-pestypig.replit.app", "helixubi.com", "casimirbot.com"],
+    "domain_caveat": "Failed marker adjacent to helixubi.com; that domain was not independently tested",
+    "source_identity": "Use separately saved live domain fingerprint; dashboard summary did not expose deployment commit"
+  },
+  "git_panel": {
+    "repository": "https://github.com/pestypig/casimirbot-",
+    "branch": "main",
+    "upstream": "origin/main",
+    "upstream_last_fetched_text": "5 days ago",
+    "latest_listed_commit": "efe7794",
+    "latest_listed_subject": "docs(environment): refresh receding-horizon evidence timestamp",
+    "local_matching_commit": "efe779444f8cff26911a050753b8fd52b0153776",
+    "local_history_distance_to_current_main": 2,
+    "workspace_modified_file_names": ["docMetadata.generated.ts", "code-lattice.json"],
+    "qualification": "UI history observation; no shell rev-parse, fetch, pull, push, stage, discard or sync performed"
+  },
+  "unverified": [
+    "Actual production runtime database endpoint/provider and applied account migrations",
+    "Backup restore acceptance; historical project chat is not fresh execution evidence",
+    "Production Google/Auth0 callback and provider configuration",
+    "Signing provisioning and hosted subscription production acceptance"
+  ],
+  "mutations": "Browser login/navigation only; no application, database, billing or deployment changes",
+  "sensitive_data_saved": false
+}

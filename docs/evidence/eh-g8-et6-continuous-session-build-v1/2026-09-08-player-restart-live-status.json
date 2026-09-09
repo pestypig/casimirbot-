@@ -1,0 +1,409 @@
+{
+  "scope": "Repaired companion installation and live retained-status read; bounded development rehearsal, not complete CS4 or ET6 acceptance",
+  "exe_sha256": "ab241cc70b3ad6aa126c77049fe0aea902fb6ed9b238ef8981bd1e5cd9d64c89",
+  "companion": {
+    "version": "0.4.12",
+    "new_sha256": "bd5b8eb7e0a89a34415d14a97b58722590ab1264bd5d33989b7dcb88f77c550e",
+    "previous_sha256": "6536f3d36b622c8f9b13dc8cf2673356ed81e51e5026ba25ba23ef6da86f99d0",
+    "rollback_file": "HelixFabricPlayerAgent-0.4.12.jar.pre-cs4-query-recovery-6536f3d3.bak",
+    "staged_hash_verified": true,
+    "new_producer_epoch_ref": "environment_action_epoch:1cc7e8c6-ba8f-48f0-96ad-db7e339d8f14"
+  },
+  "lifecycle": {
+    "operation": "environment.minecraft.fabric_loopback.launch_and_join",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+    "action_authority_id": "environment_action_authority:05934fca-87f1-4510-a8da-4be1d650f1cf",
+    "launch_authority_basis": "active_player_embodiment",
+    "status": "connected",
+    "receipt": {
+      "schema": "helix.minecraft.workstation_launch_receipt.v1",
+      "status": "connected",
+      "profile_id": "helix-combat-c0-isolated",
+      "profile_version": "fabric-loader-0.18.4-1.21.8",
+      "isolated_game_directory": true,
+      "client_process_id": 46268,
+      "server_address": "127.0.0.1:25566",
+      "launcher_action": "launched_client",
+      "connection_action": "autojoin_staged",
+      "play_control_point": "853,718",
+      "mod_loaded": true,
+      "memory_used_percent": 82.3,
+      "credentials_exposed": false
+    },
+    "authority_widened": false,
+    "credential_included": false,
+    "content_role": "minecraft_local_lifecycle_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "workflow_status": {
+    "operation": "minecraft.player.workflow.status",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "ok": true,
+    "status": "completed",
+    "summary": "The exact workflow is not currently running. Its retained result is succeeded, recorded at 2026-09-08T19:01:52.809Z. Recorded control release is historical, not a current control-state check.",
+    "observation": {
+      "schema": "helix.environment_action.control_observation.v1",
+      "control_request_ref": "environment_action_control:ba53e974-d555-4068-a328-a49b0c3224ed",
+      "workflow_ref": "workflow:cs3-calibration-20260908-1",
+      "control_kind": "status",
+      "outcome": "not_running",
+      "summary": "The exact workflow was not running in this Fabric client.",
+      "affected_workflow_refs": [],
+      "workflow_state": null,
+      "controls_released": false,
+      "evidence_refs": [],
+      "evidence_ref": "environment_action_control_evidence:2a951f7b4d2002821d665c01c3930823bd2b267f3",
+      "observed_at": "2026-09-08T19:41:36.260Z",
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "content_role": "environment_action_control_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "retained_result": {
+      "schema": "helix.environment_action.observation.v1",
+      "action_request_ref": "action_request:cs3-calibration-20260908-1",
+      "workflow_ref": "workflow:cs3-calibration-20260908-1",
+      "action_execution_ref": "environment_action_execution:d03df48f-0a16-4922-98b2-13bcb6d7cbe1",
+      "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+      "capability_version": 1,
+      "action_kind": "execute_sequence",
+      "outcome": "succeeded",
+      "summary": "The Fabric client completed the admitted sequence and every required checkpoint.",
+      "result": {
+        "control_engine": "native_fabric",
+        "started_clock": {
+          "schema": "helix.environment_clock_snapshot.v1",
+          "clock_id": "minecraft_client_tick_clock:099d8826-c83a-4720-9cb0-e1f3e8eef278",
+          "clock_kind": "minecraft_game_tick",
+          "tick_rate_hz": 20,
+          "tick_index": 9974,
+          "world_tick_index": 12679030,
+          "monotonic": {
+            "origin_id": "minecraft_monotonic_clock:698a69ee-018b-4171-a0e4-8d569f4a7bfd",
+            "elapsed_ms": 498669.307399
+          },
+          "synchronization": "server_synchronized",
+          "observed_at": "2026-09-08T19:01:49.012666900Z"
+        },
+        "completed_clock": {
+          "schema": "helix.environment_clock_snapshot.v1",
+          "clock_id": "minecraft_client_tick_clock:099d8826-c83a-4720-9cb0-e1f3e8eef278",
+          "clock_kind": "minecraft_game_tick",
+          "tick_rate_hz": 20,
+          "tick_index": 9996,
+          "world_tick_index": 12679052,
+          "monotonic": {
+            "origin_id": "minecraft_monotonic_clock:698a69ee-018b-4171-a0e4-8d569f4a7bfd",
+            "elapsed_ms": 499767.0423
+          },
+          "synchronization": "server_synchronized",
+          "observed_at": "2026-09-08T19:01:50.110896100Z"
+        },
+        "duration_ticks": 22,
+        "postconditions": [
+          {
+            "condition_id": "sequence-complete",
+            "condition_kind": "minecraft.player.sequence_completed",
+            "required": true,
+            "status": "satisfied",
+            "summary": "The native Fabric executor completed its action-specific postcondition check.",
+            "evidence_refs": [
+              "environment_action_event:ad61a173-bfe1-40f5-b2f0-5781de079e65",
+              "environment_action_event:bbb65b3f-aa28-4246-b7a8-4b1a84876665",
+              "environment_action_event:3c2edc5d-854c-4d34-b543-468248f55d9f",
+              "environment_action_event:c0025ff1-f398-4410-b1e0-ab8e96251f2c",
+              "environment_action_event:2d4eb562-6a0e-4c19-8640-108c8c373f84"
+            ],
+            "checked_at": "2026-09-08T19:01:50.146354900Z"
+          }
+        ],
+        "verified_terminal_measurements": {
+          "active_control_ticks": 23,
+          "answer_authority": false,
+          "checkpoint_settlements": [
+            {
+              "checkpoint_id": "look.post.0",
+              "monotonic_elapsed_ns": 91706099,
+              "node_id": "look.post.0",
+              "scheduler_ticks_elapsed": 117,
+              "tick_index": 116
+            },
+            {
+              "checkpoint_id": "walk.post.0",
+              "monotonic_elapsed_ns": 1056701100,
+              "node_id": "walk.post.0",
+              "scheduler_ticks_elapsed": 137,
+              "tick_index": 136
+            },
+            {
+              "checkpoint_id": "checkpoint:cs3-calibration-end",
+              "monotonic_elapsed_ns": 1056710699,
+              "node_id": "settled",
+              "scheduler_ticks_elapsed": 137,
+              "tick_index": 136
+            }
+          ],
+          "condition_observation_count": 5,
+          "condition_observations": [
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "look",
+              "satisfied": true,
+              "tick_index": 114
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "look.post.0",
+              "satisfied": true,
+              "tick_index": 116
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "walk",
+              "satisfied": true,
+              "tick_index": 116
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "walk.post.0",
+              "satisfied": true,
+              "tick_index": 136
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "settled",
+              "satisfied": true,
+              "tick_index": 136
+            }
+          ],
+          "deviation_count": 0,
+          "dispatch_to_client_accept_ms": 50,
+          "dispatch_to_first_tick_ms": 85,
+          "executed_node_count": 8,
+          "executed_node_ids": [
+            "look",
+            "look.execute",
+            "look.post.0",
+            "walk",
+            "walk.execute",
+            "walk.post.0",
+            "settled",
+            "success"
+          ],
+          "inventory_mutation_performed": false,
+          "inventory_mutations_performed": 0,
+          "last_temporal_acceptance_timing": null,
+          "last_temporal_activation_timing": null,
+          "manual_or_safety_to_release_ms": null,
+          "measurement_authority": false,
+          "missed_ticks": 0,
+          "node_outcomes": {
+            "look": "succeeded",
+            "look.execute": "succeeded",
+            "look.post.0": "succeeded",
+            "settled": "succeeded",
+            "success": "succeeded",
+            "walk": "succeeded",
+            "walk.execute": "succeeded",
+            "walk.post.0": "succeeded"
+          },
+          "oldest_pending_age_ms": 1937,
+          "planned_runway_ticks_at_accept": 400,
+          "player_interaction_performed": false,
+          "player_motion_performed": true,
+          "queue_depth_at_lease": 1,
+          "required_checkpoints_satisfied": 1,
+          "resident_computation_ms": 61,
+          "resident_inventory_observation": {
+            "action_attribution": "unestablished",
+            "available": true,
+            "between_sample_effects_observed": false,
+            "gap_detected": false,
+            "item_count_change_lower_bound": 0
+          },
+          "retry_count": 0,
+          "ruleset": "survival_tas",
+          "runway_ticks_remaining": 377,
+          "satisfied_checkpoint_ids": [
+            "look.post.0",
+            "walk.post.0",
+            "checkpoint:cs3-calibration-end"
+          ],
+          "scheduler_ticks": 23,
+          "scheduler_ticks_elapsed": 137,
+          "sequence_completed": true,
+          "sequence_id": "plan:cs3-calibration-20260908-1",
+          "stabilization_entered": false,
+          "stalled_ticks": 0,
+          "temporal_poll_count": 0,
+          "temporal_poll_max_ms": null,
+          "temporal_poll_total_ms": null,
+          "temporal_reconciliation_count": 0,
+          "temporal_reconciliation_max_ms": null,
+          "temporal_reconciliation_total_ms": null,
+          "terminal_eligible": false,
+          "terminal_reason_code": "calibration_done",
+          "wall_clock_elapsed_ms": 1056,
+          "world_mutations_performed": 0
+        },
+        "side_effects_performed": true,
+        "player_motion_performed": true,
+        "player_interaction_performed": false,
+        "inventory_mutation_performed": false,
+        "world_mutation_performed": false,
+        "manual_override_detected": false,
+        "manual_override_reason": null,
+        "controls_released": true,
+        "host_access_performed": false,
+        "automatic_replay_performed": false,
+        "model_invoked": false
+      },
+      "progress_observation_refs": [
+        "environment_action_event:ad61a173-bfe1-40f5-b2f0-5781de079e65",
+        "environment_action_event:bbb65b3f-aa28-4246-b7a8-4b1a84876665",
+        "environment_action_event:3c2edc5d-854c-4d34-b543-468248f55d9f",
+        "environment_action_event:c0025ff1-f398-4410-b1e0-ab8e96251f2c",
+        "environment_action_event:2d4eb562-6a0e-4c19-8640-108c8c373f84"
+      ],
+      "postcondition_evidence_refs": [
+        "environment_action_event:ad61a173-bfe1-40f5-b2f0-5781de079e65",
+        "environment_action_event:bbb65b3f-aa28-4246-b7a8-4b1a84876665",
+        "environment_action_event:3c2edc5d-854c-4d34-b543-468248f55d9f",
+        "environment_action_event:c0025ff1-f398-4410-b1e0-ab8e96251f2c",
+        "environment_action_event:2d4eb562-6a0e-4c19-8640-108c8c373f84"
+      ],
+      "evidence_ref": "environment_action_evidence:2326b6f74fdcac8d4b6c538743d8c82e358616dfc",
+      "observed_at": "2026-09-08T19:01:52.809Z",
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "content_role": "environment_action_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "current_authority": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:05934fca-87f1-4510-a8da-4be1d650f1cf",
+        "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+        "room_source_binding_id": "room_source_binding:5eaf90ee-96be-49da-88e7-02d978d35f44",
+        "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+        "source_id": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+        "world_id": "minecraft:minehut:479f4368-ada",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+        "subject_binding_id": "environment_subject_binding:27dfefd4-a04b-40dc-b105-9a8d4e4ab362",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.camera.track",
+          "com.casimirbot.minecraft.player.collect",
+          "com.casimirbot.minecraft.player.combat.attack",
+          "com.casimirbot.minecraft.player.combat.guard",
+          "com.casimirbot.minecraft.player.consume",
+          "com.casimirbot.minecraft.player.craft",
+          "com.casimirbot.minecraft.player.equipment.equip",
+          "com.casimirbot.minecraft.player.follow",
+          "com.casimirbot.minecraft.player.guardian.execute",
+          "com.casimirbot.minecraft.player.hotbar.select",
+          "com.casimirbot.minecraft.player.interact",
+          "com.casimirbot.minecraft.player.inventory.transfer",
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.mine",
+          "com.casimirbot.minecraft.player.navigate",
+          "com.casimirbot.minecraft.player.place",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.viability_guardian.arm",
+          "com.casimirbot.minecraft.player.viability_guardian.disarm",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 10,
+        "issued_at": "2026-09-08T18:52:15.427Z",
+        "expires_at": "2026-09-08T20:52:15.349Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:05934fca-87f1-4510-a8da-4be1d650f1cf",
+        "state": "ready",
+        "ready_for_actions": true,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-08T19:41:14.910Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": true,
+        "heartbeat_received_at": "2026-09-08T19:42:15.250Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "verification": {
+    "red_regression": "ConnectException after successful relocated heartbeat",
+    "focused_tests_passed": 8,
+    "remap_jar_exit_code": 0,
+    "discipline_quick_passed": true,
+    "docs_audit_passed": true
+  },
+  "limits": [
+    "No movement submitted after either restart.",
+    "Only single-request retained-result lookup is supported; a rolling-chain terminal locator remains missing.",
+    "Source repair was staged into the isolated Minecraft installation; this is development installation evidence, not ordinary release installer qualification.",
+    "Exact local Helix chat restoration and post-restart human binding remain outstanding.",
+    "New companion epoch requires fresh dependency verification before any temporal action."
+  ],
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

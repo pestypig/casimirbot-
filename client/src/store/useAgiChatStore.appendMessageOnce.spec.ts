@@ -58,6 +58,17 @@ describe("useAgiChatStore.appendMessageOnce", () => {
     ]);
   });
 
+  it.each(["New chat", "My saved title"])("preserves first-user title behavior for %s on replay", title => {
+    const id = useAgiChatStore.getState().newSession(title);
+    const message: ChatMessage = { id: "steering:one", role: "user", content: "Inspect the platform",
+      at: "2026-09-08T12:00:00.000Z" };
+    useAgiChatStore.getState().appendMessageOnce(id, message);
+    const first = useAgiChatStore.getState().sessions[id];
+    expect(first.title).toBe(title === "New chat" ? message.content : title);
+    useAgiChatStore.getState().appendMessageOnce(id, { ...message, content: "Conflicting replay" });
+    expect(useAgiChatStore.getState().sessions[id]).toEqual(first);
+  });
+
   it("does not overwrite an existing stable message on conflicting replay", () => {
     const sessionId = useAgiChatStore.getState().newSession("Agent observer");
     useAgiChatStore.getState().appendMessageOnce(sessionId, terminalMessage);

@@ -134,10 +134,43 @@ const deps = (
     },
   }) as never),
   awaitObservation: vi.fn(async () => observation),
+  readRetainedResult: vi.fn(async () => null),
   ...overrides,
 });
 
 describe("Minecraft player workflow-control workstation gateway", () => {
+  it("returns a retained terminal result separately from the current not-running observation", async () => {
+    const native = {...observation, control_kind: 'status' as const, outcome: 'not_running' as const,
+      workflow_state: null, controls_released: false};
+    const retained = {workflow_ref: WORKFLOW_ID, outcome:'succeeded', observed_at:'2026-08-05T11:00:00.000Z',
+      result:{controls_released:true}, answer_authority:false, terminal_eligible:false} as never;
+    const readRetainedResult = vi.fn(async () => retained);
+    const result = await executeEnvironmentActionControlGatewayCapability({
+      capabilityId:'com.casimirbot.minecraft.player.workflow.status',turnId:'turn:retained',
+      arguments:{workflow_ref:WORKFLOW_ID},accountContext:accountContext(),
+      conversationThreadId:`helix-ask:room:${ROOM_ID}`,
+      dependencies:deps({awaitObservation:vi.fn(async()=>native),readRetainedResult}),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.observation).toEqual(native);
+    expect(result.retained_result).toBe(retained);
+    expect(result.summary).toContain('historical, not a current control-state check');
+    expect(readRetainedResult).toHaveBeenCalledWith({roomId:ROOM_ID,profileId:PROFILE_ID,
+      workflowId:WORKFLOW_ID,requestingParticipantId:PARTICIPANT_ID});
+  });
+
+  it.each([CANCEL_CAPABILITY, 'com.casimirbot.minecraft.player.workflow.resume'])(
+    'does not turn %s into success using an old completed result', async capabilityId => {
+      const readRetainedResult = vi.fn(async()=>({outcome:'succeeded'}) as never);
+      const result = await executeEnvironmentActionControlGatewayCapability({capabilityId,turnId:'turn:negative',
+        arguments:{workflow_ref:WORKFLOW_ID},accountContext:accountContext(),
+        conversationThreadId:`helix-ask:room:${ROOM_ID}`,
+        dependencies:deps({readRetainedResult,awaitObservation:vi.fn(async()=>({...observation,outcome:'not_running'}))}),
+      });
+      expect(result.ok).toBe(false);
+      expect(readRetainedResult).not.toHaveBeenCalled();
+    });
+
   it("publishes status, resume, cancel, and emergency stop as bounded nonterminal tools", () => {
     expect(environmentActionControlMinecraftManifests).toHaveLength(4);
     expect(environmentActionControlMinecraftManifests.map(

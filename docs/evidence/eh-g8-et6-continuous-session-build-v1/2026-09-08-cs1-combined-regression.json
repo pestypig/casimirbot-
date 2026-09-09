@@ -1,0 +1,27 @@
+{
+  "schema": "casimirbot.cs1.component_regression.v1",
+  "date": "2026-09-08",
+  "command": "npx vitest run server/services/environment-connectors/session/__tests__ server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts client/src/components/agent-access/__tests__/EnvironmentSessionReadyUp.spec.tsx --maxWorkers=1 --minWorkers=1",
+  "exit_code": 0,
+  "files_passed": 9,
+  "tests_passed": 153,
+  "tests_failed": 0,
+  "duration_seconds": 70.05,
+  "suites": {
+    "durable-goal-store": 26,
+    "prepare-browser-session": 25,
+    "preparation-intent-store": 17,
+    "session-readiness": 28,
+    "ready-up-session": 12,
+    "recover-session-goal": 13,
+    "bound-session-evidence": 6,
+    "recovery-perception": 4,
+    "EnvironmentSessionReadyUp": 22
+  },
+  "evidence_scope": "Deterministic component composition, pg-mem ledger and jsdom UI; injected identities and environment ports are not live authentication or movement proof.",
+  "production_database_concurrency_proven": false,
+  "packaged_integrated_ready_up_proven": false,
+  "cs1_complete": false,
+  "et6_pass": false,
+  "nav1_unlocked": false
+}

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { minecraftNavigationCollisionSchema } from "../navigation/minecraft-navigation-collision-schema";
 import {
   HELIX_ENVIRONMENT_CAPABILITY_DESCRIPTOR_SCHEMA,
   HELIX_MINECRAFT_ACTOR_STATUS_READ_CAPABILITY,
@@ -212,6 +213,7 @@ const minecraftPositionTargetSchema: HelixEnvironmentConstrainedJsonSchema = {
 const minecraftPerceptionSnapshotOutputSchema: HelixEnvironmentConstrainedJsonSchema = {
   type: "object",
   properties: {
+    navigation_collision: minecraftNavigationCollisionSchema,
     result_summary: { type: "string", maxLength: 2_000 },
     snapshot_schema: {
       type: "string",
@@ -533,6 +535,10 @@ const minecraftPerceptionSnapshotOutputSchema: HelixEnvironmentConstrainedJsonSc
 const minecraftPerceptionSnapshotInputSchema: HelixEnvironmentConstrainedJsonSchema = {
   type: "object",
   properties: {
+    include_navigation_collision: {
+      type: "boolean",
+      description: "Opt in to a fixed 5x5x5 selected-player collision capture. Defaults to false. Unknown, unsupported and unavailable evidence never establishes a safe route.",
+    },
     target: {
       type: "string",
       enum: ["current_actor"],
@@ -3609,7 +3615,7 @@ const descriptors: HelixEnvironmentCapabilityDescriptor[] = [
   }),
   descriptor({
     capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
-    capabilityVersion: 1,
+    capabilityVersion: 2,
     domain: "minecraft",
     adapterProfileIds: [HELIX_MINECRAFT_ADAPTER_PROFILE_ID],
     label: "Read one bounded Minecraft perception snapshot",

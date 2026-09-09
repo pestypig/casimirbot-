@@ -1,18 +1,20 @@
+import type { ReasoningTaskAssociationVerifier } from "../../local-supervisor/reasoning-binding-ports";
 import { createHash } from "node:crypto";
 import { projectEnvironmentSessionReadiness, type EnvironmentSessionCheck,
   type EnvironmentSessionLayer } from "@shared/helix-environment-session-readiness";
-import type { HelixReasoningTaskBindingStore } from "../../local-supervisor/reasoning-task-binding-store";
 import { readSharedRealtimeRoomMembership } from "../../helix-ask/realtime-room/room-store";
 import { listRoomEnvironmentProjections, ensureOwnRoomEnvironmentSubject, RoomEnvironmentSubjectError } from "../subjects/subject-binding-store";
 import { readEnvironmentActionAuthorities, readEnvironmentActionConnectorReadiness,
-  isEnvironmentActionAuthorityError } from "../actions/authority-store";
+  isEnvironmentActionAuthorityError, environmentActionAuthorityRequiresNewGrant } from "../actions/authority-store";
 import { environmentDurableGoalStore, isEnvironmentDurableGoalError } from "../goals/durable-goal-store";
 import { readBoundSessionEvidence, type BoundSessionEvidenceInput } from "./bound-session-evidence";
+import { listEnvironmentConnectorDeviceChecks } from "../devices/device-check";
 
 /** Server-owned readers only; not an RPC-supplied evidence bag. */
 const readers = {
   membership: readSharedRealtimeRoomMembership,
   environments: listRoomEnvironmentProjections,
+  devices: listEnvironmentConnectorDeviceChecks,
   subject: ensureOwnRoomEnvironmentSubject,
   authorities: readEnvironmentActionAuthorities,
   controllers: readEnvironmentActionConnectorReadiness,
@@ -36,7 +38,7 @@ export type EnvironmentSessionReadinessInput = BoundSessionEvidenceInput & {
  */
 export async function readEnvironmentSessionReadiness(
   input: EnvironmentSessionReadinessInput,
-  bindingStore: Pick<HelixReasoningTaskBindingStore, "verifyTaskAssociation">,
+  bindingStore: ReasoningTaskAssociationVerifier,
   dependencies: typeof readers = readers,
 ) {
   if (input.context.profileId !== input.binding.profileRef ||
@@ -51,7 +53,7 @@ export async function readEnvironmentSessionReadiness(
     throw new RoomEnvironmentSubjectError("subject_binding_forbidden", 403,
       "Session readiness requires the current room participant.");
   }
-  const binding = bindingStore.verifyTaskAssociation(input.binding);
+  const binding = await bindingStore.verifyTaskAssociation(input.binding);
   const started = Date.now();
   // Fixed field order; never serialize caller objects or credentials into refs.
   const contextRef = `sha256:${createHash("sha256").update(JSON.stringify([
@@ -63,11 +65,12 @@ export async function readEnvironmentSessionReadiness(
   ])).digest("hex")}`;
   const checks: EnvironmentSessionCheck[] = [];
   const add = (layer: EnvironmentSessionLayer, state: EnvironmentSessionCheck["state"],
-    evidenceRef: string, reasons: string[] = [], deadline: number | null = null) => {
+    evidenceRef: string, reasons: string[] = [], deadline: number | null = null,
+    humanApprovalRequired = false) => {
     checks.push({ layer, state, context_ref: contextRef, evidence_ref: evidenceRef,
       observed_at_ms: started, expires_at_ms: deadline, reason_codes: reasons,
       // Diagnostic failure alone is not evidence that another consent is needed.
-      human_approval_required: false });
+      human_approval_required: humanApprovalRequired });
   };
   const failure = (layer: EnvironmentSessionLayer, error: unknown) => {
     const code = error instanceof RoomEnvironmentSubjectError ||
@@ -92,11 +95,23 @@ export async function readEnvironmentSessionReadiness(
       add("source", "blocked", input.environmentBindingId, ["session_source_identity_mismatch"]);
       add("subject", "blocked", input.subjectBindingId, ["session_source_identity_mismatch"]);
     } else {
-      add("source", environment.connection_status === "active" &&
+      try {
+        const devices = await dependencies.devices({ ownerProfileId: room.profileId, roomId: room.roomId });
+        const exactDevices = devices.filter(row => row.environment_binding_id === input.environmentBindingId &&
+          row.room_id === room.roomId && row.source_id === input.sourceId && row.world_id === input.worldId);
+        const device = exactDevices.length === 1 ? exactDevices[0] : null;
+        const deadline = device?.credential_expires_at ? Date.parse(device.credential_expires_at) : NaN;
+        if (!device) {
+          add("source", "blocked", input.environmentBindingId, ["session_source_credential_identity_unverified"]);
+        } else if (device.credential_status !== "active" || !Number.isFinite(deadline)) {
+          add("source", device.credential_status === "revoked" ? "revoked" : "blocked", input.sourceId,
+            [device.credential_status !== "active" ? "session_source_credential_inactive" : "session_source_credential_deadline_unavailable"]);
+        } else add("source", environment.connection_status === "active" &&
         environment.subject_directory?.freshness === "fresh" ? "verified" :
           environment.connection_status === "revoked" ? "revoked" : "stale",
       environment.source_id, environment.connection_status !== "active" ? ["session_source_not_active"] :
-        environment.subject_directory?.freshness !== "fresh" ? ["session_source_not_fresh"] : []);
+        environment.subject_directory?.freshness !== "fresh" ? ["session_source_not_fresh"] : [], deadline);
+      } catch (error) { failure("source", error); }
       const subject = environment.self_subject_binding;
       const subjectExact = subject?.subject_binding_id === input.subjectBindingId &&
         subject.participant_id === membership.participantId &&
@@ -126,10 +141,11 @@ export async function readEnvironmentSessionReadiness(
       authority.room_id === room.roomId && authority.source_id === input.sourceId &&
       authority.world_id === input.worldId && authority.participant_id === membership.participantId &&
       authority.subject_binding_id === input.subjectBindingId;
+    const newGrantRequired = Boolean(exact && environmentActionAuthorityRequiresNewGrant(authority));
     add("authority", !exact ? "missing" : authority.status === "active" && authority.expires_at ? "verified" :
       authority.status === "revoked" ? "revoked" : "blocked", input.actionAuthorityId,
-    !exact ? ["session_authority_identity_mismatch"] : !authority.expires_at ? ["session_finite_authority_required"] : authority.status === "active" ? [] : ["session_authority_inactive"],
-    exact && authority.expires_at ? Date.parse(authority.expires_at) : null);
+    !exact ? ["session_authority_identity_mismatch"] : newGrantRequired ? ["session_authority_new_grant_required"] : !authority.expires_at ? ["session_finite_authority_required"] : authority.status === "active" ? [] : ["session_authority_inactive"],
+    exact && authority.expires_at ? Date.parse(authority.expires_at) : null, newGrantRequired);
   } catch (error) { failure("authority", error); }
   try {
     const controllers = await dependencies.controllers(environmentInput);
@@ -156,7 +172,7 @@ export async function readEnvironmentSessionReadiness(
     add("perception", "verified", evidence.context.evidence.observation.evidence_ref);
   } catch (error) { failure("perception", error); }
   // Do not publish an authenticated snapshot after its binding was revoked.
-  bindingStore.verifyTaskAssociation(input.binding);
+  await bindingStore.verifyTaskAssociation(input.binding);
   return projectEnvironmentSessionReadiness({ context_ref: contextRef, checks,
     now_ms: Date.now(), maximum_check_age_ms: 5_000 });
 }

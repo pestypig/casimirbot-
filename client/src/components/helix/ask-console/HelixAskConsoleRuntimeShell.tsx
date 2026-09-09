@@ -6,6 +6,7 @@ import { buildHelixAskConsoleRuntimeBridgeProps } from "./HelixAskConsoleRuntime
 import { AgentRunObserverBindingSurface } from
   "./agent-run-observer/AgentRunObserverBindingSurface";
 import { HelixOperatorActivityPanel } from "./HelixOperatorActivityPanel";
+import { BoundAgentActiveChatPromptDisplay } from "./BoundAgentPromptDisplay";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 const HelixAskLegacyRuntimeBridge = React.lazy(async () => {
@@ -69,6 +70,7 @@ export function HelixAskConsoleRuntimeShell({
         <HelixAskLegacyRuntimeBridge {...buildHelixAskConsoleRuntimeBridgeProps(props)} />
       </Suspense>
       </div>
+      <div className="shrink-0"><BoundAgentActiveChatPromptDisplay /></div>
       {observer}
     </div>
   );

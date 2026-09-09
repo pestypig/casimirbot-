@@ -1,0 +1,24 @@
+{
+  "scope": "Development directory package identity; not native rehearsal or live acceptance",
+  "package": "apps/desktop/release-cs1-dispatch-retry-20260908/win-unpacked",
+  "renderer_build_exit": 0,
+  "host_build_exit": 0,
+  "staging_exit": 0,
+  "packaging_exit": 0,
+  "runtime_files_matched": 645,
+  "entrypoints_sha256": {
+    "main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service.mjs": "ca3615b6b7806d63ac74592ed80780ac1f7e1ad078c738bb6ab2bc9cb801d4da"
+  },
+  "renderer_asset": "AgentConnectionSetup-DcLzyhQJ.js",
+  "renderer_sha256": "58240938b451bc7c1c71c7b7f03380bc6138e53215b37c3856b3bf49d06a5f39",
+  "exe_sha256": "f6c8320c45341c01494fe29b49c351839e33d4490f74821bd6d101960fd8c9e5",
+  "included_changes": ["current-state continuation guidance", "unknown-outcome retry identity retention", "final probe run-association validation"],
+  "host_warning_count": 4,
+  "signing_certificate_verified": false,
+  "launched": false,
+  "prior_running_exe_preserved": true,
+  "cs1_complete": false,
+  "et6_passed": false
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "casimirbot.environment_session_build_checkpoint.v1",
+  "stage": "CS1",
+  "scope": "preparation browser/MCP transport fixture and unpacked development package",
+  "package": "apps/desktop/release-cs1-preparation-20260908/win-unpacked/CasimirBot.exe",
+  "exe_sha256": "317172f6c2b8c550849a923b4391d402a104c7c5dafaac189e7cfe711102dbf0",
+  "runtime_manifest_sha256": "85db4fe6ef33c7e07c4772e7e222063dd07a776b2ac0eaa46ca91e20dd0dbacc",
+  "runtime_files_matched": 645,
+  "asar_build_matches": {
+    "main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service.mjs": "dd1c19244475f9579927b4b7d7b9f7b81b4e19a334e922e577a7ae0edc1dffd2"
+  },
+  "checks": {
+    "mcp_coordination_tests": "26 passed; added browser HTTP -> service mailbox -> MCP read -> acknowledgement -> replay/rejection fixture",
+    "client_build": "passed; 3328 modules; 42.78 seconds",
+    "host_build": "passed",
+    "runtime_staging": "passed; six allowlisted roots",
+    "directory_packaging": "passed"
+  },
+  "limitations": [
+    "Room membership and run verification are injected in the transport fixture.",
+    "No native EXE rehearsal of this package yet; running app unchanged.",
+    "No signed-release qualification asserted.",
+    "Build warnings include browser-external modules, eval, chunk sizing and duplicate key/case warnings.",
+    "CS1 incomplete; CS2-CS4 not qualified; original ET6 unproven; NAV1 gated."
+  ]
+}

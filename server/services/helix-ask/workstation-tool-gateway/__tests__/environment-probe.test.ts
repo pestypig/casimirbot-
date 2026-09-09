@@ -368,7 +368,7 @@ const dependencies = (
 });
 
 describe("environment probe workstation gateway", () => {
-  it.each(["exact", "room", "source", "connector", "subject", "revoked-before-dispatch"])(
+  it.each(["exact", "room", "source", "connector", "subject", "revoked-before-dispatch", "async-revoked-before-dispatch"])(
     "constrains first-party setup probes to the exact environment (%s)", async scenario => {
       const connector = await dependencies().materializeConnector!({} as never);
       const dispatchProbe = vi.fn(async (_input: Parameters<EnvironmentProbeGatewayDependencies["dispatchProbe"]>[0]) =>
@@ -387,6 +387,7 @@ describe("environment probe workstation gateway", () => {
         arguments: { target: "current_actor" }, expectedEnvironmentIdentity: expected,
         assertCurrentTarget: () => {
           if (scenario === "revoked-before-dispatch") throw new Error("revoked");
+          if (scenario === "async-revoked-before-dispatch") return Promise.resolve().then(() => { throw new Error("revoked"); });
         },
         dependencies: dependencies({ listActiveConnectors: async () => [connector],
           resolveSubject: async () => ({ subjectBindingId: "subject:setup", subjectNativeId: "player:setup" }) as never,

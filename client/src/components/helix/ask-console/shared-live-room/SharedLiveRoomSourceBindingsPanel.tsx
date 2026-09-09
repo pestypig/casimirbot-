@@ -1406,6 +1406,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                     </p>
                   )}
                 </div>
+                <div tabIndex={-1} data-environment-player-settings={environment.domain_adapter === "minecraft.fabric_mod.v1" ? environment.environment_binding_id : undefined}>
                 {environment.domain_adapter === "minecraft.fabric_mod.v1" ? (
                   environment.self_subject_binding?.status === "active" ? (
                     <SharedLiveRoomPlayerEmbodimentPanel
@@ -1426,6 +1427,7 @@ export function SharedLiveRoomSourceBindingsPanel({
                     </div>
                   ) : null
                 ) : null}
+                </div>
               </article>
             );
           })}

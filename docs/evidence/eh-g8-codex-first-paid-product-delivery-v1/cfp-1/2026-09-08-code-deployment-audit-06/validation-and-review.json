@@ -1,0 +1,71 @@
+{
+  "captured_utc": "2026-09-09T00:09:57.339Z",
+  "docs_audit": {
+    "exit_code": 0,
+    "stdout": "\n> rest-express@1.0.0 helix:environment-harness:docs-audit\n> tsx scripts/audit-environment-harness-work-program.ts\n\n{\n  \"schema\": \"casimirbot.environment_harness_work_program_audit.v1\",\n  \"work_program\": \"docs/helix-environment-harness-work-program-v1.md\",\n  \"active_gate\": \"G8\",\n  \"backlink_files_checked\": 6,\n  \"canonical_link_targets_checked\": 7,\n  \"capability_status_rows_checked\": 40,\n  \"allowed_maturity_terms\": [\n    \"projected\",\n    \"specified\",\n    \"implemented\",\n    \"deterministically verified\",\n    \"live accepted\",\n    \"integrated accepted\",\n    \"release-ready\"\n  ],\n  \"acceptance_claims_checked\": 14,\n  \"ok\": true,\n  \"failures\": []\n}\n",
+    "stderr": ""
+  },
+  "relative_links_checked": 68,
+  "broken_links": [],
+  "artifacts": [
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-code-deployment-alignment-audit-v1.md",
+      "sha256": "07352d5e302c7ffc696184922bc145870a052affca8ca211bf4aec92c9032acc"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "1b0701474acdae516fc633815389db490acbb2637ff959d4b79176dfa59127f1"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md",
+      "sha256": "5b6d03b91048996cfd7bbb856395cfaff084021270c6c95217b6c63c1a02a280"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp2-public-capability-access-v1.md",
+      "sha256": "1f33bc3b8cbb25b5f4bbbda907ec9ee7aceeca6e48ed1ffc632ae296fb7ab8e3"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp2-external-client-onboarding-v1.md",
+      "sha256": "9c5dba81b13bc070f1fa3f859535f345cda41ff74d98971205db225d25e38642"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp2-bounded-obstruction-clearing-v1.md",
+      "sha256": "c6d92b92fa439ab9a7b3cd0887ab702574e3e688e261961bbf2b1946763ce9dd"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp3-license-enforcement-v1.md",
+      "sha256": "9cfea6ffc778741f27529733271c4a317c6286f9506da6cb33b4730649e7f14f"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp3-software-commerce-v1.md",
+      "sha256": "7aef6afe207be334ff4ca557d95d77408c226b5b5b59f9d4b22f2c1c2a4dd64f"
+    },
+    {
+      "path": "docs/architecture/casimirbot-developer-platform-product-contract-v1.md",
+      "sha256": "d3493915b8b288fcab1d6b08e78bccd068fb5cc298c1b4b3a8c8062dc1106d1a"
+    },
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "2c20febec059bc34186b51ce875d457088f49a00001cb84af698c6d87fdc15f2"
+    }
+  ],
+  "independent_reviews": [
+    {
+      "reviewer": "/root/audit_accounts_hosted",
+      "verdict": "accepted for account/hosted audit and specification scope",
+      "limitations": "Source review; deployed database and production identity not verified"
+    },
+    {
+      "reviewer": "/root/audit_personal_developer",
+      "verdict": "accepted after developer sequencing, readiness and personal-expiry repairs",
+      "limitations": "Documentation alignment, not runtime/deployment/release readiness"
+    }
+  ],
+  "audit_status": "Code/GitHub/public-domain assessment prepared and reviewed; authenticated Replit dashboard audit pending account selection",
+  "remaining": [
+    "Replit account choice and project/deployment inspection",
+    "Actual hosted database and OAuth configuration evidence without secret disclosure"
+  ],
+  "runtime_changes": false,
+  "cfp1_closed": false
+}

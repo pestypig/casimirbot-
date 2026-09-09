@@ -1,0 +1,19 @@
+{
+  "scope": "CS1 preparation guidance directory package, not live acceptance",
+  "package": "apps/desktop/release-cs1-preparation-guide-20260908/win-unpacked",
+  "renderer_build_exit_code": 0,
+  "renderer_build_duration_seconds": 110,
+  "stage_exit_code": 0,
+  "packager_exit_code": 0,
+  "runtime_files_sha256_matched": 645,
+  "asar_entrypoints_matched": 3,
+  "service_sha256": "2bc594e9a351c1331eae11a8022b4d810af69de1bee7b1cb4a66820c8052d22e",
+  "exe_sha256": "bb3d1570eb6d866baf6d1c33bb370aaeeac637ac29ad40ec7e8cc56332066da1",
+  "changed_renderer_asset": "AgentConnectionSetup-JedcTuxp.js",
+  "changed_renderer_sha256": "6f78e2f51adb096bd34bc46352698e97190452527f9cdb0f52dbac83903c6d72",
+  "panel_tests_passed": 36,
+  "native_launch_verified": false,
+  "note": "EXE host hash is unchanged; changed renderer is separately hashed and matched to staging. The prior presence-retention EXE remains open.",
+  "cs1_complete": false,
+  "et6_accepted": false
+}

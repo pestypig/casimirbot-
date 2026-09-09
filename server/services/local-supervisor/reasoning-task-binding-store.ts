@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { acceptPairingLedgerRow, pairingLedgerRowSchema, pairingState, type PairingLedgerRow, type PairingDestination } from "./pairing-ledger-contract";
 import {
   HELIX_REASONING_STEERING_EVENT_SCHEMA,
   HELIX_REASONING_TASK_BINDING_SCHEMA,
@@ -23,6 +24,8 @@ type PresencePort = Readonly<{
 }>;
 type PrivateBinding = HelixReasoningTaskBindingProjection & {
   claimHandleHash: string;
+  durablePairingId?: string;
+  durableDestination?: PairingDestination;
 };
 type PrivateEvent = HelixReasoningSteeringEventProjection & {
   instructionText: string;
@@ -42,6 +45,7 @@ export class HelixReasoningTaskBindingStore {
   private readonly eventDedupe = new Map<string, string>();
   private bindingEpoch = 0;
   private cursor = 0;
+  private readonly admittedDurableBindings = new Set<string>();
 
   constructor(
     private readonly presence: PresencePort,
@@ -58,12 +62,113 @@ export class HelixReasoningTaskBindingStore {
   private currentBinding(bindingId: string): PrivateBinding {
     const binding = this.bindings.get(bindingId);
     if (!binding) throw new HelixReasoningTaskBindingError("reasoning_binding_not_found", 404);
-    if (binding.status === "pending_claim" && Date.parse(binding.expires_at) <= this.now().getTime()) {
+    if (binding.durablePairingId && !this.admittedDurableBindings.has(bindingId)) {
+      throw new HelixReasoningTaskBindingError("reasoning_binding_durable_preflight_required", 409);
+    }
+    if ((binding.status === "pending_claim" || (binding.durablePairingId && binding.status === "active")) &&
+        Date.parse(binding.expires_at) <= this.now().getTime()) {
       const expired = { ...binding, status: "expired" as const };
       this.bindings.set(bindingId, expired);
       return expired;
     }
     return binding;
+  }
+
+  /** Internal lookup only, not proof of a current grant or provider presence. */
+  findOwnedBindingId(input: { profileRef: string; helixConversationId?: string }) {
+    const binding = [...this.bindings.values()].filter(row => row.authenticated_profile_ref === input.profileRef &&
+      (input.helixConversationId === undefined || row.helix_conversation_id === input.helixConversationId))
+      .sort((left, right) => right.binding_epoch - left.binding_epoch)[0];
+    if (!binding) throw new HelixReasoningTaskBindingError("reasoning_binding_not_found", 404);
+    return binding.reasoning_binding_id;
+  }
+
+  /** Internal lookup only, not proof of a current grant or provider presence. */
+  resolveDurableBindingContext(input: { profileRef: string; bindingId: string }) {
+    const binding = this.bindings.get(input.bindingId);
+    if (!binding) throw new HelixReasoningTaskBindingError("reasoning_binding_not_found", 404);
+    if (binding.authenticated_profile_ref !== input.profileRef) {
+      throw new HelixReasoningTaskBindingError("reasoning_binding_identity_mismatch", 403);
+    }
+    if (!binding.durablePairingId) return null;
+    if (!binding.durableDestination) throw new HelixReasoningTaskBindingError("pairing_destination_required", 409);
+    return { pairingId: binding.durablePairingId, destination: clone(binding.durableDestination),
+      clientSessionRef: binding.client_session_ref };
+  }
+
+  /** Apply only a revocation already committed by the authenticated ledger path. */
+  applyDurableRevocation(input: { profileRef: string; bindingId: string }, raw: PairingLedgerRow) {
+    const context = this.resolveDurableBindingContext(input);
+    const row = pairingLedgerRowSchema.parse(raw);
+    const binding = this.bindings.get(input.bindingId)!;
+    if (!context || row.id !== context.pairingId || pairingState(row, this.now()) !== "revoked" ||
+        (Object.keys(context.destination) as Array<keyof PairingDestination>)
+          .some(key => context.destination[key] !== row.approval.destination[key]) ||
+        row.approval.chatId !== binding.helix_conversation_id ||
+        (row.approval.environment?.runId ?? null) !== binding.run_id || row.pairingExpiresAt !== binding.expires_at) {
+      throw new HelixReasoningTaskBindingError("pairing_revocation_identity_mismatch", 409);
+    }
+    const revoked = { ...binding, status: "revoked" as const, revoked_at: row.revokedAt };
+    this.bindings.set(input.bindingId, revoked);
+    return this.projectBinding(revoked);
+  }
+
+  /** Server-internal bridge. The reader must authenticate and freshly read the
+   * durable grant on every invocation. No cached projection authorizes a call.
+   * The operation is synchronous so the checked grant cannot survive an await. */
+  async withAcceptedPairing<T>(input: {
+    destination: PairingDestination; clientSessionRef: string;
+    readAccepted: () => Promise<PairingLedgerRow>;
+  }, operation: (binding: HelixReasoningTaskBindingProjection) => T): Promise<T> {
+    const row = await input.readAccepted();
+    const checked = acceptPairingLedgerRow(row, input.destination, this.now());
+    if (!row.acceptedAt || checked.revision !== row.revision) {
+      throw new HelixReasoningTaskBindingError("pairing_not_accepted", 409);
+    }
+    const bindingId = `reasoning_binding:${digest(JSON.stringify([
+      this.presence.serviceInstanceRef, row.id, input.clientSessionRef,
+    ])).slice(0, 32)}`;
+    const prior = this.bindings.get(bindingId);
+    if (prior && prior.status !== "active") {
+      throw new HelixReasoningTaskBindingError(`reasoning_binding_${prior.status}`, 409);
+    }
+    const target = this.presence.listPresence().find(entry => entry.active &&
+      entry.service_instance_ref === this.presence.serviceInstanceRef &&
+      entry.authenticated_profile_ref === input.destination.profileId &&
+      entry.authenticated_mcp_client_ref === input.destination.clientId &&
+      entry.conversation_thread_ref === input.destination.taskId &&
+      entry.client_session_ref === input.clientSessionRef &&
+      Date.parse(entry.observed_at) <= this.now().getTime() &&
+      Date.parse(entry.heartbeat_expires_at) > this.now().getTime());
+    const bridge = target?.thread_observability_bridge;
+    const level = bridge && bridge.supported_levels.includes(bridge.requested_level)
+      ? bridge.requested_level : "tool_activity_only";
+    const binding: PrivateBinding = {
+      schema: HELIX_REASONING_TASK_BINDING_SCHEMA, reasoning_binding_id: bindingId,
+      binding_epoch: prior?.binding_epoch ?? ++this.bindingEpoch, status: "active",
+      service_instance_ref: this.presence.serviceInstanceRef,
+      authenticated_profile_ref: input.destination.profileId,
+      authenticated_mcp_client_ref: input.destination.clientId,
+      client_session_ref: input.clientSessionRef, provider_thread_ref_hash: digest(input.destination.taskId),
+      helix_conversation_id: row.approval.chatId, mission_id: null,
+      run_id: row.approval.environment?.runId ?? null, reasoning_role: "principal",
+      continuation_transport: level === "continuation_ready" ? "polling" : level === "checkpoint_publish" ? "monitor_only" : "unavailable",
+      negotiated_observability_level: level, created_by: "signed_in_operator",
+      created_at: row.createdAt, expires_at: row.pairingExpiresAt, claimed_at: row.acceptedAt,
+      revoked_at: null, provider_thread_content_included: false, hidden_reasoning_included: false,
+      execution_authority: false, evidence_authority: false, answer_authority: false, terminal_eligible: false,
+      claimHandleHash: "", durablePairingId: row.id, durableDestination: clone(input.destination),
+    };
+    const projection = this.projectBinding(binding);
+    this.bindings.set(bindingId, binding);
+    this.admittedDurableBindings.add(bindingId);
+    try {
+      const result = operation(projection);
+      if (result && typeof (result as { then?: unknown }).then === "function") {
+        throw new HelixReasoningTaskBindingError("reasoning_binding_async_operation_forbidden", 500);
+      }
+      return result;
+    } finally { this.admittedDurableBindings.delete(bindingId); }
   }
 
   private requireActiveOwnedBinding(input: {
@@ -207,7 +312,7 @@ export class HelixReasoningTaskBindingStore {
     bindingId: string;
     bindingEpoch: number;
     clientEventRef: string;
-    origin: "typed" | "gpt_live_finalized";
+    origin: "typed" | "gpt_live_finalized" | "agent_submitted";
     instructionText: string;
     expiresInSeconds?: number;
   }): HelixReasoningSteeringEventProjection {
@@ -218,7 +323,15 @@ export class HelixReasoningTaskBindingStore {
     }
     const dedupeKey = `${binding.reasoning_binding_id}\n${input.clientEventRef}`;
     const replayRef = this.eventDedupe.get(dedupeKey);
-    if (replayRef) return this.projectEvent(this.events.find((event) => event.steering_event_ref === replayRef)!);
+    const lifetimeMs = Math.min(3_600, Math.max(30, input.expiresInSeconds ?? 600)) * 1_000;
+    if (replayRef) {
+      const prior = this.events.find((event) => event.steering_event_ref === replayRef);
+      if (!prior || prior.instruction_sha256 !== digest(instruction) || prior.origin !== input.origin ||
+          Date.parse(prior.expires_at) - Date.parse(prior.created_at) !== lifetimeMs) {
+        throw new HelixReasoningTaskBindingError("reasoning_steering_request_conflict", 409);
+      }
+      return this.inspectEvent({ ...input, eventRef: prior.steering_event_ref });
+    }
     const createdAt = this.now();
     const cursor = ++this.cursor;
     const event: PrivateEvent = {
@@ -233,7 +346,7 @@ export class HelixReasoningTaskBindingStore {
       instruction_sha256: digest(instruction),
       instruction_length: instruction.length,
       created_at: createdAt.toISOString(),
-      expires_at: new Date(createdAt.getTime() + Math.min(3_600, Math.max(30, input.expiresInSeconds ?? 600)) * 1_000).toISOString(),
+      expires_at: new Date(createdAt.getTime() + lifetimeMs).toISOString(),
       acknowledged_at: null,
       advisory_only: true,
       execution_requested: false,
@@ -258,12 +371,28 @@ export class HelixReasoningTaskBindingStore {
     afterCursor?: number;
   }): HelixReasoningSteeringDelivery[] {
     const binding = this.requireActiveOwnedBinding(input);
+    return this.projectDeliveries(binding, input.afterCursor ?? 0);
+  }
+
+  /** Owner display only. Does not authenticate as the provider or acknowledge pickup. */
+  readForChatDisplay(input: {
+    profileRef: string; bindingId: string; bindingEpoch: number;
+    helixConversationId: string; runId: string | null; afterCursor?: number;
+  }): HelixReasoningSteeringDelivery[] {
+    const binding = this.requireActiveOwnedBinding(input);
+    if (binding.helix_conversation_id !== input.helixConversationId || binding.run_id !== input.runId) {
+      throw new HelixReasoningTaskBindingError("reasoning_binding_identity_mismatch", 409);
+    }
+    return this.projectDeliveries(binding, input.afterCursor ?? 0, true);
+  }
+
+  private projectDeliveries(binding: PrivateBinding, afterCursor: number, recent = false): HelixReasoningSteeringDelivery[] {
     const nowMs = this.now().getTime();
     return this.events.filter((event) =>
       event.reasoning_binding_id === binding.reasoning_binding_id &&
       event.binding_epoch === binding.binding_epoch &&
-      event.cursor > (input.afterCursor ?? 0))
-      .slice(0, 50)
+      event.cursor > afterCursor)
+      .slice(recent ? -50 : 0, recent ? undefined : 50)
       .map((event) => ({
         event: this.projectEvent({
           ...event,
@@ -272,7 +401,8 @@ export class HelixReasoningTaskBindingStore {
             : Date.parse(event.expires_at) <= nowMs ? "expired" : event.delivery_state,
         }),
         instruction_text: event.instructionText,
-        content_role: "operator_steering_advisory_not_execution",
+        content_role: event.origin === "agent_submitted"
+          ? "agent_steering_advisory_not_execution" : "operator_steering_advisory_not_execution",
         raw_provider_content_included: false,
         hidden_reasoning_included: false,
       }));
@@ -436,8 +566,9 @@ export class HelixReasoningTaskBindingStore {
   }
 
   private projectBinding(binding: PrivateBinding): HelixReasoningTaskBindingProjection {
-    const { claimHandleHash: _private, ...projection } = binding;
-    return clone(helixReasoningTaskBindingProjectionSchema.parse(projection));
+    const { claimHandleHash: _private, durablePairingId: _durable, durableDestination: _destination, ...projection } = binding;
+    return clone(helixReasoningTaskBindingProjectionSchema.parse({ ...projection,
+      ...(_durable ? { pairing_id: _durable } : {}) }));
   }
 
   private projectEvent(event: PrivateEvent): HelixReasoningSteeringEventProjection {

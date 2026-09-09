@@ -1,0 +1,20 @@
+{
+  "scope": "Replacement EXE startup and ordinary setup navigation only",
+  "package": "apps/desktop/release-cs1-presence-retention-20260908/win-unpacked",
+  "old_exe_closed_normally": true,
+  "new_launch_count": 1,
+  "initial_window_discovery": "No targetable window; processes remained live. Later discovery succeeded without relaunch.",
+  "service_ready_at": "2026-09-08T05:03:59.395Z",
+  "service_origin": "http://127.0.0.1:49379",
+  "window_id": 59377482,
+  "service_instance_ref": "service_instance:7bdd9f685a322fd270836fcc5130f4aa",
+  "navigation": ["Destination disclosure", "Set up connection", "Open Agent Access", "Same-task MCP presence refresh", "Automatic AI app connected panel"],
+  "input_failure": "First disclosure click reported coordinate input geometry unavailable; fresh selection, activation and snapshot recovered it.",
+  "reproduced_presentation_defect": "Guide asks user to review and bind while environment-run checkbox is disabled because no verified run is published. Preparation room remains unselected.",
+  "human_consent_automated": false,
+  "new_binding_created": false,
+  "live_run_prepared": false,
+  "heartbeat_selection_retention_live_proven": false,
+  "cs1_complete": false,
+  "et6_accepted": false
+}

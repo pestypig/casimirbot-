@@ -1,0 +1,20 @@
+{
+  "scope": "CS1 development package identity, not native rehearsal or ET6 acceptance",
+  "package": "apps/desktop/release-cs1-source-deadline-20260908/win-unpacked",
+  "builds": { "renderer": "exit_0", "host": "exit_0_four_warnings", "stage": "exit_0", "directory_package": "exit_0" },
+  "runtime_files_compared": 645,
+  "runtime_hash_mismatches": [],
+  "asar_entrypoints_match_build": true,
+  "sha256": {
+    "main.cjs": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload.cjs": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service.mjs": "a04d75fafbac5f82bc8b0c753f444e09cdbe6de79b410144e3464fc726e49701",
+    "AgentConnectionSetup-axBdCnlX.js": "1a7a857c21f7d4212575e377d3f0ab02250b956a198cf2c93349e57597edb17d",
+    "CasimirBot.exe": "d38d47084db10d3368dae071cc6fdb39c2def47899aa1d37cdb7e8a9f7223c32"
+  },
+  "includes": ["pre-probe run association revalidation", "source credential deadline collection and presentation"],
+  "replacement_launched": false,
+  "live_ready_up_proven": false,
+  "et6_pass": false,
+  "signing_certificate_verified": false
+}

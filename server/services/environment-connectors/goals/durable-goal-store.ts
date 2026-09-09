@@ -32,6 +32,7 @@ export type EnvironmentDurableGoalErrorCode =
   | "durable_goal_evidence_identity_mismatch"
   | "durable_goal_event_invalid"
   | "durable_goal_terminal"
+  | "durable_goal_request_conflict"
   | "durable_goal_session_ambiguous";
 
 export class EnvironmentDurableGoalError extends Error {
@@ -573,11 +574,21 @@ export class EnvironmentDurableGoalStore {
   async create(input: EnvironmentDurableGoalIdentityRequest & {
     objective: HelixEnvironmentDurableGoalObjective;
     occurredAt?: string;
+    idempotencyKey?: string;
   }): Promise<HelixEnvironmentDurableGoalProjection> {
     const objective = helixEnvironmentDurableGoalObjectiveSchema.parse(input.objective);
+    if (input.idempotencyKey !== undefined &&
+        (!input.idempotencyKey.trim() || input.idempotencyKey.length > 320)) {
+      throw new EnvironmentDurableGoalError("durable_goal_request_conflict", 409, "Invalid goal creation retry key.");
+    }
     return this.transaction(async (db) => {
       const identityValue = await this.resolveIdentity(db, input);
-      const goalId = `environment_durable_goal:${crypto.randomUUID()}`;
+      // Database uniqueness, not process memory, owns keyed creation. Resolve
+      // current authority even on replay; the key never bypasses admission.
+      const goalId = input.idempotencyKey === undefined
+        ? `environment_durable_goal:${crypto.randomUUID()}`
+        : `environment_durable_goal:${crypto.createHash("sha256")
+          .update(JSON.stringify(["creation-v1", input.ownerProfileId, input.idempotencyKey])).digest("hex")}`;
       const event = buildHelixEnvironmentDurableGoalEvent({
         event_id: `environment_durable_goal_event:${crypto.randomUUID()}`,
         goal_id: goalId,
@@ -588,14 +599,15 @@ export class EnvironmentDurableGoalStore {
         evidence_refs: [],
         occurred_at: input.occurredAt ?? new Date().toISOString(),
       });
-      await db.query(
+      const inserted = await db.query<{ goal_id: string; latest_event_hash: string }>(
         `INSERT INTO helix_environment_durable_goals (
            goal_id, owner_profile_id, connector_installation_id, device_id,
            environment_binding_id, room_source_binding_id, room_id,
            participant_id, subject_binding_id, subject_native_id, source_id,
            world_id, objective_hash, objective_payload, status,
            current_sequence, latest_event_hash
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'active',1,$15);`,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'active',1,$15)
+         ON CONFLICT (goal_id) DO NOTHING RETURNING goal_id, latest_event_hash;`,
         [goalId, identityValue.owner_profile_id, identityValue.connector_installation_id,
           identityValue.device_id, identityValue.environment_binding_id,
           identityValue.room_source_binding_id, identityValue.room_id,
@@ -604,6 +616,19 @@ export class EnvironmentDurableGoalStore {
           identityValue.world_id, helixEnvironmentDurableGoalSha256(objective),
           JSON.stringify(objective), event.event_hash],
       );
+      if (inserted.rows[0]?.latest_event_hash !== event.event_hash) {
+        const events = await readGoalEvents(db, goalId);
+        const creation = events[0];
+        if (input.idempotencyKey === undefined || creation?.payload.kind !== "goal_created" ||
+            helixEnvironmentDurableGoalSha256(creation.payload.objective) !== helixEnvironmentDurableGoalSha256(objective) ||
+            helixEnvironmentDurableGoalSha256(creation.identity) !== helixEnvironmentDurableGoalSha256(identityValue)) {
+          throw new EnvironmentDurableGoalError("durable_goal_request_conflict", 409,
+            "The goal creation retry key belongs to a different objective or identity.");
+        }
+        // Return current ledger state, including pauses/cancellation. Never
+        // reinsert participant grants or resurrect the original active state.
+        return reduceDurableGoalEvents(events);
+      }
       await db.query(
         `INSERT INTO helix_environment_durable_goal_participants (
            goal_id, participant_id, profile_id, granted_by_profile_id, scopes

@@ -18,7 +18,10 @@ Repeated ET6 live acceptance attempts are deferred while the prerequisite build
 stages in `docs/work-packets/eh-g8-et6-continuous-session-build-v1.md` are carried
 out. Their current stage ledger is solely in
 `docs/helix-environment-harness-work-program-v1.md`. This changes the engineering
-order, not this packet's original acceptance criteria, evidence or NAV1 gate.
+order, not this packet's original acceptance criteria or evidence. The current
+NAV prerequisite is separately defined by NAV-EQ in
+`docs/work-packets/eh-g8-nav-direct-mcp-execution-qualification-v1.md`.
+That direct-execution lane does not close ET6 or change CS1–CS5 exits.
 
 ## Classification
 

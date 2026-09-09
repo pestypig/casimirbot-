@@ -1,0 +1,31 @@
+{
+  "scope": "Built package identity and content comparison; native recovery pending",
+  "output": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-cs4-binding-recovery-20260908\\win-unpacked",
+  "build_exit_code": 0,
+  "runtime_files_compared": 645,
+  "runtime_mismatches": [],
+  "runtime_extras": [],
+  "bundles": {
+    "main.cjs": {
+      "sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+      "matches": true
+    },
+    "preload.cjs": {
+      "sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+      "matches": true
+    },
+    "service.mjs": {
+      "sha256": "c2944f074f463a596b0cc751d48b98e7c1865bd991dc6c76405e11b8f27ea1f2",
+      "matches": true
+    }
+  },
+  "client_tree_sha256": "721dfa4cfe0050a5653298b5b61f4657acbb10f2f17e362bae9ac1ec57da8ba6",
+  "exe_size": 225533440,
+  "exe_sha256": "49f75cf5a881fae24387707e2c78d56f608548fdce98df524c7bcb8ecbe2dd7d",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

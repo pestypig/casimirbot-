@@ -1,0 +1,27 @@
+{
+  "scope": "Component and composition regression after final readiness-expiry repair",
+  "command": "npx vitest run server/services/environment-connectors/session/__tests__ server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts client/src/components/agent-access/__tests__/EnvironmentSessionReadyUp.spec.tsx --maxWorkers=1 --minWorkers=1",
+  "exit_code": 0,
+  "files_passed": 9,
+  "tests_passed": 154,
+  "duration_seconds": 30.90,
+  "suites": {
+    "durable-goal-store": 26,
+    "prepare-browser-session": 26,
+    "preparation-intent-store": 17,
+    "session-readiness": 28,
+    "ready-up-session": 12,
+    "recover-session-goal": 13,
+    "bound-session-evidence": 6,
+    "recovery-perception": 4,
+    "EnvironmentSessionReadyUp": 22
+  },
+  "limitations": [
+    "Injected environment and controller ports; not live Minecraft",
+    "Goal ledger uses pg-mem, not production database concurrency",
+    "UI runs in jsdom, not the packaged EXE",
+    "Final readiness-expiry repair not in the previously built package"
+  ],
+  "cs1_complete": false,
+  "et6_passed": false
+}

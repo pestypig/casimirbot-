@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { normalizeMinecraftNavigationCollisionObservation } from "../navigation/minecraft-navigation-collision-observation";
 import {
   HELIX_ENVIRONMENT_PROBE_REQUEST_SCHEMA,
   helixEnvironmentProbeResultSchema,
@@ -930,6 +931,9 @@ export const leaseDurableEnvironmentProbesForClaim = async (input: {
                   : args.target === "current_actor"
                   ? {
                       target_ref: "current_actor",
+                      ...(legacyProbeType === "perception_snapshot" && typeof args.include_navigation_collision === "boolean"
+                        ? { include_navigation_collision: args.include_navigation_collision }
+                        : {}),
                       ...(Number.isInteger(args.horizontal_radius)
                         ? { horizontal_radius: Number(args.horizontal_radius) }
                         : {}),
@@ -1984,6 +1988,7 @@ const normalizeLegacyResult = (
       "hazards",
       "movement_candidates",
       "navigation_frontier",
+      "navigation_collision",
       "inventory",
       "coverage",
       "ui_state",
@@ -2312,6 +2317,19 @@ export const submitDurableEnvironmentProbeResult = async (input: {
     const normalizedResult = legacyResult
       ? normalizeLegacyResult(legacyResult)
       : asRecord(connectorResult!.result);
+    if (expectedProbeType === "perception_snapshot") {
+      try {
+        normalizeMinecraftNavigationCollisionObservation(normalizedResult, {
+          requested: asRecord(parseJson(row.arguments)).include_navigation_collision === true,
+          expected_subject_native_id: row.resolved_subject_native_id,
+        });
+      } catch {
+        throw new DurableEnvironmentProbeError(
+          "schema_validation_failed", 400,
+          "Navigation collision evidence failed the exact selected-player, snapshot-clock or bounded capture contract.",
+        );
+      }
+    }
     const outputIssues = validateEnvironmentConnectorSchemaValue(
       descriptor.output_schema,
       normalizedResult,

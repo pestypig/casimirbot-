@@ -1,0 +1,20 @@
+{
+  "schema": "casimirbot.environment_session_transport_checkpoint.v1",
+  "service_instance_ref": "service_instance:29006168d43e976e9cb840c3894f09fd",
+  "transition_request_ref": "desktop_tunnel_request:031ccce0-4b30-42a8-bf0f-5e55fe68cd14",
+  "observations": [
+    "Advertised authorization-status call initially returned Tool not found.",
+    "Eight-hour transition lease request failed connector schema validation: maximum 300 seconds. No delegation resulted from that rejected request.",
+    "Supported 300-second request applied existing trusted-device delegation, limited to tunnel transport.",
+    "Idempotent transition execution accepted with tool-list-changed requested and reconnect_required false.",
+    "Subsequent authorization-status call succeeded: g2-action ready true, missing_scopes empty, authorization expiry 2026-09-08T05:03:12.255Z.",
+    "Current callable tool discovery still returned no helix_environment_session_ready_up tool."
+  ],
+  "transition_receipt_hash": "889dd13b0fe44ca814102ebf50ec524181af48f04b4046b3bb4148b50655dc08",
+  "user_consent_automated": false,
+  "reconnect_requested_of_user": false,
+  "environment_authority_granted": false,
+  "binding_claim_generated": false,
+  "live_preparation_pickup_proven": false,
+  "cs1_complete": false
+}

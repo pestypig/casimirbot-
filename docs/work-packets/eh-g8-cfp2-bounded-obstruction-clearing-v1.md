@@ -25,7 +25,7 @@ Read [CFP-1](eh-g8-cfp1-product-rights-and-offer-contract-v1.md), the [controlli
 
 Minecraft EULA/Usage Guidelines commercialization and indirect product-access restrictions require review of the full design, including evaluation admission. No free-mod/paid-harness separation or test fixture establishes permission. Required approval of that boundary cannot be substituted by an engineering test. Existing independently authorized environment packets retain their own scope.
 
-CFP-2 proves pre-release ordinary-user capability using the parent-defined trusted evaluation interface. It does not implement or accept commercial purchase/expiry/refund behavior reserved for CFP-3. Bind evaluation provenance, issuer, profile/node/capability/revision/expiry to the isolated run manifest. Customer inputs cannot mint grants or change roles; reject enabled evaluation fixtures in commercial packages. Repeat the full positive and negative journey with real verified grants in CFP-3 and the same signed commercial artifact in CFP-4.
+CFP-2 proves free ordinary-user personal capability with trusted profile/node, client scope, owner/target consent and effect authority. No purchase, expiring trial or commercial/evaluation software grant is required. Test fixture isolation is not customer eligibility. CFP-3 adds hosted grants only to hosted requests; repeat never-subscribed and expired-hosted personal journeys in CFP-3/4.
 
 ## Work and file ownership
 

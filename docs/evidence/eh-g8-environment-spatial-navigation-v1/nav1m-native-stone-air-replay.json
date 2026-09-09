@@ -1,0 +1,1719 @@
+{
+  "dimension": "minecraft:overworld",
+  "cells": [
+    {
+      "position": [
+        -2,
+        -1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -2,
+        -1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -2,
+        -1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -2,
+        -1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -2,
+        -1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -2,
+        0,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        0,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        0,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        0,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        0,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        2,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        2,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        2,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        2,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -2,
+        2,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        -1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -1,
+        -1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -1,
+        -1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -1,
+        -1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -1,
+        -1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        -1,
+        0,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        0,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        0,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        0,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        0,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        2,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        2,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        2,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        2,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        -1,
+        2,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        -1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        0,
+        -1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        0,
+        -1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        0,
+        -1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        0,
+        -1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        0,
+        0,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        0,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        0,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        0,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        2,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        2,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        2,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        2,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        0,
+        2,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        -1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        1,
+        -1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        1,
+        -1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        1,
+        -1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        1,
+        -1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        1,
+        0,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        0,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        0,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        0,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        0,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        2,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        2,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        2,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        2,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        1,
+        2,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        -1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        2,
+        -1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        2,
+        -1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        2,
+        -1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        2,
+        -1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": true,
+        "reviewed_support": true,
+        "loaded": true,
+        "collision": "full_cube",
+        "hazard": false,
+        "collision_empty": false,
+        "fluid": false,
+        "air": false
+      }
+    },
+    {
+      "position": [
+        2,
+        0,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        0,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        0,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        0,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        0,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        1,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        1,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        1,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        1,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        1,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        2,
+        -2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        2,
+        -1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        2,
+        0
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        2,
+        1
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    },
+    {
+      "position": [
+        2,
+        2,
+        2
+      ],
+      "facts": {
+        "collision_full_cube": false,
+        "reviewed_support": false,
+        "loaded": true,
+        "collision": "empty",
+        "hazard": false,
+        "collision_empty": true,
+        "fluid": false,
+        "air": true
+      }
+    }
+  ],
+  "maximum": [
+    2,
+    2,
+    2
+  ],
+  "tick_start": 100,
+  "schema": "minecraft.native_collision_replay.v1",
+  "subject_native_id": "00000000-0000-4000-8000-000000000001",
+  "minimum": [
+    -2,
+    -1,
+    -2
+  ],
+  "tick_end": 100
+}

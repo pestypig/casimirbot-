@@ -43,6 +43,7 @@ import {
 import {
   createHelixMcpServer,
   type HelixEnvironmentActionMcpExecutor,
+  type HelixEnvironmentActionControlMcpExecutor,
   type HelixEnvironmentActionAuthorityLeaseExtender,
   type HelixEnvironmentProbeMcpExecutor,
   type HelixEnvironmentReasoningRoleMcpStore,
@@ -169,6 +170,7 @@ const situationObservation = (
 const connect = async (input: {
   scopes: readonly string[];
   executeAction: HelixEnvironmentActionMcpExecutor;
+  executeControl?: HelixEnvironmentActionControlMcpExecutor;
   executeProbe?: HelixEnvironmentProbeMcpExecutor;
   extendAuthority?: HelixEnvironmentActionAuthorityLeaseExtender;
   reasoningRoleService?: HelixEnvironmentReasoningRoleMcpStore;
@@ -197,9 +199,13 @@ const connect = async (input: {
       localSupervisorCoordinationStore: {
         serviceInstanceRef: "service:test", authenticateClient: vi.fn(),
       } as never,
-      reasoningTaskBindingStore: { verifyTaskAssociation: vi.fn() } as never,
+      // This admission-error fixture models a legacy binding, not a durable
+      // grant. The real durable identity/repository path is covered separately.
+      reasoningTaskBindingStore: { verifyTaskAssociation: vi.fn(),
+        resolveDurableBindingContext: vi.fn(() => null) } as never,
     } : {}),
     environmentActionExecutor: input.executeAction,
+    environmentActionControlExecutor: input.executeControl,
     environmentProbeExecutor: input.executeProbe,
     environmentActionAuthorityLeaseExtender: input.extendAuthority,
     environmentReasoningRoleService: input.reasoningRoleService,
@@ -230,6 +236,26 @@ afterEach(() => {
 });
 
 describe("Helix MCP Minecraft action boundary", () => {
+  it('transports historical workflow results separately from live status', async () => {
+    const native = {schema:'helix.environment_action.control_observation.v1',
+      control_request_ref:'control:test',workflow_ref:observation.workflow_ref,control_kind:'status',
+      outcome:'not_running',summary:'Not running.',affected_workflow_refs:[],workflow_state:null,
+      controls_released:false,evidence_refs:[],evidence_ref:'control-evidence:test',
+      observed_at:'2026-09-08T12:00:00.000Z',provenance_valid:true,eligible_for_current_turn_reentry:true,
+      content_role:'environment_action_control_observation_not_assistant_answer',reentry_required:true,
+      answer_authority:false,assistant_answer:false,terminal_eligible:false,raw_content_included:false} as const;
+    const connection = await connect({scopes:[HELIX_SHARED_LIVE_ROOM_READ_SCOPE,HELIX_ENVIRONMENT_ACTION_READ_SCOPE],
+      executeAction:vi.fn() as HelixEnvironmentActionMcpExecutor,
+      executeControl:vi.fn(async()=>({ok:true,status:'completed',summary:'Historical result; no current release claim.',
+        observation:native,retained_result:observation})) as HelixEnvironmentActionControlMcpExecutor});
+    try {
+      const result = await connection.client.callTool({name:'helix_minecraft_workflow_status',
+        arguments:{room_id:'shared_realtime_room:mcp',workflow_ref:observation.workflow_ref}});
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({ok:true,observation:native,retained_result:observation,
+        answer_authority:false,terminal_eligible:false});
+    } finally {await connection.close();}
+  });
   it("persists the exact fresh situation observation for owner-scoped durable re-entry", async () => {
     const observedAt = new Date(Date.now() - 1_000).toISOString();
     const probeObservation = {
@@ -765,11 +791,13 @@ describe("Helix MCP Minecraft action boundary", () => {
             kind: "perception_snapshot",
             horizontal_radius: 4,
             vertical_radius: 8,
+            include_navigation_collision: true,
           },
           capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
           arguments: {
             horizontal_radius: 4,
             vertical_radius: 8,
+            include_navigation_collision: true,
           },
         },
       ] as const;

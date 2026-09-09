@@ -21,6 +21,59 @@ This document is the roadmap for that comparison only. It does not replace the c
 
 User steering (September 7): prioritize a measurable signal in both experiments. Conditional local-null models remain comparison controls; they must not replace the measurable-overlap research priority. Do not manufacture a signal or relax physical constraints to achieve that priority.
 
+### Bosonic dark-matter motivation and recommendation order (September 8)
+
+User clarification: nonluminous boson stars as potential dark-matter structures motivate the connection to our gravitational calculations. Investigate a common bosonic field that could support dark structures and have testable detector consequences. Nonluminosity does not establish cosmological abundance, stability, or xenon interactions. Reference: [Dynamical Boson Stars](https://arxiv.org/abs/1202.5809).
+
+Revised order, building on the immutable [September 7 reuse audit](casimir-dp-detection-reuse-audit-2026-09-07.md):
+
+1. Define the bosonic hypothesis: field mass, self-interaction, ordinary-matter coupling, stability/abundance assumptions, and population. Distinguish bound stars, diffuse particles, coherent ambient fields, and encounters. Galactic mean density is not automatically continuous local flux for rare compact objects. This is candidate-neutral hypothesis specification, not selected NHM2 member evaluation.
+2. Build the detector-discrimination benchmark using that specification and common parameters. Predict applicable phase, force, coherence, recoil, heating and survival. Separate coherent-field response from independent-particle scattering. Preserve measurable-overlap priority, with complementary sensitivity and conditional nulls reported honestly.
+3. Add xenon companion-channel tests to candidates that pass recoil kinematic and rate checks. Include nuclear excitation when the interaction-specific target response is available. Not every bosonic model can explain the LZ event.
+4. Transfer boson-star source-to-geometry methods through existing NHM2 dependencies and independent apparatus closure. A numerical star solution does not establish a Casimir source or collapse mechanism. This update changes no selected member, runtime, proof status or execution authority.
+
+The organizing question is whether one specified bosonic dark sector can support a physically admissible dark population and predict discriminating laboratory signatures. The first implementation deliverable remains a reproducible detector comparison; the bosonic hypothesis now explicitly guides benchmark selection. Frozen apparatus inputs remain unchanged.
+
+### Planned boson-star to xenon simulation milestone (September 8)
+
+User-approved planning addition: connect a boson-star model to potential dark-matter particle flux and xenon recoil predictions through an explicit local population model.
+
+Prediction chain: specified bosonic field -> star structure and stability -> population near Earth -> particle flux or field encounter -> xenon detector response.
+
+Compare three separately specified population scenarios:
+
+- Diffuse component: a declared fraction of the same dark sector remains unbound; specify local density and velocity distribution.
+- Star encounter: derive time-dependent local field/density and velocities from a physically consistent encounter, including occurrence rate and duration. A coherent field requires an appropriate response calculation, not automatic conversion to independent particle collisions.
+- Released particles: specify a disruption or emission mechanism, energy/population budget and propagation to Earth before calculating flux. No unsupported steady leakage from a stable star.
+
+Required common inputs are boson mass, self-interactions, ordinary-matter coupling and population fractions. Star structure and stability must be checked in the applicable model, and each xenon channel must satisfy kinematics, target-response normalization and external constraints. Bound particles inside a star do not automatically constitute a continuous local halo flux. Use the same physical parameters throughout; do not tune separate detector couplings to reproduce the LZ candidate.
+
+First deliverable: side-by-side conditional predictions for star properties, local density/flux or field history, encounter probability where relevant, xenon recoil spectrum and event rate. Include stable-star cases with no accessible xenon signal, validity limits and missing detector inputs. Connect the admitted population scenarios to the planned interferometer-discrimination benchmark to retain the original measurable-overlap objective.
+
+Implementation order: freeze a candidate-neutral model/population interface; reproduce an independent published benchmark within its validity range; evaluate permitted source and population cases; fold qualified xenon response; compare discriminating observables and uncertainties. Reuse or execution of the selected NHM2 boson-star member remains subject to its canonical active gate and evidence dependencies. This planning addition grants no new selected-member execution or proof authority and does not alter frozen apparatus inputs or dated results.
+
+### Astronomy-constrained local population milestone (September 8)
+
+User-approved planning addition: combine galactic dynamics with astronomical searches for boson-star candidates to constrain the local population used in laboratory predictions. Local population means an inferred distribution near Earth, not creating or collecting dark matter in the laboratory.
+
+Execution sequence:
+
+1. Establish a local mass budget from Milky Way dynamics, including Gaia-based constraints and uncertainties in baryonic mass, geometry and equilibrium assumptions. Use published inference ranges initially; do not claim stellar kinematics uniquely determine the dark-particle velocity distribution. SPARC rotation curves and photometry may support an independent modeling benchmark, but external-galaxy fits do not directly measure the flux at Earth.
+2. Define population hypotheses with diffuse and bound fractions, boson-star mass/radius distributions, spatial distributions and velocities, consistent with the specified field model. Keep astrophysical object mass distinct from constituent particle mass. Carry uncertainty and explicit assumptions through to local predictions.
+3. Generate extended-object photometric and, where suitable, astrometric microlensing predictions from the admitted density profiles. Select an actually accessible survey product before implementation: public EROS/OGLE material or appropriate Gaia/Rubin products, subject to their available cadence, calibration, selection information and access conditions. Identify the user's boson-star rendering paper before adopting its model; none is identified yet. Rendered rings are illumination- and resolution-dependent predictions, not universal image templates.
+4. Validate a search with injected signals, survey cadence/noise, recovery efficiency and false-positive controls before inspecting candidates. Compare ordinary stellar variability, binaries, conventional lenses and instrumental artifacts. A candidate is not a boson-star identification. A null result constrains abundance only within the demonstrated selection function and assumed population.
+5. Translate surviving population ranges to laboratory inputs: continuous statistical particle flux for a justified diffuse component; encounter probability, duration and time-dependent density/field for bound structures. Include a released-particle component only with a specified production and propagation model. Use the applicable particle or coherent-field detector response, then calculate xenon spectra/rates and interferometer observables with consistent parameters.
+
+First astronomy deliverable: one reproducible published population/lensing benchmark and a versioned uncertainty/selection record feeding the detector-comparison interface. This planning addition does not initiate a bulk survey download, claim candidate discovery, substitute survey-average density for instantaneous laboratory density, or authorize selected NHM2 member execution. Existing program gates and frozen inputs remain unchanged.
+
+Primary starting references: [local dark-matter density review](https://arxiv.org/abs/2012.11477), [SPARC](https://astroweb.case.edu/SPARC/), [extended-object microlensing](https://arxiv.org/abs/2002.08962), [Rubin data access](https://rubinobservatory.org/for-scientists/data-products/data-access). Verify current release/access details when selecting data.
+
+### Identified imaging reference (September 8)
+
+The user supplied [Olivares et al., How to tell an accreting boson star from a black hole, arXiv:1809.08682v3](https://arxiv.org/html/1809.08682v3), resolving the rendering-paper input above. It models 230-GHz accretion images for EHT, with gravity-only scalar/plasma coupling and constituent masses around 1e-17 eV at the Sgr A* scaling. Model A is unstable; B is stable. Treat this as a source-to-observation benchmark, not a Rubin image template or a demonstrated xenon-scattering model.
+
+Planned intake: freeze the paper's model assumptions; assess metric, accretion and instrument-response reproducibility; separate stable from unstable controls; establish mass/kinematic compatibility before any laboratory transfer. Imaging and survey microlensing remain separate observable paths. No source model, simulation result or observational identification is imported into the selected NHM2 candidate by this reference.
+
 Working acceptance criteria:
 
 1. Specify the interaction, applicable approximations, units, particle mass/state populations, mediator parameters, target couplings and incident distribution.
@@ -39,6 +92,16 @@ The Stage-4.2R [readiness report](casimir-dp-integrated-feasibility-pilot-stage4
 At uncertainty equal to that ceiling, the conditional exothermic rigid-channel ceiling D=4.955410934904939e-8 would have signal/uncertainty about 8.52e-6, requiring approximately 586838-fold improvement in precision for SNR 5. This comparison inherits the magnetic-screen and rigid-channel assumptions and does not exclude every interaction. Compare 1-exp(-D), not D itself, with the visibility magnitude requirement.
 
 Absolute coherence and the four-cell boundary cross-ratio remain separate estimands. A factor identical in the active and reference cells cancels from the cross-ratio even if it changes absolute visibility. A boundary signal requires a model-specific difference plus covariance propagation. The eight absent empirical packets in the readiness report cannot be replaced by this design comparison.
+
+### Working hold choice after user delegation (September 7)
+
+The user authorized the assistant to choose the hold assumption. Use free evolution during the frozen 0.25-second hold for the next model comparisons. This is a research modelling choice, not measured apparatus behavior or hardware authorization. Preserve the frozen mass, geometry, separation and hold duration. Active trapping is a separate design alternative and must not be silently imported to rescue a candidate.
+
+Apply the existing <=10% displacement-growth criterion as a declared diagnostic, not as a newly measured tolerance. For the unstable linear-curvature model with zero initial relative velocity, d(t)/d(0)=cosh(omega t), giving f_allow=acosh(1.1)/(2 pi t)=0.282384 Hz. This criterion does not bound arbitrary time-dependent force histories, drift or recombination error.
+
+The archived [joint force/loop screen](casimir-dp-portal-joint-force-loop-2026-09-07.md) gives D<=1.4697e-28 for its restricted scalar family under this free-hold diagnostic and 10% loop-drift tolerance. Its dated statement that the hold question was unanswered remains an historical record; this entry resolves that choice prospectively. The scalar family is demoted for the registered design-scale signal. This is not a universal exclusion of extended interactions.
+
+Next-model admission must evaluate mean force, force gradient, momentum diffusion and branch survival together with coherence. A vanishing mean force alone does not establish undisturbed trajectories: fluctuations can heat or diffuse the sphere. A new microscopic mechanism must predict these quantities and xenon recoils with a common parameter set. No replacement interaction is admitted merely for having a small mean force.
 
 ## Frozen baseline and completed exclusions
 

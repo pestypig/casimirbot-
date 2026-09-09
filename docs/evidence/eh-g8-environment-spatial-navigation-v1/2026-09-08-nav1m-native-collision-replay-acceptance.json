@@ -1,0 +1,74 @@
+{
+  "schema": "nav1m.native_collision_replay_acceptance.v1",
+  "recorded_at": "2026-09-09 01:26:08 UTC",
+  "program_gate": "G8",
+  "maturity": "deterministically verified",
+  "scope": "Unregistered native helper and offline replay only",
+  "files": [
+    {
+      "path": "minecraft/helix-fabric-sensor/src/main/java/com/casimirbot/helixsensor/fabric/FabricNavigationCollisionFacts.java",
+      "sha256": "bb4328a68f00efc0319efac157560e4237a1dc35fb0528a8cd78039a05f7deee"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/main/java/com/casimirbot/helixsensor/fabric/FabricPerceptionSnapshot.java",
+      "sha256": "15770642fbd9604df64b9e4987e3f62e980150d2881ea12e478030a4e9a6ae7b"
+    },
+    {
+      "path": "minecraft/helix-fabric-sensor/src/test/java/com/casimirbot/helixsensor/fabric/FabricNavigationCollisionFactsTest.java",
+      "sha256": "86c4bc5849721af3b1d540d6510d82187dfdc82cf24cf60bdffa4bb207c7ca37"
+    },
+    {
+      "path": "server/services/environment-connectors/navigation/minecraft-native-collision-replay.ts",
+      "sha256": "3c41486d18d6c3ed870dc3cae11dc984c2ca1fab41c9336278121ee9e52bb7e2"
+    },
+    {
+      "path": "server/services/environment-connectors/navigation/__tests__/minecraft-native-collision-replay.test.ts",
+      "sha256": "aeaad1d388581fcfcdc43e3507e61c12acd8ded96a84db82329bdf3f1f18b93e"
+    },
+    {
+      "path": "docs/evidence/eh-g8-environment-spatial-navigation-v1/nav1m-native-stone-air-replay.json",
+      "sha256": "82e13c76c0778c2098ebed14c4e18f13de56f26500e7b6965dcfea99d539d149"
+    }
+  ],
+  "tests": {
+    "typescript": {
+      "new_replay": 12,
+      "prior_topology": 37,
+      "neutral": 15,
+      "total_passed": 64,
+      "failed": 0
+    },
+    "native": {
+      "new_measurement": 7,
+      "spatial_survey_regressions": 9,
+      "total_passed": 16,
+      "failed": 0
+    },
+    "targeted_typecheck": {
+      "diagnostics": 0,
+      "full_repository": false
+    }
+  },
+  "native_fixture": {
+    "cells": 100,
+    "expected_topology_nodes": 9,
+    "expected_topology_edges": 40,
+    "expected_frontiers": 8,
+    "source": "Minecraft 1.21.8 real BlockState/VoxelShape methods; EmptyBlockGetter and empty collision context in unit test",
+    "live_capture": false,
+    "identity_and_ticks": "synthetic fixture metadata"
+  },
+  "toolchain": {
+    "java": "21.0.12.1+1",
+    "gradle": "8.14.3",
+    "workers": 1,
+    "heap_mib": 768
+  },
+  "limitations": [
+    "No capture/transport registration or deployment.",
+    "Caller must enforce authoritative-thread same-tick selected-player capture and loaded/build-height checks.",
+    "Native block semantic support limited to air and measured stone/cobblestone/dirt/stone-bricks; hazards/fluids excluded; others unsupported.",
+    "Parsing does not authenticate source or authorize action.",
+    "No full NAV1, NAV-EQ, NAV8 or gameplay acceptance."
+  ]
+}

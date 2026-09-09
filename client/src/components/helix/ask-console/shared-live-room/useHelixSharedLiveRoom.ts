@@ -66,7 +66,7 @@ export type HelixSharedLiveRoomController = {
   clearError(): void;
   createRoom(title?: string): Promise<boolean>;
   joinRoom(inviteCode: string): Promise<boolean>;
-  openRoom(roomId: string): Promise<boolean>;
+  openRoom(roomId: string, signal?: AbortSignal): Promise<boolean>;
   createInvite(): Promise<boolean>;
   patchOwnConsent(consent: HelixSharedRealtimeRoomConsentPatch): Promise<boolean>;
   connectRuntime(): Promise<boolean>;
@@ -224,9 +224,13 @@ export function useHelixSharedLiveRoom(
     return true;
   }, [api, applyRoom, resetVisualIngress, runRoomAction]);
 
-  const openRoom = useCallback(async (roomId: string): Promise<boolean> => {
+  const openRoom = useCallback(async (roomId: string, signal?: AbortSignal): Promise<boolean> => {
     const nextRoom = await runRoomAction("open", () => api.getRoom(roomId));
-    if (!nextRoom) return false;
+    if (!nextRoom || signal?.aborted) return false;
+    if (nextRoom.room_id !== roomId || nextRoom.status === "closed") {
+      setError("The requested room is unavailable. No other room was selected.");
+      return false;
+    }
     resetVisualIngress();
     applyRoom(nextRoom);
     return true;

@@ -3314,7 +3314,7 @@ export const enqueueEnvironmentAction = async (input: {
 }, temporal?: {
   /** Internal only. No route/tool may expose this before resident delivery exists. */
   retention: Omit<Parameters<typeof retainTemporalAdmission>[1], "actionRequestId">;
-  revalidateTask: () => void;
+  revalidateTask: () => void | Promise<void>;
 }): Promise<HelixEnvironmentActionRequest> => {
   const proposalReceivedClock = readTemporalPublicationClock();
   const parsed = helixEnvironmentActionRequestSchema.safeParse(input.request);
@@ -3498,10 +3498,10 @@ export const enqueueEnvironmentAction = async (input: {
   }
   const retain = async (actionRequestId: string, unpublished = false) => {
     if (!temporal || !temporalRetention) return;
-    temporal.revalidateTask();
+    await temporal.revalidateTask();
     await retainTemporalAdmission(tx, { ...temporalRetention, actionRequestId, unpublished });
-    // Binding state is in-process, not transaction-owned. Check again after SQL.
-    temporal.revalidateTask();
+    // Binding authority is not owned by this transaction. Check again after SQL.
+    await temporal.revalidateTask();
   };
   if (!environmentActionStartDeadlineSupported(request.action_kind, request.arguments, capability?.execution_features)) {
     throw new EnvironmentActionBrokerError("action_policy_denied", 409,

@@ -1,0 +1,365 @@
+{
+  "scope": "Packaged restart rehearsal; partial recovery and reproduced control-poll failure, not CS1–CS4 or ET6 acceptance",
+  "exe_sha256": "ab241cc70b3ad6aa126c77049fe0aea902fb6ed9b238ef8981bd1e5cd9d64c89",
+  "service_ready_at": "2026-09-08T19:24:00.917Z",
+  "service_process_id": 34520,
+  "service_instance_ref": "service_instance:68f2a8b9e4da1f1005a90355b4809f02",
+  "launch": {
+    "old_exe_closed_normally": true,
+    "old_processes_absent_before_launch": true,
+    "native_launch_wait_timed_out": true,
+    "eventual_native_window_verified": true,
+    "db_restore_rows": 35244,
+    "db_restore_ms": 24836
+  },
+  "transport": {
+    "trusted_device_delegation_applied": true,
+    "manual_reconnect_requested": false,
+    "transition_request_ref": "desktop_tunnel_request:15697b5b-3f21-48ff-9ae8-2f9da06cfacb",
+    "full_scope_authority_inspection_succeeded": true
+  },
+  "authority": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:05934fca-87f1-4510-a8da-4be1d650f1cf",
+        "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+        "room_source_binding_id": "room_source_binding:5eaf90ee-96be-49da-88e7-02d978d35f44",
+        "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+        "source_id": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+        "world_id": "minecraft:minehut:479f4368-ada",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+        "subject_binding_id": "environment_subject_binding:27dfefd4-a04b-40dc-b105-9a8d4e4ab362",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.camera.track",
+          "com.casimirbot.minecraft.player.collect",
+          "com.casimirbot.minecraft.player.combat.attack",
+          "com.casimirbot.minecraft.player.combat.guard",
+          "com.casimirbot.minecraft.player.consume",
+          "com.casimirbot.minecraft.player.craft",
+          "com.casimirbot.minecraft.player.equipment.equip",
+          "com.casimirbot.minecraft.player.follow",
+          "com.casimirbot.minecraft.player.guardian.execute",
+          "com.casimirbot.minecraft.player.hotbar.select",
+          "com.casimirbot.minecraft.player.interact",
+          "com.casimirbot.minecraft.player.inventory.transfer",
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.mine",
+          "com.casimirbot.minecraft.player.navigate",
+          "com.casimirbot.minecraft.player.place",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.viability_guardian.arm",
+          "com.casimirbot.minecraft.player.viability_guardian.disarm",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 10,
+        "issued_at": "2026-09-08T18:52:15.427Z",
+        "expires_at": "2026-09-08T20:52:15.349Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:05934fca-87f1-4510-a8da-4be1d650f1cf",
+        "state": "ready",
+        "ready_for_actions": true,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-08T18:53:31.339Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": true,
+        "heartbeat_received_at": "2026-09-08T19:27:26.428Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "goal": {
+    "operation": "com.casimirbot.environment.durable_goal.inspect",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "ok": true,
+    "goal": {
+      "schema": "helix.environment_durable_goal_projection.v1",
+      "goal_id": "environment_durable_goal:9458d454ab92d2bb29ab89c74c330afe6043340dce93c434ed528b51d82602a8",
+      "revision": 1,
+      "latest_event_hash": "sha256:84ac1eb9838bd0d8c4e0b101f7c19513778b6889432c24cef5a06c0980d0f8d3",
+      "status": "active",
+      "objective": {
+        "objective_text": "Rehearse useful bounded continuous movement across the development course with three linked successor plans, fresh observation re-entry, and stop on human intervention or permission loss.",
+        "goal_kind": "custom_survival",
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "mechanics_collection_ref": null,
+        "milestones": [
+          {
+            "milestone_id": "bounded-course",
+            "description": "Traverse a freshly inspected bounded course through the real compiler, broker and resident executor; preserve interruption and revoke safety.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "three-linked-successors",
+              "fresh-observation-reentry",
+              "controls-released"
+            ]
+          }
+        ]
+      },
+      "identity": {
+        "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "host_ref": "environment_device:connector_device:legacy:2be81cc493f17699f4036bb8ddb93aaa1cf7f0ad",
+        "connector_installation_id": "connector_installation:legacy:748a2bdf41dda910086ae12c5c298b071fc44bab",
+        "device_id": "connector_device:legacy:2be81cc493f17699f4036bb8ddb93aaa1cf7f0ad",
+        "environment_binding_id": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+        "room_source_binding_id": "room_source_binding:5eaf90ee-96be-49da-88e7-02d978d35f44",
+        "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+        "goal_owner_participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+        "participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+        "authority_participant_id": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+        "subject_binding_id": "environment_subject_binding:27dfefd4-a04b-40dc-b105-9a8d4e4ab362",
+        "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+        "source_id": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+        "world_id": "minecraft:minehut:479f4368-ada",
+        "producer_epoch_ref": "environment_action_epoch:df3736a3-47e9-4281-bb8b-5f7c1e165c1b",
+        "action_authority_id": "environment_action_authority:05934fca-87f1-4510-a8da-4be1d650f1cf",
+        "authority_policy_version": 10,
+        "authority_expires_at": "2026-09-08T20:52:15.349Z",
+        "run_id": "run_4dcfd185-c553-420c-b653-d343aed95aa9",
+        "turn_id": "environment_session_goal:b91dfafa52bfb8177dbc9a916c73903d02840bcd8f8f954ee97091ce9189670c"
+      },
+      "active_milestone_id": null,
+      "milestones": [
+        {
+          "milestone_id": "bounded-course",
+          "description": "Traverse a freshly inspected bounded course through the real compiler, broker and resident executor; preserve interruption and revoke safety.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "three-linked-successors",
+            "fresh-observation-reentry",
+            "controls-released"
+          ],
+          "completed_postcondition_ids": []
+        }
+      ],
+      "recent_attempts": [],
+      "attempt_count": 0,
+      "latest_checkpoint": null,
+      "recovery": {
+        "required": false,
+        "reason": null,
+        "rebound_event_id": null
+      },
+      "consumed_semantic_wake_refs": [],
+      "event_refs": [
+        "environment_durable_goal_event:03126bf5-09e9-44a8-ab67-338e0e5b6bfe"
+      ],
+      "content_role": "environment_durable_goal_projection_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "content_role": "environment_durable_goal_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "presence": {
+    "ok": true,
+    "presence": {
+      "schema": "helix.local_supervisor_coordination.v1",
+      "service_instance_ref": "service_instance:68f2a8b9e4da1f1005a90355b4809f02",
+      "client_session_ref": "supervisor_client:51ad3b534d3aaa8238d3fac868e37038",
+      "conversation_thread_ref": "01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:ca070d77067993caefd14281d1e40fbad2437505cd284bd7812a3512649c74fb",
+      "declared_objective_summary": "Recover and verify the same retained run and goal after packaged service restart; poll exact-chat steering while active.",
+      "declared_objective_is_verified": false,
+      "lifecycle_basis": "authenticated_client_heartbeat",
+      "lifecycle_state": "active",
+      "thread_observability_bridge": {
+        "supported_levels": [
+          "tool_activity_only",
+          "checkpoint_publish",
+          "continuation_ready"
+        ],
+        "requested_level": "continuation_ready",
+        "checkpoint_publication": {
+          "freshness_window_seconds": 180,
+          "retention": "current_session",
+          "revocation": "independent"
+        },
+        "declaration_basis": "authenticated_client_declaration",
+        "provider_thread_content_included": false,
+        "hidden_reasoning_included": false,
+        "answer_authority": false,
+        "terminal_eligible": false
+      },
+      "resource_claims": [
+        {
+          "resource_ref": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+          "claim_class": "read",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:room_membership:a75b8387738a7c76bdf025c4256d33ee",
+          "collision_authority": false
+        },
+        {
+          "resource_ref": "run_4dcfd185-c553-420c-b653-d343aed95aa9",
+          "claim_class": "retained_runtime",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:retained_agent_run:904fa69d452ac5e72678fd2f6a6f1eed",
+          "collision_authority": true
+        },
+        {
+          "resource_ref": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+          "claim_class": "read",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:connector_source_epoch:92eaa734c9e5c5687488090651ce866f",
+          "collision_authority": false
+        }
+      ],
+      "room_ref": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+      "environment_ref": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+      "run_ref": "run_4dcfd185-c553-420c-b653-d343aed95aa9",
+      "verified_room_identity": {
+        "basis": "server_verified",
+        "room_ref": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+        "participant_ref": "shared_realtime_participant:16b39455-1f7b-4d6f-b4bb-0a3965f816e3",
+        "verification_ref": "supervisor_verification:room_membership:a75b8387738a7c76bdf025c4256d33ee"
+      },
+      "verified_connector_identity": {
+        "basis": "server_verified",
+        "environment_ref": "environment_binding:legacy:bbfc260b8f11ee109fc80bd8f1cc40d7df86e56b",
+        "connector_installation_ref": "connector_installation:legacy:748a2bdf41dda910086ae12c5c298b071fc44bab",
+        "source_ref": "source:room-ingress:d2cb0049-eb85-4e16-9389-60cf1de1196c",
+        "producer_epoch_ref": "adapter_epoch:d5557aba5e66b20e19f6be5f0ea36356479546fb",
+        "verification_ref": "supervisor_verification:connector_source_epoch:92eaa734c9e5c5687488090651ce866f"
+      },
+      "verified_retained_runtime_identity": {
+        "basis": "server_verified",
+        "run_ref": "run_4dcfd185-c553-420c-b653-d343aed95aa9",
+        "run_version": 2,
+        "run_room_binding_ref": "agent_room_binding:3f0ee8b9-10ab-4138-9b0c-833300ab6486",
+        "run_room_binding_version": 1,
+        "verification_ref": "supervisor_verification:retained_agent_run:904fa69d452ac5e72678fd2f6a6f1eed"
+      },
+      "verified_execution_lease_identity": null,
+      "blocker_summary": null,
+      "observed_at": "2026-09-08T19:29:37.839Z",
+      "heartbeat_expires_at": "2026-09-08T19:32:37.839Z",
+      "active": true,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "native_account_identity_included": false,
+      "content_role": "supervisor_presence_advisory",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "identity_basis": {
+      "authenticated_profile": "server_verified",
+      "authenticated_mcp_client": "server_verified",
+      "conversation_thread": "client_declared",
+      "client_session": "server_derived"
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "status_attempt": {
+    "operation": "minecraft.player.workflow.status",
+    "room_id": "shared_realtime_room:07c009a9-cb6f-44f9-a1c4-48baa2e079ef",
+    "ok": false,
+    "status": "failed",
+    "summary": "The player workflow control did not return before its deadline and was not replayed.",
+    "observation": {
+      "schema": "helix.environment_action.control_observation.v1",
+      "control_request_ref": "environment_action_control_uncreated:8930ef257fe013fd7ae78351915db062a596de34",
+      "workflow_ref": "workflow:cs3-calibration-20260908-1",
+      "control_kind": "status",
+      "outcome": "forbidden",
+      "summary": "The player workflow control did not return before its deadline and was not replayed.",
+      "affected_workflow_refs": [],
+      "workflow_state": null,
+      "controls_released": false,
+      "evidence_refs": [],
+      "evidence_ref": "environment_action_control_failure:8930ef257fe013fd7ae78351915db062a596de34",
+      "observed_at": "2026-09-08T19:28:15.304Z",
+      "provenance_valid": false,
+      "eligible_for_current_turn_reentry": false,
+      "content_role": "environment_action_control_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "diagnosed_failure": {
+    "control_request": "environment_action_control:a3dce123-d971-4ca5-8c94-294b8f3a8c99",
+    "created_at": "2026-09-08T19:27:45.269Z",
+    "deadline_at": "2026-09-08T19:28:15.265Z",
+    "status": "expired",
+    "leased_at": null,
+    "completed_at": "2026-09-08T19:28:15.304Z",
+    "result_count": 0,
+    "native_warning": "action_poll_unreachable",
+    "cause": "HTTP client sends the complete query-bearing poll URL to a resolver that rejects query-bearing inputs; heartbeat relocates but GET polls stay on the closed original port."
+  },
+  "other_open_boundaries": [
+    "Service-local reasoning binding is absent after restart. PNA3.4b requires epoch rotation; old claims must not be replayed.",
+    "EXE chat list shows only a new empty chat. Profile snapshot writes return 413; exact-chat recovery cause is not yet fully established.",
+    "Retained workflow status is not live-verified because current native status pickup timed out."
+  ],
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

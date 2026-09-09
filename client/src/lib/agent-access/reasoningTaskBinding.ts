@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type BrowserReasoningBinding = Readonly<{
   reasoning_binding_id: string;
+  pairing_id?: string;
   helix_conversation_id: string;
   status: "pending_claim" | "active" | "revoked" | "expired" | "superseded";
   continuation_transport: "polling" | "monitor_only" | "unavailable";
@@ -203,7 +204,10 @@ export const dispatchReasoningSteering = async (input: {
 );
 
 export const dispatchCurrentReasoningSteering = async (input: {
-  helixConversationId?: string;
+  helixConversationId: string;
+  bindingId: string;
+  bindingEpoch: number;
+  runId: string | null;
   clientEventRef: string;
   origin: "typed" | "gpt_live_finalized";
   instructionText: string;
@@ -213,9 +217,10 @@ export const dispatchCurrentReasoningSteering = async (input: {
     {
       method: "POST",
       body: JSON.stringify({
-        ...(input.helixConversationId
-          ? { helix_conversation_id: input.helixConversationId }
-          : {}),
+        helix_conversation_id: input.helixConversationId,
+        reasoning_binding_id: input.bindingId,
+        binding_epoch: input.bindingEpoch,
+        run_id: input.runId,
         client_event_ref: input.clientEventRef,
         origin: input.origin,
         instruction_text: input.instructionText,

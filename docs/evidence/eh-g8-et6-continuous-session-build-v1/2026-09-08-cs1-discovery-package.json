@@ -1,0 +1,31 @@
+{
+  "scope": "Package build and content equality; native rehearsal pending",
+  "output": "apps/desktop/release-cs1-discovery-20260908/win-unpacked",
+  "build_exit_code": 0,
+  "focused_tests_passed": 29,
+  "docs_audit_passed": true,
+  "discipline_quick_passed": true,
+  "runtime_files_compared": 645,
+  "runtime_mismatches": [],
+  "bundles": {
+    "main.cjs": {
+      "sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+      "matches": true
+    },
+    "preload.cjs": {
+      "sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+      "matches": true
+    },
+    "service.mjs": {
+      "sha256": "63e279200cbddcab0afa75bf6bd1cf76b86f95846fe0cbfcc40508fbb38250ec",
+      "matches": true
+    }
+  },
+  "exe_size": 225533440,
+  "exe_sha256": "9b1f40568a03b914fa4364d9faec5061ab05a4d611b9920c526c2dba82b21365",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false
+}

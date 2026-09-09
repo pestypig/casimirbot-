@@ -1,4 +1,4 @@
-import type { HelixReasoningTaskBindingStore } from "../../local-supervisor/reasoning-task-binding-store";
+import type { ReasoningTaskAssociationVerifier } from "../../local-supervisor/reasoning-binding-ports";
 import { listRoomEnvironmentProjections, refreshOwnRoomEnvironmentSubjectEpoch,
   RoomEnvironmentSubjectError } from "../subjects/subject-binding-store";
 import { readEnvironmentSessionReadiness, type EnvironmentSessionReadinessInput } from "./session-readiness";
@@ -19,7 +19,7 @@ const services = {
  */
 export async function readyUpEnvironmentSession(
   input: EnvironmentSessionReadinessInput,
-  bindingStore: Pick<HelixReasoningTaskBindingStore, "verifyTaskAssociation">,
+  bindingStore: ReasoningTaskAssociationVerifier,
   dependencies: typeof services = services,
 ) {
   const before = await dependencies.inspect(input, bindingStore);
@@ -38,7 +38,7 @@ export async function readyUpEnvironmentSession(
     const prior = selected?.self_subject_binding;
     if (prior && prior.subject_binding_id === input.subjectBindingId &&
         prior.participant_id === input.context.participantId && prior.status !== "revoked") {
-      bindingStore.verifyTaskAssociation(input.binding);
+      await bindingStore.verifyTaskAssociation(input.binding);
       try {
         const refreshed = await dependencies.refreshSubject({
           roomId: input.context.roomId, profileId: input.context.profileId,

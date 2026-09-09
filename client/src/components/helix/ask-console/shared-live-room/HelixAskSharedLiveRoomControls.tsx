@@ -31,6 +31,10 @@ export function HelixAskSharedLiveRoomControls({
   onOwnerRoomClosed,
 }: HelixAskSharedLiveRoomControlsProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [navigationRoomId, setNavigationRoomId] = useState<string | null>(null);
+  const navigationRead = useRef<AbortController | null>(null);
+  useEffect(() => () => navigationRead.current?.abort(), []);
+  const [navigationTarget, setNavigationTarget] = useState<{ environmentBindingId: string } | null>(null);
   const controller = useHelixSharedLiveRoom({
     realtimeSessionId,
     runtimeActive,
@@ -71,16 +75,37 @@ export function HelixAskSharedLiveRoomControls({
   useEffect(() => {
     const openDialog = (event: Event): void => {
       const expectedRoom = (event as CustomEvent<{ roomId?: unknown }>).detail?.roomId;
-      if (expectedRoom !== undefined && (typeof expectedRoom !== "string" ||
-          room?.room_id !== expectedRoom || room.status === "closed")) return;
+      const environmentBindingId = (event as CustomEvent<{ environmentBindingId?: unknown }>).detail?.environmentBindingId;
+      if (environmentBindingId !== undefined &&
+          (typeof environmentBindingId !== "string" || !environmentBindingId.trim() || expectedRoom === undefined)) return;
+      if (expectedRoom !== undefined && (typeof expectedRoom !== "string" || !expectedRoom.trim())) return;
+      const report = (event as CustomEvent<{ onResult?: unknown }>).detail?.onResult;
+      const reportResult = (opened: boolean) => { if (typeof report === "function") report(opened); };
+      if (expectedRoom === room?.room_id && room?.status === "closed") return;
+      navigationRead.current?.abort();
+      const read = new AbortController();
+      navigationRead.current = read;
       // An exact navigation request may check whether this controller handled
-      // it. This never joins a different room or changes any room consent.
+      // it. Opening an owned room is an authenticated read, never a join or
+      // consent change. Keep another displayed room hidden during recovery.
       if (expectedRoom !== undefined) event.preventDefault();
+      setNavigationTarget(typeof environmentBindingId === "string" ? { environmentBindingId } : null);
+      setNavigationRoomId(typeof expectedRoom === "string" ? expectedRoom : null);
+      if (typeof expectedRoom === "string" && room?.room_id !== expectedRoom) {
+        setDialogOpen(false);
+        void controller.openRoom(expectedRoom, read.signal).then(opened => {
+          if (read.signal.aborted) return;
+          setDialogOpen(opened);
+          reportResult(opened);
+        }).catch(() => { if (!read.signal.aborted) reportResult(false); });
+        return;
+      }
       setDialogOpen(true);
+      reportResult(true);
     };
     window.addEventListener(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT, openDialog);
     return () => window.removeEventListener(HELIX_SHARED_LIVE_ROOM_OPEN_DIALOG_EVENT, openDialog);
-  }, [room?.room_id, room?.status]);
+  }, [room?.room_id, room?.status, controller.openRoom]);
 
   useEffect(() => {
     onActiveRoomChange?.(room?.status === "closed" ? null : room?.room_id ?? null);
@@ -148,19 +173,20 @@ export function HelixAskSharedLiveRoomControls({
             ? "border-fuchsia-300/50 bg-fuchsia-400/15 text-fuchsia-100 hover:bg-fuchsia-400/20"
             : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
         }`}
-        onClick={() => setDialogOpen(true)}
+        onClick={() => { navigationRead.current?.abort(); setNavigationRoomId(null); setNavigationTarget(null); setDialogOpen(true); }}
       >
         <Users className="h-4 w-4" />
         <span>{roomButtonLabel}</span>
       </button>
 
-      {dialogOpen ? (
+      {dialogOpen && (!navigationRoomId || room?.room_id === navigationRoomId) ? (
         <SharedLiveRoomDialog
           room={room}
           controller={controller}
           titleId={titleId}
           descriptionId={descriptionId}
           onClose={closeDialog}
+          navigationTarget={navigationTarget}
           onVisualSourceCaptureRequested={onVisualSourceCaptureRequested}
           onHostTransportInvalidated={onHostTransportInvalidated}
           onOwnerRoomClosed={onOwnerRoomClosed}

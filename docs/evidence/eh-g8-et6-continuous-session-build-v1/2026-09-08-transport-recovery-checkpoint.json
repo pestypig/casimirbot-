@@ -1,0 +1,45 @@
+{
+  "scope": "Partial native transport recovery; not integrated session acceptance",
+  "continuation_ref": "01a081e3-1973-76a3-b35b-0bd6d541933d",
+  "running_package": "apps/desktop/release-cs1-discovery-20260908/win-unpacked/CasimirBot.exe",
+  "service_instance_ref": "service_instance:73a1a089091615f1b5e564b20c4dfc25",
+  "service_ready_at": "2026-09-08T17:17:54.398Z",
+  "service_process_id": 36552,
+  "local_listener_revalidated": true,
+  "initial_boundary": {
+    "presence_update": "HTTP 522",
+    "authorization_status": "HTTP 522",
+    "native_process_and_window_running": true
+  },
+  "recovery": {
+    "action": "Ordinary Refresh harness connection, once",
+    "authority": "Existing trusted Full Harness device policy",
+    "new_human_consent_automated": false,
+    "application_restart": false,
+    "binding_replaced": false,
+    "authorization_ready": true,
+    "authorization_expires_at": "2026-09-08T18:50:24.563Z",
+    "exact_presence_refreshed_at": "2026-09-08T17:50:36.984Z"
+  },
+  "subsequent_observations": {
+    "run_inspect": "HTTP 522; result unavailable",
+    "discover_runs": "Succeeded; zero eligible candidates",
+    "old_run_id": "run_69cb152a-dcb9-40ff-a988-d95e75acacff",
+    "old_run_deadline": "2026-09-08T17:43:50.629Z",
+    "native_binding_state": "active",
+    "run_deadline_extended": false
+  },
+  "limitations": [
+    "Recovery is partial: successful authorization and presence do not erase the later HTTP 522.",
+    "Retained runtime identity is not proof of an unexpired run budget.",
+    "No player permission, durable environment goal or gameplay was admitted.",
+    "The default-renderer, exact-room navigation and bootstrap-epoch source repairs are not in this running package."
+  ],
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "cs5_handoff_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

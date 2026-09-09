@@ -4,11 +4,11 @@ Capability or component: ENV-NAV1 — bounded spatial/topological evidence, goal
 Lifecycle stage: evidence normalization → intent arbitration → tool admission → execution → evidence re-entry → follow-up reasoning
 Reaction timescale: adapter cadence for local control and safety; short checkpoint horizons for route execution; semantic-event cadence for Codex replanning; durable milestones for longer objectives
 Authority owner: Runtime Codex selects the destination, policy and strategy; Helix owns identity, admission, effect bounds, provenance and terminal eligibility; the adapter owns evidence compilation; the admitted local planner/controller may choose only a route and trajectory inside the fixed destination, traversal, cost and safety envelope; the environment arbiter owns physical execution and release
-Current maturity: deterministically verified for NAV0; NAV1–NAV9 remain specified and depend on the open ET6 Minecraft capacity qualification
+Current maturity: deterministically verified for NAV0, NAV1-D synthetic topology, NAV1-M native measurement/replay and NAV1-C capture orchestration fixtures; remaining NAV1–NAV9 work stays specified; live executor integration depends on NAV-EQ
 Target maturity: deterministically verified provider-neutral contracts and Minecraft planner/controller, followed by live-accepted Minecraft A0/A1/B evidence and a non-shipping Baritone black-box comparison; FiveM remains a contract-only second-environment fixture in this packet
 Required evidence: strict schemas and adversarial fixtures; revision-bound coverage and topology; bounded search and trajectory budgets; checkpoint-linked temporal plans; obstacle, hazard, deviation and coverage-boundary replanning; local and user interruption latency; no duplicate effects; deterministic Minecraft courses; held-out black-box benchmark results; shipping-profile dependency exclusion; A0 direct, A1 authenticated MCP and B keyed Helix acceptance; and one non-Minecraft conformance fixture
 Explicit non-goals: no Baritone redistribution, shipping dependency, source translation, copied API or implementation structure; no FiveM/GTA runtime implementation in this packet; no unbounded world dump or generic physics engine; no planner-authored objective; no mining, building, combat, inventory mutation, teleportation or World Authority hidden inside movement-only navigation; no claim that reachability, distance, one local frontier or one benchmark course proves general navigation
-Downstream gate unlocked: after ET6 passes, Minecraft-native movement qualification for companion C4/S6 gather-and-craft, unknown-world Nether progression and later second-adapter navigation; no public companion mining or full Nether acceptance is authorized by this packet alone
+Downstream gate unlocked: after NAV-EQ passes, Minecraft-native movement qualification for companion C4/S6 gather-and-craft, unknown-world Nether progression and later second-adapter navigation; no public companion mining or full Nether acceptance is authorized by this packet alone
 
 # EH-G8 environment spatial navigation v1
 
@@ -23,10 +23,14 @@ progress, interruption and replanning through the existing Environment Time
 contract.
 
 This packet may be specified during G8 because it fixes schemas, authority and
-acceptance boundaries. Runtime implementation begins only after ET6 establishes
+acceptance boundaries. Live executor integration begins only after NAV-EQ establishes
 the Minecraft scheduler/controller/watchdog capacity envelope. That order
 prevents a new planner from hiding existing latency, stall or duplication
 problems.
+
+The NAV1-D offline slice below may compile bounded Minecraft evidence and run
+deterministic topology fixtures before that qualification. It cannot dispatch
+movement or establish scheduler timing, so it cannot hide execution stalls.
 
 “Baritone-class or better” is an evaluation target, not a product dependency or
 an architectural inheritance claim. Regardless of what upstream licensing may
@@ -59,6 +63,14 @@ evidence to a topology, route corridor, receding trajectory and truthful
 replanning lifecycle.
 
 ## Research conclusions
+
+The [2026-09-09 robotics/TAS methods review](../research/eh-nav-robotics-tas-methods-review-2026-09-09.md)
+compares this hierarchy with Nav2, predictive control, real-time design and
+Minecraft TAS instrumentation. It proposes explicit motion-model calibration,
+coverage/stopping envelopes, separate semantic/prediction/commit horizons,
+bounded local repair and ablation tests for NAV3–NAV6. These are design-review
+inputs, not adopted runtime changes or acceptance claims. Existing gate order,
+the NAV1-O pause, NAV-EQ requirements and non-shipping exclusions are unchanged.
 
 ### Non-shipping Baritone behavioral baseline
 
@@ -396,8 +408,110 @@ for structured evidence.
 | NAV8  | Live A0, authenticated MCP A1 and keyed Helix B Minecraft acceptance                 | exact goal/effect parity, activity/evidence re-entry, revoke and denial |
 | NAV9  | FiveM-shaped contract conformance fixture                                            | no Minecraft vocabulary in shared schemas; no live GTA claim            |
 
-NAV1 implementation cannot begin until ET6 has passed. NAV0 may proceed now.
+NAV1-D offline topology compilation and fixtures may proceed in parallel.
+Live executor integration requires live-accepted NAV-EQ execution qualification.
+See `docs/work-packets/eh-g8-nav-direct-mcp-execution-qualification-v1.md`.
+Full ET6 and room-driven steering retain their separate acceptance requirements.
 NAV8 does not authorize mining/building/combat or promote the Nether journey.
+
+## Current prerequisite revision — 2026-09-08
+
+NAV-EQ replaces full ET6 closure as the engineering prerequisite for NAV
+live executor integration. Its direct authenticated MCP trial must establish rolling
+execution, fresh observation re-entry, local/manual and direct-user
+interruption, reconnect, explicit revoke and zero duplicate or stale effects
+through the real temporal compiler, broker and executor. It is currently
+`specified`; this documentation revision does not unlock NAV1 by itself.
+
+Hosted-room message binding is an additional dependency for room-driven
+steering. Existing execution authorization checks remain enforced, even when
+the implementation stores them in a room context. Full ET6/CS1–CS5 criteria and
+NAV8's full A0/A1/B exits remain unchanged. The dated NAV0 record below retains
+the former ET6-only policy as history; this section governs current sequencing.
+
+## Personal-product alignment and NAV1-D — 2026-09-08
+
+This revision supersedes earlier blanket NAV implementation holds only for
+the explicitly offline NAV1-D scope. The [developer-platform product contract](../architecture/casimirbot-developer-platform-product-contract-v1.md)
+and [CFP-2.ONBOARD](eh-g8-cfp2-external-client-onboarding-v1.md) own the free
+personal tool journey. Navigation consumes their supported connection,
+identity, consent and recovery mechanisms. This task does not implement a
+parallel account system, direct-context service, SDK, billing flow or room
+onboarding workaround. CFP admission and release gates remain unchanged;
+neither the selected free offer nor local Minecraft tests close CFP-1 or G8.
+
+The next navigation-owned goal is **NAV1-D: deterministic Minecraft spatial
+evidence-to-topology qualification**. It is independent of an open execution
+prerequisite because it has no tool dispatch, native control or live authority
+mutation. It reuses the NAV0 neutral contracts and existing Minecraft sensor
+vocabulary; Minecraft geometry stays in the adapter, not shared required types.
+
+Scope and order:
+
+1. Inventory the exact sensor snapshot/frontier schemas and existing collision,
+   support and traversal facts. Identify gaps explicitly rather than inventing
+   passability from block names or treating omitted cells as air.
+2. Freeze small deterministic input fixtures and independently specified
+   expected nodes, edges, rejected transitions and unknown frontiers: flat
+   floor; diagonal corner obstruction; one-block ascent with and without
+   headroom; narrow/low cave; unsupported or unsafe descent; hazard detour;
+   truncated/unloaded coverage; changed observation or producer identity.
+3. Implement a pure, bounded, original topology compiler with no dispatch or
+   executor import. Preserve snapshot hash/revision, frame, epoch and evidence
+   lineage. Conservative unsupported geometry remains unknown or rejected.
+4. Test exact topology, deterministic output hashes, input ordering invariance,
+   resource bounds, and stale/cross-identity rejection. Keep the existing
+   non-voxel conformance fixture green. Do not claim a route-search engine from
+   topology tests; route planning remains NAV2.
+5. Where available, compare against consented read-only Minecraft captures or
+   controlled native fixtures. Record synthetic, replayed and live evidence
+   separately. Arena construction/reset needs separately scoped setup
+   authority; an already-open game does not prove reproducibility.
+
+Exit: bounded topology compiler and frozen deterministic tests, with exact
+unsupported geometry documented. No fluent movement, ordinary-user installed
+acceptance, NAV-EQ, NAV8, Nether or second-environment runtime claim.
+
+Personal onboarding/access remains product-owned. NAV-EQ consumes its actual
+execution readiness and measures rolling handoff, interruption and recovery;
+hosted subscription or collaboration acceptance is not a prerequisite for
+the free personal navigation path. Product catalog-count failures remain
+tracked by their owning packet, not silently reclassified as NAV failures.
+
+## NAV1-D deterministic acceptance — 2026-09-08
+
+Current NAV1-D evidence is recorded separately in
+`docs/work-packets/eh-g8-nav1d-offline-minecraft-topology-v1.md` and
+`docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-08-nav1d-offline-topology-acceptance.json`.
+That offline full-cube profile passed 37 new deterministic cases, 15 NAV0
+regressions and 9 existing native component tests. It introduces no live
+sensor wiring or executor integration. The NAV0 record below is historical;
+its blanket hold has been narrowly superseded by the NAV1-D revision above.
+
+## NAV1-M native measurement/replay — 2026-09-08
+
+The next bounded mapping slice is deterministically verified in
+`docs/work-packets/eh-g8-nav1m-native-collision-replay-v1.md`. Real Minecraft
+block-state and voxel-shape tests produced a replay consumed by the neutral
+topology bridge: 64 TypeScript tests and 16 native tests passed. This is an
+unregistered helper and offline replay, not selected-player world capture or
+full NAV1 acceptance. Next is authoritative-thread bounded capture wiring,
+under exact observation identity and coverage/clock checks. No game deployment
+or movement occurred; NAV-EQ still gates live executor integration.
+
+## NAV1-C bounded capture — 2026-09-08
+
+The follow-on observation integration is paused in progress at
+[NAV1-O](eh-g8-nav1o-admitted-collision-observation-v1.md). It has not advanced
+live maturity or unlocked movement; remaining verification is listed there.
+
+The unregistered capture primitive and deterministic boundary fixtures are
+recorded in `docs/work-packets/eh-g8-nav1c-bounded-native-capture-v1.md`.
+Sixty-five TypeScript and thirty native tests passed. The ServerLevel/player
+entry compiles; the tests inject thread/player/tick/clock state and do not
+prove live selected-player capture or the 20 ms elapsed budget in a running
+world. Next is admitted observation-path integration and read-only capture
+qualification. Full NAV1 and NAV-EQ remain open; no movement was dispatched.
 
 ## NAV0 deterministic acceptance — 2026-09-03
 
@@ -440,7 +554,7 @@ movement authority was introduced by NAV0.
 
 Stop the affected stage and retain its lower maturity when:
 
-- ET6 has not established the executor/watchdog capacity needed by NAV1–NAV5;
+- live executor integration is attempted before NAV-EQ establishes capacity;
 - shared schemas require Minecraft blocks/ticks or FiveM navmesh/ped types;
 - the planner executes through unknown coverage without explicit frontier
   permission;
@@ -466,8 +580,10 @@ Nether objective consume only a live-accepted Minecraft navigation profile;
 they do not absorb planner authority or bypass their own effect gates.
 
 ```text
-ET6 Minecraft capacity qualification
-  -> NAV0–NAV6 owned neutral/Minecraft navigation
+NAV0 contracts (deterministically verified)
+  -> NAV1-D offline Minecraft evidence/topology fixtures (parallel)
+  + product-owned personal MCP readiness -> NAV-EQ live execution qualification
+  -> remaining NAV1–NAV6 owned neutral/Minecraft navigation and integration
   -> NAV7 isolated black-box comparison
   -> NAV8 Minecraft A0/A1/B acceptance
   -> companion C4/S6 and unknown-world Nether compositions

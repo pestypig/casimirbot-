@@ -946,7 +946,8 @@ public final class FabricProbeExecutor {
             player,
             config,
             horizontalRadius,
-            verticalRadius
+            verticalRadius,
+            Boolean.TRUE.equals(target.get("include_navigation_collision"))
         );
         return success(
             probe,

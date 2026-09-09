@@ -1,0 +1,35 @@
+{
+  "schema": "casimirbot.environment_session.package_evidence.v1",
+  "date": "2026-09-08",
+  "stage": "CS1",
+  "package": "apps/desktop/release-cs1-run-handoff-20260908/win-unpacked",
+  "renderer_build": "passed",
+  "host_build": "passed",
+  "runtime_staging": "passed",
+  "packager_exit": "unobserved: process handle missing on resumed poll",
+  "artifact_verification": {
+    "runtime_files_compared": 645,
+    "runtime_mismatches": [],
+    "asar_entrypoints_match_built_outputs": true,
+    "main_cjs_sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+    "preload_cjs_sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+    "service_mjs_sha256": "908228683dad2da9969f63ba180305e3eb8569eb8e77a5fa028a498a80d5eb41",
+    "exe_sha256": "5516506bcd85ab17df975640331140dc8f8f89854c8732afd43550fcc72fd4ec"
+  },
+  "native_observations": [
+    "Previous EXE closed normally; process absence verified before launching replacement.",
+    "Initial launch reported no targetable window; live replacement processes were verified and not relaunched.",
+    "Service ready at 2026-09-08T04:29:47.940Z; PID 27080; origin http://127.0.0.1:61231.",
+    "Replacement native window 36637288 observed and activated.",
+    "Ordinary destination disclosure, Set up connection and Open Agent Access navigation succeeded.",
+    "Same-task authenticated presence on service_instance:f4fc67b928bef9c6eec7defb5a1178f7 advanced the panel to preparation controls.",
+    "No verified environment run is currently published; its checkbox remains disabled.",
+    "Current callable catalog contains no helix_environment_session_ready_up; no live prepare_run call was possible."
+  ],
+  "component_verification": "26 MCP coordination tests passed, including same-task publication and failed-publication retry without another run",
+  "consent_actions_automated": false,
+  "gameplay_executed": false,
+  "cs1_complete": false,
+  "et6_accepted": false,
+  "limitations": ["No signed installer verification", "No full typecheck claim", "No live preparation pickup or binding handoff proof"]
+}

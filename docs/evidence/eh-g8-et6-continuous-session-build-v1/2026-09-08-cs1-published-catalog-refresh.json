@@ -1,0 +1,28 @@
+{
+  "scope": "Connected app published metadata refresh; not current-task invocation or session readiness",
+  "date_utc": "2026-09-08",
+  "app_name": "CasimirBot Device Check v2",
+  "app_id": "asdk_app_6a91d26fb68481918606bfc290b2ab0d",
+  "surface": "Existing authenticated ChatGPT app Manage settings, Actions and Information",
+  "before": {
+    "ready_up_in_complete_accessibility_tree": false,
+    "ready_up_in_current_task_tool_enumeration": false
+  },
+  "action": "Clicked Information / Refresh once; no reconnect, authentication, permission change or EXE restart",
+  "after": {
+    "ready_up_in_refreshed_accessibility_tree": true,
+    "published_name": "helix_environment_session_ready_up",
+    "published_access": "WRITE",
+    "published_required_scopes": ["helix.environment_actions.write", "helix.rooms.read"],
+    "published_description_includes": ["read_preparation", "discover_runs", "prepare_run"],
+    "ready_up_row_marked_reconnect_needed": false,
+    "other_rows_marked_reconnect_needed": true,
+    "ready_up_in_current_task_tool_enumeration": false
+  },
+  "interpretation": "The saved app metadata was missing Ready up and now publishes it. This does not establish refresh of the active task's callable catalog, runtime scope admission, or successful preparation.",
+  "next_boundary": "Verify callable catalog delivery to this same task before invoking Ready up. Do not add duplicate server registration or substitute another tool as a transport.",
+  "environment_run_prepared": false,
+  "binding_changed": false,
+  "gameplay_executed": false,
+  "cs1_complete": false
+}

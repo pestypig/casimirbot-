@@ -1,4 +1,12 @@
 import express from "express";
+import crypto from "node:crypto";
+import { migration087 } from "../../db/migrations/087_pairing_ledger";
+import { PairingLedgerRepository } from "../../services/local-supervisor/pairing-ledger-repository";
+import { newDb } from "pg-mem";
+import { migration088 } from "../../db/migrations/088_pairing_destinations";
+import { migration089 } from "../../db/migrations/089_pairing_destination_identity";
+import { PairingDestinationRegistrationStore } from "../../services/local-supervisor/pairing-destination-registration";
+import { ephemeralPairingVault } from "../../services/local-supervisor/__tests__/pairing-vault-fixture";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import type { HelixLocalSupervisorPresence } from "@shared/helix-local-supervisor-coordination";
@@ -7,6 +15,8 @@ import { createAgentConnectionsRouter } from "../agent-connections";
 import { HelixReasoningTaskBindingStore } from
   "../../services/local-supervisor/reasoning-task-binding-store";
 import { EnvironmentDurableGoalError } from "../../services/environment-connectors/goals/durable-goal-store";
+import { EnvironmentSessionPreparationError } from "../../services/environment-connectors/session/preparation-error";
+import { EnvironmentSessionPreparationIntentStore } from "../../services/environment-connectors/session/preparation-intent-store";
 
 const SESSION_ID = "session-owned";
 const PROFILE_ID = "profile-owned";
@@ -60,9 +70,14 @@ const presence = (overrides: Partial<HelixLocalSupervisorPresence> = {}): HelixL
 });
 
 const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presence?: HelixLocalSupervisorPresence[];
+  destinationRegistrationStore?: Parameters<typeof createAgentConnectionsRouter>[0]["destinationRegistrationStore"];
+  pairingLedgerRepository?: Parameters<typeof createAgentConnectionsRouter>[0]["pairingLedgerRepository"];
+  readPairingDeviceTrust?: Parameters<typeof createAgentConnectionsRouter>[0]["readPairingDeviceTrust"];
+  validatePairingEnvironment?: Parameters<typeof createAgentConnectionsRouter>[0]["validatePairingEnvironment"];
   resolveRunAssociation?: Parameters<typeof createAgentConnectionsRouter>[0]["resolveRunAssociation"];
   prepareEnvironmentSession?: Parameters<typeof createAgentConnectionsRouter>[0]["prepareEnvironmentSession"];
   prepareBrowserSession?: Parameters<typeof createAgentConnectionsRouter>[0]["prepareBrowserSession"];
+  preparationIntentStore?: Parameters<typeof createAgentConnectionsRouter>[0]["preparationIntentStore"];
   readPreparationMembership?: Parameters<typeof createAgentConnectionsRouter>[0]["readPreparationMembership"] }) => {
   const listBindings = vi.fn(async () => ({
     schema: "helix.agent_account_bindings.v1" as const,
@@ -80,12 +95,17 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
   }));
   const app = express();
   app.use("/api/account", createAgentConnectionsRouter({
+    destinationRegistrationStore: input?.destinationRegistrationStore,
+    pairingLedgerRepository: input?.pairingLedgerRepository,
+    readPairingDeviceTrust: input?.readPairingDeviceTrust,
+    validatePairingEnvironment: input?.validatePairingEnvironment,
     bindingStore: { listBindings } as never,
     coordinationStore,
     reasoningBindingStore: reasoningStore,
     preparationBindingStore: reasoningStore,
     prepareEnvironmentSession: input?.prepareEnvironmentSession,
     prepareBrowserSession: input?.prepareBrowserSession,
+    preparationIntentStore: input?.preparationIntentStore,
     readPreparationMembership: input?.readPreparationMembership,
     resolveSession,
     resolveRunAssociation: input?.resolveRunAssociation,
@@ -99,11 +119,180 @@ const getReadiness = (app: express.Express, profile = "codex_app") =>
     .set("Cookie", `helix_session=${SESSION_ID}`);
 
 describe("owner-scoped AI app connection readiness", () => {
+  it("issues one encrypted invitation through the browser handler while idle and rejects changed authority", async () => {
+    const pool = new (newDb().adapters.createPg().Pool)();
+    await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
+    await pool.query("INSERT INTO helix_accounts VALUES ($1)", [PROFILE_ID]);
+    const dbClient = await pool.connect();
+    try { for (const migration of [migration087, migration088, migration089]) await migration.run(dbClient, { enablePgvector: false }); }
+    finally { dbClient.release(); }
+    vi.stubEnv("HELIX_DESKTOP_DEVICE_ID", "fixture-device");
+    try {
+      const vault = ephemeralPairingVault();
+      const store = new PairingDestinationRegistrationStore(pool, async () => {}, () => new Date(), vault);
+      const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
+      const registered = await store.registerAuthenticated({ issuer: opaque("issuer", binding.issuer), profileId: PROFILE_ID,
+        installationId: opaque("installation", "fixture-device"), clientId: "fixture-client", taskId: "fixture-exact-task" },
+      { requestId: "fixture-registration", durationSeconds: 900 });
+      const trust = vi.fn(async () => ({ trusted: true }) as never);
+      const environment = vi.fn(async () => false);
+      const h = setup({ presence: [], destinationRegistrationStore: store,
+        pairingLedgerRepository: new PairingLedgerRepository(pool, vault, async () => {}),
+        readPairingDeviceTrust: trust, validatePairingEnvironment: environment,
+        readPreparationMembership: async () => ({ participantId: "fixture-participant", roomStatus: "open" }) as never });
+      const body = { requestId: "fixture-issue", registrationId: registered.registrationId, chatId: "fixture-chat",
+        environment: null, invitationSeconds: 900, pairingSeconds: 28800 };
+      h.resolveSession.mockImplementation(async (...args: unknown[]) => args[0] === SESSION_ID
+        ? { session_id: SESSION_ID, profile: { profile_id: PROFILE_ID } } : null as never);
+      const modelOnly = await request(h.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Authorization", "Bearer fixture-model-credential").send(body);
+      expect(modelOnly.status).toBe(401);
+      const issue = (value = body) => request(h.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", `helix_session=${SESSION_ID}`).send(value);
+      const results = await Promise.all([issue(), issue()]);
+      expect(results.map(result => result.status)).toEqual([200, 200]);
+      expect(results[0].body).toEqual(results[1].body);
+      expect(results[0].body).toMatchObject({ ok: true, pairing: { state: "pending", executionAuthority: false } });
+      expect(results[0].body.pairing.destinationDigest).toBe(registered.destinationDigest);
+      const listed = await request(h.app).get("/api/account/session/agent-connections/reasoning-destinations")
+        .set("Cookie", `helix_session=${SESSION_ID}`);
+      expect(listed.status).toBe(200);
+      expect(listed.body.destinations[0].destinationDigest).toBe(results[0].body.pairing.destinationDigest);
+      expect(results[0].headers["cache-control"]).toBe("no-store");
+      expect((await issue({ ...body, chatId: "fixture-changed-chat" })).status).toBe(409);
+      const rejectedEnvironment = await issue({ ...body, requestId: "fixture-environment",
+        environment: { roomId: "fixture-room", runId: "fixture-run" } } as never);
+      expect(rejectedEnvironment.status).toBe(409);
+      expect(rejectedEnvironment.body.error).toBe("pairing_environment_unavailable");
+      expect((await issue({ ...body, origin: "gpt_live" } as never)).status).toBe(400);
+      trust.mockResolvedValueOnce({ trusted: false } as never);
+      expect((await issue()).status).toBe(403);
+      h.resolveSession.mockResolvedValueOnce(null as never);
+      expect((await issue()).status).toBe(401);
+      const pairingPath = `/api/account/session/agent-connections/reasoning-pairings/${encodeURIComponent(results[0].body.pairing.id)}`;
+      const read = () => request(h.app).get(pairingPath).set("Cookie", `helix_session=${SESSION_ID}`);
+      const revoke = (value = {}) => request(h.app).post(`${pairingPath}/revoke`)
+        .set("Cookie", `helix_session=${SESSION_ID}`).send(value);
+      const pending = await read();
+      expect(pending.status).toBe(200);
+      expect(pending.body.pairing).toEqual(results[0].body.pairing);
+      const reconciliationPath = `/api/account/session/agent-connections/reasoning-invitations/${body.requestId}`;
+      const reconciliation = await request(h.app).get(reconciliationPath).set("Cookie", `helix_session=${SESSION_ID}`);
+      expect(reconciliation.status).toBe(200);
+      expect(reconciliation.body.pairing).toEqual(pending.body.pairing);
+      expect(JSON.stringify(reconciliation.body)).not.toContain(results[0].body.invitation.secret);
+      expect((await request(h.app).get(reconciliationPath)).status).toBe(401);
+      h.resolveSession.mockResolvedValueOnce({ session_id: "fixture-foreign-session", profile: { profile_id: "fixture-foreign-owner" } });
+      const foreignReconciliation = await request(h.app).get(reconciliationPath).set("Cookie", `helix_session=${SESSION_ID}`);
+      expect(foreignReconciliation.body.pairing).toBeNull();
+      expect(pending.headers["cache-control"]).toBe("no-store");
+      expect(JSON.stringify(pending.body)).not.toContain(results[0].body.invitation.secret);
+      expect((await request(h.app).get(pairingPath)).status).toBe(401);
+      expect((await request(h.app).post(`${pairingPath}/revoke`)
+        .set("Authorization", "Bearer fixture-model-credential").send({})).status).toBe(401);
+      expect((await revoke({ profile_id: PROFILE_ID, human_approved: true })).status).toBe(400);
+      h.resolveSession.mockResolvedValueOnce({ session_id: "fixture-foreign-session",
+        profile: { profile_id: "fixture-foreign-owner" } });
+      expect((await read()).status).toBe(404);
+      h.resolveSession.mockResolvedValueOnce({ session_id: "fixture-foreign-session",
+        profile: { profile_id: "fixture-foreign-owner" } });
+      expect((await revoke()).status).toBe(404);
+      trust.mockResolvedValue({ trusted: false } as never);
+      const revocations = await Promise.all([revoke(), revoke()]);
+      expect(revocations.map(result => result.status)).toEqual([200, 200]);
+      expect(revocations[0].body).toEqual(revocations[1].body);
+      expect(revocations[0].body).toMatchObject({ runtime_binding_active: false,
+        pairing: { state: "revoked", revision: 2, executionAuthority: false } });
+      expect(revocations[0].body.pairing.pairingExpiresAt).toBe(results[0].body.pairing.pairingExpiresAt);
+      expect((await read()).body).toEqual(revocations[0].body);
+      expect((await revoke()).body).toEqual(revocations[0].body);
+      const rows = (await pool.query("SELECT * FROM helix_pairing_ledger")).rows;
+      expect(rows).toHaveLength(1);
+      expect(JSON.stringify(rows)).not.toContain(results[0].body.invitation.secret);
+    } finally { vi.unstubAllEnvs(); await pool.end(); }
+  });
+  it("lists encrypted registered destinations while idle using only browser session ownership", async () => {
+    const pool = new (newDb().adapters.createPg().Pool)();
+    await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
+    await pool.query("INSERT INTO helix_accounts VALUES ($1), ($2)", [PROFILE_ID, "fixture-foreign-owner"]);
+    const client = await pool.connect();
+    try { await migration088.run(client, { enablePgvector: false }); await migration089.run(client, { enablePgvector: false }); }
+    finally { client.release(); }
+    try {
+      const store = new PairingDestinationRegistrationStore(pool, async () => {}, () => new Date("2026-09-08T12:00:00Z"), ephemeralPairingVault());
+      const destination = { issuer: "fixture-issuer", profileId: PROFILE_ID, installationId: "fixture-install",
+        clientId: "fixture-client", taskId: "fixture-owner-task" };
+      await store.registerAuthenticated(destination, { requestId: "fixture-own", durationSeconds: 900 });
+      await store.registerAuthenticated({ ...destination, profileId: "fixture-foreign-owner", taskId: "fixture-private-other-task" },
+        { requestId: "fixture-other", durationSeconds: 900 });
+      const h = setup({ presence: [], destinationRegistrationStore: store });
+      const result = await request(h.app).get("/api/account/session/agent-connections/reasoning-destinations?profile_id=fixture-foreign-owner");
+      expect(result.status).toBe(200);
+      expect(result.headers["cache-control"]).toBe("no-store");
+      expect(result.body.destinations).toHaveLength(1);
+      expect(result.body.destinations[0]).toMatchObject({ destination, currentPresence: false, pairingAuthority: false });
+      expect(JSON.stringify(result.body)).not.toContain("fixture-private-other-task");
+      h.resolveSession.mockResolvedValueOnce(null as never);
+      expect((await request(h.app).get("/api/account/session/agent-connections/reasoning-destinations")).status).toBe(401);
+    } finally { await pool.end(); }
+  });
+  it("routes repeated browser requests through the real mailbox and rejects stale target delivery", async () => {
+    const row = presence({ observed_at: new Date().toISOString(),
+      heartbeat_expires_at: new Date(Date.now() + 120000).toISOString() });
+    const mailbox = new EnvironmentSessionPreparationIntentStore({ serviceInstanceRef: SERVICE_REF,
+      listPresence: () => [row] }, async input => {
+      if (input.roomId !== "room:owned") throw new Error("room_not_owned");
+    });
+    const harness = setup({ presence: [row], preparationIntentStore: mailbox });
+    const send = (requestId: string) => request(harness.app)
+      .post("/api/account/session/agent-connections/environment-session/prepare-request")
+      .set("Cookie", `helix_session=${SESSION_ID}`).send({ request_id: requestId,
+        client_session_ref: row.client_session_ref, client_continuation_ref: row.conversation_thread_ref,
+        helix_conversation_id: "chat:local", room_id: "room:owned", requested_duration_seconds: 28800 });
+    const replies = await Promise.all(["window:a", "window:b", "window:c"].map(send));
+    expect(replies.map(reply => reply.status)).toEqual([202, 202, 202]);
+    expect(new Set(replies.map(reply => reply.body.intent.intentId)).size).toBe(1);
+    const target = { profileRef: PROFILE_ID, authenticatedMcpClientRef: "mcp-client-owned",
+      clientSessionRef: "client-session-owned", continuationRef: "thread-owned" };
+    expect(mailbox.read(target)).toHaveLength(1);
+    expect(() => mailbox.read({ ...target, continuationRef: "different-task" })).toThrow();
+    row.active = false;
+    expect((await send("window:a")).status).toBe(409);
+    expect(() => mailbox.read(target)).toThrow("preparation_target_unavailable");
+  });
+  it("requests pre-binding setup as the browser owner and rejects forged ownership or unlinked access", async () => {
+    const enqueue = vi.fn().mockResolvedValue({ intentId: "intent:a", status: "pending",
+      origin: "authenticated_browser_setup", execution_authority: false });
+    const harness = setup({ preparationIntentStore: { request: enqueue } });
+    const body = { request_id: "request:a", client_session_ref: "client-session-owned",
+      client_continuation_ref: "thread-owned", helix_conversation_id: "chat:local",
+      room_id: "room:owned", requested_duration_seconds: 28800 };
+    const send = (app: typeof harness.app, payload: object) => request(app)
+      .post("/api/account/session/agent-connections/environment-session/prepare-request")
+      .set("Cookie", `helix_session=${SESSION_ID}`).send(payload);
+    const result = await send(harness.app, body);
+    expect(result.status).toBe(202);
+    expect(result.body).toMatchObject({ ready: false, execution_authority: false,
+      task_binding_authority: false, intent: { status: "pending" } });
+    expect(enqueue).toHaveBeenCalledWith({ requestId: "request:a", profileRef: PROFILE_ID,
+      clientSessionRef: "client-session-owned", continuationRef: "thread-owned",
+      helixConversationId: "chat:local", roomId: "room:owned", requestedDurationSeconds: 28800 });
+    expect((await send(harness.app, { ...body, profileRef: "foreign" })).status).toBe(400);
+    const unlinked = setup({ bindings: [], preparationIntentStore: { request: enqueue } });
+    expect((await send(unlinked.app, body)).status).toBe(403);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
   it("prepares as the browser owner without accepting or exposing provider identity", async () => {
     const prepare = vi.fn().mockResolvedValue({ readiness: { ready: false }, repairs: [],
       execution_authority: false, answer_authority: false, terminal_eligible: false });
     const membership = vi.fn().mockResolvedValue({ participantId: "participant-owned", roomStatus: "active" });
-    const automatic = vi.fn().mockResolvedValue({ readiness: { ready: false }, repairs: [] });
+    const blockedPreparation = { readiness: { ready: false, valid_until_ms: null,
+      checks: [{ layer: "authority", state: "revoked", human_approval_required: true }] },
+      selection: { room_id: "room-owned", environment_binding_id: "environment-owned" },
+      session_deadlines: { run_expires_at_ms: 1900000000000 }, repairs: [],
+      execution_authority: false, answer_authority: false, terminal_eligible: false };
+    const automatic = vi.fn().mockResolvedValue(blockedPreparation);
     const harness = setup({ prepareEnvironmentSession: prepare, prepareBrowserSession: automatic, readPreparationMembership: membership,
       presence: [presence({ observed_at: new Date().toISOString(),
         heartbeat_expires_at: new Date(Date.now() + 120_000).toISOString(),
@@ -134,20 +323,38 @@ describe("owner-scoped AI app connection readiness", () => {
       context: expect.objectContaining({ profileId: PROFILE_ID, participantId: "participant-owned" }),
       binding: expect.objectContaining({ clientContinuationRef: "thread-owned", profileRef: PROFILE_ID }),
     });
-    expect(prepare.mock.calls[0][1] === harness.reasoningStore).toBe(true);
+    const verifier = prepare.mock.calls[0][1];
+    const verifiedTarget = prepare.mock.calls[0][0].binding;
+    await expect(verifier.verifyTaskAssociation(verifiedTarget)).resolves.toEqual(
+      harness.reasoningStore.verifyTaskAssociation(verifiedTarget));
+    await expect(verifier.verifyTaskAssociation({ ...verifiedTarget, clientContinuationRef: "thread:foreign" }))
+      .rejects.toThrow("reasoning_binding_task_association_mismatch");
+    const goalBootstrap = { environment_binding_id: "environment-owned", subject_binding_id: "subject-owned",
+      action_authority_id: "authority-owned", objective: { domain: "minecraft", goal_kind: "custom_survival",
+        objective_text: "Cross the platform", game_version: "1.21.8", mechanics_collection_ref: null,
+        milestones: [{ milestone_id: "cross", description: "Cross", dependency_milestone_ids: [], required_postcondition_ids: ["arrival"] }] } };
     const automaticBody = { reasoning_binding_id: bound.reasoning_binding_id, binding_epoch: bound.binding_epoch,
-      helix_conversation_id: "chat-owned", mission_id: null, run_id: "run-owned", request_id: "ready-up:one" };
+      helix_conversation_id: "chat-owned", mission_id: null, run_id: "run-owned", request_id: "ready-up:one",
+      goal_bootstrap: goalBootstrap };
     const automaticResponse = await post(automaticBody as typeof body).expect(200);
     expect(automaticResponse.body.requested_by).toBe("authenticated_browser_owner");
+    expect(automaticResponse.body).toMatchObject(blockedPreparation);
     expect(automatic.mock.calls[0][0]).toEqual({ sessionId: SESSION_ID, profileRef: PROFILE_ID,
       bindingId: bound.reasoning_binding_id, bindingEpoch: bound.binding_epoch,
-      helixConversationId: "chat-owned", missionId: null, runId: "run-owned", requestId: "ready-up:one" });
-    expect(automatic.mock.calls[0][1] === harness.reasoningStore).toBe(true);
+      helixConversationId: "chat-owned", missionId: null, runId: "run-owned", requestId: "ready-up:one",
+      goalBootstrap });
+    await expect(automatic.mock.calls[0][1].verifyTaskAssociation(verifiedTarget)).resolves.toEqual(
+      harness.reasoningStore.verifyTaskAssociation(verifiedTarget));
     automatic.mockRejectedValueOnce(new EnvironmentDurableGoalError("durable_goal_session_ambiguous", 409,
       "private backend context must not be returned"));
     const ambiguous = await post(automaticBody as typeof body).expect(409);
     expect(ambiguous.body.error).toBe("durable_goal_session_ambiguous");
     expect(JSON.stringify(ambiguous.body)).not.toContain("private backend");
+    const partialError = new EnvironmentSessionPreparationError(new Error("private detail"),
+      [{ layer: "subject", changed: true, reason_code: "subject_epoch_checked" }], true);
+    automatic.mockRejectedValueOnce(partialError);
+    const partial = await post(automaticBody as typeof body).expect(500);
+    expect(partial.body).toEqual(partialError.projection);
     await post({ ...body, helix_conversation_id: "other-chat" }).expect(409);
     await post({ ...body, client_continuation_ref: "forged" } as typeof body).expect(400);
     membership.mockResolvedValueOnce(null);
@@ -163,8 +370,14 @@ describe("owner-scoped AI app connection readiness", () => {
   it("binds only the explicitly selected current run and preserves the claim on stale selection", async () => {
     const association = { run_id: "run-owned", run_version: 2, room_id: "room-owned",
       room_binding_id: "room-binding-owned", room_binding_version: 3, verification_ref: "verified-run-2" };
-    const resolveRunAssociation = vi.fn(async () => association);
+    // Match the real resolver: its finite deadline must survive the strict
+    // readiness projection, not turn a successfully prepared run into HTTP 500.
+    const resolveRunAssociation = vi.fn(async () => ({ ...association,
+      run_expires_at: "2099-01-01T00:00:00.000Z" }));
     const harness = setup({ resolveRunAssociation });
+    const ready = await getReadiness(harness.app).expect(200);
+    expect(ready.body.verified_run_association).toEqual({ ...association,
+      run_expires_at: "2099-01-01T00:00:00.000Z" });
     const post = (body: Record<string, unknown>) => request(harness.app)
       .post("/api/account/session/agent-connections/reasoning-bindings/claims")
       .set("Cookie", `helix_session=${SESSION_ID}`).send({
@@ -450,12 +663,32 @@ describe("owner-scoped AI app connection readiness", () => {
       answer_authority: false,
       terminal_eligible: false,
     });
+    const exactTarget = { reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch, run_id: binding.run_id ?? null };
+    for (const chat of [undefined, "", "   "]) {
+      await request(harness.app)
+        .post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
+        .set("Cookie", `helix_session=${SESSION_ID}`)
+        .send({ ...exactTarget, helix_conversation_id: chat, client_event_ref: "ambiguous-event",
+          origin: "typed", instruction_text: "Do not pick a chat for this request" })
+        .expect(400);
+    }
+    for (const changed of [{ binding_epoch: binding.binding_epoch + 1 },
+      { reasoning_binding_id: "binding:replaced" }, { run_id: "run:other" }]) {
+      await request(harness.app)
+        .post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
+        .set("Cookie", `helix_session=${SESSION_ID}`)
+        .send({ ...exactTarget, ...changed, helix_conversation_id: "helix-chat-owned",
+          client_event_ref: "stale-target-event", origin: "typed", instruction_text: "Do not retarget" })
+        .expect(409);
+    }
     const currentDispatch = await request(harness.app)
       .post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
       .set("Cookie", `helix_session=${SESSION_ID}`)
       .send({
         helix_conversation_id: "helix-chat-owned",
         client_event_ref: "current-event",
+        ...exactTarget,
         origin: "typed",
         instruction_text: "Private current-binding steering text",
       })
@@ -472,12 +705,27 @@ describe("owner-scoped AI app connection readiness", () => {
       terminal_eligible: false,
     });
     expect(JSON.stringify(currentDispatch.body)).not.toContain("Private current-binding");
+    const displayPath = `/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(binding.reasoning_binding_id)}/chat-prompts`;
+    const displayQuery = { binding_epoch: binding.binding_epoch, helix_conversation_id: "helix-chat-owned",
+      ...(binding.run_id ? { run_id: binding.run_id } : {}) };
+    const display = await request(harness.app).get(displayPath).query(displayQuery)
+      .set("Cookie", `helix_session=${SESSION_ID}`).expect(200);
+    expect(display.body).toMatchObject({ display_only: true, provider_pickup_confirmed: false, answer_authority: false });
+    expect(display.body.deliveries).toEqual(expect.arrayContaining([expect.objectContaining({
+      instruction_text: "Private current-binding steering text",
+      event: expect.objectContaining({ delivery_state: "pending" }),
+    })]));
+    await request(harness.app).get(displayPath).query({ ...displayQuery, helix_conversation_id: "foreign-chat" })
+      .set("Cookie", `helix_session=${SESSION_ID}`).expect(409);
+    harness.resolveSession.mockResolvedValueOnce(null as never);
+    await request(harness.app).get(displayPath).query(displayQuery).expect(401);
     await request(harness.app)
       .post("/api/account/session/agent-connections/reasoning-bindings/steering/current")
       .set("Cookie", `helix_session=${SESSION_ID}`)
       .send({
         helix_conversation_id: "helix-chat-other",
         client_event_ref: "wrong-chat-event",
+        ...exactTarget,
         origin: "typed",
         instruction_text: "Must not fall back to the latest binding",
       })

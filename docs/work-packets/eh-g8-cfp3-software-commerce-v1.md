@@ -1,6 +1,6 @@
 Program gate: G8 — Environment-harness release evaluation
 Workstream: CFP-3.COMMERCE candidate implementation contract
-Capability or component: Selected software plan purchase, portal and authoritative sandbox lifecycle
+Capability or component: Selected hosted collaboration subscription purchase, portal and authoritative sandbox lifecycle
 Lifecycle stage: tool admission; evidence normalization; presentation
 Reaction timescale: durable implementation planning; runtime limits must be frozen by CFP-1
 Authority owner: Commerce implementer; identity and ledger reviewer; one attended sandbox operator; product owner retains commercial and release decisions
@@ -10,7 +10,7 @@ Required evidence: CFP-1 closure, CFP-2 completion, rights and terms freeze, exa
 Explicit non-goals: no dispatch from this draft, no production charging/publication, source privatization, automatic rights clearance, capability promotion, or replacement agent runtime
 Downstream gate unlocked: CFP-4 integrated same-signed-artifact acceptance only after parent CFP-3 evidence closure
 
-# CFP-3.COMMERCE — Selected software plan purchase, portal and authoritative sandbox lifecycle
+# CFP-3.COMMERCE — Selected hosted collaboration subscription purchase, portal and authoritative sandbox lifecycle
 
 Status: candidate child packet, NOT DISPATCHABLE. Owner-selected bounded
 Minecraft assistance is a product direction, not permission for paid Minecraft
@@ -23,6 +23,14 @@ Parent packet: `docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md`
 Stage and task ID: CFP-3.COMMERCE.
 Change classification: tool admission; evidence normalization; presentation.
 Current stage authority: `docs/helix-environment-harness-work-program-v1.md`.
+
+
+Offer precedence (owner selection 2026-09-08): the complete supported personal
+MCP experience is free; subscription gates hosted collaboration only. Apply
+CFP-1's "Selected offer: free personal tools, paid hosted collaboration" section
+to all older paid-software, evaluation and entitlement wording below. Freeze
+exact capability/scenario mapping before dispatch. No payment fixture, trial
+expiry or purchase may become a requirement for the personal customer path.
 
 ## Admission prerequisites
 
@@ -49,9 +57,9 @@ or expiry semantics during implementation.
 
 Owner/reviewer responsibilities: Commerce implementer; identity and ledger reviewer; one attended sandbox operator.
 
-Allowed files: server/routes/desktop-auth0-step-up.ts; server/routes/installed-account-services.ts; server/routes/stripe-sandbox-webhook.ts; server/services/helix-account/billing-entitlement-store.ts and targeted tests; shared/helix-billing-entitlement.ts only for explicitly reviewed backward-compatible changes; new software SKU/event adapter and tests at paths frozen at dispatch. No production keys, provider-spend execution, price activation, repository visibility or release workflow changes.
+Allowed files: server/routes/desktop-auth0-step-up.ts; server/routes/installed-account-services.ts; server/routes/stripe-sandbox-webhook.ts; server/services/helix-account/billing-entitlement-store.ts and targeted tests; shared/helix-billing-entitlement.ts only for explicitly reviewed backward-compatible changes; new hosted subscription SKU/event adapter and tests at paths frozen at dispatch. No production keys, provider-spend execution, price activation, repository visibility or release workflow changes.
 
-Implement the subscription-only initial offer: no credit top-ups, credit bundles, provider enrollment or CasimirBot-funded inference. Reuse applicable subscription and webhook foundations without exposing historical prepaid products in this checkout. Earlier entitlement draft credit scenarios are outside initial-offer acceptance; existing ledger checks are regression checks only where shared code is touched. Map the owner-selected subscription SKU to independent software grants through verified authoritative events. Specify software-subscription refunds, cancellation scheduling versus paid-period end, failed-payment policy, equal-time event reconciliation, duplicate replay and restart persistence. Expose owner-authorized public purchase/account management with scoped fresh step-up, preserving developer access. Keep existing provider ledger semantics and SPB stage order. This packet provides deterministic and deployed attended sandbox evidence only.
+Implement the subscription-only initial offer: no credit top-ups, credit bundles, provider enrollment or CasimirBot-funded inference. Reuse applicable subscription and webhook foundations without exposing historical prepaid products in this checkout. Earlier entitlement draft credit scenarios are outside initial-offer acceptance; existing ledger checks are regression checks only where shared code is touched. Map the owner-selected subscription SKU to independent hosted-collaboration grants through verified authoritative events. Specify hosted-subscription refunds, cancellation scheduling versus paid-period end, failed-payment policy, equal-time event reconciliation, duplicate replay and restart persistence. Expose owner-authorized public purchase/account management with scoped fresh step-up, preserving developer access. Keep existing provider ledger semantics and SPB stage order. This packet provides deterministic and deployed attended sandbox evidence only.
 
 The coordinator freezes exact file ownership before dispatch. Shared builder,
 schema or handler files have one writer; changes required by another packet
@@ -61,6 +69,10 @@ No shared service restart is implied by this packet.
 
 The [subscription-only ENT reconciliation](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-subscription-only-03/subscription-offer-reconciliation.md) controls the initial
 offer's scenario meanings over the earlier entitlement draft.
+
+Apply the [domain/account delivery contract](../architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md)
+and its DOM-01–07 cases to this component's assigned ownership; coordinate
+shared identity, database and deployment files before implementation.
 
 ## Acceptance and commands
 
@@ -77,7 +89,7 @@ npx vitest run server/routes/__tests__/stripe-sandbox-webhook.test.ts server/rou
 npm run helix:environment-harness:docs-audit
 ```
 
-Proposed software-SKU event, public-owner step-up and partial-refund classification tests require named files frozen at dispatch. Deployed sandbox checkout/portal/refund/webhook replay uses an attended test-account session and an explicit sandbox resource reservation. Do not invent a live command or invoke checkout as an unattended test fixture.
+Proposed hosted-SKU event, public-owner step-up and partial-refund classification tests require named files frozen at dispatch. Deployed sandbox checkout/portal/refund/webhook replay uses an attended test-account session and an explicit sandbox resource reservation. Do not invent a live command or invoke checkout as an unattended test fixture.
 
 Read applicable repository/adapter contracts and skills before implementation.
 Run the narrowest meaningful checks for actual edits. If release verification,

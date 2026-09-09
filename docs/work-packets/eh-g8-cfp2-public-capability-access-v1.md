@@ -19,13 +19,21 @@ Stage and task ID: CFP-2.PUBLIC.
 Change classification: tool admission; source admission.
 Stage authority: [canonical program](../helix-environment-harness-work-program-v1.md).
 
+
+Offer precedence (owner selection 2026-09-08): the complete supported personal
+MCP experience is free; subscription gates hosted collaboration only. Apply
+CFP-1's "Selected offer: free personal tools, paid hosted collaboration" section
+to all older paid-software, evaluation and entitlement wording below. Freeze
+exact capability/scenario mapping before dispatch. No payment fixture, trial
+expiry or purchase may become a requirement for the personal customer path.
+
 ## Frozen prerequisites and bounds
 
 Read [CFP-1](eh-g8-cfp1-product-rights-and-offer-contract-v1.md), the [controlling task proposal](eh-g8-cfp1-bounded-assistance-acceptance-v1.md), [route and primitive inspection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md), and [CFP-0 audit](../audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md). Freeze exact versions/hardware/fixtures, final numeric limits, owners and source hashes before dispatch. The earlier six-resource collection proposal is not this task.
 
 Minecraft EULA/Usage Guidelines commercialization and indirect product-access restrictions require review of the full design, including evaluation admission. No free-mod/paid-harness separation or test fixture establishes permission. Required approval of that boundary cannot be substituted by an engineering test. Existing independently authorized environment packets retain their own scope.
 
-CFP-2 proves pre-release ordinary-user capability using the parent-defined trusted evaluation interface. It does not implement or accept commercial purchase/expiry/refund behavior reserved for CFP-3. Bind evaluation provenance, issuer, profile/node/capability/revision/expiry to the isolated run manifest. Customer inputs cannot mint grants or change roles; reject enabled evaluation fixtures in commercial packages. Repeat the full positive and negative journey with real verified grants in CFP-3 and the same signed commercial artifact in CFP-4.
+CFP-2 proves free ordinary-user personal capability with trusted profile/node, client scope, owner/target consent and effect authority. No purchase, expiring trial or commercial/evaluation software grant is required. Test fixture isolation is not customer eligibility. CFP-3 adds hosted grants only to hosted requests; repeat never-subscribed and expired-hosted personal journeys in CFP-3/4.
 
 ## Work and file ownership
 
@@ -33,7 +41,7 @@ Owner and reviewer: Account/room-policy implementer; independent authorization r
 
 Allowed files: shared/helix-account-session.ts; server/routes/agi.realtime-room/http-context.ts and the exact lifecycle/participant/environment/pairing routes in the CFP1 route addendum; server/services/shared-live-room-control/service.ts; server/routes/helix-shared-live-rooms.ts; selected MCP and workstation-gateway handlers only; targeted tests.
 
-Introduce the trusted eligibility interface and isolated pre-release evaluation adapter defined in CFP1. Make exact owner-work-room creation, own consent/pairing/player binding, selected narrow capability reads/actions and native lifecycle reachable to ordinary users. Reuse one trusted decision at browser/API/MCP/service boundaries. Keep invitations, other members, admin commands, unrestricted room controls and unrelated actions denied. Preserve developer superset and no-session user semantics. Never expose raw connector credential routes through the wizard.
+Implement the parent-defined free-personal authorization predicates using existing account, target and consent policy. Make exact owner-work-room creation, own consent/pairing/player binding, selected narrow capability reads/actions and native lifecycle reachable to ordinary users. Reuse one trusted decision at browser/API/MCP/service boundaries. Keep invitations, other members, admin commands, unrestricted room controls and unrelated actions denied. Preserve developer superset and no-session user semantics. Never expose raw connector credential routes through the wizard.
 
 One coordinator allocates shared files and one operator reserves each installed node, server, client/game session and evaluation profile. No concurrent test may restart or mutate those resources without that reservation. Read AGENTS.md, environment reasoning/dual-plane and relevant PNA/loop contracts before edits.
 

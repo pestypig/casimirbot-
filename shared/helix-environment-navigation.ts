@@ -1071,6 +1071,7 @@ export const validateHelixEnvironmentNavigationPlanContext = (input: {
     }
   }
   if (request.destination.kind === "coordinate_radius") {
+    const destinationCoordinate = request.destination.coordinate;
     if (request.destination.coordinate.length !== snapshot.bounds.axes.length) {
       reasons.push("destination_dimension_mismatch");
     } else if (plan.plan_kind === "complete_route") {
@@ -1078,7 +1079,7 @@ export const validateHelixEnvironmentNavigationPlanContext = (input: {
       const distance = terminal
         ? Math.sqrt(
             terminal.position.reduce((sum, coordinate, index) => {
-              const delta = coordinate - request.destination.coordinate[index];
+              const delta = coordinate - destinationCoordinate[index];
               return sum + delta * delta;
             }, 0),
           )

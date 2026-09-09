@@ -11,10 +11,10 @@ and required evidence are maintained only in
 
 ## Commercial delivery direction
 
-The selected product direction is a paid installed CasimirBot harness for users
+The selected product direction is a free personal CasimirBot harness with paid hosted collaboration for users
 of an existing supported reasoning application, with Codex App as the first
-polished connection profile. Users purchase CasimirBot's environment
-capabilities, maintained integrations, updates, and support. The ordinary
+polished connection profile. Personal supported tools are free; subscriptions
+fund maintained hosted collaboration, integrations, updates and support. The ordinary
 external-client journey does not require a second bundled model runtime,
 provider-key enrollment, or CasimirBot-funded inference. Any required hosted
 coordination must be costed into the subscription. Managed model/API consumption
@@ -25,8 +25,8 @@ implementation where ownership and dependency obligations permit, with
 deliberately selected public contracts, examples, and components. Existing
 licensed copies and third-party obligations require a rights/distribution
 review; this specification changes no license or repository visibility.
-An indefinitely free full harness is not a product requirement. Trial/demo
-scope, commercial term, offline allowance, and expiry behavior must be frozen
+The complete supported single-person MCP experience is free. Paid hosted
+collaboration terms, any hosted trial, offline allowance and expiry must be frozen
 before dependent implementation; stop, revocation, export, and account recovery
 must remain available under the defined lifecycle.
 
@@ -45,13 +45,27 @@ commercial classification/permission and the component-rights review remain
 open; this selection does not approve a paid mod or paid in-game access check.
 The broad acceptance requirements below remain unchanged.
 
-The owner selected recurring subscription for the broader harness. Minecraft
+The owner selected recurring subscription for hosted collaboration and free personal tools. Minecraft
 is a visible proof of concept among its capability combinations, not the
 whole paid product or a selected Minecraft-only action subscription. Reuse
 existing Stripe subscription groundwork. The initial offer excludes provider
 credits and CasimirBot-funded inference, including managed GPT Live. Component rights are established through
 ownership or sufficient existing licenses, with unclear material separately
 resolved or excluded; no blanket assignment or relicense is inferred.
+
+The base journey is connect, approve a clear scope, use the program, stop and
+return without manual connection repair. Room-to-task steering is a separate
+capability and must not be a user-facing prerequisite to ordinary tool access.
+The controlling scope and acceptance split is in CFP-1; broader G8 obligations
+remain unchanged. This is a product requirement, not current-runtime acceptance.
+
+Authenticated hosted collaboration is the leading paid-service candidate:
+maintained room hosting, scoped participant access to owner-shared program
+capabilities, revocation/recovery, action history and connector support. It does
+not grant another person's model account or subscription. Security boundaries
+apply regardless of payment; room eligibility never replaces consent. Prove
+the personal tool loop first, then the invite/grant/use/revoke/reconnect journey
+specified in CFP-1. Payer roles, guest policy and price-tier mapping remain open.
 
 ## Product thesis
 
@@ -105,6 +119,25 @@ can discover governed capabilities. It is not the environment credential or
 execution authority. A narrower southbound connector protocol binds the local
 companion to the exact program, user, device, world, document, session or other
 environment subject.
+
+## Domain and delivery
+
+The [domain, accounts and delivery plan](casimirbot-domain-accounts-and-delivery-plan-v1.md)
+connects the public landing/download page, browser collaboration service and
+free personal desktop harness to one development source and shared contracts.
+The backend durable database binds authenticated accounts to verified hosted
+subscriptions; program owners grant action access separately. Replit is a
+deployment target, not a forked product or authoritative local billing snapshot.
+
+## Developer platform direction
+
+The [developer platform product contract](casimirbot-developer-platform-product-contract-v1.md)
+defines the intended integration kit: typed program capabilities, free personal
+MCP use, and owner-authorized collaboration through shared platform services.
+Developers supply native program behavior; the harness supplies reviewed
+connection and permission infrastructure; the external client owns reasoning.
+Independent developer onboarding and a non-Minecraft integration must prove
+this generality before it becomes a release claim.
 
 ## Enabled capability baseline
 
